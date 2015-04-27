@@ -240,3 +240,44 @@ env.CppUnitTest(
         'update_index_data',
     ],
 )
+
+# This library exists because some libraries, such as our networking library, need access to server
+# options, but not to the helpers to set them from the command line.  libserver_options_core.a just
+# has the structure for storing the server options, while libserver_options.a has the code to set
+# them via the command line.
+env.Library(
+    target="server_options_core",
+    source=[
+        "server_options.cpp",
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/bson',
+    ],
+)
+
+env.Library(
+    target="server_options",
+    source=[
+        "server_options_helpers.cpp",
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/bson',
+        '$BUILD_DIR/mongo/util/cmdline_utils/cmdline_utils',
+        # The dependency on network is a temporary crutch that should go away once the
+        # networking library has separate options
+        '$BUILD_DIR/mongo/util/net/network',
+        '$BUILD_DIR/mongo/util/options_parser/options_parser',
+        'server_options_core',
+        'server_parameters',
+    ],
+)
+
+env.CppUnitTest(
+    target='server_options_test',
+    source=[
+        'server_options_test.cpp',
+    ],
+    LIBDEPS=[
+        'server_options',
+    ],
+)

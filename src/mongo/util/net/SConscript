@@ -9,7 +9,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/util/foundation',
-        '$BUILD_DIR/mongo/server_options_core',
+        '$BUILD_DIR/mongo/db/server_options_core',
     ],
 )
 
@@ -39,7 +39,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/util/background_job',
         '$BUILD_DIR/mongo/util/fail_point',
-        '$BUILD_DIR/mongo/server_options_core',
+        '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/util/concurrency/ticketholder',
         '$BUILD_DIR/mongo/util/foundation',
         '$BUILD_DIR/mongo/util/options_parser/options_parser',

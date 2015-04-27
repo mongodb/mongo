@@ -317,7 +317,7 @@ coredbEnv.Library("coredb", [
                            'db/startup_warnings_common',
                            '$BUILD_DIR/mongo/util/foundation',
                            '$BUILD_DIR/third_party/shim_snappy',
-                           'server_options',
+                           'db/server_options',
                            '$BUILD_DIR/mongo/util/cmdline_utils/cmdline_utils',
                            '$BUILD_DIR/mongo/logger/parse_log_component_settings',
                            '$BUILD_DIR/mongo/client/clientdriver',
@@ -469,28 +469,6 @@ serverOnlyFiles = [ "db/background.cpp",
                     "util/compress.cpp",
                     "util/logfile.cpp",
                 ]
-
-# This library exists because some libraries, such as our networking library, need access to server
-# options, but not to the helpers to set them from the command line.  libserver_options_core.a just
-# has the structure for storing the server options, while libserver_options.a has the code to set
-# them via the command line.
-env.Library("server_options_core", ["db/server_options.cpp"],
-            LIBDEPS=['bson'])
-
-env.Library("server_options", [
-                    "db/server_options_helpers.cpp"
-                    ],
-            LIBDEPS=['bson',
-                     'util/net/network', # temporary crutch that should go away once the networking
-                                # library has separate options
-                     'server_options_core',
-                     'db/server_parameters',
-                     '$BUILD_DIR/mongo/util/cmdline_utils/cmdline_utils',
-                     '$BUILD_DIR/mongo/util/options_parser/options_parser',
-                    ])
-
-env.CppUnitTest('server_options_test', 'db/server_options_test.cpp',
-                LIBDEPS=['server_options'])
 
 env.CppUnitTest('v8_deadline_monitor_test', 'scripting/v8_deadline_monitor_test.cpp', LIBDEPS=[])
 
@@ -772,7 +750,7 @@ env.Library(
 
 # mongod options
 env.Library("mongod_options", ["db/mongod_options.cpp"],
-            LIBDEPS=['server_options',
+            LIBDEPS=['db/server_options',
                      'mongocommon',
                      'serveronly',
                      'coreserver',
