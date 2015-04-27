@@ -380,7 +380,7 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 		 * for locks or our caller hasn't allowed us to take the schema
 		 * lock - they do so on purpose and will handle error returns.
 		 */
-		if (LF_ISSET(WT_DHANDLE_LOCK_ONLY) ||
+		if ((LF_ISSET(WT_DHANDLE_LOCK_ONLY) && ret == EBUSY) ||
 		    (!F_ISSET(session, WT_SESSION_SCHEMA_LOCKED) &&
 		    F_ISSET(session,
 		    WT_SESSION_HANDLE_LIST_LOCKED | WT_SESSION_TABLE_LOCKED)))
