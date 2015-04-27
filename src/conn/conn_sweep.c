@@ -113,6 +113,11 @@ __sweep_expire(WT_SESSION_IMPL *session)
 		    !__wt_txn_visible_all(session, btree->rec_max_txn))
 			goto unlock;
 
+		/*
+		 * Mark the handle as dead and close the underlying file
+		 * handle. Closing the handle decrements the open file count,
+		 * meaning the close loop won't overrun the configured minimum.
+		 */
 		if (F_ISSET(dhandle, WT_DHANDLE_OPEN))
 			WT_WITH_DHANDLE(session, dhandle, ret =
 			    __wt_conn_btree_sync_and_close(session, 0, 1));
