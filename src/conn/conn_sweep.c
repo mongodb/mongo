@@ -9,11 +9,12 @@
 #include "wt_internal.h"
 
 /*
- * __sweep_count --
- *	Count if there are dead handles.
+ * __sweep_mark --
+ *	Mark idle handles with a time of death, and note if we see dead
+ *	handles.
  */
 static int
-__sweep_count(WT_SESSION_IMPL *session, int *dead_handlesp)
+__sweep_mark(WT_SESSION_IMPL *session, int *dead_handlesp)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle;
@@ -50,11 +51,12 @@ __sweep_count(WT_SESSION_IMPL *session, int *dead_handlesp)
 }
 
 /*
- * __sweep_mark_dead --
- *	Mark any old files dead.
+ * __sweep_expire --
+ *	Mark trees dead if they are clean and haven't been accessed recently,
+ *	until we have reached the configured minimum number of handles.
  */
 static int
-__sweep_mark_dead(WT_SESSION_IMPL *session)
+__sweep_expire(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
 	WT_CONNECTION_IMPL *conn;
@@ -229,7 +231,7 @@ __sweep_server(void *arg)
 	conn = S2C(session);
 
 	/*
-	 * Sweep for dead handles.
+	 * Sweep for dead and excess handles.
 	 */
 	while (F_ISSET(conn, WT_CONN_SERVER_RUN) &&
 	    F_ISSET(conn, WT_CONN_SERVER_SWEEP)) {
@@ -238,21 +240,21 @@ __sweep_server(void *arg)
 		    (uint64_t)conn->sweep_interval * WT_MILLION));
 
 		/*
-		 * Ignore in-use files once the open file count reaches the
-		 * minimum number of handles.
+		 * Mark handles with a time of death, and report whether any
+		 * handles are marked dead.
 		 */
-		if (conn->open_file_count < conn->sweep_handles_min)
+		WT_ERR(__sweep_mark(session, &dead_handles));
+
+		if (dead_handles == 0 &&
+		    conn->open_file_count < conn->sweep_handles_min)
 			continue;
 
-		/* Sweep the handles. */
-		WT_ERR(__sweep_count(session, &dead_handles));
-
-		if (dead_handles == 0)
-			continue;
-
-		WT_WITH_DHANDLE_LOCK(session,
-		    ret = __sweep_mark_dead(session));
-		WT_ERR(ret);
+		/* Close handles if we have reached the configured limit */
+		if (conn->open_file_count >= conn->sweep_handles_min) {
+			WT_WITH_DHANDLE_LOCK(session,
+			    ret = __sweep_expire(session));
+			WT_ERR(ret);
+		}
 
 		WT_ERR(__sweep_flush(session));
 
