@@ -6,7 +6,7 @@ port = allocatePorts(1);
 
 baseName = "stat_header";
 
-m = _startMongod("--port", port[0], "--dbpath", MongoRunner.dataPath + baseName + port[0], "--nohttpinterface", "--bind_ip", "127.0.0.1");
+m = startMongod("--port", port[0], "--dbpath", MongoRunner.dataPath + baseName + port[0], "--nohttpinterface", "--bind_ip", "127.0.0.1");
 
 clearRawMongoProgramOutput();
 
