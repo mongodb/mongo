@@ -470,17 +470,6 @@ serverOnlyFiles = [ "db/background.cpp",
                     "util/logfile.cpp",
                 ]
 
-env.CppUnitTest("scoped_db_conn_test", [ "client/scoped_db_conn_test.cpp" ],
-                 LIBDEPS=[
-                    "coredb",
-                    "coreserver",
-                    "s/coreshard",
-                    "mongocommon",
-                    "message_server_port",
-                    "s/mongoscore",
-                    "util/ntservice_mock"],
-                 NO_CRUTCH=True)
-
 env.CppUnitTest('config_server_tests', [ 's/config_server_tests.cpp' ],
                 LIBDEPS=[ "s/mongoscore",
                           "s/coreshard",

@@ -59,3 +59,20 @@ if env['MONGO_BUILD_SASL_CLIENT']:
         ],
         SYSLIBDEPS=saslLibs,
     )
+
+env.CppUnitTest(
+    target="scoped_db_conn_test",
+    source=[
+        "scoped_db_conn_test.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/coredb",
+        "$BUILD_DIR/mongo/coreserver",
+        "$BUILD_DIR/mongo/message_server_port",
+        "$BUILD_DIR/mongo/mongocommon",
+        "$BUILD_DIR/mongo/s/coreshard",
+        "$BUILD_DIR/mongo/s/mongoscore",
+        "$BUILD_DIR/mongo/util/ntservice_mock",
+    ],
+    NO_CRUTCH=True,
+)
