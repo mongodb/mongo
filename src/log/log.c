@@ -397,7 +397,7 @@ __log_decrypt(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out)
 	WT_DECL_RET;
 	WT_ENCRYPTOR *encryptor;
 	WT_KEYED_ENCRYPTOR *kencryptor;
-	size_t decrypted_size, result_len, src_len;
+	size_t encryptor_data_len, result_len;
 	uint32_t clear_cksum, unpadded_len;
 	uint8_t *dst, *src;
 
@@ -414,9 +414,8 @@ __log_decrypt(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out)
 	 * There are a lot of sizes and offsets to keep track of here.
 	 * unpadded_len: the size of the encrypted log record in memory.  This
 	 *	was the encrypted log record size before log padding.
-	 * decrypted_size: the size of the original data including
-	 *	the log header.
-	 * src_len: the final size of the encrypted data without the log header.
+	 * encryptor_data_len: the final size of the encrypted data
+	 *	without the log header and internal information.
 	 * result_len: the final decrypted size to use for checksum.
 	 *
 	 * For the decrypted output, we need to allocate a buffer large
@@ -435,14 +434,15 @@ __log_decrypt(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out)
 	WT_ERR(__wt_buf_initsize(session, *out, unpadded_len));
 
 	src = (uint8_t *)in->mem + WT_LOG_ENCRYPT_SKIP + WT_ENCRYPT_LEN;
-	src_len = unpadded_len - WT_LOG_ENCRYPT_SKIP - WT_ENCRYPT_LEN;
+	encryptor_data_len = 
+	    unpadded_len - WT_LOG_ENCRYPT_SKIP - WT_ENCRYPT_LEN;
 	dst = (uint8_t *)(*out)->mem + WT_LOG_ENCRYPT_SKIP;
 	/*
 	 * Copy in the skipped header bytes.
 	 */
 	memcpy((*out)->mem, in->mem, WT_LOG_ENCRYPT_SKIP);
-	WT_ERR(encryptor->decrypt(encryptor, &session->iface, src, src_len,
-	    dst, unpadded_len - WT_LOG_ENCRYPT_SKIP, &result_len));
+	WT_ERR(encryptor->decrypt(encryptor, &session->iface,
+	    src, encryptor_data_len, dst, encryptor_data_len, &result_len));
 
 	/*
 	 * Verify the checksum of the pre-encrypted data matches a checksum

@@ -22,7 +22,7 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	WT_ENCRYPTOR *encryptor;
 	const WT_PAGE_HEADER *dsk;
-	size_t result_len, skip;
+	size_t encryptor_data_len, result_len, skip;
 	uint32_t clear_cksum, encrypt_len;
 	uint8_t *dst;
 
@@ -72,11 +72,11 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 
 		memcpy(buf->mem, tmp->data, skip);
 		dst = (uint8_t *)buf->mem + skip;
+		encryptor_data_len = encrypt_len - skip - WT_ENCRYPT_LEN;
 		ret = encryptor->decrypt(
 		    encryptor, &session->iface,
 		    (uint8_t *)tmp->data + skip + WT_ENCRYPT_LEN,
-		    encrypt_len - skip - WT_ENCRYPT_LEN,
-		    dst, encrypt_len - skip, &result_len);
+		    encryptor_data_len, dst, encryptor_data_len, &result_len);
 
 		/*
 		 * It may be file corruption, which
