@@ -51,12 +51,12 @@ __sweep_mark(WT_SESSION_IMPL *session, int *dead_handlesp)
 }
 
 /*
- * __sweep_discard_expired --
- *	Close files that have no changes since the last checkpoint, until we
- *	have reached the configured minimum number of handles.
+ * __sweep_expire --
+ *	Mark trees dead if they are clean and haven't been accessed recently,
+ *	until we have reached the configured minimum number of handles.
  */
 static int
-__sweep_discard_expired(WT_SESSION_IMPL *session)
+__sweep_expire(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
 	WT_CONNECTION_IMPL *conn;
@@ -252,7 +252,7 @@ __sweep_server(void *arg)
 		/* Close handles if we have reached the configured limit */
 		if (conn->open_file_count >= conn->sweep_handles_min) {
 			WT_WITH_DHANDLE_LOCK(session,
-			    ret = __sweep_discard_expired(session));
+			    ret = __sweep_expire(session));
 			WT_ERR(ret);
 		}
 
