@@ -136,16 +136,21 @@ namespace mongo {
 
     /**
      * Hierarchy of resource types. The lock manager knows nothing about this hierarchy, it is
-     * purely logical. Resources of different types will never conflict with each other. While the
-     * lock manager does not know or care about ordering, the general policy is that resources are
-     * acquired in the order below. For example, one might first acquire a RESOURCE_GLOBAL and then
-     * the desired RESOURCE_DATABASE, both using intent modes, and finally a RESOURCE_COLLECTION
-     * in exclusive mode.
+     * purely logical. Resources of different types will never conflict with each other.
+     *
+     * While the lock manager does not know or care about ordering, the general policy is that
+     * resources are acquired in the order below. For example, one might first acquire a
+     * RESOURCE_GLOBAL and then the desired RESOURCE_DATABASE, both using intent modes, and
+     * finally a RESOURCE_COLLECTION in exclusive mode. When locking multiple resources of the
+     * same type, the canonical order is by resourceId order.
+     *
+     * It is OK to lock resources out of order, but it is the users responsibility to ensure
+     * ordering is consistent so deadlock cannot occur.
      */
     enum ResourceType {
-        // Special (singleton) resources
+        // Types used for special resources, use with a hash id from ResourceId::SingletonHashIds.
         RESOURCE_INVALID = 0,
-        RESOURCE_GLOBAL,
+        RESOURCE_GLOBAL,           // Used for mode changes or global exclusive operations
         RESOURCE_MMAPV1_FLUSH,     // Necessary only for the MMAPv1 engine
 
         // Generic resources
@@ -171,6 +176,17 @@ namespace mongo {
         BOOST_STATIC_ASSERT(ResourceTypesCount <= (1 << resourceTypeBits));
 
     public:
+        /**
+         * Assign hash ids for special resources to avoid accidental reuse of ids. For ids used
+         * with the same ResourceType, the order here must be the same as the locking order.
+         */
+        enum SingletonHashIds {
+            SINGLETON_INVALID = 0,
+            SINGLETON_PARALLEL_BATCH_WRITER_MODE,
+            SINGLETON_GLOBAL,
+            SINGLETON_MMAPV1_FLUSH
+        };
+
         ResourceId() : _fullHash(0) { }
         ResourceId(ResourceType type, StringData ns);
         ResourceId(ResourceType type, const std::string& ns);
@@ -180,6 +196,11 @@ namespace mongo {
 
         operator uint64_t() const {
             return _fullHash;
+        }
+
+        // This defines the canonical locking order, first by type and then hash id
+        bool operator<(const ResourceId& rhs) const {
+            return _fullHash < rhs._fullHash;
         }
 
         ResourceType getType() const {
@@ -193,7 +214,6 @@ namespace mongo {
         std::string toString() const;
 
     private:
-
         /**
          * The top 'resourceTypeBits' bits of '_fullHash' represent the resource type,
          * while the remaining bits contain the bottom bits of the hashId. This avoids false
@@ -228,6 +248,15 @@ namespace mongo {
     // Hardcoded resource id for admin db. This is to ensure direct writes to auth collections
     // are serialized (see SERVER-16092)
     extern const ResourceId resourceIdAdminDB;
+
+    // Hardcoded resource id for ParallelBatchWriterMode. We use the same resource type
+    // as resourceIdGlobal. This will also ensure the waits are reported as global, which
+    // is appropriate. The lock will never be contended unless the parallel batch writers
+    // must stop all other accesses globally. This resource must be locked before all other
+    // resources (including resourceIdGlobal). Replication applier threads don't take this
+    // lock.
+    // TODO: Merge this with resourceIdGlobal
+    extern const ResourceId resourceIdParallelBatchWriterMode;
 
     /**
      * Interface on which granted lock requests will be notified. See the contract for the notify

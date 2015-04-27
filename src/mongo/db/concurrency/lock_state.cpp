@@ -32,6 +32,8 @@
 
 #include "mongo/db/concurrency/lock_state.h"
 
+#include <vector>
+
 #include "mongo/db/service_context.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/platform/compiler.h"
@@ -101,29 +103,19 @@ namespace {
     };
 
 
-    /**
-     * Used to sort locks by granularity when snapshotting lock state. We must report and reacquire
-     * locks in the same granularity in which they are acquired (i.e. global, flush, database,
-     * collection, etc).
-     */
-    struct SortByGranularity {
-        inline bool operator()(const Locker::OneLock& lhs, const Locker::OneLock& rhs) const {
-            return lhs.resourceId.getType() < rhs.resourceId.getType();
-        }
-    };
-
-
     // Global lock manager instance.
     LockManager globalLockManager;
 
     // Global lock. Every server operation, which uses the Locker must acquire this lock at least
     // once. See comments in the header file (begin/endTransaction) for more information.
-    const ResourceId resourceIdGlobal = ResourceId(RESOURCE_GLOBAL, 1ULL);
+    const ResourceId resourceIdGlobal = ResourceId(RESOURCE_GLOBAL,
+                                                   ResourceId::SINGLETON_GLOBAL);
 
     // Flush lock. This is only used for the MMAP V1 storage engine and synchronizes journal writes
     // to the shared view and remaps. See the comments in the header for information on how MMAP V1
     // concurrency control works.
-    const ResourceId resourceIdMMAPV1Flush = ResourceId(RESOURCE_MMAPV1_FLUSH, 2ULL);
+    const ResourceId resourceIdMMAPV1Flush = ResourceId(RESOURCE_MMAPV1_FLUSH,
+                                                        ResourceId::SINGLETON_MMAPV1_FLUSH);
 
     // How often (in millis) to check for deadlock if a lock has not been granted for some time
     const unsigned DeadlockTimeoutMs = 500;
@@ -143,7 +135,7 @@ namespace {
     bool shouldDelayUnlock(ResourceId resId, LockMode mode) {
         // Global and flush lock are not used to protect transactional resources and as such, they
         // need to be acquired and released when requested.
-        if (resId == resourceIdGlobal) {
+        if (resId.getType() == RESOURCE_GLOBAL) {
             return false;
         }
 
@@ -264,9 +256,7 @@ namespace {
         : _id(idCounter.addAndFetch(1)),
           _requestStartTime(0),
           _wuowNestingLevel(0),
-          _batchWriter(false),
-          _lockPendingParallelWriter(false) {
-
+          _batchWriter(false) {
     }
 
     template<bool IsForMMAPV1>
@@ -353,7 +343,12 @@ namespace {
             // If we're here we should only have one reference to any lock. It is a programming
             // error for any lock to have more references than the global lock, because every
             // scope starts by calling lockGlobal.
-            invariant(_unlockImpl(it));
+            if (it.key().getType() == RESOURCE_GLOBAL) {
+                it.next();
+            }
+            else {
+                invariant(_unlockImpl(it));
+            }
         }
 
         return true;
@@ -515,7 +510,7 @@ namespace {
         }
         _lock.unlock();
 
-        std::sort(lockerInfo->locks.begin(), lockerInfo->locks.end(), SortByGranularity());
+        std::sort(lockerInfo->locks.begin(), lockerInfo->locks.end());
 
         lockerInfo->waitingResource = getWaitingResource();
         lockerInfo->stats.append(_stats);
@@ -557,7 +552,8 @@ namespace {
             // We should never have to save and restore metadata locks.
             invariant((IsForMMAPV1 && (resourceIdMMAPV1Flush == resId)) ||
                       RESOURCE_DATABASE == resId.getType() ||
-                      RESOURCE_COLLECTION == resId.getType());
+                      RESOURCE_COLLECTION == resId.getType() ||
+                      (RESOURCE_GLOBAL == resId.getType() && isSharedLockMode(it->mode)));
 
             // And, stuff the info into the out parameter.
             OneLock info;
@@ -569,8 +565,8 @@ namespace {
             invariant(unlock(resId));
         }
 
-        // Sort locks from coarsest to finest.  They'll later be acquired in this order.
-        std::sort(stateOut->locks.begin(), stateOut->locks.end(), SortByGranularity());
+        // Sort locks by ResourceId. They'll later be acquired in this canonical locking order.
+        std::sort(stateOut->locks.begin(), stateOut->locks.end());
 
         return true;
     }
@@ -580,9 +576,14 @@ namespace {
         // We shouldn't be saving and restoring lock state from inside a WriteUnitOfWork.
         invariant(!inAWriteUnitOfWork());
 
-        invariant(LOCK_OK == lockGlobal(state.globalMode));
-
         std::vector<OneLock>::const_iterator it = state.locks.begin();
+        // If we locked the PBWM, it must be locked before the resourceIdGlobal resource.
+        if (it != state.locks.end() && it->resourceId == resourceIdParallelBatchWriterMode) {
+            invariant(LOCK_OK == lock(it->resourceId, it->mode));
+            it++;
+        }
+
+        invariant(LOCK_OK == lockGlobal(state.globalMode));
         for (; it != state.locks.end(); it++) {
             // This is a sanity check that lockGlobal restored the MMAP V1 flush lock in the
             // expected mode.
@@ -619,9 +620,10 @@ namespace {
         globalStats.recordAcquisition(_id, resId, mode);
         _stats.recordAcquisition(resId, mode);
 
-        // Give priority to the full modes for global and flush lock so we don't stall global
-        // operations such as shutdown or flush.
-        if (resId == resourceIdGlobal || (IsForMMAPV1 && resId == resourceIdMMAPV1Flush)) {
+        // Give priority to the full modes for global, parallel batch writer mode,
+        // and flush lock so we don't stall global operations such as shutdown or flush.
+        const ResourceType resType = resId.getType();
+        if (resType == RESOURCE_GLOBAL || (IsForMMAPV1 && resId == resourceIdMMAPV1Flush)) {
             if (mode == MODE_S || mode == MODE_X) {
                 request->enqueueAtFront = true;
                 request->compatibleFirst = true;
@@ -669,7 +671,7 @@ namespace {
         // correct to do if not in a write unit of work.
         const bool yieldFlushLock = IsForMMAPV1 &&
                                     !inAWriteUnitOfWork() &&
-                                    resId != resourceIdGlobal &&
+                                    resId.getType() != RESOURCE_GLOBAL &&
                                     resId != resourceIdMMAPV1Flush;
         if (yieldFlushLock) {
             invariant(unlock(resourceIdMMAPV1Flush));
@@ -915,5 +917,7 @@ namespace {
     const ResourceId resourceIdOplog =
         ResourceId(RESOURCE_COLLECTION, StringData("local.oplog.rs"));
     const ResourceId resourceIdAdminDB = ResourceId(RESOURCE_DATABASE, StringData("admin"));
+    const ResourceId resourceIdParallelBatchWriterMode =
+        ResourceId(RESOURCE_GLOBAL, ResourceId::SINGLETON_PARALLEL_BATCH_WRITER_MODE);
 
 } // namespace mongo

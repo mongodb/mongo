@@ -295,7 +295,7 @@ namespace repl {
         SimpleMutex::scoped_lock fsynclk(filesLockedFsync);
 
         // stop all readers until we're done
-        Lock::ParallelBatchWriterMode pbwm;
+        Lock::ParallelBatchWriterMode pbwm(txn->lockState());
 
         ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
         if (replCoord->getMemberState().primary() &&

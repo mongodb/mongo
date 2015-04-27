@@ -44,30 +44,7 @@ namespace {
 
     //  SERVER-14668: Remove or invert sense once MMAPv1 CLL can be default
     MONGO_EXPORT_STARTUP_SERVER_PARAMETER(enableCollectionLocking, bool, true);
-
-
-    class AcquiringParallelWriter {
-    public:
-
-        AcquiringParallelWriter(Locker* ls)
-            : _ls(ls) {
-
-            _ls->setLockPendingParallelWriter(true);
-        }
-
-        ~AcquiringParallelWriter() {
-            _ls->setLockPendingParallelWriter(false);
-        }
-
-    private:
-        Locker* const _ls;
-    };
-
 } // namespace
-
-
-    RWLockRecursive Lock::ParallelBatchWriterMode::_batchLock("special");
-
 
     Lock::TempRelease::TempRelease(Locker* lockState)
         : _lockState(lockState),
@@ -83,11 +60,23 @@ namespace {
         }
     }
 
+    Lock::GlobalLock::GlobalLock(Locker* locker)
+          : _locker(locker),
+            _result(LOCK_INVALID),
+            _pbwm(locker, resourceIdParallelBatchWriterMode) { }
+
+    Lock::GlobalLock::GlobalLock(Locker* locker, LockMode lockMode, unsigned timeoutMs)
+          : _locker(locker),
+            _result(LOCK_INVALID),
+            _pbwm(locker, resourceIdParallelBatchWriterMode) {
+        _lock(lockMode, timeoutMs);
+    }
+
+
 
     void Lock::GlobalLock::_lock(LockMode lockMode, unsigned timeoutMs) {
         if (!_locker->isBatchWriter()) {
-            AcquiringParallelWriter a(_locker);
-            _pbws_lk.reset(new RWLockRecursive::Shared(ParallelBatchWriterMode::_batchLock));
+            _pbwm.lock(MODE_IS);
         }
 
         _result = _locker->lockGlobalBegin(lockMode);
@@ -95,15 +84,14 @@ namespace {
             _result = _locker->lockGlobalComplete(timeoutMs);
         }
 
-        if (_result != LOCK_OK) {
-            _pbws_lk.reset();
+        if (_result != LOCK_OK && !_locker->isBatchWriter()) {
+            _pbwm.unlock();
         }
     }
 
     void Lock::GlobalLock::_unlock() {
         if (isLocked()) {
             _locker->unlockAll();
-            _pbws_lk.reset();
             _result = LOCK_INVALID;
         }
     }
@@ -218,10 +206,13 @@ namespace {
         }
     }
 
+    Lock::ParallelBatchWriterMode::ParallelBatchWriterMode(Locker* lockState)
+          : _pbwm(lockState, resourceIdParallelBatchWriterMode, MODE_X) { }
 
     void Lock::ResourceLock::lock(LockMode mode) {
         invariant(_result == LOCK_INVALID);
         _result = _locker->lock(_rid, mode);
+        invariant(_result == LOCK_OK);
     }
 
     void Lock::ResourceLock::unlock() {

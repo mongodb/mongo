@@ -64,20 +64,44 @@ namespace mongo {
         };
 
 
-        /** turn on "parallel batch writer mode".  blocks all other threads. this mode is off
-            by default. note only one thread creates a ParallelBatchWriterMode object; the rest just
-            call iAmABatchParticipant().  Note that this lock is not released on a temprelease, just
-            the normal lock things below.
-            */
-        class ParallelBatchWriterMode {
-            MONGO_DISALLOW_COPYING(ParallelBatchWriterMode);
-        public:
-            ParallelBatchWriterMode() : _lk(_batchLock) { }
+        /**
+         * General purpose RAII wrapper for a resource managed by the lock manager
+         *
+         * See LockMode for the supported modes. Unlike DBLock/Collection lock, this will not do
+         * any additional checks/upgrades or global locking. Use ResourceLock for locking
+         * resources other than RESOURCE_GLOBAL, RESOURCE_DATABASE and RESOURCE_COLLECTION.
+         */
+        class ResourceLock {
+            MONGO_DISALLOW_COPYING(ResourceLock);
 
-            static RWLockRecursive _batchLock;
+        public:
+            ResourceLock(Locker* locker, ResourceId rid)
+                  : _rid(rid),
+                    _locker(locker),
+                    _result(LOCK_INVALID) {
+            }
+
+            ResourceLock(Locker* locker, ResourceId rid, LockMode mode)
+                  : _rid(rid),
+                    _locker(locker),
+                    _result(LOCK_INVALID) {
+                lock(mode);
+            }
+
+            ~ResourceLock() {
+                unlock();
+            }
+
+            void lock(LockMode mode);
+            void unlock();
+
+            bool isLocked() const { return _result == LOCK_OK; }
 
         private:
-            RWLockRecursive::Exclusive _lk;
+            const ResourceId _rid;
+            Locker* const _locker;
+
+            LockResult _result;
         };
 
 
@@ -90,14 +114,8 @@ namespace mongo {
          */
         class GlobalLock {
         public:
-            explicit GlobalLock(Locker* locker) : _locker(locker), _result(LOCK_INVALID) { }
-
-            GlobalLock(Locker* locker, LockMode lockMode, unsigned timeoutMs)
-                : _locker(locker),
-                  _result(LOCK_INVALID) {
-
-                _lock(lockMode, timeoutMs);
-            }
+            explicit GlobalLock(Locker* locker);
+            GlobalLock(Locker* locker, LockMode lockMode, unsigned timeoutMs);
 
             ~GlobalLock() {
                 _unlock();
@@ -112,8 +130,7 @@ namespace mongo {
 
             Locker* const _locker;
             LockResult _result;
-
-            boost::scoped_ptr<RWLockRecursive::Shared> _pbws_lk;
+            ResourceLock _pbwm;
         };
 
 
@@ -249,46 +266,21 @@ namespace mongo {
             bool _serialized;
         };
 
+
         /**
-         * General purpose RAII wrapper for a resource managed by the lock manager
-         *
-         * See LockMode for the supported modes. Unlike DBLock/Collection lock, this will not do
-         * any additional checks/upgrades or global locking. Use ResourceLock for locking
-         * resources other than RESOURCE_GLOBAL, RESOURCE_DATABASE and RESOURCE_COLLECTION.
+         * Turn on "parallel batch writer mode" by locking the global ParallelBatchWriterMode
+         * resource in exclusive mode. This mode is off by default.
+         * Note that only one thread creates a ParallelBatchWriterMode object; the other batch
+         * writers just call setIsBatchWriter().
          */
-        class ResourceLock {
-            MONGO_DISALLOW_COPYING(ResourceLock);
+        class ParallelBatchWriterMode {
+            MONGO_DISALLOW_COPYING(ParallelBatchWriterMode);
+
         public:
-            ResourceLock(Locker* locker, ResourceId rid)
-                : _rid(rid),
-                  _locker(locker),
-                  _result(LOCK_INVALID) {
-
-            }
-
-            ResourceLock(Locker* locker, ResourceId rid, LockMode mode)
-                : _rid(rid),
-                  _locker(locker),
-                  _result(LOCK_INVALID) {
-
-                lock(mode);
-            }
-
-            ~ResourceLock() {
-                unlock();
-            }
-
-            void lock(LockMode mode);
-            void unlock();
-
-            bool isLocked() const { return _result == LOCK_OK; }
+            explicit ParallelBatchWriterMode(Locker* lockState);
 
         private:
-            const ResourceId _rid;
-            Locker* const _locker;
-
-            LockResult _result;
+            ResourceLock _pbwm;
         };
-
     };
 }

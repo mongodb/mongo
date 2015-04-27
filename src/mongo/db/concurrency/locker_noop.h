@@ -166,14 +166,9 @@ namespace mongo {
             invariant(false);
         }
 
-        virtual void setLockPendingParallelWriter(bool newValue) {
-            invariant(false);
-        }
-
         virtual bool hasStrongLocks() const {
             return false;
         }
-
     };
 
 } // namespace mongo
