@@ -716,12 +716,19 @@ namespace {
     }
 
     Status WiredTigerRecordStore::truncate( OperationContext* txn ) {
-        // TODO: use a WiredTiger fast truncate
-        boost::scoped_ptr<RecordIterator> iter( getIterator( txn ) );
-        while( !iter->isEOF() ) {
-            RecordId loc = iter->getNext();
-            deleteRecord( txn, loc );
+        WiredTigerCursor startWrap( _uri, _instanceId, true, txn);
+        WT_CURSOR* start = startWrap.get();
+        int ret = WT_OP_CHECK(start->next(start));
+        //Empty collections don't have anything to truncate.
+        if (ret == WT_NOTFOUND) {
+            return Status::OK();
         }
+        invariantWTOK(ret);
+
+        WT_SESSION* session = WiredTigerRecoveryUnit::get(txn)->getSession(txn)->getSession();
+        invariantWTOK(WT_OP_CHECK(session->truncate(session, NULL, start, NULL, NULL)));
+        _changeNumRecords(txn, -numRecords(txn));
+        _increaseDataSize(txn, -dataSize(txn));
 
         return Status::OK();
     }
