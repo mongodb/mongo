@@ -1,6 +1,25 @@
 3.0.3, Apr 25 2015
 ------------------
 
+commit 04f9af1c4fb9a9287786948a818c88eef68cb8a4
+Author: Keith Bostic <keith@wiredtiger.com>
+Date:   Thu Apr 23 17:52:42 2015 -0400
+
+    If a file is marked cache-resident, it can never be evicted,
+    this fixes SERVER-18192.
+
+commit 96f85a0987217074dd91de689a499cd0a4c16bbb
+Author: Keith Bostic <keith@wiredtiger.com>
+Date:   Thu Apr 23 15:08:06 2015 -0400
+
+    Always clear WT_BTREE_NO_HAZARD when cache_resident is not configured,
+    otherwise we can (1) create a file with cache_resident configured
+    (setting both no-eviction and no-hazard), (2) drop the file, then
+    (3) re-create the file without cache_resident configured (clearing only
+    no-eviction), and the result will be a file that can be evicted and
+    where we aren't maintaining hazard pointers, and nothing good is going
+    to happen after that.
+
 commit 9166bca3d07d6592c1426c2c33bd56b6be0667e0
 Author: Alex Gorrod <alexg@wiredtiger.com>
 Date:   Thu Apr 23 05:43:35 2015 +0000
