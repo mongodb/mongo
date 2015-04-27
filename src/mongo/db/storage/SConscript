@@ -69,6 +69,7 @@ env.Library(
         'sorted_data_interface_test_unindex.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/service_context',
         'index_entry_comparison',
     ],
 )
@@ -92,7 +93,9 @@ env.Library(
         'record_store_test_updatewithdamages.cpp',
         'record_store_test_validate.cpp',
         ],
-    LIBDEPS=[]
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/service_context',
+        ]
     )
 
 env.Library(

@@ -60,7 +60,10 @@ env.Library(
     source=[
         'kv_engine_test_harness.cpp',
         ],
-    LIBDEPS=['kv_engine_core']
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/service_context',
+        'kv_engine_core',
+        ]
     )
 
 env.CppUnitTest(

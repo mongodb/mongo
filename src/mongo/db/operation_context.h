@@ -34,6 +34,7 @@
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/util/decorable.h"
 
 namespace mongo {
 
@@ -52,7 +53,7 @@ namespace mongo {
      * destruction it deassociates itself. At any time a client can be associated with at most one
      * OperationContext.
      */
-    class OperationContext  {
+    class OperationContext : public Decorable<OperationContext> {
         MONGO_DISALLOW_COPYING(OperationContext);
     public:
         virtual ~OperationContext() { }

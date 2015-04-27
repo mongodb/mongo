@@ -108,6 +108,7 @@ if wiredtiger:
         source=['wiredtiger_util_test.cpp',
                 ],
         LIBDEPS=[
+            '$BUILD_DIR/mongo/db/service_context',
             'storage_wiredtiger_mock',
             ],
         )
