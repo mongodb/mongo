@@ -287,3 +287,14 @@ env.Library(
         'ntservice_mock.cpp',
     ],
 )
+
+env.Library(
+    target='mmap',
+    source=[
+        'mmap.cpp',
+        'mmap_${TARGET_OS_FAMILY}.cpp',
+    ],
+    LIBDEPS=[
+        'foundation',
+    ],
+)

@@ -337,9 +337,6 @@ env.Library(
         'util/net/hostandport',
          ])
 
-# Memory-mapped files support.  Used by mongod and some tools.
-env.Library('mmap', ['util/mmap.cpp', 'util/mmap_${TARGET_OS_FAMILY}.cpp'], LIBDEPS=['util/foundation'])
-
 env.Library('elapsed_tracker',
             ['util/elapsed_tracker.cpp'],
             LIBDEPS=['util/foundation',
@@ -717,7 +714,7 @@ serveronlyLibdeps = ["coreshard",
                      'db/storage/mmap_v1/storage_mmapv1',
                      'db/storage/storage_engine_lock_file',
                      'db/storage/storage_engine_metadata',
-                     'mmap',
+                     'util/mmap',
                      'elapsed_tracker',
                      '$BUILD_DIR/third_party/shim_snappy']
 
