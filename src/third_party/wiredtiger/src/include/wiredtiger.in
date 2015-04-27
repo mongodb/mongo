@@ -522,7 +522,7 @@ struct __wt_cursor {
 	 * @snippet ex_all.c Reconfigure a cursor
 	 *
 	 * @param cursor the cursor handle
-	 * @configstart{cursor.reconfigure, see dist/api_data.py}
+	 * @configstart{WT_CURSOR.reconfigure, see dist/api_data.py}
 	 * @config{append, append the value as a new record\, creating a new
 	 * record number key; valid only for cursors with record number keys., a
 	 * boolean flag; default \c false.}
@@ -809,7 +809,7 @@ struct __wt_session {
 	 * @snippet ex_all.c Close a session
 	 *
 	 * @param session the session handle
-	 * @configempty{session.close, see dist/api_data.py}
+	 * @configempty{WT_SESSION.close, see dist/api_data.py}
 	 * @errors
 	 */
 	int __F(close)(WT_HANDLE_CLOSED(WT_SESSION) *session,
@@ -826,7 +826,7 @@ struct __wt_session {
 	 * All cursors are reset.
 	 *
 	 * @param session the session handle
-	 * @configstart{session.reconfigure, see dist/api_data.py}
+	 * @configstart{WT_SESSION.reconfigure, see dist/api_data.py}
 	 * @config{isolation, the default isolation level for operations in this
 	 * session., a string\, chosen from the following options: \c
 	 * "read-uncommitted"\, \c "read-committed"\, \c "snapshot"; default \c
@@ -888,7 +888,7 @@ struct __wt_session {
 	 *  <br>
 	 *  @copydoc doc_cursor_types
 	 * @param to_dup a cursor to duplicate
-	 * @configstart{session.open_cursor, see dist/api_data.py}
+	 * @configstart{WT_SESSION.open_cursor, see dist/api_data.py}
 	 * @config{append, append the value as a new record\, creating a new
 	 * record number key; valid only for cursors with record number keys., a
 	 * boolean flag; default \c false.}
@@ -977,7 +977,7 @@ struct __wt_session {
 	 * @param name the URI of the object to create, such as
 	 * \c "table:stock". For a description of URI formats
 	 * see @ref data_sources.
-	 * @configstart{session.create, see dist/api_data.py}
+	 * @configstart{WT_SESSION.create, see dist/api_data.py}
 	 * @config{allocation_size, the file unit allocation size\, in bytes\,
 	 * must a power-of-two; smaller values decrease the file space required
 	 * by overflow items\, and the default value of 4KB is a good choice
@@ -1181,7 +1181,7 @@ struct __wt_session {
 	 * @param session the session handle
 	 * @param name the URI of the object to compact, such as
 	 * \c "table:stock"
-	 * @configstart{session.compact, see dist/api_data.py}
+	 * @configstart{WT_SESSION.compact, see dist/api_data.py}
 	 * @config{timeout, maximum amount of time to allow for compact in
 	 * seconds.  The actual amount of time spent in compact may exceed the
 	 * configured value.  A value of zero disables the timeout., an integer;
@@ -1199,7 +1199,7 @@ struct __wt_session {
 	 *
 	 * @param session the session handle
 	 * @param name the URI of the object to drop, such as \c "table:stock"
-	 * @configstart{session.drop, see dist/api_data.py}
+	 * @configstart{WT_SESSION.drop, see dist/api_data.py}
 	 * @config{force, return success if the object does not exist., a
 	 * boolean flag; default \c false.}
 	 * @config{remove_files, should the underlying files be removed?., a
@@ -1229,7 +1229,7 @@ struct __wt_session {
 	 * @param session the session handle
 	 * @param uri the current URI of the object, such as \c "table:old"
 	 * @param newuri the new URI of the object, such as \c "table:new"
-	 * @configempty{session.rename, see dist/api_data.py}
+	 * @configempty{WT_SESSION.rename, see dist/api_data.py}
 	 * @ebusy_errors
 	 */
 	int __F(rename)(WT_SESSION *session,
@@ -1254,7 +1254,7 @@ struct __wt_session {
 	 *
 	 * @param session the session handle
 	 * @param name the URI of the file or table to salvage
-	 * @configstart{session.salvage, see dist/api_data.py}
+	 * @configstart{WT_SESSION.salvage, see dist/api_data.py}
 	 * @config{force, force salvage even of files that do not appear to be
 	 * WiredTiger files., a boolean flag; default \c false.}
 	 * @configend
@@ -1284,7 +1284,7 @@ struct __wt_session {
 	 * @param stop optional cursor marking the last record discarded;
 	 * if <code>NULL</code>, the truncate continues to the end of the
 	 * object
-	 * @configempty{session.truncate, see dist/api_data.py}
+	 * @configempty{WT_SESSION.truncate, see dist/api_data.py}
 	 * @ebusy_errors
 	 */
 	int __F(truncate)(WT_SESSION *session,
@@ -1302,7 +1302,7 @@ struct __wt_session {
 	 *
 	 * @param session the session handle
 	 * @param name the URI of the file or table to upgrade
-	 * @configempty{session.upgrade, see dist/api_data.py}
+	 * @configempty{WT_SESSION.upgrade, see dist/api_data.py}
 	 * @ebusy_errors
 	 */
 	int __F(upgrade)(WT_SESSION *session,
@@ -1319,7 +1319,7 @@ struct __wt_session {
 	 *
 	 * @param session the session handle
 	 * @param name the URI of the file or table to verify
-	 * @configstart{session.verify, see dist/api_data.py}
+	 * @configstart{WT_SESSION.verify, see dist/api_data.py}
 	 * @config{dump_address, Display addresses and page types as pages are
 	 * verified\, using the application's message handler\, intended for
 	 * debugging., a boolean flag; default \c false.}
@@ -1362,7 +1362,7 @@ struct __wt_session {
 	 * @snippet ex_all.c transaction commit/rollback
 	 *
 	 * @param session the session handle
-	 * @configstart{session.begin_transaction, see dist/api_data.py}
+	 * @configstart{WT_SESSION.begin_transaction, see dist/api_data.py}
 	 * @config{isolation, the isolation level for this transaction; defaults
 	 * to the session's isolation level., a string\, chosen from the
 	 * following options: \c "read-uncommitted"\, \c "read-committed"\, \c
@@ -1391,7 +1391,7 @@ struct __wt_session {
 	 * @snippet ex_all.c transaction commit/rollback
 	 *
 	 * @param session the session handle
-	 * @configempty{session.commit_transaction, see dist/api_data.py}
+	 * @configempty{WT_SESSION.commit_transaction, see dist/api_data.py}
 	 * @errors
 	 */
 	int __F(commit_transaction)(WT_SESSION *session, const char *config);
@@ -1406,7 +1406,7 @@ struct __wt_session {
 	 * @snippet ex_all.c transaction commit/rollback
 	 *
 	 * @param session the session handle
-	 * @configempty{session.rollback_transaction, see dist/api_data.py}
+	 * @configempty{WT_SESSION.rollback_transaction, see dist/api_data.py}
 	 * @errors
 	 */
 	int __F(rollback_transaction)(WT_SESSION *session, const char *config);
@@ -1420,7 +1420,7 @@ struct __wt_session {
 	 * @snippet ex_all.c Checkpoint examples
 	 *
 	 * @param session the session handle
-	 * @configstart{session.checkpoint, see dist/api_data.py}
+	 * @configstart{WT_SESSION.checkpoint, see dist/api_data.py}
 	 * @config{drop, specify a list of checkpoints to drop.  The list may
 	 * additionally contain one of the following keys: \c "from=all" to drop
 	 * all checkpoints\, \c "from=<checkpoint>" to drop all checkpoints
@@ -1495,7 +1495,7 @@ struct __wt_connection {
 	 *
 	 * @param connection the connection handle
 	 * @param uri the connection handle
-	 * @configstart{connection.async_new_op, see dist/api_data.py}
+	 * @configstart{WT_CONNECTION.async_new_op, see dist/api_data.py}
 	 * @config{append, append the value as a new record\, creating a new
 	 * record number key; valid only for operations with record number
 	 * keys., a boolean flag; default \c false.}
@@ -1531,7 +1531,7 @@ struct __wt_connection {
 	 * @snippet ex_all.c Close a connection
 	 *
 	 * @param connection the connection handle
-	 * @configstart{connection.close, see dist/api_data.py}
+	 * @configstart{WT_CONNECTION.close, see dist/api_data.py}
 	 * @config{leak_memory, don't free memory during close., a boolean flag;
 	 * default \c false.}
 	 * @configend
@@ -1546,7 +1546,7 @@ struct __wt_connection {
 	 * @snippet ex_all.c Reconfigure a connection
 	 *
 	 * @param connection the connection handle
-	 * @configstart{connection.reconfigure, see dist/api_data.py}
+	 * @configstart{WT_CONNECTION.reconfigure, see dist/api_data.py}
 	 * @config{async = (, asynchronous operations configuration options., a
 	 * set of related configuration options defined below.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, enable asynchronous
@@ -1555,7 +1555,8 @@ struct __wt_connection {
 	 * simultaneous asynchronous operations., an integer between 1 and 4096;
 	 * default \c 1024.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;threads, the number
-	 * of worker threads to service asynchronous requests., an integer
+	 * of worker threads to service asynchronous requests.  Each worker
+	 * thread uses a session from the configured session_max., an integer
 	 * between 1 and 20; default \c 2.}
 	 * @config{ ),,}
 	 * @config{cache_overhead, assume the heap allocator overhead is the
@@ -1570,8 +1571,9 @@ struct __wt_connection {
 	 * @config{cache_size, maximum heap memory to allocate for the cache.  A
 	 * database should configure either \c cache_size or \c shared_cache but
 	 * not both., an integer between 1MB and 10TB; default \c 100MB.}
-	 * @config{checkpoint = (, periodically checkpoint the database., a set
-	 * of related configuration options defined below.}
+	 * @config{checkpoint = (, periodically checkpoint the database.
+	 * Enabling the checkpoint server uses a session from the configured
+	 * session_max., a set of related configuration options defined below.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;log_size, wait for this amount of log
 	 * record bytes to be written to the log between each checkpoint.  A
 	 * database can configure both log_size and wait to set an upper bound
@@ -1590,7 +1592,8 @@ struct __wt_connection {
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;threads_max, maximum number of
 	 * threads WiredTiger will start to help evict pages from cache.  The
 	 * number of threads started will vary depending on the current eviction
-	 * load., an integer between 1 and 20; default \c 1.}
+	 * load.  Each eviction worker thread uses a session from the configured
+	 * session_max., an integer between 1 and 20; default \c 1.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;threads_min, minimum number of
 	 * threads WiredTiger will start to help evict pages from cache.  The
 	 * number of threads currently running will vary depending on the
@@ -1609,24 +1612,32 @@ struct __wt_connection {
 	 * integer between 10 and 99; default \c 95.}
 	 * @config{file_manager = (, control how file handles are managed., a
 	 * set of related configuration options defined below.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;close_handle_minimum, number of
+	 * handles open before the file manager will look for handles to close.,
+	 * an integer greater than or equal to 0; default \c 250.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;close_idle_time, amount of time in
 	 * seconds a file handle needs to be idle before attempting to close
-	 * it., an integer between 1 and 1000; default \c 30.}
+	 * it., an integer between 1 and 100000; default \c 30.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;close_scan_interval, interval in
 	 * seconds at which to check for files that are inactive and close
-	 * them., an integer between 1 and 1000; default \c 10.}
+	 * them., an integer between 1 and 100000; default \c 10.}
 	 * @config{ ),,}
 	 * @config{lsm_manager = (, configure database wide options for LSM tree
-	 * management., a set of related configuration options defined below.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;merge, merge LSM chunks where
-	 * possible., a boolean flag; default \c true.}
+	 * management.  The LSM manager is started automatically the first time
+	 * an LSM tree is opened.  The LSM manager uses a session from the
+	 * configured session_max., a set of related configuration options
+	 * defined below.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;merge, merge LSM
+	 * chunks where possible., a boolean flag; default \c true.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;worker_thread_max, Configure a set of
-	 * threads to manage merging LSM trees in the database., an integer
-	 * between 3 and 20; default \c 4.}
+	 * threads to manage merging LSM trees in the database.  Each worker
+	 * thread uses a session handle from the configured session_max., an
+	 * integer between 3 and 20; default \c 4.}
 	 * @config{ ),,}
 	 * @config{shared_cache = (, shared cache configuration options.  A
 	 * database should configure either a cache_size or a shared_cache not
-	 * both., a set of related configuration options defined below.}
+	 * both.  Enabling a shared cache uses a session from the configured
+	 * session_max., a set of related configuration options defined below.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;chunk, the granularity that a shared
 	 * cache is redistributed., an integer between 1MB and 10TB; default \c
 	 * 10MB.}
@@ -1657,9 +1668,11 @@ struct __wt_connection {
 	 * \c "none"\, \c "clear"; default \c none.}
 	 * @config{statistics_log = (, log any statistics the database is
 	 * configured to maintain\, to a file.  See @ref statistics for more
-	 * information., a set of related configuration options defined below.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;on_close, log statistics on database
-	 * close., a boolean flag; default \c false.}
+	 * information.  Enabling the statistics log server uses a session from
+	 * the configured session_max., a set of related configuration options
+	 * defined below.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;on_close, log
+	 * statistics on database close., a boolean flag; default \c false.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;path, the pathname to a file into
 	 * which the log records are written\, may contain ISO C standard
 	 * strftime conversion specifications.  If the value is not an absolute
@@ -1710,7 +1723,7 @@ struct __wt_connection {
 	 * @snippet ex_all.c Configure method configuration
 	 *
 	 * @param connection the connection handle
-	 * @param method the name of the method
+	 * @param method the method being configured
 	 * @param uri the object type or NULL for all object types
 	 * @param config the additional configuration's name and default value
 	 * @param type the additional configuration's type (must be one of
@@ -1747,7 +1760,7 @@ struct __wt_connection {
 	 * @param connection the connection handle
 	 * @param errhandler An error handler.  If <code>NULL</code>, the
 	 * connection's error handler is used
-	 * @configstart{connection.open_session, see dist/api_data.py}
+	 * @configstart{WT_CONNECTION.open_session, see dist/api_data.py}
 	 * @config{isolation, the default isolation level for operations in this
 	 * session., a string\, chosen from the following options: \c
 	 * "read-uncommitted"\, \c "read-committed"\, \c "snapshot"; default \c
@@ -1774,7 +1787,7 @@ struct __wt_connection {
 	 * @param path the filename of the extension module, or \c "local" to
 	 * search the current application binary for the initialization
 	 * function, see @ref extensions for more details.
-	 * @configstart{connection.load_extension, see dist/api_data.py}
+	 * @configstart{WT_CONNECTION.load_extension, see dist/api_data.py}
 	 * @config{config, configuration string passed to the entry point of the
 	 * extension as its WT_CONFIG_ARG argument., a string; default empty.}
 	 * @config{entry, the entry point of the extension\, called to
@@ -1805,7 +1818,7 @@ struct __wt_connection {
 	 * @param prefix the URI prefix for this data source, e.g., "file:"
 	 * @param data_source the application-supplied implementation of
 	 *	WT_DATA_SOURCE to manage this data source.
-	 * @configempty{connection.add_data_source, see dist/api_data.py}
+	 * @configempty{WT_CONNECTION.add_data_source, see dist/api_data.py}
 	 * @errors
 	 */
 	int __F(add_data_source)(WT_CONNECTION *connection, const char *prefix,
@@ -1823,7 +1836,7 @@ struct __wt_connection {
 	 * @param name the name of the collation to be used in calls to
 	 * 	WT_SESSION::create, may not be \c "none"
 	 * @param collator the application-supplied collation handler
-	 * @configempty{connection.add_collator, see dist/api_data.py}
+	 * @configempty{WT_CONNECTION.add_collator, see dist/api_data.py}
 	 * @errors
 	 */
 	int __F(add_collator)(WT_CONNECTION *connection,
@@ -1843,7 +1856,7 @@ struct __wt_connection {
 	 * @param name the name of the compression function to be used in calls
 	 *	to WT_SESSION::create, may not be \c "none"
 	 * @param compressor the application-supplied compression handler
-	 * @configempty{connection.add_compressor, see dist/api_data.py}
+	 * @configempty{WT_CONNECTION.add_compressor, see dist/api_data.py}
 	 * @errors
 	 */
 	int __F(add_compressor)(WT_CONNECTION *connection,
@@ -1861,7 +1874,7 @@ struct __wt_connection {
 	 * @param name the name of the extractor to be used in calls to
 	 * 	WT_SESSION::create, may not be \c "none"
 	 * @param extractor the application-supplied extractor
-	 * @configempty{connection.add_extractor, see dist/api_data.py}
+	 * @configempty{WT_CONNECTION.add_extractor, see dist/api_data.py}
 	 * @errors
 	 */
 	int __F(add_extractor)(WT_CONNECTION *connection, const char *name,
@@ -1897,8 +1910,10 @@ struct __wt_connection {
  * maximum number of expected simultaneous asynchronous operations., an integer
  * between 1 and 4096; default \c 1024.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;threads, the number of worker threads to
- * service asynchronous requests., an integer between 1 and 20; default \c 2.}
- * @config{ ),,}
+ * service asynchronous requests.  Each worker thread uses a session from the
+ * configured session_max., an integer between 1 and 20; default \c 2.}
+ * @config{
+ * ),,}
  * @config{buffer_alignment, in-memory alignment (in bytes) for buffers used for
  * I/O. The default value of -1 indicates a platform-specific alignment value
  * should be used (4KB on Linux systems when direct I/O is configured\, zero
@@ -1914,7 +1929,8 @@ struct __wt_connection {
  * @config{cache_size, maximum heap memory to allocate for the cache.  A
  * database should configure either \c cache_size or \c shared_cache but not
  * both., an integer between 1MB and 10TB; default \c 100MB.}
- * @config{checkpoint = (, periodically checkpoint the database., a set of
+ * @config{checkpoint = (, periodically checkpoint the database.  Enabling the
+ * checkpoint server uses a session from the configured session_max., a set of
  * related configuration options defined below.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;log_size, wait for this amount of log record
  * bytes to be written to the log between each checkpoint.  A database can
@@ -1949,13 +1965,15 @@ struct __wt_connection {
  * configuration options defined below.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;threads_max, maximum number of threads
  * WiredTiger will start to help evict pages from cache.  The number of threads
- * started will vary depending on the current eviction load., an integer between
- * 1 and 20; default \c 1.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;threads_min, minimum
- * number of threads WiredTiger will start to help evict pages from cache.  The
- * number of threads currently running will vary depending on the current
- * eviction load., an integer between 1 and 20; default \c 1.}
- * @config{ ),,}
+ * started will vary depending on the current eviction load.  Each eviction
+ * worker thread uses a session from the configured session_max., an integer
+ * between 1 and 20; default \c 1.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;threads_min,
+ * minimum number of threads WiredTiger will start to help evict pages from
+ * cache.  The number of threads currently running will vary depending on the
+ * current eviction load., an integer between 1 and 20; default \c 1.}
+ * @config{
+ * ),,}
  * @config{eviction_dirty_target, continue evicting until the cache has less
  * dirty memory than the value\, as a percentage of the total cache size.  Dirty
  * pages will only be evicted if the cache is full enough to trigger eviction.,
@@ -1980,19 +1998,23 @@ struct __wt_connection {
  * following options: \c "data"\, \c "log"; default empty.}
  * @config{file_manager = (, control how file handles are managed., a set of
  * related configuration options defined below.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;close_handle_minimum, number of handles open
+ * before the file manager will look for handles to close., an integer greater
+ * than or equal to 0; default \c 250.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;close_idle_time, amount of time in seconds a
  * file handle needs to be idle before attempting to close it., an integer
- * between 1 and 1000; default \c 30.}
+ * between 1 and 100000; default \c 30.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;close_scan_interval, interval in seconds at
  * which to check for files that are inactive and close them., an integer
- * between 1 and 1000; default \c 10.}
+ * between 1 and 100000; default \c 10.}
  * @config{ ),,}
  * @config{hazard_max, maximum number of simultaneous hazard pointers per
  * session handle., an integer greater than or equal to 15; default \c 1000.}
- * @config{log = (, enable logging., a set of related configuration options
- * defined below.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;archive, automatically
- * archive unneeded log files., a boolean flag; default \c true.}
+ * @config{log = (, enable logging.  Enabling logging uses three sessions from
+ * the configured session_max., a set of related configuration options defined
+ * below.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;archive, automatically archive
+ * unneeded log files., a boolean flag; default \c true.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;compressor, configure a compressor for log
  * records.  Permitted values are \c "none" or custom compression engine name
  * created with WT_CONNECTION::add_compressor.  If WiredTiger has builtin
@@ -2013,11 +2035,14 @@ struct __wt_connection {
  * chosen from the following options: \c "error"\, \c "on"; default \c on.}
  * @config{ ),,}
  * @config{lsm_manager = (, configure database wide options for LSM tree
- * management., a set of related configuration options defined below.}
+ * management.  The LSM manager is started automatically the first time an LSM
+ * tree is opened.  The LSM manager uses a session from the configured
+ * session_max., a set of related configuration options defined below.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;merge, merge LSM chunks where possible., a
  * boolean flag; default \c true.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;worker_thread_max, Configure a set of threads
- * to manage merging LSM trees in the database., an integer between 3 and 20;
+ * to manage merging LSM trees in the database.  Each worker thread uses a
+ * session handle from the configured session_max., an integer between 3 and 20;
  * default \c 4.}
  * @config{ ),,}
  * @config{mmap, Use memory mapping to access files when possible., a boolean
@@ -2029,7 +2054,8 @@ struct __wt_connection {
  * @config{session_max, maximum expected number of sessions (including server
  * threads)., an integer greater than or equal to 1; default \c 100.}
  * @config{shared_cache = (, shared cache configuration options.  A database
- * should configure either a cache_size or a shared_cache not both., a set of
+ * should configure either a cache_size or a shared_cache not both.  Enabling a
+ * shared cache uses a session from the configured session_max., a set of
  * related configuration options defined below.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;chunk, the granularity that a shared cache is
  * redistributed., an integer between 1MB and 10TB; default \c 10MB.}
@@ -2057,8 +2083,9 @@ struct __wt_connection {
  * list\, with values chosen from the following options: \c "all"\, \c "fast"\,
  * \c "none"\, \c "clear"; default \c none.}
  * @config{statistics_log = (, log any statistics the database is configured to
- * maintain\, to a file.  See @ref statistics for more information., a set of
- * related configuration options defined below.}
+ * maintain\, to a file.  See @ref statistics for more information.  Enabling
+ * the statistics log server uses a session from the configured session_max., a
+ * set of related configuration options defined below.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;on_close, log statistics on database close.,
  * a boolean flag; default \c false.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;path, the
@@ -2421,7 +2448,7 @@ int wiredtiger_unpack_uint(WT_PACK_STREAM *ps, uint64_t *up);
 /*! @} */
 
 /*!
- * @name Configuration string parsing
+ * @name Configuration strings
  * @{
  */
 
@@ -2477,6 +2504,27 @@ struct __wt_config_item {
 	type;
 };
 
+#if !defined(SWIG) && !defined(DOXYGEN)
+/*!
+ * Validate a configuration string for a WiredTiger API.
+ * This API is outside the scope of a WiredTiger connection handle, since
+ * applications may need to validate configuration strings prior to calling
+ * ::wiredtiger_open.
+ * @param session the session handle (may be \c NULL if the database not yet
+ * opened).
+ * @param errhandler An error handler (used if \c session is \c NULL; if both
+ * \c session and \c errhandler are \c NULL, error messages will be written to
+ * stderr).
+ * @param name the WiredTiger function or method to validate.
+ * @param config the configuration string being parsed.
+ * @returns zero for success, non-zero to indicate an error.
+ *
+ * @snippet ex_all.c Validate a configuration string
+ */
+int wiredtiger_config_validate(WT_SESSION *session,
+    WT_EVENT_HANDLER *errhandler, const char *name, const char *config);
+#endif
+
 /*!
  * Create a handle that can be used to parse or create configuration strings
  * compatible with WiredTiger APIs.
@@ -2490,6 +2538,8 @@ struct __wt_config_item {
  * @param len the number of valid bytes in \c config
  * @param[out] config_parserp A pointer to the newly opened handle
  * @errors
+ *
+ * @snippet ex_config_parse.c Create a configuration parser
  */
 int wiredtiger_config_parser_open(WT_SESSION *session,
     const char *config, size_t len, WT_CONFIG_PARSER **config_parserp);

@@ -54,7 +54,8 @@ def typedesc(c):
         desc += ' of strings'
     return desc
 
-def parseconfig(c, name_indent=''):
+def parseconfig(c, method_name, name_indent=''):
+    c.method_name = method_name
     ctype = gettype(c)
     desc = whitespace_re.sub(' ', c.desc.strip())
     desc = desc.strip('.') + '.'
@@ -73,7 +74,8 @@ def parseconfig(c, name_indent=''):
     output = '@config{' + ', '.join((name, desc, tdesc)) + '}\n'
     if ctype == 'category':
         for subc in sorted(c.subconfig):
-            output += parseconfig(subc, name_indent + ('&nbsp;' * 4))
+            output += parseconfig(subc, method_name, \
+                                  name_indent + ('&nbsp;' * 4))
         output += '@config{ ),,}\n'
     return output
 
@@ -140,7 +142,7 @@ for line in open(f, 'r'):
         lastname = name
         if 'undoc' in c.flags:
             continue
-        output = parseconfig(c)
+        output = parseconfig(c, config_name)
         for l in w.wrap(output):
             tfile.write(prefix + l.replace('\n', '\n' + prefix) + '\n')
 
@@ -160,9 +162,12 @@ tfile.write('''/* DO NOT EDIT: automatically built by dist/api_config.py. */
 #include "wt_internal.h"
 ''')
 
-# Make a TextWrapper that can wrap at commas.
+# Make a TextWrapper that wraps at commas.
 w = textwrap.TextWrapper(width=64, break_on_hyphens=False)
 w.wordsep_re = w.wordsep_simple_re = re.compile(r'(,)')
+
+# TextWrapper that wraps at whitespace.
+ws = textwrap.TextWrapper(width=64, break_on_hyphens=False)
 
 def checkstr(c):
     '''Generate the function reference and JSON string used by __wt_config_check
@@ -202,28 +207,36 @@ def get_default(c):
         return ''
 
 created_subconfigs=set()
-def add_subconfig(c):
-    if c.name in created_subconfigs:
+def add_subconfig(c, cname):
+    if cname in created_subconfigs:
         return
-    created_subconfigs.add(c.name)
+    created_subconfigs.add(cname)
     tfile.write('''
-static const WT_CONFIG_CHECK confchk_%(name)s_subconfigs[] = {
+%(name)s[] = {
 \t%(check)s
-\t{ NULL, NULL, NULL, NULL, NULL }
+\t{ NULL, NULL, NULL, NULL, NULL, 0 }
 };
 ''' % {
-    'name' : c.name,
+    'name' : '\n    '.join(ws.wrap(\
+        'static const WT_CONFIG_CHECK confchk_' + cname + '_subconfigs')),
     'check' : '\n\t'.join(getconfcheck(subc) for subc in sorted(c.subconfig)),
 })
+
+def getcname(c):
+    '''Return the C name of a sub configuration'''
+    prefix = c.method_name.replace('.', '_') + '_' \
+             if hasattr(c, 'method_name') else ''
+    return prefix + c.name
 
 def getsubconfigstr(c):
     '''Return a string indicating if an item has sub configuration'''
     ctype = gettype(c)
     if ctype == 'category':
-        add_subconfig(c)
-        return 'confchk_' + c.name + '_subconfigs'
+        cname = getcname(c)
+        add_subconfig(c, cname)
+        return 'confchk_' + cname + '_subconfigs, ' + str(len(c.subconfig))
     else:
-        return 'NULL'
+        return 'NULL, 0'
 
 # Write structures of arrays of allowable configuration options, including a
 # NULL as a terminator for iteration.
@@ -233,7 +246,7 @@ for name in sorted(api_data.methods.keys()):
         tfile.write('''
 static const WT_CONFIG_CHECK confchk_%(name)s[] = {
 \t%(check)s
-\t{ NULL, NULL, NULL, NULL, NULL }
+\t{ NULL, NULL, NULL, NULL, NULL, 0 }
 };
 ''' % {
     'name' : name.replace('.', '_'),
@@ -270,14 +283,15 @@ for name in sorted(api_data.methods.keys()):
     # Write the checks reference, or NULL if no related checks structure.
     tfile.write('\n\t  ')
     if ctype:
-        tfile.write('confchk_' + name.replace('.', '_'))
+        tfile.write(
+            'confchk_' + name.replace('.', '_') + ', ' + str(len(ctype)))
     else:
-        tfile.write('NULL')
+        tfile.write('NULL, 0')
 
     tfile.write('\n\t},')
 
 # Write a NULL as a terminator for iteration.
-tfile.write('\n\t{ NULL, NULL, NULL }')
+tfile.write('\n\t{ NULL, NULL, NULL, 0 }')
 tfile.write('\n};\n')
 
 # Write the routine that connects the WT_CONNECTION_IMPL structure to the list
@@ -292,8 +306,7 @@ __wt_conn_config_init(WT_SESSION_IMPL *session)
 \tconn = S2C(session);
 
 \t/* Build a list of pointers to the configuration information. */
-\tWT_RET(__wt_calloc_def(session,
-\t    sizeof(config_entries) / sizeof(config_entries[0]), &epp));
+\tWT_RET(__wt_calloc_def(session, WT_ELEMENTS(config_entries), &epp));
 \tconn->config_entries = epp;
 
 \t/* Fill in the list to reference the default information. */
@@ -313,6 +326,21 @@ __wt_conn_config_discard(WT_SESSION_IMPL *session)
 \tconn = S2C(session);
 
 \t__wt_free(session, conn->config_entries);
+}
+
+/*        
+ * __wt_conn_config_match --
+ *      Return the static configuration entry for a method.
+ */
+const WT_CONFIG_ENTRY *
+__wt_conn_config_match(const char *method)
+{
+\tconst WT_CONFIG_ENTRY *ep;
+
+\tfor (ep = config_entries; ep->method != NULL; ++ep)
+\t\tif (strcmp(method, ep->method) == 0)
+\t\t\treturn (ep);
+\treturn (NULL);
 }
 ''')
 

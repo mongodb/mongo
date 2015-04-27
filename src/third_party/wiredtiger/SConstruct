@@ -34,6 +34,9 @@ AddOption("--enable-python", dest="lang-python", type="string", nargs=1, action=
 AddOption("--enable-snappy", dest="snappy", type="string", nargs=1, action="store",
           help="Use snappy compression")
 
+AddOption("--enable-tcmalloc", dest="tcmalloc", type="string", nargs=1, action="store",
+          help="Use TCMalloc for memory allocation")
+
 AddOption("--enable-verbose", dest="verbose", action="store_true", default=False,
           help="Configure WiredTiger to support the verbose configuration string to wiredtiger_open")
 
@@ -113,6 +116,7 @@ useZlib = GetOption("zlib")
 useSnappy = GetOption("snappy")
 useLz4 = GetOption("lz4")
 useBdb = GetOption("bdb")
+useTcmalloc = GetOption("tcmalloc")
 wtlibs = []
 
 conf = Configure(env)
@@ -155,6 +159,16 @@ if useBdb:
     conf.env.Append(LIBPATH=[useBdb+ "/lib"])
     if not conf.CheckCHeader('db.h'):
         print 'db.h must be installed!'
+        Exit(1)
+
+if useTcmalloc:
+    conf.env.Append(CPPPATH=[useTcmalloc + "/include"])
+    conf.env.Append(LIBPATH=[useTcmalloc + "/lib"])
+    if conf.CheckCHeader('gperftools/tcmalloc.h'):
+        wtlibs.append("libtcmalloc_minimal")
+        conf.env.Append(CPPDEFINES=['HAVE_LIBTCMALLOC'])
+    else:
+        print 'tcmalloc.h must be installed!'
         Exit(1)
 
 env = conf.Finish()
@@ -338,11 +352,12 @@ t = env.Program("t_huge",
     LIBS=[wtlib] + wtlibs)
 Default(t)
 
-#env.Program("t_fops",
-    #["test/fops/file.c",
-    #"test/fops/fops.c",
-    #"test/fops/t.c"],
-    #LIBS=[wtlib])
+t = env.Program("t_fops",
+    ["test/fops/file.c",
+    "test/fops/fops.c",
+    "test/fops/t.c"],
+    LIBS=[wtlib, shim] + wtlibs)
+Default(t)
 
 if useBdb:
     benv = env.Clone()

@@ -264,7 +264,7 @@ __cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip, WT_UPDATE *upd)
 	__wt_cell_unpack(cell, unpack);
 	if (unpack->type == WT_CELL_KEY &&
 	    cbt->rip_saved != NULL && cbt->rip_saved == rip - 1) {
-		WT_ASSERT(session, cbt->tmp.size >= unpack->prefix);
+		WT_ASSERT(session, cbt->row_key->size >= unpack->prefix);
 
 		/*
 		 * Grow the buffer as necessary as well as ensure data has been
@@ -274,22 +274,22 @@ __cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip, WT_UPDATE *upd)
 		 * Don't grow the buffer unnecessarily or copy data we don't
 		 * need, truncate the item's data length to the prefix bytes.
 		 */
-		cbt->tmp.size = unpack->prefix;
+		cbt->row_key->size = unpack->prefix;
 		WT_RET(__wt_buf_grow(
-		    session, &cbt->tmp, cbt->tmp.size + unpack->size));
-		memcpy((uint8_t *)cbt->tmp.data + cbt->tmp.size,
+		    session, cbt->row_key, cbt->row_key->size + unpack->size));
+		memcpy((uint8_t *)cbt->row_key->data + cbt->row_key->size,
 		    unpack->data, unpack->size);
-		cbt->tmp.size += unpack->size;
+		cbt->row_key->size += unpack->size;
 	} else {
 		/*
 		 * Call __wt_row_leaf_key_work instead of __wt_row_leaf_key: we
 		 * already did __wt_row_leaf_key's fast-path checks inline.
 		 */
-slow:		WT_RET(
-		    __wt_row_leaf_key_work(session, page, rip, &cbt->tmp, 0));
+slow:		WT_RET(__wt_row_leaf_key_work(
+		    session, page, rip, cbt->row_key, 0));
 	}
-	kb->data = cbt->tmp.data;
-	kb->size = cbt->tmp.size;
+	kb->data = cbt->row_key->data;
+	kb->size = cbt->row_key->size;
 	cbt->rip_saved = rip;
 
 value:

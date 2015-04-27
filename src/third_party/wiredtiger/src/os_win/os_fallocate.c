@@ -17,12 +17,13 @@ __wt_fallocate_config(WT_SESSION_IMPL *session, WT_FH *fh)
 {
 	WT_UNUSED(session);
 
-	fh->fallocate_available = WT_FALLOCATE_AVAILABLE;
-
 	/*
-	 * We use a separate handle for file size changes, so there's no need
-	 * for locking.
+	 * fallocate on Windows would be implemented using SetEndOfFile, which
+	 * can also truncate the file. WiredTiger expects fallocate to ignore
+	 * requests to truncate the file which Windows does not do, so we don't
+	 * support the call.
 	 */
+	fh->fallocate_available = WT_FALLOCATE_NOT_AVAILABLE;
 	fh->fallocate_requires_locking = 0;
 }
 
@@ -34,23 +35,10 @@ int
 __wt_fallocate(
     WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, wt_off_t len)
 {
-	WT_DECL_RET;
-	LARGE_INTEGER largeint;
+	WT_UNUSED(session);
+	WT_UNUSED(fh);
+	WT_UNUSED(offset);
+	WT_UNUSED(len);
 
-	WT_RET(__wt_verbose(
-	    session, WT_VERB_FILEOPS, "%s: fallocate", fh->name));
-
-	largeint.QuadPart = offset + len;
-
-	if ((ret = SetFilePointerEx(
-	    fh->filehandle_secondary, largeint, NULL, FILE_BEGIN)) == FALSE)
-		WT_RET_MSG(session,
-		    __wt_errno(), "%s SetFilePointerEx error", fh->name);
-
-	if ((ret = SetEndOfFile(fh->filehandle_secondary)) != FALSE) {
-		fh->size = fh->extend_size = len;
-		return (0);
-	}
-
-	WT_RET_MSG(session, __wt_errno(), "%s SetEndOfFile error", fh->name);
+	return (ENOTSUP);
 }

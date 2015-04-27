@@ -24,9 +24,9 @@
 	    { WT_CONFIG_BASE(s, h##_##n), config, NULL };		\
 	API_SESSION_INIT(s, h, n, cur, dh);				\
 	WT_ERR(WT_SESSION_CHECK_PANIC(s));				\
-	WT_ERR(((config) != NULL) ?					\
-	    __wt_config_check((s),					\
-	    WT_CONFIG_REF(session, h##_##n), (config), 0) : 0);		\
+	if ((config) != NULL)						\
+		WT_ERR(__wt_config_check((s),				\
+		    WT_CONFIG_REF(session, h##_##n), (config), 0));	\
 	WT_ERR(__wt_verbose((s), WT_VERB_API, "CALL: " #h ":" #n))
 
 #define	API_END(s, ret)							\
@@ -96,29 +96,29 @@
 
 #define	CONNECTION_API_CALL(conn, s, n, config, cfg)			\
 	s = (conn)->default_session;					\
-	API_CALL(s, connection, n, NULL, NULL, config, cfg)
+	API_CALL(s, WT_CONNECTION, n, NULL, NULL, config, cfg)
 
 #define	CONNECTION_API_CALL_NOCONF(conn, s, n)				\
 	s = (conn)->default_session;					\
-	API_CALL_NOCONF(s, connection, n, NULL, NULL)
+	API_CALL_NOCONF(s, WT_CONNECTION, n, NULL, NULL)
 
 #define	SESSION_API_CALL(s, n, config, cfg)				\
-	API_CALL(s, session, n, NULL, NULL, config, cfg)
+	API_CALL(s, WT_SESSION, n, NULL, NULL, config, cfg)
 
 #define	SESSION_API_CALL_NOCONF(s, n)					\
-	API_CALL_NOCONF(s, session, n, NULL, NULL)
+	API_CALL_NOCONF(s, WT_SESSION, n, NULL, NULL)
 
 #define	SESSION_TXN_API_CALL(s, n, config, cfg)				\
-	TXN_API_CALL(s, session, n, NULL, NULL, config, cfg)
+	TXN_API_CALL(s, WT_SESSION, n, NULL, NULL, config, cfg)
 
 #define	CURSOR_API_CALL(cur, s, n, bt)					\
 	(s) = (WT_SESSION_IMPL *)(cur)->session;			\
-	API_CALL_NOCONF(s, cursor, n, cur,				\
+	API_CALL_NOCONF(s, WT_CURSOR, n, cur,				\
 	    ((bt) == NULL) ? NULL : ((WT_BTREE *)(bt))->dhandle)
 
 #define	CURSOR_UPDATE_API_CALL(cur, s, n, bt)				\
 	(s) = (WT_SESSION_IMPL *)(cur)->session;			\
-	TXN_API_CALL_NOCONF(s, cursor, n, cur,				\
+	TXN_API_CALL_NOCONF(s, WT_CURSOR, n, cur,			\
 	    ((bt) == NULL) ? NULL : ((WT_BTREE *)(bt))->dhandle)
 
 #define	CURSOR_UPDATE_API_END(s, ret)					\

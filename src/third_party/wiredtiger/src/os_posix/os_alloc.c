@@ -9,6 +9,21 @@
 #include "wt_internal.h"
 
 /*
+ * On systems with poor default allocators for allocations greater than 16 KB,
+ * we provide an option to use TCMalloc explicitly.
+ * This is important on Windows which does not have a builtin mechanism
+ * to replace C run-time memory management functions with alternatives.
+ */
+#ifdef HAVE_LIBTCMALLOC
+#include <gperftools/tcmalloc.h>
+
+#define	calloc			tc_calloc
+#define	realloc 		tc_realloc
+#define	posix_memalign 		tc_posix_memalign
+#define	free 			tc_free
+#endif
+
+/*
  * There's no malloc interface, WiredTiger never calls malloc.
  *
  * The problem is an application might allocate memory, write secret stuff in
@@ -145,8 +160,7 @@ __wt_realloc_aligned(WT_SESSION_IMPL *session,
 		bytes_to_allocate =
 		    WT_ALIGN(bytes_to_allocate, S2C(session)->buffer_alignment);
 
-		if (session != NULL)
-			WT_STAT_FAST_CONN_INCR(session, memory_allocation);
+		WT_STAT_FAST_CONN_INCR(session, memory_allocation);
 
 		if ((ret = posix_memalign(&newp,
 		    S2C(session)->buffer_alignment,

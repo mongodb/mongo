@@ -549,14 +549,15 @@ __wt_cell_leaf_value_parse(WT_PAGE *page, WT_CELL *cell)
 static inline int
 __wt_cell_unpack_safe(WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
 {
-	uint64_t saved_v, v;
-	uint32_t saved_len;
-	int copied;
+	struct {
+		uint32_t len;
+		uint64_t v;
+	} copy;
+	uint64_t v;
 	const uint8_t *p;
 
-	copied = 0;
-	saved_len = 0;
-	saved_v = 0;
+	copy.len = 0;
+	copy.v = 0;			/* -Werror=maybe-uninitialized */
 
 	/*
 	 * The verification code specifies an end argument, a pointer to 1 past
@@ -572,14 +573,18 @@ __wt_cell_unpack_safe(WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
 
 restart:
 	/*
-	 * This code is performance critical for scans through read-only trees.
-	 * Avoid WT_CLEAR here: it makes this code run significantly slower.
+	 * This path is performance critical for read-only trees, we're parsing
+	 * on-page structures. For that reason we don't clear the unpacked cell
+	 * structure (although that would be simpler), instead we make sure we
+	 * initialize all structure elements either here or in the immediately
+	 * following switch.
 	 */
-	WT_CLEAR_INLINE(WT_CELL_UNPACK, *unpack);
 	WT_CELL_LEN_CHK(cell, 0);
 	unpack->cell = cell;
-	unpack->type = __wt_cell_type(cell);
+	unpack->v = 0;
 	unpack->raw = __wt_cell_type_raw(cell);
+	unpack->type = __wt_cell_type(cell);
+	unpack->ovfl = 0;
 
 	/*
 	 * Handle cells with neither an RLE count or data length: short key/data
@@ -589,18 +594,23 @@ restart:
 	case WT_CELL_KEY_SHORT_PFX:
 		WT_CELL_LEN_CHK(cell, 1);		/* skip prefix */
 		unpack->prefix = cell->__chunk[1];
-
 		unpack->data = cell->__chunk + 2;
 		unpack->size = cell->__chunk[0] >> WT_CELL_SHORT_SHIFT;
 		unpack->__len = 2 + unpack->size;
 		goto done;
 	case WT_CELL_KEY_SHORT:
 	case WT_CELL_VALUE_SHORT:
+		unpack->prefix = 0;
 		unpack->data = cell->__chunk + 1;
 		unpack->size = cell->__chunk[0] >> WT_CELL_SHORT_SHIFT;
 		unpack->__len = 1 + unpack->size;
 		goto done;
 	}
+
+	unpack->prefix = 0;
+	unpack->data = NULL;
+	unpack->size = 0;
+	unpack->__len = 0;
 
 	p = (uint8_t *)cell + 1;			/* skip cell */
 
@@ -638,10 +648,9 @@ restart:
 		 */
 		WT_RET(__wt_vunpack_uint(
 		    &p, end == NULL ? 0 : (size_t)(end - p), &v));
-		saved_len = WT_PTRDIFF32(p, cell);
-		saved_v = unpack->v;
+		copy.len = WT_PTRDIFF32(p, cell);
+		copy.v = unpack->v;
 		cell = (WT_CELL *)((uint8_t *)cell - v);
-		copied = 1;
 		goto restart;
 
 	case WT_CELL_KEY_OVFL:
@@ -691,10 +700,10 @@ restart:
 	 * we need the right length).
 	 */
 done:	WT_CELL_LEN_CHK(cell, unpack->__len);
-	if (copied) {
+	if (copy.len != 0) {
 		unpack->raw = WT_CELL_VALUE_COPY;
-		unpack->__len = saved_len;
-		unpack->v = saved_v;
+		unpack->__len = copy.len;
+		unpack->v = copy.v;
 	}
 
 	return (0);

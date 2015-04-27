@@ -153,7 +153,7 @@ __wt_row_search(WT_SESSION_IMPL *session,
 
 	btree = S2BT(session);
 	collator = btree->collator;
-	item = &cbt->search_key;
+	item = cbt->tmp;
 
 	__cursor_pos_clear(cbt);
 
@@ -178,10 +178,7 @@ __wt_row_search(WT_SESSION_IMPL *session,
 	append_check = insert && cbt->append_tree;
 	descend_right = 1;
 
-	/*
-	 * In the service of eviction splits, we're only searching a single leaf
-	 * page, not a full tree.
-	 */
+	/* We may only be searching a single leaf page, not the full tree. */
 	if (leaf != NULL) {
 		current = leaf;
 		goto leaf_only;
@@ -195,8 +192,7 @@ restart:	page = current->page;
 		if (page->type != WT_PAGE_ROW_INT)
 			break;
 
-		WT_ASSERT(session, session->split_gen != 0);
-		pindex = WT_INTL_INDEX_COPY(page);
+		WT_INTL_INDEX_GET(session, page, pindex);
 
 		/*
 		 * Fast-path internal pages with one child, a common case for
@@ -488,8 +484,7 @@ restart:
 		if (page->type != WT_PAGE_ROW_INT)
 			break;
 
-		WT_ASSERT(session, session->split_gen != 0);
-		pindex = WT_INTL_INDEX_COPY(page);
+		WT_INTL_INDEX_GET(session, page, pindex);
 		descent = pindex->index[
 		    __wt_random(session->rnd) % pindex->entries];
 
@@ -523,13 +518,12 @@ restart:
 		 */
 		cbt->ref = current;
 		cbt->compare = 0;
-		WT_ASSERT(session, session->split_gen != 0);
-		pindex = WT_INTL_INDEX_COPY(btree->root.page);
+		WT_INTL_INDEX_GET(session, btree->root.page, pindex);
 		cbt->slot = pindex->entries < 2 ?
 		    __wt_random(session->rnd) % page->pg_row_entries : 0;
 
 		return (__wt_row_leaf_key(session,
-		    page, page->pg_row_d + cbt->slot, &cbt->search_key, 0));
+		    page, page->pg_row_d + cbt->slot, cbt->tmp, 0));
 	}
 
 	/*

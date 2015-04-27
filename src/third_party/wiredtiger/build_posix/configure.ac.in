@@ -19,7 +19,7 @@ m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([no])])
 # Configure options.  The AM_OPTIONS and the libtool configuration
 # need to stay here.  Moving them below the compiler and other
 # configurations causes -Wcast_align warnings and other warnings
-# on MacOS.
+# on OS X.
 AM_OPTIONS
 
 define([AC_LIBTOOL_LANG_CXX_CONFIG], [:])dnl
@@ -73,7 +73,7 @@ AM_TYPES
 
 AC_PROG_INSTALL
 
-AC_CHECK_HEADERS([pthread_np.h])
+AC_CHECK_HEADERS([x86intrin.h])
 AC_CHECK_LIB(pthread, pthread_create)
 AC_CHECK_LIB(dl, dlopen)
 AC_CHECK_LIB(rt, sched_yield)
@@ -107,7 +107,7 @@ AC_DEFINE_UNQUOTED(WT_BUFFER_ALIGNMENT_DEFAULT, $BUFFER_ALIGNMENT,
 
 AC_SUBST(AM_CFLAGS)
 
-# test/format requires an installed Oracle Berkeley DB release tree.
+# test/format optionally uses a Oracle Berkeley DB release for verification.
 AC_MSG_CHECKING([if --with-berkeleydb=DIR option specified])
 AC_ARG_WITH(berkeleydb,
     [AS_HELP_STRING([--with-berkeleydb=DIR],

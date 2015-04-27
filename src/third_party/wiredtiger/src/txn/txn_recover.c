@@ -41,8 +41,8 @@ __recovery_cursor(WT_SESSION_IMPL *session, WT_RECOVERY *r,
     WT_LSN *lsnp, u_int id, int duplicate, WT_CURSOR **cp)
 {
 	WT_CURSOR *c;
-	const char *cfg[] = { WT_CONFIG_BASE(session, session_open_cursor),
-	    "overwrite", NULL };
+	const char *cfg[] = { WT_CONFIG_BASE(
+	    session, WT_SESSION_open_cursor), "overwrite", NULL };
 	int metadata_op;
 
 	c = NULL;
@@ -263,13 +263,15 @@ __txn_commit_apply(
  */
 static int
 __txn_log_recover(WT_SESSION_IMPL *session,
-    WT_ITEM *logrec, WT_LSN *lsnp, void *cookie, int firstrecord)
+    WT_ITEM *logrec, WT_LSN *lsnp, WT_LSN *next_lsnp,
+    void *cookie, int firstrecord)
 {
 	WT_RECOVERY *r;
 	const uint8_t *end, *p;
 	uint64_t txnid;
 	uint32_t rectype;
 
+	WT_UNUSED(next_lsnp);
 	r = cookie;
 	p = LOG_SKIP_HEADER(logrec->data);
 	end = (const uint8_t *)logrec->data + logrec->size;
@@ -374,32 +376,30 @@ __recovery_free(WT_RECOVERY *r)
 static int
 __recovery_file_scan(WT_RECOVERY *r)
 {
-	WT_DECL_RET;
 	WT_CURSOR *c;
-	const char *uri, *config;
+	WT_DECL_RET;
 	int cmp;
+	const char *uri, *config;
 
 	/* Scan through all files in the metadata. */
 	c = r->files[0].c;
 	c->set_key(c, "file:");
 	if ((ret = c->search_near(c, &cmp)) != 0) {
 		/* Is the metadata empty? */
-		if (ret == WT_NOTFOUND)
-			ret = 0;
-		goto err;
+		WT_RET_NOTFOUND_OK(ret);
+		return (0);
 	}
 	if (cmp < 0)
-		WT_ERR_NOTFOUND_OK(c->next(c));
+		WT_RET_NOTFOUND_OK(c->next(c));
 	for (; ret == 0; ret = c->next(c)) {
-		WT_ERR(c->get_key(c, &uri));
+		WT_RET(c->get_key(c, &uri));
 		if (!WT_PREFIX_MATCH(uri, "file:"))
 			break;
-		WT_ERR(c->get_value(c, &config));
-		WT_ERR(__recovery_setup_file(r, uri, config));
+		WT_RET(c->get_value(c, &config));
+		WT_RET(__recovery_setup_file(r, uri, config));
 	}
-	WT_ERR_NOTFOUND_OK(ret);
-
-err:	return (ret);
+	WT_RET_NOTFOUND_OK(ret);
+	return (0);
 }
 
 /*

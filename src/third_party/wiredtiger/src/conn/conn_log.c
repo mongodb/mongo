@@ -344,18 +344,13 @@ typedef struct {
 } WT_LOG_WRLSN_ENTRY;
 
 /*
- * __log_wrlsn_cmp --
- *	The log wrlsn comparison function for qsort.
+ * WT_WRLSN_ENTRY_CMP_LT --
+ *	Return comparison of a written slot pair by LSN.
  */
-static int WT_CDECL
-__log_wrlsn_cmp(const void *a, const void *b)
-{
-	WT_LOG_WRLSN_ENTRY *ae, *be;
-
-	ae = (WT_LOG_WRLSN_ENTRY *)a;
-	be = (WT_LOG_WRLSN_ENTRY *)b;
-	return (LOG_CMP(&ae->lsn, &be->lsn));
-}
+#define	WT_WRLSN_ENTRY_CMP_LT(entry1, entry2)				\
+	((entry1).lsn.file < (entry2).lsn.file ||			\
+	((entry1).lsn.file == (entry2).lsn.file &&			\
+	(entry1).lsn.offset < (entry2).lsn.offset))
 
 /*
  * __log_wrlsn_server --
@@ -404,8 +399,9 @@ __log_wrlsn_server(void *arg)
 		 */
 		if (written_i > 0) {
 			yield = 0;
-			qsort(written, written_i, sizeof(WT_LOG_WRLSN_ENTRY),
-			    __log_wrlsn_cmp);
+			WT_INSERTION_SORT(written, written_i,
+			    WT_LOG_WRLSN_ENTRY, WT_WRLSN_ENTRY_CMP_LT);
+
 			/*
 			 * We know the written array is sorted by LSN.  Go
 			 * through them either advancing write_lsn or stop
@@ -422,6 +418,7 @@ __log_wrlsn_server(void *arg)
 				slot = &log->slot_pool[written[i].slot_index];
 				WT_ASSERT(session, LOG_CMP(&written[i].lsn,
 				    &slot->slot_release_lsn) == 0);
+				log->write_start_lsn = slot->slot_start_lsn;
 				log->write_lsn = slot->slot_end_lsn;
 				WT_ERR(__wt_cond_signal(session,
 				    log->log_write_cond));
@@ -552,6 +549,7 @@ __wt_logmgr_create(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_ZERO_LSN(&log->sync_dir_lsn);
 	WT_INIT_LSN(&log->trunc_lsn);
 	WT_INIT_LSN(&log->write_lsn);
+	WT_INIT_LSN(&log->write_start_lsn);
 	log->fileid = 0;
 	WT_RET(__wt_cond_alloc(session, "log sync", 0, &log->log_sync_cond));
 	WT_RET(__wt_cond_alloc(session, "log write", 0, &log->log_write_cond));

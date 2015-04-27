@@ -589,9 +589,10 @@ config_sanity(CONFIG *cfg)
 		fprintf(stderr, "interval value longer than the run-time\n");
 		return (EINVAL);
 	}
-	if (cfg->table_count < 1 || cfg->table_count > 99) {
+	/* The maximum is here to keep file name construction simple. */
+	if (cfg->table_count < 1 || cfg->table_count > 99999) {
 		fprintf(stderr,
-		    "invalid table count, less than 1 or greater than 99\n");
+		    "invalid table count, less than 1 or greater than 99999\n");
 		return (EINVAL);
 	}
 	if (cfg->database_count < 1 || cfg->database_count > 99) {
@@ -613,26 +614,26 @@ config_print(CONFIG *cfg)
 	u_int i;
 
 	printf("Workload configuration:\n");
-	printf("\tHome: %s\n", cfg->home);
-	printf("\tTable name: %s\n", cfg->table_name);
-	printf("\tConnection configuration: %s\n", cfg->conn_config);
+	printf("\t" "Home: %s\n", cfg->home);
+	printf("\t" "Table name: %s\n", cfg->table_name);
+	printf("\t" "Connection configuration: %s\n", cfg->conn_config);
 	if (cfg->sess_config != NULL)
-		printf("\tSession configuration: %s\n", cfg->sess_config);
+		printf("\t" "Session configuration: %s\n", cfg->sess_config);
 
 	printf("\t%s table: %s\n",
 	    cfg->create ? "Creating new" : "Using existing",
 	    cfg->table_config);
-	printf("\tKey size: %" PRIu32 ", value size: %" PRIu32 "\n",
+	printf("\t" "Key size: %" PRIu32 ", value size: %" PRIu32 "\n",
 	    cfg->key_sz, cfg->value_sz);
 	if (cfg->create)
-		printf("\tPopulate threads: %" PRIu32 ", inserting %" PRIu32
+		printf("\t" "Populate threads: %" PRIu32 ", inserting %" PRIu32
 		    " rows\n",
 		    cfg->populate_threads, cfg->icount);
 
-	printf("\tWorkload seconds, operations: %" PRIu32 ", %" PRIu32 "\n",
+	printf("\t" "Workload seconds, operations: %" PRIu32 ", %" PRIu32 "\n",
 	    cfg->run_time, cfg->run_ops);
 	if (cfg->workload != NULL) {
-		printf("\tWorkload configuration(s):\n");
+		printf("\t" "Workload configuration(s):\n");
 		for (i = 0, workp = cfg->workload;
 		    i < cfg->workload_cnt; ++i, ++workp)
 			printf("\t\t%" PRId64 " threads (inserts=%" PRId64
@@ -641,12 +642,12 @@ config_print(CONFIG *cfg)
 			    workp->insert, workp->read, workp->update);
 	}
 
-	printf("\tCheckpoint threads, interval: %" PRIu32 ", %" PRIu32 "\n",
+	printf("\t" "Checkpoint threads, interval: %" PRIu32 ", %" PRIu32 "\n",
 	    cfg->checkpoint_threads, cfg->checkpoint_interval);
-	printf("\tReporting interval: %" PRIu32 "\n", cfg->report_interval);
-	printf("\tSampling interval: %" PRIu32 "\n", cfg->sample_interval);
+	printf("\t" "Reporting interval: %" PRIu32 "\n", cfg->report_interval);
+	printf("\t" "Sampling interval: %" PRIu32 "\n", cfg->sample_interval);
 
-	printf("\tVerbosity: %" PRIu32 "\n", cfg->verbose);
+	printf("\t" "Verbosity: %" PRIu32 "\n", cfg->verbose);
 }
 
 /*

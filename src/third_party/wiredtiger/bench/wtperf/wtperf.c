@@ -68,6 +68,7 @@ static const char * const debug_tconfig = "";
 static void	*checkpoint_worker(void *);
 static int	 create_tables(CONFIG *);
 static int	 create_uris(CONFIG *);
+static int	drop_all_tables(CONFIG *);
 static int	 execute_populate(CONFIG *);
 static int	 execute_workload(CONFIG *);
 static int	 find_table_count(CONFIG *);
@@ -229,7 +230,7 @@ track_operation(TRACK *trk, uint64_t usecs)
 		++trk->us[v];
 
 	/*
-	 * Second buckets: millseconds from 1ms to 1000ms, at 1ms each.
+	 * Second buckets: milliseconds from 1ms to 1000ms, at 1ms each.
 	 */
 	else if (v < ms_to_us(1000))
 		++trk->ms[us_to_ms(v)];
@@ -380,7 +381,7 @@ worker(void *arg)
 	CONFIG_THREAD *thread;
 	TRACK *trk;
 	WT_CONNECTION *conn;
-	WT_CURSOR **cursors, *cursor;
+	WT_CURSOR **cursors, *cursor, *tmp_cursor;
 	WT_SESSION *session;
 	int64_t ops, ops_per_txn, throttle_ops;
 	size_t i;
@@ -388,6 +389,7 @@ worker(void *arg)
 	uint8_t *op, *op_end;
 	int measure_latency, ret;
 	char *value_buf, *key_buf, *value;
+	char buf[512];
 
 	thread = (CONFIG_THREAD *)arg;
 	cfg = thread->cfg;
@@ -409,6 +411,20 @@ worker(void *arg)
 		lprintf(cfg, ENOMEM, 0,
 		    "worker: couldn't allocate cursor array");
 		goto err;
+	}
+	for (i = 0; i < cfg->table_count_idle; i++) {
+		snprintf(buf, 512, "%s_idle%05d", cfg->uris[0], (int)i);
+		if ((ret = session->open_cursor(
+		    session, buf, NULL, NULL, &tmp_cursor)) != 0) {
+			lprintf(cfg, ret, 0,
+			    "Error opening idle table %s", buf);
+			goto err;
+		}
+		if ((ret = tmp_cursor->close(tmp_cursor)) != 0) {
+			lprintf(cfg, ret, 0,
+			    "Error closing idle table %s", buf);
+			goto err;
+		}
 	}
 	for (i = 0; i < cfg->table_count; i++) {
 		if ((ret = session->open_cursor(session,
@@ -1513,6 +1529,10 @@ err:	cfg->stop = 1;
 	    cfg, (u_int)cfg->workers_cnt, cfg->workers)) != 0 && ret == 0)
 		ret = t_ret;
 
+	/* Drop tables if configured to and this isn't an error path */
+	if (ret == 0 && cfg->drop_tables && (ret = drop_all_tables(cfg)) != 0)
+		lprintf(cfg, ret, 0, "Drop tables failed.");
+
 	/* Report if any worker threads didn't finish. */
 	if (cfg->error != 0) {
 		lprintf(cfg, WT_ERROR, 0,
@@ -1602,20 +1622,18 @@ create_uris(CONFIG *cfg)
 		goto err;
 	}
 	for (i = 0; i < cfg->table_count; i++) {
-		uri = cfg->uris[i] = calloc(base_uri_len + 3, 1);
+		uri = cfg->uris[i] = calloc(base_uri_len + 5, 1);
 		if (uri == NULL) {
 			ret = ENOMEM;
 			goto err;
 		}
-		memcpy(uri, cfg->base_uri, base_uri_len);
 		/*
 		 * If there is only one table, just use base name.
 		 */
-		if (cfg->table_count > 1) {
-			uri[base_uri_len] = uri[base_uri_len + 1] = '0';
-			uri[base_uri_len] = '0' + (i / 10);
-			uri[base_uri_len + 1] = '0' + (i % 10);
-		}
+		if (cfg->table_count == 1)
+			memcpy(uri, cfg->base_uri, base_uri_len);
+		else
+			sprintf(uri, "%s%05d", cfg->base_uri, i);
 	}
 err:	if (ret != 0 && cfg->uris != NULL) {
 		for (i = 0; i < cfg->table_count; i++)
@@ -1632,6 +1650,7 @@ create_tables(CONFIG *cfg)
 	WT_SESSION *session;
 	size_t i;
 	int ret;
+	char buf[512];
 
 	if (cfg->create == 0)
 		return (0);
@@ -1641,6 +1660,16 @@ create_tables(CONFIG *cfg)
 		lprintf(cfg, ret, 0,
 		    "Error opening a session on %s", cfg->home);
 		return (ret);
+	}
+
+	for (i = 0; i < cfg->table_count_idle; i++) {
+		snprintf(buf, 512, "%s_idle%05d", cfg->uris[0], (int)i);
+		if ((ret = session->create(
+		    session, buf, cfg->table_config)) != 0) {
+			lprintf(cfg, ret, 0,
+			    "Error creating idle table %s", buf);
+			return (ret);
+		}
 	}
 
 	for (i = 0; i < cfg->table_count; i++)
@@ -2026,7 +2055,7 @@ main(int argc, char *argv[])
 		cfg->async_threads = 2;
 	if (cfg->async_threads > 0) {
 		/*
-		 * The maximum number of async threasd is two digits, so just
+		 * The maximum number of async threads is two digits, so just
 		 * use that to compute the space we need.  Assume the default
 		 * of 1024 for the max ops.  Although we could bump that up
 		 * to 4096 if needed.
@@ -2259,6 +2288,42 @@ worker_throttle(int64_t throttle, int64_t *ops, struct timespec *interval)
 
 	*ops = 0;
 	*interval = now;
+}
+
+static int
+drop_all_tables(CONFIG *cfg)
+{
+	struct timespec start, stop;
+	WT_SESSION *session;
+	size_t i;
+	uint64_t msecs;
+	int ret, t_ret;
+
+	/* Drop any tables. */
+	if ((ret = cfg->conn->open_session(
+	    cfg->conn, NULL, cfg->sess_config, &session)) != 0) {
+		lprintf(cfg, ret, 0,
+		    "Error opening a session on %s", cfg->home);
+		return (ret);
+	}
+	(void)__wt_epoch(NULL, &start);
+	for (i = 0; i < cfg->table_count; i++) {
+		if ((ret = session->drop(
+		    session, cfg->uris[i], NULL)) != 0) {
+			lprintf(cfg, ret, 0,
+			    "Error dropping table %s", cfg->uris[i]);
+			goto err;
+		}
+	}
+	(void)__wt_epoch(NULL, &stop);
+	msecs = ns_to_ms(WT_TIMEDIFF(stop, start));
+	lprintf(cfg, 0, 1,
+	    "Executed %" PRIu32 " drop operations average time %" PRIu64 "ms",
+	    cfg->table_count, msecs / cfg->table_count);
+
+err:	if ((t_ret = session->close(session, NULL)) != 0 && ret == 0)
+		ret = t_ret;
+	return (ret);
 }
 
 static uint64_t

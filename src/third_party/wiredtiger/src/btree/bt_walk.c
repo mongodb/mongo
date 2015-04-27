@@ -272,7 +272,7 @@ descend:		couple = ref;
 			page = ref->page;
 			if (page->type == WT_PAGE_ROW_INT ||
 			    page->type == WT_PAGE_COL_INT) {
-				pindex = WT_INTL_INDEX_COPY(page);
+				WT_INTL_INDEX_GET(session, page, pindex);
 				slot = prev ? pindex->entries - 1 : 0;
 			} else {
 				*refp = ref;

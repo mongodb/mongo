@@ -49,7 +49,6 @@ src/config/config.c
 src/config/config_api.c
 src/config/config_check.c
 src/config/config_collapse.c
-src/config/config_concat.c
 src/config/config_def.c
 src/config/config_ext.c
 src/config/config_upgrade.c
@@ -157,7 +156,6 @@ src/support/hash_fnv.c
 src/support/hazard.c
 src/support/hex.c
 src/support/huffman.c
-src/support/mutex.c
 src/support/pow.c
 src/support/rand.c
 src/support/scratch.c

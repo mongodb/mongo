@@ -1,9 +1,8 @@
 # This file is a python script that describes the WiredTiger API.
 
 class Method:
-    def __init__(self, config, **flags):
+    def __init__(self, config):
         self.config = config
-        self.flags = flags
 
 class Config:
     def __init__(self, name, default, desc, subconfig=None, **flags):
@@ -320,8 +319,9 @@ connection_runtime_config = [
             maximum number of expected simultaneous asynchronous
                 operations''', min='1', max='4096'),
         Config('threads', '2', r'''
-            the number of worker threads to service asynchronous
-                requests''',
+            the number of worker threads to service asynchronous requests.
+            Each worker thread uses a session from the configured
+            session_max.''',
                 min='1', max='20'), # !!! Must match WT_ASYNC_MAX_WORKERS
             ]),
     Config('cache_size', '100MB', r'''
@@ -339,7 +339,8 @@ connection_runtime_config = [
         workloads''',
         min='0', max='30'),
     Config('checkpoint', '', r'''
-        periodically checkpoint the database''',
+        periodically checkpoint the database. Enabling the checkpoint server
+        uses a session from the configured session_max''',
         type='category', subconfig=[
         Config('name', '"WiredTigerCheckpoint"', r'''
             the checkpoint name'''),
@@ -372,19 +373,25 @@ connection_runtime_config = [
     Config('file_manager', '', r'''
         control how file handles are managed''',
         type='category', subconfig=[
+        Config('close_handle_minimum', '250', r'''
+            number of handles open before the file manager will look for handles
+            to close''', min=0),
         Config('close_idle_time', '30', r'''
             amount of time in seconds a file handle needs to be idle
-            before attempting to close it''', min=1, max=1000),
+            before attempting to close it''', min=1, max=100000),
         Config('close_scan_interval', '10', r'''
             interval in seconds at which to check for files that are
-            inactive and close them''', min=1, max=1000)
+            inactive and close them''', min=1, max=100000),
         ]),
     Config('lsm_manager', '', r'''
-        configure database wide options for LSM tree management''',
+        configure database wide options for LSM tree management. The LSM
+        manager is started automatically the first time an LSM tree is opened.
+        The LSM manager uses a session from the configured session_max.''',
         type='category', subconfig=[
         Config('worker_thread_max', '4', r'''
             Configure a set of threads to manage merging LSM trees in
-            the database.''',
+            the database. Each worker thread uses a session handle from
+            the configured session_max''',
             min='3',     # !!! Must match WT_LSM_MIN_WORKERS
             max='20'),     # !!! Must match WT_LSM_MAX_WORKERS
         Config('merge', 'true', r'''
@@ -400,7 +407,8 @@ connection_runtime_config = [
             Config('threads_max', '1', r'''
                 maximum number of threads WiredTiger will start to help evict
                 pages from cache. The number of threads started will vary
-                depending on the current eviction load''',
+                depending on the current eviction load. Each eviction worker
+                thread uses a session from the configured session_max''',
                 min=1, max=20),
             Config('threads_min', '1', r'''
                 minimum number of threads WiredTiger will start to help evict
@@ -410,7 +418,8 @@ connection_runtime_config = [
             ]),
     Config('shared_cache', '', r'''
         shared cache configuration options. A database should configure
-        either a cache_size or a shared_cache not both''',
+        either a cache_size or a shared_cache not both. Enabling a
+        shared cache uses a session from the configured session_max''',
         type='category', subconfig=[
         Config('chunk', '10MB', r'''
             the granularity that a shared cache is redistributed''',
@@ -443,7 +452,9 @@ connection_runtime_config = [
         type='list', choices=['all', 'fast', 'none', 'clear']),
     Config('statistics_log', '', r'''
         log any statistics the database is configured to maintain,
-        to a file.  See @ref statistics for more information''',
+        to a file.  See @ref statistics for more information. Enabling
+        the statistics log server uses a session from the configured
+        session_max''',
         type='category', subconfig=[
         Config('on_close', 'false', r'''log statistics on database close''',
             type='boolean'),
@@ -543,7 +554,8 @@ common_wiredtiger_open = [
         handle''',
         min='15'),
     Config('log', '', r'''
-        enable logging''',
+        enable logging. Enabling logging uses three sessions from the
+        configured session_max''',
         type='category', subconfig=[
         Config('archive', 'true', r'''
             automatically archive unneeded log files''',
@@ -626,13 +638,13 @@ methods = {
 
 'table.meta' : Method(table_meta),
 
-'cursor.close' : Method([]),
+'WT_CURSOR.close' : Method([]),
 
-'cursor.reconfigure' : Method(cursor_runtime_config),
+'WT_CURSOR.reconfigure' : Method(cursor_runtime_config),
 
-'session.close' : Method([]),
+'WT_SESSION.close' : Method([]),
 
-'session.compact' : Method([
+'WT_SESSION.compact' : Method([
     Config('timeout', '1200', r'''
         maximum amount of time to allow for compact in seconds. The
         actual amount of time spent in compact may exceed the configured
@@ -640,7 +652,7 @@ methods = {
         type='int'),
 ]),
 
-'session.create' : Method(file_config + lsm_config + source_meta + 
+'WT_SESSION.create' : Method(file_config + lsm_config + source_meta + 
         index_only_config + table_only_config + [
     Config('exclusive', 'false', r'''
         fail if the object exists.  When false (the default), if the
@@ -649,7 +661,7 @@ methods = {
         type='boolean'),
 ]),
 
-'session.drop' : Method([
+'WT_SESSION.drop' : Method([
     Config('force', 'false', r'''
         return success if the object does not exist''',
         type='boolean'),
@@ -658,9 +670,9 @@ methods = {
         type='boolean'),
 ]),
 
-'session.log_printf' : Method([]),
+'WT_SESSION.log_printf' : Method([]),
 
-'session.open_cursor' : Method(cursor_runtime_config + [
+'WT_SESSION.open_cursor' : Method(cursor_runtime_config + [
     Config('bulk', 'false', r'''
         configure the cursor for bulk-loading, a fast, initial load
         path (see @ref tune_bulk_load for more information).  Bulk-load
@@ -734,17 +746,17 @@ methods = {
         type='list'),
 ]),
 
-'session.rename' : Method([]),
-'session.salvage' : Method([
+'WT_SESSION.rename' : Method([]),
+'WT_SESSION.salvage' : Method([
     Config('force', 'false', r'''
         force salvage even of files that do not appear to be WiredTiger
         files''',
         type='boolean'),
 ]),
-'session.strerror' : Method([]),
-'session.truncate' : Method([]),
-'session.upgrade' : Method([]),
-'session.verify' : Method([
+'WT_SESSION.strerror' : Method([]),
+'WT_SESSION.truncate' : Method([]),
+'WT_SESSION.upgrade' : Method([]),
+'WT_SESSION.verify' : Method([
     Config('dump_address', 'false', r'''
         Display addresses and page types as pages are verified,
         using the application's message handler, intended for debugging''',
@@ -767,7 +779,7 @@ methods = {
         type='boolean')
 ]),
 
-'session.begin_transaction' : Method([
+'WT_SESSION.begin_transaction' : Method([
     Config('isolation', '', r'''
         the isolation level for this transaction; defaults to the
         session's isolation level''',
@@ -784,10 +796,10 @@ methods = {
         type='boolean'),
 ]),
 
-'session.commit_transaction' : Method([]),
-'session.rollback_transaction' : Method([]),
+'WT_SESSION.commit_transaction' : Method([]),
+'WT_SESSION.rollback_transaction' : Method([]),
 
-'session.checkpoint' : Method([
+'WT_SESSION.checkpoint' : Method([
     Config('drop', '', r'''
         specify a list of checkpoints to drop.
         The list may additionally contain one of the following keys:
@@ -809,11 +821,11 @@ methods = {
         if non-empty, checkpoint the list of objects''', type='list'),
 ]),
 
-'connection.add_collator' : Method([]),
-'connection.add_compressor' : Method([]),
-'connection.add_data_source' : Method([]),
-'connection.add_extractor' : Method([]),
-'connection.async_new_op' : Method([
+'WT_CONNECTION.add_collator' : Method([]),
+'WT_CONNECTION.add_compressor' : Method([]),
+'WT_CONNECTION.add_data_source' : Method([]),
+'WT_CONNECTION.add_extractor' : Method([]),
+'WT_CONNECTION.async_new_op' : Method([
     Config('append', 'false', r'''
         append the value as a new record, creating a new record
         number key; valid only for operations with record number keys''',
@@ -835,14 +847,14 @@ methods = {
         value. A value of zero disables the timeout''',
         type='int'),
 ]),
-'connection.close' : Method([
+'WT_CONNECTION.close' : Method([
     Config('leak_memory', 'false', r'''
         don't free memory during close''',
         type='boolean'),
 ]),
-'connection.reconfigure' : Method(connection_runtime_config),
+'WT_CONNECTION.reconfigure' : Method(connection_runtime_config),
 
-'connection.load_extension' : Method([
+'WT_CONNECTION.load_extension' : Method([
     Config('config', '', r'''
         configuration string passed to the entry point of the
         extension as its WT_CONFIG_ARG argument'''),
@@ -857,9 +869,9 @@ methods = {
         ::wiredtiger_extension_terminate'''),
 ]),
 
-'connection.open_session' : Method(session_config),
+'WT_CONNECTION.open_session' : Method(session_config),
 
-'session.reconfigure' : Method(session_config),
+'WT_SESSION.reconfigure' : Method(session_config),
 
 # There are 4 variants of the wiredtiger_open configurations.
 # wiredtiger_open:

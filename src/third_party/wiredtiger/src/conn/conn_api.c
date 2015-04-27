@@ -852,38 +852,44 @@ __conn_reconfigure(WT_CONNECTION *wt_conn, const char *config)
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	const char *p, *config_cfg[] = { NULL, NULL, NULL };
+	const char *p;
 
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
 
 	CONNECTION_API_CALL(conn, session, reconfigure, config, cfg);
-	WT_UNUSED(cfg);
 
 	/* Serialize reconfiguration. */
 	__wt_spin_lock(session, &conn->reconfig_lock);
 
 	/*
-	 * The configuration argument has been checked for validity, replace the
+	 * The configuration argument has been checked for validity, update the
 	 * previous connection configuration.
 	 *
 	 * DO NOT merge the configuration before the reconfigure calls.  Some
 	 * of the underlying reconfiguration functions do explicit checks with
 	 * the second element of the configuration array, knowing the defaults
 	 * are in slot #1 and the application's modifications are in slot #2.
+	 *
+	 * First, replace the base configuration set up by CONNECTION_API_CALL
+	 * with the current connection configuration, otherwise reconfiguration
+	 * functions will find the base value instead of previously configured
+	 * value.
 	 */
-	config_cfg[0] = conn->cfg;
-	config_cfg[1] = config;
+	cfg[0] = conn->cfg;
+	cfg[1] = config;
 
-	WT_ERR(__conn_statistics_config(session, config_cfg));
-	WT_ERR(__wt_async_reconfig(session, config_cfg));
-	WT_ERR(__wt_cache_config(session, 1, config_cfg));
-	WT_ERR(__wt_checkpoint_server_create(session, config_cfg));
-	WT_ERR(__wt_lsm_manager_reconfig(session, config_cfg));
-	WT_ERR(__wt_statlog_create(session, config_cfg));
+	/* Second, reconfigure the system. */
+	WT_ERR(__conn_statistics_config(session, cfg));
+	WT_ERR(__wt_async_reconfig(session, cfg));
+	WT_ERR(__wt_cache_config(session, 1, cfg));
+	WT_ERR(__wt_checkpoint_server_create(session, cfg));
+	WT_ERR(__wt_lsm_manager_reconfig(session, cfg));
+	WT_ERR(__wt_statlog_create(session, cfg));
 	WT_ERR(__wt_sweep_config(session, cfg));
-	WT_ERR(__wt_verbose_config(session, config_cfg));
+	WT_ERR(__wt_verbose_config(session, cfg));
 
-	WT_ERR(__wt_config_merge(session, config_cfg, &p));
+	/* Third, merge everything together, creating a new connection state. */
+	WT_ERR(__wt_config_merge(session, cfg, NULL, &p));
 	__wt_free(session, conn->cfg);
 	conn->cfg = p;
 
@@ -1460,7 +1466,8 @@ __wt_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
  *	Save the base configuration used to create a database.
  */
 static int
-__conn_write_base_config(WT_SESSION_IMPL *session, const char *cfg[])
+__conn_write_base_config(
+    WT_SESSION_IMPL *session, const char *cfg[], const char *config)
 {
 	FILE *fp;
 	WT_CONFIG parser;
@@ -1505,54 +1512,40 @@ __conn_write_base_config(WT_SESSION_IMPL *session, const char *cfg[])
 	    "# these settings, set a WIREDTIGER_CONFIG environment variable\n"
 	    "# or create a WiredTiger.config file to override them.");
 
-	fprintf(fp, "version=(major=%d,minor=%d)\n\n",
-	    WIREDTIGER_VERSION_MAJOR, WIREDTIGER_VERSION_MINOR);
-
 	/*
-	 * We were passed an array of configuration strings where slot 0 is all
-	 * possible values and the second and subsequent slots are changes
-	 * specified by the application during open (using the wiredtiger_open
-	 * configuration string, an environment variable, or user-configuration
-	 * file). The base configuration file contains all changes to default
-	 * settings made at create, and we include the user-configuration file
-	 * in that list, even though we don't expect it to change. Of course,
-	 * an application could leave that file as it is right now and not
-	 * remove a configuration we need, but applications can also guarantee
-	 * all database users specify consistent environment variables and
-	 * wiredtiger_open configuration arguments, and if we protect against
+	 * The base configuration file contains all changes to default settings
+	 * made at create, and we include the user-configuration file in that
+	 * list, even though we don't expect it to change. Of course, an
+	 * application could leave that file as it is right now and not remove
+	 * a configuration we need, but applications can also guarantee all
+	 * database users specify consistent environment variables and
+	 * wiredtiger_open configuration arguments -- if we protect against
 	 * those problems, might as well include the application's configuration
-	 * file as well.
+	 * file in that protection.
 	 *
-	 * We want the list of defaults that have been changed, that is, if the
-	 * application didn't somehow configure a setting, we don't write out a
-	 * default value, so future releases may silently migrate to new default
-	 * values.
+	 * We were passed the configuration items specified by the application.
+	 * That list includes configuring the default setting, presumably if
+	 * the application configured it explicitly, that setting should survive
+	 * even if the default changes.
 	 */
-	while (*++cfg != NULL) {
-		WT_ERR(__wt_config_init( session,
-		    &parser, WT_CONFIG_BASE(session, wiredtiger_open_basecfg)));
-		while ((ret = __wt_config_next(&parser, &k, &v)) == 0) {
-			if ((ret =
-			    __wt_config_getone(session, *cfg, &k, &v)) == 0) {
-				/* Fix quoting for non-trivial settings. */
-				if (v.type == WT_CONFIG_ITEM_STRING) {
-					--v.str;
-					v.len += 2;
-				}
-				fprintf(fp, "%.*s=%.*s\n",
-				    (int)k.len, k.str, (int)v.len, v.str);
-			}
-			WT_ERR_NOTFOUND_OK(ret);
+	WT_ERR(__wt_config_init(session, &parser, config));
+	while ((ret = __wt_config_next(&parser, &k, &v)) == 0) {
+		/* Fix quoting for non-trivial settings. */
+		if (v.type == WT_CONFIG_ITEM_STRING) {
+			--v.str;
+			v.len += 2;
 		}
-		WT_ERR_NOTFOUND_OK(ret);
+		fprintf(fp,
+		    "%.*s=%.*s\n", (int)k.len, k.str, (int)v.len, v.str);
 	}
+	WT_ERR_NOTFOUND_OK(ret);
 
 	/* Flush the handle and rename the file into place. */
 	return (__wt_sync_and_rename_fp(
 	    session, &fp, WT_BASECONFIG_SET, WT_BASECONFIG));
 
 	/* Close any file handle left open, remove any temporary file. */
-err:	WT_TRET(__wt_fclose(session, &fp, WT_FHANDLE_WRITE));
+err:	WT_TRET(__wt_fclose(&fp, WT_FHANDLE_WRITE));
 	WT_TRET(__wt_remove_if_exists(session, WT_BASECONFIG_SET));
 
 	return (ret);
@@ -1592,26 +1585,24 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 
 	WT_CONFIG_ITEM cval, sval;
 	WT_CONNECTION_IMPL *conn;
+	WT_DECL_ITEM(i1);
+	WT_DECL_ITEM(i2);
+	WT_DECL_ITEM(i3);
 	WT_DECL_RET;
-	WT_ITEM i1, i2, i3;
 	const WT_NAME_FLAG *ft;
 	WT_SESSION_IMPL *session;
+	const char *base_merge;
+	char version[64];
 
-	/* Leave space for optional additional configuration. */
-	const char *cfg[] = { NULL, NULL, NULL, NULL, NULL, NULL };
+	/* Leave lots of space for optional additional configuration. */
+	const char *cfg[] = {
+	    NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL };
 
 	*wt_connp = NULL;
 
 	conn = NULL;
 	session = NULL;
-
-	/*
-	 * We could use scratch buffers, but I'd rather the default session
-	 * not tie down chunks of memory past the open call.
-	 */
-	WT_CLEAR(i1);
-	WT_CLEAR(i2);
-	WT_CLEAR(i3);
+	base_merge = NULL;
 
 	WT_RET(__wt_library_init());
 
@@ -1659,20 +1650,55 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	 * entries override earlier entries):
 	 *
 	 * 1. all possible wiredtiger_open configurations
-	 * 2. base configuration file, created with the database (optional)
-	 * 3. the config passed in by the application.
-	 * 4. user configuration file (optional)
-	 * 5. environment variable settings (optional)
+	 * 2. the WiredTiger compilation version (expected to be overridden by
+	 *    any value in the base configuration file)
+	 * 3. base configuration file, created with the database (optional)
+	 * 4. the config passed in by the application
+	 * 5. user configuration file (optional)
+	 * 6. environment variable settings (optional)
 	 *
 	 * Clear the entries we added to the stack, we're going to build it in
 	 * order.
 	 */
+	WT_ERR(__wt_scr_alloc(session, 0, &i1));
+	WT_ERR(__wt_scr_alloc(session, 0, &i2));
+	WT_ERR(__wt_scr_alloc(session, 0, &i3));
 	cfg[0] = WT_CONFIG_BASE(session, wiredtiger_open_all);
 	cfg[1] = NULL;
-	WT_ERR(__conn_config_file(session, WT_BASECONFIG, 0, cfg, &i1));
+	WT_ERR_TEST(snprintf(version, sizeof(version),
+	    "version=(major=%d,minor=%d)",
+	    WIREDTIGER_VERSION_MAJOR, WIREDTIGER_VERSION_MINOR) >=
+	    (int)sizeof(version), ENOMEM);
+	__conn_config_append(cfg, version);
+	WT_ERR(__conn_config_file(session, WT_BASECONFIG, 0, cfg, i1));
 	__conn_config_append(cfg, config);
-	WT_ERR(__conn_config_file(session, WT_USERCONFIG, 1, cfg, &i2));
-	WT_ERR(__conn_config_env(session, cfg, &i3));
+	WT_ERR(__conn_config_file(session, WT_USERCONFIG, 1, cfg, i2));
+	WT_ERR(__conn_config_env(session, cfg, i3));
+
+	/*
+	 * Merge the full configuration stack and save it for reconfiguration.
+	 */
+	WT_ERR(__wt_config_merge(session, cfg, NULL, &conn->cfg));
+
+	/*
+	 * When writing the base configuration file, we write the version and
+	 * any configuration information set by the application (in other words,
+	 * the stack except for cfg[0]). However, some configuration values need
+	 * to be stripped out from the base configuration file; do that now, and
+	 * merge the rest to be written.
+	 */
+	WT_ERR(__wt_config_merge(session, cfg + 1, "create=", &base_merge));
+
+	/*
+	 * Reset cfg to the configuration stack we're going to use for the rest
+	 * of the open.
+	 *
+	 * Underlying code distinguishes the base values from the user-specified
+	 * information by ignoring cfg[0]. Make that work by leaving base values
+	 * in cfg[0], and the collapsed user-specified values in cfg[1].
+	 */
+	cfg[1] = base_merge;
+	cfg[2] = NULL;
 
 	/*
 	 * Configuration ...
@@ -1785,25 +1811,33 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	 * Configuration completed; optionally write the base configuration file
 	 * if it doesn't already exist.
 	 */
-	WT_ERR(__conn_write_base_config(session, cfg));
+	WT_ERR(__conn_write_base_config(session, cfg, base_merge));
 
 	/*
 	 * Start the worker threads last.
 	 */
 	WT_ERR(__wt_connection_workers(session, cfg));
 
-	/* Merge the final configuration for later reconfiguration. */
-	WT_ERR(__wt_config_merge(session, cfg, &conn->cfg));
-
 	WT_STATIC_ASSERT(offsetof(WT_CONNECTION_IMPL, iface) == 0);
 	*wt_connp = &conn->iface;
 
-err:	/* Discard the configuration strings. */
-	__wt_buf_free(session, &i1);
-	__wt_buf_free(session, &i2);
-	__wt_buf_free(session, &i3);
+err:	/* Discard the scratch buffers. */
+	__wt_scr_free(session, &i1);
+	__wt_scr_free(session, &i2);
+	__wt_scr_free(session, &i3);
 
-	if (ret != 0 && conn != NULL)
+	__wt_free(session, base_merge);
+
+	/*
+	 * We may have allocated scratch memory when using the dummy session or
+	 * the subsequently created real session, and we don't want to tie down
+	 * memory for the rest of the run in either of them.
+	 */
+	if (session != &conn->dummy_session)
+		__wt_scr_discard(session);
+	__wt_scr_discard(&conn->dummy_session);
+
+	if (ret != 0)
 		WT_TRET(__wt_connection_close(conn));
 
 	return (ret);

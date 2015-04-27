@@ -45,6 +45,8 @@ __wt_conn_stat_init(WT_SESSION_IMPL *session)
 	__wt_async_stats_update(session);
 	__wt_cache_stats_update(session);
 	__wt_txn_stats_update(session);
+
+	WT_CONN_STAT(session, file_open) = S2C(session)->open_file_count;
 }
 
 /*
@@ -140,7 +142,7 @@ __statlog_dump(WT_SESSION_IMPL *session, const char *name, int conn_stats)
 	uint64_t max;
 	const char *uri;
 	const char *cfg[] = {
-	    WT_CONFIG_BASE(session, session_open_cursor), NULL };
+	    WT_CONFIG_BASE(session, WT_SESSION_open_cursor), NULL };
 
 	conn = S2C(session);
 
@@ -166,7 +168,7 @@ __statlog_dump(WT_SESSION_IMPL *session, const char *name, int conn_stats)
 		    sizeof(WT_DSRC_STATS) / sizeof(WT_STATS);
 		for (i = 0,
 		    stats = WT_CURSOR_STATS(cursor); i <  max; ++i, ++stats)
-			WT_ERR(__wt_fprintf(session, conn->stat_fp,
+			WT_ERR(__wt_fprintf(conn->stat_fp,
 			    "%s %" PRIu64 " %s %s\n",
 			    conn->stat_stamp,
 			    stats->v, name, stats->desc));
@@ -300,7 +302,7 @@ __statlog_log_one(WT_SESSION_IMPL *session, WT_ITEM *path, WT_ITEM *tmp)
 	if ((log_file = conn->stat_fp) == NULL ||
 	    path == NULL || strcmp(tmp->mem, path->mem) != 0) {
 		conn->stat_fp = NULL;
-		WT_RET(__wt_fclose(session, &log_file, WT_FHANDLE_APPEND));
+		WT_RET(__wt_fclose(&log_file, WT_FHANDLE_APPEND));
 		if (path != NULL)
 			(void)strcpy(path->mem, tmp->mem);
 		WT_RET(__wt_fopen(session,
@@ -315,11 +317,6 @@ __statlog_log_one(WT_SESSION_IMPL *session, WT_ITEM *path, WT_ITEM *tmp)
 
 	/* Dump the connection statistics. */
 	WT_RET(__statlog_dump(session, conn->home, 1));
-
-#if SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX_LOGGING
-	/* Dump the spinlock statistics. */
-	WT_RET(__wt_statlog_dump_spinlock(conn, conn->home));
-#endif
 
 	/*
 	 * Lock the schema and walk the list of open handles, dumping
@@ -344,7 +341,7 @@ __statlog_log_one(WT_SESSION_IMPL *session, WT_ITEM *path, WT_ITEM *tmp)
 		WT_RET(__statlog_lsm_apply(session));
 
 	/* Flush. */
-	return (__wt_fflush(session, conn->stat_fp));
+	return (__wt_fflush(conn->stat_fp));
 }
 
 /*
@@ -529,7 +526,7 @@ __wt_statlog_destroy(WT_SESSION_IMPL *session, int is_close)
 	conn->stat_session = NULL;
 	conn->stat_tid_set = 0;
 	conn->stat_format = NULL;
-	WT_TRET(__wt_fclose(session, &conn->stat_fp, WT_FHANDLE_APPEND));
+	WT_TRET(__wt_fclose(&conn->stat_fp, WT_FHANDLE_APPEND));
 	conn->stat_path = NULL;
 	conn->stat_sources = NULL;
 	conn->stat_stamp = NULL;

@@ -180,10 +180,11 @@ __create_colgroup(WT_SESSION_IMPL *session,
 	const char **cfgp, *cfg[4] =
 	    { WT_CONFIG_BASE(session, colgroup_meta), config, NULL, NULL };
 	const char *sourcecfg[] = { config, NULL, NULL };
-	const char *cgname, *source, *tablename;
-	char *cgconf, *sourceconf, *oldconf;
+	const char *cgname, *source, *sourceconf, *tablename;
+	char *cgconf, *oldconf;
 
-	cgconf = sourceconf = oldconf = NULL;
+	sourceconf = NULL;
+	cgconf = oldconf = NULL;
 	WT_CLEAR(fmt);
 	WT_CLEAR(confbuf);
 	WT_CLEAR(namebuf);
@@ -244,7 +245,7 @@ __create_colgroup(WT_SESSION_IMPL *session,
 		    table, cval.str, cval.len, NULL, 1, &fmt));
 	}
 	sourcecfg[1] = fmt.data;
-	WT_ERR(__wt_config_concat(session, sourcecfg, &sourceconf));
+	WT_ERR(__wt_config_merge(session, sourcecfg, NULL, &sourceconf));
 
 	WT_ERR(__wt_schema_create(session, source, sourceconf));
 
@@ -322,13 +323,14 @@ __create_index(WT_SESSION_IMPL *session,
 	const char *cfg[4] =
 	    { WT_CONFIG_BASE(session, index_meta), NULL, NULL, NULL };
 	const char *sourcecfg[] = { config, NULL, NULL };
-	const char *source, *idxname, *tablename;
-	char *sourceconf, *idxconf;
+	const char *source, *sourceconf, *idxname, *tablename;
+	char *idxconf;
 	size_t tlen;
 	int have_extractor;
 	u_int i, npublic_cols;
 
-	idxconf = sourceconf = NULL;
+	sourceconf = NULL;
+	idxconf = NULL;
 	WT_CLEAR(confbuf);
 	WT_CLEAR(fmt);
 	WT_CLEAR(extra_cols);
@@ -458,7 +460,7 @@ __create_index(WT_SESSION_IMPL *session,
 	    session, &fmt, ",index_key_columns=%u", npublic_cols));
 
 	sourcecfg[1] = fmt.data;
-	WT_ERR(__wt_config_concat(session, sourcecfg, &sourceconf));
+	WT_ERR(__wt_config_merge(session, sourcecfg, NULL, &sourceconf));
 
 	WT_ERR(__wt_schema_create(session, source, sourceconf));
 
@@ -573,7 +575,7 @@ __create_data_source(WT_SESSION_IMPL *session,
 {
 	WT_CONFIG_ITEM cval;
 	const char *cfg[] = {
-	    WT_CONFIG_BASE(session, session_create), config, NULL };
+	    WT_CONFIG_BASE(session, WT_SESSION_create), config, NULL };
 
 	/*
 	 * Check to be sure the key/value formats are legal: the underlying

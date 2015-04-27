@@ -356,11 +356,19 @@ static int
 __curfile_close(WT_CURSOR *cursor)
 {
 	WT_CURSOR_BTREE *cbt;
+	WT_CURSOR_BULK *cbulk;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_API_CALL(cursor, session, close, cbt->btree);
+	if (F_ISSET(cursor, WT_CURSTD_BULK)) {
+		/* Free the bulk-specific resources. */
+		cbulk = (WT_CURSOR_BULK *)cbt;
+		WT_TRET(__wt_bulk_wrapup(session, cbulk));
+		__wt_buf_free(session, &cbulk->last);
+	}
+
 	WT_TRET(__wt_btcur_close(cbt));
 	if (cbt->btree != NULL) {
 		/* Increment the data-source's in-use counter. */
@@ -424,8 +432,8 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 	cursor->internal_uri = btree->dhandle->name;
 	cursor->key_format = btree->key_format;
 	cursor->value_format = btree->value_format;
-
 	cbt->btree = btree;
+
 	if (bulk) {
 		F_SET(cursor, WT_CURSTD_BULK);
 
@@ -448,6 +456,9 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 		cursor->next = __curfile_next_random;
 		cursor->reset = __curfile_reset;
 	}
+
+	/* Underlying btree initialization. */
+	__wt_btcur_open(cbt);
 
 	/* __wt_cursor_init is last so we don't have to clean up on error. */
 	WT_ERR(__wt_cursor_init(

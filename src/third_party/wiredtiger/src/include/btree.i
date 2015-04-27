@@ -279,13 +279,11 @@ __wt_page_refp(WT_SESSION_IMPL *session,
 	WT_PAGE_INDEX *pindex;
 	uint32_t i;
 
-	WT_ASSERT(session, session->split_gen != 0);
-
 	/*
 	 * Copy the parent page's index value: the page can split at any time,
 	 * but the index's value is always valid, even if it's not up-to-date.
 	 */
-retry:	pindex = WT_INTL_INDEX_COPY(ref->home);
+retry:	WT_INTL_INDEX_GET(session, ref->home, pindex);
 
 	/*
 	 * Use the page's reference hint: it should be correct unless the page
@@ -967,10 +965,6 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int check_splits)
 	if (mod == NULL)
 		return (1);
 
-	/* Skip pages that are already being evicted. */
-	if (F_ISSET_ATOMIC(page, WT_PAGE_EVICT_LRU))
-		return (0);
-
 	/*
 	 * If the tree was deepened, there's a requirement that newly created
 	 * internal pages not be evicted until all threads are known to have
@@ -1098,7 +1092,13 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 	 */
 	if (ref == NULL || __wt_ref_is_root(ref))
 		return (0);
-	page = ref->page;
+
+	/*
+	 * If hazard pointers aren't necessary for this file, we can't be
+	 * evicting, we're done.
+	 */
+	if (F_ISSET(btree, WT_BTREE_IN_MEMORY))
+		return (0);
 
 	/*
 	 * Attempt to evict pages with the special "oldest" read generation.
@@ -1112,9 +1112,10 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 	 * it contains an update that isn't stable.  Also skip forced eviction
 	 * if we just did an in-memory split.
 	 */
-	if (page->read_gen != WT_READGEN_OLDEST ||
+	page = ref->page;
+	if (F_ISSET(btree, WT_BTREE_NO_EVICTION) ||
 	    LF_ISSET(WT_READ_NO_EVICT) ||
-	    F_ISSET(btree, WT_BTREE_NO_EVICTION) ||
+	    page->read_gen != WT_READGEN_OLDEST ||
 	    !__wt_page_can_evict(session, page, 1))
 		return (__wt_hazard_clear(session, page));
 
@@ -1229,13 +1230,13 @@ __wt_skip_choose_depth(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_btree_size_overflow --
- *	Check if the size of an in-memory tree with a single leaf page is over
+ * __wt_btree_lsm_size --
+ *	Return if the size of an in-memory tree with a single leaf page is over
  * a specified maximum.  If called on anything other than a simple tree with a
- * single leaf page, returns true so the calling code will switch to a new tree.
+ * single leaf page, returns true so our LSM caller will switch to a new tree.
  */
 static inline int
-__wt_btree_size_overflow(WT_SESSION_IMPL *session, uint64_t maxsize)
+__wt_btree_lsm_size(WT_SESSION_IMPL *session, uint64_t maxsize)
 {
 	WT_BTREE *btree;
 	WT_PAGE *child, *root;
@@ -1254,7 +1255,7 @@ __wt_btree_size_overflow(WT_SESSION_IMPL *session, uint64_t maxsize)
 		return (1);
 
 	/* Check for a tree with a single leaf page. */
-	pindex = WT_INTL_INDEX_COPY(root);
+	WT_INTL_INDEX_GET(session, root, pindex);
 	if (pindex->entries != 1)		/* > 1 child page, switch */
 		return (1);
 
@@ -1272,105 +1273,4 @@ __wt_btree_size_overflow(WT_SESSION_IMPL *session, uint64_t maxsize)
 		return (1);
 
 	return (child->memory_footprint > maxsize);
-}
-
-/*
- * __wt_lex_compare --
- *	Lexicographic comparison routine.
- *
- * Returns:
- *	< 0 if user_item is lexicographically < tree_item
- *	= 0 if user_item is lexicographically = tree_item
- *	> 0 if user_item is lexicographically > tree_item
- *
- * We use the names "user" and "tree" so it's clear in the btree code which
- * the application is looking at when we call its comparison func.
- */
-static inline int
-__wt_lex_compare(const WT_ITEM *user_item, const WT_ITEM *tree_item)
-{
-	const uint8_t *userp, *treep;
-	size_t len, usz, tsz;
-
-	usz = user_item->size;
-	tsz = tree_item->size;
-	len = WT_MIN(usz, tsz);
-
-	for (userp = user_item->data, treep = tree_item->data;
-	    len > 0;
-	    --len, ++userp, ++treep)
-		if (*userp != *treep)
-			return (*userp < *treep ? -1 : 1);
-
-	/* Contents are equal up to the smallest length. */
-	return ((usz == tsz) ? 0 : (usz < tsz) ? -1 : 1);
-}
-
-/*
- * __wt_compare --
- *	The same as __wt_lex_compare, but using the application's collator
- * function when configured.
- */
-static inline int
-__wt_compare(WT_SESSION_IMPL *session, WT_COLLATOR *collator,
-    const WT_ITEM *user_item, const WT_ITEM *tree_item, int *cmpp)
-{
-	if (collator == NULL) {
-		*cmpp = __wt_lex_compare(user_item, tree_item);
-		return (0);
-	}
-	return (collator->compare(
-	    collator, &session->iface, user_item, tree_item, cmpp));
-}
-
-/*
- * __wt_lex_compare_skip --
- *	Lexicographic comparison routine, skipping leading bytes.
- *
- * Returns:
- *	< 0 if user_item is lexicographically < tree_item
- *	= 0 if user_item is lexicographically = tree_item
- *	> 0 if user_item is lexicographically > tree_item
- *
- * We use the names "user" and "tree" so it's clear in the btree code which
- * the application is looking at when we call its comparison func.
- */
-static inline int
-__wt_lex_compare_skip(
-    const WT_ITEM *user_item, const WT_ITEM *tree_item, size_t *matchp)
-{
-	const uint8_t *userp, *treep;
-	size_t len, usz, tsz;
-
-	usz = user_item->size;
-	tsz = tree_item->size;
-	len = WT_MIN(usz, tsz) - *matchp;
-
-	for (userp = (uint8_t *)user_item->data + *matchp,
-	    treep = (uint8_t *)tree_item->data + *matchp;
-	    len > 0;
-	    --len, ++userp, ++treep, ++*matchp)
-		if (*userp != *treep)
-			return (*userp < *treep ? -1 : 1);
-
-	/* Contents are equal up to the smallest length. */
-	return ((usz == tsz) ? 0 : (usz < tsz) ? -1 : 1);
-}
-
-/*
- * __wt_compare_skip --
- *	The same as __wt_lex_compare_skip, but using the application's collator
- * function when configured.
- */
-static inline int
-__wt_compare_skip(WT_SESSION_IMPL *session, WT_COLLATOR *collator,
-    const WT_ITEM *user_item, const WT_ITEM *tree_item, int *cmpp,
-    size_t *matchp)
-{
-	if (collator == NULL) {
-		*cmpp = __wt_lex_compare_skip(user_item, tree_item, matchp);
-		return (0);
-	}
-	return (collator->compare(
-	    collator, &session->iface, user_item, tree_item, cmpp));
 }

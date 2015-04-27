@@ -31,10 +31,16 @@
  *	The SWIG interface file defining the wiredtiger python API.
  */
 %define DOCSTRING
-"@defgroup wt_python WiredTiger Python API
-Python wrappers aroung the WiredTiger C API.
-@{
-@cond IGNORE"
+"Python wrappers around the WiredTiger C API
+
+This provides an API similar to the C API, with the following modifications:
+  - Many C functions are exposed as OO methods. See the Python examples and test suite
+  - Errors are handled in a Pythonic way; wrap calls in try/except blocks
+  - Cursors have extra accessor methods and iterators that are higher-level than the C API
+  - Statistics cursors behave a little differently and are best handled using the C-like functions
+  - C Constants starting with WT_STAT_DSRC are instead exposed under wiredtiger.stat.dsrc
+  - C Constants starting with WT_STAT_CONN are instead exposed under wiredtiger.stat.conn
+"
 %enddef
 
 %module(docstring=DOCSTRING) wiredtiger
@@ -358,12 +364,12 @@ retry:
 	$action
 	if (result != 0 && result != EBUSY)
 		SWIG_ERROR_IF_NOT_SET(result);
-        else if (result == EBUSY) {
+	else if (result == EBUSY) {
 		SWIG_PYTHON_THREAD_BEGIN_ALLOW;
-                __wt_sleep(0, 10000);
+		__wt_sleep(0, 10000);
 		SWIG_PYTHON_THREAD_END_ALLOW;
-                goto retry;
-        }
+		goto retry;
+	}
 }
 %enddef
 
@@ -745,8 +751,8 @@ typedef int int_void;
 		}
 		else {
 			ret = $self->equals($self, other, &cmp);
-                        if (ret == 0)
-                                ret = cmp;
+			if (ret == 0)
+				ret = cmp;
 		}
 		return (ret);
 	}
@@ -842,12 +848,25 @@ typedef int int_void;
 			self._iterable = IterableCursor(self)
 		return self._iterable
 
+	def __delitem__(self, key):
+		'''Python convenience for removing'''
+		self.set_key(key)
+		if self.remove() != 0:
+			raise KeyError
+
 	def __getitem__(self, key):
 		'''Python convenience for searching'''
 		self.set_key(key)
 		if self.search() != 0:
 			raise KeyError
 		return self.get_value()
+
+	def __setitem__(self, key, value):
+		'''Python convenience for inserting'''
+		self.set_key(key)
+		self.set_value(value)
+		if self.insert() != 0:
+			raise KeyError
 %}
 };
 
@@ -870,17 +889,17 @@ typedef int int_void;
 %{
 int diagnostic_build() {
 #ifdef HAVE_DIAGNOSTIC
-        return 1;
+	return 1;
 #else
-        return 0;
+	return 0;
 #endif
 }
 
 int verbose_build() {
 #ifdef HAVE_VERBOSE
-        return 1;
+	return 1;
 #else
-        return 0;
+	return 0;
 #endif
 }
 %}
@@ -1127,8 +1146,8 @@ pythonAsyncCallback(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *asyncop, int opret,
 	int ret, t_ret;
 	PY_CALLBACK *pcb;
 	PyObject *arglist, *notify_method, *pyresult;
-        WT_ASYNC_OP_IMPL *op;
-        WT_SESSION_IMPL *session;
+	WT_ASYNC_OP_IMPL *op;
+	WT_SESSION_IMPL *session;
 
 	/*
 	 * Ensure the global interpreter lock is held since we'll be
@@ -1136,8 +1155,8 @@ pythonAsyncCallback(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *asyncop, int opret,
 	 */
 	SWIG_PYTHON_THREAD_BEGIN_BLOCK;
 
-        op = (WT_ASYNC_OP_IMPL *)asyncop;
-        session = O2S(op);
+	op = (WT_ASYNC_OP_IMPL *)asyncop;
+	session = O2S(op);
 	pcb = (PY_CALLBACK *)asyncop->c.lang_private;
 	asyncop->c.lang_private = NULL;
 	ret = 0;
@@ -1172,10 +1191,10 @@ err:		__wt_err(session, ret, "python async callback error");
 	}
 	__wt_free(session, pcb);
 
-        if (ret == 0 && (opret == 0 || opret == WT_NOTFOUND))
-	        return (0);
-        else
-                return (1);
+	if (ret == 0 && (opret == 0 || opret == WT_NOTFOUND))
+		return (0);
+	else
+		return (1);
 }
 
 static WT_ASYNC_CALLBACK pyApiAsyncCallback = { pythonAsyncCallback };

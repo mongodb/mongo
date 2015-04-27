@@ -1,15 +1,21 @@
-WiredTiger 2.5.3: (March 26, 2015)
+WiredTiger 2.6.0: (April 22, 2015)
 
-This is version 2.5.3 of WiredTiger.
+This is version 2.6.0 of WiredTiger.
 
 WiredTiger release packages and documentation can be found at:
 
 	http://source.wiredtiger.com/
 
+WiredTiger uses JIRA for issue management:
+
+	http://jira.mongodb.org/browse/WT
+
+Please do not report issues through GitHub.
+
 Information on configuring, building and installing WiredTiger can be
 found at:
 
-	http://source.wiredtiger.com/2.5.3/install.html
+	http://source.wiredtiger.com/2.6.0/install.html
 
 WiredTiger licensing information can be found at:
 

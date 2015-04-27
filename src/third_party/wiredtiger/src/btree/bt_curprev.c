@@ -301,14 +301,18 @@ __cursor_var_prev(WT_CURSOR_BTREE *cbt, int newpage)
 	WT_CELL *cell;
 	WT_CELL_UNPACK unpack;
 	WT_COL *cip;
+	WT_INSERT *ins;
 	WT_ITEM *val;
 	WT_PAGE *page;
 	WT_SESSION_IMPL *session;
 	WT_UPDATE *upd;
+	uint64_t rle_start;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 	page = cbt->ref->page;
 	val = &cbt->iface.value;
+
+	rle_start = 0;			/* -Werror=maybe-uninitialized */
 
 	/* Initialize for each new page. */
 	if (newpage) {
@@ -327,7 +331,8 @@ new_page:	if (cbt->recno < page->pg_var_recno)
 			return (WT_NOTFOUND);
 
 		/* Find the matching WT_COL slot. */
-		if ((cip = __col_var_search(page, cbt->recno)) == NULL)
+		if ((cip =
+		    __col_var_search(page, cbt->recno, &rle_start)) == NULL)
 			return (WT_NOTFOUND);
 		cbt->slot = WT_COL_SLOT(page, cip);
 
@@ -358,15 +363,47 @@ new_page:	if (cbt->recno < page->pg_var_recno)
 			if ((cell = WT_COL_PTR(page, cip)) == NULL)
 				continue;
 			__wt_cell_unpack(cell, &unpack);
-			if (unpack.type == WT_CELL_DEL)
+			if (unpack.type == WT_CELL_DEL) {
+				if (__wt_cell_rle(&unpack) == 1)
+					continue;
+				/*
+				 * There can be huge gaps in the variable-length
+				 * column-store name space appearing as deleted
+				 * records. If more than one deleted record, do
+				 * the work of finding the next record to return
+				 * instead of looping through the records.
+				 *
+				 * First, find the largest record in the update
+				 * list that's smaller than the current record.
+				 */
+				ins = __col_insert_search_lt(
+				    cbt->ins_head, cbt->recno);
+
+				/*
+				 * Second, for records with RLEs greater than 1,
+				 * the above call to __col_var_search located
+				 * this record in the page's list of repeating
+				 * records, and returned the starting record.
+				 * The starting record - 1 is the record to
+				 * which we could skip, if there was no larger
+				 * record in the update list.
+				 */
+				cbt->recno = rle_start - 1;
+				if (ins != NULL &&
+				    WT_INSERT_RECNO(ins) > cbt->recno)
+					cbt->recno = WT_INSERT_RECNO(ins);
+
+				/* Adjust for the outer loop decrement. */
+				++cbt->recno;
 				continue;
+			}
 			WT_RET(__wt_page_cell_data_ref(
-			    session, page, &unpack, &cbt->tmp));
+			    session, page, &unpack, cbt->tmp));
 
 			cbt->cip_saved = cip;
 		}
-		val->data = cbt->tmp.data;
-		val->size = cbt->tmp.size;
+		val->data = cbt->tmp->data;
+		val->size = cbt->tmp->size;
 		return (0);
 	}
 	/* NOTREACHED */

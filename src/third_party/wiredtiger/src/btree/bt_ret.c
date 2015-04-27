@@ -19,6 +19,7 @@ __wt_kv_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE *upd)
 	WT_CELL *cell;
 	WT_CELL_UNPACK unpack;
 	WT_CURSOR *cursor;
+	WT_ITEM *tmp;
 	WT_PAGE *page;
 	WT_ROW *rip;
 	uint8_t v;
@@ -79,8 +80,23 @@ __wt_kv_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE *upd)
 			cursor->key.data = WT_INSERT_KEY(cbt->ins);
 			cursor->key.size = WT_INSERT_KEY_SIZE(cbt->ins);
 		} else if (cbt->compare == 0) {
-			cursor->key.data = cbt->search_key.data;
-			cursor->key.size = cbt->search_key.size;
+			/*
+			 * If not in an insert list and there's an exact match,
+			 * the row-store search function built the key we want
+			 * to return in the cursor's temporary buffer. Swap the
+			 * cursor's search-key and temporary buffers so we can
+			 * return it (it's unsafe to return the temporary buffer
+			 * itself because our caller might do another search in
+			 * this table using the key we return, and we'd corrupt
+			 * the search key during any subsequent search that used
+			 * the temporary buffer.
+			 */
+			tmp = cbt->row_key;
+			cbt->row_key = cbt->tmp;
+			cbt->tmp = tmp;
+
+			cursor->key.data = cbt->row_key->data;
+			cursor->key.size = cbt->row_key->size;
 		} else
 			WT_RET(__wt_row_leaf_key(
 			    session, page, rip, &cursor->key, 0));

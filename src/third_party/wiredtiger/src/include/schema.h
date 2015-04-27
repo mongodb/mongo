@@ -125,11 +125,17 @@ struct __wt_table {
 	WT_CONNECTION_IMPL *__conn = S2C(session);		\
 	int __handle_locked =					\
 		F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED);\
+	int __table_locked =					\
+		F_ISSET(session, WT_SESSION_TABLE_LOCKED);	\
 	int __schema_locked =					\
 		F_ISSET(session, WT_SESSION_SCHEMA_LOCKED);	\
 	if (__handle_locked) {					\
 		F_CLR(session, WT_SESSION_HANDLE_LIST_LOCKED);	\
 		__wt_spin_unlock(session, &__conn->dhandle_lock);\
+	}							\
+	if (__table_locked) {					\
+		F_CLR(session, WT_SESSION_TABLE_LOCKED);	\
+		__wt_spin_unlock(session, &__conn->table_lock);\
 	}							\
 	if (__schema_locked) {					\
 		F_CLR(session, WT_SESSION_SCHEMA_LOCKED);	\
@@ -139,6 +145,10 @@ struct __wt_table {
 	if (__schema_locked) {					\
 		__wt_spin_lock(session, &__conn->schema_lock);	\
 		F_SET(session, WT_SESSION_SCHEMA_LOCKED);	\
+	}							\
+	if (__table_locked) {					\
+		__wt_spin_lock(session, &__conn->table_lock);	\
+		F_SET(session, WT_SESSION_TABLE_LOCKED);	\
 	}							\
 	if (__handle_locked) {					\
 		__wt_spin_lock(session, &__conn->dhandle_lock);	\

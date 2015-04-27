@@ -349,9 +349,8 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_TXN *txn;
 	WT_TXN_GLOBAL *txn_global;
 	WT_TXN_ISOLATION saved_isolation;
-	const char *txn_cfg[] =
-	    { WT_CONFIG_BASE(session, session_begin_transaction),
-	      "isolation=snapshot", NULL };
+	const char *txn_cfg[] = { WT_CONFIG_BASE(session,
+	    WT_SESSION_begin_transaction), "isolation=snapshot", NULL };
 	void *saved_meta_next;
 	int full, logging, tracking;
 	u_int i;
@@ -1090,7 +1089,7 @@ __wt_checkpoint_sync(WT_SESSION_IMPL *session, const char *cfg[])
  *	Checkpoint a single file as part of closing the handle.
  */
 int
-__wt_checkpoint_close(WT_SESSION_IMPL *session, int final, int force)
+__wt_checkpoint_close(WT_SESSION_IMPL *session, int final)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
@@ -1099,8 +1098,8 @@ __wt_checkpoint_close(WT_SESSION_IMPL *session, int final, int force)
 	btree = S2BT(session);
 	bulk = F_ISSET(btree, WT_BTREE_BULK) ? 1 : 0;
 
-	/* Handle forced discard (when dropping a file). */
-	if (force)
+	/* If the handle is already dead, force the discard. */
+	if (F_ISSET(session->dhandle, WT_DHANDLE_DEAD))
 		return (__wt_cache_op(session, NULL, WT_SYNC_DISCARD_FORCE));
 
 	/*

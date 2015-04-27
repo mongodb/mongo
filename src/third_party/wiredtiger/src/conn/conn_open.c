@@ -116,6 +116,7 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	WT_TRET(__wt_checkpoint_server_destroy(session));
 	WT_TRET(__wt_statlog_destroy(session, 1));
 	WT_TRET(__wt_sweep_destroy(session));
+	WT_TRET(__wt_evict_destroy(session));
 
 	/* Close open data handles. */
 	WT_TRET(__wt_conn_dhandle_discard(session));
@@ -152,9 +153,6 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 		WT_TRET(__wt_close(session, &fh));
 		fh = SLIST_FIRST(&conn->fhlh);
 	}
-
-	/* Shut down the eviction server thread. */
-	WT_TRET(__wt_evict_destroy(session));
 
 	/* Disconnect from shared cache - must be before cache destroy. */
 	WT_TRET(__wt_conn_cache_pool_destroy(session));
@@ -230,23 +228,22 @@ __wt_connection_workers(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_RET(__wt_evict_create(session));
 
 	/*
-	 * Start the handle sweep thread.
-	 */
-	WT_RET(__wt_sweep_create(session));
-
-	/*
 	 * Start the optional statistics thread.  Start statistics first so that
 	 * other optional threads can know if statistics are enabled or not.
 	 */
 	WT_RET(__wt_statlog_create(session, cfg));
-
-	/* Start the optional async threads. */
-	WT_RET(__wt_async_create(session, cfg));
-
 	WT_RET(__wt_logmgr_create(session, cfg));
 
 	/* Run recovery. */
 	WT_RET(__wt_txn_recover(session));
+
+	/*
+	 * Start the handle sweep thread.
+	 */
+	WT_RET(__wt_sweep_create(session));
+
+	/* Start the optional async threads. */
+	WT_RET(__wt_async_create(session, cfg));
 
 	/*
 	 * Start the optional logging/archive thread.

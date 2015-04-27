@@ -75,8 +75,8 @@ retry:
 	 */
 	my_slot = my_consume % async->async_qsize;
 	prev_slot = last_consume % async->async_qsize;
-	*op = (WT_ASYNC_OP_IMPL*)WT_ATOMIC_STORE8(
-		async->async_queue[my_slot], NULL);
+	*op = async->async_queue[my_slot];
+	async->async_queue[my_slot] = NULL;
 
 	WT_ASSERT(session, async->cur_queue > 0);
 	WT_ASSERT(session, *op != NULL);
@@ -105,12 +105,10 @@ retry:
 static int
 __async_flush_wait(WT_SESSION_IMPL *session, WT_ASYNC *async, uint64_t my_gen)
 {
-	WT_DECL_RET;
-
 	while (async->flush_state == WT_ASYNC_FLUSHING &&
 	    async->flush_gen == my_gen)
-		WT_ERR(__wt_cond_wait(session, async->flush_cond, 10000));
-err:	return (ret);
+		WT_RET(__wt_cond_wait(session, async->flush_cond, 10000));
+	return (0);
 }
 
 /*

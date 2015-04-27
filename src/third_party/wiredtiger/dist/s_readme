@@ -35,6 +35,12 @@ WiredTiger release packages and documentation can be found at:
 
 	http://source.wiredtiger.com/
 
+WiredTiger uses JIRA for issue management:
+
+	http://jira.mongodb.org/browse/WT
+
+Please do not report issues through GitHub.
+
 Information on configuring, building and installing WiredTiger can be
 found at:
 

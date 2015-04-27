@@ -254,13 +254,13 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 
 	/* Eviction; the metadata file is never evicted. */
 	if (WT_IS_METADATA(btree->dhandle))
-		F_SET(btree, WT_BTREE_NO_EVICTION | WT_BTREE_NO_HAZARD);
+		F_SET(btree, WT_BTREE_IN_MEMORY | WT_BTREE_NO_EVICTION);
 	else {
 		WT_RET(__wt_config_gets(session, cfg, "cache_resident", &cval));
 		if (cval.val)
-			F_SET(btree, WT_BTREE_NO_EVICTION | WT_BTREE_NO_HAZARD);
+			F_SET(btree, WT_BTREE_IN_MEMORY | WT_BTREE_NO_EVICTION);
 		else
-			F_CLR(btree, WT_BTREE_NO_EVICTION);
+			F_CLR(btree, WT_BTREE_IN_MEMORY | WT_BTREE_NO_EVICTION);
 	}
 
 	/* Checksums */
@@ -422,7 +422,7 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, int creation)
 		    __wt_page_alloc(session, WT_PAGE_COL_INT, 1, 1, 1, &root));
 		root->pg_intl_parent_ref = &btree->root;
 
-		pindex = WT_INTL_INDEX_COPY(root);
+		pindex = WT_INTL_INDEX_GET_SAFE(root);
 		ref = pindex->index[0];
 		ref->home = root;
 		ref->page = NULL;
@@ -435,7 +435,7 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, int creation)
 		    __wt_page_alloc(session, WT_PAGE_ROW_INT, 0, 1, 1, &root));
 		root->pg_intl_parent_ref = &btree->root;
 
-		pindex = WT_INTL_INDEX_COPY(root);
+		pindex = WT_INTL_INDEX_GET_SAFE(root);
 		ref = pindex->index[0];
 		ref->home = root;
 		ref->page = NULL;
@@ -507,8 +507,11 @@ __wt_btree_evictable(WT_SESSION_IMPL *session, int on)
 
 	btree = S2BT(session);
 
-	/* The metadata file is never evicted. */
-	if (on && !WT_IS_METADATA(btree->dhandle))
+	/* Permanently cache-resident files can never be evicted. */
+	if (F_ISSET(btree, WT_BTREE_IN_MEMORY))
+		return;
+
+	if (on)
 		F_CLR(btree, WT_BTREE_NO_EVICTION);
 	else
 		F_SET(btree, WT_BTREE_NO_EVICTION);

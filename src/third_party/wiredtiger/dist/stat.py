@@ -123,7 +123,13 @@ __wt_stat_refresh_''' + name + '''_stats(void *stats_arg)
     f.write('}\n')
 
     # Aggregation is only interesting for data-source statistics.
+    # Complain if any aggregation flags are set.
     if name == 'connection':
+        for l in sorted(list):
+            if 'no_aggregate' in l.flags or 'max_aggregate' in l.flags:
+                print >>sys.stdout,\
+                    "Aggregation configuration for " +\
+                    name + "." + l.name + " statistics not supported"
         return;
 
     f.write('''
