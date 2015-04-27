@@ -233,7 +233,7 @@ extern int __wt_conn_btree_apply(WT_SESSION_IMPL *session, int apply_checkpoints
 extern int __wt_conn_btree_apply_single_ckpt(WT_SESSION_IMPL *session, const char *uri, int (*func)(WT_SESSION_IMPL *, const char *[]), const char *cfg[]);
 extern int __wt_conn_btree_apply_single(WT_SESSION_IMPL *session, const char *uri, const char *checkpoint, int (*func)(WT_SESSION_IMPL *, const char *[]), const char *cfg[]);
 extern int __wt_conn_dhandle_close_all( WT_SESSION_IMPL *session, const char *name, int force);
-extern int __wt_conn_dhandle_discard_single(WT_SESSION_IMPL *session, int final);
+extern int __wt_conn_dhandle_discard_single(WT_SESSION_IMPL *session, int final, int force);
 extern int __wt_conn_dhandle_discard(WT_SESSION_IMPL *session);
 extern int __wt_connection_init(WT_CONNECTION_IMPL *conn);
 extern int __wt_connection_destroy(WT_CONNECTION_IMPL *conn);
@@ -577,7 +577,7 @@ extern int __wt_open_internal_session(WT_CONNECTION_IMPL *conn, const char *name
 extern int __wt_open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler, const char *config, WT_SESSION_IMPL **sessionp);
 extern int __wt_compact_uri_analyze(WT_SESSION_IMPL *session, const char *uri, int *skip);
 extern int __wt_session_compact( WT_SESSION *wt_session, const char *uri, const char *config);
-extern int __wt_session_lock_dhandle(WT_SESSION_IMPL *session, uint32_t flags);
+extern int __wt_session_lock_dhandle(WT_SESSION_IMPL *session, uint32_t flags, int *deadp);
 extern int __wt_session_release_btree(WT_SESSION_IMPL *session);
 extern int __wt_session_get_btree_ckpt(WT_SESSION_IMPL *session, const char *uri, const char *cfg[], uint32_t flags);
 extern void __wt_session_close_cache(WT_SESSION_IMPL *session);
@@ -671,7 +671,7 @@ extern int __wt_checkpoint_list(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_checkpoint_sync(WT_SESSION_IMPL *session, const char *cfg[]);
-extern int __wt_checkpoint_close(WT_SESSION_IMPL *session, int final, int force);
+extern int __wt_checkpoint_close(WT_SESSION_IMPL *session, int final);
 extern uint64_t __wt_ext_transaction_id(WT_EXTENSION_API *wt_api, WT_SESSION *wt_session);
 extern int __wt_ext_transaction_isolation_level( WT_EXTENSION_API *wt_api, WT_SESSION *wt_session);
 extern int __wt_ext_transaction_notify( WT_EXTENSION_API *wt_api, WT_SESSION *wt_session, WT_TXN_NOTIFY *notify);
