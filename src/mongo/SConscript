@@ -70,10 +70,6 @@ env.SConscript(
     ],
 )
 
-
-def add_exe( v ):
-    return "${PROGPREFIX}%s${PROGSUFFIX}" % v
-
 # ------    SOURCE FILE SETUP -----------
 
 env.Library('bson', [
@@ -666,6 +662,9 @@ distBinaries = []
 
 if env.TargetOSIs('windows'):
     distBinaries.extend(['mongod.pdb', 'mongos.pdb'])
+
+def add_exe( v ):
+    return "${PROGPREFIX}%s${PROGSUFFIX}" % v
 
 def installBinary( e, name ):
     name = add_exe( name )
