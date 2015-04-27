@@ -80,7 +80,8 @@ __sweep_expire(WT_SESSION_IMPL *session)
 
 		if (WT_IS_METADATA(dhandle))
 			continue;
-		if (F_ISSET(dhandle, WT_DHANDLE_DEAD))
+		if (!F_ISSET(dhandle, WT_DHANDLE_OPEN) ||
+		    F_ISSET(dhandle, WT_DHANDLE_DEAD))
 			continue;
 		if (dhandle->session_inuse != 0 ||
 		    now <= dhandle->timeofdeath + conn->sweep_idle_time)
@@ -118,9 +119,8 @@ __sweep_expire(WT_SESSION_IMPL *session)
 		 * handle. Closing the handle decrements the open file count,
 		 * meaning the close loop won't overrun the configured minimum.
 		 */
-		if (F_ISSET(dhandle, WT_DHANDLE_OPEN))
-			WT_WITH_DHANDLE(session, dhandle, ret =
-			    __wt_conn_btree_sync_and_close(session, 0, 1));
+		WT_WITH_DHANDLE(session, dhandle, ret =
+		    __wt_conn_btree_sync_and_close(session, 0, 1));
 
 unlock:		WT_TRET(__wt_writeunlock(session, dhandle->rwlock));
 		WT_RET_BUSY_OK(ret);
@@ -143,17 +143,9 @@ __sweep_flush(WT_SESSION_IMPL *session)
 
 	WT_STAT_FAST_CONN_INCR(session, dh_conn_sweeps);
 	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
-		if (!F_ISSET(dhandle, WT_DHANDLE_DEAD))
+		if (!F_ISSET(dhandle, WT_DHANDLE_OPEN) ||
+		    !F_ISSET(dhandle, WT_DHANDLE_DEAD))
 			continue;
-
-		/*
-		 * We have a candidate for closing; if it's open, acquire an
-		 * exclusive lock on the handle and close it.
-		 */
-		if ((ret =
-		    __wt_try_writelock(session, dhandle->rwlock)) == EBUSY)
-			continue;
-		WT_RET(ret);
 
 		/* If the handle is marked "dead", flush it from cache. */
 		WT_WITH_DHANDLE(session, dhandle, ret =
@@ -163,7 +155,6 @@ __sweep_flush(WT_SESSION_IMPL *session)
 		if (ret == 0)
 			WT_STAT_FAST_CONN_INCR(session, dh_conn_handles);
 
-		WT_TRET(__wt_writeunlock(session, dhandle->rwlock));
 		WT_RET_BUSY_OK(ret);
 	}
 
@@ -188,7 +179,9 @@ __sweep_remove_handles(WT_SESSION_IMPL *session)
 		dhandle_next = SLIST_NEXT(dhandle, l);
 		if (WT_IS_METADATA(dhandle))
 			continue;
-		if (F_ISSET(dhandle, WT_DHANDLE_OPEN))
+		if (F_ISSET(dhandle, WT_DHANDLE_OPEN) ||
+		    dhandle->session_inuse != 0 ||
+		    dhandle->session_ref != 0)
 			continue;
 
 		/* Make sure we get exclusive access. */

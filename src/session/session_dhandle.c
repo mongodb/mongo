@@ -296,7 +296,8 @@ __session_dhandle_sweep(WT_SESSION_IMPL *session)
 		dhandle = dhandle_cache->dhandle;
 		if (dhandle != session->dhandle &&
 		    dhandle->session_inuse == 0 &&
-		    now - dhandle->timeofdeath > conn->sweep_idle_time) {
+		    (F_ISSET(dhandle, WT_DHANDLE_DEAD) ||
+		    now - dhandle->timeofdeath > conn->sweep_idle_time)) {
 			WT_STAT_FAST_CONN_INCR(session, dh_session_handles);
 			__session_discard_btree(session, dhandle_cache);
 		}
@@ -342,8 +343,6 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 	bucket = __wt_hash_city64(uri, strlen(uri)) % WT_HASH_ARRAY_SIZE;
 	SLIST_FOREACH(dhandle_cache, &session->dhhash[bucket], hashl) {
 		dhandle = dhandle_cache->dhandle;
-		if (F_ISSET(dhandle, WT_DHANDLE_DEAD))
-			continue;
 		if (strcmp(uri, dhandle->name) != 0)
 			continue;
 		if (checkpoint == NULL && dhandle->checkpoint == NULL)
@@ -387,8 +386,12 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 		    WT_SESSION_HANDLE_LIST_LOCKED | WT_SESSION_TABLE_LOCKED)))
 			return (ret);
 
-		/* We found the data handle, don't try to get it again. */
-		if (!is_dead)
+		/* If we found the handle and it isn't dead, reopen it. */
+		if (is_dead) {
+			__session_discard_btree(session, dhandle_cache);
+			dhandle_cache = NULL;
+			session->dhandle = dhandle = NULL;
+		} else
 			LF_SET(WT_DHANDLE_HAVE_REF);
 	}
 
