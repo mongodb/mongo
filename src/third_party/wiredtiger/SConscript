@@ -3,6 +3,7 @@ import re
 import textwrap
 
 Import("env windows darwin solaris linux freebsd openbsd debugBuild")
+Import("get_option")
 
 env = env.Clone()
 env.InjectThirdPartyIncludePaths(libraries=['snappy', 'zlib'])
@@ -20,6 +21,9 @@ if debugBuild:
 
 if windows:
     env.Append(CPPPATH=["build_win"])
+    if get_option('allocator') == 'tcmalloc':
+        env.InjectThirdPartyIncludePaths(libraries=['gperftools'])
+        env.Append(CPPDEFINES=['HAVE_LIBTCMALLOC'])
 elif darwin:
     env.Append(CPPPATH=["build_darwin"])
 elif solaris:
