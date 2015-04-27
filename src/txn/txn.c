@@ -202,13 +202,13 @@ __txn_refresh(WT_SESSION_IMPL *session, const int get_snapshot)
 	    (!get_snapshot || oldest_id - prev_oldest_id > 100) &&
 	    WT_ATOMIC_CAS4(txn_global->scan_count, 1, -1)) {
 		WT_ORDERED_READ(session_cnt, conn->session_cnt);
+		ckpt_id = txn_global->checkpoint_id;
 		for (i = 0, s = txn_global->states; i < session_cnt; i++, s++) {
 			/*
 			 * Skip the checkpoint transaction; it is never read
 			 * from.
 			 */
-			if (txn_global->checkpoint_id != WT_TXN_NONE &&
-			    s->id == txn_global->checkpoint_id)
+			if (ckpt_id != WT_TXN_NONE && ckpt_id == s->id)
 				continue;
 
 			if ((id = s->id) != WT_TXN_NONE &&
