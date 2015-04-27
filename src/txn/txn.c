@@ -60,12 +60,12 @@ __wt_txn_release_snapshot(WT_SESSION_IMPL *session)
 	txn = &session->txn;
 	txn_state = &S2C(session)->txn_global.states[session->id];
 
-	if (txn_state->snap_min != WT_TXN_NONE) {
-		WT_ASSERT(session,
-		    session->txn.isolation == TXN_ISO_READ_UNCOMMITTED ||
-		    !__wt_txn_visible_all(session, txn_state->snap_min));
-		txn_state->snap_min = WT_TXN_NONE;
-	}
+	WT_ASSERT(session,
+	    txn_state->snap_min == WT_TXN_NONE ||
+	    session->txn.isolation == TXN_ISO_READ_UNCOMMITTED ||
+	    !__wt_txn_visible_all(session, txn_state->snap_min));
+
+	txn_state->snap_min = WT_TXN_NONE;
 	F_CLR(txn, TXN_HAS_SNAPSHOT);
 }
 
