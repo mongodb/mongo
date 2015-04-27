@@ -139,13 +139,13 @@ __wt_txn_visible(WT_SESSION_IMPL *session, uint64_t id)
 
 	txn = &session->txn;
 
-	/* Nobody sees the results of aborted transactions. */
-	if (id == WT_TXN_ABORTED)
-		return (0);
-
 	/* Changes with no associated transaction are always visible. */
 	if (id == WT_TXN_NONE)
 		return (1);
+
+	/* Nobody sees the results of aborted transactions. */
+	if (id == WT_TXN_ABORTED)
+		return (0);
 
 	/*
 	 * Eviction only sees globally visible updates, or if there is a
