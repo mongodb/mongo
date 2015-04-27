@@ -258,28 +258,6 @@ env.CppUnitTest(
     LIBDEPS=["mongocommon"]
 )
 
-if get_option('allocator') == 'tcmalloc':
-    tcmspEnv = env.Clone()
-
-    if not use_system_version_of_library('tcmalloc'):
-
-        # Add in the include path for our vendored tcmalloc.
-        tcmspEnv.InjectThirdPartyIncludePaths('gperftools')
-
-        # If our changes to tcmalloc are ever upstreamed, this should become set based on a top
-        # level configure check, though its effects should still be scoped just to these files.
-        tcmspEnv.Append(
-            CPPDEFINES=['MONGO_HAVE_GPERFTOOLS_GET_THREAD_CACHE_SIZE']
-        )
-
-    tcmspEnv.Library('tcmalloc_set_parameter',
-                [
-                    'util/tcmalloc_server_status_section.cpp',
-                    'util/tcmalloc_set_parameter.cpp',
-                ],
-                LIBDEPS=['db/server_parameters'],
-                LIBDEPS_DEPENDENTS=['mongod', 'mongos'])
-
 coredbEnv = env.Clone()
 coredbEnv.InjectThirdPartyIncludePaths(libraries=['snappy'])
 coredbEnv.Library("coredb", [

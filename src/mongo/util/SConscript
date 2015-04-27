@@ -1,7 +1,9 @@
 # -*- mode: python -*-
 
 Import("env")
+Import("get_option")
 Import("has_option")
+Import("use_system_version_of_library")
 
 env.Library(
     target='intrusive_counter',
@@ -219,3 +221,34 @@ env.CppUnitTest(
         "net/network", # Temporary crutch since the ssl cleanup is hard coded in background.cpp
     ],
 )
+
+if get_option('allocator') == 'tcmalloc':
+    tcmspEnv = env.Clone()
+
+    if not use_system_version_of_library('tcmalloc'):
+
+        # Add in the include path for our vendored tcmalloc.
+        tcmspEnv.InjectThirdPartyIncludePaths('gperftools')
+
+        # If our changes to tcmalloc are ever upstreamed, this should become set based on a top
+        # level configure check, though its effects should still be scoped just to these files.
+        tcmspEnv.Append(
+            CPPDEFINES=[
+                'MONGO_HAVE_GPERFTOOLS_GET_THREAD_CACHE_SIZE'
+            ]
+        )
+
+    tcmspEnv.Library(
+        target='tcmalloc_set_parameter',
+        source=[
+            'tcmalloc_server_status_section.cpp',
+            'tcmalloc_set_parameter.cpp',
+        ],
+        LIBDEPS=[
+            '$BUILD_DIR/mongo/db/server_parameters',
+        ],
+        LIBDEPS_DEPENDENTS=[
+            '$BUILD_DIR/mongo/${PROGPREFIX}mongod${PROGSUFFIX}',
+            '$BUILD_DIR/mongo/${PROGPREFIX}mongos${PROGSUFFIX}',
+        ],
+    )
