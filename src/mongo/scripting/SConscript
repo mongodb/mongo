@@ -81,3 +81,12 @@ env.Library(
         'scripting' if serverJs else 'scripting_none',
     ],
 )
+
+env.CppUnitTest(
+    target='v8_deadline_monitor_test',
+    source=[
+        'v8_deadline_monitor_test.cpp',
+    ],
+    LIBDEPS=[
+    ],
+)

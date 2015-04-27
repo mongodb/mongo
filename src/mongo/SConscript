@@ -470,8 +470,6 @@ serverOnlyFiles = [ "db/background.cpp",
                     "util/logfile.cpp",
                 ]
 
-env.CppUnitTest('v8_deadline_monitor_test', 'scripting/v8_deadline_monitor_test.cpp', LIBDEPS=[])
-
 env.Library('stacktrace',
             'util/stacktrace_${TARGET_OS_FAMILY}.cpp',
             LIBDEPS=['bson',
