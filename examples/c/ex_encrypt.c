@@ -76,47 +76,19 @@ MY_CRYPTO my_crypto_global;
 #define	IV_LEN		16
 
 /*
- * compute_cksum --
- *	Compute a simple checksum on the data.
+ * make_cksum --
+ *	This is where one would call a checksum function on the encrypted
  *	buffer.  Here we just put random values in it.
  */
-static uint32_t
-compute_cksum(uint8_t *src, size_t srclen)
-{
-	uint32_t sum;
-	size_t i;
-
-	sum = 0;
-	for (i = 0; i < srclen; i++)
-		sum = ((sum << 3) | (sum >> 29)) ^ src[i];
-	return (sum);
-}
-
 static int
-make_cksum(uint8_t *dst, uint8_t *src, size_t srclen)
+make_cksum(uint8_t *dst)
 {
-	uint32_t sum;
-
-	sum = compute_cksum(src, srclen);
-	dst[0] = (sum >> 24) & 0xff;
-	dst[1] = (sum >> 16) & 0xff;
-	dst[2] = (sum >> 8) & 0xff;
-	dst[3] = sum & 0xff;
-	return (0);
-}
-
-static int
-check_cksum(uint8_t *dst, uint8_t *src, size_t srclen)
-{
-	uint32_t sum;
-
-	sum = compute_cksum(src, srclen);
-	if (dst[0] != ((sum >> 24) & 0xff) ||
-	    dst[1] != ((sum >> 16) & 0xff) ||
-	    dst[2] != ((sum >> 8) & 0xff) ||
-	    dst[3] != (sum & 0xff))
-		return (EINVAL);
-
+	int i;
+	/*
+	 * Assume array is big enough for the checksum.
+	 */
+	for (i = 0; i < CHKSUM_LEN; i++)
+		dst[i] = (uint8_t)random();
 	return (0);
 }
 
@@ -171,7 +143,6 @@ rotate_decrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
     uint8_t *dst, size_t dst_len,
     size_t *result_lenp)
 {
-	int ret;
 	MY_CRYPTO *my_crypto = (MY_CRYPTO *)encryptor;
 	uint32_t i;
 
@@ -191,29 +162,22 @@ rotate_decrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	}
 
 	/*
+	 * !!! Most implementations would verify the checksum here.
+	 */
+	/*
 	 * Copy the encrypted data to the destination buffer and then
 	 * decrypt the destination buffer in place.
 	 */
-	/*
-	 * !!! Most implementations would need the IV to initialize
-	 * the encryption algorith.  For now, we skip over it
-	 * and the checksum.
-	 */
-	i = IV_LEN + CHKSUM_LEN;
+	i = CHKSUM_LEN + IV_LEN;
 	memcpy(&dst[0], &src[i], dst_len);
 	/*
 	 * Call common rotate function on the text portion of the
 	 * buffer.  Send in dst_len as the length of the text.
 	 */
-	do_rotate(&dst[0], dst_len, 26 - my_crypto->rot_N);
-
 	/*
-	 * Our checksum is over the unencrypted content, so we
-	 * verify it here.
+	 * !!! Most implementations would need the IV too.
 	 */
-	if ((ret = check_cksum(&src[IV_LEN], &dst[0], dst_len)) != 0)
-	    return (ret);
-
+	do_rotate(&dst[0], dst_len, 26 - my_crypto->rot_N);
 	*result_lenp = dst_len;
 	return (0);
 }
@@ -253,12 +217,12 @@ rotate_encrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	 */
 	do_rotate(&dst[i], src_len, my_crypto->rot_N);
 	/*
-	 * Add a checksum of the unencrypted contents and add the IV.
+	 * Checksum the encrypted buffer and add the IV.
 	 */
 	i = 0;
+	make_cksum(&dst[i]);
+	i += CHKSUM_LEN;
 	make_iv(&dst[i]);
-	i += IV_LEN;
-	make_cksum(&dst[i], &src[0], src_len);
 	*result_lenp = dst_len;
 	return (0);
 }

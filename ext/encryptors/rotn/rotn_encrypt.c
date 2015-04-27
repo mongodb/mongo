@@ -67,14 +67,14 @@
 
 /* Local encryptor structure. */
 typedef struct {
-	WT_ENCRYPTOR encryptor;		/* Must come first */
-	WT_EXTENSION_API *wt_api;	/* Extension API */
-	uint32_t rot_N;			/* rotN value */
-	char *keyid;			/* Saved keyid */
+	WT_ENCRYPTOR encryptor;	/* Must come first */
+	WT_EXTENSION_API *wt_api; /* Extension API */
+	uint32_t rot_N;		/* rotN value */
+	char *keyid;		/* Saved keyid */
 	char *secretkey;		/* Saved secretkey */
-	unsigned char *shift_forw;	/* Encrypt shift data from secretkey */
-	unsigned char *shift_back;	/* Decrypt shift data from secretkey */
-	size_t shift_len;		/* Length of shift* byte arrays */
+	unsigned char *shift_forw; /* Encrypt shift data from secretkey */
+	unsigned char *shift_back; /* Decrypt shift data from secretkey */
+	size_t shift_len;	/* Length of shift* byte arrays */
 
 } ROTN_ENCRYPTOR;
 /*! [WT_ENCRYPTOR initialization structure] */
@@ -83,47 +83,19 @@ typedef struct {
 #define	IV_LEN		16
 
 /*
- * compute_cksum --
- *	Compute a simple checksum on the data.
+ * make_cksum --
+ *	This is where one would call a checksum function on the encrypted
  *	buffer.  Here we just put random values in it.
  */
-static uint32_t
-compute_cksum(uint8_t *src, size_t srclen)
-{
-	uint32_t sum;
-	size_t i;
-
-	sum = 0;
-	for (i = 0; i < srclen; i++)
-		sum = ((sum << 3) | (sum >> 29)) ^ src[i];
-	return (sum);
-}
-
 static int
-make_cksum(uint8_t *dst, uint8_t *src, size_t srclen)
+make_cksum(uint8_t *dst)
 {
-	uint32_t sum;
-
-	sum = compute_cksum(src, srclen);
-	dst[0] = (sum >> 24) & 0xff;
-	dst[1] = (sum >> 16) & 0xff;
-	dst[2] = (sum >> 8) & 0xff;
-	dst[3] = sum & 0xff;
-	return (0);
-}
-
-static int
-check_cksum(uint8_t *dst, uint8_t *src, size_t srclen)
-{
-	uint32_t sum;
-
-	sum = compute_cksum(src, srclen);
-	if (dst[0] != ((sum >> 24) & 0xff) ||
-	    dst[1] != ((sum >> 16) & 0xff) ||
-	    dst[2] != ((sum >> 8) & 0xff) ||
-	    dst[3] != (sum & 0xff))
-		return (EINVAL);
-
+	int i;
+	/*
+	 * Assume array is big enough for the checksum.
+	 */
+	for (i = 0; i < CHKSUM_LEN; i++)
+		dst[i] = (uint8_t)random();
 	return (0);
 }
 
@@ -218,12 +190,12 @@ rotn_encrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 		do_shift(&dst[i], src_len,
 		    rotn_encryptor->shift_forw,  rotn_encryptor->shift_len);
 	/*
-	 * Add a checksum of the unencrypted contents and add the IV.
+	 * Checksum the encrypted buffer and add the IV.
 	 */
 	i = 0;
+	make_cksum(&dst[i]);
+	i += CHKSUM_LEN;
 	make_iv(&dst[i]);
-	i += IV_LEN;
-	make_cksum(&dst[i], &src[0], src_len);
 	*result_lenp = dst_len;
 	return (0);
 }
@@ -240,7 +212,6 @@ rotn_decrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
     uint8_t *dst, size_t dst_len,
     size_t *result_lenp)
 {
-	int ret;
 	ROTN_ENCRYPTOR *rotn_encryptor = (ROTN_ENCRYPTOR *)encryptor;
 	uint32_t i;
 
@@ -257,8 +228,11 @@ rotn_decrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	}
 
 	/*
+	 * !!! Most implementations would verify the checksum here.
+	 */
+	/*
 	 * Copy the encrypted data to the destination buffer and then
-	 * decrypt the destination buffer in place.
+	 * decrypt the destination buffer.
 	 */
 	i = CHKSUM_LEN + IV_LEN;
 	memcpy(&dst[0], &src[i], dst_len);
@@ -276,14 +250,6 @@ rotn_decrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	else
 		do_shift(&dst[0], dst_len,
 		    rotn_encryptor->shift_back,  rotn_encryptor->shift_len);
-
-	/*
-	 * Our checksum is over the unencrypted content, so we
-	 * verify it here.
-	 */
-	if ((ret = check_cksum(&src[IV_LEN], &dst[0], dst_len)) != 0)
-	    return (ret);
-
 	*result_lenp = dst_len;
 	return (0);
 }
@@ -324,7 +290,6 @@ rotn_customize(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	WT_EXTENSION_API *wt_api;
 
 	ret = 0;
-	keyid_val = 0;
 
 	orig = (const ROTN_ENCRYPTOR *)encryptor;
 	wt_api = orig->wt_api;
@@ -335,8 +300,15 @@ rotn_customize(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	rotn_encryptor->keyid = rotn_encryptor->secretkey = NULL;
 
 	/*
-	 * Stash the keyid from the configuration string.
 	 * In this demonstration, we expect keyid to be a number.
+	 */
+	if ((keyid_val = atoi(keyid.str)) < 0) {
+		ret = EINVAL;
+		goto err;
+	}
+
+	/*
+	 * Stash the keyid from the configuration string.
 	 */
 	if ((ret = wt_api->config_get(wt_api, session, encrypt_config,
 	    "keyid", &keyid)) == 0 && keyid.len != 0) {
@@ -346,11 +318,6 @@ rotn_customize(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 		}
 		strncpy(rotn_encryptor->keyid, keyid.str, keyid.len + 1);
 		rotn_encryptor->keyid[keyid.len] = '\0';
-
-		if ((keyid_val = atoi(keyid.str)) < 0) {
-			ret = EINVAL;
-			goto err;
-		}
 	}
 
 	/*
