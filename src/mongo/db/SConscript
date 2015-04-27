@@ -281,3 +281,31 @@ env.CppUnitTest(
         'server_options',
     ],
 )
+
+env.Library(
+    target='range_deleter',
+    source=[
+        'range_deleter.cpp',
+        'range_deleter_mock_env.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base/base',
+        '$BUILD_DIR/mongo/bson',
+        '$BUILD_DIR/mongo/db/repl/repl_coordinator_global',
+        '$BUILD_DIR/mongo/service_context',
+        '$BUILD_DIR/mongo/util/concurrency/synchronization',
+        'range_arithmetic',
+    ],
+)
+
+env.CppUnitTest(
+    target='range_deleter_test',
+    source=[
+        'range_deleter_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/repl/replmocks',
+        'common',
+        'range_deleter',
+    ],
+)

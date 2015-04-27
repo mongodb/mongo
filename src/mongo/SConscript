@@ -482,27 +482,6 @@ if has_option( 'use-cpu-profiler' ):
     # just to this file.
     env.InjectThirdPartyIncludePaths('tcmalloc')
 
-env.Library('range_deleter',
-            [ 'db/range_deleter.cpp',
-              'db/range_deleter_mock_env.cpp',
-            ],
-            LIBDEPS = [
-                '$BUILD_DIR/mongo/db/repl/repl_coordinator_global',
-                'base/base',
-                'bson',
-                'service_context',
-                'db/range_arithmetic',
-                'util/concurrency/synchronization'
-            ])
-
-env.CppUnitTest('range_deleter_test',
-                [ 'db/range_deleter_test.cpp' ],
-                LIBDEPS = [
-                    '$BUILD_DIR/mongo/db/repl/replmocks',
-                    'db/common',
-                    'range_deleter',
-                ])
-
 serveronlyEnv = env.Clone()
 serveronlyEnv.InjectThirdPartyIncludePaths(libraries=['snappy'])
 serveronlyLibdeps = ["s/coreshard",
@@ -515,7 +494,7 @@ serveronlyLibdeps = ["s/coreshard",
                      "db/ops/update_driver",
                      "db/global_timestamp",
                      "db/catalog/index_key_validate",
-                     'range_deleter',
+                     'db/range_deleter',
                      'scripting/scripting_server',
                      "db/update_index_data",
                      's/metadata',
