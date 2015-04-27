@@ -70,32 +70,11 @@ __wt_txn_release_snapshot(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_txn_update_oldest --
- *	Sweep the running transactions to update the oldest ID required.
- */
-void
-__wt_txn_update_oldest(WT_SESSION_IMPL *session)
-{
-	/*
-	 * !!!
-	 * If a data-source is calling the WT_EXTENSION_API.transaction_oldest
-	 * method (for the oldest transaction ID not yet visible to a running
-	 * transaction), and then comparing that oldest ID against committed
-	 * transactions to see if updates for a committed transaction are still
-	 * visible to running transactions, the oldest transaction ID may be
-	 * the same as the last committed transaction ID, if the transaction
-	 * state wasn't refreshed after the last transaction committed.  Push
-	 * past the last committed transaction.
-	 */
-	__wt_txn_refresh(session, 0);
-}
-
-/*
- * __wt_txn_refresh --
+ * __txn_refresh --
  *	Allocate a transaction ID and/or a snapshot.
  */
-void
-__wt_txn_refresh(WT_SESSION_IMPL *session, int get_snapshot)
+static inline void
+__txn_refresh(WT_SESSION_IMPL *session, const int get_snapshot)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_TXN *txn;
@@ -261,6 +240,37 @@ __wt_txn_refresh(WT_SESSION_IMPL *session, int get_snapshot)
 
 	if (get_snapshot)
 		__txn_sort_snapshot(session, n, current_id);
+}
+
+/*
+ * __wt_txn_snapshot --
+ *	Allocate a snapshot.
+ */
+void
+__wt_txn_snapshot(WT_SESSION_IMPL *session)
+{
+	__txn_refresh(session, 1);
+}
+
+/*
+ * __wt_txn_update_oldest --
+ *	Sweep the running transactions to update the oldest ID required.
+ */
+void
+__wt_txn_update_oldest(WT_SESSION_IMPL *session)
+{
+	/*
+	 * !!!
+	 * If a data-source is calling the WT_EXTENSION_API.transaction_oldest
+	 * method (for the oldest transaction ID not yet visible to a running
+	 * transaction), and then comparing that oldest ID against committed
+	 * transactions to see if updates for a committed transaction are still
+	 * visible to running transactions, the oldest transaction ID may be
+	 * the same as the last committed transaction ID, if the transaction
+	 * state wasn't refreshed after the last transaction committed.  Push
+	 * past the last committed transaction.
+	 */
+	__txn_refresh(session, 0);
 }
 
 /*
