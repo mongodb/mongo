@@ -1,10 +1,12 @@
+var db;
+
 (function() {
      "use strict"
 
      var myShardingTest = new ShardingTest("sharding_passthrough", 1, 0, 1);
      myShardingTest.adminCommand({ enablesharding : "test" });
 
-     var db = myShardingTest.getDB("test");
+     db = myShardingTest.getDB("test");
      db.getMongo().forceWriteMode("commands");
      _useWriteCommandsDefault = function() { return true; }; // for tests launching parallel shells.
 
