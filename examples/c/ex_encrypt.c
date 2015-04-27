@@ -144,6 +144,7 @@ rotate_decrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
     size_t *result_lenp)
 {
 	MY_CRYPTO *my_crypto = (MY_CRYPTO *)encryptor;
+	size_t mylen;
 	uint32_t i;
 
 	(void)session;		/* Unused */
@@ -154,7 +155,8 @@ rotate_decrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	/*
 	 * Make sure it is big enough.
 	 */
-	if (dst_len < src_len - CHKSUM_LEN - IV_LEN) {
+	mylen = src_len - CHKSUM_LEN - IV_LEN;
+	if (dst_len < mylen) {
 		fprintf(stderr,
 		    "Rotate: ENOMEM ERROR: dst_len %lu src_len %lu\n",
 		    dst_len, src_len);
@@ -169,7 +171,7 @@ rotate_decrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	 * decrypt the destination buffer in place.
 	 */
 	i = CHKSUM_LEN + IV_LEN;
-	memcpy(&dst[0], &src[i], dst_len);
+	memcpy(&dst[0], &src[i], mylen);
 	/*
 	 * Call common rotate function on the text portion of the
 	 * buffer.  Send in dst_len as the length of the text.
@@ -177,8 +179,8 @@ rotate_decrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	/*
 	 * !!! Most implementations would need the IV too.
 	 */
-	do_rotate(&dst[0], dst_len, 26 - my_crypto->rot_N);
-	*result_lenp = dst_len;
+	do_rotate(&dst[0], mylen, 26 - my_crypto->rot_N);
+	*result_lenp = mylen;
 	return (0);
 }
 
@@ -463,6 +465,7 @@ main(void)
 	    COMP_A COMP_B COMP_C COMP_A COMP_B COMP_C
 	    COMP_A COMP_B COMP_C COMP_A COMP_B COMP_C
 	    "The quick brown fox jumps over the lazy dog ");
+	simple_walk_log(session);
 
 	/*
 	 * Create and open some encrypted and not encrypted tables.

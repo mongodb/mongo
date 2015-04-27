@@ -213,6 +213,7 @@ rotn_decrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
     size_t *result_lenp)
 {
 	ROTN_ENCRYPTOR *rotn_encryptor = (ROTN_ENCRYPTOR *)encryptor;
+	size_t mylen;
 	uint32_t i;
 
 	(void)session;		/* Unused */
@@ -222,7 +223,8 @@ rotn_decrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	/*
 	 * Make sure it is big enough.
 	 */
-	if (dst_len < src_len - CHKSUM_LEN - IV_LEN) {
+	mylen = src_len - CHKSUM_LEN - IV_LEN;
+	if (dst_len < mylen) {
 		fprintf(stderr, "Rotate: ENOMEM ERROR\n");
 		return (ENOMEM);
 	}
@@ -235,7 +237,7 @@ rotn_decrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	 * decrypt the destination buffer.
 	 */
 	i = CHKSUM_LEN + IV_LEN;
-	memcpy(&dst[0], &src[i], dst_len);
+	memcpy(&dst[0], &src[i], mylen);
 	/*
 	 * Depending on whether we have a secret key or not,
 	 * call the common rotate or shift function on the text portion
@@ -246,11 +248,11 @@ rotn_decrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	 * !!! Most implementations would need the IV too.
 	 */
 	if (rotn_encryptor->shift_len == 0)
-		do_rotate(&dst[0], dst_len, 26 - rotn_encryptor->rot_N);
+		do_rotate(&dst[0], mylen, 26 - rotn_encryptor->rot_N);
 	else
-		do_shift(&dst[0], dst_len,
+		do_shift(&dst[0], mylen,
 		    rotn_encryptor->shift_back,  rotn_encryptor->shift_len);
-	*result_lenp = dst_len;
+	*result_lenp = mylen;
 	return (0);
 }
 /*! [WT_ENCRYPTOR decrypt] */

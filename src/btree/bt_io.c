@@ -22,7 +22,7 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	WT_ENCRYPTOR *encryptor;
 	const WT_PAGE_HEADER *dsk;
-	size_t decrypted_size, result_len, skip;
+	size_t result_len, skip;
 	uint32_t clear_cksum, encrypt_len;
 	uint8_t *dst;
 
@@ -72,20 +72,14 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 
 		memcpy(buf->mem, tmp->data, skip);
 		dst = (uint8_t *)buf->mem + skip;
-		decrypted_size = encrypt_len - skip - WT_ENCRYPT_LEN -
-		    btree->kencryptor->size_const;
 		ret = encryptor->decrypt(
 		    encryptor, &session->iface,
 		    (uint8_t *)tmp->data + skip + WT_ENCRYPT_LEN,
 		    encrypt_len - skip - WT_ENCRYPT_LEN,
-		    dst, decrypted_size, &result_len);
+		    dst, encrypt_len - skip, &result_len);
 
 		/*
-		 * If checksums were turned off because we're depending on the
-		 * decompression to fail on any corrupted data (even with
-		 * decryption), we'll end up here after corruption happens.
-		 * If we're salvaging the file, it's OK, otherwise, we can't
-		 * tell how severe it is.  It may be file corruption, which
+		 * It may be file corruption, which
 		 * is really, really bad, or it may be a mismatch of
 		 * encryption configuration, for example, an incorrect
 		 * secretkey.
@@ -96,15 +90,11 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 			    F_ISSET(session, WT_SESSION_SALVAGE_CORRUPT_OK) ?
 			    WT_ERROR :
 			    __wt_illegal_value(session, btree->dhandle->name));
-		if (decrypted_size != result_len)
-			WT_ERR_MSG(session, WT_ERROR,
-			    "encrypted block: calculated size different than "
-			    "result size");
-		if (clear_cksum != __wt_cksum(dst, decrypted_size))
+		if (clear_cksum != __wt_cksum(dst, result_len))
 			WT_ERR_MSG(session, EINVAL,
 			    "Invalid decryption of block");
 		memcpy((uint8_t *)tmp->data + skip,
-		    (uint8_t *)buf->mem + skip, decrypted_size);
+		    (uint8_t *)buf->mem + skip, result_len);
 	}
 	if (F_ISSET(dsk, WT_PAGE_COMPRESSED)) {
 		if (btree->compressor == NULL ||

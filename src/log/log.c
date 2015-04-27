@@ -397,7 +397,7 @@ __log_decrypt(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out)
 	WT_DECL_RET;
 	WT_ENCRYPTOR *encryptor;
 	WT_KEYED_ENCRYPTOR *kencryptor;
-	size_t decrypted_size, dst_len, result_len, src_len;
+	size_t decrypted_size, result_len, src_len;
 	uint32_t clear_cksum, unpadded_len;
 	uint8_t *dst, *src;
 
@@ -413,12 +413,11 @@ __log_decrypt(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out)
 	/*
 	 * There are a lot of sizes and offsets to keep track of here.
 	 * unpadded_len: the size of the encrypted log record in memory.  This
-	 *	was the encrypted log record size before padding.
+	 *	was the encrypted log record size before log padding.
 	 * decrypted_size: the size of the original data including
 	 *	the log header.
 	 * src_len: the final size of the encrypted data without the log header.
-	 * dst_len: the final size of the decrypted original  data without
-	 *	the log header.
+	 * result_len: the final decrypted size to use for checksum.
 	 *
 	 * For the decrypted output, we need to allocate a buffer large
 	 * enough for a record header and the decrypted data.
@@ -432,26 +431,24 @@ __log_decrypt(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out)
 	 * The size of the new buffer should be the unpadded length less
 	 * the extra non-user data overhead added for encryption.
 	 */
-	decrypted_size = unpadded_len - kencryptor->size_const - WT_ENCRYPT_LEN;
 	WT_ERR(__wt_scr_alloc(session, 0, out));
-	WT_ERR(__wt_buf_initsize(session, *out, decrypted_size));
+	WT_ERR(__wt_buf_initsize(session, *out, unpadded_len));
 
 	src = (uint8_t *)in->mem + WT_LOG_ENCRYPT_SKIP + WT_ENCRYPT_LEN;
 	src_len = unpadded_len - WT_LOG_ENCRYPT_SKIP - WT_ENCRYPT_LEN;
 	dst = (uint8_t *)(*out)->mem + WT_LOG_ENCRYPT_SKIP;
-	dst_len = decrypted_size - WT_LOG_ENCRYPT_SKIP;
 	/*
 	 * Copy in the skipped header bytes.
 	 */
 	memcpy((*out)->mem, in->mem, WT_LOG_ENCRYPT_SKIP);
-	WT_ERR(encryptor->decrypt(encryptor, &session->iface,
-	    src, src_len, dst, dst_len, &result_len));
+	WT_ERR(encryptor->decrypt(encryptor, &session->iface, src, src_len,
+	    dst, unpadded_len - WT_LOG_ENCRYPT_SKIP, &result_len));
 
 	/*
 	 * Verify the checksum of the pre-encrypted data matches a checksum
 	 * of the post-decrypted data.  They should be identical.
 	 */
-	if (clear_cksum != __wt_cksum(dst, dst_len))
+	if (clear_cksum != __wt_cksum(dst, result_len))
 		WT_ERR_MSG(session, EINVAL,
 		    "Invalid decryption of log record");
 	/*
@@ -460,7 +457,7 @@ __log_decrypt(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out)
 	 * here after corruption happens.  If we're salvaging the file,
 	 * it's OK, otherwise it's really, really bad.
 	 */
-	if (ret != 0 || result_len != dst_len)
+	if (ret != 0)
 		WT_ERR(WT_ERROR);
 err:	return (ret);
 }
@@ -1779,7 +1776,6 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 		memcpy(eitem->mem, ip->mem, WT_LOG_ENCRYPT_SKIP);
 		unpadded_lenp = (uint32_t *)
 		    ((uint8_t *)eitem->mem + WT_LOG_ENCRYPT_SKIP);
-		*unpadded_lenp = WT_STORE_SIZE(new_size);
 		cksump = (uint32_t *)
 		    ((uint8_t *)unpadded_lenp + sizeof(uint32_t));
 		eitem->size = new_size;
@@ -1802,6 +1798,7 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 		*cksump = WT_STORE_SIZE(clear_cksum);
 		WT_ERR(encryptor->encrypt(encryptor, &session->iface,
 		    src, src_len, dst, dst_len, &result_len));
+		result_len += WT_ENCRYPT_LEN + WT_LOG_ENCRYPT_SKIP;
 
 		/* TODO: stats */
 
@@ -1811,6 +1808,7 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 		 */
 		ip = eitem;
 		newlrp = (WT_LOG_RECORD *)eitem->mem;
+		*unpadded_lenp = WT_STORE_SIZE(result_len);
 		F_SET(newlrp, WT_LOG_RECORD_ENCRYPTED);
 		WT_ASSERT(session, new_size < UINT32_MAX &&
 		    ip->size < UINT32_MAX);
