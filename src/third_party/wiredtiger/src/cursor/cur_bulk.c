@@ -220,36 +220,6 @@ err:	API_END_RET(session, ret);
 }
 
 /*
- * __curbulk_close --
- *	WT_CURSOR->close for the bulk cursor type.
- */
-static int
-__curbulk_close(WT_CURSOR *cursor)
-{
-	WT_BTREE *btree;
-	WT_CURSOR_BULK *cbulk;
-	WT_DECL_RET;
-	WT_SESSION_IMPL *session;
-
-	cbulk = (WT_CURSOR_BULK *)cursor;
-	btree = cbulk->cbt.btree;
-
-	CURSOR_API_CALL(cursor, session, close, btree);
-
-	WT_TRET(__wt_bulk_wrapup(session, cbulk));
-	__wt_buf_free(session, &cbulk->last);
-
-	WT_TRET(__wt_session_release_btree(session));
-
-	/* The URI is owned by the btree handle. */
-	cursor->internal_uri = NULL;
-
-	WT_TRET(__wt_cursor_close(cursor));
-
-err:	API_END_RET(session, ret);
-}
-
-/*
  * __wt_curbulk_init --
  *	Initialize a bulk cursor.
  */
@@ -278,7 +248,6 @@ __wt_curbulk_init(WT_SESSION_IMPL *session,
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}
-	c->close = __curbulk_close;
 
 	cbulk->bitmap = bitmap;
 	if (bitmap)

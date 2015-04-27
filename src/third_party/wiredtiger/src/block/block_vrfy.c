@@ -146,7 +146,7 @@ __verify_last_truncate(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckpt)
 	ci = &_ci;
 	WT_RET(__wt_block_ckpt_init(session, ci, ckpt->name));
 	WT_ERR(__wt_block_buffer_to_ckpt(session, block, ckpt->raw.data, ci));
-	WT_ERR(__wt_ftruncate(session, block->fh, ci->file_size));
+	WT_ERR(__wt_block_truncate(session, block->fh, ci->file_size));
 
 err:	__wt_block_ckpt_destroy(session, ci);
 	return (ret);

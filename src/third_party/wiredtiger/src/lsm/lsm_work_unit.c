@@ -344,7 +344,7 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 		WT_RET_MSG(session, ret, "LSM metadata write");
 
 	/*
-	 * Clear the "cache resident" flag so the primary can be evicted and
+	 * Clear the no-eviction flag so the primary can be evicted and
 	 * eventually closed.  Only do this once the checkpoint has succeeded:
 	 * otherwise, accessing the leaf page during the checkpoint can trigger
 	 * forced eviction.
@@ -457,7 +457,7 @@ __lsm_discard_handle(
 	WT_RET(__wt_session_get_btree(session, uri, checkpoint, NULL,
 	    WT_DHANDLE_EXCLUSIVE | WT_DHANDLE_LOCK_ONLY));
 
-	F_SET(session->dhandle, WT_DHANDLE_DISCARD);
+	F_SET(session->dhandle, WT_DHANDLE_DISCARD_FORCE);
 	return (__wt_session_release_btree(session));
 }
 

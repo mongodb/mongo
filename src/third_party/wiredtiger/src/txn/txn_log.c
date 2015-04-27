@@ -302,7 +302,7 @@ __wt_txn_checkpoint_log(
 	switch (flags) {
 	case WT_TXN_LOG_CKPT_PREPARE:
 		txn->full_ckpt = 1;
-		*ckpt_lsn = S2C(session)->log->alloc_lsn;
+		*ckpt_lsn = S2C(session)->log->write_start_lsn;
 		break;
 
 	case WT_TXN_LOG_CKPT_START:
@@ -327,7 +327,7 @@ __wt_txn_checkpoint_log(
 			txn->ckpt_nsnapshot = 0;
 			WT_CLEAR(empty);
 			ckpt_snapshot = &empty;
-			*ckpt_lsn = S2C(session)->log->alloc_lsn;
+			*ckpt_lsn = S2C(session)->log->write_start_lsn;
 		} else
 			ckpt_snapshot = txn->ckpt_snapshot;
 
@@ -440,7 +440,8 @@ __wt_txn_truncate_end(WT_SESSION_IMPL *session)
  */
 static int
 __txn_printlog(WT_SESSION_IMPL *session,
-    WT_ITEM *rawrec, WT_LSN *lsnp, void *cookie, int firstrecord)
+    WT_ITEM *rawrec, WT_LSN *lsnp, WT_LSN *next_lsnp,
+    void *cookie, int firstrecord)
 {
 	FILE *out;
 	WT_LOG_RECORD *logrec;
@@ -452,6 +453,7 @@ __txn_printlog(WT_SESSION_IMPL *session,
 	const uint8_t *end, *p;
 	const char *msg;
 
+	WT_UNUSED(next_lsnp);
 	out = cookie;
 
 	p = LOG_SKIP_HEADER(rawrec->data);

@@ -356,11 +356,19 @@ static int
 __curfile_close(WT_CURSOR *cursor)
 {
 	WT_CURSOR_BTREE *cbt;
+	WT_CURSOR_BULK *cbulk;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_API_CALL(cursor, session, close, cbt->btree);
+	if (F_ISSET(cursor, WT_CURSTD_BULK)) {
+		/* Free the bulk-specific resources. */
+		cbulk = (WT_CURSOR_BULK *)cbt;
+		WT_TRET(__wt_bulk_wrapup(session, cbulk));
+		__wt_buf_free(session, &cbulk->last);
+	}
+
 	WT_TRET(__wt_btcur_close(cbt));
 	if (cbt->btree != NULL) {
 		/* Increment the data-source's in-use counter. */

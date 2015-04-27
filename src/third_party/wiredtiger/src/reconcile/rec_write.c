@@ -127,15 +127,15 @@ typedef struct {
 	 */
 	struct __rec_boundary {
 		/*
-		 * The start field records location in the initial split buffer,
-		 * that is, the first byte of the split chunk recorded before we
-		 * decide to split a page; the offset between the first byte of
-		 * chunk[0] and the first byte of chunk[1] is chunk[0]'s length.
+		 * Offset is the byte offset in the initial split buffer of the
+		 * first byte of the split chunk, recorded before we decide to
+		 * split the page; the difference between chunk[1]'s offset and
+		 * chunk[0]'s offset is chunk[0]'s length.
 		 *
-		 * Once we split a page, we stop filling in the start field, as
-		 * we're writing the split chunks as we find them.
+		 * Once we split a page, we stop filling in offset values, we're
+		 * writing the split chunks as we find them.
 		 */
-		uint8_t *start;		/* Split's first byte */
+		size_t offset;		/* Split's first byte */
 
 		/*
 		 * The recno and entries fields are the starting record number
@@ -1512,8 +1512,7 @@ __rec_leaf_page_max(WT_SESSION_IMPL *session,  WT_RECONCILE *r)
 static void
 __rec_split_bnd_init(WT_SESSION_IMPL *session, WT_BOUNDARY *bnd)
 {
-	bnd->start = NULL;
-
+	bnd->offset = 0;
 	bnd->recno = 0;
 	bnd->entries = 0;
 
@@ -1527,7 +1526,10 @@ __rec_split_bnd_init(WT_SESSION_IMPL *session, WT_BOUNDARY *bnd)
 	bnd->skip_next = 0;
 	bnd->skip_allocated = 0;
 
-	/* Ignore the key, we re-use that memory in each new reconciliation. */
+	/*
+	 * Don't touch the key, we re-use that memory in each new
+	 * reconciliation.
+	 */
 
 	bnd->already_compressed = 0;
 }
@@ -1542,8 +1544,8 @@ __rec_split_bnd_grow(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 	/*
 	 * Make sure there's enough room for another boundary.  The calculation
 	 * is +2, because when filling in the current boundary's information,
-	 * we save the start point of the next boundary (for example, a record
-	 * number or key), in the (current + 1) slot.
+	 * we save start information for the next boundary (a byte offset and a
+	 * record number or key), in the (current + 1) slot.
 	 *
 	 * For the same reason, we're always initializing one ahead.
 	 */
@@ -1692,7 +1694,7 @@ __rec_split_init(WT_SESSION_IMPL *session,
 	WT_RET(__rec_split_bnd_grow(session, r));
 	__rec_split_bnd_init(session, &r->bnd[0]);
 	r->bnd[0].recno = recno;
-	r->bnd[0].start = WT_PAGE_HEADER_BYTE(btree, dsk);
+	r->bnd[0].offset = WT_PAGE_HEADER_BYTE_SIZE(btree);
 
 	/*
 	 * If the maximum page size is the same as the split page size, either
@@ -1984,10 +1986,10 @@ __rec_split(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t next_len)
 			    session, r, &next->key, dsk->type));
 
 		/*
-		 * Set the starting buffer address and clear the entries (the
+		 * Set the starting buffer offset and clear the entries (the
 		 * latter not required, but cleaner).
 		 */
-		next->start = r->first_free;
+		next->offset = WT_PTRDIFF(r->first_free, dsk);
 		next->entries = 0;
 
 		/* Set the space available to another split-size chunk. */
@@ -2643,8 +2645,8 @@ __rec_split_fixup(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
 	WT_PAGE_HEADER *dsk;
-	uint32_t i, len;
-	uint8_t *dsk_start;
+	size_t i, len;
+	uint8_t *dsk_start, *p;
 
 	/*
 	 * When we overflow physical limits of the page, we walk the list of
@@ -2672,8 +2674,8 @@ __rec_split_fixup(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 	dsk_start = WT_PAGE_HEADER_BYTE(btree, dsk);
 	for (i = 0, bnd = r->bnd; i < r->bnd_next; ++i, ++bnd) {
 		/* Copy the page contents to the temporary buffer. */
-		len = WT_PTRDIFF32((bnd + 1)->start, bnd->start);
-		memcpy(dsk_start, bnd->start, len);
+		len = (bnd + 1)->offset - bnd->offset;
+		memcpy(dsk_start, (uint8_t *)r->dsk.mem + bnd->offset, len);
 
 		/* Finalize the header information and write the page. */
 		dsk->recno = bnd->recno;
@@ -2698,13 +2700,14 @@ __rec_split_fixup(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 	 * chunk, including header, because if there was room for that large a
 	 * remnant, we wouldn't have switched from accumulating to a page end.
 	 */
-	len = WT_PTRDIFF32(r->first_free, bnd->start);
+	p = (uint8_t *)r->dsk.mem + bnd->offset;
+	len = WT_PTRDIFF(r->first_free, p);
 	if (len >= r->split_size - WT_PAGE_HEADER_BYTE_SIZE(btree))
 		WT_PANIC_ERR(session, EINVAL,
 		    "Reconciliation remnant too large for the split buffer");
 	dsk = r->dsk.mem;
 	dsk_start = WT_PAGE_HEADER_BYTE(btree, dsk);
-	(void)memmove(dsk_start, bnd->start, len);
+	(void)memmove(dsk_start, p, len);
 
 	/*
 	 * Fix up our caller's information, including updating the starting

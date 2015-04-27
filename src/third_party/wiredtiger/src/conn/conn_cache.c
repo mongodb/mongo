@@ -215,6 +215,22 @@ __wt_cache_destroy(WT_SESSION_IMPL *session)
 	if (cache == NULL)
 		return (0);
 
+	/* The cache should be empty at this point.  Complain if not. */
+	if (cache->pages_inmem != cache->pages_evict)
+		__wt_errx(session,
+		    "cache server: exiting with %" PRIu64 " pages in "
+		    "memory and %" PRIu64 " pages evicted",
+		    cache->pages_inmem, cache->pages_evict);
+	if (cache->bytes_inmem != 0)
+		__wt_errx(session,
+		    "cache server: exiting with %" PRIu64 " bytes in memory",
+		    cache->bytes_inmem);
+	if (cache->bytes_dirty != 0 || cache->pages_dirty != 0)
+		__wt_errx(session,
+		    "cache server: exiting with %" PRIu64
+		    " bytes dirty and %" PRIu64 " pages dirty",
+		    cache->bytes_dirty, cache->pages_dirty);
+
 	WT_TRET(__wt_cond_destroy(session, &cache->evict_cond));
 	WT_TRET(__wt_cond_destroy(session, &cache->evict_waiter_cond));
 	__wt_spin_destroy(session, &cache->evict_lock);
