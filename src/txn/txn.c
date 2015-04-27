@@ -34,8 +34,11 @@ __txn_sort_snapshot(WT_SESSION_IMPL *session, uint32_t n, uint64_t snap_max)
 
 	txn = &session->txn;
 
-	if (n > 1)
+	if (n <= 10)
+		WT_INSERTION_SORT(txn->snapshot, n, uint64_t, TXNID_LT);
+	else
 		qsort(txn->snapshot, n, sizeof(uint64_t), __wt_txnid_cmp);
+
 	txn->snapshot_count = n;
 	txn->snap_max = snap_max;
 	txn->snap_min = (n > 0 && TXNID_LE(txn->snapshot[0], snap_max)) ?
