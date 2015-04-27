@@ -106,7 +106,7 @@ env.Library(
         '$BUILD_DIR/mongo/base/base',
         '$BUILD_DIR/mongo/logger/logger',
         '$BUILD_DIR/mongo/platform/platform',
-        '$BUILD_DIR/mongo/stacktrace',
+        '$BUILD_DIR/mongo/util/stacktrace',
         '$BUILD_DIR/mongo/util/concurrency/synchronization',
         '$BUILD_DIR/mongo/util/concurrency/thread_name',
         '$BUILD_DIR/mongo/util/debugger',
@@ -307,5 +307,32 @@ env.Library(
     LIBDEPS=[
         'foundation',
         'net/network', # this is for using listener to check elapsed time
+    ],
+)
+
+env.Library(
+    target='stacktrace',
+    source=[
+        'stacktrace_${TARGET_OS_FAMILY}.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base/base',
+        '$BUILD_DIR/mongo/bson',
+        '$BUILD_DIR/mongo/version',
+        'stringutils',
+    ],
+)
+
+quick_exit_env = env.Clone()
+if has_option('gcov'):
+    quick_exit_env.Append(
+        CPPDEFINES=[
+            'MONGO_GCOV',
+        ],
+    )
+quick_exit_env.Library(
+    target='quick_exit',
+    source=[
+        'quick_exit.cpp',
     ],
 )

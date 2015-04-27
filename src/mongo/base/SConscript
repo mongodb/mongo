@@ -24,7 +24,7 @@ env.Library('base',
              'status.cpp',
              'string_data.cpp',
             ],
-            LIBDEPS=['$BUILD_DIR/mongo/quick_exit',
+            LIBDEPS=['$BUILD_DIR/mongo/util/quick_exit',
                      '$BUILD_DIR/third_party/murmurhash3/murmurhash3',
             ])
 

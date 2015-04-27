@@ -234,7 +234,7 @@ env.Library('mongocommon', commonFiles,
                      'util/net/network',
                      'util/processinfo',
                      'util/concurrency/spin_lock',
-                     'stacktrace',
+                     'util/stacktrace',
                      'util/stringutils',
                      'util/concurrency/synchronization',
                      'util/concurrency/thread_name',
@@ -470,21 +470,6 @@ serverOnlyFiles = [ "db/background.cpp",
                     "util/logfile.cpp",
                 ]
 
-env.Library('stacktrace',
-            'util/stacktrace_${TARGET_OS_FAMILY}.cpp',
-            LIBDEPS=['bson',
-                     'util/stringutils',
-                     'version',
-                     '$BUILD_DIR/mongo/base/base'])
-
-quick_exit_env = env.Clone()
-if has_option('gcov'):
-    quick_exit_env.Append(CPPDEFINES=['MONGO_GCOV'])
-quick_exit_env.Library(target='quick_exit',
-            source=[
-                'util/quick_exit.cpp',
-            ])
-
 # This library contains sharding functionality used by both mongod and mongos. Certain tests,
 # which exercise this functionality also link against it.
 env.Library(
@@ -700,7 +685,7 @@ env.Library("message_server_port", "util/net/message_server_port.cpp")
 env.Library("signal_handlers_synchronous",
             ['util/signal_handlers_synchronous.cpp',
              'util/allocator.cpp',],
-            LIBDEPS=["stacktrace", "util/foundation"]
+            LIBDEPS=["util/stacktrace", "util/foundation"]
             )
 
 env.Library("signal_handlers",
