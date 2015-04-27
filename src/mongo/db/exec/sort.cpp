@@ -330,9 +330,9 @@ namespace mongo {
         const size_t maxBytes = static_cast<size_t>(internalQueryExecMaxBlockingSortBytes);
         if (_memUsage > maxBytes) {
             mongoutils::str::stream ss;
-            ss << "sort stage buffered data usage of " << _memUsage
-               << " bytes exceeds internal limit of " << maxBytes << " bytes";
-            Status status(ErrorCodes::Overflow, ss);
+            ss << "Sort operation used more than the maximum " << maxBytes
+               << " bytes of RAM. Add an index, or specify a smaller limit.";
+            Status status(ErrorCodes::OperationFailed, ss);
             *out = WorkingSetCommon::allocateStatusMember( _ws, status);
             return PlanStage::FAILURE;
         }
