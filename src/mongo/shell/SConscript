@@ -1,0 +1,36 @@
+# -*- mode: python; -*-
+
+Import("env")
+
+# if you add a file here, you need to add it in scripting/engine.cpp and shell/createCPPfromJavaScriptFiles.js as well
+env.JSHeader(
+    target="mongo.cpp",
+    source=[
+        "assert.js",
+        "bulk_api.js",
+        "collection.js",
+        "db.js",
+        "explain_query.js",
+        "explainable.js",
+        "mongo.js",
+        "mr.js",
+        "query.js",
+        "types.js",
+        "upgrade_check.js",
+        "utils.js",
+        "utils_sh.js",
+        "utils_auth.js",
+    ],
+)
+
+# if you add a file here, you need to add it in shell/shell_utils.cpp and shell/createCPPfromJavaScriptFiles.js as well
+env.JSHeader(
+    target="mongo-server.cpp",
+    source=[
+        "servers.js",
+        "shardingtest.js",
+        "servers_misc.js",
+        "replsettest.js",
+        "replsetbridge.js"
+    ],
+)
