@@ -1,0 +1,83 @@
+# -*- mode: python -*-
+
+Import([
+    'env',
+    'serverJs',
+    'usev8',
+    'v8suffix',
+])
+
+env.Library(
+    target='scripting_common',
+    source=[
+        'engine.cpp',
+        'utils.cpp',
+    ],
+)
+
+env.Library(
+    target='bson_template_evaluator',
+    source=[
+        "bson_template_evaluator.cpp",
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/bson',
+    ],
+)
+
+env.CppUnitTest(
+    target='bson_template_evaluator_test',
+    source=[
+        'bson_template_evaluator_test.cpp',
+    ],
+    LIBDEPS=[
+        'bson_template_evaluator',
+    ],
+)
+
+env.Library(
+    target='scripting_none',
+    source=[
+        'engine_none.cpp',
+    ],
+    LIBDEPS=[
+        'bson_template_evaluator',
+        'scripting_common',
+    ],
+)
+
+if usev8:
+    scriptingEnv = env.Clone()
+    scriptingEnv.InjectThirdPartyIncludePaths(libraries=['v8'])
+    scriptingEnv.Library(
+        target='scripting',
+        source=[
+            'engine_v8' + v8suffix + '.cpp',
+            'v8' + v8suffix + '_db.cpp',
+            'v8' + v8suffix + '_utils.cpp',
+            'v8' + v8suffix + '_profiler.cpp',
+        ],
+        LIBDEPS=[
+            'bson_template_evaluator',
+            'scripting_common',
+            '$BUILD_DIR/third_party/shim_v8',
+        ],
+    )
+else:
+    env.Library(
+        target='scripting',
+        source=[
+        ],
+        LIBDEPS=[
+            'scripting_none',
+        ],
+    )
+
+env.Library(
+    target='scripting_server',
+    source=[
+    ],
+    LIBDEPS=[
+        'scripting' if serverJs else 'scripting_none',
+    ],
+)

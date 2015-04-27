@@ -10,10 +10,8 @@ from buildscripts import utils
 Import("env")
 Import("has_option")
 Import("get_option")
-Import("serverJs")
 Import("usev8")
 Import("use_system_version_of_library")
-Import("v8suffix")
 Import("wiredtiger")
 
 # Boost we need everywhere. 's2' is spammed in all over the place by
@@ -58,6 +56,7 @@ env.SConscript(
         's/catalog/legacy',
         's/client',
         's/commands',
+        'scripting',
         'unittest',
         'util',
         'util/cmdline_utils',
@@ -310,7 +309,7 @@ coredbEnv.Library("coredb", [
                            'db/commands/server_status_core',
                            'db/common',
                            'db/pipeline/document_value',
-                           'scripting_common',
+                           'scripting/scripting_common',
                            'db/server_parameters',
                            'db/matcher/expressions',
                            'db/matcher/expressions_geo',
@@ -326,76 +325,6 @@ coredbEnv.Library("coredb", [
                            '$BUILD_DIR/mongo/logger/parse_log_component_settings',
                            '$BUILD_DIR/mongo/client/clientdriver',
                            ])
-
-env.Library(
-    target='scripting_common',
-    source=[
-        'scripting/engine.cpp',
-        'scripting/utils.cpp',
-    ],
-)
-
-env.Library(
-    target='scripting_none',
-    source=[
-        'scripting/engine_none.cpp',
-    ],
-    LIBDEPS=[
-        'bson_template_evaluator',
-        'scripting_common',
-    ],
-)
-
-env.Library('bson_template_evaluator', ["scripting/bson_template_evaluator.cpp"],
-            LIBDEPS=['bson'])
-env.CppUnitTest('bson_template_evaluator_test', ['scripting/bson_template_evaluator_test.cpp'],
-                LIBDEPS=['bson_template_evaluator'])
-
-if usev8:
-    scriptingEnv = env.Clone()
-    scriptingEnv.InjectThirdPartyIncludePaths(libraries=['v8'])
-    scriptingEnv.Library(
-        target='scripting',
-        source=[
-            'scripting/engine_v8' + v8suffix + '.cpp',
-            'scripting/v8' + v8suffix + '_db.cpp',
-            'scripting/v8' + v8suffix + '_utils.cpp',
-            'scripting/v8' + v8suffix + '_profiler.cpp',
-        ],
-        LIBDEPS=[
-            'bson_template_evaluator',
-            'scripting_common',
-            '$BUILD_DIR/third_party/shim_v8',
-        ],
-    )
-else:
-    env.Library(
-        target='scripting',
-        source=[
-        ],
-        LIBDEPS=[
-            'scripting_none',
-        ],
-    )
-
-if serverJs:
-    env.Library(
-        target='scripting_server',
-        source=[
-        ],
-        LIBDEPS=[
-            'scripting',
-        ],
-    )
-else:
-    env.Library(
-        target='scripting_server',
-        source=[
-        ],
-        LIBDEPS=[
-            'scripting_none',
-        ],
-    )
 
 env.Library('update_index_data', [ 'db/update_index_data.cpp' ], LIBDEPS=[ 'db/common' ])
 
@@ -766,7 +695,7 @@ serveronlyLibdeps = ["coreshard",
                      "db/global_timestamp",
                      "db/catalog/index_key_validate",
                      'range_deleter',
-                     'scripting_server',
+                     'scripting/scripting_server',
                      "update_index_data",
                      's/metadata',
                      's/batch_write_types',
@@ -1058,7 +987,7 @@ if not has_option('noshell') and usev8:
                 LIBDEPS=[
                     'db/index/external_key_generator',
                     'db/catalog/index_key_validate',
-                    'scripting',
+                    'scripting/scripting',
                     'signal_handlers',
                     'mongocommon'
                 ])
