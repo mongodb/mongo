@@ -76,6 +76,14 @@ var secondary = replTest.add({});
 replTest.reInitiate(4*60*1000);
 secondary.setSlaveOk();
 
+// This fail point will cause the first intial sync to fail, and leave an op in the buffer to 
+// verify the fix from SERVER-17807
+print("=================== failpoint enabled ==============");
+printjson(assert.commandWorked(secondary.getDB("admin").adminCommand( 
+                                  { configureFailPoint: 'failInitSyncWithBufferedEntriesLeft', 
+                                    mode: {times: 1}} )));
+printjson(assert.commandWorked(secondary.getDB("admin").adminCommand( { resync:true } )));
+
 // NOTE: This is here to prevent false negatives, but it is racy and dependent on magic numbers.
 // Removed the assertion because it was too flaky.  Printing a warning instead (dan)
 jsTestLog("making sure we dropped some dups");
@@ -87,10 +95,13 @@ if (!droppedDups) {
     jsTestLog("Warning: Test did not trigger duplicate documents, this run will be a false negative");
 }
 
-jsTestLog("stoping writes and waiting for replica set to coalesce")
+jsTestLog("stopping writes and waiting for replica set to coalesce")
 primary.getDB('test').stop.insert({});
 worker.join();
-replTest.awaitReplication(2*60*1000); // Make sure all writes have hit secondary.
+//make sure all secondaries are caught up, after init sync
+reconnect(secondary.getDB("test"));
+replTest.awaitSecondaryNodes();
+replTest.awaitReplication(2*60*1000);
 
 jsTestLog("check that secondary has correct counts");
 var secondaryColl = secondary.getDB('test').getCollection('cloner');
