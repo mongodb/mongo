@@ -204,9 +204,35 @@ __wt_txn_read(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 }
 
 /*
+ * __wt_txn_begin --
+ *	Begin a transaction.
+ */
+static inline int
+__wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
+{
+	WT_TXN *txn;
+
+	txn = &session->txn;
+	txn->isolation = session->isolation;
+	txn->txn_logsync = S2C(session)->txn_logsync;
+
+	if (cfg != NULL)
+		WT_RET(__wt_txn_config(session, cfg));
+
+	if (txn->isolation == TXN_ISO_SNAPSHOT) {
+		if (session->ncursors > 0)
+			WT_RET(__wt_session_copy_values(session));
+		__wt_txn_refresh(session, 1);
+	}
+
+	F_SET(txn, TXN_RUNNING);
+	return (0);
+}
+
+/*
  * __wt_txn_autocommit_check --
  *	If an auto-commit transaction is required, start one.
-*/
+ */
 static inline int
 __wt_txn_autocommit_check(WT_SESSION_IMPL *session)
 {

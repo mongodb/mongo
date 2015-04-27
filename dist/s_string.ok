@@ -43,6 +43,7 @@ CELL's
 CELLs
 CHECKKEY
 CKPT
+CMP
 CONCAT
 CONFIG
 CPUs
@@ -162,6 +163,7 @@ LockFile
 Lookup
 MALLOC
 MEM
+MEMALIGN
 MERCHANTABILITY
 MSVC
 MUTEX
@@ -243,6 +245,7 @@ Spinlocks
 Split's
 Stoica
 TAILQ
+TCMalloc
 TODO
 TORTIOUS
 TXN
@@ -273,6 +276,7 @@ Vo
 Vv
 VxWorks
 WIREDTIGER
+WRLSN
 WakeAllConditionVariable
 Wconditional
 WeakHashLen

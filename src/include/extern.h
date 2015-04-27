@@ -199,6 +199,7 @@ extern int __wt_config_collapse( WT_SESSION_IMPL *session, const char **cfg, cha
 extern int __wt_config_merge(WT_SESSION_IMPL *session, const char **cfg, const char *cfg_strip, const char **config_ret);
 extern int __wt_conn_config_init(WT_SESSION_IMPL *session);
 extern void __wt_conn_config_discard(WT_SESSION_IMPL *session);
+extern const WT_CONFIG_ENTRY *__wt_conn_config_match(const char *method);
 extern int __wt_ext_config_parser_open(WT_EXTENSION_API *wt_ext, WT_SESSION *wt_session, const char *config, size_t len, WT_CONFIG_PARSER **config_parserp);
 extern int __wt_ext_config_get(WT_EXTENSION_API *wt_api, WT_SESSION *wt_session, WT_CONFIG_ARG *cfg_arg, const char *key, WT_CONFIG_ITEM *cval);
 extern int __wt_config_upgrade(WT_SESSION_IMPL *session, WT_ITEM *buf);
@@ -656,7 +657,7 @@ extern int WT_CDECL __wt_txnid_cmp(const void *v1, const void *v2);
 extern void __wt_txn_release_snapshot(WT_SESSION_IMPL *session);
 extern void __wt_txn_update_oldest(WT_SESSION_IMPL *session);
 extern void __wt_txn_refresh(WT_SESSION_IMPL *session, int get_snapshot);
-extern int __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[]);
+extern int __wt_txn_config(WT_SESSION_IMPL *session, const char *cfg[]);
 extern void __wt_txn_release(WT_SESSION_IMPL *session);
 extern int __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[]);
