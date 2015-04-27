@@ -118,6 +118,20 @@
  *    shared libraries.
  *
  *    Same correct/incorrect usage as for MONGO_COMPILER_API_EXPORT.
+ *
+ * MONGO_COMPILER_UNREACHABLE
+ *
+ *   Instructs the compiler that a line of code will never be reached.
+ *
+ *
+ *   Example:
+ *       // code above checks that expr can only be FOO or BAR
+ *       switch (expr) {
+ *       case FOO: { ... }
+ *       case BAR: { ... }
+ *       default:
+ *           MONGO_COMPILER_UNREACHABLE;
+ *
  */
 
 #if defined(_MSC_VER)

@@ -56,3 +56,5 @@
 
 #define MONGO_likely(x) bool(x)
 #define MONGO_unlikely(x) bool(x)
+
+#define MONGO_COMPILER_UNREACHABLE __assume(0)

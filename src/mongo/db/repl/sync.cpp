@@ -37,13 +37,14 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/client.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/repl/oplogreader.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 
@@ -155,6 +156,9 @@ namespace repl {
                 return true;
             }
         } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "InsertRetry", nss.ns());
+
+        // fixes compile errors on GCC - see SERVER-18219 for details
+        MONGO_COMPILER_UNREACHABLE;
     }
 
 } // namespace repl

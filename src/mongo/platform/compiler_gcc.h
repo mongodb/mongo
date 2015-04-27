@@ -64,3 +64,5 @@
 
 #define MONGO_likely(x) static_cast<bool>(__builtin_expect(static_cast<bool>(x), 1))
 #define MONGO_unlikely(x) static_cast<bool>(__builtin_expect(static_cast<bool>(x), 0))
+
+#define MONGO_COMPILER_UNREACHABLE __builtin_unreachable()

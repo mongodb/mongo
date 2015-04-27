@@ -39,6 +39,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -92,6 +93,9 @@ namespace {
             }
             return false;
         } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(&txn, "getInitialSyncFlags", minvalidNS);
+
+        // fixes compile errors on GCC - see SERVER-18219 for details
+        MONGO_COMPILER_UNREACHABLE;
     }
 
     Timestamp getMinValid(OperationContext* txn) {
