@@ -299,3 +299,19 @@ env.CppUnitTest(
         'mongoscore',
     ]
 )
+
+env.CppUnitTest(
+    target='config_server_tests',
+    source=[
+        'config_server_tests.cpp',
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/coredb",
+        "$BUILD_DIR/mongo/coreserver",
+        "$BUILD_DIR/mongo/message_server_port",
+        "$BUILD_DIR/mongo/mocklib",
+        "$BUILD_DIR/mongo/mongocommon",
+        "coreshard",
+        "mongoscore",
+    ],
+)

@@ -470,16 +470,6 @@ serverOnlyFiles = [ "db/background.cpp",
                     "util/logfile.cpp",
                 ]
 
-env.CppUnitTest('config_server_tests', [ 's/config_server_tests.cpp' ],
-                LIBDEPS=[ "s/mongoscore",
-                          "s/coreshard",
-                          "mongocommon",
-                          "coreserver",
-                          "coredb",
-                          "message_server_port",
-                          "mocklib"])
-
-
 if has_option( 'use-cpu-profiler' ):
     serverOnlyFiles.append( 'db/commands/cpuprofile.cpp' )
     env.Append(LIBS=['unwind'])
