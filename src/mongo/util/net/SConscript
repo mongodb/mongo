@@ -57,3 +57,10 @@ env.CppUnitTest(
         'network',
     ],
 )
+
+env.Library(
+    target="message_server_port",
+    source=[
+        "message_server_port.cpp",
+    ],
+)

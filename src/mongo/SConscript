@@ -533,8 +533,6 @@ if wiredtiger:
 serveronlyEnv.Library("serveronly", serverOnlyFiles,
                       LIBDEPS=serveronlyLibdeps )
 
-env.Library("message_server_port", "util/net/message_server_port.cpp")
-
 env.Library("signal_handlers_synchronous",
             ['util/signal_handlers_synchronous.cpp',
              'util/allocator.cpp',],
@@ -553,7 +551,7 @@ mongodAndMongosFiles = [
     "db/dbwebserver.cpp",
     ]
 env.Library("mongodandmongos", mongodAndMongosFiles,
-            LIBDEPS=["message_server_port", "signal_handlers"])
+            LIBDEPS=["util/net/message_server_port", "signal_handlers"])
 
 env.Library("mongodwebserver",
             [
