@@ -337,12 +337,6 @@ env.Library(
         'util/net/hostandport',
          ])
 
-env.Library('elapsed_tracker',
-            ['util/elapsed_tracker.cpp'],
-            LIBDEPS=['util/foundation',
-                     'util/net/network'] # this is for using listener to check elapsed time
-            )
-
 # mongod files - also files used in tools. present in dbtests, but not in mongos and not in client
 # libs.
 serverOnlyFiles = [ "db/background.cpp",
@@ -715,7 +709,7 @@ serveronlyLibdeps = ["coreshard",
                      'db/storage/storage_engine_lock_file',
                      'db/storage/storage_engine_metadata',
                      'util/mmap',
-                     'elapsed_tracker',
+                     'util/elapsed_tracker',
                      '$BUILD_DIR/third_party/shim_snappy']
 
 if wiredtiger:

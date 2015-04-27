@@ -298,3 +298,14 @@ env.Library(
         'foundation',
     ],
 )
+
+env.Library(
+    target='elapsed_tracker',
+    source=[
+        'elapsed_tracker.cpp',
+    ],
+    LIBDEPS=[
+        'foundation',
+        'net/network', # this is for using listener to check elapsed time
+    ],
+)

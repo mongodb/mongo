@@ -27,7 +27,7 @@ if wiredtiger:
             '$BUILD_DIR/mongo/db/storage/index_entry_comparison',
             '$BUILD_DIR/mongo/db/storage/key_string',
             '$BUILD_DIR/mongo/db/storage/oplog_hack',
-            '$BUILD_DIR/mongo/elapsed_tracker',
+            '$BUILD_DIR/mongo/util/elapsed_tracker',
             '$BUILD_DIR/mongo/util/foundation',
             '$BUILD_DIR/mongo/util/processinfo',
             '$BUILD_DIR/mongo/util/concurrency/ticketholder',
