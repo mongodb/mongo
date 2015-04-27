@@ -336,3 +336,26 @@ quick_exit_env.Library(
         'quick_exit.cpp',
     ],
 )
+
+env.Library(
+    target="signal_handlers_synchronous",
+    source=[
+        'allocator.cpp',
+        'signal_handlers_synchronous.cpp',
+    ],
+    LIBDEPS=[
+        "foundation",
+        "stacktrace",
+    ],
+)
+
+env.Library(
+    target="signal_handlers",
+    source=[
+        "signal_handlers.cpp",
+    ],
+    LIBDEPS=[
+        "foundation",
+        "signal_handlers_synchronous",
+    ],
+)
