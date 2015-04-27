@@ -312,10 +312,16 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session, int final, int force)
 	/*
 	 * The close can fail if an update cannot be written, return the EBUSY
 	 * error to our caller for eventual retry.
+	 *
+	 * If we are forcing the close, just mark the handle dead and the tree
+	 * will be discarded later.  Don't do this for memory-mapped trees: we
+	 * have to close the file handle to allow the file to be removed, but
+	 * memory mapped trees contain pointers into memory that will become
+	 * invalid if the mapping is closed.
 	 */
 	if (!F_ISSET(btree,
 	    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY))
-		WT_ERR(force ?
+		WT_ERR(force && (btree->bm == NULL || btree->bm->map == NULL) ?
 		    __conn_dhandle_mark_dead(session) :
 		    __wt_checkpoint_close(session, final));
 
