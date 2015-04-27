@@ -236,20 +236,15 @@ namespace mongo {
 
         virtual void assertEmptyAndReset();
 
-        virtual bool hasLockPending() const { return getWaitingResource().isValid() || _lockPendingParallelWriter; }
+        virtual bool hasLockPending() const { return getWaitingResource().isValid(); }
 
         virtual void setIsBatchWriter(bool newValue) { _batchWriter = newValue; }
         virtual bool isBatchWriter() const { return _batchWriter; }
-        virtual void setLockPendingParallelWriter(bool newValue) { 
-            _lockPendingParallelWriter = newValue;
-        }
 
         virtual bool hasStrongLocks() const;
 
     private:
-
         bool _batchWriter;
-        bool _lockPendingParallelWriter;
     };
 
     typedef LockerImpl<false> DefaultLockerImpl;

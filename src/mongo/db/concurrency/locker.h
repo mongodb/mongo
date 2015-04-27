@@ -190,6 +190,11 @@ namespace mongo {
 
             // In what mode is it held?
             LockMode mode;
+
+            // Reporting/serialization order is by resourceId, which is the canonical locking order
+            bool operator<(const OneLock& rhs) const {
+                return resourceId < rhs.resourceId;
+            }
         };
 
         /**
@@ -199,8 +204,7 @@ namespace mongo {
          * reused.
          */
         struct LockerInfo {
-            // List of high-level locks held by this locker, sorted by hierarchy in the order
-            // Global, Flush (MMAP V1 only), Database, Collection.
+            // List of high-level locks held by this locker, sorted by ResourceId
             std::vector<OneLock> locks;
 
             // If isValid(), then what lock this particular locker is sleeping on
@@ -278,7 +282,6 @@ namespace mongo {
         // Used for the replication parallel log op application threads
         virtual void setIsBatchWriter(bool newValue) = 0;
         virtual bool isBatchWriter() const = 0;
-        virtual void setLockPendingParallelWriter(bool newValue) = 0;
 
         /**
          * A string lock is MODE_X or MODE_S.
