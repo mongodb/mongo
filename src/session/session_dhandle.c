@@ -144,13 +144,13 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 	 * If we had special flags set, close the handle so that future access
 	 * can get a handle without special flags.
 	 */
-	if (F_ISSET(dhandle, WT_DHANDLE_DISCARD) ||
-	    F_ISSET(btree, WT_BTREE_SPECIAL_FLAGS)) {
-		WT_ASSERT(session, F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE));
-
-		WT_TRET(__wt_conn_btree_sync_and_close(
-		    session, 0, F_ISSET(dhandle, WT_DHANDLE_DISCARD)));
+	if (F_ISSET(dhandle, WT_DHANDLE_DISCARD)) {
+		WT_WITH_DHANDLE_LOCK(session,
+		    ret = __wt_conn_btree_sync_and_close(session, 0, 1));
 		F_CLR(dhandle, WT_DHANDLE_DISCARD);
+	} else if (F_ISSET(btree, WT_BTREE_SPECIAL_FLAGS)) {
+		WT_ASSERT(session, F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE));
+		ret = __wt_conn_btree_sync_and_close(session, 0, 0);
 	}
 
 	if (F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE))

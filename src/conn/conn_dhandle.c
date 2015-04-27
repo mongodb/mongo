@@ -248,6 +248,30 @@ err:	WT_TRET(__wt_rwlock_destroy(session, &dhandle->rwlock));
 }
 
 /*
+ * __conn_dhandle_mark_dead --
+ *	Mark a data handle dead.
+ */
+static int
+__conn_dhandle_mark_dead(WT_SESSION_IMPL *session)
+{
+	int evict_reset;
+
+	WT_ASSERT(session, F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED));
+
+	/*
+	 * Handle forced discard (e.g., when dropping a file).
+	 *
+	 * We need exclusive access to the file -- disable ordinary
+	 * eviction and drain any blocks already queued.
+	 */
+	WT_RET(__wt_evict_file_exclusive_on(session, &evict_reset));
+	F_SET(session->dhandle, WT_DHANDLE_DEAD);
+	if (evict_reset)
+		__wt_evict_file_exclusive_off(session);
+	return (0);
+}
+
+/*
  * __wt_conn_btree_sync_and_close --
  *	Sync and close the underlying btree handle.
  */
@@ -291,7 +315,9 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session, int final, int force)
 	 */
 	if (!F_ISSET(btree,
 	    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY))
-		WT_ERR(__wt_checkpoint_close(session, final, force));
+		WT_ERR(force ?
+		    __conn_dhandle_mark_dead(session) :
+		    __wt_checkpoint_close(session, final));
 
 	WT_TRET(__wt_btree_close(session));
 	if (!force || final) {
