@@ -219,5 +219,24 @@ env.CppUnitTest(
     ],
 )
 
+env.Library(
+    target='update_index_data',
+    source=[
+        'update_index_data.cpp'
+    ],
+    LIBDEPS=[
+        'common',
+    ],
+)
 
-
+env.CppUnitTest(
+    target='update_index_data_test',
+    source=[
+        'update_index_data_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/bson',
+        'common',
+        'update_index_data',
+    ],
+)

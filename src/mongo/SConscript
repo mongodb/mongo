@@ -129,9 +129,6 @@ env.CppUnitTest('bson_validate_test', ['bson/bson_validate_test.cpp'],
 env.CppUnitTest('bsonobjbuilder_test', ['bson/bsonobjbuilder_test.cpp'],
                 LIBDEPS=['bson'])
 
-env.CppUnitTest('update_index_data_test', ['db/update_index_data_test.cpp'],
-                LIBDEPS=['bson','update_index_data','db/common'])
-
 env.CppUnitTest('oid_test', ['bson/oid_test.cpp'],
                 LIBDEPS=['bson'])
 
@@ -325,8 +322,6 @@ coredbEnv.Library("coredb", [
                            '$BUILD_DIR/mongo/logger/parse_log_component_settings',
                            '$BUILD_DIR/mongo/client/clientdriver',
                            ])
-
-env.Library('update_index_data', [ 'db/update_index_data.cpp' ], LIBDEPS=[ 'db/common' ])
 
 env.Library(
     target='service_context',
@@ -696,7 +691,7 @@ serveronlyLibdeps = ["coreshard",
                      "db/catalog/index_key_validate",
                      'range_deleter',
                      'scripting/scripting_server',
-                     "update_index_data",
+                     "db/update_index_data",
                      's/metadata',
                      's/batch_write_types',
                      's/catalog/legacy/catalog_manager_legacy',
