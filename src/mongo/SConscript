@@ -470,83 +470,20 @@ serverOnlyFiles = [ "db/background.cpp",
                     "util/logfile.cpp",
                 ]
 
-# This library contains sharding functionality used by both mongod and mongos. Certain tests,
-# which exercise this functionality also link against it.
-env.Library(
-    target='coreshard',
-    source=[
-        # This is only here temporarily for auto-split logic in chunk.cpp.
-        's/balancer_policy.cpp',
-        's/distlock.cpp',
-        's/config.cpp',
-        's/grid.cpp',
-        's/chunk.cpp',
-        's/chunk_manager.cpp',
-        's/config_server_checker_service.cpp',
-        's/shard_key_pattern.cpp',
-        's/version_manager.cpp',
-    ],
-    LIBDEPS=[
-        's/base',
-        's/client/sharding_client',
-        's/cluster_ops_impl',
-        's/dist_lock',
-    ]
-)
-
-# This library is only used by the mongos execuable and any tests which require mongos runtime
-# objects, such as the request processing pipeline or the balancer.
-env.Library(
-    target='mongoscore',
-    source=[
-        's/balance.cpp',
-        's/cluster_last_error_info.cpp',
-        's/cursors.cpp',
-        's/request.cpp',
-        's/s_only.cpp',
-        's/strategy.cpp',
-        's/version_mongos.cpp',
-    ],
-    LIBDEPS=[
-        'db/auth/authmongos',
-        'db/fts/ftsmongos',
-        'db/query/explain_common',
-        'db/query/lite_parsed_query',
-        's/cluster_ops',
-        's/cluster_write_op_conversion',
-    ]
-)
-
-env.CppUnitTest(
-    target='mongoscore_test',
-    source=[
-        's/shard_key_pattern_test.cpp',
-        's/balancing_window_test.cpp',
-        's/balancer_policy_tests.cpp',
-    ],
-    LIBDEPS=[
-        'mongoscore',
-        'coreshard',
-        'mongocommon',
-        'coreserver',
-        'coredb',
-    ]
-)
-
 env.CppUnitTest("scoped_db_conn_test", [ "client/scoped_db_conn_test.cpp" ],
                  LIBDEPS=[
                     "coredb",
                     "coreserver",
-                    "coreshard",
+                    "s/coreshard",
                     "mongocommon",
                     "message_server_port",
-                    "mongoscore",
+                    "s/mongoscore",
                     "util/ntservice_mock"],
                  NO_CRUTCH=True)
 
 env.CppUnitTest('config_server_tests', [ 's/config_server_tests.cpp' ],
-                LIBDEPS=[ "mongoscore",
-                          "coreshard",
+                LIBDEPS=[ "s/mongoscore",
+                          "s/coreshard",
                           "mongocommon",
                           "coreserver",
                           "coredb",
@@ -631,7 +568,7 @@ env.CppUnitTest('range_deleter_test',
 
 serveronlyEnv = env.Clone()
 serveronlyEnv.InjectThirdPartyIncludePaths(libraries=['snappy'])
-serveronlyLibdeps = ["coreshard",
+serveronlyLibdeps = ["s/coreshard",
                      'db/curop',
                      "db/auth/authmongod",
                      "db/fts/ftsmongod",
@@ -805,11 +742,11 @@ env.Install(
             's/catalog/legacy/catalog_manager_legacy',
             's/client/sharding_connection_hook',
             's/commands/cluster_commands',
-            "mongoscore",
+            "s/mongoscore",
             "coreserver",
             "coredb",
             "mongocommon",
-            "coreshard",
+            "s/coreshard",
             "util/ntservice",
             "mongodandmongos",
             '$BUILD_DIR/mongo/util/options_parser/options_parser_init',
