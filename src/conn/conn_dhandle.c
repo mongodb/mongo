@@ -70,9 +70,9 @@ __conn_dhandle_open_lock(
 			return (EBUSY);
 
 		/*
-		 * If the handle is open, get a read lock and recheck.
+		 * If the handle is open, try to get a read lock and recheck.
 		 *
-		 * Wait for a read lock if we want exclusive access and failed
+		 * Try to get a read lock if we want exclusive access and failed
 		 * to get it: the sweep server may be closing this handle, and
 		 * we need to wait for it to release its lock.  If we want
 		 * exclusive access and find the handle open once we get the
@@ -80,7 +80,15 @@ __conn_dhandle_open_lock(
 		 */
 		if (F_ISSET(dhandle, WT_DHANDLE_OPEN) &&
 		    (!want_exclusive || lock_busy)) {
-			WT_RET(__wt_readlock(session, dhandle->rwlock));
+			ret = __wt_try_readlock(session, dhandle->rwlock);
+			if (ret == EBUSY) {
+				if (want_exclusive &&
+				    F_ISSET(dhandle, WT_DHANDLE_OPEN))
+					return (ret);
+				__wt_yield();
+				continue;
+			}
+			WT_RET(ret);
 			is_open = F_ISSET(dhandle, WT_DHANDLE_OPEN) ? 1 : 0;
 			if (is_open && !want_exclusive) {
 				WT_ASSERT(session,

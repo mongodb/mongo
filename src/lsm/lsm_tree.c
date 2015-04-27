@@ -230,7 +230,7 @@ __lsm_tree_cleanup_old(WT_SESSION_IMPL *session, const char *uri)
 {
 	WT_DECL_RET;
 	const char *cfg[] =
-	    { WT_CONFIG_BASE(session, session_drop), "force", NULL };
+	    { WT_CONFIG_BASE(session, WT_SESSION_drop), "force", NULL };
 	int exists;
 
 	WT_RET(__wt_exist(session, uri + strlen("file:"), &exists));
@@ -303,7 +303,7 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	WT_LSM_TREE *lsm_tree;
 	const char *cfg[] =
-	    { WT_CONFIG_BASE(session, session_create), config, NULL };
+	    { WT_CONFIG_BASE(session, WT_SESSION_create), config, NULL };
 	char *tmpconfig;
 
 	/* If the tree is open, it already exists. */
@@ -372,7 +372,7 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 		cval.len -= 2;
 	}
 	WT_ERR(__wt_config_check(session,
-	   WT_CONFIG_REF(session, session_create), cval.str, cval.len));
+	   WT_CONFIG_REF(session, WT_SESSION_create), cval.str, cval.len));
 	WT_ERR(__wt_strndup(
 	    session, cval.str, cval.len, &lsm_tree->bloom_config));
 
@@ -513,7 +513,7 @@ __lsm_tree_open_check(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	WT_CONFIG_ITEM cval;
 	uint64_t maxleafpage, required;
 	const char *cfg[] = { WT_CONFIG_BASE(
-	    session, session_create), lsm_tree->file_config, NULL };
+	    session, WT_SESSION_create), lsm_tree->file_config, NULL };
 
 	WT_RET(__wt_config_gets(session, cfg, "leaf_page_max", &cval));
 	maxleafpage = (uint64_t)cval.val;
@@ -539,8 +539,7 @@ __lsm_tree_open_check(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
  *	Open an LSM tree structure.
  */
 static int
-__lsm_tree_open(
-    WT_SESSION_IMPL *session, const char *uri, WT_LSM_TREE **treep)
+__lsm_tree_open(WT_SESSION_IMPL *session, const char *uri, WT_LSM_TREE **treep)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;

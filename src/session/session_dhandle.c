@@ -425,7 +425,16 @@ __wt_session_lock_checkpoint(WT_SESSION_IMPL *session, const char *checkpoint)
 	WT_DATA_HANDLE *dhandle, *saved_dhandle;
 	WT_DECL_RET;
 
+	WT_ASSERT(session, WT_META_TRACKING(session));
 	saved_dhandle = session->dhandle;
+
+	/*
+	 * If we already have the checkpoint locked, don't attempt to lock
+	 * it again.
+	 */
+	if ((ret = __wt_meta_track_find_handle(
+	    session, saved_dhandle->name, checkpoint)) != WT_NOTFOUND)
+		return (ret);
 
 	/*
 	 * Get the checkpoint handle exclusive, so no one else can access it
@@ -450,7 +459,6 @@ __wt_session_lock_checkpoint(WT_SESSION_IMPL *session, const char *checkpoint)
 	dhandle = session->dhandle;
 	F_SET(dhandle, WT_DHANDLE_DISCARD);
 
-	WT_ASSERT(session, WT_META_TRACKING(session));
 	WT_ERR(__wt_meta_track_handle_lock(session, 0));
 
 	/* Restore the original btree in the session. */

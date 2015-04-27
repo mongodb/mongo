@@ -327,8 +327,7 @@ __wt_lsm_manager_destroy(WT_SESSION_IMPL *session)
 			WT_TRET(wt_session->close(wt_session, NULL));
 		}
 	}
-	WT_STAT_FAST_CONN_INCRV(session,
-	    lsm_work_units_discarded, removed);
+	WT_STAT_FAST_CONN_INCRV(session, lsm_work_units_discarded, removed);
 
 	/* Free resources that are allocated in connection initialize */
 	__wt_spin_destroy(session, &manager->switch_lock);

@@ -344,7 +344,7 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 		WT_RET_MSG(session, ret, "LSM metadata write");
 
 	/*
-	 * Clear the "cache resident" flag so the primary can be evicted and
+	 * Clear the no-eviction flag so the primary can be evicted and
 	 * eventually closed.  Only do this once the checkpoint has succeeded:
 	 * otherwise, accessing the leaf page during the checkpoint can trigger
 	 * forced eviction.
@@ -469,9 +469,8 @@ static int
 __lsm_drop_file(WT_SESSION_IMPL *session, const char *uri)
 {
 	WT_DECL_RET;
-	const char *drop_cfg[] = {
-	    WT_CONFIG_BASE(session, session_drop), "remove_files=false", NULL
-	};
+	const char *drop_cfg[] = { WT_CONFIG_BASE(
+	    session, WT_SESSION_drop), "remove_files=false", NULL };
 
 	/*
 	 * We need to grab the schema lock to drop the file, so first try to
