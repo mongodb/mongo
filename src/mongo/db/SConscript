@@ -309,3 +309,33 @@ env.CppUnitTest(
         'range_deleter',
     ],
 )
+
+
+# This library is linked into mongos and mongod only, not into the shell or any tools.
+env.Library(
+    target="mongodandmongos",
+    source=[
+        "dbwebserver.cpp",
+        "initialize_server_global_state.cpp",
+        "server_extra_log_context.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/util/net/message_server_port",
+        "$BUILD_DIR/mongo/util/signal_handlers",
+    ],
+)
+
+env.Library(
+    target="mongodwebserver",
+    source=[
+        "clientlistplugin.cpp",
+        "restapi.cpp",
+        "stats/snapshots_webplugins.cpp",
+        "repl/replset_web_handler.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/coredb",
+        "mongodandmongos",
+        'repl/repl_coordinator_global',
+    ],
+)

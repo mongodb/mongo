@@ -533,26 +533,6 @@ if wiredtiger:
 serveronlyEnv.Library("serveronly", serverOnlyFiles,
                       LIBDEPS=serveronlyLibdeps )
 
-# These files go into mongos and mongod only, not into the shell or any tools.
-mongodAndMongosFiles = [
-    "db/initialize_server_global_state.cpp",
-    "db/server_extra_log_context.cpp",
-    "db/dbwebserver.cpp",
-    ]
-env.Library("mongodandmongos", mongodAndMongosFiles,
-            LIBDEPS=["util/net/message_server_port", "util/signal_handlers"])
-
-env.Library("mongodwebserver",
-            [
-             "db/clientlistplugin.cpp",
-             "db/repl/replset_web_handler.cpp",
-             "db/restapi.cpp",
-             "db/stats/snapshots_webplugins.cpp",
-             ],
-            LIBDEPS=["coredb",
-                     "mongodandmongos",
-                     "$BUILD_DIR/mongo/db/repl/repl_coordinator_global"])
-
 mongodOnlyFiles = [ "db/db.cpp", "db/mongod_options_init.cpp" ]
 
 # ----- TARGETS ------
@@ -589,8 +569,8 @@ mongod = env.Install(
         LIBDEPS=[
             "coredb",
             "coreserver",
-            "mongodandmongos",
-            "mongodwebserver",
+            "db/mongodandmongos",
+            "db/mongodwebserver",
             "util/ntservice",
             "serveronly",
             "mongod_options",
@@ -651,7 +631,7 @@ env.Install(
             "mongocommon",
             "s/coreshard",
             "util/ntservice",
-            "mongodandmongos",
+            "db/mongodandmongos",
             '$BUILD_DIR/mongo/util/options_parser/options_parser_init',
         ]))
 
