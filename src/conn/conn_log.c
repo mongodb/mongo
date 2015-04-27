@@ -344,18 +344,13 @@ typedef struct {
 } WT_LOG_WRLSN_ENTRY;
 
 /*
- * __log_wrlsn_cmp --
- *	The log wrlsn comparison function for qsort.
+ * WT_WRLSN_ENTRY_CMP_LT --
+ *	Return comparison of a written slot pair by LSN.
  */
-static int WT_CDECL
-__log_wrlsn_cmp(const void *a, const void *b)
-{
-	WT_LOG_WRLSN_ENTRY *ae, *be;
-
-	ae = (WT_LOG_WRLSN_ENTRY *)a;
-	be = (WT_LOG_WRLSN_ENTRY *)b;
-	return (LOG_CMP(&ae->lsn, &be->lsn));
-}
+#define	WT_WRLSN_ENTRY_CMP_LT(entry1, entry2)				\
+	((entry1).lsn.file < (entry2).lsn.file ||			\
+	((entry1).lsn.file == (entry2).lsn.file &&			\
+	(entry1).lsn.offset < (entry2).lsn.offset))
 
 /*
  * __log_wrlsn_server --
@@ -404,8 +399,9 @@ __log_wrlsn_server(void *arg)
 		 */
 		if (written_i > 0) {
 			yield = 0;
-			qsort(written, written_i, sizeof(WT_LOG_WRLSN_ENTRY),
-			    __log_wrlsn_cmp);
+			WT_INSERTION_SORT(written, written_i,
+			    WT_LOG_WRLSN_ENTRY, WT_WRLSN_ENTRY_CMP_LT);
+
 			/*
 			 * We know the written array is sorted by LSN.  Go
 			 * through them either advancing write_lsn or stop
