@@ -581,13 +581,20 @@ namespace {
 
                 // Add the doc to our rollback file
                 BSONObj obj;
-                bool found = Helpers::findOne(txn, ctx.db()->getCollection(doc.ns), pattern, obj, false);
-                if (found) {
-                    removeSaver->goingToDelete(obj);
-                }
-                else {
-                    error() << "rollback cannot find object: " << pattern
-                            << " in namespace " << doc.ns;
+                Collection* collection = ctx.db()->getCollection(doc.ns);
+
+                // Do not log an error when undoing an insert on a no longer existent collection.
+                // It is likely that the collection was dropped as part of rolling back a
+                // createCollection command and regardless, the document no longer exists.
+                if (collection) {
+                    bool found = Helpers::findOne(txn, collection, pattern, obj, false);
+                    if (found) {
+                        removeSaver->goingToDelete(obj);
+                    }
+                    else {
+                        error() << "rollback cannot find object: " << pattern
+                                << " in namespace " << doc.ns;
+                    }
                 }
 
                 if (it->second.isEmpty()) {
@@ -595,7 +602,6 @@ namespace {
                     // TODO 1.6 : can't delete from a capped collection.  need to handle that here.
                     deletes++;
 
-                    Collection* collection = ctx.db()->getCollection(doc.ns);
                     if (collection) {
                         if (collection->isCapped()) {
                             // can't delete from a capped collection - so we truncate instead. if
