@@ -170,15 +170,6 @@ namespace mongo {
         ASSERT_EQUALS(ErrorCodes::FailedToParse, result.getStatus().code());
     }
 
-    TEST_F(WiredTigerUtilMetadataTest, GetApplicationMetadataInvalidMetadata) {
-        const char* config = "app_metadata=(abc=def=ghi)";
-        createSession(config);
-        StatusWith<BSONObj> result =
-            WiredTigerUtil::getApplicationMetadata(getOperationContext(), getURI());
-        ASSERT_NOT_OK(result.getStatus());
-        ASSERT_EQUALS(ErrorCodes::BadValue, result.getStatus().code());
-    }
-
     TEST_F(WiredTigerUtilMetadataTest, GetApplicationMetadataDuplicateKeys) {
         const char* config = "app_metadata=(abc=123,abc=456)";
         createSession(config);
