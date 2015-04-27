@@ -1,0 +1,122 @@
+# -*- mode: python; -*-
+
+Import("env")
+
+env.Library(
+    target="framework_options",
+    source=[
+        "framework_options.cpp",
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/util/options_parser/options_parser_init',
+    ],
+)
+
+env.Library(
+    target='testframework',
+    source=[
+        'framework.cpp',
+        'framework_options_init.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/unittest/unittest',
+        'framework_options',
+    ],
+)
+
+env.Library(
+    target='mocklib',
+    source=[
+        'mock/mock_conn_registry.cpp',
+        'mock/mock_dbclient_connection.cpp',
+        'mock/mock_dbclient_cursor.cpp',
+        'mock/mock_remote_db_server.cpp',
+        'mock/mock_replica_set.cpp'
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/client/clientdriver',
+        '$BUILD_DIR/mongo/db/repl/replica_set_messages'
+    ],
+)
+
+dbtest = env.Program(
+    target="dbtest",
+    source=[
+        'accumulatortests.cpp',
+        'basictests.cpp',
+        'chunktests.cpp',
+        'clienttests.cpp',
+        'commandtests.cpp',
+        'config_server_fixture.cpp',
+        'config_upgrade_tests.cpp',
+        'counttests.cpp',
+        'dbhelper_tests.cpp',
+        'dbtests.cpp',
+        'directclienttests.cpp',
+        'documentsourcetests.cpp',
+        'executor_registry.cpp',
+        'expressiontests.cpp',
+        'gle_test.cpp',
+        'indexcatalogtests.cpp',
+        'indexupdatetests.cpp',
+        'jsobjtests.cpp',
+        'jsontests.cpp',
+        'jstests.cpp',
+        'matchertests.cpp',
+        'merge_chunk_tests.cpp',
+        'mmaptests.cpp',
+        'mock_dbclient_conn_test.cpp',
+        'mock_replica_set_test.cpp',
+        'namespacetests.cpp',
+        'oplogstarttests.cpp',
+        'pdfiletests.cpp',
+        'perftests.cpp',
+        'pipelinetests.cpp',
+        'plan_ranking.cpp',
+        'query_multi_plan_runner.cpp',
+        'query_plan_executor.cpp',
+        'query_stage_and.cpp',
+        'query_stage_cached_plan.cpp',
+        'query_stage_collscan.cpp',
+        'query_stage_count.cpp',
+        'query_stage_count_scan.cpp',
+        'query_stage_delete.cpp',
+        'query_stage_distinct.cpp',
+        'query_stage_fetch.cpp',
+        'query_stage_ixscan.cpp',
+        'query_stage_keep.cpp',
+        'query_stage_limit_skip.cpp',
+        'query_stage_merge_sort.cpp',
+        'query_stage_near.cpp',
+        'query_stage_sort.cpp',
+        'query_stage_subplan.cpp',
+        'query_stage_tests.cpp',
+        'query_stage_update.cpp',
+        'querytests.cpp',
+        'replica_set_monitor_test.cpp',
+        'repltests.cpp',
+        'rollbacktests.cpp',
+        'sharding.cpp',
+        'socktests.cpp',
+        'threadedtests.cpp',
+        'updatetests.cpp',
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/coredb",
+        "$BUILD_DIR/mongo/coreserver",
+        "$BUILD_DIR/mongo/db/auth/authmocks",
+        "$BUILD_DIR/mongo/db/query/query",
+        "$BUILD_DIR/mongo/db/repl/repl_coordinator_global",
+        "$BUILD_DIR/mongo/db/repl/replmocks",
+        "$BUILD_DIR/mongo/mongocommon",
+        "$BUILD_DIR/mongo/mutable_bson_test_utils",
+        "$BUILD_DIR/mongo/s/cluster_ops",
+        "$BUILD_DIR/mongo/s/cluster_ops_impl",
+        "$BUILD_DIR/mongo/serveronly",
+        "$BUILD_DIR/mongo/util/signal_handlers_synchronous",
+        "mocklib",
+        "testframework",
+    ],
+)
+
+env.Alias("dbtest", env.Install('#/', dbtest))

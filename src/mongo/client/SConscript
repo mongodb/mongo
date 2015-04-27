@@ -39,7 +39,7 @@ env.CppUnitTest("replica_set_monitor_test",
 
 env.CppUnitTest("dbclient_rs_test",
                 ["dbclient_rs_test.cpp"],
-                LIBDEPS=['clientdriver', '$BUILD_DIR/mongo/mocklib'])
+                LIBDEPS=['clientdriver', '$BUILD_DIR/mongo/dbtests/mocklib'])
 
 if env['MONGO_BUILD_SASL_CLIENT']:
     saslLibs = ['sasl2']
