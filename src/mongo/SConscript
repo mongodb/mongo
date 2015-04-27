@@ -482,48 +482,6 @@ if has_option( 'use-cpu-profiler' ):
     # just to this file.
     env.InjectThirdPartyIncludePaths('tcmalloc')
 
-env.CppUnitTest(
-    target="index_filter_commands_test",
-    source=[
-        "db/commands/index_filter_commands_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/serveronly",
-        "$BUILD_DIR/mongo/coreserver",
-        "$BUILD_DIR/mongo/coredb",
-        "$BUILD_DIR/mongo/util/ntservice_mock",
-    ],
-    NO_CRUTCH = True,
-)
-
-env.CppUnitTest(
-    target="mr_test",
-    source=[
-        "db/commands/mr_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/serveronly",
-        "$BUILD_DIR/mongo/coreserver",
-        "$BUILD_DIR/mongo/coredb",
-        "$BUILD_DIR/mongo/util/ntservice_mock",
-    ],
-    NO_CRUTCH = True,
-)
-
-env.CppUnitTest(
-    target="plan_cache_commands_test",
-    source=[
-        "db/commands/plan_cache_commands_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/serveronly",
-        "$BUILD_DIR/mongo/coreserver",
-        "$BUILD_DIR/mongo/coredb",
-        "$BUILD_DIR/mongo/util/ntservice_mock",
-    ],
-    NO_CRUTCH = True,
-)
-
 env.Library('range_deleter',
             [ 'db/range_deleter.cpp',
               'db/range_deleter_mock_env.cpp',
