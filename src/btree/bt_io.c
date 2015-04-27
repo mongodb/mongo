@@ -23,7 +23,8 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 	WT_ENCRYPTOR *encryptor;
 	const WT_PAGE_HEADER *dsk;
 	size_t decrypted_size, result_len, skip;
-	uint32_t encrypt_len;
+	uint32_t clear_cksum, encrypt_len;
+	uint8_t *dst;
 
 	btree = S2BT(session);
 	bm = btree->bm;
@@ -57,6 +58,8 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 		skip = WT_BLOCK_ENCRYPT_SKIP;
 		encrypt_len = WT_STORE_SIZE(*((uint32_t *)
 		    ((uint8_t *)tmp->data + skip)));
+		clear_cksum = WT_STORE_SIZE(*((uint32_t *)
+		    ((uint8_t *)tmp->data + skip + sizeof(uint32_t))));
 		if (encrypt_len > tmp->size)
 			WT_ERR_MSG(session, WT_ERROR,
 			    "corrupted encrypted block: padded size less than "
@@ -68,13 +71,14 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_buf_initsize(session, buf, encrypt_len));
 
 		memcpy(buf->mem, tmp->data, skip);
+		dst = (uint8_t *)buf->mem + skip;
 		decrypted_size = encrypt_len - skip - WT_ENCRYPT_LEN -
 		    btree->kencryptor->size_const;
 		ret = encryptor->decrypt(
 		    encryptor, &session->iface,
 		    (uint8_t *)tmp->data + skip + WT_ENCRYPT_LEN,
 		    encrypt_len - skip - WT_ENCRYPT_LEN,
-		    (uint8_t *)buf->mem + skip, decrypted_size, &result_len);
+		    dst, decrypted_size, &result_len);
 
 		/*
 		 * If checksums were turned off because we're depending on the
@@ -96,6 +100,9 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 			WT_ERR_MSG(session, WT_ERROR,
 			    "encrypted block: calculated size different than "
 			    "result size");
+		if (clear_cksum != __wt_cksum(dst, decrypted_size))
+			WT_ERR_MSG(session, EINVAL,
+			    "Invalid decryption of block");
 		memcpy((uint8_t *)tmp->data + skip,
 		    (uint8_t *)buf->mem + skip, decrypted_size);
 	}
@@ -197,7 +204,7 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 	WT_PAGE_HEADER *dsk;
 	size_t len, src_len, dst_len, result_len, size;
 	int data_cksum, compression_failed, encrypted;
-	uint32_t *unpadded_lenp;
+	uint32_t *cksump, clear_cksum, *unpadded_lenp;
 	uint8_t *src, *dst;
 
 	btree = S2BT(session);
@@ -334,6 +341,7 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 		dst = (uint8_t *)etmp->mem +
 		    WT_BLOCK_ENCRYPT_SKIP + WT_ENCRYPT_LEN;
 		dst_len = src_len + len;
+		clear_cksum = __wt_cksum(src, src_len);
 		if ((ret = encryptor->encrypt(encryptor,
 		    &session->iface,
 		    src, src_len,
@@ -355,11 +363,16 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 		etmp->size = result_len;
 		/*
 		 * Store original size so we know how much space is needed
-		 * on the decryption side.
+		 * on the decryption side.  Store pre-encrypt checksum so we
+		 * can verify after decryption.
 		 */
 		unpadded_lenp = (uint32_t *)((uint8_t *)etmp->mem +
 		    WT_BLOCK_ENCRYPT_SKIP);
 		*unpadded_lenp = WT_STORE_SIZE(result_len);
+		cksump = (uint32_t *)
+		    ((uint8_t *)unpadded_lenp + sizeof(uint32_t));
+		*cksump = WT_STORE_SIZE(clear_cksum);
+
 		ip = etmp;
 	}
 	dsk = ip->mem;

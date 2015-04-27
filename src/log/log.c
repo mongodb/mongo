@@ -398,7 +398,7 @@ __log_decrypt(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out)
 	WT_ENCRYPTOR *encryptor;
 	WT_KEYED_ENCRYPTOR *kencryptor;
 	size_t decrypted_size, dst_len, result_len, src_len;
-	uint32_t unpadded_len;
+	uint32_t clear_cksum, unpadded_len;
 	uint8_t *dst, *src;
 
 	conn = S2C(session);
@@ -425,6 +425,8 @@ __log_decrypt(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out)
 	 */
 	unpadded_len = WT_STORE_SIZE(*((uint32_t *)
 	    ((uint8_t *)in->data + WT_LOG_ENCRYPT_SKIP)));
+	clear_cksum = WT_STORE_SIZE(*((uint32_t *)
+	    ((uint8_t *)in->data + WT_LOG_ENCRYPT_SKIP + sizeof(uint32_t))));
 	WT_ASSERT(session, unpadded_len > 0);
 	/*
 	 * The size of the new buffer should be the unpadded length less
@@ -445,6 +447,13 @@ __log_decrypt(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out)
 	WT_ERR(encryptor->decrypt(encryptor, &session->iface,
 	    src, src_len, dst, dst_len, &result_len));
 
+	/*
+	 * Verify the checksum of the pre-encrypted data matches a checksum
+	 * of the post-decrypted data.  They should be identical.
+	 */
+	if (clear_cksum != __wt_cksum(dst, dst_len))
+		WT_ERR_MSG(session, EINVAL,
+		    "Invalid decryption of log record");
 	/*
 	 * If checksums were turned off because we're depending on the
 	 * decryption to fail on any corrupted data, we'll end up
@@ -1669,7 +1678,7 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	WT_LOG_RECORD *newlrp;
 	int compression_failed;
 	size_t dst_len, len, new_size, result_len, src_len;
-	uint32_t *unpadded_lenp;
+	uint32_t *cksump, clear_cksum, *unpadded_lenp;
 	uint8_t *dst, *src;
 
 	conn = S2C(session);
@@ -1771,6 +1780,8 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 		unpadded_lenp = (uint32_t *)
 		    ((uint8_t *)eitem->mem + WT_LOG_ENCRYPT_SKIP);
 		*unpadded_lenp = WT_STORE_SIZE(new_size);
+		cksump = (uint32_t *)
+		    ((uint8_t *)unpadded_lenp + sizeof(uint32_t));
 		eitem->size = new_size;
 
 		/*
@@ -1783,6 +1794,12 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 		dst = (uint8_t *)eitem->mem +
 		    WT_LOG_ENCRYPT_SKIP + WT_ENCRYPT_LEN;
 		dst_len = src_len + kencryptor->size_const;
+		/*
+		 * We want to store a checksum of the pre-encrypted data
+		 * and store it so that we can detect a bad key on decryption.
+		 */
+		clear_cksum = __wt_cksum(src, src_len);
+		*cksump = WT_STORE_SIZE(clear_cksum);
 		WT_ERR(encryptor->encrypt(encryptor, &session->iface,
 		    src, src_len, dst, dst_len, &result_len));
 
