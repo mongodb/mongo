@@ -55,6 +55,7 @@ namespace repl {
     class OplogReader;
     class ReplSetHeartbeatArgs;
     class ReplSetHeartbeatResponse;
+    class ReplSetHtmlSummary;
     class UpdatePositionArgs;
 
     /**
@@ -550,6 +551,12 @@ namespace repl {
          * currentSource: the current sync source
          */
         virtual bool shouldChangeSyncSource(const HostAndPort& currentSource) = 0;
+
+        /**
+         * Writes into 'output' all the information needed to generate a summary of the current
+         * replication state for use by the web interface.
+         */
+        virtual void summarizeAsHtml(ReplSetHtmlSummary* output) = 0;
 
     protected:
 

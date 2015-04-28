@@ -186,6 +186,7 @@ namespace repl {
         virtual bool stepDown(Date_t until, bool force, OpTime lastOpApplied);
         virtual bool stepDownIfPending();
         virtual Date_t getStepDownTime() const;
+        virtual void summarizeAsHtml(ReplSetHtmlSummary* output);
 
         ////////////////////////////////////////////////////////////
         //
