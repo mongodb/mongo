@@ -470,7 +470,7 @@ main(void)
 	    COMP_A COMP_B COMP_C COMP_A COMP_B COMP_C
 	    COMP_A COMP_B COMP_C COMP_A COMP_B COMP_C
 	    "The quick brown fox jumps over the lazy dog ");
-	simple_walk_log(session);
+	ret = simple_walk_log(session);
 
 	/*
 	 * Create and open some encrypted and not encrypted tables.
@@ -540,7 +540,7 @@ main(void)
 
 		printf("Read key %s; value %s\n", key1, val1);
 	}
-	simple_walk_log(session);
+	ret = simple_walk_log(session);
 	printf("CLOSE\n");
 	ret = conn->close(conn, NULL);
 
@@ -584,7 +584,7 @@ main(void)
 	/*
 	 * Verify we can read the encrypted log after restart.
 	 */
-	simple_walk_log(session);
+	ret = simple_walk_log(session);
 	ret = session->open_cursor(session, "table:crypto1", NULL, NULL, &c1);
 	ret = session->open_cursor(session, "table:crypto2", NULL, NULL, &c2);
 	ret = session->open_cursor(session, "table:nocrypto", NULL, NULL, &nc);
@@ -593,8 +593,8 @@ main(void)
 	 * Read the same data from each cursor.  All should be identical.
 	 */
 	while (c1->next(c1) == 0) {
-		c2->next(c2);
-		nc->next(nc);
+		ret = c2->next(c2);
+		ret = nc->next(nc);
 		ret = c1->get_key(c1, &key1);
 		ret = c1->get_value(c1, &val1);
 		ret = c2->get_key(c2, &key2);
