@@ -60,6 +60,7 @@ namespace repl {
     class ReplSetHeartbeatArgsV1;
     class ReplSetHeartbeatResponse;
     class ReplSetHeartbeatResponseV1;
+    class ReplSetHtmlSummary;
     class ReplSetRequestVotesArgs;
     class ReplSetRequestVotesResponse;
     class ReplicaSetConfig;
@@ -589,6 +590,12 @@ namespace repl {
          * Returns true if the V1 election protocol is being used and false otherwise.
          */ 
         virtual bool isV1ElectionProtocol() = 0;
+
+        /**
+         * Writes into 'output' all the information needed to generate a summary of the current
+         * replication state for use by the web interface.
+         */
+        virtual void summarizeAsHtml(ReplSetHtmlSummary* output) = 0;
 
     protected:
 

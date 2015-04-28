@@ -189,6 +189,7 @@ namespace repl {
         virtual void prepareCursorResponseInfo(BSONObjBuilder* objBuilder,
                                                const Timestamp& lastCommitttedOpTime) const;
 
+        virtual void summarizeAsHtml(ReplSetHtmlSummary* output);
 
         ////////////////////////////////////////////////////////////
         //

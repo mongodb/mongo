@@ -322,5 +322,7 @@ namespace repl {
         return true;
     }
 
+    void ReplicationCoordinatorMock::summarizeAsHtml(ReplSetHtmlSummary* output) {}
+
 } // namespace repl
 } // namespace mongo

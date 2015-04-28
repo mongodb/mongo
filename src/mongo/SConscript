@@ -934,10 +934,13 @@ env.Library("mongodandmongos", mongodAndMongosFiles,
 env.Library("mongodwebserver",
             [
              "db/clientlistplugin.cpp",
+             "db/repl/replset_web_handler.cpp",
              "db/restapi.cpp",
              "db/stats/snapshots_webplugins.cpp",
              ],
-            LIBDEPS=["coredb", "mongodandmongos"])
+            LIBDEPS=["coredb",
+                     "mongodandmongos",
+                     "$BUILD_DIR/mongo/db/repl/repl_coordinator_global"])
 
 mongodOnlyFiles = [ "db/db.cpp", "db/mongod_options_init.cpp" ]
 

@@ -196,6 +196,8 @@ namespace repl {
 
         virtual bool isV1ElectionProtocol();
 
+        virtual void summarizeAsHtml(ReplSetHtmlSummary* output);
+
     private:
 
         const ReplSettings _settings;

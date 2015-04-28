@@ -251,6 +251,8 @@ namespace repl {
 
         virtual bool isV1ElectionProtocol();
 
+        virtual void summarizeAsHtml(ReplSetHtmlSummary* s);
+
         // ================== Test support API ===================
 
         /**
@@ -777,6 +779,9 @@ namespace repl {
          * servers; set _lastCommittedOpTime to this new entry, if greater than the current entry.
          */
         void _updateLastCommittedOpTime_inlock();
+
+        void _summarizeAsHtml_finish(const ReplicationExecutor::CallbackData& cbData,
+                                     ReplSetHtmlSummary* output);
 
         //
         // All member variables are labeled with one of the following codes indicating the

@@ -40,7 +40,6 @@
 
 namespace mongo {
 
-    class OperationContext;
     class Timestamp;
 
 namespace repl {
@@ -360,6 +359,13 @@ namespace repl {
          */
         virtual void prepareCursorResponseInfo(BSONObjBuilder* objBuilder,
                                                const Timestamp& lastCommittedOpTime) const = 0;
+
+        /**
+         * Writes into 'output' all the information needed to generate a summary of the current
+         * replication state for use by the web interface.
+         */
+        virtual void summarizeAsHtml(ReplSetHtmlSummary* output) = 0;
+
 
     protected:
         TopologyCoordinator() {}

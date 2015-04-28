@@ -48,6 +48,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
+#include "mongo/db/repl/repl_set_html_summary.h"
 #include "mongo/db/repl/repl_set_request_votes_args.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replica_set_config_checks.h"
@@ -2440,6 +2441,32 @@ namespace {
     Status ReplicationCoordinatorImpl::processHeartbeatV1(const ReplSetHeartbeatArgsV1& args,
                                                           ReplSetHeartbeatResponseV1* response) {
         return {ErrorCodes::CommandNotFound, "not implemented"};
+    }
+
+    void ReplicationCoordinatorImpl::summarizeAsHtml(ReplSetHtmlSummary* output) {
+        CBHStatus cbh = _replExecutor.scheduleWork(
+            stdx::bind(&ReplicationCoordinatorImpl::_summarizeAsHtml_finish,
+                       this,
+                       stdx::placeholders::_1,
+                       output));
+        if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
+            return;
+        }
+        fassert(28638, cbh.getStatus());
+        _replExecutor.wait(cbh.getValue());
+    }
+
+    void ReplicationCoordinatorImpl::_summarizeAsHtml_finish(const CallbackData& cbData,
+                                                             ReplSetHtmlSummary* output) {
+        if (cbData.status == ErrorCodes::CallbackCanceled) {
+            return;
+        }
+
+        output->setSelfOptime(getMyLastOptime());
+        output->setSelfUptime(time(0) - serverGlobalParams.started);
+        output->setNow(_replExecutor.now());
+
+        _topCoord->summarizeAsHtml(output);
     }
 
 } // namespace repl
