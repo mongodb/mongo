@@ -7,7 +7,7 @@
 s = new ShardingTest( "shard_index", 2, 0, 1 )
 
 // Regenerate fully because of SERVER-2782
-for ( var i = 0; i < 19; i++ ) {
+for ( var i = 0; i < 22; i++ ) {
         
     var coll = s.admin._mongo.getDB( "test" ).getCollection( "foo" + i )
     coll.drop()
@@ -339,6 +339,49 @@ for ( var i = 0; i < 19; i++ ) {
         catch( e ){
             print(e);
             assert( false, "Should be able to shard coll with hashed and regular unique index");
+        }
+    }
+    if ( i == 19 ) {
+        // Create sparse index.
+        coll.ensureIndex( { x : 1 }, { sparse : true } );
+
+        passed = false;
+        try {
+            s.adminCommand( { shardcollection : "" + coll, key : { x : 1 } } );
+            passed = true;
+        }
+        catch ( e ) {
+            print( e );
+        }
+        assert( !passed, "Should not be able to shard coll with sparse index" );
+    }
+    if ( i == 20 ) {
+        // Create partial index.
+        coll.ensureIndex( { x : 1 }, { filter: { num : { $gt : 1 } } } );
+
+        passed = false;
+        try {
+            s.adminCommand( { shardcollection : "" + coll, key : { x : 1 } } );
+            passed = true;
+        }
+        catch ( e ) {
+            print( e );
+        }
+        assert( !passed, "Should not be able to shard coll with partial index" );
+    }
+    if ( i == 21 ) {
+        // Ensure that a collection with a normal index and a partial index can be sharded, where
+        // both are prefixed by the shard key.
+
+        coll.ensureIndex( { x : 1, num : 1 }, { filter: { num : { $gt : 1 } } } );
+        coll.ensureIndex( { x : 1, num : -1 } );
+
+        try {
+            s.adminCommand( { shardcollection : "" + coll, key : { x : 1 } } );
+        }
+        catch ( e ) {
+            print( e );
+            assert( false, "Should be able to shard coll with regular and partial index");
         }
     }
 }

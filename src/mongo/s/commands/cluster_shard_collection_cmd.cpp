@@ -205,7 +205,7 @@ namespace {
             //    is "useful" for the proposed key.  A "useful" index is defined as follows
             //    Useful Index:
             //         i. contains proposedKey as a prefix
-            //         ii. is not sparse
+            //         ii. is not a sparse index or partial index
             //         iii. contains no null values
             //         iv. is not multikey (maybe lift this restriction later)
             //         v. if a hashed index, has default seed (lift this restriction later)
@@ -248,7 +248,9 @@ namespace {
                 BSONObj idx = *it;
                 BSONObj currentKey = idx["key"].embeddedObject();
                 // Check 2.i. and 2.ii.
-                if (!idx["sparse"].trueValue() && proposedKey.isPrefixOf(currentKey)) {
+                if (!idx["sparse"].trueValue() &&
+                    idx["filter"].eoo() &&
+                    proposedKey.isPrefixOf(currentKey)) {
 
                     // We can't currently use hashed indexes with a non-default hash seed
                     // Check v.
