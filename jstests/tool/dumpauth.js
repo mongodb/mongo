@@ -1,36 +1,37 @@
 // dumpauth.js
 // test mongodump with authentication
-baseName = "tool_dumpauth";
 
 var m = MongoRunner.runMongod({auth: "", bind_ip: "127.0.0.1"});
-db = m.getDB( "admin" );
+var dbName = "admin"
+var colName = "testcol"
+db = m.getDB(dbName);
 
 db.createUser({user:  "testuser" , pwd: "testuser", roles: jsTest.adminUserRoles});
 assert( db.auth( "testuser" , "testuser" ) , "auth failed" );
 
-t = db[ baseName ];
+t = db[colName];
 t.drop();
 
 for(var i = 0; i < 100; i++) {
-  t["testcol"].save({ "x": i });
+  t.save({ "x": i });
 }
 
 x = runMongoProgram( "mongodump",
-                     "--db", baseName,
+                     "--db", dbName,
                      "--authenticationDatabase=admin",
                      "-u", "testuser",
                      "-p", "testuser",
                      "-h", "127.0.0.1:"+m.port,
-                     "--collection", "testcol" );
+                     "--collection", colName);
 assert.eq(x, 0, "mongodump should succeed with authentication");
 
 // SERVER-5233: mongodump with authentication breaks when using "--out -"
 x = runMongoProgram( "mongodump",
-                     "--db", baseName,
+                     "--db", dbName,
                      "--authenticationDatabase=admin",
                      "-u", "testuser",
                      "-p", "testuser",
                      "-h", "127.0.0.1:"+m.port,
-                     "--collection", "testcol",
+                     "--collection", colName,
                      "--out", "-" );
 assert.eq(x, 0, "mongodump should succeed with authentication while using '--out'");
