@@ -1,5 +1,6 @@
 package mongorestore
 
+//Usage describes basic usage of mongorestore
 var Usage = `<options> <directory or file to restore>
 
 Restore backups generated with mongodump to a running server.
@@ -20,7 +21,7 @@ type InputOptions struct {
 }
 
 // Name returns a human-readable group name for input options.
-func (_ *InputOptions) Name() string {
+func (*InputOptions) Name() string {
 	return "input"
 }
 
@@ -38,6 +39,6 @@ type OutputOptions struct {
 }
 
 // Name returns a human-readable group name for output options.
-func (_ *OutputOptions) Name() string {
+func (*OutputOptions) Name() string {
 	return "restore"
 }

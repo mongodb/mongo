@@ -3,6 +3,7 @@ package mongorestore
 
 import (
 	"fmt"
+	"github.com/mongodb/mongo-tools/common/archive"
 	"github.com/mongodb/mongo-tools/common/auth"
 	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/intents"
@@ -12,6 +13,7 @@ import (
 	"github.com/mongodb/mongo-tools/common/util"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
+	"os"
 	"sync"
 )
 
@@ -47,6 +49,8 @@ type MongoRestore struct {
 
 	// indexes belonging to dbs and collections
 	dbCollectionIndexes map[string]collectionIndexes
+
+	archive *archive.Reader
 }
 
 type collectionIndexes map[string][]IndexDocument
@@ -146,6 +150,7 @@ func (restore *MongoRestore) ParseAndValidateOptions() error {
 
 // Restore runs the mongorestore program.
 func (restore *MongoRestore) Restore() error {
+	var target archive.DirLike
 	err := restore.ParseAndValidateOptions()
 	if err != nil {
 		log.Logf(log.DebugLow, "got error from options parsing: %v", err)
@@ -155,15 +160,31 @@ func (restore *MongoRestore) Restore() error {
 	// Build up all intents to be restored
 	restore.manager = intents.NewIntentManager()
 
-	// handle cases where the user passes in a file instead of a directory
-	if isBSON(restore.TargetDirectory) {
-		log.Log(log.DebugLow, "mongorestore target is a file, not a directory")
-		err = restore.handleBSONInsteadOfDirectory(restore.TargetDirectory)
+	if restore.InputOptions.Archive {
+		restore.archive = &archive.Reader{
+			In:      os.Stdin,
+			Prelude: &archive.Prelude{},
+		}
+		err = restore.archive.Prelude.Read(restore.archive.In)
+		if err != nil {
+			return nil
+		}
+		target = restore.archive.Prelude.NewPreludeExplorer()
+	} else {
+		target, err = newDirDirLike(restore.TargetDirectory)
 		if err != nil {
 			return err
 		}
-	} else {
-		log.Log(log.DebugLow, "mongorestore target is a directory, not a file")
+		// handle cases where the user passes in a file instead of a directory
+		if !target.IsDir() {
+			log.Log(log.DebugLow, "mongorestore target is a file, not a directory")
+			err = restore.handleBSONInsteadOfDirectory(restore.TargetDirectory)
+			if err != nil {
+				return err
+			}
+		} else {
+			log.Log(log.DebugLow, "mongorestore target is a directory, not a file")
+		}
 	}
 	if restore.ToolOptions.Collection != "" &&
 		restore.OutputOptions.NumParallelCollections > 1 &&
@@ -176,25 +197,33 @@ func (restore *MongoRestore) Restore() error {
 		restore.OutputOptions.NumInsertionWorkers = restore.OutputOptions.NumParallelCollections
 	}
 
+	// Create the demux before intent creation, because muted archive intents need
+	// to register themselves with the demux directly
+	if restore.InputOptions.Archive {
+		restore.archive.Demux = &archive.Demultiplexer{
+			In: restore.archive.In,
+		}
+	}
+
 	switch {
 	case restore.ToolOptions.DB == "" && restore.ToolOptions.Collection == "":
 		log.Logf(log.Always,
 			"building a list of dbs and collections to restore from %v dir",
-			restore.TargetDirectory)
-		err = restore.CreateAllIntents(restore.TargetDirectory)
+			target.Path())
+		err = restore.CreateAllIntents(target)
 	case restore.ToolOptions.DB != "" && restore.ToolOptions.Collection == "":
 		log.Logf(log.Always,
 			"building a list of collections to restore from %v dir",
-			restore.TargetDirectory)
+			target.Path())
 		err = restore.CreateIntentsForDB(
 			restore.ToolOptions.DB,
-			restore.TargetDirectory)
+			target)
 	case restore.ToolOptions.DB != "" && restore.ToolOptions.Collection != "":
-		log.Logf(log.Always, "checking for collection data in %v", restore.TargetDirectory)
+		log.Logf(log.Always, "checking for collection data in %v", target.Path())
 		err = restore.CreateIntentForCollection(
 			restore.ToolOptions.DB,
 			restore.ToolOptions.Collection,
-			restore.TargetDirectory)
+			target)
 	}
 	if err != nil {
 		return fmt.Errorf("error scanning filesystem: %v", err)
@@ -203,6 +232,32 @@ func (restore *MongoRestore) Restore() error {
 	if restore.isMongos && restore.manager.HasConfigDBIntent() && restore.ToolOptions.DB == "" {
 		return fmt.Errorf("cannot do a full restore on a sharded system - " +
 			"remove the 'config' directory from the dump directory first")
+	}
+
+	if restore.InputOptions.Archive {
+		namespaceChan := make(chan string, 1)
+		namespaceErrorChan := make(chan error)
+		restore.archive.Demux.NamespaceChan = namespaceChan
+		restore.archive.Demux.NamespaceErrorChan = namespaceErrorChan
+
+		go restore.archive.Demux.Run()
+		// consume the new namespace announcement from the demux for all of the collections that get cached
+		for {
+			ns := <-namespaceChan
+			intent := restore.manager.IntentForNamespace(ns)
+			if intent == nil {
+				return fmt.Errorf("No intent for collection in archive: %v", ns)
+			}
+			if intent.IsSystemIndexes() || intent.IsUsers() || intent.IsRoles() || intent.IsAuthVersion() {
+				log.Logf(log.DebugLow, "eating namespace %v", ns)
+				namespaceErrorChan <- nil
+			} else {
+				// Put the ns back on the chan so that the demultiplexer can start correctly
+				log.Logf(log.DebugLow, "shoving namespace back on the ns chan %v", ns)
+				namespaceChan <- ns
+				break
+			}
+		}
 	}
 
 	// If restoring users and roles, make sure we validate auth versions
@@ -231,7 +286,7 @@ func (restore *MongoRestore) Restore() error {
 
 	// Restore the regular collections
 	if restore.InputOptions.Archive {
-		restore.manager.Finalize(intents.ArchiveOrder)
+		restore.manager.FinalizeWithPrioritizer(restore.archive.Demux.NewPrioritizer(restore.manager))
 	} else if restore.OutputOptions.NumParallelCollections > 1 {
 		restore.manager.Finalize(intents.MultiDatabaseLTF)
 	} else {

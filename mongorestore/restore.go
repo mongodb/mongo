@@ -63,7 +63,11 @@ func (restore *MongoRestore) RestoreIntents() error {
 	}
 
 	// single-threaded
-	for intent := restore.manager.Pop(); intent != nil; intent = restore.manager.Pop() {
+	for {
+		intent := restore.manager.Pop()
+		if intent == nil {
+			break
+		}
 		err := restore.RestoreIntent(intent)
 		if err != nil {
 			return fmt.Errorf("%v: %v", intent.Namespace(), err)

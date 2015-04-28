@@ -311,14 +311,14 @@ func (manager *Manager) Finalize(pType PriorityType) {
 	case MultiDatabaseLTF:
 		log.Log(log.DebugHigh, "finalizing intent manager with multi-database longest task first prioritizer")
 		manager.prioritizer = NewMultiDatabaseLTFPrioritizer(manager.intentsByDiscoveryOrder)
-	case ArchiveOrder:
-		log.Log(log.DebugHigh, "finalizing intent manager with archive order prioritizer")
-		// XXX figure how how to get the required parameters here
-		//		manager.prioritizer = NewArchivePrioritizer(manager.intentsByDiscoveryOrder)
 	default:
 		panic("cannot initialize IntentPrioritizer with unknown type")
 	}
 	// release these for the garbage collector and to ensure code correctness
 	manager.intents = nil
 	manager.intentsByDiscoveryOrder = nil
+}
+
+func (manager *Manager) FinalizeWithPrioritizer(prioritizer IntentPrioritizer) {
+	manager.prioritizer = prioritizer
 }

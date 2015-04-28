@@ -10,6 +10,7 @@ import (
 	"github.com/mongodb/mongo-tools/common/log"
 	"gopkg.in/mgo.v2/bson"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 )
@@ -28,6 +29,10 @@ func (f *bsonFileFile) Open() (err error) {
 	if f.intent.BSONPath == "" {
 		return fmt.Errorf("No BSONPath for %v.%v", f.intent.DB, f.intent.C)
 	}
+	err = os.MkdirAll(path.Dir(f.intent.BSONPath), os.ModeDir|os.ModePerm)
+	if err != nil {
+		return fmt.Errorf("error creating BSON file %v: %v", f.intent.BSONPath, err)
+	}
 	f.File, err = os.Create(f.intent.BSONPath)
 	if err != nil {
 		return fmt.Errorf("error creating BSON file %v: %v", f.intent.BSONPath, err)
@@ -43,6 +48,10 @@ type metadataFileFile struct {
 func (f *metadataFileFile) Open() (err error) {
 	if f.intent.MetadataPath == "" {
 		return fmt.Errorf("No MetadataPath for %v.%v", f.intent.DB, f.intent.C)
+	}
+	err = os.MkdirAll(path.Dir(f.intent.BSONPath), os.ModeDir|os.ModePerm)
+	if err != nil {
+		return fmt.Errorf("error creating BSON file %v: %v", f.intent.BSONPath, err)
 	}
 	f.File, err = os.Create(f.intent.MetadataPath)
 	if err != nil {
@@ -92,11 +101,11 @@ func (dump *MongoDump) outputPath(dbName, colName string) string {
 }
 
 // NewIntent creates a bare intent without populating the options.
-func (dump *MongoDump) NewIntent(dbName, collName string, stdout bool) (*intents.Intent, error) {
+func (dump *MongoDump) NewIntent(dbName, colName string, stdout bool) (*intents.Intent, error) {
 	intent := &intents.Intent{
 		DB:       dbName,
-		C:        collName,
-		BSONPath: dump.outputPath(dbName, collName) + ".bson",
+		C:        colName,
+		BSONPath: dump.outputPath(dbName, colName) + ".bson",
 	}
 
 	// add stdout flags if we're using stdout
@@ -132,7 +141,7 @@ func (dump *MongoDump) NewIntent(dbName, collName string, stdout bool) (*intents
 	}
 	defer session.Close()
 
-	count, err := session.DB(dbName).C(collName).Count()
+	count, err := session.DB(dbName).C(colName).Count()
 	if err != nil {
 		return nil, fmt.Errorf("error counting %v: %v", intent.Namespace(), err)
 	}
@@ -141,6 +150,7 @@ func (dump *MongoDump) NewIntent(dbName, collName string, stdout bool) (*intents
 	return intent, nil
 }
 
+// CreateOplogIntents creates an intents.Intent for the oplog and adds it to the manager
 func (dump *MongoDump) CreateOplogIntents() error {
 
 	err := dump.determineOplogCollectionName()

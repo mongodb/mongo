@@ -60,11 +60,15 @@ func TestBasicMux(t *testing.T) {
 			inChecksum[dbc.Namespace()] = crc32.NewIEEE()
 			muxIns[dbc.Namespace()] = &MuxIn{Intent: dbc, Mux: mux}
 		}
-		errChan := make(chan byte)
+		errChan := make(chan error)
 		for index, dbc := range testIntents {
 			closeDbc := dbc
 			go func() {
-				muxIns[closeDbc.Namespace()].Open()
+				err = muxIns[closeDbc.Namespace()].Open()
+				if err != nil {
+					errChan <- nil
+					return
+				}
 				defer muxIns[closeDbc.Namespace()].Close()
 				staticBSONBuf := make([]byte, db.MaxBSONSize)
 				for i := 0; i < 10000; i++ {
@@ -83,17 +87,17 @@ func TestBasicMux(t *testing.T) {
 			fmt.Fprintf(os.Stderr, "About to mux\n")
 			go mux.Run()
 
-			for _, _ = range testIntents {
+			for _ = range testIntents {
 				err := <-errChan
 				So(err, ShouldBeNil)
 			}
 			close(mux.Control)
-			demux := &Demultiplexer{in: buf}
-			demuxOuts := map[string]*DemuxOut{}
+			demux := &Demultiplexer{In: buf}
+			demuxOuts := map[string]*RegularCollectionReceiver{}
 
 			for _, dbc := range testIntents {
 				outChecksum[dbc.Namespace()] = crc32.NewIEEE()
-				demuxOuts[dbc.Namespace()] = &DemuxOut{Intent: dbc, Demux: demux}
+				demuxOuts[dbc.Namespace()] = &RegularCollectionReceiver{Intent: dbc, Demux: demux}
 				demuxOuts[dbc.Namespace()].Open()
 			}
 			errChan := make(chan error)
@@ -123,7 +127,7 @@ func TestBasicMux(t *testing.T) {
 			Convey("and demultiplexed successfully", func() {
 				err = demux.Run()
 				So(err, ShouldBeNil)
-				for _, _ = range testIntents {
+				for _ = range testIntents {
 					err := <-errChan
 					So(err, ShouldBeNil)
 				}

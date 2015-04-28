@@ -33,13 +33,13 @@ func TestPrelude(t *testing.T) {
 			Metadata:   "m4",
 		}
 
-		archivePrelude := &ArchivePrelude{
-			Header: &ArchiveHeader{
+		archivePrelude := &Prelude{
+			Header: &Header{
 				ArchiveFormatVersion: "version-foo",
 			},
-			CollectionMetadatas: []*CollectionMetadata{cm1, cm2, cm3, cm4},
-			DBS:                 []string{"db1", "db2", "db3"},
-			CollectionMetadatasByDB: map[string][]*CollectionMetadata{
+			NamespaceMetadatas: []*CollectionMetadata{cm1, cm2, cm3, cm4},
+			DBS:                []string{"db1", "db2", "db3"},
+			NamespaceMetadatasByDB: map[string][]*CollectionMetadata{
 				"db1": []*CollectionMetadata{cm1, cm2},
 				"db2": []*CollectionMetadata{cm3},
 				"db3": []*CollectionMetadata{cm4},
@@ -48,7 +48,7 @@ func TestPrelude(t *testing.T) {
 		buf := &bytes.Buffer{}
 		err = archivePrelude.Write(buf)
 		So(err, ShouldBeNil)
-		archivePrelude2 := &ArchivePrelude{}
+		archivePrelude2 := &Prelude{}
 		err := archivePrelude2.Read(buf)
 		So(err, ShouldBeNil)
 		So(archivePrelude2, ShouldResemble, archivePrelude)

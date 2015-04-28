@@ -45,7 +45,7 @@ type MongoDump struct {
 	oplogStart      bson.MongoTimestamp
 	isMongos        bool
 	authVersion     int
-	archive         *archive.ArchiveWriter
+	archive         *archive.Writer
 	progressManager *progress.Manager
 }
 
@@ -142,7 +142,7 @@ func (dump *MongoDump) Dump() error {
 	}
 
 	if dump.OutputOptions.Archive {
-		dump.archive = &archive.ArchiveWriter{
+		dump.archive = &archive.Writer{
 			Out: os.Stdout,
 			Mux: &archive.Multiplexer{Out: os.Stdout, Control: make(chan byte)},
 		}

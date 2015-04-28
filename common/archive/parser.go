@@ -13,25 +13,27 @@ import (
 //   zero or more body BSON documents
 //   a four byte terminator (0xFFFFFFFF)
 
+// ParserConsumer is the interface that one needs to implent to consume data from the Parser
 type ParserConsumer interface {
 	HeaderBSON([]byte) error
 	BodyBSON([]byte) error
 	End() error
 }
 
+// Parser encapsulates the small amount of state that the parser needs to keep
 type Parser struct {
 	In     io.Reader
 	buf    [db.MaxBSONSize]byte
 	length int
 }
 
-type ParserError struct {
+type parserError struct {
 	Err error
 	Msg string
 }
 
-// Error is part of the Error interface. It formats a ParserError for human readability.
-func (pe *ParserError) Error() string {
+// Error is part of the Error interface. It formats a parserError for human readability.
+func (pe *parserError) Error() string {
 	err := fmt.Sprintf("corruption found in archive; %v", pe.Msg)
 	if pe.Err != nil {
 		err = fmt.Sprintf("%v ( %v )", err, pe.Err)
@@ -39,16 +41,16 @@ func (pe *ParserError) Error() string {
 	return err
 }
 
-// parserError creates a ParserError with just a message
-func parserError(msg string) error {
-	return &ParserError{
+// newParserError creates a parserError with just a message
+func newParserError(msg string) error {
+	return &parserError{
 		Msg: msg,
 	}
 }
 
-// parserError creates a ParserError with a message as well as an underlying cause error
-func parserErrError(msg string, err error) error {
-	return &ParserError{
+// newParserErrError creates a parserError with a message as well as an underlying cause error
+func newParserErrError(msg string, err error) error {
+	return &parserError{
 		Err: err,
 		Msg: msg,
 	}
@@ -66,7 +68,7 @@ func (parse *Parser) readBSONOrTerminator() (bool, error) {
 		return false, err
 	}
 	if err != nil {
-		return false, parserErrError("head length or terminator", err)
+		return false, newParserErrError("head length or terminator", err)
 	}
 	size := int32(
 		(uint32(parse.buf[0]) << 0) |
@@ -78,7 +80,7 @@ func (parse *Parser) readBSONOrTerminator() (bool, error) {
 		return true, nil
 	}
 	if size < minBSONSize || size > db.MaxBSONSize {
-		return false, parserError(fmt.Sprintf("%v is neither a valid bson length nor a archive terminator", size))
+		return false, newParserError(fmt.Sprintf("%v is neither a valid bson length nor a archive terminator", size))
 	}
 	// TODO Because we're reusing this same buffer for all of our IO, we are basically guaranteeing that we'll
 	// copy the bytes twice.  At some point we should fix this. It's slightly complex, because we'll need consumer
@@ -86,10 +88,10 @@ func (parse *Parser) readBSONOrTerminator() (bool, error) {
 	_, err = io.ReadAtLeast(parse.In, parse.buf[4:size], int(size)-4)
 	if err != nil {
 		// any error, including EOF is an error so we wrap it up
-		return false, parserErrError("read bson", err)
+		return false, newParserErrError("read bson", err)
 	}
 	if parse.buf[size-1] != 0x00 {
-		return false, parserError("bson doesn't end with a null byte")
+		return false, newParserError("bson doesn't end with a null byte")
 	}
 	parse.length = int(size)
 	return false, nil
@@ -111,7 +113,7 @@ func (parse *Parser) ReadAllBlocks(consumer ParserConsumer) (err error) {
 // calling consumer.HeaderBSON() on the header, consumer.BodyBSON() on each piece of body,
 // and consumer.EOF() when EOF is encountered before any data was read.
 // It returns nil if a whole block was read, io.EOF is nothing was read,
-// and a ParserError if there was any io error in the middle of the block,
+// and a parserError if there was any io error in the middle of the block,
 // if either of the consumer methods return error, or if there was any sort of
 // parsing failure.
 func (parse *Parser) ReadBlock(consumer ParserConsumer) (err error) {
@@ -119,7 +121,7 @@ func (parse *Parser) ReadBlock(consumer ParserConsumer) (err error) {
 	if err == io.EOF {
 		handlerErr := consumer.End()
 		if handlerErr != nil {
-			return parserErrError("ParserConsumer.End", handlerErr)
+			return newParserErrError("ParserConsumer.End", handlerErr)
 		}
 		return err
 	}
@@ -127,11 +129,11 @@ func (parse *Parser) ReadBlock(consumer ParserConsumer) (err error) {
 		return err
 	}
 	if isTerminator {
-		return parserError("consecutive terminators / headerless blocks are not allowed")
+		return newParserError("consecutive terminators / headerless blocks are not allowed")
 	}
 	err = consumer.HeaderBSON(parse.buf[:parse.length])
 	if err != nil {
-		return parserErrError("ParserConsumer.HeaderBSON()", err)
+		return newParserErrError("ParserConsumer.HeaderBSON()", err)
 	}
 	for {
 		isTerminator, err = parse.readBSONOrTerminator()
@@ -143,7 +145,7 @@ func (parse *Parser) ReadBlock(consumer ParserConsumer) (err error) {
 		}
 		err = consumer.BodyBSON(parse.buf[:parse.length])
 		if err != nil {
-			return parserErrError("ParserConsumer.BodyBSON()", err)
+			return newParserErrError("ParserConsumer.BodyBSON()", err)
 		}
 	}
 }

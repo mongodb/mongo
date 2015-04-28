@@ -10,6 +10,7 @@ import (
 	"sync"
 )
 
+// Multiplexer is what one uses to create interleaved intents in an archive
 type Multiplexer struct {
 	Out                  io.Writer
 	Control              chan byte

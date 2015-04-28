@@ -226,26 +226,3 @@ func (dbh *DBHeap) Pop() interface{} {
 	*dbh = old[0 : n-1]
 	return toPop
 }
-
-//===== ArchivePrioritizer =====
-
-// ArchivePrioritizer is a completely reactive prioritizer
-// Intents are handed out as they arrive in the archive
-type ArchivePrioritizer struct {
-	demuxNamespaceChan chan string
-	mgr                *Manager
-}
-
-func NewArchivePrioritizer(demuxNamespaceChan chan string, mgr *Manager) *ArchivePrioritizer {
-	return &ArchivePrioritizer{demuxNamespaceChan: demuxNamespaceChan, mgr: mgr}
-}
-
-func (archive *ArchivePrioritizer) Get() *Intent {
-	namespace := <-archive.demuxNamespaceChan
-	return archive.mgr.IntentForNamespace(namespace)
-}
-
-func (archive *ArchivePrioritizer) Finish(*Intent) {
-	// no-op
-	return
-}
