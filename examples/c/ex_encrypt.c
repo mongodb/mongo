@@ -253,17 +253,19 @@ static int
 rotate_customize(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
     WT_CONFIG_ARG *encrypt_config, WT_ENCRYPTOR **customp)
 {
-	int ret;
-	const MY_CRYPTO *orig_crypto;
 	MY_CRYPTO *my_crypto;
 	WT_CONFIG_ITEM keyid, secret;
 	WT_EXTENSION_API *extapi;
+	int ret;
+	const MY_CRYPTO *orig_crypto;
 
 	extapi = session->connection->get_extension_api(session->connection);
 
 	orig_crypto = (const MY_CRYPTO *)encryptor;
-	if ((my_crypto = calloc(1, sizeof(MY_CRYPTO))) == NULL)
-		return (errno);
+	if ((my_crypto = calloc(1, sizeof(MY_CRYPTO))) == NULL) {
+		ret = errno;
+		goto err;
+	}
 	*my_crypto = *orig_crypto;
 	my_crypto->keyid = my_crypto->password = NULL;
 
@@ -273,16 +275,20 @@ rotate_customize(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	 */
 	if ((ret = extapi->config_get(extapi, session, encrypt_config,
 	    "keyid", &keyid)) == 0 && keyid.len != 0) {
-		if ((my_crypto->keyid = malloc(keyid.len + 1)) == NULL)
-			return (errno);
+		if ((my_crypto->keyid = malloc(keyid.len + 1)) == NULL) {
+			ret = errno;
+			goto err;
+		}
 		strncpy(my_crypto->keyid, keyid.str, keyid.len + 1);
 		my_crypto->keyid[keyid.len] = '\0';
 	}
 
 	if ((ret = extapi->config_get(extapi, session, encrypt_config,
 	    "secretkey", &secret)) == 0 && secret.len != 0) {
-		if ((my_crypto->password = malloc(secret.len + 1)) == NULL)
-			return (errno);
+		if ((my_crypto->password = malloc(secret.len + 1)) == NULL) {
+			ret = errno;
+			goto err;
+		}
 		strncpy(my_crypto->password, secret.str, secret.len + 1);
 		my_crypto->password[secret.len] = '\0';
 	}
@@ -292,27 +298,29 @@ rotate_customize(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	 */
 	if (ITEM_MATCHES(keyid, "system")) {
 		if (my_crypto->password == NULL ||
-		    strcmp(my_crypto->password, SYS_PW) != 0)
+		    strcmp(my_crypto->password, SYS_PW) != 0) {
+			ret = EPERM;
 			goto err;
+		}
 		my_crypto->rot_N = 13;
 	} else if (ITEM_MATCHES(keyid, USER1_KEYID))
 		my_crypto->rot_N = 4;
 	else if (ITEM_MATCHES(keyid, USER2_KEYID))
 		my_crypto->rot_N = 19;
-	else
-		return (EINVAL);
+	else {
+		ret = EINVAL;
+		goto err;
+	}
 
 	++my_crypto->num_calls;		/* Call count */
 
 	*customp = &my_crypto->encryptor;
 	return (0);
-err:
-	if (my_crypto->keyid != NULL)
-		free(my_crypto->keyid);
-	if (my_crypto->password != NULL)
-		free(my_crypto->password);
+
+err:	free(my_crypto->keyid);
+	free(my_crypto->password);
 	free(my_crypto);
-	return (EPERM);
+	return (ret);
 }
 
 /*
