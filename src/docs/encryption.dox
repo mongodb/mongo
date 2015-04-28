@@ -15,12 +15,12 @@ the encryption algorithm and keys to be used for database log files and a subset
 of the WiredTiger metadata files. By default, this same encryption
 is also used for all data files. We call this the <em>system</em> encryption.
 
-It is also possible to use different encryption options when individual data files
-are first created, using the \c encryption= configuration in
-the WT_SESSION::create call.  Such options override the default (<em>system</em>) encryption
-that was indicated in the ::wiredtiger_open call. It is possible to
-turn encryption off for individual files, or to use a different encryptor,
-or to specify a different \c keyid.
+It is also possible to use different encryption options when individual
+data files are first created, using the \c encryption= configuration in
+the WT_SESSION::create call.  Such options override the default
+(<em>system</em>) encryption that was indicated in the ::wiredtiger_open
+call. It is possible to turn encryption off for individual files, or to
+use a different encryptor, or to specify a different \c keyid.
 
 It is an error to specify encryption in a WT_SESSION::create call when it
 was not specified in the ::wiredtiger_open call. This prevents accidental
