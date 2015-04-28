@@ -658,7 +658,6 @@ out:
 	if (conn->kencryptor == NULL && kenc != NULL)
 		WT_ERR_MSG(session, EINVAL, "table encryption "
 		    "requires connection encryption to be set");
-	kenc = NULL;
 	return (0);
 
 err:	if (kenc != NULL) {
