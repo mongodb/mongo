@@ -47,7 +47,6 @@ int add_my_encryptors(WT_CONNECTION *connection);
 
 static const char *home = NULL;
 
-#define	BUFSIZE		16
 #define	MAX_TENANTS	3
 
 #define	SYS_KEYID	"system"
