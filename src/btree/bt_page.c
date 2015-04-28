@@ -102,10 +102,18 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 			return (WT_RESTART);
 		case WT_REF_MEM:
 			/*
-			 * The page is in memory: get a hazard pointer, update
-			 * the page's LRU and return.  The expected reason we
-			 * can't get a hazard pointer is because the page is
-			 * being evicted; yield and try again.
+			 * The page is in memory.
+			 *
+			 * Get a hazard pointer if one is required. We cannot
+			 * be evicting if no hazard pointer is required, we're
+			 * done.
+			 */
+			if (F_ISSET(S2BT(session), WT_BTREE_IN_MEMORY))
+				goto skip_evict;
+
+			/*
+			 * The expected reason we can't get a hazard pointer is
+			 * because the page is being evicted, yield, try again.
 			 */
 #ifdef HAVE_DIAGNOSTIC
 			WT_RET(
@@ -119,12 +127,19 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 				break;
 			}
 
-			page = ref->page;
-			WT_ASSERT(session, page != NULL);
+			/*
+			 * If eviction is configured for this file, check to see
+			 * if the page qualifies for forced eviction and update
+			 * the page's generation number. If eviction isn't being
+			 * done on this file, we're done.
+			 */
+			if (F_ISSET(S2BT(session), WT_BTREE_NO_EVICTION))
+				goto skip_evict;
 
 			/*
 			 * Forcibly evict pages that are too big.
 			 */
+			page = ref->page;
 			if (force_attempts < 10 &&
 			    __evict_force_check(session, page, flags)) {
 				++force_attempts;
@@ -149,12 +164,6 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 				continue;
 			}
 
-			/* Check if we need an autocommit transaction. */
-			if ((ret = __wt_txn_autocommit_check(session)) != 0) {
-				WT_TRET(__wt_hazard_clear(session, page));
-				return (ret);
-			}
-
 			/*
 			 * If we read the page and we are configured to not
 			 * trash the cache, set the oldest read generation so
@@ -169,8 +178,11 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 			    page->read_gen < __wt_cache_read_gen(session))
 				page->read_gen =
 				    __wt_cache_read_gen_set(session);
-
-			return (0);
+skip_evict:
+			/*
+			 * Check if we need an autocommit transaction.
+			 */
+			return (__wt_txn_autocommit_check(session));
 		WT_ILLEGAL_VALUE(session);
 		}
 

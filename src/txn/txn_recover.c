@@ -41,8 +41,8 @@ __recovery_cursor(WT_SESSION_IMPL *session, WT_RECOVERY *r,
     WT_LSN *lsnp, u_int id, int duplicate, WT_CURSOR **cp)
 {
 	WT_CURSOR *c;
-	const char *cfg[] = { WT_CONFIG_BASE(session, session_open_cursor),
-	    "overwrite", NULL };
+	const char *cfg[] = { WT_CONFIG_BASE(
+	    session, WT_SESSION_open_cursor), "overwrite", NULL };
 	int metadata_op;
 
 	c = NULL;
@@ -65,7 +65,7 @@ __recovery_cursor(WT_SESSION_IMPL *session, WT_RECOVERY *r,
 			    "No file found with ID %u (max %u)",
 			    id, r->nfiles));
 		r->missing = 1;
-	} else if (LOG_CMP(lsnp, &r->files[id].ckpt_lsn) >= 0) {
+	} else if (WT_LOG_CMP(lsnp, &r->files[id].ckpt_lsn) >= 0) {
 		/*
 		 * We're going to apply the operation.  Get the cursor, opening
 		 * one if none is cached.

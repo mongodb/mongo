@@ -797,7 +797,7 @@ __debug_page_row_int(WT_DBG *ds, WT_PAGE *page, uint32_t flags)
 	WT_REF *ref;
 	WT_SESSION_IMPL *session;
 	size_t len;
-	uint8_t *p;
+	void *p;
 
 	session = ds->session;
 

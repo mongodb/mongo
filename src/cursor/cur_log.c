@@ -74,7 +74,7 @@ __curlog_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
 	acl = (WT_CURSOR_LOG *)a;
 	bcl = (WT_CURSOR_LOG *)b;
 	WT_ASSERT(session, cmpp != NULL);
-	*cmpp = LOG_CMP(acl->cur_lsn, bcl->cur_lsn);
+	*cmpp = WT_LOG_CMP(acl->cur_lsn, bcl->cur_lsn);
 	/*
 	 * If both are on the same LSN, compare step counter.
 	 */

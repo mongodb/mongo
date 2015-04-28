@@ -1,5 +1,6 @@
 # List of OK external symbols.
 wiredtiger_config_parser_open
+wiredtiger_config_validate
 wiredtiger_open
 wiredtiger_pack_close
 wiredtiger_pack_int
