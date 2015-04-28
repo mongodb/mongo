@@ -781,7 +781,8 @@ namespace repl {
         /**
          * Method to write a configuration transmitted via heartbeat message to stable storage.
          */
-        void _heartbeatReconfigStore(const ReplicaSetConfig& newConfig);
+        void _heartbeatReconfigStore(const ReplicationExecutor::CallbackData& cbd,
+                                     const ReplicaSetConfig& newConfig);
 
         /**
          * Conclusion actions of a heartbeat-triggered reconfiguration.
@@ -866,10 +867,6 @@ namespace repl {
         // Thread that drives actions in the topology coordinator
         // Set in startReplication() and thereafter accessed in shutdown.
         boost::scoped_ptr<boost::thread> _topCoordDriverThread;                           // (I)
-
-        // Thread that is used to write new configs received via a heartbeat reconfig
-        // to stable storage.  It is an error to change this if _inShutdown is true.
-        boost::scoped_ptr<boost::thread> _heartbeatReconfigThread;                        // (M)
 
         // Our RID, used to identify us to our sync source when sending replication progress
         // updates upstream.  Set once in startReplication() and then never modified again.

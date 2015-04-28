@@ -386,7 +386,6 @@ namespace {
             return;
         }
 
-        boost::thread* hbReconfigThread = NULL;
         {
             boost::lock_guard<boost::mutex> lk(_mutex);
             fassert(28533, !_inShutdown);
@@ -403,15 +402,6 @@ namespace {
                 WaiterInfo* waiter = *it;
                 waiter->condVar->notify_all();
             }
-
-            // Since we've set _inShutdown we know that _heartbeatReconfigThread will not be
-            // changed again, which makes it safe to store the pointer to it to be accessed outside
-            // of _mutex.
-            hbReconfigThread = _heartbeatReconfigThread.get();
-        }
-
-        if (hbReconfigThread) {
-            hbReconfigThread->join();
         }
 
         _replExecutor.shutdown();

@@ -30,7 +30,7 @@
 
 #include "mongo/db/repl/network_interface_mock.h"
 
-#include "mongo/db/operation_context_noop.h"
+#include "mongo/db/repl/operation_context_repl_mock.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/time_support.h"
@@ -67,11 +67,8 @@ namespace repl {
         return _now_inlock();
     }
 
-    void NetworkInterfaceMock::runCallbackWithGlobalExclusiveLock(
-            const stdx::function<void (OperationContext* txn)>& callback) {
-
-        OperationContextNoop txn;
-        callback(&txn);
+    OperationContext* NetworkInterfaceMock::createOperationContext() {
+        return new OperationContextReplMock();
     }
 
     void NetworkInterfaceMock::startCommand(

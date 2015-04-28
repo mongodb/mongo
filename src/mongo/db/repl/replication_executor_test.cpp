@@ -30,8 +30,11 @@
 
 #include <map>
 #include <boost/scoped_ptr.hpp>
+#include <boost/thread/barrier.hpp>
 #include <boost/thread/thread.hpp>
 
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/network_interface_mock.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/replication_executor_test_fixture.h"
@@ -379,15 +382,70 @@ namespace {
         ASSERT_EQUALS(ErrorCodes::CallbackCanceled, status1);
     }
 
+    TEST_F(ReplicationExecutorTest, ScheduleDBWorkAndExclusiveWorkConcurrently) {
+        boost::barrier barrier(2U);
+        NamespaceString nss("mydb", "mycoll");
+        ReplicationExecutor& executor = getExecutor();
+        Status status1(ErrorCodes::InternalError, "Not mutated");
+        OperationContext* txn = nullptr;
+        using CallbackData = ReplicationExecutor::CallbackData;
+        ASSERT_OK(executor.scheduleDBWork([&](const CallbackData& cbData) {
+            status1 = cbData.status;
+            txn = cbData.txn;
+            barrier.count_down_and_wait();
+            if (cbData.status != ErrorCodes::CallbackCanceled) {
+                cbData.executor->shutdown();
+            }
+        }).getStatus());
+        ASSERT_OK(executor.scheduleWorkWithGlobalExclusiveLock([&](const CallbackData& cbData) {
+            barrier.count_down_and_wait();
+        }).getStatus());
+        executor.run();
+        ASSERT_OK(status1);
+        ASSERT(txn);
+    }
+
+    TEST_F(ReplicationExecutorTest, ScheduleDBWorkWithCollectionLock) {
+        NamespaceString nss("mydb", "mycoll");
+        ReplicationExecutor& executor = getExecutor();
+        Status status1(ErrorCodes::InternalError, "Not mutated");
+        OperationContext* txn = nullptr;
+        bool collectionIsLocked = false;
+        using CallbackData = ReplicationExecutor::CallbackData;
+        ASSERT_OK(executor.scheduleDBWork([&](const CallbackData& cbData) {
+            status1 = cbData.status;
+            txn = cbData.txn;
+            collectionIsLocked = txn ?
+                txn->lockState()->isCollectionLockedForMode(nss.ns(), MODE_X) :
+                false;
+            if (cbData.status != ErrorCodes::CallbackCanceled) {
+                cbData.executor->shutdown();
+            }
+        }, nss, MODE_X).getStatus());
+        executor.run();
+        ASSERT_OK(status1);
+        ASSERT(txn);
+        ASSERT_TRUE(collectionIsLocked);
+    }
+
     TEST_F(ReplicationExecutorTest, ScheduleExclusiveLockOperation) {
         ReplicationExecutor& executor = getExecutor();
         Status status1(ErrorCodes::InternalError, "Not mutated");
-        ASSERT_OK(executor.scheduleWorkWithGlobalExclusiveLock(
-                          stdx::bind(setStatusAndShutdown,
-                                     stdx::placeholders::_1,
-                                     &status1)).getStatus());
+        OperationContext* txn = nullptr;
+        bool lockIsW = false;
+        using CallbackData = ReplicationExecutor::CallbackData;
+        ASSERT_OK(executor.scheduleWorkWithGlobalExclusiveLock([&](const CallbackData& cbData) {
+            status1 = cbData.status;
+            txn = cbData.txn;
+            lockIsW = txn ? txn->lockState()->isW() : false;
+            if (cbData.status != ErrorCodes::CallbackCanceled) {
+                cbData.executor->shutdown();
+            }
+        }).getStatus());
         executor.run();
         ASSERT_OK(status1);
+        ASSERT(txn);
+        ASSERT_TRUE(lockIsW);
     }
 
     TEST_F(ReplicationExecutorTest, RemoteCommandWithTimeout) {

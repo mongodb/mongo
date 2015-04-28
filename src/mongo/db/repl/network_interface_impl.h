@@ -82,8 +82,7 @@ namespace repl {
                 const ReplicationExecutor::RemoteCommandRequest& request,
                 const RemoteCommandCompletionFn& onFinish);
         virtual void cancelCommand(const ReplicationExecutor::CallbackHandle& cbHandle);
-        virtual void runCallbackWithGlobalExclusiveLock(
-                const stdx::function<void (OperationContext*)>& callback);
+        OperationContext* createOperationContext() override;
 
         std::string getNextCallbackWithGlobalLockThreadName();
 

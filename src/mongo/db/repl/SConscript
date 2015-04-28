@@ -31,14 +31,20 @@ env.Library(
         '$BUILD_DIR/mongo/db/query/lite_parsed_query',
         ])
 
-env.Library('replication_executor',
-            [
-                'replication_executor.cpp',
-                'scatter_gather_algorithm.cpp',
-                'scatter_gather_runner.cpp',
-            ],
-            LIBDEPS=['$BUILD_DIR/mongo/util/foundation',
-                     '$BUILD_DIR/mongo/util/net/hostandport'])
+env.Library(
+    target='replication_executor',
+    source=[
+        'replication_executor.cpp',
+        'scatter_gather_algorithm.cpp',
+        'scatter_gather_runner.cpp',
+    ],
+    LIBDEPS=[
+        'database_task',
+        'task_runner',
+        '$BUILD_DIR/mongo/util/foundation',
+        '$BUILD_DIR/mongo/util/net/hostandport',
+    ],
+)
 
 env.Library(
     target='replication_executor_test_fixture',

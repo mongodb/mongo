@@ -707,13 +707,9 @@ namespace {
         }
     }
 
-    void NetworkInterfaceImpl::runCallbackWithGlobalExclusiveLock(
-            const stdx::function<void (OperationContext*)>& callback) {
+    OperationContext* NetworkInterfaceImpl::createOperationContext() {
         Client::initThreadIfNotAlready();
-        OperationContextImpl txn;
-        ScopedTransaction transaction(&txn, MODE_X);
-        Lock::GlobalWrite lk(txn.lockState());
-        callback(&txn);
+        return new OperationContextImpl();
     }
 
 }  // namespace repl
