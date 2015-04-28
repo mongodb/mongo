@@ -123,9 +123,9 @@ do_rotate(uint8_t *buf, size_t len, uint32_t rotn)
 	for (i = 0; i < len; i++) {
 		if (isalpha(buf[i])) {
 			if (islower(buf[i]))
-				buf[i] = (buf[i] - 'a' + rotn) % 26 + 'a';
+				buf[i] = ((buf[i] - 'a') + rotn) % 26 + 'a';
 			else
-				buf[i] = (buf[i] - 'A' + rotn) % 26 + 'A';
+				buf[i] = ((buf[i] - 'A') + rotn) % 26 + 'A';
 		}
 	}
 }
