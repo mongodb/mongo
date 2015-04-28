@@ -40,6 +40,7 @@
 #include "mongo/db/repl/isself.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
+#include "mongo/db/repl/repl_set_html_summary.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/rslog.h"
 #include "mongo/db/server_parameters.h"
@@ -2082,6 +2083,15 @@ namespace {
         return false;
     }
 
+
+    void TopologyCoordinatorImpl::summarizeAsHtml(ReplSetHtmlSummary* output) {
+        output->setConfig(_rsConfig);
+        output->setHBData(_hbdata);
+        output->setSelfIndex(_selfIndex);
+        output->setPrimaryIndex(_currentPrimaryIndex);
+        output->setSelfState(getMemberState());
+        output->setSelfHeartbeatMessage(_hbmsg);
+    }
 
 } // namespace repl
 } // namespace mongo
