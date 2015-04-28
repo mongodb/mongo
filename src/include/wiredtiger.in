@@ -1890,7 +1890,7 @@ struct __wt_connection {
 	 * @param name the name of the encryption function to be used in calls
 	 *	to WT_SESSION::create, may not be \c "none"
 	 * @param encryptor the application-supplied encryption handler
-	 * @configempty{connection.add_encryptor, see dist/api_data.py}
+	 * @configempty{WT_CONNECTION.add_encryptor, see dist/api_data.py}
 	 * @errors
 	 */
 	int __F(add_encryptor)(WT_CONNECTION *connection,
