@@ -387,6 +387,7 @@ rf
 rmw
 ro
 rocksdb
+rotn
 rpc
 runnable
 runtime

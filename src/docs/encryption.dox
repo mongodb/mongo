@@ -1,21 +1,23 @@
-/*! @m_page{{c,java},encryption,Encryptors}
+/*! @m_page{{c},encryption,Encryptors}
 
+@section encryption_overview Overview of Encryption in WiredTiger
 @ref encryption_custom "Custom encryption engines" may be used to
-extend WiredTiger.  WiredTiger does not currently offer builtin support for
-any particular encryption algorithm.  Encryption engines in \c ext/encryptors
-are provided for demonstration purposes only.
+extend WiredTiger.  WiredTiger does not currently offer builtin
+support for any particular encryption algorithm.
+@ref encryption_examples "Example encryption code" is provided
+to demonstrate how encryption extensions are created.
 
 The encryption extension must be loaded in the ::wiredtiger_open call.
-See @subpage extensions for details on extending WiredTiger.
+See @subpage extensions for details on how extensions are loaded.
 Also, encryption is specified using \c encryption= in the configuration
 for the ::wiredtiger_open call. This configuration establishes
-the encryption to be used for database log files and a subset
-of the WiredTiger metadata files. By default, this encryption
-is also used for all data files. We call this the <em>system encryptor</em>.
+the encryption algorithm and keys to be used for database log files and a subset
+of the WiredTiger metadata files. By default, this same encryption
+is also used for all data files. We call this the <em>system</em> encryption.
 
-Different encryption options may be specified for individual data files when
-they the files are first created, using the \c encryption= configuration in
-the WT_SESSION::create call.  Such options override the default encryption
+It is also possible to use different encryption options when individual data files
+are first created, using the \c encryption= configuration in
+the WT_SESSION::create call.  Such options override the default (<em>system</em>) encryption
 that was indicated in the ::wiredtiger_open call. It is possible to
 turn encryption off for individual files, or to use a different encryptor,
 or to specify a different \c keyid.
@@ -64,7 +66,9 @@ are stored in WiredTiger metadata using the system encryptor.
 @section encryption_custom Custom encryption engines
 
 WiredTiger may be extended by adding custom encryption engines
-that we call \em encryptors; see WT_ENCRYPTOR for more information.
+that we call \em encryptors.
+See @subpage extensions for general details on extending WiredTiger,
+and see WT_ENCRYPTOR for the encryptor interface.
 
 Custom encryptors are registered by calling WT_CONNECTION::add_encryptor,
 this creates an encryptor name that may be referenced using the
@@ -86,4 +90,22 @@ Of these, only database log files may also be compressed.  When both
 compression and encryption is done on log files, the same ordering
 (compress then encrypt) applies as log records are written to disk.
 
+@section encryption_examples Encryption examples
+
+There are two kinds of example code with overlapping functionality.
+A simple, self contained encryption example is in examples/c/ex_encrypt.c .
+This example includes a small encryptor that rotates letters in the
+alphabet by a fixed amount, based on the value of \c keyid.  This example
+also shows how encryption is configured within an application.
+The second set of examples are in \c ext/encryptors.  These are
+encryptors only (no application level code), showing how encryptors
+might be packaged in a loadable shared library.
+\c nop_encryptor.c merely copies its input to its output.
+\c rotn_encryptor.c is an extended version of the example that
+rotates the alphabet.  It adds a twist in that a \c secretkey can
+be specified, changing the rotation per letter.  The Python test suite
+uses the rotn encryptor to help test the encryption framework.
+
+Please note that these samples are for demonstration use only.
+They do not provide any security.
  */
