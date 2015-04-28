@@ -125,6 +125,62 @@ __conn_dhandle_open_lock(
 }
 
 /*
+ * __conn_dhandle_destroy --
+ *	Destroy a data handle.
+ */
+static int
+__conn_dhandle_destroy(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle)
+{
+	WT_DECL_RET;
+
+	WT_TRET(__wt_rwlock_destroy(session, &dhandle->rwlock));
+	__wt_free(session, dhandle->name);
+	__wt_free(session, dhandle->checkpoint);
+	__wt_free(session, dhandle->handle);
+	__wt_spin_destroy(session, &dhandle->close_lock);
+	__wt_overwrite_and_free(session, dhandle);
+
+	return (ret);
+}
+
+/*
+ * __conn_dhandle_alloc --
+ *	Allocate a new data handle and return it linked into the connection's
+ *	list.
+ */
+static int
+__conn_dhandle_alloc(WT_SESSION_IMPL *session,
+    const char *name, const char *ckpt, WT_DATA_HANDLE **dhandlep)
+{
+	WT_BTREE *btree;
+	WT_DATA_HANDLE *dhandle;
+	WT_DECL_RET;
+
+	WT_RET(__wt_calloc_one(session, &dhandle));
+
+	WT_ERR(__wt_rwlock_alloc(session, &dhandle->rwlock, "data handle"));
+
+	dhandle->name_hash = __wt_hash_city64(name, strlen(name));
+	WT_ERR(__wt_strdup(session, name, &dhandle->name));
+	if (ckpt != NULL)
+		WT_ERR(__wt_strdup(session, ckpt, &dhandle->checkpoint));
+
+	/* TODO: abstract this out for other data handle types */
+	WT_ERR(__wt_calloc_one(session, &btree));
+	dhandle->handle = btree;
+	btree->dhandle = dhandle;
+
+	WT_ERR(__wt_spin_init(
+	    session, &dhandle->close_lock, "data handle close"));
+
+	*dhandlep = dhandle;
+	return (0);
+
+err:	WT_TRET(__conn_dhandle_destroy(session, dhandle));
+	return (ret);
+}
+
+/*
  * __wt_conn_dhandle_find --
  *	Find a previously opened data handle.
  */
@@ -180,7 +236,6 @@ static int
 __conn_dhandle_get(WT_SESSION_IMPL *session,
     const char *name, const char *ckpt, uint32_t flags)
 {
-	WT_BTREE *btree;
 	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
@@ -206,21 +261,7 @@ __conn_dhandle_get(WT_SESSION_IMPL *session,
 	 * then initialize the data handle.  Exclusively lock the data handle
 	 * before inserting it in the list.
 	 */
-	WT_RET(__wt_calloc_one(session, &dhandle));
-
-	WT_ERR(__wt_rwlock_alloc(session, &dhandle->rwlock, "data handle"));
-
-	dhandle->name_hash = __wt_hash_city64(name, strlen(name));
-	WT_ERR(__wt_strdup(session, name, &dhandle->name));
-	if (ckpt != NULL)
-		WT_ERR(__wt_strdup(session, ckpt, &dhandle->checkpoint));
-
-	WT_ERR(__wt_calloc_one(session, &btree));
-	dhandle->handle = btree;
-	btree->dhandle = dhandle;
-
-	WT_ERR(__wt_spin_init(
-	    session, &dhandle->close_lock, "data handle close"));
+	WT_RET(__conn_dhandle_alloc(session, name, ckpt, &dhandle));
 
 	F_SET(dhandle, WT_DHANDLE_EXCLUSIVE);
 	WT_ERR(__wt_writelock(session, dhandle->rwlock));
@@ -237,13 +278,7 @@ __conn_dhandle_get(WT_SESSION_IMPL *session,
 	session->dhandle = dhandle;
 	return (0);
 
-err:	WT_TRET(__wt_rwlock_destroy(session, &dhandle->rwlock));
-	__wt_free(session, dhandle->name);
-	__wt_free(session, dhandle->checkpoint);
-	__wt_free(session, dhandle->handle);		/* btree free */
-	__wt_spin_destroy(session, &dhandle->close_lock);
-	__wt_overwrite_and_free(session, dhandle);
-
+err:	WT_TRET(__conn_dhandle_destroy(session, dhandle));
 	return (ret);
 }
 
@@ -810,14 +845,8 @@ __wt_conn_dhandle_discard_single(WT_SESSION_IMPL *session, int final, int force)
 	 * After successfully removing the handle, clean it up.
 	 */
 	if (ret == 0 || final) {
-		WT_TRET(__wt_rwlock_destroy(session, &dhandle->rwlock));
-		__wt_free(session, dhandle->name);
-		__wt_free(session, dhandle->checkpoint);
 		__conn_btree_config_clear(session);
-		__wt_free(session, dhandle->handle);
-		__wt_spin_destroy(session, &dhandle->close_lock);
-		__wt_overwrite_and_free(session, dhandle);
-
+		WT_TRET(__conn_dhandle_destroy(session, dhandle));
 		session->dhandle = NULL;
 	}
 
