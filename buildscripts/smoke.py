@@ -272,7 +272,7 @@ class mongod(NullMongod):
             synced = False
             while not synced:
                 synced = True
-                for source in local.sources.find(fields=["syncedTo"]):
+                for source in local.sources.find({}, ["syncedTo"]):
                     synced = synced and "syncedTo" in source and source["syncedTo"]
 
     def _start(self, argv):
