@@ -41,6 +41,7 @@
 #include "mongo/db/cloner.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/ops/update.h"
@@ -522,6 +523,8 @@ namespace {
             log() << "rollback 4.3";
         }
 
+        map<string,shared_ptr<Helpers::RemoveSaver> > removeSavers;
+
         log() << "rollback 4.6";
         // drop collections to drop before doing individual fixups - that might make things faster
         // below actually if there were subsequent inserts to rollback
@@ -533,6 +536,37 @@ namespace {
             Database* db = dbHolder().get(txn, nsToDatabaseSubstring(*it));
             if (db) {
                 WriteUnitOfWork wunit(txn);
+
+                shared_ptr<Helpers::RemoveSaver>& removeSaver = removeSavers[*it];
+                if (!removeSaver)
+                    removeSaver.reset(new Helpers::RemoveSaver("rollback", "", *it));
+
+                // perform a collection scan and write all documents in the collection to disk
+                boost::scoped_ptr<PlanExecutor> exec(
+                        InternalPlanner::collectionScan(txn,
+                                                        *it,
+                                                        db->getCollection(*it)));
+                BSONObj curObj;
+                PlanExecutor::ExecState execState;
+                while (PlanExecutor::ADVANCED == (execState = exec->getNext(&curObj, NULL))) {
+                    removeSaver->goingToDelete(curObj);
+                }
+                if (execState != PlanExecutor::IS_EOF) {
+                    if (execState == PlanExecutor::FAILURE &&
+                            WorkingSetCommon::isValidStatusMemberObject(curObj)) {
+                        Status errorStatus = WorkingSetCommon::getMemberObjectStatus(curObj);
+                        severe() << "rolling back createCollection on " << *it
+                                 << " failed with " << errorStatus
+                                 << ". A full resync is necessary.";
+                    }
+                    else {
+                        severe() << "rolling back createCollection on " << *it
+                                 << " failed. A full resync is necessary.";
+                    }
+                            
+                    throw RSFatalException();
+                }
+
                 db->dropCollection(txn, *it);
                 wunit.commit();
             }
@@ -544,8 +578,6 @@ namespace {
         uassert(13423,
                 str::stream() << "replSet error in rollback can't find " << rsoplog,
                 oplogCollection);
-
-        map<string,shared_ptr<Helpers::RemoveSaver> > removeSavers;
 
         unsigned deletes = 0, updates = 0;
         time_t lastProgressUpdate = time(0);
