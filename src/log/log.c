@@ -434,7 +434,7 @@ __log_decrypt(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out)
 	WT_ERR(__wt_buf_initsize(session, *out, unpadded_len));
 
 	src = (uint8_t *)in->mem + WT_LOG_ENCRYPT_SKIP + WT_ENCRYPT_LEN;
-	encryptor_data_len = 
+	encryptor_data_len =
 	    unpadded_len - WT_LOG_ENCRYPT_SKIP - WT_ENCRYPT_LEN;
 	dst = (uint8_t *)(*out)->mem + WT_LOG_ENCRYPT_SKIP;
 	/*
