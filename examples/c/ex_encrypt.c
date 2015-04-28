@@ -155,7 +155,7 @@ rotate_decrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	/*
 	 * Make sure it is big enough.
 	 */
-	mylen = src_len - CHKSUM_LEN - IV_LEN;
+	mylen = src_len - (CHKSUM_LEN + IV_LEN);
 	if (dst_len < mylen) {
 		fprintf(stderr,
 		    "Rotate: ENOMEM ERROR: dst_len %lu src_len %lu\n",
