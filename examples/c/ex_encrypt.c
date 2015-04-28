@@ -47,8 +47,6 @@ int add_my_encryptors(WT_CONNECTION *connection);
 
 static const char *home = NULL;
 
-#define	MAX_TENANTS	3
-
 #define	SYS_KEYID	"system"
 #define	SYS_BADPW	"bad_password"
 #define	SYS_PW		"system_password"
