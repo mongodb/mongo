@@ -72,7 +72,7 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 
 		memcpy(buf->mem, tmp->data, skip);
 		dst = (uint8_t *)buf->mem + skip;
-		encryptor_data_len = encrypt_len - skip - WT_ENCRYPT_LEN;
+		encryptor_data_len = encrypt_len - (skip + WT_ENCRYPT_LEN);
 		ret = encryptor->decrypt(
 		    encryptor, &session->iface,
 		    (uint8_t *)tmp->data + skip + WT_ENCRYPT_LEN,
