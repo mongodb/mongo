@@ -113,6 +113,7 @@ func (demux *Demultiplexer) End() error {
 	if demux.NamespaceChan != nil {
 		close(demux.NamespaceChan)
 	}
+	close(demux.NamespaceChan)
 	return nil
 }
 
