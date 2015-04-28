@@ -454,7 +454,7 @@ main(void)
 	} else
 		home = NULL;
 
-	srandom((unsigned int)getpid());
+	srandom((unsigned long)getpid());
 
 	ret = wiredtiger_open(home, NULL, WT_OPEN_CONFIG_GOOD, &conn);
 
