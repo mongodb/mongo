@@ -14,8 +14,8 @@ static int __log_read_internal(WT_SESSION_IMPL *, WT_ITEM *, WT_LSN *,
 static int __log_write_internal(WT_SESSION_IMPL *, WT_ITEM *, WT_LSN *,
     uint32_t);
 
-#define	WT_LOG_COMPRESS_SKIP (offsetof(WT_LOG_RECORD, record))
-#define	WT_LOG_ENCRYPT_SKIP (offsetof(WT_LOG_RECORD, record))
+#define	WT_LOG_COMPRESS_SKIP	(offsetof(WT_LOG_RECORD, record))
+#define	WT_LOG_ENCRYPT_SKIP	(offsetof(WT_LOG_RECORD, record))
 
 /*
  * __wt_log_ckpt --
