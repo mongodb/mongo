@@ -11,7 +11,7 @@
 const char *home = ".";				/* Home directory */
 const char *progname;				/* Program name */
 						/* Global arguments */
-const char *usage_prefix = "[-Vv] [-R] [-C config] [-E secretkey] [-h home]";
+const char *usage_prefix = "[-RVv] [-C config] [-E secretkey] [-h home]";
 int verbose;					/* Verbose flag */
 
 static const char *command;			/* Command name */
