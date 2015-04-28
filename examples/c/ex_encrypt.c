@@ -80,7 +80,7 @@ MY_CRYPTO my_crypto_global;
  *	This is where one would call a checksum function on the encrypted
  *	buffer.  Here we just put random values in it.
  */
-static int
+static void
 make_cksum(uint8_t *dst)
 {
 	int i;
@@ -89,7 +89,6 @@ make_cksum(uint8_t *dst)
 	 */
 	for (i = 0; i < CHKSUM_LEN; i++)
 		dst[i] = (uint8_t)random();
-	return (0);
 }
 
 /*
@@ -97,7 +96,7 @@ make_cksum(uint8_t *dst)
  *	This is where one would generate the initialization vector.
  *	Here we just put random values in it.
  */
-static int
+static void
 make_iv(uint8_t *dst)
 {
 	int i;
@@ -106,7 +105,6 @@ make_iv(uint8_t *dst)
 	 */
 	for (i = 0; i < IV_LEN; i++)
 		dst[i] = (uint8_t)random();
-	return (0);
 }
 
 /*
@@ -158,7 +156,7 @@ rotate_decrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	mylen = src_len - (CHKSUM_LEN + IV_LEN);
 	if (dst_len < mylen) {
 		fprintf(stderr,
-		    "Rotate: ENOMEM ERROR: dst_len %lu src_len %lu\n",
+		    "Rotate: ENOMEM ERROR: dst_len %z src_len %z\n",
 		    dst_len, src_len);
 		return (ENOMEM);
 	}
