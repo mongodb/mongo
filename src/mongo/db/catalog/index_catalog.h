@@ -97,13 +97,21 @@ namespace mongo {
                                                 const BSONObj& key,
                                                 bool includeUnfinishedIndexes = false ) const;
 
-        /* Returns the index entry for the first index whose prefix contains
-         * 'keyPattern'. If 'requireSingleKey' is true, skip indices that contain
-         * array attributes. Otherwise, returns NULL.
+        /**
+         * Returns an index suitable for shard key range scans.
+         *
+         * This index:
+         * - must be prefixed by 'shardKey', and
+         * - must not be a partial index.
+         *
+         * If the parameter 'requireSingleKey' is true, then this index additionally must not be
+         * multi-key.
+         *
+         * If no such index exists, returns NULL.
          */
-        IndexDescriptor* findIndexByPrefix( OperationContext* txn,
-                                            const BSONObj &keyPattern,
-                                            bool requireSingleKey ) const;
+        IndexDescriptor* findShardKeyPrefixedIndex( OperationContext* txn,
+                                                    const BSONObj& shardKey,
+                                                    bool requireSingleKey ) const;
 
         void findIndexByType( OperationContext* txn,
                               const std::string& type,

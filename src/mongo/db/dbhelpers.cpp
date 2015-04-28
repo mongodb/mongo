@@ -302,9 +302,9 @@ namespace mongo {
         // Therefore, any multi-key index prefixed by shard key cannot be multikey over
         // the shard key fields.
         const IndexDescriptor* idx =
-            collection->getIndexCatalog()->findIndexByPrefix(txn,
-                                                             shardKeyPattern,
-                                                             false /* allow multi key */);
+            collection->getIndexCatalog()->findShardKeyPrefixedIndex(txn,
+                                                                     shardKeyPattern,
+                                                                     false); // requireSingleKey
 
         if ( idx == NULL )
             return false;
@@ -509,7 +509,7 @@ namespace mongo {
 
         // Require single key
         IndexDescriptor *idx =
-            collection->getIndexCatalog()->findIndexByPrefix( txn, range.keyPattern, true );
+            collection->getIndexCatalog()->findShardKeyPrefixedIndex( txn, range.keyPattern, true );
 
         if ( idx == NULL ) {
             return Status( ErrorCodes::IndexNotFound, range.keyPattern.toString() );

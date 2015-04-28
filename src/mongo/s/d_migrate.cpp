@@ -491,9 +491,9 @@ namespace mongo {
             // Therefore, any multi-key index prefixed by shard key cannot be multikey over
             // the shard key fields.
             IndexDescriptor *idx =
-                collection->getIndexCatalog()->findIndexByPrefix(txn,
-                                                                 _shardKeyPattern ,
-                                                                 false);  /* allow multi key */
+                collection->getIndexCatalog()->findShardKeyPrefixedIndex(txn,
+                                                                         _shardKeyPattern ,
+                                                                         false); // requireSingleKey
 
             if (idx == NULL) {
                 errmsg = str::stream() << "can't find index with prefix " << _shardKeyPattern

@@ -1031,16 +1031,19 @@ namespace {
         return NULL;
     }
 
-    IndexDescriptor* IndexCatalog::findIndexByPrefix( OperationContext* txn,
-                                                      const BSONObj &keyPattern,
-                                                      bool requireSingleKey ) const {
+    IndexDescriptor* IndexCatalog::findShardKeyPrefixedIndex( OperationContext* txn,
+                                                              const BSONObj& shardKey,
+                                                              bool requireSingleKey ) const {
         IndexDescriptor* best = NULL;
 
         IndexIterator ii = getIndexIterator( txn, false );
         while ( ii.more() ) {
             IndexDescriptor* desc = ii.next();
 
-            if ( !keyPattern.isPrefixOf( desc->keyPattern() ) )
+            if ( desc->isPartial() )
+                continue;
+
+            if ( !shardKey.isPrefixOf( desc->keyPattern() ) )
                 continue;
 
             if( !desc->isMultikey( txn ) )

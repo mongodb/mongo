@@ -153,9 +153,10 @@ namespace mongo {
             }
 
             IndexDescriptor *idx =
-                collection->getIndexCatalog()->findIndexByPrefix( txn,
-                                                                  keyPattern,
-                                                                  true );  /* require single key */
+                collection->getIndexCatalog()
+                          ->findShardKeyPrefixedIndex( txn,
+                                                       keyPattern,
+                                                       true ); // requireSingleKey
             if ( idx == NULL ) {
                 errmsg = "couldn't find valid index for shard key";
                 return false;
@@ -320,9 +321,9 @@ namespace mongo {
                 // Therefore, any multi-key index prefixed by shard key cannot be multikey over
                 // the shard key fields.
                 IndexDescriptor *idx =
-                    collection->getIndexCatalog()->findIndexByPrefix( txn,
-                                                                      keyPattern,
-                                                                      false );
+                    collection->getIndexCatalog()->findShardKeyPrefixedIndex( txn,
+                                                                              keyPattern,
+                                                                              false );
                 if ( idx == NULL ) {
                     errmsg = (string)"couldn't find index over splitting key " +
                              keyPattern.clientReadable().toString();
@@ -863,7 +864,9 @@ namespace mongo {
                 // single-valued. Therefore, any multi-key index prefixed by shard
                 // key cannot be multikey over the shard key fields.
                 IndexDescriptor *idx =
-                    collection->getIndexCatalog()->findIndexByPrefix(txn, keyPattern, false);
+                    collection->getIndexCatalog()->findShardKeyPrefixedIndex(txn,
+                                                                             keyPattern,
+                                                                             false);
 
                 if (idx == NULL) {
                     return true;

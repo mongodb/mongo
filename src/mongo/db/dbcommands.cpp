@@ -766,8 +766,10 @@ namespace mongo {
                     keyPattern = Helpers::inferKeyPattern( min );
                 }
 
-                IndexDescriptor *idx =
-                    collection->getIndexCatalog()->findIndexByPrefix( txn, keyPattern, true );  /* require single key */
+                IndexDescriptor* idx = collection->getIndexCatalog()->findShardKeyPrefixedIndex(
+                        txn,
+                        keyPattern,
+                        true ); // requireSingleKey
 
                 if ( idx == NULL ) {
                     errmsg = "couldn't find valid index containing key pattern";
