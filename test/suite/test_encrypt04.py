@@ -140,25 +140,7 @@ class test_encrypt04(wttest.WiredTigerTestCase, suite_subprocess):
         # we can still enable encryption and read existing files.
         expect_error = not is_same and self.name1 != 'none'
 
-        # If we mismatched configuration, the decryption
-        # will produce garbage that may be indistinguishable
-        # from file corruption. File corruption may result
-        # in an abort - so it's not safe to do the wiredtiger_open
-        # in this process.  Run a wt command to verify that it's
-        bad_error = expect_error and self.name2 != 'none'
-
-        if bad_error:
-            self.KNOWN_LIMITATION("verify should fail horribly in this case")
-            outfile = "listout.txt"
-            errfile = "listerr.txt"
-            self.runWt(["verify", self.uri],
-                       outfilename=outfile, errfilename=errfile,
-                       reopensession=False)
-            self.check_file_content(outfile, '')
-
-            # TODO: understand why verify is not giving severe errors here.
-            #self.check_file_content(errfile, '')
-        elif expect_error:
+        if expect_error:
             completed = False
             with self.expectedStderrPattern(''):   # effectively ignore stderr
                 try:
