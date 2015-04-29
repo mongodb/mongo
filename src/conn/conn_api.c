@@ -697,13 +697,11 @@ __conn_add_encryptor(WT_CONNECTION *wt_conn,
 		    "invalid name for an encryptor: %s", name);
 
 	/*
-	 * Verify that terminate is set if customize is set.
-	 * We could relax this restriction and give an error
-	 * if customize returns an encryptor and terminate
-	 * is not set. That seems more prone to mistakes.
+	 * Verify that terminate is set if customize is set. We could relax this
+	 * restriction and give an error if customize returns an encryptor and
+	 * terminate is not set. That seems more prone to mistakes.
 	 */
-	if (encryptor->customize != NULL &&
-	    encryptor->terminate == NULL)
+	if (encryptor->customize != NULL && encryptor->terminate == NULL)
 		WT_ERR_MSG(session, EINVAL,
 		    "encryptor: %s: has customize but no terminate", name);
 
