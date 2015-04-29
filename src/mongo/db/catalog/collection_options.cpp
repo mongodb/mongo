@@ -63,6 +63,7 @@ namespace mongo {
         flagsSet = false;
         temp = false;
         storageEngine = BSONObj();
+        validator = BSONObj();
     }
 
     bool CollectionOptions::isValid() const {
@@ -163,6 +164,13 @@ namespace mongo {
 
                 storageEngine = e.Obj().getOwned();
             }
+            else if (fieldName == "validator") {
+                if (e.type() != mongo::Object) {
+                    return Status(ErrorCodes::BadValue, "'validator' has to be a document.");
+                }
+
+                validator = e.Obj().getOwned();
+            }
         }
 
         return Status::OK();
@@ -194,6 +202,10 @@ namespace mongo {
 
         if (!storageEngine.isEmpty()) {
             b.append("storageEngine", storageEngine);
+        }
+
+        if (!validator.isEmpty()) {
+            b.append("validator", validator);
         }
 
         return b.obj();

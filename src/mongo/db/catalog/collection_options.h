@@ -97,6 +97,9 @@ namespace mongo {
 
         // Storage engine collection options. Always owned or empty.
         BSONObj storageEngine;
+
+        // Always owned or empty.
+        BSONObj validator;
     };
 
 }

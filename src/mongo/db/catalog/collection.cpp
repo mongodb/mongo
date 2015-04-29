@@ -45,6 +45,7 @@
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/index/index_access_method.h"
+#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/update_driver.h"
@@ -58,6 +59,50 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
+
+namespace {
+    const auto bannedExpressionsInValidators = std::set<StringData>{
+        "$geoNear",
+        "$near",
+        "$nearSphere",
+        "$text",
+        "$where",
+    };
+    Status checkValidatorForBannedExpressions(const BSONObj& validator) {
+        for (auto field : validator) {
+            const auto name = field.fieldNameStringData();
+            if (name[0] == '$' && bannedExpressionsInValidators.count(name)) {
+                return {ErrorCodes::InvalidOptions,
+                        str::stream() << name << " is not allowed in collection validators"};
+            }
+
+            if (field.type() == Object || field.type() == Array) {
+                auto status = checkValidatorForBannedExpressions(field.Obj());
+                if (!status.isOK())
+                    return status;
+            }
+        }
+
+        return Status::OK();
+    }
+
+    StatusWith<std::unique_ptr<MatchExpression>> parseValidator(const BSONObj& validator) {
+        if (validator.isEmpty())
+            return {nullptr};
+
+        {
+            auto status = checkValidatorForBannedExpressions(validator);
+            if (!status.isOK())
+                return status;
+        }
+
+        auto statusWithRawPtr = MatchExpressionParser::parse(validator);
+        if (!statusWithRawPtr.isOK())
+            return statusWithRawPtr.getStatus();
+
+        return {std::unique_ptr<MatchExpression>(statusWithRawPtr.getValue())};
+    }
+}
 
     using boost::scoped_ptr;
     using std::endl;
@@ -98,6 +143,8 @@ namespace mongo {
           _dbce( dbce ),
           _infoCache( this ),
           _indexCatalog( this ),
+          _validatorDoc(_details->getCollectionOptions(txn).validator.getOwned()),
+          _validator(uassertStatusOK(parseValidator(_validatorDoc))),
           _cursorManager( fullNS ) {
         _magic = 1357924;
         _indexCatalog.init(txn);
@@ -173,9 +220,21 @@ namespace mongo {
         return true;
     }
 
+    Status Collection::checkValidation(const BSONObj& document) const {
+        if (!_validator)
+            return Status::OK();
+
+        if (_validator->matchesBSON(document))
+            return Status::OK();
+
+        return {ErrorCodes::DocumentValidationFailure, "Document failed validation"};
+    }
+
+
     StatusWith<RecordId> Collection::insertDocument(OperationContext* txn,
                                                     const DocWriter* doc,
                                                     bool enforceQuota) {
+        invariant(!_validator);
         dassert(txn->lockState()->isCollectionLockedForMode(ns().toString(), MODE_IX));
         invariant( !_indexCatalog.haveAnyIndexes() ); // eventually can implement, just not done
 
@@ -195,6 +254,11 @@ namespace mongo {
                                                     const BSONObj& docToInsert,
                                                     bool enforceQuota,
                                                     bool fromMigrate) {
+        {
+            auto status = checkValidation(docToInsert);
+            if (!status.isOK())
+                return status;
+        }
 
         const SnapshotId sid = txn->recoveryUnit()->getSnapshotId();
 
@@ -221,6 +285,12 @@ namespace mongo {
                                                     const BSONObj& doc,
                                                     MultiIndexBlock* indexBlock,
                                                     bool enforceQuota) {
+        {
+            auto status = checkValidation(doc);
+            if (!status.isOK())
+                return status;
+        }
+
         dassert(txn->lockState()->isCollectionLockedForMode(ns().toString(), MODE_IX));
 
         StatusWith<RecordId> loc = _recordStore->insertRecord( txn,
@@ -334,6 +404,12 @@ namespace mongo {
                                                      bool indexesAffected,
                                                      OpDebug* debug,
                                                      oplogUpdateEntryArgs& args) {
+        {
+            auto status = checkValidation(newDoc);
+            if (!status.isOK())
+                return status;
+        }
+
         dassert(txn->lockState()->isCollectionLockedForMode(ns().toString(), MODE_IX));
         invariant(oldDoc.snapshotId() == txn->recoveryUnit()->getSnapshotId());
 
@@ -460,15 +536,22 @@ namespace mongo {
     }
 
 
+    bool Collection::updateWithDamagesSupported() const {
+        if (_validator)
+            return false;
+
+        return _recordStore->updateWithDamagesSupported();
+    }
+
     Status Collection::updateDocumentWithDamages( OperationContext* txn,
                                                   const RecordId& loc,
                                                   const Snapshotted<RecordData>& oldRec,
                                                   const char* damageSource,
                                                   const mutablebson::DamageVector& damages,
                                                   oplogUpdateEntryArgs& args) {
-
         dassert(txn->lockState()->isCollectionLockedForMode(ns().toString(), MODE_IX));
         invariant(oldRec.snapshotId() == txn->recoveryUnit()->getSnapshotId());
+        invariant(updateWithDamagesSupported());
 
         // Broadcast the mutation so that query results stay correct.
         _cursorManager.invalidateDocument(txn, loc, INVALIDATION_MUTATION);
@@ -587,6 +670,23 @@ namespace mongo {
 
         _cursorManager.invalidateAll(false, "capped collection truncated");
         _recordStore->temp_cappedTruncateAfter( txn, end, inclusive );
+    }
+
+    Status Collection::setValidator(OperationContext* txn, BSONObj validatorDoc) {
+        invariant(txn->lockState()->isCollectionLockedForMode(ns().toString(), MODE_X));
+
+        // Make owned early so that the parsed match expression refers to the owned object.
+        if (!validatorDoc.isOwned()) validatorDoc = validatorDoc.getOwned();
+
+        auto statusWithMatcher = parseValidator(validatorDoc);
+        if (!statusWithMatcher.isOK())
+            return statusWithMatcher.getStatus();
+
+        _details->updateValidator(txn, validatorDoc);
+
+        _validator = std::move(statusWithMatcher.getValue());
+        _validatorDoc = std::move(validatorDoc);
+        return Status::OK();
     }
 
     namespace {

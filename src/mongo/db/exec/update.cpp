@@ -469,7 +469,7 @@ namespace mongo {
         // only enable in-place mutations if the underlying storage engine offers support for
         // writing damage events.
         _doc.reset(oldObj.value(),
-                   (_collection->getRecordStore()->updateWithDamagesSupported() ?
+                   (_collection->updateWithDamagesSupported() ?
                     mutablebson::Document::kInPlaceEnabled :
                     mutablebson::Document::kInPlaceDisabled));
 

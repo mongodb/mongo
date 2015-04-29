@@ -30,8 +30,11 @@
 
 #pragma once
 
+#include <memory>
 #include <string>
 
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/mutable/damage_vector.h"
 #include "mongo/db/catalog/collection_info_cache.h"
@@ -52,16 +55,14 @@ namespace mongo {
     class DatabaseCatalogEntry;
     class ExtentManager;
     class IndexCatalog;
+    class MatchExpression;
     class MultiIndexBlock;
+    class OpDebug;
     class OperationContext;
-
+    class RecordFetcher;
+    class RecordIterator;
     class UpdateDriver;
     class UpdateRequest;
-
-    class RecordIterator;
-    class RecordFetcher;
-
-    class OpDebug;
 
     struct CompactOptions {
 
@@ -209,8 +210,12 @@ namespace mongo {
                                             bool indexesAffected,
                                             OpDebug* debug,
                                             oplogUpdateEntryArgs& args);
+
+        bool updateWithDamagesSupported() const;
+
         /**
-         * right now not allowed to modify indexes
+         * Not allowed to modify indexes.
+         * Illegal to call if updateWithDamagesSupported() returns false.
          */
         Status updateDocumentWithDamages(OperationContext* txn,
                                          const RecordId& loc,
@@ -257,6 +262,14 @@ namespace mongo {
          */
         void temp_cappedTruncateAfter( OperationContext* txn, RecordId end, bool inclusive );
 
+        /**
+         * Sets the validator for this collection.
+         *
+         * An empty validator removes all validation.
+         * Requires an exclusive lock on the collection.
+         */
+        Status setValidator(OperationContext* txn, BSONObj validator);
+
         // -----------
 
         //
@@ -283,6 +296,11 @@ namespace mongo {
         // --- end suspect things
 
     private:
+
+        /**
+         * Returns a non-ok Status if document does not pass this collection's validator.
+         */
+        Status checkValidation(const BSONObj& document) const;
 
         Status recordStoreGoingToMove( OperationContext* txn,
                                        const RecordId& oldLocation,
@@ -313,6 +331,11 @@ namespace mongo {
         DatabaseCatalogEntry* _dbce;
         CollectionInfoCache _infoCache;
         IndexCatalog _indexCatalog;
+
+        // Empty means no filter.
+        BSONObj _validatorDoc;
+        // Points into _validatorDoc. Null means no filter.
+        std::unique_ptr<MatchExpression> _validator;
 
         // this is mutable because read only users of the Collection class
         // use it keep state.  This seems valid as const correctness of Collection

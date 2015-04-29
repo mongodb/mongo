@@ -357,40 +357,44 @@ namespace mongo {
         }
     }
 
+namespace {
+    void updateSystemNamespaces(OperationContext* txn, RecordStore* namespaces,
+                                const NamespaceString& ns, const BSONObj& update) {
+
+        if (!namespaces)
+            return;
+
+        boost::scoped_ptr<RecordIterator> iterator(namespaces->getIterator(txn));
+        while (!iterator->isEOF()) {
+            const RecordId loc = iterator->getNext();
+            const BSONObj oldEntry = iterator->dataFor(loc).toBson();
+            BSONElement e = oldEntry["name"];
+            if (e.type() != String)
+                continue;
+
+            if (e.String() != ns.ns())
+                continue;
+
+            const BSONObj newEntry = applyUpdateOperators(oldEntry, update);
+            StatusWith<RecordId> result = namespaces->updateRecord(txn, loc, newEntry.objdata(),
+                                                                   newEntry.objsize(), false, NULL);
+            fassert(17486, result.getStatus());
+            return;
+        }
+        fassertFailed(17488);
+    }
+}
+
     void NamespaceDetailsCollectionCatalogEntry::updateFlags(OperationContext* txn, int newValue) {
         NamespaceDetailsRSV1MetaData md(ns().ns(), _details);
         md.replaceUserFlags(txn, newValue);
-
-        if ( !_namespacesRecordStore )
-            return;
-
-        boost::scoped_ptr<RecordIterator> iterator( _namespacesRecordStore->getIterator(txn) );
-        while ( !iterator->isEOF() ) {
-            RecordId loc = iterator->getNext();
-
-            BSONObj oldEntry = iterator->dataFor( loc ).toBson();
-            BSONElement e = oldEntry["name"];
-            if ( e.type() != String )
-                continue;
-
-            if ( e.String() != ns().ns() )
-                continue;
-
-            BSONObj newEntry =
-                applyUpdateOperators( oldEntry,
-                                      BSON( "$set" << BSON( "options.flags" << newValue) ) );
-
-            StatusWith<RecordId> result = _namespacesRecordStore->updateRecord(txn,
-                                                                               loc,
-                                                                               newEntry.objdata(),
-                                                                               newEntry.objsize(),
-                                                                               false,
-                                                                               NULL);
-            fassert( 17486, result.isOK() );
-            return;
-        }
-
-        fassertFailed( 17488 );
+        updateSystemNamespaces(txn, _namespacesRecordStore, ns(),
+                               BSON("$set" << BSON("options.flags" << newValue)));
     }
 
+    void NamespaceDetailsCollectionCatalogEntry::updateValidator(OperationContext* txn,
+                                                                 const BSONObj& validator) {
+        updateSystemNamespaces(txn, _namespacesRecordStore, ns(),
+                               BSON("$set" << BSON("options.validator" << validator)));
+    }
 }

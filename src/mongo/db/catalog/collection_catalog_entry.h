@@ -105,6 +105,13 @@ namespace mongo {
          */
         virtual void updateFlags(OperationContext* txn, int newValue) = 0;
 
+        /**
+         * Updates the validator for this collection.
+         *
+         * An empty validator removes all validation.
+         */
+        virtual void updateValidator(OperationContext* txn, const BSONObj& validator) = 0;
+
     private:
         NamespaceString _ns;
     };

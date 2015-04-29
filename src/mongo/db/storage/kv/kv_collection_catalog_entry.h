@@ -39,7 +39,7 @@ namespace mongo {
     class KVCatalog;
     class KVEngine;
 
-    class KVCollectionCatalogEntry : public BSONCollectionCatalogEntry {
+    class KVCollectionCatalogEntry final : public BSONCollectionCatalogEntry {
     public:
         KVCollectionCatalogEntry( KVEngine* engine,
                                   KVCatalog* catalog,
@@ -47,42 +47,40 @@ namespace mongo {
                                   StringData ident,
                                   RecordStore* rs );
 
-        virtual ~KVCollectionCatalogEntry();
+        ~KVCollectionCatalogEntry() final;
 
-        virtual int getMaxAllowedIndexes() const { return 64; };
+        int getMaxAllowedIndexes() const final { return 64; };
 
-        virtual bool setIndexIsMultikey(OperationContext* txn,
-                                        StringData indexName,
-                                        bool multikey = true);
+        bool setIndexIsMultikey(OperationContext* txn,
+                                StringData indexName,
+                                bool multikey = true) final;
 
-        virtual void setIndexHead( OperationContext* txn,
-                                   StringData indexName,
-                                   const RecordId& newHead );
+        void setIndexHead( OperationContext* txn,
+                           StringData indexName,
+                           const RecordId& newHead ) final;
 
-        virtual Status removeIndex( OperationContext* txn,
-                                    StringData indexName );
+        Status removeIndex( OperationContext* txn,
+                            StringData indexName ) final;
 
-        virtual Status prepareForIndexBuild( OperationContext* txn,
-                                             const IndexDescriptor* spec );
+        Status prepareForIndexBuild( OperationContext* txn,
+                                     const IndexDescriptor* spec ) final;
 
-        virtual void indexBuildSuccess( OperationContext* txn,
-                                        StringData indexName );
+        void indexBuildSuccess( OperationContext* txn,
+                                StringData indexName ) final;
 
-        /* Updates the expireAfterSeconds field of the given index to the value in newExpireSecs.
-         * The specified index must already contain an expireAfterSeconds field, and the value in
-         * that field and newExpireSecs must both be numeric.
-         */
-        virtual void updateTTLSetting( OperationContext* txn,
-                                       StringData idxName,
-                                       long long newExpireSeconds );
+        void updateTTLSetting( OperationContext* txn,
+                               StringData idxName,
+                               long long newExpireSeconds ) final;
 
-        virtual void updateFlags(OperationContext* txn, int newValue);
+        void updateFlags(OperationContext* txn, int newValue) final;
+
+        void updateValidator(OperationContext* txn, const BSONObj& validator) final;
 
         RecordStore* getRecordStore() { return _recordStore.get(); }
         const RecordStore* getRecordStore() const { return _recordStore.get(); }
 
     protected:
-        virtual MetaData _getMetaData( OperationContext* txn ) const;
+        MetaData _getMetaData( OperationContext* txn ) const final;
 
     private:
         class AddIndexChange;

@@ -178,6 +178,13 @@ namespace mongo {
         _catalog->putMetaData( txn, ns().toString(), md );
     }
 
+    void KVCollectionCatalogEntry::updateValidator(OperationContext* txn,
+                                                   const BSONObj& validator) {
+        MetaData md = _getMetaData(txn);
+        md.options.validator = validator;
+        _catalog->putMetaData(txn, ns().toString(), md);
+    }
+
     BSONCollectionCatalogEntry::MetaData KVCollectionCatalogEntry::_getMetaData( OperationContext* txn ) const {
         return _catalog->getMetaData( txn, ns().toString() );
     }

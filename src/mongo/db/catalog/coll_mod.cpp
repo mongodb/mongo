@@ -131,6 +131,11 @@ namespace mongo {
                     result->appendAs(newExpireSecs , "expireAfterSeconds_new");
                 }
             }
+            else if (str::equals("validator", e.fieldName())) {
+                auto status = coll->setValidator(txn, e.Obj());
+                if (!status.isOK())
+                    errorStatus = std::move(status);
+            }
             else {
                 // As of SERVER-17312 we only support these two options. When SERVER-17320 is
                 // resolved this will need to be enhanced to handle other options.
