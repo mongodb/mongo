@@ -7,6 +7,17 @@ support for any particular encryption algorithm.
 @ref encryption_examples "Example encryption code" is provided
 to demonstrate how encryption extensions are created.
 
+\warning The encryption infrastructure included in WiredTiger, when used with a
+strong encryption algorithm, is intended to protect data stored in files
+(that is, <em>encryption at rest</em>). The table content (keys, values),
+the metadata pertaining to data (table, index, column names, and other
+configuration information) are well as the database log files are encrypted
+on disk.  Decryption occurs when the data is read into memory; thus an
+attacker having the ability to directly read system memory will have access
+to unencrypted data. Many systems may also page memory to a backing disk
+under load. Access to any such \em paging or \em swap devices must be
+considered when planning the security of a system.
+
 The encryption extension must be loaded in the ::wiredtiger_open call.
 See @subpage extensions for details on how extensions are loaded.
 Also, encryption is specified using \c encryption= in the configuration
@@ -27,20 +38,28 @@ was not specified in the ::wiredtiger_open call. This prevents accidental
 exposure of the file's data in log files, which would be written in the
 clear in such a scenario.
 
+\warning When using separate keys for individual data files or tables, the
+key used for the \em system encryption continues to have fundamental
+importance.  The database log, protected by the \em system encryption,
+contains a shared stream of changes to all data files. Thus, if the \em
+system key is exposed, even when per-file keys are not exposed, an attacker
+can read database log files, and hence has access to data in individual
+files.
+
 @section encryption_parameters Encryption keyid and secretkey
 
 Two parameters, \c keyid and \c secretkey, may be specified
 when configuring encryption for ::wiredtiger_open to allow the possibility
 of varying the algorithm according to different keys.
 
-The configuration parameter <code>encryption=(keyid)</code> may be used
-in ::wiredtiger_open or WT_SESSION::create calls. This is intended
+The configuration parameter <code>encryption=(keyid=<em>identifier</em>)</code>
+may be used in ::wiredtiger_open or WT_SESSION::create calls. This is intended
 to reference a key stored using a Key Management Solution (KMS).
 The \c keyid given to ::wiredtiger_open is stored in the clear in
 WiredTiger configuration files; it should never contain sensitive
-information.  As an example, \c keyid might be a integer between 0 and 99;
-the encryptor may consult the KMS to return one of the 100 keys
-stored within it. The encryptor will use the returned key when
+information.  As an example, with a \c keyid of \c "customerABC",
+the encryptor would consult the KMS to return a key previously stored
+for \c "customerABC". The encryptor will use the returned key when
 applying the encryption.  To effectively use the \c keyid, a custom
 encryptor must implement the WT_ENCRYPTOR::customize callback.
 It is during \c customize that the encryptor has an opportunity to use
@@ -75,33 +94,18 @@ this creates an encryptor name that may be referenced using the
 <code>encryption=(name=...</code> configuration string in the ::wiredtiger_open
 or WT_SESSION::create call.
 
-@section encryption_and_compression Encryption and compression
-
-Encryption may be used with @ref compression "compression".
-When encryption and compression are both specified during
-session create, any block to be written to disk
-is first compressed, then encrypted. Hence, blocks read from disk are
-first decrypted, then decompressed into memory.
-
-When encryption is specified during ::wiredtiger_open, database
-log files and some system metadata files (those containing table,
-index, column names, and configuration pertaining to these) are encrypted.
-Of these, only database log files may also be compressed.  When both
-compression and encryption is done on log files, the same ordering
-(compress then encrypt) applies as log records are written to disk.
-
 @section encryption_examples Encryption examples
 
 There are two kinds of example code with overlapping functionality.
-A simple, self contained encryption example is in examples/c/ex_encrypt.c .
+A simple, self contained encryption example is in @ex_ref{ex_encrypt.c}.
 This example includes a small encryptor that rotates letters in the
 alphabet by a fixed amount, based on the value of \c keyid.  This example
 also shows how encryption is configured within an application.
 The second set of examples are in \c ext/encryptors.  These are
 encryptors only (no application level code), showing how encryptors
 might be packaged in a loadable shared library.
-\c nop_encryptor.c merely copies its input to its output.
-\c rotn_encryptor.c is an extended version of the example that
+@ex_ref{nop_encrypt.c} merely copies its input to its output.
+@ex_ref{rotn_encrypt.c} is an extended version of the example that
 rotates the alphabet.  It adds a twist in that a \c secretkey can
 be specified, changing the rotation per letter.  The Python test suite
 uses the rotn encryptor to help test the encryption framework.

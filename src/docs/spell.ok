@@ -150,6 +150,7 @@ copydoc
 cpp
 crashless
 cursortype
+customerABC
 cv
 dN
 dNLen
@@ -452,6 +453,7 @@ ul
 umask
 unallocated
 unencoded
+unencrypted
 unescaped
 unicode
 uninstall
