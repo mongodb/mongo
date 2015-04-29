@@ -1800,7 +1800,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		{ NULL, 0 }
 	};
 
-	WT_CONFIG_ITEM cval, enc, keyid, sval;
+	WT_CONFIG_ITEM cval, keyid, secretkey, sval;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_ITEM(i1);
 	WT_DECL_ITEM(i2);
@@ -1808,8 +1808,9 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_DECL_RET;
 	const WT_NAME_FLAG *ft;
 	WT_SESSION_IMPL *session;
-	const char *enc_cfg[] = { NULL, NULL };
 	const char *base_merge;
+	const char *enc_cfg[] = { NULL, NULL };
+	char buf[512];
 	char version[64];
 
 	/* Leave lots of space for optional additional configuration. */
@@ -2000,13 +2001,20 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	 * The metadata/log encryptor is configured after extensions, since
 	 * extensions may load encryptors.  We have to do this before creating
 	 * the metadata file.
+	 *
+	 * The encryption customize callback needs the fully realized set of
+	 * encryption args.
 	 */
 	conn->kencryptor = NULL;
 	WT_ERR(__wt_config_gets_none(session, cfg, "encryption.name", &cval));
 	WT_ERR(__wt_config_gets_none(session, cfg, "encryption.keyid", &keyid));
-	WT_ERR(__wt_config_gets(session, cfg, "encryption", &enc));
-	if (enc.len != 0)
-		WT_ERR(__wt_strndup(session, enc.str, enc.len, &enc_cfg[0]));
+	WT_ERR(__wt_config_gets_none(session, cfg, "encryption.secretkey",
+	    &secretkey));
+	WT_ERR_TEST(snprintf(buf, sizeof(buf),
+	    "(name=%.*s,keyid=%.*s,secretkey=%.*s)",
+	    (int)cval.len, cval.str, (int)keyid.len, keyid.str,
+	    (int)secretkey.len, secretkey.str) >= (int)sizeof(buf), ENOMEM);
+	enc_cfg[0] = buf;
 	WT_ERR(__wt_encryptor_config(session, &cval, &keyid,
 	    (WT_CONFIG_ARG *)enc_cfg, &conn->kencryptor));
 
@@ -2054,8 +2062,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_STATIC_ASSERT(offsetof(WT_CONNECTION_IMPL, iface) == 0);
 	*wt_connp = &conn->iface;
 
-err:	__wt_free(session, enc_cfg[0]);
-	/* Discard the scratch buffers. */
+err:	/* Discard the scratch buffers. */
 	__wt_scr_free(session, &i1);
 	__wt_scr_free(session, &i2);
 	__wt_scr_free(session, &i3);
