@@ -131,7 +131,7 @@ __wt_session_lock_dhandle(WT_SESSION_IMPL *session, uint32_t flags, int *deadp)
 int
 __wt_session_release_btree(WT_SESSION_IMPL *session)
 {
-	enum { NOLOCK, READLOCK, WRITELOCK } locked;
+	enum { READLOCK, WRITELOCK } locked;
 	WT_BTREE *btree;
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
@@ -159,8 +159,6 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 		F_CLR(dhandle, WT_DHANDLE_EXCLUSIVE);
 
 	switch (locked) {
-	case NOLOCK:
-		break;
 	case READLOCK:
 		WT_TRET(__wt_readunlock(session, dhandle->rwlock));
 		break;
