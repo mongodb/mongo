@@ -191,8 +191,7 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 	int64_t maj_version, min_version;
 	uint32_t bitcnt;
 	int fixed;
-	const char **cfg;
-	const char *enc_cfg[] = { NULL, NULL };
+	const char **cfg, *enc_cfg[] = { NULL, NULL };
 
 	btree = S2BT(session);
 	cfg = btree->dhandle->cfg;

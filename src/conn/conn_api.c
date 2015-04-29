@@ -1807,8 +1807,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_DECL_RET;
 	const WT_NAME_FLAG *ft;
 	WT_SESSION_IMPL *session;
-	const char *enc_cfg[] = { NULL, NULL };
-	const char *base_merge;
+	const char *base_merge, *enc_cfg[] = { NULL, NULL };
 	char version[64];
 
 	/* Leave lots of space for optional additional configuration. */
