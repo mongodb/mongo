@@ -68,7 +68,7 @@ namespace repl {
             // conLock releases...
         }
         void reconnect() {
-            connInfo->cc.reset(new DBClientConnection(true, 0, connInfo->getTimeout()));
+            connInfo->cc.reset(new DBClientConnection(true, connInfo->getTimeout()));
             connInfo->cc->_logLevel = logger::LogSeverity::Debug(2);
             connInfo->connected = false;
             connect();
