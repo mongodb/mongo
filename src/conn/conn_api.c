@@ -1678,7 +1678,7 @@ __wt_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
  */
 static int
 __conn_write_base_config(
-    WT_SESSION_IMPL *session, const char *cfg[], const char *config)
+    WT_SESSION_IMPL *session, const char *cfg[], const char *base_config)
 {
 	FILE *fp;
 	WT_CONFIG parser;
@@ -1739,7 +1739,7 @@ __conn_write_base_config(
 	 * the application configured it explicitly, that setting should survive
 	 * even if the default changes.
 	 */
-	WT_ERR(__wt_config_init(session, &parser, config));
+	WT_ERR(__wt_config_init(session, &parser, base_config));
 	while ((ret = __wt_config_next(&parser, &k, &v)) == 0) {
 		/* Fix quoting for non-trivial settings. */
 		if (v.type == WT_CONFIG_ITEM_STRING) {
@@ -2005,27 +2005,6 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	    (WT_CONFIG_ARG *)enc_cfg, &conn->kencryptor));
 
 	/*
-	 * When writing the base configuration file, we write the version and
-	 * any configuration information set by the application (in other words,
-	 * the stack except for cfg[0]). However, some configuration values need
-	 * to be stripped out from the base configuration file; do that now, and
-	 * merge the rest to be written.
-	 */
-	WT_ERR(__wt_config_merge(session,
-	    cfg + 1, "create=,encryption=(secretkey=)", &base_merge));
-
-	/*
-	 * Reset cfg to the configuration stack we're going to use for the rest
-	 * of the open.
-	 *
-	 * Underlying code distinguishes the base values from the user-specified
-	 * information by ignoring cfg[0]. Make that work by leaving base values
-	 * in cfg[0], and the collapsed user-specified values in cfg[1].
-	 */
-	cfg[1] = base_merge;
-	cfg[2] = NULL;
-
-	/*
 	 * Check on the turtle and metadata files, creating them if necessary
 	 * (which avoids application threads racing to create the metadata file
 	 * later).  Once the metadata file exists, get a reference to it in
@@ -2037,7 +2016,15 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	/*
 	 * Configuration completed; optionally write the base configuration file
 	 * if it doesn't already exist.
+	 *
+	 * When writing the base configuration file, we write the version and
+	 * any configuration information set by the application (in other words,
+	 * the stack except for cfg[0]). However, some configuration values need
+	 * to be stripped out from the base configuration file; do that now, and
+	 * merge the rest to be written.
 	 */
+	WT_ERR(__wt_config_merge(session,
+	    cfg + 1, "create=,encryption=(secretkey=)", &base_merge));
 	WT_ERR(__conn_write_base_config(session, cfg, base_merge));
 
 	/*
