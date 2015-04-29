@@ -745,8 +745,7 @@ __wt_conn_remove_encryptor(WT_SESSION_IMPL *session)
 			/* Remove from the connection's list, free memory. */
 			SLIST_REMOVE(
 			    &nenc->keyedlh, kenc, __wt_keyed_encryptor, l);
-			if (kenc->keyid != NULL)
-				__wt_free(session, kenc->keyid);
+			__wt_free(session, kenc->keyid);
 			__wt_free(session, kenc);
 		}
 
