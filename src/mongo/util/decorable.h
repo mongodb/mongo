@@ -79,7 +79,7 @@ namespace mongo {
             }
 
             T& operator()(D* d) const {
-                return static_cast<Decorable*>(d)->_decorations.getDecoration(_raw);
+                return (*this)(*d);
             }
 
             const T& operator()(const D& d) const {
@@ -87,7 +87,7 @@ namespace mongo {
             }
 
             const T& operator()(const D* d) const {
-                return static_cast<const Decorable*>(d)->_decorations.getDecoration(_raw);
+                return (*this)(*d);
             }
 
         private:
