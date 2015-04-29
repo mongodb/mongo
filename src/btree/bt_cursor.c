@@ -842,7 +842,7 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
 	if (__cursor_valid(cbt, &upd))
 		WT_ERR(__wt_kv_return(session, cbt, upd));
 	else
-		WT_ERR(__wt_btcur_search_near(cbt, 0));
+		WT_ERR(__wt_btcur_search_near(cbt, NULL));
 
 err:	if (ret != 0)
 		WT_TRET(__cursor_reset(cbt));

@@ -413,7 +413,7 @@ __clsm_open_cursors(
 	if (lsm_tree->nchunks == 0)
 		return (0);
 
-	ckpt_cfg[0] = WT_CONFIG_BASE(session, session_open_cursor);
+	ckpt_cfg[0] = WT_CONFIG_BASE(session, WT_SESSION_open_cursor);
 	ckpt_cfg[1] = "checkpoint=" WT_CHECKPOINT ",raw";
 	ckpt_cfg[2] = NULL;
 

@@ -14,8 +14,8 @@ static int __log_read_internal(WT_SESSION_IMPL *, WT_ITEM *, WT_LSN *,
 static int __log_write_internal(WT_SESSION_IMPL *, WT_ITEM *, WT_LSN *,
     uint32_t);
 
-#define	WT_LOG_COMPRESS_SKIP (offsetof(WT_LOG_RECORD, record))
-#define	WT_LOG_ENCRYPT_SKIP (offsetof(WT_LOG_RECORD, record))
+#define	WT_LOG_COMPRESS_SKIP	(offsetof(WT_LOG_RECORD, record))
+#define	WT_LOG_ENCRYPT_SKIP	(offsetof(WT_LOG_RECORD, record))
 
 /*
  * __wt_log_ckpt --
@@ -398,8 +398,8 @@ __log_decrypt(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out)
 	WT_ENCRYPTOR *encryptor;
 	WT_KEYED_ENCRYPTOR *kencryptor;
 	size_t encryptor_data_len, result_len;
-	uint32_t clear_cksum, unpadded_len;
-	uint8_t *dst, *src;
+	uint32_t clear_cksum, *tmp_cksump, unpadded_len;
+	uint8_t *dst, *src, *tmp_dst;
 
 	conn = S2C(session);
 	kencryptor = conn->kencryptor;
@@ -423,8 +423,6 @@ __log_decrypt(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out)
 	 */
 	unpadded_len = WT_STORE_SIZE(*((uint32_t *)
 	    ((uint8_t *)in->data + WT_LOG_ENCRYPT_SKIP)));
-	clear_cksum = WT_STORE_SIZE(*((uint32_t *)
-	    ((uint8_t *)in->data + WT_LOG_ENCRYPT_SKIP + sizeof(uint32_t))));
 	WT_ASSERT(session, unpadded_len > 0);
 	/*
 	 * The size of the new buffer should be the unpadded length less
@@ -433,33 +431,39 @@ __log_decrypt(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out)
 	WT_ERR(__wt_scr_alloc(session, 0, out));
 	WT_ERR(__wt_buf_initsize(session, *out, unpadded_len));
 
-	src = (uint8_t *)in->mem + WT_LOG_ENCRYPT_SKIP + WT_ENCRYPT_LEN;
-	encryptor_data_len =
-	    unpadded_len - WT_LOG_ENCRYPT_SKIP - WT_ENCRYPT_LEN;
+	src = (uint8_t *)in->mem + WT_LOG_ENCRYPT_SKIP + WT_ENCRYPT_LEN_SIZE;
+	encryptor_data_len = unpadded_len -
+	    (WT_LOG_ENCRYPT_SKIP + WT_ENCRYPT_LEN_SIZE);
 	dst = (uint8_t *)(*out)->mem + WT_LOG_ENCRYPT_SKIP;
+
 	/*
-	 * Copy in the skipped header bytes.
+	 * Hijack the last few bytes from the header we're skipping because
+	 * the checksum is the first thing in the buffer.  We will overwrite
+	 * the checksum after verifying it when we copy in the skipped header,
+	 * and then the real data will be at the right location in the buffer.
 	 */
-	memcpy((*out)->mem, in->mem, WT_LOG_ENCRYPT_SKIP);
+	tmp_dst = dst - WT_ENCRYPT_CKSUM_SIZE;
+	tmp_cksump = (uint32_t *)tmp_dst;
 	WT_ERR(encryptor->decrypt(encryptor, &session->iface,
-	    src, encryptor_data_len, dst, encryptor_data_len, &result_len));
+	    src, encryptor_data_len, tmp_dst, encryptor_data_len, &result_len));
 
 	/*
 	 * Verify the checksum of the pre-encrypted data matches a checksum
 	 * of the post-decrypted data.  They should be identical.
 	 */
+	result_len -= WT_ENCRYPT_CKSUM_SIZE;
+	clear_cksum = WT_STORE_SIZE(*tmp_cksump);
 	if (clear_cksum != __wt_cksum(dst, result_len))
 		WT_ERR_MSG(session, EINVAL,
 		    "Invalid decryption of log record");
 	/*
-	 * If checksums were turned off because we're depending on the
-	 * decryption to fail on any corrupted data, we'll end up
-	 * here after corruption happens.  If we're salvaging the file,
-	 * it's OK, otherwise it's really, really bad.
+	 * Copy in the skipped header bytes.  This overwrites the checksum.
 	 */
-	if (ret != 0)
-		WT_ERR(WT_ERROR);
-err:	return (ret);
+	memcpy((*out)->mem, in->mem, WT_LOG_ENCRYPT_SKIP);
+
+err:	if (ret != 0)
+		__wt_scr_free(session, out);
+	return (ret);
 }
 
 /*
@@ -1051,7 +1055,7 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, int *freep)
 	 * be holes in the log file.
 	 */
 	WT_STAT_FAST_CONN_INCR(session, log_release_write_lsn);
-	while (LOG_CMP(&log->write_lsn, &slot->slot_release_lsn) != 0) {
+	while (WT_LOG_CMP(&log->write_lsn, &slot->slot_release_lsn) != 0) {
 		if (++yield_count < 1000)
 			__wt_yield();
 		else
@@ -1114,7 +1118,7 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, int *freep)
 		 * Sync the log file if needed.
 		 */
 		if (F_ISSET(slot, SLOT_SYNC) &&
-		    LOG_CMP(&log->sync_lsn, &slot->slot_end_lsn) < 0) {
+		    WT_LOG_CMP(&log->sync_lsn, &slot->slot_end_lsn) < 0) {
 			WT_ERR(__wt_verbose(session, WT_VERB_LOG,
 			    "log_release: sync log %s", log->log_fh->name));
 			WT_STAT_FAST_CONN_INCR(session, log_sync);
@@ -1593,7 +1597,7 @@ advance:
 
 	/* Truncate if we're in recovery. */
 	if (LF_ISSET(WT_LOGSCAN_RECOVER) &&
-	    LOG_CMP(&rd_lsn, &log->trunc_lsn) < 0)
+	    WT_LOG_CMP(&rd_lsn, &log->trunc_lsn) < 0)
 		WT_ERR(__log_truncate(session,
 		    &rd_lsn, WT_LOG_FILENAME, 0));
 
@@ -1674,9 +1678,9 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	WT_LOG *log;
 	WT_LOG_RECORD *newlrp;
 	int compression_failed;
-	size_t dst_len, len, new_size, result_len, src_len;
-	uint32_t *cksump, clear_cksum, *unpadded_lenp;
-	uint8_t *dst, *src;
+	size_t dst_len, len, new_size, result_len, src_len, tmp_src_len;
+	uint32_t clear_cksum, orig_val, *tmp_cksump, *unpadded_lenp;
+	uint8_t *dst, *src, *tmp_src;
 
 	conn = S2C(session);
 	log = conn->log;
@@ -1765,8 +1769,8 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 		 * Allocate enough space for the original record plus the
 		 * encryption size constant plus the length we store.
 		 */
-		new_size = ip->size +
-		    kencryptor->size_const + WT_ENCRYPT_LEN;
+		new_size = ip->size + kencryptor->size_const +
+		    WT_ENCRYPT_LEN_SIZE + WT_ENCRYPT_CKSUM_SIZE;
 		WT_ERR(__wt_scr_alloc(session, new_size, &eitem));
 
 		/*
@@ -1776,8 +1780,6 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 		memcpy(eitem->mem, ip->mem, WT_LOG_ENCRYPT_SKIP);
 		unpadded_lenp = (uint32_t *)
 		    ((uint8_t *)eitem->mem + WT_LOG_ENCRYPT_SKIP);
-		cksump = (uint32_t *)
-		    ((uint8_t *)unpadded_lenp + sizeof(uint32_t));
 		eitem->size = new_size;
 
 		/*
@@ -1787,18 +1789,40 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 		 */
 		src = (uint8_t *)ip->mem + WT_LOG_ENCRYPT_SKIP;
 		src_len = ip->size - WT_LOG_ENCRYPT_SKIP;
-		dst = (uint8_t *)eitem->mem +
-		    WT_LOG_ENCRYPT_SKIP + WT_ENCRYPT_LEN;
-		dst_len = src_len + kencryptor->size_const;
+
 		/*
-		 * We want to store a checksum of the pre-encrypted data
-		 * and store it so that we can detect a bad key on decryption.
+		 * Hijack the last few bytes from the header we're skipping
+		 * because we inject the checksum as the first thing in
+		 * the source buffer for encryption.  Save the original
+		 * header value to restore afterward.
 		 */
 		clear_cksum = __wt_cksum(src, src_len);
-		*cksump = WT_STORE_SIZE(clear_cksum);
-		WT_ERR(encryptor->encrypt(encryptor, &session->iface,
-		    src, src_len, dst, dst_len, &result_len));
-		result_len += WT_ENCRYPT_LEN + WT_LOG_ENCRYPT_SKIP;
+		tmp_src = src - WT_ENCRYPT_CKSUM_SIZE;
+		tmp_cksump = (uint32_t *)tmp_src;
+		orig_val = *tmp_cksump;
+		*tmp_cksump = WT_STORE_SIZE(clear_cksum);
+		tmp_src_len = src_len + WT_ENCRYPT_CKSUM_SIZE;
+
+		dst = (uint8_t *)eitem->mem +
+		    WT_LOG_ENCRYPT_SKIP + WT_ENCRYPT_LEN_SIZE;
+		dst_len = tmp_src_len + kencryptor->size_const;
+
+		/*
+		 * Send in the temporary source address and length that
+		 * includes the checksum we injected.
+		 */
+		ret = encryptor->encrypt(encryptor, &session->iface,
+		    tmp_src, tmp_src_len, dst, dst_len, &result_len);
+		/*
+		 * Immediately restore the original header value.
+		 */
+		*tmp_cksump = orig_val;
+		if (ret != 0)
+			goto err;
+		/*
+		 * The final result length includes the skipped lengths.
+		 */
+		result_len += WT_LOG_ENCRYPT_SKIP + WT_ENCRYPT_LEN_SIZE;
 
 		/* TODO: stats */
 
@@ -1928,13 +1952,13 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 			WT_ERR(__wt_log_slot_free(session, myslot.slot));
 	} else if (LF_ISSET(WT_LOG_FSYNC)) {
 		/* Wait for our writes to reach disk */
-		while (LOG_CMP(&log->sync_lsn, &lsn) <= 0 &&
+		while (WT_LOG_CMP(&log->sync_lsn, &lsn) <= 0 &&
 		    myslot.slot->slot_error == 0)
 			(void)__wt_cond_wait(
 			    session, log->log_sync_cond, 10000);
 	} else if (LF_ISSET(WT_LOG_FLUSH)) {
 		/* Wait for our writes to reach the OS */
-		while (LOG_CMP(&log->write_lsn, &lsn) <= 0 &&
+		while (WT_LOG_CMP(&log->write_lsn, &lsn) <= 0 &&
 		    myslot.slot->slot_error == 0)
 			(void)__wt_cond_wait(
 			    session, log->log_write_cond, 10000);

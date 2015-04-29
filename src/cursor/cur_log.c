@@ -74,7 +74,7 @@ __curlog_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
 	acl = (WT_CURSOR_LOG *)a;
 	bcl = (WT_CURSOR_LOG *)b;
 	WT_ASSERT(session, cmpp != NULL);
-	*cmpp = LOG_CMP(acl->cur_lsn, bcl->cur_lsn);
+	*cmpp = WT_LOG_CMP(acl->cur_lsn, bcl->cur_lsn);
 	/*
 	 * If both are on the same LSN, compare step counter.
 	 */
@@ -245,8 +245,7 @@ __curlog_next(WT_CURSOR *cursor)
 	WT_STAT_FAST_CONN_INCR(session, cursor_next);
 	WT_STAT_FAST_DATA_INCR(session, cursor_next);
 
-err:	
-	API_END_RET(session, ret);
+err:	API_END_RET(session, ret);
 
 }
 

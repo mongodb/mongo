@@ -23,8 +23,8 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 	WT_ENCRYPTOR *encryptor;
 	const WT_PAGE_HEADER *dsk;
 	size_t encryptor_data_len, result_len, skip;
-	uint32_t clear_cksum, encrypt_len;
-	uint8_t *dst;
+	uint32_t clear_cksum, encrypt_len, *tmp_cksump;
+	uint8_t *dst, *src, *tmp_dst;
 
 	btree = S2BT(session);
 	bm = btree->bm;
@@ -56,10 +56,12 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 			    "configured");
 
 		skip = WT_BLOCK_ENCRYPT_SKIP;
+		/*
+		 * We are guaranteed that tmp was initialized in the conditional
+		 * above.  We can use it here.
+		 */
 		encrypt_len = WT_STORE_SIZE(*((uint32_t *)
 		    ((uint8_t *)tmp->data + skip)));
-		clear_cksum = WT_STORE_SIZE(*((uint32_t *)
-		    ((uint8_t *)tmp->data + skip + sizeof(uint32_t))));
 		if (encrypt_len > tmp->size)
 			WT_ERR_MSG(session, WT_ERROR,
 			    "corrupted encrypted block: padded size less than "
@@ -70,13 +72,22 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 		 */
 		WT_ERR(__wt_buf_initsize(session, buf, encrypt_len));
 
-		memcpy(buf->mem, tmp->data, skip);
+		src = (uint8_t *)tmp->data + skip + WT_ENCRYPT_LEN_SIZE;
+		encryptor_data_len = encrypt_len - (skip + WT_ENCRYPT_LEN_SIZE);
 		dst = (uint8_t *)buf->mem + skip;
-		encryptor_data_len = encrypt_len - skip - WT_ENCRYPT_LEN;
-		ret = encryptor->decrypt(
-		    encryptor, &session->iface,
-		    (uint8_t *)tmp->data + skip + WT_ENCRYPT_LEN,
-		    encryptor_data_len, dst, encryptor_data_len, &result_len);
+
+		/*
+		 * Hijack the last few bytes from the header we're skipping
+		 * because the checksum is the first thing in the buffer.  We
+		 * will overwrite the checksum after verifying it when we copy
+		 * in the skipped header, and then the real data will be at
+		 * the right location in the buffer.
+		 */
+		tmp_dst = dst - WT_ENCRYPT_CKSUM_SIZE;
+		tmp_cksump = (uint32_t *)tmp_dst;
+		ret = encryptor->decrypt(encryptor, &session->iface,
+		    src, encryptor_data_len,
+		    tmp_dst, encryptor_data_len, &result_len);
 
 		/*
 		 * It may be file corruption, which
@@ -85,14 +96,26 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 		 * secretkey.
 		 */
 		if (ret != 0)
-			WT_ERR(
-			    F_ISSET(btree, WT_BTREE_VERIFY) ||
+			WT_ERR(F_ISSET(btree, WT_BTREE_VERIFY) ||
 			    F_ISSET(session, WT_SESSION_SALVAGE_CORRUPT_OK) ?
 			    WT_ERROR :
 			    __wt_illegal_value(session, btree->dhandle->name));
+
+		/*
+		 * Verify the checksum of the pre-encrypted data matches a
+		 * checksum of the post-decrypted data.  They should be
+		 * identical.
+		 */
+		result_len -= WT_ENCRYPT_CKSUM_SIZE;
+		clear_cksum = WT_STORE_SIZE(*tmp_cksump);
 		if (clear_cksum != __wt_cksum(dst, result_len))
 			WT_ERR_MSG(session, EINVAL,
 			    "Invalid decryption of block");
+		/*
+		 * Copy in the skipped header bytes.  This overwrites the
+		 * checksum we verified.
+		 */
+		memcpy(buf->mem, tmp->data, skip);
 		memcpy((uint8_t *)tmp->data + skip,
 		    (uint8_t *)buf->mem + skip, result_len);
 	}
@@ -135,8 +158,7 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 		 */
 		if (ret != 0 ||
 		    result_len != dsk->mem_size - WT_BLOCK_COMPRESS_SKIP)
-			WT_ERR(
-			    F_ISSET(btree, WT_BTREE_VERIFY) ||
+			WT_ERR(F_ISSET(btree, WT_BTREE_VERIFY) ||
 			    F_ISSET(session, WT_SESSION_SALVAGE_CORRUPT_OK) ?
 			    WT_ERROR :
 			    __wt_illegal_value(session, btree->dhandle->name));
@@ -192,10 +214,10 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 	WT_ENCRYPTOR *encryptor;
 	WT_ITEM *ip;
 	WT_PAGE_HEADER *dsk;
-	size_t len, src_len, dst_len, result_len, size;
-	int data_cksum, compression_failed, encrypted;
-	uint32_t *cksump, clear_cksum, *unpadded_lenp;
-	uint8_t *src, *dst;
+	size_t dst_len, len, result_len, size, src_len, tmp_src_len;
+	int compression_failed, data_cksum, encrypted;
+	uint32_t clear_cksum, orig_val, *tmp_cksump, *unpadded_lenp;
+	uint8_t *dst, *src, *tmp_src;
 
 	btree = S2BT(session);
 	bm = btree->bm;
@@ -319,24 +341,46 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 		src_len = ip->size - WT_BLOCK_ENCRYPT_SKIP;
 
 		/*
+		 * Hijack the last few bytes from the header we're skipping
+		 * because we inject the checksum as the first thing in the
+		 * source buffer for encryption.  Save the original
+		 * header value to restore afterward.
+		 */
+		clear_cksum = __wt_cksum(src, src_len);
+		tmp_src = src - WT_ENCRYPT_CKSUM_SIZE;
+		tmp_cksump = (uint32_t *)tmp_src;
+		orig_val = *tmp_cksump;
+		*tmp_cksump = WT_STORE_SIZE(clear_cksum);
+		tmp_src_len = src_len + WT_ENCRYPT_CKSUM_SIZE;
+
+		/*
 		 * Compute the size needed for the destination buffer.
 		 */
 		len = btree->kencryptor->size_const;
-
-		size = ip->size + len + WT_ENCRYPT_LEN;
+		size = ip->size + len +
+		    WT_ENCRYPT_LEN_SIZE + WT_ENCRYPT_CKSUM_SIZE;
 		WT_ERR(bm->write_size(bm, session, &size));
 		WT_ERR(__wt_scr_alloc(session, size, &etmp));
 
+		unpadded_lenp = (uint32_t *)((uint8_t *)etmp->mem +
+		    WT_BLOCK_ENCRYPT_SKIP);
+
 		/* Skip the header bytes of the destination data. */
 		dst = (uint8_t *)etmp->mem +
-		    WT_BLOCK_ENCRYPT_SKIP + WT_ENCRYPT_LEN;
-		dst_len = src_len + len;
-		clear_cksum = __wt_cksum(src, src_len);
-		if ((ret = encryptor->encrypt(encryptor,
-		    &session->iface,
-		    src, src_len,
-		    dst, dst_len,
-		    &result_len)) != 0)
+		    WT_BLOCK_ENCRYPT_SKIP + WT_ENCRYPT_LEN_SIZE;
+		dst_len = tmp_src_len + len;
+
+		/*
+		 * Send in the temporary source address and length that
+		 * includes the checksum we injected.
+		 */
+		ret = encryptor->encrypt(encryptor, &session->iface,
+		    tmp_src, tmp_src_len, dst, dst_len, &result_len);
+		/*
+		 * Immediately restore the original header value.
+		 */
+		*tmp_cksump = orig_val;
+		if (ret != 0)
 			WT_ERR_MSG(session, ret,
 			    "%s encryption error: failed to encrypt %"
 			    WT_SIZET_FMT " bytes", btree->dhandle->name,
@@ -344,7 +388,10 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 
 		/*TODO: stats*/
 		encrypted = 1;
-		result_len += WT_BLOCK_ENCRYPT_SKIP + WT_ENCRYPT_LEN;
+		/*
+		 * The final result length includes the skipped lengths.
+		 */
+		result_len += WT_BLOCK_ENCRYPT_SKIP + WT_ENCRYPT_LEN_SIZE;
 		/*
 		 * Copy in the skipped header bytes, set the final data
 		 * size.
@@ -353,15 +400,9 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 		etmp->size = result_len;
 		/*
 		 * Store original size so we know how much space is needed
-		 * on the decryption side.  Store pre-encrypt checksum so we
-		 * can verify after decryption.
+		 * on the decryption side.
 		 */
-		unpadded_lenp = (uint32_t *)((uint8_t *)etmp->mem +
-		    WT_BLOCK_ENCRYPT_SKIP);
 		*unpadded_lenp = WT_STORE_SIZE(result_len);
-		cksump = (uint32_t *)
-		    ((uint8_t *)unpadded_lenp + sizeof(uint32_t));
-		*cksump = WT_STORE_SIZE(clear_cksum);
 
 		ip = etmp;
 	}

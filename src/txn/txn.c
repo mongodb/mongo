@@ -34,8 +34,11 @@ __txn_sort_snapshot(WT_SESSION_IMPL *session, uint32_t n, uint64_t snap_max)
 
 	txn = &session->txn;
 
-	if (n > 1)
+	if (n <= 10)
+		WT_INSERTION_SORT(txn->snapshot, n, uint64_t, TXNID_LT);
+	else
 		qsort(txn->snapshot, n, sizeof(uint64_t), __wt_txnid_cmp);
+
 	txn->snapshot_count = n;
 	txn->snap_max = snap_max;
 	txn->snap_min = (n > 0 && TXNID_LE(txn->snapshot[0], snap_max)) ?
@@ -261,11 +264,11 @@ __wt_txn_refresh(WT_SESSION_IMPL *session, int get_snapshot)
 }
 
 /*
- * __wt_txn_begin --
- *	Begin a transaction.
+ * __wt_txn_config --
+ *	Configure a transaction.
  */
 int
-__wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
+__wt_txn_config(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_CONFIG_ITEM cval;
 	WT_TXN *txn;
@@ -273,9 +276,7 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 	txn = &session->txn;
 
 	WT_RET(__wt_config_gets_def(session, cfg, "isolation", 0, &cval));
-	if (cval.len == 0)
-		txn->isolation = session->isolation;
-	else
+	if (cval.len != 0)
 		txn->isolation =
 		    WT_STRING_MATCH("snapshot", cval.str, cval.len) ?
 		    TXN_ISO_SNAPSHOT :
@@ -291,18 +292,11 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 	 * the connection-wide flag and not overridden here, we end up clearing
 	 * all flags.
 	 */
-	txn->txn_logsync = S2C(session)->txn_logsync;
 	WT_RET(__wt_config_gets_def(session, cfg, "sync",
 	    FLD_ISSET(txn->txn_logsync, WT_LOG_FLUSH) ? 1 : 0, &cval));
 	if (!cval.val)
 		txn->txn_logsync = 0;
 
-	F_SET(txn, TXN_RUNNING);
-	if (txn->isolation == TXN_ISO_SNAPSHOT) {
-		if (session->ncursors > 0)
-			WT_RET(__wt_session_copy_values(session));
-		__wt_txn_refresh(session, 1);
-	}
 	return (0);
 }
 

@@ -47,9 +47,6 @@ int add_my_encryptors(WT_CONNECTION *connection);
 
 static const char *home = NULL;
 
-#define	BUFSIZE		16
-#define	MAX_TENANTS	3
-
 #define	SYS_KEYID	"system"
 #define	SYS_BADPW	"bad_password"
 #define	SYS_PW		"system_password"
@@ -80,7 +77,7 @@ MY_CRYPTO my_crypto_global;
  *	This is where one would call a checksum function on the encrypted
  *	buffer.  Here we just put random values in it.
  */
-static int
+static void
 make_cksum(uint8_t *dst)
 {
 	int i;
@@ -89,7 +86,6 @@ make_cksum(uint8_t *dst)
 	 */
 	for (i = 0; i < CHKSUM_LEN; i++)
 		dst[i] = (uint8_t)random();
-	return (0);
 }
 
 /*
@@ -97,7 +93,7 @@ make_cksum(uint8_t *dst)
  *	This is where one would generate the initialization vector.
  *	Here we just put random values in it.
  */
-static int
+static void
 make_iv(uint8_t *dst)
 {
 	int i;
@@ -106,7 +102,6 @@ make_iv(uint8_t *dst)
 	 */
 	for (i = 0; i < IV_LEN; i++)
 		dst[i] = (uint8_t)random();
-	return (0);
 }
 
 /*
@@ -126,9 +121,9 @@ do_rotate(uint8_t *buf, size_t len, uint32_t rotn)
 	for (i = 0; i < len; i++) {
 		if (isalpha(buf[i])) {
 			if (islower(buf[i]))
-				buf[i] = (buf[i] - 'a' + rotn) % 26 + 'a';
+				buf[i] = ((buf[i] - 'a') + rotn) % 26 + 'a';
 			else
-				buf[i] = (buf[i] - 'A' + rotn) % 26 + 'A';
+				buf[i] = ((buf[i] - 'A') + rotn) % 26 + 'A';
 		}
 	}
 }
@@ -155,10 +150,10 @@ rotate_decrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	/*
 	 * Make sure it is big enough.
 	 */
-	mylen = src_len - CHKSUM_LEN - IV_LEN;
+	mylen = src_len - (CHKSUM_LEN + IV_LEN);
 	if (dst_len < mylen) {
 		fprintf(stderr,
-		    "Rotate: ENOMEM ERROR: dst_len %lu src_len %lu\n",
+		    "Rotate: ENOMEM ERROR: dst_len %zu src_len %zu\n",
 		    dst_len, src_len);
 		return (ENOMEM);
 	}
@@ -255,17 +250,19 @@ static int
 rotate_customize(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
     WT_CONFIG_ARG *encrypt_config, WT_ENCRYPTOR **customp)
 {
-	int ret;
-	const MY_CRYPTO *orig_crypto;
 	MY_CRYPTO *my_crypto;
 	WT_CONFIG_ITEM keyid, secret;
 	WT_EXTENSION_API *extapi;
+	int ret;
+	const MY_CRYPTO *orig_crypto;
 
 	extapi = session->connection->get_extension_api(session->connection);
 
 	orig_crypto = (const MY_CRYPTO *)encryptor;
-	if ((my_crypto = calloc(1, sizeof(MY_CRYPTO))) == NULL)
-		return (errno);
+	if ((my_crypto = calloc(1, sizeof(MY_CRYPTO))) == NULL) {
+		ret = errno;
+		goto err;
+	}
 	*my_crypto = *orig_crypto;
 	my_crypto->keyid = my_crypto->password = NULL;
 
@@ -275,16 +272,20 @@ rotate_customize(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	 */
 	if ((ret = extapi->config_get(extapi, session, encrypt_config,
 	    "keyid", &keyid)) == 0 && keyid.len != 0) {
-		if ((my_crypto->keyid = malloc(keyid.len + 1)) == NULL)
-			return (errno);
+		if ((my_crypto->keyid = malloc(keyid.len + 1)) == NULL) {
+			ret = errno;
+			goto err;
+		}
 		strncpy(my_crypto->keyid, keyid.str, keyid.len + 1);
 		my_crypto->keyid[keyid.len] = '\0';
 	}
 
 	if ((ret = extapi->config_get(extapi, session, encrypt_config,
 	    "secretkey", &secret)) == 0 && secret.len != 0) {
-		if ((my_crypto->password = malloc(secret.len + 1)) == NULL)
-			return (errno);
+		if ((my_crypto->password = malloc(secret.len + 1)) == NULL) {
+			ret = errno;
+			goto err;
+		}
 		strncpy(my_crypto->password, secret.str, secret.len + 1);
 		my_crypto->password[secret.len] = '\0';
 	}
@@ -294,27 +295,29 @@ rotate_customize(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	 */
 	if (ITEM_MATCHES(keyid, "system")) {
 		if (my_crypto->password == NULL ||
-		    strcmp(my_crypto->password, SYS_PW) != 0)
+		    strcmp(my_crypto->password, SYS_PW) != 0) {
+			ret = EPERM;
 			goto err;
+		}
 		my_crypto->rot_N = 13;
 	} else if (ITEM_MATCHES(keyid, USER1_KEYID))
 		my_crypto->rot_N = 4;
 	else if (ITEM_MATCHES(keyid, USER2_KEYID))
 		my_crypto->rot_N = 19;
-	else
-		return (EINVAL);
+	else {
+		ret = EINVAL;
+		goto err;
+	}
 
 	++my_crypto->num_calls;		/* Call count */
 
 	*customp = &my_crypto->encryptor;
 	return (0);
-err:
-	if (my_crypto->keyid != NULL)
-		free(my_crypto->keyid);
-	if (my_crypto->password != NULL)
-		free(my_crypto->password);
+
+err:	free(my_crypto->keyid);
+	free(my_crypto->password);
 	free(my_crypto);
-	return (EPERM);
+	return (ret);
 }
 
 /*
@@ -451,7 +454,7 @@ main(void)
 	} else
 		home = NULL;
 
-	srandom((unsigned int)getpid());
+	srandom((unsigned long)getpid());
 
 	ret = wiredtiger_open(home, NULL, WT_OPEN_CONFIG_GOOD, &conn);
 
@@ -465,7 +468,7 @@ main(void)
 	    COMP_A COMP_B COMP_C COMP_A COMP_B COMP_C
 	    COMP_A COMP_B COMP_C COMP_A COMP_B COMP_C
 	    "The quick brown fox jumps over the lazy dog ");
-	simple_walk_log(session);
+	ret = simple_walk_log(session);
 
 	/*
 	 * Create and open some encrypted and not encrypted tables.
@@ -535,7 +538,7 @@ main(void)
 
 		printf("Read key %s; value %s\n", key1, val1);
 	}
-	simple_walk_log(session);
+	ret = simple_walk_log(session);
 	printf("CLOSE\n");
 	ret = conn->close(conn, NULL);
 
@@ -579,7 +582,7 @@ main(void)
 	/*
 	 * Verify we can read the encrypted log after restart.
 	 */
-	simple_walk_log(session);
+	ret = simple_walk_log(session);
 	ret = session->open_cursor(session, "table:crypto1", NULL, NULL, &c1);
 	ret = session->open_cursor(session, "table:crypto2", NULL, NULL, &c2);
 	ret = session->open_cursor(session, "table:nocrypto", NULL, NULL, &nc);
@@ -588,8 +591,8 @@ main(void)
 	 * Read the same data from each cursor.  All should be identical.
 	 */
 	while (c1->next(c1) == 0) {
-		c2->next(c2);
-		nc->next(nc);
+		ret = c2->next(c2);
+		ret = nc->next(nc);
 		ret = c1->get_key(c1, &key1);
 		ret = c1->get_value(c1, &val1);
 		ret = c2->get_key(c2, &key2);

@@ -1092,7 +1092,13 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 	 */
 	if (ref == NULL || __wt_ref_is_root(ref))
 		return (0);
-	page = ref->page;
+
+	/*
+	 * If hazard pointers aren't necessary for this file, we can't be
+	 * evicting, we're done.
+	 */
+	if (F_ISSET(btree, WT_BTREE_IN_MEMORY))
+		return (0);
 
 	/*
 	 * Attempt to evict pages with the special "oldest" read generation.
@@ -1106,9 +1112,10 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 	 * it contains an update that isn't stable.  Also skip forced eviction
 	 * if we just did an in-memory split.
 	 */
-	if (page->read_gen != WT_READGEN_OLDEST ||
+	page = ref->page;
+	if (F_ISSET(btree, WT_BTREE_NO_EVICTION) ||
 	    LF_ISSET(WT_READ_NO_EVICT) ||
-	    F_ISSET(btree, WT_BTREE_NO_EVICTION) ||
+	    page->read_gen != WT_READGEN_OLDEST ||
 	    !__wt_page_can_evict(session, page, 1))
 		return (__wt_hazard_clear(session, page));
 

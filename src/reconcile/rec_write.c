@@ -2278,7 +2278,8 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session,
 		    (size_t)r->raw_offsets[slots], &result_len));
 	extra_skip = 0;
 	if (btree->kencryptor != NULL)
-		extra_skip = btree->kencryptor->size_const + WT_ENCRYPT_LEN;
+		extra_skip = btree->kencryptor->size_const +
+		    WT_ENCRYPT_LEN_SIZE + WT_ENCRYPT_CKSUM_SIZE;
 
 	corrected_page_size = result_len + WT_BLOCK_COMPRESS_SKIP;
 	WT_RET(bm->write_size(bm, session, &corrected_page_size));

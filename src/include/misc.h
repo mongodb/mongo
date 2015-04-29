@@ -64,7 +64,8 @@
  * of the original data so that we can detect a bad decryption.
  * Constant value.
  */
-#define	WT_ENCRYPT_LEN	(sizeof(uint32_t) * 2)
+#define	WT_ENCRYPT_LEN_SIZE	sizeof(uint32_t)
+#define	WT_ENCRYPT_CKSUM_SIZE	sizeof(uint32_t)
 
 /*
  * __wt_calloc_def, __wt_calloc_one --
@@ -133,6 +134,33 @@
 #define	FLD_CLR(field, mask)	((field) &= ~((uint32_t)(mask)))
 #define	FLD_ISSET(field, mask)	((field) & ((uint32_t)(mask)))
 #define	FLD_SET(field, mask)	((field) |= ((uint32_t)(mask)))
+
+/*
+ * Insertion sort, for sorting small sets of values.
+ *
+ * The "compare_lt" argument is a function or macro that returns true when
+ * its first argument is less than its second argument.
+ */
+#define	WT_INSERTION_SORT(arrayp, n, value_type, compare_lt) do {	\
+	value_type __v;							\
+	int __i, __j, __n = (int)(n);					\
+	if (__n == 2) {							\
+		__v = (arrayp)[1];					\
+		if (compare_lt(__v, (arrayp)[0])) {			\
+			(arrayp)[1] = (arrayp)[0];			\
+			(arrayp)[0] = __v;				\
+		}							\
+	}								\
+	if (__n > 2) {							\
+		for (__i = 1; __i < __n; ++__i) {			\
+			__v = (arrayp)[__i];				\
+			for (__j = __i - 1; __j >= 0 &&			\
+			    compare_lt(__v, (arrayp)[__j]); --__j)	\
+				(arrayp)[__j + 1] = (arrayp)[__j];	\
+			(arrayp)[__j + 1] = __v;			\
+		}							\
+	}								\
+} while (0)
 
 /* Verbose messages. */
 #ifdef HAVE_VERBOSE

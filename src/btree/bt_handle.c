@@ -191,8 +191,7 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 	int64_t maj_version, min_version;
 	uint32_t bitcnt;
 	int fixed;
-	const char **cfg;
-	const char *enc_cfg[] = { NULL, NULL };
+	const char **cfg, *enc_cfg[] = { NULL, NULL };
 
 	btree = S2BT(session);
 	cfg = btree->dhandle->cfg;
@@ -259,13 +258,13 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 
 	/* Eviction; the metadata file is never evicted. */
 	if (WT_IS_METADATA(btree->dhandle))
-		F_SET(btree, WT_BTREE_NO_EVICTION | WT_BTREE_NO_HAZARD);
+		F_SET(btree, WT_BTREE_IN_MEMORY | WT_BTREE_NO_EVICTION);
 	else {
 		WT_RET(__wt_config_gets(session, cfg, "cache_resident", &cval));
 		if (cval.val)
-			F_SET(btree, WT_BTREE_NO_EVICTION | WT_BTREE_NO_HAZARD);
+			F_SET(btree, WT_BTREE_IN_MEMORY | WT_BTREE_NO_EVICTION);
 		else
-			F_CLR(btree, WT_BTREE_NO_EVICTION);
+			F_CLR(btree, WT_BTREE_IN_MEMORY | WT_BTREE_NO_EVICTION);
 	}
 
 	/* Checksums */
@@ -312,7 +311,7 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 	WT_RET(__wt_config_gets_none(session, cfg, "block_compressor", &cval));
 	WT_RET(__wt_compressor_config(session, &cval, &btree->compressor));
 
-	if (WT_IS_METADATA(btree->dhandle) && conn->kencryptor != NULL)
+	if (WT_IS_METADATA(btree->dhandle))
 		btree->kencryptor = conn->kencryptor;
 	else {
 		WT_RET(__wt_config_gets_none(
@@ -529,8 +528,11 @@ __wt_btree_evictable(WT_SESSION_IMPL *session, int on)
 
 	btree = S2BT(session);
 
-	/* The metadata file is never evicted. */
-	if (on && !WT_IS_METADATA(btree->dhandle))
+	/* Permanently cache-resident files can never be evicted. */
+	if (F_ISSET(btree, WT_BTREE_IN_MEMORY))
+		return;
+
+	if (on)
 		F_CLR(btree, WT_BTREE_NO_EVICTION);
 	else
 		F_SET(btree, WT_BTREE_NO_EVICTION);

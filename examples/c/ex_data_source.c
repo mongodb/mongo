@@ -612,25 +612,25 @@ main(void)
 	/*! [WT_DATA_SOURCE configure boolean] */
 	/* my_boolean defaults to true. */
 	ret = conn->configure_method(conn,
-	    "session.open_cursor", NULL, "my_boolean=true", "boolean", NULL);
+	    "WT_SESSION.open_cursor", NULL, "my_boolean=true", "boolean", NULL);
 	/*! [WT_DATA_SOURCE configure boolean] */
 
 	/*! [WT_DATA_SOURCE configure integer] */
 	/* my_integer defaults to 5. */
 	ret = conn->configure_method(conn,
-	    "session.open_cursor", NULL, "my_integer=5", "int", NULL);
+	    "WT_SESSION.open_cursor", NULL, "my_integer=5", "int", NULL);
 	/*! [WT_DATA_SOURCE configure integer] */
 
 	/*! [WT_DATA_SOURCE configure string] */
 	/* my_string defaults to "name". */
 	ret = conn->configure_method(conn,
-	    "session.open_cursor", NULL, "my_string=name", "string", NULL);
+	    "WT_SESSION.open_cursor", NULL, "my_string=name", "string", NULL);
 	/*! [WT_DATA_SOURCE configure string] */
 
 	/*! [WT_DATA_SOURCE configure list] */
 	/* my_list defaults to "first" and "second". */
 	ret = conn->configure_method(conn,
-	    "session.open_cursor",
+	    "WT_SESSION.open_cursor",
 	    NULL, "my_list=[first, second]", "list", NULL);
 	/*! [WT_DATA_SOURCE configure list] */
 
@@ -639,7 +639,8 @@ main(void)
 	 * Limit the number of devices to between 1 and 30; the default is 5.
 	 */
 	ret = conn->configure_method(conn,
-	    "session.open_cursor", NULL, "devices=5", "int", "min=1, max=30");
+	    "WT_SESSION.open_cursor",
+	    NULL, "devices=5", "int", "min=1, max=30");
 	/*! [WT_DATA_SOURCE configure integer with checking] */
 
 	/*! [WT_DATA_SOURCE configure string with checking] */
@@ -648,7 +649,7 @@ main(void)
 	 * to /home.
 	 */
 	ret = conn->configure_method(conn,
-	    "session.open_cursor", NULL, "target=/home", "string",
+	    "WT_SESSION.open_cursor", NULL, "target=/home", "string",
 	    "choices=[/device, /home, /target]");
 	/*! [WT_DATA_SOURCE configure string with checking] */
 
@@ -658,7 +659,7 @@ main(void)
 	 * /target; default to /mnt.
 	 */
 	ret = conn->configure_method(conn,
-	    "session.open_cursor", NULL, "paths=[/mnt]", "list",
+	    "WT_SESSION.open_cursor", NULL, "paths=[/mnt]", "list",
 	    "choices=[/device, /home, /mnt, /target]");
 	/*! [WT_DATA_SOURCE configure list with checking] */
 
