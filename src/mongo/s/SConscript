@@ -2,6 +2,14 @@
 
 Import("env")
 
+env.SConscript(
+    dirs=[
+        'catalog',
+        'client',
+        'commands',
+    ],
+)
+
 #
 # Schema and backward compatibility code for "config" collections.
 #

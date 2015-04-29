@@ -2,6 +2,12 @@
 
 Import("env")
 
+env.SConscript(
+    dirs=[
+        'legacy',
+    ],
+)
+
 env.Library(
     target='catalog_types',
     source=[

@@ -5,6 +5,16 @@ Import("get_option")
 Import("has_option")
 Import("use_system_version_of_library")
 
+env.SConscript(
+    dirs=[
+        'cmdline_utils',
+        'concurrency',
+        'mongoutils',
+        'net',
+        'options_parser',
+    ],
+)
+
 env.Library(
     target='intrusive_counter',
     source=[

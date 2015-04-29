@@ -2,6 +2,12 @@
 
 Import("env")
 
+env.SConscript(
+    dirs=[
+        'tom',
+    ],
+)
+
 env.Library('crypto_tom',
            ['crypto_tom.cpp'],
            LIBDEPS=['tom/tomcrypt'])

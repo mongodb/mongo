@@ -1,5 +1,16 @@
 Import("env")
 
+env.SConscript(
+    dirs=[
+        'devnull',
+        'in_memory',
+        'kv',
+        'mmap_v1',
+        'wiredtiger',
+    ],
+)
+
+
 env.Library(
     target='index_entry_comparison',
     source=[

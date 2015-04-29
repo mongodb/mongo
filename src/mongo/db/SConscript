@@ -2,6 +2,27 @@
 
 Import("env")
 
+env.SConscript(
+    dirs=[
+        'auth',
+        'catalog',
+        'commands',
+        'concurrency',
+        'exec',
+        'fts',
+        'geo',
+        'index',
+        'matcher',
+        'ops',
+        'pipeline',
+        'query',
+        'repl',
+        'sorter',
+        'stats',
+        'storage',
+    ],
+)
+
 #
 # The db/'common' lib has the abstractions that are shared by components of the
 # server. Ideally, many of the object in 'coredb' should be moved here when their dependencies
