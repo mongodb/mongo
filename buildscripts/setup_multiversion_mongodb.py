@@ -6,6 +6,7 @@ import os
 import tempfile
 import urllib2
 import subprocess
+import httplib
 import tarfile
 import shutil
 import errno
@@ -56,10 +57,12 @@ class MultiVersionDownloader :
         return self._links
 
     def download_links(self):
-        href = "http://dl.mongodb.org/dl/%s/%s" \
-               % (self.platform.lower(), self.arch)
-
-        html = urllib2.urlopen(href).read()
+        href = "http://dl.mongodb.org"
+        domain = httplib.HTTPConnection('dl.mongodb.org')
+        domain.connect()
+        domain.request('GET', "/dl/%s/%s"  % (self.platform.lower(), self.arch))
+        response = domain.getresponse()
+        html = response.read()
 
         links = {}
         for line in html.split():
