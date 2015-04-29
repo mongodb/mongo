@@ -327,17 +327,6 @@ coredbEnv.Library("coredb", [
                            '$BUILD_DIR/mongo/client/clientdriver',
                            ])
 
-env.Library('ntservice', ['util/ntservice.cpp'],
-            LIBDEPS=['util/foundation',
-                     '$BUILD_DIR/mongo/util/options_parser/options_parser'])
-if env.TargetOSIs('windows'):
-    env.CppUnitTest('ntservice_test', 'util/ntservice_test.cpp',
-                    LIBDEPS=['ntservice'],
-                    LIBS=['shell32', env['LIBS']],
-                    NO_CRUTCH=True)
-
-env.Library('ntservice_mock', ['util/ntservice_mock.cpp'])
-
 env.Library(
     target='scripting_common',
     source=[
@@ -676,7 +665,7 @@ env.CppUnitTest("scoped_db_conn_test", [ "client/scoped_db_conn_test.cpp" ],
                     "mongocommon",
                     "message_server_port",
                     "mongoscore",
-                    "ntservice_mock"],
+                    "util/ntservice_mock"],
                  NO_CRUTCH=True)
 
 env.CppUnitTest('config_server_tests', [ 's/config_server_tests.cpp' ],
@@ -710,7 +699,7 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/serveronly",
         "$BUILD_DIR/mongo/coreserver",
         "$BUILD_DIR/mongo/coredb",
-        "$BUILD_DIR/mongo/ntservice_mock",
+        "$BUILD_DIR/mongo/util/ntservice_mock",
     ],
     NO_CRUTCH = True,
 )
@@ -724,7 +713,7 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/serveronly",
         "$BUILD_DIR/mongo/coreserver",
         "$BUILD_DIR/mongo/coredb",
-        "$BUILD_DIR/mongo/ntservice_mock",
+        "$BUILD_DIR/mongo/util/ntservice_mock",
     ],
     NO_CRUTCH = True,
 )
@@ -738,7 +727,7 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/serveronly",
         "$BUILD_DIR/mongo/coreserver",
         "$BUILD_DIR/mongo/coredb",
-        "$BUILD_DIR/mongo/ntservice_mock",
+        "$BUILD_DIR/mongo/util/ntservice_mock",
     ],
     NO_CRUTCH = True,
 )
@@ -886,7 +875,7 @@ mongod = env.Install(
             "coreserver",
             "mongodandmongos",
             "mongodwebserver",
-            "ntservice",
+            "util/ntservice",
             "serveronly",
             "mongod_options",
         ]))
@@ -906,7 +895,7 @@ env.Install(
                         "tools/mongobridge_options_init.cpp"
                     ],
                     LIBDEPS=[
-                        "ntservice_mock",
+                        "util/ntservice_mock",
                         "serveronly",
                         "coreserver",
                         "coredb",
@@ -918,7 +907,7 @@ env.Install(
                         "client/examples/mongoperf.cpp",
                     ],
                     LIBDEPS=[
-                        "ntservice_mock",
+                        "util/ntservice_mock",
                         "serveronly",
                         "coreserver",
                         "coredb",
@@ -945,7 +934,7 @@ env.Install(
             "coredb",
             "mongocommon",
             "coreshard",
-            "ntservice",
+            "util/ntservice",
             "mongodandmongos",
             '$BUILD_DIR/mongo/util/options_parser/options_parser_init',
         ]))
