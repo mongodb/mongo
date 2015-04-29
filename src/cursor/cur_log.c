@@ -245,8 +245,7 @@ __curlog_next(WT_CURSOR *cursor)
 	WT_STAT_FAST_CONN_INCR(session, cursor_next);
 	WT_STAT_FAST_DATA_INCR(session, cursor_next);
 
-err:	
-	API_END_RET(session, ret);
+err:	API_END_RET(session, ret);
 
 }
 
