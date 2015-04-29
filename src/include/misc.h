@@ -61,7 +61,7 @@
 /*
  * Encryption needs to know its original length before either the
  * block or logging subsystems pad.  We also store a 32-bit checksum
- * of the original data so that we can detect a bad decryption.  But
+ * of the original data so that we can detect a bad decryption.
  * Constant value.
  */
 #define	WT_ENCRYPT_LEN_SIZE	sizeof(uint32_t)
