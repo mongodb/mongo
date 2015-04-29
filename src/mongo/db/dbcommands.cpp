@@ -604,7 +604,6 @@ namespace mongo {
                 // We drop and re-acquire these locks every document because md5'ing is expensive
                 scoped_ptr<AutoGetCollectionForRead> ctx(new AutoGetCollectionForRead(txn, ns));
                 Collection* coll = ctx->getCollection();
-                const ChunkVersion shardVersionAtStart = shardingState.getVersion(ns);
 
                 PlanExecutor* rawExec;
                 if (!getExecutor(txn, coll, cq, PlanExecutor::YIELD_MANUAL, &rawExec,
