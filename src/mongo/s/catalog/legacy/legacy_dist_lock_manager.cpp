@@ -30,7 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/legacy_dist_lock_manager.h"
+#include "mongo/s/catalog/legacy/legacy_dist_lock_manager.h"
 
 #include "mongo/s/type_locks.h"
 #include "mongo/stdx/memory.h"

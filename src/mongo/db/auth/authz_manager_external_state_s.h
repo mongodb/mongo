@@ -35,7 +35,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/auth/authz_manager_external_state.h"
 #include "mongo/db/auth/user_name.h"
-#include "mongo/s/dist_lock_manager.h"
+#include "mongo/s/catalog/dist_lock_manager.h"
 #include "mongo/stdx/functional.h"
 
 

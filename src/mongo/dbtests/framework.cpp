@@ -49,7 +49,7 @@
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/d_state.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/legacy_dist_lock_manager.h"
+#include "mongo/s/catalog/legacy/legacy_dist_lock_manager.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/background.h"
 #include "mongo/util/concurrency/mutex.h"

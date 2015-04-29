@@ -28,56 +28,35 @@
 
 #pragma once
 
-#include <boost/thread.hpp>
-#include <map>
-#include <memory>
-
-#include "mongo/bson/oid.h"
-#include "mongo/client/connection_string.h"
+#include "mongo/client/dbclientinterface.h"
 #include "mongo/s/dist_lock_manager.h"
-#include "mongo/s/distlock.h"
-#include "mongo/s/legacy_dist_lock_pinger.h"
-#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
-    class DistributedLock;
+    class CatalogManager;
 
-    class LegacyDistLockManager: public DistLockManager {
+    class ReplSetDistLockManager: public DistLockManager {
     public:
-        explicit LegacyDistLockManager(ConnectionString configServer);
+        ReplSetDistLockManager(CatalogManager* lockCatalogue);
 
-        virtual ~LegacyDistLockManager() = default;
+        virtual ~ReplSetDistLockManager() = default;
 
-        virtual void startUp() override;
-        virtual void shutDown() override;
+        virtual void startUp();
+        virtual void shutDown();
 
         virtual StatusWith<DistLockManager::ScopedDistLock> lock(
                 StringData name,
                 StringData whyMessage,
                 stdx::chrono::milliseconds waitFor,
-                stdx::chrono::milliseconds lockTryInterval) override;
+                stdx::chrono::milliseconds lockTryInterval);
 
-        // For testing only.
-        void enablePinger(bool enable);
-
-    private:
+    protected:
         virtual void unlock(const DistLockHandle& lockHandle) BOOST_NOEXCEPT;
 
         virtual Status checkStatus(const DistLockHandle& lockHandle);
 
-        const ConnectionString _configServer;
-
-        boost::mutex _mutex;
-        boost::condition_variable _noLocksCV;
-        std::map<DistLockHandle, std::unique_ptr<DistributedLock>> _lockMap;
-
-        std::unique_ptr<LegacyDistLockPinger> _pinger;
-
-        bool _isStopped;
-
-        // For testing only.
-        bool _pingerEnabled;
+    private:
+        CatalogManager* _lockCatalogue; // Not owned here.
     };
 
 }

@@ -30,7 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/dist_lock_manager.h"
+#include "mongo/s/catalog/dist_lock_manager.h"
 
 #include <memory>
 

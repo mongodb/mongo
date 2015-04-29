@@ -29,7 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/distlock.h"
+#include "mongo/s/catalog/legacy/distlock.h"
 
 #include <boost/scoped_ptr.hpp>
 

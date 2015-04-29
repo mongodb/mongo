@@ -37,7 +37,7 @@
 
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/legacy_dist_lock_manager.h"
+#include "mongo/s/catalog/legacy/legacy_dist_lock_manager.h"
 #include "mongo/s/d_state.h"
 #include "mongo/s/type_config_version.h"
 #include "mongo/stdx/memory.h"

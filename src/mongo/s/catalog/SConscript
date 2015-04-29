@@ -55,3 +55,14 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/s/catalog/catalog_types'
     ]
 )
+
+env.Library(
+    target='dist_lock_manager',
+    source=[
+        'dist_lock_manager.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base/base',
+    ],
+)
+

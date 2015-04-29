@@ -31,7 +31,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/distlock.h"
+#include "mongo/s/catalog/legacy/distlock.h"
 
 #include <boost/shared_ptr.hpp>
 #include <boost/thread/thread.hpp>
@@ -45,7 +45,7 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/s/legacy_dist_lock_pinger.h"
+#include "mongo/s/catalog/legacy/legacy_dist_lock_pinger.h"
 #include "mongo/util/bson_util.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/log.h"

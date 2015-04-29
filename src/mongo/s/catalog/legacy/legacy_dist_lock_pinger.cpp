@@ -30,12 +30,12 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/legacy_dist_lock_pinger.h"
+#include "mongo/s/catalog/legacy/legacy_dist_lock_pinger.h"
 
 #include <boost/thread.hpp>
 
 #include "mongo/client/connpool.h"
-#include "mongo/s/distlock.h"
+#include "mongo/s/catalog/legacy/distlock.h"
 #include "mongo/s/type_lockpings.h"
 #include "mongo/s/type_locks.h"
 #include "mongo/util/exit.h"

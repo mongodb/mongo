@@ -233,18 +233,6 @@ env.CppUnitTest(
     ]
 )
 
-env.Library(
-    target='dist_lock',
-    source=[
-        'dist_lock_manager.cpp',
-        'legacy_dist_lock_manager.cpp',
-        'legacy_dist_lock_pinger.cpp',
-    ],
-    LIBDEPS=[
-        'base',
-    ],
-)
-
 # This library contains sharding functionality used by both mongod and mongos. Certain tests,
 # which exercise this functionality also link against it.
 env.Library(
@@ -255,7 +243,6 @@ env.Library(
         'chunk.cpp',
         'chunk_manager.cpp',
         'config.cpp',
-        'distlock.cpp',
         'grid.cpp',
         'shard_key_pattern.cpp',
         'version_manager.cpp',
@@ -263,8 +250,7 @@ env.Library(
     LIBDEPS=[
         'base',
         'client/sharding_client',
-        'cluster_ops_impl',
-        'dist_lock',
+        'cluster_ops_impl'
     ]
 )
 

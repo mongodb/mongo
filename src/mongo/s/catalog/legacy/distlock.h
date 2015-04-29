@@ -33,7 +33,7 @@
 #include "mongo/client/connpool.h"
 #include "mongo/client/syncclusterconnection.h"
 #include "mongo/logger/labeled_level.h"
-#include "mongo/s/dist_lock_manager.h"
+#include "mongo/s/catalog/dist_lock_manager.h"
 
 namespace mongo {
 

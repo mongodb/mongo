@@ -46,7 +46,7 @@
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/commands/cluster_commands_common.h"
 #include "mongo/s/config.h"
-#include "mongo/s/dist_lock_manager.h"
+#include "mongo/s/catalog/dist_lock_manager.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/strategy.h"
 #include "mongo/stdx/chrono.h"
