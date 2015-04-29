@@ -138,14 +138,6 @@ env.CppUnitTest('oid_test', ['bson/oid_test.cpp'],
 env.CppUnitTest('bson_extract_test', ['bson/util/bson_extract_test.cpp'], LIBDEPS=['bson'])
 env.CppUnitTest('bson_check_test', ['bson/util/bson_check_test.cpp'], LIBDEPS=['bson'])
 
-env.Library('lasterror', [
-            "db/lasterror.cpp",
-            ],
-            LIBDEPS=[
-                'service_context',
-                'util/foundation',
-            ])
-
 def getSysInfo():
     if env.TargetOSIs("windows"):
         return "windows " + str( sys.getwindowsversion() )
@@ -230,8 +222,8 @@ env.Library('mongocommon', commonFiles,
                      '$BUILD_DIR/mongo/client/clientdriver',
                      'util/fail_point',
                      'util/foundation',
-                     'service_context',
-                     'lasterror',
+                     'db/service_context',
+                     'db/lasterror',
                      'db/mongohasher',
                      'db/namespace_string',
                      'util/net/network',
@@ -325,20 +317,6 @@ coredbEnv.Library("coredb", [
                            '$BUILD_DIR/mongo/logger/parse_log_component_settings',
                            '$BUILD_DIR/mongo/client/clientdriver',
                            ])
-
-env.Library(
-    target='service_context',
-    source=[
-        'db/client.cpp',
-        'db/client_basic.cpp',
-        'db/service_context.cpp',
-        'db/service_context_noop.cpp',
-    ],
-    LIBDEPS=[
-        'util/concurrency/spin_lock',
-        'util/decorable',
-        'util/net/hostandport',
-         ])
 
 # mongod files - also files used in tools. present in dbtests, but not in mongos and not in client
 # libs.

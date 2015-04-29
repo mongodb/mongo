@@ -170,7 +170,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson',
         '$BUILD_DIR/mongo/db/common', # for Message
-        '$BUILD_DIR/mongo/lasterror',
+        '$BUILD_DIR/mongo/db/lasterror',
         'cluster_ops',
     ],
 )

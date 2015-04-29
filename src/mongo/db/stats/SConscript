@@ -8,7 +8,7 @@ env.Library(
         'top.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/service_context',
+        '$BUILD_DIR/mongo/db/service_context',
     ],
 )
 

@@ -50,7 +50,7 @@ env.Library('authorization_manager_global',
             ],
             LIBDEPS=[
                 'authcore',
-                '$BUILD_DIR/mongo/service_context',
+                '$BUILD_DIR/mongo/db/service_context',
             ])
 
 env.Library('authservercommon',
