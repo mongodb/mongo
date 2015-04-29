@@ -311,7 +311,7 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 	WT_RET(__wt_config_gets_none(session, cfg, "block_compressor", &cval));
 	WT_RET(__wt_compressor_config(session, &cval, &btree->compressor));
 
-	if (WT_IS_METADATA(btree->dhandle) && conn->kencryptor != NULL)
+	if (WT_IS_METADATA(btree->dhandle))
 		btree->kencryptor = conn->kencryptor;
 	else {
 		WT_RET(__wt_config_gets_none(
