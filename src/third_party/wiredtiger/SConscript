@@ -20,6 +20,9 @@ if debugBuild:
 
 if env.TargetOSIs('windows'):
     env.Append(CPPPATH=["build_win"])
+    env.Append(CFLAGS=[
+        "/wd4090" # Ignore warning about mismatched const qualifiers
+    ])
 elif env.TargetOSIs('osx'):
     env.Append(CPPPATH=["build_darwin"])
 elif env.TargetOSIs('solaris'):
