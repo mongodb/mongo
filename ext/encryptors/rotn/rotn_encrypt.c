@@ -67,14 +67,16 @@
 
 /* Local encryptor structure. */
 typedef struct {
-	WT_ENCRYPTOR encryptor;	/* Must come first */
-	WT_EXTENSION_API *wt_api; /* Extension API */
-	uint32_t rot_N;		/* rotN value */
-	char *keyid;		/* Saved keyid */
+	WT_ENCRYPTOR encryptor;		/* Must come first */
+
+	WT_EXTENSION_API *wt_api;	/* Extension API */
+
+	uint32_t rot_N;			/* rotN value */
+	char *keyid;			/* Saved keyid */
 	char *secretkey;		/* Saved secretkey */
-	unsigned char *shift_forw; /* Encrypt shift data from secretkey */
-	unsigned char *shift_back; /* Decrypt shift data from secretkey */
-	size_t shift_len;	/* Length of shift* byte arrays */
+	unsigned char *shift_forw;	/* Encrypt shift data from secretkey */
+	unsigned char *shift_back;	/* Decrypt shift data from secretkey */
+	size_t shift_len;		/* Length of shift* byte arrays */
 
 } ROTN_ENCRYPTOR;
 /*! [WT_ENCRYPTOR initialization structure] */
