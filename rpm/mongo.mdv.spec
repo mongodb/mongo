@@ -1,5 +1,5 @@
 %define name    mongodb
-%define version 2.4.14
+%define version 2.4.15-pre-
 %define release %mkrel 1
 
 Name:    %{name}
