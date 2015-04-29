@@ -310,7 +310,7 @@ rotate_customize(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 
 	++my_crypto->num_calls;		/* Call count */
 
-	*customp = &my_crypto->encryptor;
+	*customp = (WT_ENCRYPTOR *)my_crypto;
 	return (0);
 
 err:	free(my_crypto->keyid);

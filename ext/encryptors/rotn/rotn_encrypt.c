@@ -74,8 +74,8 @@ typedef struct {
 	uint32_t rot_N;			/* rotN value */
 	char *keyid;			/* Saved keyid */
 	char *secretkey;		/* Saved secretkey */
-	unsigned char *shift_forw;	/* Encrypt shift data from secretkey */
-	unsigned char *shift_back;	/* Decrypt shift data from secretkey */
+	u_char *shift_forw;		/* Encrypt shift data from secretkey */
+	u_char *shift_back;		/* Decrypt shift data from secretkey */
 	size_t shift_len;		/* Length of shift* byte arrays */
 
 } ROTN_ENCRYPTOR;
@@ -89,7 +89,7 @@ typedef struct {
  *	This is where one would call a checksum function on the encrypted
  *	buffer.  Here we just put random values in it.
  */
-static int
+static void
 make_cksum(uint8_t *dst)
 {
 	int i;
@@ -98,7 +98,6 @@ make_cksum(uint8_t *dst)
 	 */
 	for (i = 0; i < CHKSUM_LEN; i++)
 		dst[i] = (uint8_t)random();
-	return (0);
 }
 
 /*
@@ -106,7 +105,7 @@ make_cksum(uint8_t *dst)
  *	This is where one would generate the initialization vector.
  *	Here we just put random values in it.
  */
-static int
+static void
 make_iv(uint8_t *dst)
 {
 	int i;
@@ -115,7 +114,6 @@ make_iv(uint8_t *dst)
 	 */
 	for (i = 0; i < IV_LEN; i++)
 		dst[i] = (uint8_t)random();
-	return (0);
 }
 
 /*
@@ -135,9 +133,9 @@ do_rotate(uint8_t *buf, size_t len, uint32_t rotn)
 	for (i = 0; i < len; i++) {
 		if (isalpha(buf[i])) {
 			if (islower(buf[i]))
-				buf[i] = (buf[i] - 'a' + rotn) % 26 + 'a';
+				buf[i] = ((buf[i] - 'a') + rotn) % 26 + 'a';
 			else
-				buf[i] = (buf[i] - 'A' + rotn) % 26 + 'A';
+				buf[i] = ((buf[i] - 'A') + rotn) % 26 + 'A';
 		}
 	}
 }
@@ -147,7 +145,7 @@ do_rotate(uint8_t *buf, size_t len, uint32_t rotn)
  *	Perform a Vigenere cipher
  */
 static void
-do_shift(uint8_t *buf, size_t len, unsigned char *shift, size_t shiftlen)
+do_shift(uint8_t *buf, size_t len, u_char *shift, size_t shiftlen)
 {
 	uint32_t i;
 	/*
@@ -225,7 +223,7 @@ rotn_decrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	/*
 	 * Make sure it is big enough.
 	 */
-	mylen = src_len - CHKSUM_LEN - IV_LEN;
+	mylen = src_len - (CHKSUM_LEN + IV_LEN);
 	if (dst_len < mylen) {
 		fprintf(stderr, "Rotate: ENOMEM ERROR\n");
 		return (ENOMEM);
@@ -285,13 +283,13 @@ static int
 rotn_customize(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
     WT_CONFIG_ARG *encrypt_config, WT_ENCRYPTOR **customp)
 {
-	int ret, keyid_val;
 	const ROTN_ENCRYPTOR *orig;
-	size_t i, len;
-	unsigned char base;
 	ROTN_ENCRYPTOR *rotn_encryptor;
 	WT_CONFIG_ITEM keyid, secret;
 	WT_EXTENSION_API *wt_api;
+	size_t i, len;
+	int ret, keyid_val;
+	u_char base;
 
 	ret = 0;
 	keyid_val = 0;
@@ -347,9 +345,11 @@ rotn_customize(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 				ret = EINVAL;
 				goto err;
 			}
-			base -= keyid_val;
-			rotn_encryptor->shift_forw[i] = secret.str[i] - base;
-			rotn_encryptor->shift_back[i] = base - secret.str[i];
+			base -= (u_char)keyid_val;
+			rotn_encryptor->shift_forw[i] =
+			    (u_char)secret.str[i] - base;
+			rotn_encryptor->shift_back[i] =
+			    base - (u_char)secret.str[i];
 		}
 		rotn_encryptor->shift_len = len;
 		strncpy(rotn_encryptor->secretkey, secret.str, secret.len + 1);
@@ -360,9 +360,9 @@ rotn_customize(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	 * In a real encryptor, we could use some sophisticated key management
 	 * here to map the keyid onto a secret key.
 	 */
-	rotn_encryptor->rot_N = keyid_val;
+	rotn_encryptor->rot_N = (uint32_t)keyid_val;
 
-	*customp = &rotn_encryptor->encryptor;
+	*customp = (WT_ENCRYPTOR *)rotn_encryptor;
 	return (0);
 
 err:	free(rotn_encryptor->keyid);
