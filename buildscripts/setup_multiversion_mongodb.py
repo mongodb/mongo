@@ -7,6 +7,9 @@ import tempfile
 import urllib2
 import subprocess
 import tarfile
+import signal
+import threading
+import traceback
 import shutil
 import errno
 # To ensure it exists on the system
@@ -16,6 +19,20 @@ import gzip
 # Useful script for installing multiple versions of MongoDB on a machine
 # Only really tested/works on Linux.
 #
+
+def dump_stacks(signal, frame):
+    print "======================================"
+    print "DUMPING STACKS due to SIGUSR1 signal"
+    print "======================================"
+    threads = threading.enumerate();
+
+    print "Total Threads: " + str(len(threads))
+
+    for id, stack in sys._current_frames().items():
+        print "Thread %d" % (id)
+        print "".join(traceback.format_stack(stack))
+    print "======================================"
+
 
 def version_tuple(version):
     """Returns a version tuple that can be used for numeric sorting
@@ -214,6 +231,12 @@ def parse_cl_args(args):
     return (MultiVersionDownloader(install_dir, link_dir, platform), versions)
 
 def main():
+
+    # Listen for SIGUSR1 and dump stack if received.
+    try:
+        signal.signal(signal.SIGUSR1, dump_stacks)
+    except AttributeError:
+        print "Cannot catch signals on Windows"
 
     downloader, versions = parse_cl_args(sys.argv[1:])
 
