@@ -118,14 +118,13 @@ do_rotate(uint8_t *buf, size_t len, uint32_t rotn)
 	/*
 	 * Now rotate
 	 */
-	for (i = 0; i < len; i++) {
+	for (i = 0; i < len; i++)
 		if (isalpha(buf[i])) {
 			if (islower(buf[i]))
 				buf[i] = ((buf[i] - 'a') + rotn) % 26 + 'a';
 			else
 				buf[i] = ((buf[i] - 'A') + rotn) % 26 + 'A';
 		}
-	}
 }
 
 /*
@@ -311,7 +310,7 @@ rotate_customize(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 
 	++my_crypto->num_calls;		/* Call count */
 
-	*customp = &my_crypto->encryptor;
+	*customp = (WT_ENCRYPTOR *)my_crypto;
 	return (0);
 
 err:	free(my_crypto->keyid);
@@ -388,8 +387,8 @@ static int
 simple_walk_log(WT_SESSION *session)
 {
 	WT_CURSOR *cursor;
-	WT_LSN lsn;
 	WT_ITEM logrec_key, logrec_value;
+	WT_LSN lsn;
 	uint64_t txnid;
 	uint32_t fileid, opcount, optype, rectype;
 	int found, ret;
@@ -438,8 +437,8 @@ int
 main(void)
 {
 	WT_CONNECTION *conn;
-	WT_SESSION *session;
 	WT_CURSOR *c1, *c2, *nc;
+	WT_SESSION *session;
 	int i, ret;
 	char keybuf[16], valbuf[16];
 	char *key1, *key2, *key3, *val1, *val2, *val3;
@@ -527,8 +526,7 @@ main(void)
 			ret = session->log_printf(session,
 			    "Wrote %d records", i);
 	}
-	ret = session->log_printf(session,
-	    "Done. Wrote %d total records", i);
+	ret = session->log_printf(session, "Done. Wrote %d total records", i);
 
 	while (c1->next(c1) == 0) {
 		ret = c1->get_key(c1, &key1);

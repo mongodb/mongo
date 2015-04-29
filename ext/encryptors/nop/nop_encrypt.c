@@ -63,7 +63,7 @@ nop_encrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	++nop_encryptor->nop_calls;		/* Call count */
 
 	if (dst_len < src_len)
-		return (EINVAL);
+		return (ENOMEM);
 
 	memcpy(dst, src, src_len);
 	*result_lenp = src_len;
