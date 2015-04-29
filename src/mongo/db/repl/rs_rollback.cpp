@@ -34,11 +34,13 @@
 #include "mongo/db/client.h"
 #include "mongo/db/cloner.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/ops/update_request.h"
 #include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/query/internal_plans.h"
+#include "mongo/db/query/runner.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/rs.h"
 
@@ -450,12 +452,38 @@ namespace mongo {
             sethbmsg("rollback 4.3");
         }
 
+        map<string,shared_ptr<Helpers::RemoveSaver> > removeSavers;
+
         sethbmsg("rollback 4.6");
         /** drop collections to drop before doing individual fixups - that might make things faster below actually if there were subsequent inserts to rollback */
         for( set<string>::iterator i = h.toDrop.begin(); i != h.toDrop.end(); i++ ) {
             Client::Context c(*i);
             try {
                 log() << "replSet rollback drop: " << *i << rsLog;
+                shared_ptr<Helpers::RemoveSaver>& removeSaver = removeSavers[*i];
+                if (!removeSaver)
+                    removeSaver.reset(new Helpers::RemoveSaver("rollback", "", *i));
+
+                // perform a collection scan and write all documents in the collection to disk
+                boost::scoped_ptr<Runner> runner(InternalPlanner::collectionScan(*i));
+                BSONObj curObj;
+                Runner::RunnerState runnerState;
+                while (Runner::RUNNER_ADVANCED == (runnerState = runner->getNext(&curObj, NULL))) {
+                    removeSaver->goingToDelete(curObj);
+                }
+                if (runnerState != Runner::RUNNER_EOF) {
+                    if (runnerState == Runner::RUNNER_ERROR) {
+                        severe() << "rolling back createCollection on " << *i
+                            << " failed with " << WorkingSetCommon::toStatusString(curObj)
+                            << ". A full resync is necessary.";
+                    }
+                    else {
+                        severe() << "rolling back createCollection on " << *i
+                            << " failed. A full resync is necessary.";
+                    }
+
+                    throw std::exception();
+                }
                 c.db()->dropCollection(*i);
             }
             catch(...) {
@@ -469,8 +497,6 @@ namespace mongo {
         uassert(13423,
                 str::stream() << "replSet error in rollback can't find " << rsoplog,
                 oplogCollection);
-
-        map<string,shared_ptr<Helpers::RemoveSaver> > removeSavers;
 
         unsigned deletes = 0, updates = 0;
         for( list<pair<DocID,bo> >::iterator i = goodVersions.begin(); i != goodVersions.end(); i++ ) {
