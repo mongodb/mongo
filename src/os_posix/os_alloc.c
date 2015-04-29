@@ -43,6 +43,12 @@ __wt_calloc(WT_SESSION_IMPL *session, size_t number, size_t size, void *retp)
 	void *p;
 
 	/*
+	 * Defensive: if our caller doesn't handle errors correctly, ensure a
+	 * free won't fail.
+	 */
+	*(void **)retp = NULL;
+
+	/*
 	 * !!!
 	 * This function MUST handle a NULL WT_SESSION_IMPL handle.
 	 */
