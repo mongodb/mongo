@@ -1,0 +1,22 @@
+# -*- mode: python; -*-
+
+Import('env')
+
+mongobridge = env.Program(
+    target="mongobridge",
+    source=[
+        "bridge.cpp",
+        "mongobridge_options.cpp",
+        "mongobridge_options_init.cpp"
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/coredb",
+        "$BUILD_DIR/mongo/coreserver",
+        "$BUILD_DIR/mongo/serveronly",
+        "$BUILD_DIR/mongo/util/ntservice_mock",
+        "$BUILD_DIR/mongo/util/options_parser/options_parser_init",
+        "$BUILD_DIR/mongo/util/signal_handlers_synchronous",
+    ],
+)
+
+env.Install("#/", mongobridge)

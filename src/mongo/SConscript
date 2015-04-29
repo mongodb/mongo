@@ -57,6 +57,7 @@ env.SConscript(
         's/client',
         's/commands',
         'scripting',
+        'tools',
         'unittest',
         'util',
         'util/cmdline_utils',
@@ -573,20 +574,6 @@ rewrittenTools = [ "mongodump", "mongorestore", "mongoexport", "mongoimport", "m
 env.Install(
     '#/',
     [
-        env.Program("mongobridge",
-                    [
-                        "tools/bridge.cpp",
-                        "tools/mongobridge_options.cpp",
-                        "tools/mongobridge_options_init.cpp"
-                    ],
-                    LIBDEPS=[
-                        "util/ntservice_mock",
-                        "serveronly",
-                        "coreserver",
-                        "coredb",
-                        "util/signal_handlers_synchronous",
-                        "$BUILD_DIR/mongo/util/options_parser/options_parser_init",
-                    ]),
         env.Program("mongoperf",
                     [
                         "client/examples/mongoperf.cpp",
