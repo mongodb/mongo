@@ -11,6 +11,7 @@ noinst_PROGRAMS = \
 	ex_config_parse \
 	ex_cursor \
 	ex_data_source \
+	ex_encrypt \
 	ex_extending \
 	ex_extractor \
 	ex_hello \
@@ -22,11 +23,7 @@ noinst_PROGRAMS = \
 	ex_stat \
 	ex_thread
 
-if HAVE_BUILTIN_EXTENSION_SNAPPY
-noinst_PROGRAMS += ex_encrypt
-
 ex_encrypt_LDFLAGS = -rdynamic
-endif
 
 # The examples can be run with no arguments as simple smoke tests
 TESTS = $(noinst_PROGRAMS)

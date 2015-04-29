@@ -424,7 +424,7 @@ simple_walk_log(WT_SESSION *session)
 
 #define	WT_OPEN_CONFIG_COMMON \
     "create,cache_size=100MB,extensions=[" EXTENSION_NAME "],"\
-    "log=(archive=false,enabled=true,compressor=snappy)," \
+    "log=(archive=false,enabled=true)," \
 
 #define	WT_OPEN_CONFIG_GOOD \
     WT_OPEN_CONFIG_COMMON \
@@ -482,11 +482,9 @@ main(void)
 	    "encryption=(name=rotn,keyid=" USER1_KEYID"),"
 	    "columns=(value0,key0)");
 	ret = session->create(session, "table:crypto2",
-	    "block_compressor=snappy,"
 	    "encryption=(name=rotn,keyid=" USER2_KEYID"),"
 	    "key_format=S,value_format=S");
 	ret = session->create(session, "table:nocrypto",
-	    "block_compressor=snappy,"
 	    "key_format=S,value_format=S");
 
 	/*
