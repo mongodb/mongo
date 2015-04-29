@@ -686,8 +686,6 @@ __conn_add_encryptor(WT_CONNECTION *wt_conn,
 	WT_SESSION_IMPL *session;
 	int i;
 
-	WT_UNUSED(name);
-	WT_UNUSED(encryptor);
 	nenc = NULL;
 
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
