@@ -734,7 +734,7 @@ namespace {
 
         // there may be pointers pointing at keys in the btree(s).  kill them.
         // TODO: can this can only clear cursors on this index?
-        _collection->getCursorManager()->invalidateAll( false );
+        _collection->getCursorManager()->invalidateAll(false, "all indexes on collection dropped");
 
         // make sure nothing in progress
         massert( 17348,
@@ -862,15 +862,19 @@ namespace {
         if ( !status.isOK() )
             return status;
 
+        // Pulling indexName/indexNamespace out as they are needed post descriptor release.
+        string indexName = entry->descriptor()->indexName();
+        string indexNamespace = entry->descriptor()->indexNamespace();
+
         // there may be pointers pointing at keys in the btree(s).  kill them.
         // TODO: can this can only clear cursors on this index?
-        _collection->getCursorManager()->invalidateAll( false );
+        _collection->getCursorManager()->invalidateAll(false, str::stream() << "index '" 
+                                                                            << indexName 
+                                                                            << "' dropped");
 
         // wipe out stats
         _collection->infoCache()->reset(txn);
 
-        string indexNamespace = entry->descriptor()->indexNamespace();
-        string indexName = entry->descriptor()->indexName();
 
         // --------- START REAL WORK ----------
 
@@ -1105,7 +1109,9 @@ namespace {
 
         // Notify other users of the IndexCatalog that we're about to invalidate 'oldDesc'.
         const bool collectionGoingAway = false;
-        _collection->getCursorManager()->invalidateAll( collectionGoingAway );
+        _collection->getCursorManager()->invalidateAll(collectionGoingAway,
+                                                       str::stream() << "definition of index '" 
+                                                                     << indexName << "' changed");
 
         // Delete the IndexCatalogEntry that owns this descriptor.  After deletion, 'oldDesc' is
         // invalid and should not be dereferenced.

@@ -561,7 +561,7 @@ namespace mongo {
         Status status = _indexCatalog.dropAllIndexes(txn, true);
         if ( !status.isOK() )
             return status;
-        _cursorManager.invalidateAll( false );
+        _cursorManager.invalidateAll(false, "collection truncated");
         _infoCache.reset( txn );
 
         // 3) truncate record store
@@ -585,7 +585,7 @@ namespace mongo {
         dassert(txn->lockState()->isCollectionLockedForMode(ns().toString(), MODE_IX));
         invariant( isCapped() );
 
-        _cursorManager.invalidateAll(false);
+        _cursorManager.invalidateAll(false, "capped collection truncated");
         _recordStore->temp_cappedTruncateAfter( txn, end, inclusive );
     }
 

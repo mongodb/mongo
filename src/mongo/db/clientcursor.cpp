@@ -160,7 +160,7 @@ namespace mongo {
 
     void ClientCursor::kill() {
         if ( _exec.get() )
-            _exec->kill();
+            _exec->kill("cursor killed");
 
         _cursorManager = NULL;
     }

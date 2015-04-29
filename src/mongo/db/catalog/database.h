@@ -128,7 +128,13 @@ namespace mongo {
          */
         Collection* _getOrCreateCollectionInstance(OperationContext* txn, StringData fullns);
 
-        void _clearCollectionCache(OperationContext* txn, StringData fullns );
+        /**
+         * Deregisters and invalidates all cursors on collection 'fullns'.  Callers must specify
+         * 'reason' for why the cache is being cleared.
+         */
+        void _clearCollectionCache(OperationContext* txn, 
+                                   StringData fullns, 
+                                   const std::string& reason);
 
         class AddCollectionChange;
         class RemoveCollectionChange;

@@ -39,6 +39,7 @@
 #include "mongo/db/exec/index_scan.h"
 #include "mongo/db/exec/pipeline_proxy.h"
 #include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/operation_context_impl.h"
@@ -428,7 +429,7 @@ namespace QueryPlanExecutor {
                 // There should be one cursor before invalidation,
                 // and zero cursors after invalidation.
                 ASSERT_EQUALS(1U, numCursors());
-                coll->getCursorManager()->invalidateAll(false);
+                coll->getCursorManager()->invalidateAll(false, "Invalidate Test");
                 ASSERT_EQUALS(0U, numCursors());
             }
         };
@@ -459,12 +460,16 @@ namespace QueryPlanExecutor {
                 // If the cursor is pinned, it sticks around,
                 // even after invalidation.
                 ASSERT_EQUALS(1U, numCursors());
-                collection->getCursorManager()->invalidateAll(false);
+                const std::string invalidateReason("InvalidatePinned Test");
+                collection->getCursorManager()->invalidateAll(false, invalidateReason);
                 ASSERT_EQUALS(1U, numCursors());
 
                 // The invalidation should have killed the runner.
                 BSONObj objOut;
                 ASSERT_EQUALS(PlanExecutor::DEAD, exec->getNext(&objOut, NULL));
+                ASSERT(WorkingSetCommon::isValidStatusMemberObject(objOut));
+                const Status status = WorkingSetCommon::getMemberObjectStatus(objOut);
+                ASSERT(status.reason().find(invalidateReason) != string::npos);
 
                 // Deleting the underlying cursor should cause the
                 // number of cursors to return to 0.

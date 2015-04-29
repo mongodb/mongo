@@ -60,8 +60,11 @@ namespace mongo {
          * @param collectionGoingAway Pass as true if the Collection instance is going away.
          *                            This could be because the db is being closed, or the
          *                            collection/db is being dropped.
+         * @param reason              The motivation for invalidating all cursors. Will be used
+         *                            for error reporting and logging when an operation finds that
+         *                            the cursor it was operating on has been killed.
          */
-        void invalidateAll( bool collectionGoingAway );
+        void invalidateAll(bool collectionGoingAway, const std::string& reason);
 
         /**
          * Broadcast a document invalidation to all relevant PlanExecutor(s).  invalidateDocument

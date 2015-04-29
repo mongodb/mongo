@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
 #include <boost/scoped_ptr.hpp>
 
 #include "mongo/base/status.h"
@@ -307,10 +308,10 @@ namespace mongo {
         /**
          * If we're yielding locks, the database we're operating over or any collection we're
          * relying on may be dropped.  When this happens all cursors and plan executors on that
-         * database and collection are killed or deleted in some fashion. (This is how _killed
-         * gets set.)
+         * database and collection are killed or deleted in some fashion.  Callers must specify
+         * the 'reason' for why this executor is being killed.
          */
-        void kill();
+        void kill(std::string reason);
 
         /**
          * If we're yielding locks, writes may occur to documents that we rely on to keep valid
@@ -392,6 +393,8 @@ namespace mongo {
          */
         Status pickBestPlan(YieldPolicy policy);
 
+        bool killed() { return static_cast<bool>(_killReason); };
+
         // The OperationContext that we're executing within.  We need this in order to release
         // locks.
         OperationContext* _opCtx;
@@ -411,9 +414,9 @@ namespace mongo {
         // What namespace are we operating over?
         std::string _ns;
 
-        // Did somebody drop an index we care about or the namespace we're looking at?  If so,
-        // we'll be killed.
-        bool _killed;
+        // If _killReason has a value, then we have been killed and the value represents the reason
+        // for the kill.
+        boost::optional<std::string> _killReason;
 
         // This is used to handle automatic yielding when allowed by the YieldPolicy. Never NULL.
         // TODO make this a non-pointer member. This requires some header shuffling so that this
