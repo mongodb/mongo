@@ -49,8 +49,7 @@ __evict_exclusive(WT_SESSION_IMPL *session, WT_REF *ref)
  *	Evict a page.
  */
 int
-__wt_evict(
-    WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
+__wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
@@ -116,8 +115,7 @@ __wt_evict(
 		if (__wt_ref_is_root(ref))
 			__wt_ref_out(session, ref);
 		else
-			WT_ERR(
-			    __evict_page_dirty_update(
+			WT_ERR(__evict_page_dirty_update(
 			    session, ref, LF_ISSET(WT_EVICT_EXCLUSIVE)));
 
 		WT_STAT_FAST_CONN_INCR(session, cache_eviction_dirty);
@@ -273,13 +271,14 @@ __evict_child_check(WT_SESSION_IMPL *session, WT_REF *parent)
  */
 static int
 __evict_review(
-    WT_SESSION_IMPL *session,
-    WT_REF *ref,  int *inmem_splitp, uint32_t flags)
+    WT_SESSION_IMPL *session, WT_REF *ref,  int *inmem_splitp, uint32_t flags)
 {
 	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_PAGE_MODIFY *mod;
-	uint32_t reconcile_flags = WT_EVICTING;
+	uint32_t reconcile_flags;
+
+	reconcile_flags = WT_EVICTING;
 
 	/*
 	 * Get exclusive access to the page if our caller doesn't have the tree
@@ -315,8 +314,8 @@ __evict_review(
 	}
 
 	/* Check if the page can be evicted. */
-	if (!LF_ISSET(WT_EVICT_EXCLUSIVE) && !__wt_page_can_evict(session,
-	    page, flags))
+	if (!LF_ISSET(WT_EVICT_EXCLUSIVE) &&
+	    !__wt_page_can_evict(session, page, flags))
 		return (EBUSY);
 
 	/*

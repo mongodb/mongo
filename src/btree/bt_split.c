@@ -1039,7 +1039,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 	 */
 	size = sizeof(WT_PAGE_INDEX) + pindex->entries * sizeof(WT_REF *);
 	WT_TRET(__split_safe_free(session,
-		split_gen, LF_ISSET(WT_EVICT_EXCLUSIVE), pindex, size));
+	    split_gen, LF_ISSET(WT_EVICT_EXCLUSIVE), pindex, size));
 	parent_decr += size;
 
 	/*
@@ -1368,9 +1368,8 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 	 * longer locked, so we cannot safely look at it.
 	 */
 	page = NULL;
-	if ((ret = __split_parent(
-	    session, ref, split_ref, 2,
-	    parent_incr, WT_EVICT_FORCE_SPLIT)) != 0) {
+	if ((ret = __split_parent(session,
+	    ref, split_ref, 2, parent_incr, WT_EVICT_FORCE_SPLIT)) != 0) {
 		/*
 		 * Move the insert list element back to the original page list.
 		 * For simplicity, the previous skip list pointers originally

@@ -51,7 +51,7 @@ __evict_force_check(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 
 	/* If eviction cannot succeed, don't try. */
 	return (__wt_page_can_evict(session,
-		    page, WT_EVICT_CHECK_SPLITS | WT_EVICT_FORCE_SPLIT));
+	    page, WT_EVICT_CHECK_SPLITS | WT_EVICT_FORCE_SPLIT));
 }
 
 /*
