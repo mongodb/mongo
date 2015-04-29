@@ -104,13 +104,24 @@ namespace mongo {
 
         }
 
-        ShardPtr findIfExists( const string& shardName ) {
-            reload();
-
-            boost::lock_guard<boost::mutex> lk( _mutex );
-            ShardMap::iterator i = _lookup.find( shardName );
-            if ( i != _lookup.end() ) return i->second;
+        ShardPtr findUsingLookUp(const string& shardName) {
+            ShardMap::iterator it;
+            {
+                boost::lock_guard<boost::mutex> lk(_mutex);
+                it = _lookup.find(shardName);
+            }
+            if (it != _lookup.end()) return it->second;
             return ShardPtr();
+        }
+
+        ShardPtr findIfExists(const string& shardName) {
+            ShardPtr shard = findUsingLookUp(shardName);
+            if (shard) {
+                return shard;
+            }
+            // if we can't find the shard, we might just need to reload the cache
+            reload();
+            return findUsingLookUp(shardName);
         }
 
         ShardPtr find(const string& ident) {
