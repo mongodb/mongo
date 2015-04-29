@@ -188,7 +188,7 @@ rotn_encrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 		do_rotate(&dst[i], src_len, rotn_encryptor->rot_N);
 	else
 		do_shift(&dst[i], src_len,
-		    rotn_encryptor->shift_forw,  rotn_encryptor->shift_len);
+		    rotn_encryptor->shift_forw, rotn_encryptor->shift_len);
 	/*
 	 * Checksum the encrypted buffer and add the IV.
 	 */
@@ -251,7 +251,7 @@ rotn_decrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 		do_rotate(&dst[0], mylen, 26 - rotn_encryptor->rot_N);
 	else
 		do_shift(&dst[0], mylen,
-		    rotn_encryptor->shift_back,  rotn_encryptor->shift_len);
+		    rotn_encryptor->shift_back, rotn_encryptor->shift_len);
 	*result_lenp = mylen;
 	return (0);
 }
@@ -292,6 +292,7 @@ rotn_customize(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	WT_EXTENSION_API *wt_api;
 
 	ret = 0;
+	keyid_val = 0;
 
 	orig = (const ROTN_ENCRYPTOR *)encryptor;
 	wt_api = orig->wt_api;
@@ -302,18 +303,17 @@ rotn_customize(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	rotn_encryptor->keyid = rotn_encryptor->secretkey = NULL;
 
 	/*
-	 * In this demonstration, we expect keyid to be a number.
-	 */
-	if ((keyid_val = atoi(keyid.str)) < 0) {
-		ret = EINVAL;
-		goto err;
-	}
-
-	/*
 	 * Stash the keyid from the configuration string.
 	 */
 	if ((ret = wt_api->config_get(wt_api, session, encrypt_config,
 	    "keyid", &keyid)) == 0 && keyid.len != 0) {
+		/*
+		 * In this demonstration, we expect keyid to be a number.
+		 */
+		if ((keyid_val = atoi(keyid.str)) < 0) {
+			ret = EINVAL;
+			goto err;
+		}
 		if ((rotn_encryptor->keyid = malloc(keyid.len + 1)) == NULL) {
 			ret = errno;
 			goto err;
