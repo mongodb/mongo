@@ -344,7 +344,7 @@ namespace {
 
         _masterHost = h;
         _master.reset(newConn);
-        _master->setReplSetClientCallback(this);
+        _master->setParentReplSetName(_setName);
         _master->setRunCommandHook(_runCommandHook);
         _master->setPostRunCommandHook(_postRunCommandHook);
 
@@ -748,7 +748,7 @@ namespace {
                 newConn != NULL);
 
         _lastSlaveOkConn.reset(newConn);
-        _lastSlaveOkConn->setReplSetClientCallback(this);
+        _lastSlaveOkConn->setParentReplSetName(_setName);
         _lastSlaveOkConn->setRunCommandHook(_runCommandHook);
         _lastSlaveOkConn->setPostRunCommandHook(_postRunCommandHook);
 

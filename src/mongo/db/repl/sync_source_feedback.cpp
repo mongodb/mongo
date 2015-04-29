@@ -79,7 +79,7 @@ namespace repl {
             return true;
         }
         log() << "setting syncSourceFeedback to " << host.toString();
-        _connection.reset(new DBClientConnection(false, 0, OplogReader::tcp_timeout));
+        _connection.reset(new DBClientConnection(false, OplogReader::tcp_timeout));
         string errmsg;
         try {
             if (!_connection->connect(host, errmsg) ||

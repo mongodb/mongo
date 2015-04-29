@@ -34,8 +34,8 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/client/constants.h"
-#include "mongo/client/dbclient_rs.h"
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/config.h"
 #include "mongo/db/auth/internal_user_auth.h"
@@ -935,14 +935,13 @@ namespace mongo {
                                         int options) {
         if (DBClientWithCommands::runCommand(dbname, cmd, info, options))
             return true;
-        
-        if ( clientSet && isNotMasterErrorString( info["errmsg"] ) ) {
-            clientSet->isntMaster();
+
+        if (!_parentReplSetName.empty()) {
+            handleNotMasterResponse(info["errmsg"]);
         }
 
         return false;
     }
-
 
     void DBClientConnection::_checkConnection() {
         if ( !_failed )
@@ -1051,10 +1050,6 @@ namespace mongo {
             n += i.n();
         }
         return n;
-    }
-
-    void DBClientConnection::setReplSetClientCallback(DBClientReplicaSet* rsClient) {
-        clientSet = rsClient;
     }
 
     unsigned long long DBClientConnection::query(
@@ -1393,6 +1388,14 @@ namespace mongo {
         toSend.setData(dbQuery, b.buf(), b.len());
     }
 
+    DBClientConnection::DBClientConnection(bool _autoReconnect, double so_timeout):
+                    _failed(false),
+                    autoReconnect(_autoReconnect),
+                    autoReconnectBackoff(1000, 2000),
+                    _so_timeout(so_timeout) {
+        _numConnections.fetchAndAdd(1);
+    }
+
     void DBClientConnection::say( Message &toSend, bool isRetry , string * actualServer ) {
         checkConnection();
         try {
@@ -1469,12 +1472,10 @@ namespace mongo {
         *retry = false;
         *host = _serverString;
 
-        if ( clientSet && nReturned ) {
+        if (!_parentReplSetName.empty() && nReturned) {
             verify(data);
-            BSONObj o(data);
-            if ( isNotMasterErrorString( getErrField(o) ) ) {
-                clientSet->isntMaster();
-            }
+            BSONObj bsonView(data);
+            handleNotMasterResponse(getErrField(bsonView));
         }
     }
 
@@ -1491,6 +1492,27 @@ namespace mongo {
             sayPiggyBack( m );
         else
             say(m);
+    }
+
+    void DBClientConnection::setParentReplSetName(const string& replSetName) {
+        _parentReplSetName = replSetName;
+    }
+
+    void DBClientConnection::handleNotMasterResponse(const BSONElement& elemToCheck) {
+        if (!isNotMasterErrorString(elemToCheck)) {
+            return;
+        }
+
+        MONGO_LOG_COMPONENT(1, logger::LogComponent::kReplication)
+            << "got not master from: " << _serverString
+            << " of repl set: " << _parentReplSetName;
+
+        ReplicaSetMonitorPtr monitor = ReplicaSetMonitor::get(_parentReplSetName);
+        if (monitor) {
+            monitor->failedHost(_server);
+        }
+
+        _failed = true;
     }
 
 #ifdef MONGO_CONFIG_SSL
@@ -1512,7 +1534,7 @@ namespace mongo {
 
 
     bool serverAlive( const string &uri ) {
-        DBClientConnection c( false, 0, 20 ); // potentially the connection to server could fail while we're checking if it's alive - so use timeouts
+        DBClientConnection c(false, 20); // potentially the connection to server could fail while we're checking if it's alive - so use timeouts
         string err;
         if ( !c.connect( HostAndPort(uri), err ) )
             return false;

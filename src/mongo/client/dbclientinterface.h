@@ -1098,14 +1098,10 @@ namespace mongo {
 
         /**
            @param _autoReconnect if true, automatically reconnect on a connection failure
-           @param cp used by DBClientReplicaSet.  You do not need to specify this parameter
            @param timeout tcp timeout in seconds - this is for read/write, not connect.
            Connect timeout is fixed, but short, at 5 seconds.
          */
-        DBClientConnection(bool _autoReconnect=false, DBClientReplicaSet* cp=0, double so_timeout=0) :
-            clientSet(cp), _failed(false), autoReconnect(_autoReconnect), autoReconnectBackoff(1000, 2000), _so_timeout(so_timeout) {
-            _numConnections.fetchAndAdd(1);
-        }
+        DBClientConnection(bool _autoReconnect = false, double so_timeout = 0);
 
         virtual ~DBClientConnection() {
             _numConnections.fetchAndAdd(-1);
@@ -1200,16 +1196,10 @@ namespace mongo {
         }
 
         /**
-         * Primarily used for notifying the replica set client that the server
-         * it is talking to is not primary anymore.
-         *
-         * @param rsClient caller is responsible for managing the life of rsClient
-         * and making sure that it lives longer than this object.
-         *
-         * Warning: This is only for internal use and will eventually be removed in
-         * the future.
+         * Set the name of the replica set that this connection is associated to.
+         * Note: There is no validation on replSetName.
          */
-        void setReplSetClientCallback(DBClientReplicaSet* rsClient);
+        void setParentReplSetName(const std::string& replSetName);
 
         static void setLazyKillCursor( bool lazy ) { _lazyKillCursor = lazy; }
         static bool getLazyKillCursor() { return _lazyKillCursor; }
@@ -1221,7 +1211,6 @@ namespace mongo {
         virtual void _auth(const BSONObj& params);
         virtual void sayPiggyBack( Message &toSend );
 
-        DBClientReplicaSet *clientSet;
         boost::scoped_ptr<MessagingPort> p;
         boost::scoped_ptr<SockAddr> server;
         bool _failed;
@@ -1245,6 +1234,19 @@ namespace mongo {
 #ifdef MONGO_CONFIG_SSL
         SSLManagerInterface* sslManager();
 #endif
+
+    private:
+
+        /**
+         * Checks the BSONElement for the 'not master' keyword and if it does exist,
+         * try to inform the replica set monitor that the host this connects to is
+         * no longer primary.
+         */
+        void handleNotMasterResponse(const BSONElement& elemToCheck);
+
+        // Contains the string for the replica set name of the host this is connected to.
+        // Should be empty if this connection is not pointing to a replica set member.
+        std::string _parentReplSetName;
     };
 
     /** pings server to check if it's up
