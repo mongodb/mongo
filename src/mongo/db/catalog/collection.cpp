@@ -40,6 +40,7 @@
 #include "mongo/base/owned_pointer_map.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/database_catalog_entry.h"
+#include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands/server_status_metric.h"
@@ -220,8 +221,11 @@ namespace {
         return true;
     }
 
-    Status Collection::checkValidation(const BSONObj& document) const {
+    Status Collection::checkValidation(OperationContext* txn, const BSONObj& document) const {
         if (!_validator)
+            return Status::OK();
+
+        if (documentValidationDisabled(txn))
             return Status::OK();
 
         if (_validator->matchesBSON(document))
@@ -234,7 +238,7 @@ namespace {
     StatusWith<RecordId> Collection::insertDocument(OperationContext* txn,
                                                     const DocWriter* doc,
                                                     bool enforceQuota) {
-        invariant(!_validator);
+        invariant(!_validator || documentValidationDisabled(txn));
         dassert(txn->lockState()->isCollectionLockedForMode(ns().toString(), MODE_IX));
         invariant( !_indexCatalog.haveAnyIndexes() ); // eventually can implement, just not done
 
@@ -255,7 +259,7 @@ namespace {
                                                     bool enforceQuota,
                                                     bool fromMigrate) {
         {
-            auto status = checkValidation(docToInsert);
+            auto status = checkValidation(txn, docToInsert);
             if (!status.isOK())
                 return status;
         }
@@ -286,7 +290,7 @@ namespace {
                                                     MultiIndexBlock* indexBlock,
                                                     bool enforceQuota) {
         {
-            auto status = checkValidation(doc);
+            auto status = checkValidation(txn, doc);
             if (!status.isOK())
                 return status;
         }
@@ -405,7 +409,7 @@ namespace {
                                                      OpDebug* debug,
                                                      oplogUpdateEntryArgs& args) {
         {
-            auto status = checkValidation(newDoc);
+            auto status = checkValidation(txn, newDoc);
             if (!status.isOK())
                 return status;
         }

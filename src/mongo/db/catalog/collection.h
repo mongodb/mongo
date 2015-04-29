@@ -175,6 +175,10 @@ namespace mongo {
                                             bool enforceQuota,
                                             bool fromMigrate = false);
 
+        /**
+         * Callers must ensure no document validation is performed for this collection when calling
+         * this method.
+         */
         StatusWith<RecordId> insertDocument( OperationContext* txn,
                                             const DocWriter* doc,
                                             bool enforceQuota );
@@ -300,7 +304,7 @@ namespace mongo {
         /**
          * Returns a non-ok Status if document does not pass this collection's validator.
          */
-        Status checkValidation(const BSONObj& document) const;
+        Status checkValidation(OperationContext* txn, const BSONObj& document) const;
 
         Status recordStoreGoingToMove( OperationContext* txn,
                                        const RecordId& oldLocation,

@@ -37,6 +37,7 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/client.h"
 #include "mongo/db/cloner.h"
 #include "mongo/db/db_raii.h"
@@ -346,6 +347,7 @@ namespace {
         BackgroundSync* bgsync(BackgroundSync::get());
         OperationContextImpl txn;
         txn.setReplicatedWrites(false);
+        DisableDocumentValidation validationDisabler(&txn);
         ReplicationCoordinator* replCoord(getGlobalReplicationCoordinator());
 
         // reset state for initial sync

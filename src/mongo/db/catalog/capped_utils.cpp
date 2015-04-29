@@ -33,6 +33,7 @@
 #include "mongo/db/background.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/db_raii.h"
@@ -158,6 +159,8 @@ namespace {
                     fromCollection,
                     InternalPlanner::FORWARD));
 
+
+        DisableDocumentValidation validationDisabler(txn);
 
         while (true) {
             BSONObj obj;

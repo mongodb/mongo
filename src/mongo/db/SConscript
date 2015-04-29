@@ -499,6 +499,7 @@ serverOnlyFiles = [
     "catalog/cursor_manager.cpp",
     "catalog/database.cpp",
     "catalog/database_holder.cpp",
+    "catalog/document_validation.cpp",
     "catalog/drop_collection.cpp",
     "catalog/drop_database.cpp",
     "catalog/drop_indexes.cpp",

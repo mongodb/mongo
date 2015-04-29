@@ -36,6 +36,7 @@
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/client.h"
@@ -88,6 +89,8 @@ namespace {
                             const NamespaceString& target,
                             bool dropTarget,
                             bool stayTemp) {
+        DisableDocumentValidation validationDisabler(txn);
+
         ScopedTransaction transaction(txn, MODE_X);
         Lock::GlobalWrite globalWriteLock(txn->lockState());
         // We stay in source context the whole time. This is mostly to set the CurOp namespace.

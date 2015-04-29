@@ -43,6 +43,7 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_engine.h"
@@ -176,7 +177,7 @@ namespace {
                           bool preserveClonedFilesOnFailure,
                           bool backupOriginalFiles) {
 
-
+        DisableDocumentValidation validationDisabler(txn);
 
         // We must hold some form of lock here
         invariant(txn->lockState()->isLocked());

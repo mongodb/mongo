@@ -35,15 +35,16 @@
 
 #include <boost/shared_ptr.hpp>
 
-#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
+#include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/client.h"
 #include "mongo/db/cloner.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/working_set_common.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/ops/update.h"
@@ -881,6 +882,7 @@ namespace {
 
         log() << "beginning rollback" << rsLog;
 
+        DisableDocumentValidation validationDisabler(txn);
         txn->setReplicatedWrites(false);
         unsigned s = _syncRollback(txn, oplogreader, replCoord);
         if (s)

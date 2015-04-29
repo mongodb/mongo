@@ -51,6 +51,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/cloner.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/db_raii.h"
@@ -1327,6 +1328,7 @@ namespace repl {
 
         OperationContextImpl txn;
         AuthorizationSession::get(txn.getClient())->grantInternalAuthorization();
+        DisableDocumentValidation validationDisabler(&txn);
 
         while ( 1 ) {
             try {

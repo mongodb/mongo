@@ -39,6 +39,7 @@
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/operation_context.h"
@@ -104,6 +105,8 @@ namespace mongo {
     StatusWith<CompactStats> Collection::compact( OperationContext* txn,
                                                   const CompactOptions* compactOptions ) {
         dassert(txn->lockState()->isCollectionLockedForMode(ns().toString(), MODE_X));
+
+        DisableDocumentValidation validationDisabler(txn);
 
         if ( !_recordStore->compactSupported() )
             return StatusWith<CompactStats>( ErrorCodes::CommandNotSupported,
