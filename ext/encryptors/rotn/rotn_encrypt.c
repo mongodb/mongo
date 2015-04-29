@@ -362,15 +362,11 @@ rotn_customize(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 
 	*customp = &rotn_encryptor->encryptor;
 	return (0);
-err:
-	if (rotn_encryptor->keyid != NULL)
-		free(rotn_encryptor->keyid);
-	if (rotn_encryptor->secretkey != NULL)
-		free(rotn_encryptor->secretkey);
-	if (rotn_encryptor->shift_forw != NULL)
-		free(rotn_encryptor->shift_forw);
-	if (rotn_encryptor->shift_back != NULL)
-		free(rotn_encryptor->shift_back);
+
+err:	free(rotn_encryptor->keyid);
+	free(rotn_encryptor->secretkey);
+	free(rotn_encryptor->shift_forw);
+	free(rotn_encryptor->shift_back);
 	free(rotn_encryptor);
 	return (EPERM);
 }
@@ -393,9 +389,7 @@ rotn_terminate(WT_ENCRYPTOR *encryptor, WT_SESSION *session)
 	free(rotn_encryptor->keyid);
 	free(rotn_encryptor->shift_forw);
 	free(rotn_encryptor->shift_back);
-
 	free(encryptor);
-
 	return (0);
 }
 /*! [WT_ENCRYPTOR terminate] */
