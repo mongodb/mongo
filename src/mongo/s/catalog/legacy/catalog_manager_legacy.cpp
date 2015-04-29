@@ -864,7 +864,7 @@ namespace {
 
     Status CatalogManagerLegacy::getCollections(const std::string* dbName,
                                                 std::vector<CollectionType>* collections) {
-        collections->empty();
+        collections->clear();
 
         BSONObjBuilder b;
         if (dbName) {
