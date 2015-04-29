@@ -606,18 +606,9 @@ __wt_encryptor_config(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval,
 	int locked;
 
 	*kencryptorp = NULL;
-	conn = S2C(session);
 	kenc = NULL;
+	conn = S2C(session);
 	locked = 0;
-
-	/*
-	 * Check if encryption is set on the connection. If someone wants
-	 * encryption on a table, it needs to be configured on the database
-	 * as well.
-	 */
-	if (conn->kencryptor == NULL && kencryptorp != &conn->kencryptor)
-		WT_RET_MSG(session, EINVAL, "table encryption "
-		    "requires connection encryption to be set");
 
 	__wt_spin_lock(session, &conn->encryptor_lock);
 	locked = 1;
@@ -629,6 +620,14 @@ __wt_encryptor_config(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval,
 		goto out;
 	}
 
+	/*
+	 * Check if encryption is set on the connection.  If
+	 * someone wants encryption on a table, it needs to be
+	 * configured on the database as well.
+	 */
+	if (conn->kencryptor == NULL && kencryptorp != &conn->kencryptor)
+		WT_ERR_MSG(session, EINVAL, "table encryption "
+		    "requires connection encryption to be set");
 	hash = __wt_hash_city64(keyid->str, keyid->len);
 	bucket = hash % WT_HASH_ARRAY_SIZE;
 	SLIST_FOREACH(kenc, &nenc->keyedhashlh[bucket], l)
