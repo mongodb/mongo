@@ -533,10 +533,6 @@ if wiredtiger:
 serveronlyEnv.Library("serveronly", serverOnlyFiles,
                       LIBDEPS=serveronlyLibdeps )
 
-mongodOnlyFiles = [ "db/db.cpp", "db/mongod_options_init.cpp" ]
-
-# ----- TARGETS ------
-
 env.Library(
     target='coreserver',
     source=[
@@ -551,31 +547,24 @@ env.Library(
     ],
 )
 
-# mongod options
-env.Library("mongod_options", ["db/mongod_options.cpp"],
-            LIBDEPS=['db/server_options',
-                     'mongocommon',
-                     'serveronly',
-                     'coreserver',
-                     'coredb',
-                     '$BUILD_DIR/mongo/util/options_parser/options_parser_init'])
+mongod = env.Program(
+    target="mongod",
+    source=[
+        "db/db.cpp",
+        "db/mongod_options_init.cpp",
+    ],
+    LIBDEPS=[
+        "coredb",
+        "coreserver",
+        "db/mongod_options",
+        "db/mongodandmongos",
+        "db/mongodwebserver",
+        "serveronly",
+        "util/ntservice",
+    ],
+)
 
-# main db target
-mongod = env.Install(
-    '#/',
-    env.Program(
-        "mongod",
-        mongodOnlyFiles,
-        LIBDEPS=[
-            "coredb",
-            "coreserver",
-            "db/mongodandmongos",
-            "db/mongodwebserver",
-            "util/ntservice",
-            "serveronly",
-            "mongod_options",
-        ]))
-Default( mongod )
+env.Default(env.Install('#/', mongod))
 
 # tools
 rewrittenTools = [ "mongodump", "mongorestore", "mongoexport", "mongoimport", "mongostat", "mongotop", "bsondump", "mongofiles", "mongooplog" ]
