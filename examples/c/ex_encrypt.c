@@ -34,6 +34,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #ifndef _WIN32
 #include <unistd.h>
 #else
@@ -85,7 +86,7 @@ make_cksum(uint8_t *dst)
 	 * Assume array is big enough for the checksum.
 	 */
 	for (i = 0; i < CHKSUM_LEN; i++)
-		dst[i] = (uint8_t)random();
+		dst[i] = (uint8_t)rand();
 }
 
 /*
@@ -101,7 +102,7 @@ make_iv(uint8_t *dst)
 	 * Assume array is big enough for the initialization vector.
 	 */
 	for (i = 0; i < IV_LEN; i++)
-		dst[i] = (uint8_t)random();
+		dst[i] = (uint8_t)rand();
 }
 
 /*
@@ -453,7 +454,7 @@ main(void)
 	} else
 		home = NULL;
 
-	srandom((unsigned long)getpid());
+	srand((unsigned long)time(NULL));
 
 	ret = wiredtiger_open(home, NULL, WT_OPEN_CONFIG_GOOD, &conn);
 
