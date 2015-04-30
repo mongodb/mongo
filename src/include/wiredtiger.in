@@ -3312,9 +3312,8 @@ struct __wt_encryptor {
 	 * opportunity to retrieve and save keys in a customized encryptor.
 	 * If the callback returns a non-NULL encryptor, that instance
 	 * is used instead of this one for any callbacks.
-	 * @param[in] keyid configuration value of "keyid" in the
-	 * wiredtiger_open or WT_SESSION::create call.
-	 * @param[in] app_config the "encryption" portion of the
+	 *
+	 * @param[in] encrypt_config the "encryption" portion of the
 	 *            configuration from the wiredtiger_open or
 	 *            WT_SESSION::create call
 	 * @param[out] customp the new modified encryptor, or NULL.
