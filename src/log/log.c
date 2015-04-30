@@ -9,8 +9,6 @@
 #include "wt_internal.h"
 
 static int __log_decompress(WT_SESSION_IMPL *, WT_ITEM *, WT_ITEM **);
-static int __log_read_internal(WT_SESSION_IMPL *, WT_ITEM *, WT_LSN *,
-    uint32_t);
 static int __log_write_internal(WT_SESSION_IMPL *, WT_ITEM *, WT_LSN *,
     uint32_t);
 
@@ -362,7 +360,7 @@ __log_decompress(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out)
 	compressor = conn->log_compressor;
 	if (compressor == NULL || compressor->decompress == NULL)
 		WT_RET_MSG(session, WT_ERROR,
-		    "log_read: Compressed record with "
+		    "log_decompress: Compressed record with "
 		    "no configured compressor");
 	uncompressed_size = logrec->mem_len;
 	WT_RET(__wt_scr_alloc(session, 0, out));
@@ -407,7 +405,7 @@ __log_decrypt(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out)
 	    (encryptor = kencryptor->encryptor) == NULL ||
 	    encryptor->decrypt == NULL)
 		WT_ERR_MSG(session, WT_ERROR,
-		    "log_read: Encrypted record with "
+		    "log_decrypt: Encrypted record with "
 		    "no configured decrypt method");
 
 	/*
@@ -457,9 +455,18 @@ __log_decrypt(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out)
 		WT_ERR_MSG(session, EINVAL,
 		    "Invalid decryption of log record");
 	/*
+	 * This length is now the full decrypted size, including the header.
+	 */
+	result_len += WT_LOG_ENCRYPT_SKIP;
+	/*
 	 * Copy in the skipped header bytes.  This overwrites the checksum.
 	 */
 	memcpy((*out)->mem, in->mem, WT_LOG_ENCRYPT_SKIP);
+	/*
+	 * The original buffer was the maximum size needed.  Set the buffer
+	 * to the actual size now.
+	 */
+	WT_ERR(__wt_buf_initsize(session, *out, result_len));
 
 err:	if (ret != 0)
 		__wt_scr_free(session, out);
@@ -1223,122 +1230,6 @@ __wt_log_newfile(WT_SESSION_IMPL *session, int conn_create, int *created)
 	if (created != NULL)
 		*created = create_log;
 	return (0);
-}
-
-/*
- * __wt_log_read --
- *	Read the log record at the given LSN.  Return the potentially
- *	compressed record (including the log header) in the WT_ITEM.  Caller
- *	is responsible for freeing it.
- */
-int
-__wt_log_read(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
-    uint32_t flags)
-{
-	WT_DECL_ITEM(decryptitem);
-	WT_DECL_ITEM(uncitem);
-	WT_DECL_RET;
-	WT_LOG_RECORD *logrec;
-	WT_ITEM swap;
-
-	WT_ERR(__log_read_internal(session, record, lsnp, flags));
-	logrec = (WT_LOG_RECORD *)record->mem;
-	/*
-	 * We swap around the WT_ITEM pointers so that no matter what
-	 * combination of encryption or compression we have, the caller
-	 * can free the one returned record.
-	 */
-	if (F_ISSET(logrec, WT_LOG_RECORD_ENCRYPTED)) {
-		WT_ERR(__log_decrypt(session, record, &decryptitem));
-
-		swap = *record;
-		*record = *decryptitem;
-		*decryptitem = swap;
-	}
-	if (F_ISSET(logrec, WT_LOG_RECORD_COMPRESSED)) {
-		WT_ERR(__log_decompress(session, record, &uncitem));
-
-		swap = *record;
-		*record = *uncitem;
-		*uncitem = swap;
-	}
-
-err:	__wt_scr_free(session, &decryptitem);
-	__wt_scr_free(session, &uncitem);
-	return (ret);
-}
-
-/*
- * __log_read_internal --
- *	Read the log record at the given LSN.  Return the uncompressed record
- *	(including the log header) in the WT_ITEM.  Caller is responsible for
- *	freeing it.
- */
-static int
-__log_read_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
-    uint32_t flags)
-{
-	WT_CONNECTION_IMPL *conn;
-	WT_DECL_RET;
-	WT_FH *log_fh;
-	WT_LOG *log;
-	WT_LOG_RECORD *logrec;
-	uint32_t cksum, rdup_len, reclen;
-
-	WT_UNUSED(flags);
-	/*
-	 * If the caller didn't give us an LSN or something to return,
-	 * there's nothing to do.
-	 */
-	if (lsnp == NULL || record == NULL)
-		return (0);
-	conn = S2C(session);
-	log = conn->log;
-	/*
-	 * If the offset isn't on an allocation boundary it must be wrong.
-	 */
-	if (lsnp->offset % log->allocsize != 0 || lsnp->file > log->fileid)
-		return (WT_NOTFOUND);
-
-	WT_RET(__log_openfile(
-	    session, 0, &log_fh, WT_LOG_FILENAME, lsnp->file));
-	/*
-	 * Read the minimum allocation size a record could be.
-	 */
-	WT_ERR(__wt_buf_init(session, record, log->allocsize));
-	WT_ERR(__wt_read(session,
-	    log_fh, lsnp->offset, (size_t)log->allocsize, record->mem));
-	/*
-	 * First 4 bytes is the real record length.  See if we
-	 * need to read more than the allocation size.  We expect
-	 * that we rarely will have to read more.  Most log records
-	 * will be fairly small.
-	 */
-	reclen = *(uint32_t *)record->mem;
-	if (reclen == 0) {
-		ret = WT_NOTFOUND;
-		goto err;
-	}
-	if (reclen > log->allocsize) {
-		rdup_len = __wt_rduppo2(reclen, log->allocsize);
-		WT_ERR(__wt_buf_grow(session, record, rdup_len));
-		WT_ERR(__wt_read(session,
-		    log_fh, lsnp->offset, (size_t)rdup_len, record->mem));
-	}
-	/*
-	 * We read in the record, verify checksum.
-	 */
-	logrec = (WT_LOG_RECORD *)record->mem;
-	cksum = logrec->checksum;
-	logrec->checksum = 0;
-	logrec->checksum = __wt_cksum(logrec, logrec->len);
-	if (logrec->checksum != cksum)
-		WT_ERR_MSG(session, WT_ERROR, "log_read: Bad checksum");
-	record->size = logrec->len;
-	WT_STAT_FAST_CONN_INCR(session, log_reads);
-err:
-	WT_TRET(__wt_close(session, &log_fh));
-	return (ret);
 }
 
 /*
