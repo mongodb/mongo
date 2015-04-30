@@ -59,7 +59,6 @@ __session_add_dhandle(
  *	operations.  For example, attempting to verify a file should not fail
  *	because the sweep server happens to be in the process of closing that
  *	file.
- *
  */
 int
 __wt_session_lock_dhandle(
@@ -70,12 +69,12 @@ __wt_session_lock_dhandle(
 	WT_DECL_RET;
 	int is_open, lock_busy, want_exclusive;
 
+	*is_deadp = 0;
+
 	dhandle = session->dhandle;
 	btree = dhandle->handle;
 	lock_busy = 0;
 	want_exclusive = LF_ISSET(WT_DHANDLE_EXCLUSIVE) ? 1 : 0;
-
-	*is_deadp = 0;
 
 	/*
 	 * Check that the handle is open.  We've already incremented
@@ -157,10 +156,10 @@ __wt_session_lock_dhandle(
 			F_SET(dhandle, WT_DHANDLE_EXCLUSIVE);
 			WT_ASSERT(session, !F_ISSET(dhandle, WT_DHANDLE_DEAD));
 			return (0);
-		} else if (ret != EBUSY || (is_open && want_exclusive))
+		}
+		if (ret != EBUSY || (is_open && want_exclusive))
 			return (ret);
-		else
-			lock_busy = 1;
+		lock_busy = 1;
 
 		/* Give other threads a chance to make progress. */
 		__wt_yield();
