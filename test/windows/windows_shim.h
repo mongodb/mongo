@@ -62,10 +62,13 @@ _Check_return_opt_ int __cdecl _wt_snprintf(
 /*
  * Emulate <sys/time.h>
  */
+#ifndef WINSHIM_TIMEVAL
+#define WINSHIM_TIMEVAL
 struct timeval {
 	time_t tv_sec;
 	int64_t tv_usec;
 };
+#endif
 
 int gettimeofday(struct timeval* tp, void* tzp);
 
@@ -91,10 +94,13 @@ usleep(useconds_t useconds);
 typedef CRITICAL_SECTION  pthread_mutex_t;
 typedef CONDITION_VARIABLE pthread_cond_t;
 
+#ifndef WINSHIM_RWLOCK
+#define WINSHIM_RWLOCK
 struct rwlock_wrapper {
 	SRWLOCK rwlock;
 	int exclusive_locked;
 };
+#endif
 
 struct rwlock_wrapper;
 typedef struct rwlock_wrapper pthread_rwlock_t;

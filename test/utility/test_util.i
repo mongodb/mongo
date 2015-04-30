@@ -33,6 +33,13 @@
 #ifdef _WIN32
 #include "windows_shim.h"
 #endif
+
+#ifdef _WIN32
+	#define DIR_DELIM '\\'
+#else
+	#define	DIR_DELIM '/'
+#endif
+
 /*
  * die --
  *	Report an error and quit.

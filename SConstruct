@@ -408,18 +408,12 @@ env.Append(BUILDERS={'SmokeTest' : Builder(action = builder_smoke_test)})
 #env.Alias("test", env.SmokeTest(t))
 #Default(t)
 
-test_util_lib = env.Library(
-    target="libtest_util",
-    source=["test/utility/test_util.c"])
-env.Append(CPPPATH=["test/utility"])
-Default(test_util_lib)
-
-
 t = env.Program("t_fops",
     ["test/fops/file.c",
     "test/fops/fops.c",
     "test/fops/t.c"],
-    LIBS=[wtlib, shim, test_util_lib] + wtlibs)
+    LIBS=[wtlib, shim] + wtlibs)
+env.Append(CPPPATH=["test/utility"])
 env.Alias("test", env.SmokeTest(t))
 Default(t)
 

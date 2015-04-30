@@ -74,11 +74,7 @@ main(int argc, char *argv[])
 	working_dir = NULL;
 
 	//Remove directories
-#ifdef _WIN32
-	if ((progname = strrchr(argv[0], '\\')) == NULL)
-#else
-	if ((progname = strrchr(argv[0], '/')) == NULL)
-#endif
+	if ((progname = strrchr(argv[0], DIR_DELIM)) == NULL)
 		progname = argv[0];
 	else
 		++progname;
