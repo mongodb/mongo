@@ -194,7 +194,6 @@ env.CppUnitTest(
 coredbEnv = env.Clone()
 coredbEnv.InjectThirdPartyIncludePaths(libraries=['snappy'])
 coredbEnv.Library("coredb", [
-        "client/parallel.cpp",
         "db/audit.cpp",
         "db/commands.cpp",
         "db/commands/authentication_commands.cpp",
@@ -447,7 +446,8 @@ serveronlyLibdeps = ["s/coreshard",
                      'db/storage/storage_engine_metadata',
                      'util/mmap',
                      'util/elapsed_tracker',
-                     '$BUILD_DIR/third_party/shim_snappy']
+                     '$BUILD_DIR/third_party/shim_snappy',
+                     'client/parallel']
 
 if wiredtiger:
     serveronlyLibdeps.append( 'db/storage/wiredtiger/storage_wiredtiger' )

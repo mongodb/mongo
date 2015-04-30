@@ -78,3 +78,12 @@ env.CppUnitTest(
     ],
     NO_CRUTCH=True,
 )
+
+env.Library(
+    target="parallel",
+    source=[
+        'parallel.cpp',
+    ],
+    LIBDEPS=[
+    ],
+)
