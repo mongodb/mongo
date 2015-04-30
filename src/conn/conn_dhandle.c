@@ -17,7 +17,7 @@ __conn_dhandle_destroy(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle)
 {
 	WT_DECL_RET;
 
-	WT_TRET(__wt_rwlock_destroy(session, &dhandle->rwlock));
+	ret = __wt_rwlock_destroy(session, &dhandle->rwlock);
 	__wt_free(session, dhandle->name);
 	__wt_free(session, dhandle->checkpoint);
 	__wt_free(session, dhandle->handle);
@@ -45,7 +45,8 @@ __conn_dhandle_alloc(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_rwlock_alloc(session, &dhandle->rwlock, "data handle"));
 	dhandle->name_hash = __wt_hash_city64(uri, strlen(uri));
 	WT_ERR(__wt_strdup(session, uri, &dhandle->name));
-	WT_ERR(__wt_strdup(session, checkpoint, &dhandle->checkpoint));
+	if (checkpoint != NULL)
+		WT_ERR(__wt_strdup(session, checkpoint, &dhandle->checkpoint));
 
 	/* TODO: abstract this out for other data handle types */
 	WT_ERR(__wt_calloc_one(session, &btree));
