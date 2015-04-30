@@ -42,7 +42,7 @@ env.Library(
         'extent_manager.cpp',
         ],
     LIBDEPS= [
-        '$BUILD_DIR/mongo/bson',
+        '$BUILD_DIR/mongo/bson/bson',
         '$BUILD_DIR/mongo/util/foundation',
         ]
     )
@@ -143,7 +143,7 @@ env.Library(
         'btree/key.cpp'
         ],
     LIBDEPS= [
-        '$BUILD_DIR/mongo/bson'
+        '$BUILD_DIR/mongo/bson/bson'
         ]
     )
 

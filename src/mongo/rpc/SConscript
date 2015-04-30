@@ -10,7 +10,7 @@ env.Library(
         'get_status_from_command_result.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/bson',
+        '$BUILD_DIR/mongo/bson/bson',
         '$BUILD_DIR/mongo/util/foundation'
     ],
 )

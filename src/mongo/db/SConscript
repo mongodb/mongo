@@ -39,7 +39,7 @@ env.Library(
         'write_concern_options.cpp'
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/bson',
+        '$BUILD_DIR/mongo/bson/bson',
         '$BUILD_DIR/mongo/util/foundation',
         '$BUILD_DIR/mongo/db/index_names',
         '$BUILD_DIR/mongo/db/service_context',
@@ -137,6 +137,7 @@ env.Library(
         'curop.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
         '$BUILD_DIR/mongo/db/commands/server_status_core',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/stats/top',
@@ -178,7 +179,7 @@ env.Library(
         'range_arithmetic.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/bson',
+        '$BUILD_DIR/mongo/bson/bson',
         '$BUILD_DIR/mongo/util/foundation',
     ],
 )
@@ -226,7 +227,7 @@ env.Library(
         "server_parameters.cpp",
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/bson",
+        "$BUILD_DIR/mongo/bson/bson",
         "$BUILD_DIR/mongo/util/foundation",
     ],
 )
@@ -258,7 +259,7 @@ env.CppUnitTest(
         'update_index_data_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/bson',
+        '$BUILD_DIR/mongo/bson/bson',
         'common',
         'update_index_data',
     ],
@@ -274,7 +275,7 @@ env.Library(
         "server_options.cpp",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/bson',
+        '$BUILD_DIR/mongo/bson/bson',
     ],
 )
 
@@ -284,7 +285,7 @@ env.Library(
         "server_options_helpers.cpp",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/bson',
+        '$BUILD_DIR/mongo/bson/bson',
         '$BUILD_DIR/mongo/util/cmdline_utils/cmdline_utils',
         # The dependency on network is a temporary crutch that should go away once the
         # networking library has separate options
@@ -313,7 +314,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base/base',
-        '$BUILD_DIR/mongo/bson',
+        '$BUILD_DIR/mongo/bson/bson',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_global',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/util/concurrency/synchronization',

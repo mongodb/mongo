@@ -7,14 +7,14 @@ env.Library("geometry", [ "hash.cpp",
                           "shapes.cpp",
                           "big_polygon.cpp",
                           "r2_region_coverer.cpp" ],
-            LIBDEPS = [ "$BUILD_DIR/mongo/bson",
+            LIBDEPS = [ "$BUILD_DIR/mongo/bson/bson",
                         "$BUILD_DIR/third_party/s2/s2" ])
 
 # Geometry / BSON parsing and wrapping
 env.Library("geoparser", [ "geoparser.cpp",
                            "geometry_container.cpp" ],
             LIBDEPS = [ "geometry",
-                        "$BUILD_DIR/mongo/bson",
+                        "$BUILD_DIR/mongo/bson/bson",
                         "$BUILD_DIR/third_party/s2/s2" ])
 
 env.CppUnitTest("hash_test", [ "hash_test.cpp" ],

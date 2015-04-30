@@ -25,6 +25,7 @@ env.InjectMongoIncludePaths()
 env.SConscript(
     dirs=[
         'base',
+        'bson',
         'client',
         'crypto',
         'db',
@@ -41,70 +42,6 @@ env.SConscript(
         'util',
     ],
 )
-
-# ------    SOURCE FILE SETUP -----------
-
-env.Library('bson', [
-        'bson/mutable/document.cpp',
-        'bson/mutable/element.cpp',
-        'bson/util/bson_extract.cpp',
-        'util/safe_num.cpp',
-        'bson/bson_validate.cpp',
-        'bson/oid.cpp',
-        "bson/timestamp.cpp",
-        'bson/bson_startuptest.cpp',
-        'bson/bsonelement.cpp',
-        'bson/bsonmisc.cpp',
-        'bson/bsonobj.cpp',
-        'bson/bsonobjbuilder.cpp',
-        'bson/bsontypes.cpp',
-        'bson/json.cpp'
-        ], LIBDEPS=[
-        '$BUILD_DIR/mongo/platform/platform',
-        'base/base',
-        'util/stringutils',
-        'util/md5',
-        ])
-
-env.Library('mutable_bson_test_utils', [
-        'bson/mutable/mutable_bson_test_utils.cpp'
-        ], LIBDEPS=['bson'])
-
-env.CppUnitTest('builder_test', ['bson/util/builder_test.cpp'],
-                LIBDEPS=['bson'])
-
-env.CppUnitTest('mutable_bson_test', ['bson/mutable/mutable_bson_test.cpp'],
-                 LIBDEPS=['bson', 'mutable_bson_test_utils'])
-
-env.CppUnitTest('mutable_bson_algo_test', ['bson/mutable/mutable_bson_algo_test.cpp'],
-                LIBDEPS=['bson', 'mutable_bson_test_utils'])
-
-env.CppUnitTest('safe_num_test', ['util/safe_num_test.cpp'],
-                LIBDEPS=['bson'])
-
-env.CppUnitTest('string_map_test', ['util/string_map_test.cpp'],
-                LIBDEPS=['bson','util/foundation'])
-
-env.CppUnitTest('bson_field_test', ['bson/bson_field_test.cpp'],
-                LIBDEPS=['bson'])
-
-env.CppUnitTest('bson_obj_test', ['bson/bson_obj_test.cpp'],
-                LIBDEPS=['bson'])
-
-env.CppUnitTest('bson_obj_data_type_test', ['bson/bson_obj_data_type_test.cpp'],
-                LIBDEPS=['bson'])
-
-env.CppUnitTest('bson_validate_test', ['bson/bson_validate_test.cpp'],
-                LIBDEPS=['bson'])
-
-env.CppUnitTest('bsonobjbuilder_test', ['bson/bsonobjbuilder_test.cpp'],
-                LIBDEPS=['bson'])
-
-env.CppUnitTest('oid_test', ['bson/oid_test.cpp'],
-                LIBDEPS=['bson'])
-
-env.CppUnitTest('bson_extract_test', ['bson/util/bson_extract_test.cpp'], LIBDEPS=['bson'])
-env.CppUnitTest('bson_check_test', ['bson/util/bson_check_test.cpp'], LIBDEPS=['bson'])
 
 def get_toolchain_ver(tool):
     # By default we don't know the version of each tool, and only report what
@@ -202,7 +139,7 @@ env.Library('version',
                 'util/version.cpp'
             ],
             LIBDEPS=[
-                'bson',
+                'bson/bson',
                 '$BUILD_DIR/mongo/base/base'
             ])
 
@@ -222,7 +159,7 @@ if env['MONGO_BUILD_SASL_CLIENT']:
     extraCommonLibdeps.append('client/cyrus_sasl_client_session')
 
 env.Library('mongocommon', commonFiles,
-            LIBDEPS=['bson',
+            LIBDEPS=['bson/bson',
                      'util/background_job',
                      '$BUILD_DIR/mongo/client/clientdriver',
                      'util/fail_point',

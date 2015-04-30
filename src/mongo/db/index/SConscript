@@ -18,7 +18,7 @@ env.Library(
             'expression_keys_private.cpp',
         ],
         LIBDEPS=[
-            '$BUILD_DIR/mongo/bson',
+            '$BUILD_DIR/mongo/bson/bson',
             '$BUILD_DIR/mongo/db/fts/base',
             '$BUILD_DIR/mongo/db/geo/geometry',
             '$BUILD_DIR/mongo/db/geo/geoparser',
@@ -34,7 +34,7 @@ env.Library(
         ],
         LIBDEPS=[
             'key_generator',
-            '$BUILD_DIR/mongo/bson',
+            '$BUILD_DIR/mongo/bson/bson',
         ],
 )
 

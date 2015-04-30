@@ -23,7 +23,7 @@ env.Library('logger',
 
 env.Library('parse_log_component_settings',
             ['parse_log_component_settings.cpp'],
-            LIBDEPS=['logger', '$BUILD_DIR/mongo/bson'])
+            LIBDEPS=['logger', '$BUILD_DIR/mongo/bson/bson'])
 
 # writes multi-byte sequences to console
 # to support manual testing of console stream  under Windows

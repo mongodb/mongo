@@ -6,7 +6,7 @@ env.Library(
         'in_memory_record_store.cpp'
         ],
     LIBDEPS= [
-        '$BUILD_DIR/mongo/bson',
+        '$BUILD_DIR/mongo/bson/bson',
         '$BUILD_DIR/mongo/db/storage/oplog_hack',
         '$BUILD_DIR/mongo/util/foundation',
         ]
@@ -21,7 +21,7 @@ env.Library(
         ],
     LIBDEPS= [
         'in_memory_record_store',
-        '$BUILD_DIR/mongo/bson',
+        '$BUILD_DIR/mongo/bson/bson',
         '$BUILD_DIR/mongo/db/catalog/collection_options',
         '$BUILD_DIR/mongo/db/index/index_descriptor',
         '$BUILD_DIR/mongo/db/storage/index_entry_comparison',

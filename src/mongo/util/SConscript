@@ -172,7 +172,7 @@ env.Library(
         "processinfo_${TARGET_OS}.cpp",
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/bson",
+        "$BUILD_DIR/mongo/bson/bson",
         "foundation",
     ],
 )
@@ -195,7 +195,7 @@ env.Library(
         "fail_point_service.cpp",
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/bson",
+        "$BUILD_DIR/mongo/bson/bson",
         "foundation",
     ],
 )
@@ -327,7 +327,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base/base',
-        '$BUILD_DIR/mongo/bson',
+        '$BUILD_DIR/mongo/bson/bson',
         '$BUILD_DIR/mongo/version',
         'stringutils',
     ],
@@ -377,5 +377,37 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         # None since unowned_ptr is header-only.
+    ],
+)
+
+env.Library(
+    target='safe_num',
+    source=[
+        'safe_num.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/bson/bson',
+    ],
+)
+
+env.CppUnitTest(
+    target='safe_num_test',
+    source=[
+        'safe_num_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/bson/bson',
+        'safe_num',
+    ],
+)
+
+env.CppUnitTest(
+    target='string_map_test',
+    source=[
+        'string_map_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/bson/bson',
+        'foundation',
     ],
 )

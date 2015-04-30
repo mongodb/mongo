@@ -9,7 +9,7 @@ env.Library(
         "working_set.cpp",
     ],
     LIBDEPS = [
-        "$BUILD_DIR/mongo/bson",
+        "$BUILD_DIR/mongo/bson/bson",
     ],
 )
 
@@ -72,7 +72,7 @@ env.Library(
     ],
     LIBDEPS = [
         "scoped_timer",
-        "$BUILD_DIR/mongo/bson",
+        "$BUILD_DIR/mongo/bson/bson",
     ],
 )
 

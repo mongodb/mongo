@@ -21,7 +21,7 @@ env.Library('base', ['mongo_version_range.cpp',
                      'type_mongos.cpp',
                      'type_tags.cpp'],
             LIBDEPS=['$BUILD_DIR/mongo/base/base',
-                     '$BUILD_DIR/mongo/bson'])
+                     '$BUILD_DIR/mongo/bson/bson'])
 
 env.CppUnitTest('chunk_version_test', 'chunk_version_test.cpp',
                 LIBDEPS=['base',
@@ -29,7 +29,7 @@ env.CppUnitTest('chunk_version_test', 'chunk_version_test.cpp',
 
 env.CppUnitTest('mongo_version_range_test', 'mongo_version_range_test.cpp', 
                 LIBDEPS=['base',
-                         '$BUILD_DIR/mongo/bson',
+                         '$BUILD_DIR/mongo/bson/bson',
                          '$BUILD_DIR/mongo/db/common'])
 
 env.CppUnitTest('type_config_version_test', 'type_config_version_test.cpp',
@@ -65,7 +65,7 @@ env.Library(
     LIBDEPS=[
         'base',
         'catalog/catalog_types',
-        '$BUILD_DIR/mongo/bson',
+        '$BUILD_DIR/mongo/bson/bson',
         '$BUILD_DIR/mongo/base/base',
         '$BUILD_DIR/mongo/client/clientdriver',
         '$BUILD_DIR/mongo/db/range_arithmetic',
@@ -115,7 +115,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base/base',
-        '$BUILD_DIR/mongo/bson',
+        '$BUILD_DIR/mongo/bson/bson',
     ],
 )
 
@@ -148,7 +148,7 @@ env.Library(
         'write_ops/batch_write_exec.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/bson',
+        '$BUILD_DIR/mongo/bson/bson',
         '$BUILD_DIR/mongo/client/clientdriver',
         'batch_write_types',
         '$BUILD_DIR/mongo/util/concurrency/synchronization'
@@ -177,7 +177,7 @@ env.Library(
         'write_ops/batch_downconvert.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/bson',
+        '$BUILD_DIR/mongo/bson/bson',
         '$BUILD_DIR/mongo/db/common', # for Message
         '$BUILD_DIR/mongo/db/lasterror',
         'cluster_ops',
@@ -213,7 +213,7 @@ env.Library(
         'dbclient_shard_resolver.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/bson',
+        '$BUILD_DIR/mongo/bson/bson',
         '$BUILD_DIR/mongo/s/client/sharding_client',
         'cluster_ops',
         'cluster_write_op_conversion',

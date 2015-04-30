@@ -23,7 +23,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base/base',
-        '$BUILD_DIR/mongo/bson',
+        '$BUILD_DIR/mongo/bson/bson',
         '$BUILD_DIR/mongo/client/clientdriver',
         '$BUILD_DIR/mongo/coredb',
         '$BUILD_DIR/mongo/db/common',
@@ -267,7 +267,8 @@ env.Library('replica_set_messages',
                 'last_vote.cpp',
             ],
             LIBDEPS=[
-                '$BUILD_DIR/mongo/bson',
+                '$BUILD_DIR/mongo/bson/bson',
+                '$BUILD_DIR/mongo/bson/util/bson_extract',
                 '$BUILD_DIR/mongo/util/net/hostandport',
                 '$BUILD_DIR/mongo/db/common',
             ])
@@ -278,7 +279,10 @@ env.CppUnitTest('replica_set_config_test',
                     'replica_set_config_test.cpp',
                     'replica_set_tag_test.cpp',
                 ],
-                LIBDEPS=['replica_set_messages'])
+                LIBDEPS=[
+                    '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
+                    'replica_set_messages',
+                ])
 
 env.CppUnitTest('isself_test',
                 [

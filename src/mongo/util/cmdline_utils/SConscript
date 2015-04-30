@@ -3,7 +3,7 @@
 Import("env")
 
 env.Library('cmdline_utils', ['censor_cmdline.cpp'],
-                              LIBDEPS=['$BUILD_DIR/mongo/bson'])
+                              LIBDEPS=['$BUILD_DIR/mongo/bson/bson'])
 
 env.CppUnitTest('censor_cmdline_test',
                 'censor_cmdline_test.cpp',

@@ -30,7 +30,9 @@ env.Library('authcore', ['action_set.cpp',
                          'user_set.cpp'],
             LIBDEPS=['sasl_options',
                      '$BUILD_DIR/mongo/base/base',
-                     '$BUILD_DIR/mongo/bson',
+                     '$BUILD_DIR/mongo/bson/bson',
+                     '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
+                     '$BUILD_DIR/mongo/bson/util/bson_extract',
                      '$BUILD_DIR/mongo/crypto/scramauth',
                      '$BUILD_DIR/mongo/db/common',
                      '$BUILD_DIR/mongo/db/ops/update_driver',
@@ -41,7 +43,11 @@ env.Library('authcore', ['action_set.cpp',
 
 env.Library('authcommon',
             ['internal_user_auth.cpp'],
-            LIBDEPS=['$BUILD_DIR/mongo/bson'])
+            LIBDEPS=[
+                '$BUILD_DIR/mongo/bson/bson',
+                '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
+                '$BUILD_DIR/mongo/bson/util/bson_extract',
+            ])
 
 env.Library('authorization_manager_global',
             [
