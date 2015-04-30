@@ -45,20 +45,20 @@ namespace OplogStartTests {
         Base() : _txn(),
                  _scopedXact(&_txn, MODE_X),
                  _lk(_txn.lockState()),
-                 _wunit(&_txn),
                  _context(&_txn, ns()),
                  _client(&_txn) {
 
             Collection* c = _context.db()->getCollection(ns());
             if (!c) {
+                WriteUnitOfWork wuow(&_txn);
                 c = _context.db()->createCollection(&_txn, ns());
+                wuow.commit();
             }
             ASSERT(c->getIndexCatalog()->haveIdIndex(&_txn));
         }
 
         ~Base() {
             client()->dropCollection(ns());
-            _wunit.commit();
 
             // The OplogStart stage is not allowed to outlive it's RecoveryUnit.
             _stage.reset();
@@ -107,7 +107,6 @@ namespace OplogStartTests {
         OperationContextImpl _txn;
         ScopedTransaction _scopedXact;
         Lock::GlobalWrite _lk;
-        WriteUnitOfWork _wunit;
         OldClientContext _context;
 
         DBDirectClient _client;
