@@ -27,7 +27,7 @@
  */
 
 #include "thread.h"
-#include "test_util.h"
+#include "test_util.i"
 
 static u_int uid = 1;
 

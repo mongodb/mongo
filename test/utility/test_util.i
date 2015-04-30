@@ -29,13 +29,15 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <wiredtiger.h>
-#include "test_util.h"
 
+#ifdef _WIN32
+#include "windows_shim.h"
+#endif
 /*
  * die --
  *	Report an error and quit.
  */
-void
+static inline void
 die(int e, const char *fmt, ...)
 {
 	va_list ap;
@@ -54,13 +56,15 @@ die(int e, const char *fmt, ...)
  *	Takes a buffer, its size and the intended work directory.
  *	Creates the full intended work directory in buffer.
  */
-int
+static inline int
 testutil_work_dir_from_path(char *buffer, size_t inputSize, char *dir)
 {
-	char default_dir[2] = ".";
-
+	/* If no directory is provided, use the default. */
 	if (dir == NULL) {
-		dir = default_dir;
+		if (inputSize < 9)
+			return (1);
+		snprintf(buffer, inputSize, "WT_TEST");
+		return (0);
 	}
 
 	/* 9 bytes for the directory and WT_TEST */
@@ -78,14 +82,14 @@ testutil_work_dir_from_path(char *buffer, size_t inputSize, char *dir)
 
 /*
  * testutil_clean_work_dir --
- *	Remove any existing work directories
+ *	Remove any existing work directories, can optionally fail on error
  */
-void
+static inline int
 testutil_clean_work_dir(char *dir)
 {
 	char *buffer;
 	size_t inputSize;
-	int ret;
+
 	/* 10 bytes for the Windows rd command */
 	inputSize = strlen(dir) + 19;
 	buffer = (char*) malloc (inputSize);
@@ -95,15 +99,14 @@ testutil_clean_work_dir(char *dir)
 #else
 	snprintf(buffer, inputSize, "rm -rf %s", dir);
 #endif
-	if ((ret = system(buffer)) != 0)
-		die(ret, "directory cleanup call failed");
+	return system(buffer);
 }
 
 /*
  * testutil_make_work_dir --
  *	Delete the existing work directory if it exists, then create a new one.
  */
-void
+static inline void
 testutil_make_work_dir(char *dir)
 {
 	char *buffer;

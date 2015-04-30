@@ -27,7 +27,7 @@
  */
 
 #include "thread.h"
-#include "test_util.h"
+#include "test_util.i"
 
 WT_CONNECTION *conn;				/* WiredTiger connection */
 pthread_rwlock_t single;			/* Single thread */
@@ -73,7 +73,12 @@ main(int argc, char *argv[])
 	char *config_open, *working_dir;
 	working_dir = NULL;
 
+	//Remove directories
+#ifdef _WIN32
+	if ((progname = strrchr(argv[0], '\\')) == NULL)
+#else
 	if ((progname = strrchr(argv[0], '/')) == NULL)
+#endif
 		progname = argv[0];
 	else
 		++progname;
