@@ -423,12 +423,8 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 		WT_RET(__session_dhandle_find(session, uri, checkpoint));
 		dhandle = session->dhandle;
 
-retry:		/* Try to lock the handle. */
-		ret = __wt_session_lock_dhandle(session, flags, &is_dead);
-		if (ret != 0) {
-			session->dhandle = NULL;
-			return (ret);
-		}
+		/* Try to lock the handle. */
+		WT_RET(__wt_session_lock_dhandle(session, flags, &is_dead));
 		if (is_dead)
 			continue;
 
@@ -440,25 +436,41 @@ retry:		/* Try to lock the handle. */
 
 		WT_ASSERT(session, F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE));
 
-		/* Open the handle. */
-		if ((ret = __wt_conn_btree_open(session, cfg, flags)) != 0) {
+		/*
+		 * For now, we need the schema lock and handle list locks to
+		 * open a file for real.
+		 *
+		 * Code needing exclusive access (such as drop or verify)
+		 * assumes that it can close all open handles, then open an
+		 * exclusive handle on the active tree and no other threads can
+		 * reopen handles in the meantime.  A combination of the schema
+		 * and handle list locks are used to enforce this.
+		 */
+		if (!F_ISSET(session, WT_SESSION_SCHEMA_LOCKED) ||
+		    !F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED)) {
 			F_CLR(dhandle, WT_DHANDLE_EXCLUSIVE);
-			WT_TRET(__wt_writeunlock(session, dhandle->rwlock));
-			session->dhandle = NULL;
+			WT_RET(__wt_writeunlock(session, dhandle->rwlock));
+
+			WT_WITH_SCHEMA_LOCK(session,
+			    WT_WITH_DHANDLE_LOCK(session, ret =
+				__wt_session_get_btree(
+				session, uri, checkpoint, cfg, flags)));
+
 			return (ret);
 		}
+
+		/* Open the handle. */
+		if ((ret = __wt_conn_btree_open(session, cfg, flags)) == 0 &&
+		    LF_ISSET(WT_DHANDLE_EXCLUSIVE))
+			break;
 
 		/*
 		 * If we got the handle exclusive to open it but only want
 		 * ordinary access, drop our lock and retry the open.
 		 */
-		if (!LF_ISSET(WT_DHANDLE_EXCLUSIVE)) {
-			F_CLR(dhandle, WT_DHANDLE_EXCLUSIVE);
-			WT_RET(__wt_writeunlock(session, dhandle->rwlock));
-			goto retry;
-		}
-
-		break;
+		F_CLR(dhandle, WT_DHANDLE_EXCLUSIVE);
+		WT_TRET(__wt_writeunlock(session, dhandle->rwlock));
+		WT_RET(ret);
 	}
 
 	WT_ASSERT(session, !F_ISSET(dhandle, WT_DHANDLE_DEAD));

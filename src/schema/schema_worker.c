@@ -60,11 +60,13 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 				WT_SAVE_DHANDLE(session,
 				    ret = file_func(session, cfg));
 				WT_TRET(__wt_session_release_btree(session));
-			} else if (ret == EBUSY)
-				/* TODO: Decode checkpoint from cfg. */
+			} else if (ret == EBUSY) {
+				WT_ASSERT(session, !FLD_ISSET(
+				    open_flags, WT_DHANDLE_EXCLUSIVE));
 				WT_WITH_DHANDLE_LOCK(session,
 				    ret = __wt_conn_btree_apply_single_ckpt(
 				    session, uri, file_func, cfg));
+			}
 			WT_ERR(ret);
 		}
 	} else if (WT_PREFIX_MATCH(uri, "colgroup:")) {
