@@ -51,6 +51,7 @@
 #include "mongo/db/lasterror.h"
 #include "mongo/db/log_process_details.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/exit.h"
@@ -61,7 +62,7 @@
 #include "mongo/util/ntservice.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/ramlog.h"
-#include "mongo/util/version_reporting.h"
+#include "mongo/util/version.h"
 
 namespace mongo {
 
@@ -90,6 +91,7 @@ namespace mongo {
                  std::string& errmsg,
                  BSONObjBuilder& result) {
         appendBuildInfo(result);
+        appendStorageEngineList(&result);
         return true;
 
         }

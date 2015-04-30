@@ -43,7 +43,7 @@
 #include "mongo/util/processinfo.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/text.h"
-#include "mongo/util/version_reporting.h"
+#include "mongo/util/version.h"
 
 namespace mongo {
 

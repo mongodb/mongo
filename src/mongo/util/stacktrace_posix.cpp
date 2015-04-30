@@ -187,6 +187,7 @@ namespace {
         BSONObjBuilder soMap;
         soMap << "mongodbVersion" << versionString;
         soMap << "gitVersion" << gitVersion();
+        soMap << "compiledModules" << compiledModules();
         struct utsname unameData;
         if (!uname(&unameData)) {
             BSONObjBuilder unameBuilder(soMap.subobjStart("uname"));

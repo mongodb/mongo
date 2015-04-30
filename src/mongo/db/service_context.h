@@ -336,4 +336,15 @@ namespace mongo {
     Status validateStorageOptions(const BSONObj& storageEngineOptions,
         stdx::function<Status (const StorageEngine::Factory* const, const BSONObj&)> validateFunc);
 
+    /*
+     * Returns a BSONArray containing the names of available storage engines, or an empty
+     * array if there is no global ServiceContext
+     */
+    BSONArray storageEngineList();
+
+    /*
+     * Appends a the list of available storage engines to a BSONObjBuilder for reporting purposes.
+     */
+    void appendStorageEngineList(BSONObjBuilder* result);
+
 }  // namespace mongo

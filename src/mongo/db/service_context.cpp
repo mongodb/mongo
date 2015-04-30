@@ -176,4 +176,26 @@ namespace mongo {
         return result;
     }
 
+    BSONArray storageEngineList() {
+        if (!hasGlobalServiceContext())
+            return BSONArray();
+
+        boost::scoped_ptr<StorageFactoriesIterator> sfi(
+            getGlobalServiceContext()->makeStorageFactoriesIterator());
+
+        if (!sfi)
+            return BSONArray();
+
+        BSONArrayBuilder engineArrayBuilder;
+
+        while (sfi->more()) {
+            engineArrayBuilder.append(sfi->next()->getCanonicalName());
+        }
+
+        return engineArrayBuilder.arr();
+    }
+
+    void appendStorageEngineList(BSONObjBuilder* result) {
+        result->append("storageEngines", storageEngineList());
+    }
 }  // namespace mongo

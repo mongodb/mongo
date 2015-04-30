@@ -55,7 +55,7 @@
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
-#include "mongo/util/version_reporting.h"
+#include "mongo/util/version.h"
 
 namespace moe = mongo::optionenvironment;
 
@@ -120,7 +120,6 @@ namespace mongo {
             srand( (unsigned) frameworkGlobalParams.seed );
             printGitVersion();
             printOpenSSLVersion();
-            printSysInfo();
 
             getGlobalServiceContext()->setGlobalStorageEngine(storageGlobalParams.engine);
 

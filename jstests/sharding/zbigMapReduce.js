@@ -217,7 +217,7 @@ function runTest(s) {
 }
 
 var s = setupTest();
-if (s.getDB( "admin" ).runCommand( "buildInfo" ).bits < 64) {
+if (s.getDB( "admin" ).runCommand( "buildInfo" ).pointerSizeBits < 64) {
     print("Skipping test on 32-bit platforms");
 }
 else {

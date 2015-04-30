@@ -115,7 +115,7 @@
 #include "mongo/util/startup_test.h"
 #include "mongo/util/text.h"
 #include "mongo/util/time_support.h"
-#include "mongo/util/version_reporting.h"
+#include "mongo/util/version.h"
 
 #if !defined(_WIN32)
 # include <sys/file.h>
@@ -214,6 +214,7 @@ namespace mongo {
 
         BSONObjBuilder buildinfo( toLog.subobjStart("buildinfo"));
         appendBuildInfo(buildinfo);
+        appendStorageEngineList(&buildinfo);
         buildinfo.doneFast();
 
         BSONObj o = toLog.obj();

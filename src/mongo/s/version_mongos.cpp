@@ -39,7 +39,6 @@
 #include "mongo/util/log.h"
 #include "mongo/util/net/sock.h"
 #include "mongo/util/version.h"
-#include "mongo/util/version_reporting.h"
 
 namespace mongo {
 
@@ -52,7 +51,6 @@ namespace mongo {
             DEV std::cout << "DEBUG build" << std::endl;
             std::cout << "git version: " << gitVersion() << std::endl;
             std::cout << openSSLVersion("OpenSSL version: ") << std::endl;
-            std::cout <<  "build sys info: " << sysInfo() << std::endl;
         }
         else {
             log() << "MongoS version " << versionString << " starting: pid=" <<

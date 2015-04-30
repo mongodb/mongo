@@ -20,7 +20,7 @@ function get_ipaddr() {
     var hostType = null;
 
     try {
-        hostType = getBuildInfo().sysInfo.split(' ')[0];
+        hostType = getBuildInfo().buildEnvironment.target_os;
 
         // os-specific methods
         if (hostType == "windows") {

@@ -35,11 +35,18 @@
 
 namespace mongo {
     struct BSONArray;
+    class BSONObjBuilder;
 
     // mongo version
     extern const char versionString[];
     extern const BSONArray versionArray;
     std::string mongodVersion();
+
+    // mongo git version
+    const char* gitVersion();
+    const char* distName();
+    void printGitVersion();
+    std::vector<std::string> compiledModules();
 
     // Convert a version std::string into a numeric array
     BSONArray toVersionArray(const char* version);
@@ -47,12 +54,18 @@ namespace mongo {
     // Checks whether another version is the same major version as us
     bool isSameMajorVersion(const char* version);
 
-    const char * gitVersion();
-    const char * compiledJSEngine();
-    const char * allocator();
-    const char * loaderFlags();
-    const char * compilerFlags();
-    std::string sysInfo();
+    // Get/print the version of OpenSSL that's used at runtime
+    const std::string openSSLVersion(
+        const std::string& prefix = "",
+        const std::string& suffix = "");
+    void printOpenSSLVersion();
+
+    // Append build info data to a BSONObjBuilder
+    void appendBuildInfo(BSONObjBuilder& result);
+
+    void printTargetMinOS();
+    void printAllocator();
+    void show_warnings();
 
 }  // namespace mongo
 

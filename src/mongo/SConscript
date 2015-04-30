@@ -4,8 +4,11 @@
 
 import os
 import itertools
+import subprocess
 import sys
 from buildscripts import utils
+
+import SCons.Action
 
 Import("env")
 Import("has_option")
@@ -103,23 +106,68 @@ env.CppUnitTest('oid_test', ['bson/oid_test.cpp'],
 env.CppUnitTest('bson_extract_test', ['bson/util/bson_extract_test.cpp'], LIBDEPS=['bson'])
 env.CppUnitTest('bson_check_test', ['bson/util/bson_check_test.cpp'], LIBDEPS=['bson'])
 
-def getSysInfo():
-    if env.TargetOSIs("windows"):
-        return "windows " + str( sys.getwindowsversion() )
-    else:
-        return " ".join( os.uname() )
+def get_toolchain_ver(tool):
+    # By default we don't know the version of each tool, and only report what
+    # command gets executed (gcc vs /opt/mongodbtoolchain/bin/gcc).
+    verstr = "version unknown"
+    proc = None
+    if env.ToolchainIs('clang', 'gcc'):
+        proc = SCons.Action._subproc(env,
+            env.subst("${%s} --version" % tool),
+            stdout=subprocess.PIPE,
+            stderr='devnull',
+            stdin='devnull',
+            universal_newlines=True,
+            error='raise',
+            shell=True)
+        verstr = proc.stdout.readline()
 
-buildInfo = env.Substfile(
-    'buildinfo.cpp.in',
+    elif env.ToolchainIs('msvc') and env.TargetOSIs('windows'):
+        proc = SCons.Action._subproc(env,
+            env.subst("${%s}" % tool),
+            stdout='devnull',
+            stderr=subprocess.PIPE,
+            stdin='devnull',
+            universal_newlines=True,
+            error='raise',
+            shell=True)
+        verstr = proc.stderr.readline()
+
+    # If we started a process, we should drain its stdout/stderr and wait for
+    # it to end.
+    if proc:
+        proc.communicate()
+
+    return env.subst('${%s}: %s' % (tool, verstr))
+
+js_engine_ver = get_option("js-engine") if get_option("server-js") == "on" else "none"
+
+# On windows, we need to escape the backslashes in the command-line
+# so that windows paths look okay.
+cmd_line = " ".join(sys.argv).encode('string-escape')
+if env.TargetOSIs('windows'):
+    cmd_line = cmd_line.replace('\\', r'\\')
+
+module_list = '{ %s }' % ', '.join([ '"{0}"'.format(x) for x in env['MONGO_MODULES'] ])
+
+versionInfo = env.Substfile(
+    'util/version.cpp.in',
     SUBST_DICT=[
+        ('@mongo_code_version@', env['MONGO_CODE_VERSION']),
         ('@buildinfo_git_version@', env['MONGO_GIT_VERSION']),
-        ('@buildinfo_js_engine@', "V8" if usev8 else "Unknown"),
+        ('@buildinfo_js_engine@', js_engine_ver),
         ('@buildinfo_allocator@', GetOption('allocator')),
-        ('@buildinfo_loader_flags@', env.subst('$LINKFLAGS $LDFLAGS')),
-        ('@buildinfo_compiler_flags@', env.subst('$CXXFLAGS $CCFLAGS $CFLAGS')),
-        ('@buildinfo_sysinfo@', getSysInfo()),
+        ('@buildinfo_ccflags@', env['CCFLAGS']),
+        ('@buildinfo_cflags@', env['CFLAGS']),
+        ('@buildinfo_cxxflags@', env['CXXFLAGS']),
+        ('@buildinfo_linkflags@', env['LINKFLAGS']),
+        ('@buildinfo_cmdline@', cmd_line),
+        ('@buildinfo_modules@', module_list),
+        ('@buildinfo_target_arch@', env['TARGET_ARCH']),
+        ('@buildinfo_target_os@', env.GetTargetOSName()),
+        ('@buildinfo_cc_version@', get_toolchain_ver('CC')),
+        ('@buildinfo_cxx_version@', get_toolchain_ver('CXX')),
     ])
-env.NoCache(buildInfo)
 
 config_header_substs = (
     ('@mongo_config_byte_order@', 'MONGO_CONFIG_BYTE_ORDER'),
@@ -149,15 +197,8 @@ configHeaderFile = env.Substfile(
     SUBST_DICT=[(k, env.makeConfigHeaderDefine(v)) for (k, v) in config_header_substs]
 )
 
-versionFile = env.Substfile(
-    'util/version.cpp.in',
-    SUBST_DICT=[
-        ('@mongo_code_version@', env['MONGO_CODE_VERSION'])
-    ])
-
 env.Library('version',
             [
-                'buildinfo.cpp',
                 'util/version.cpp'
             ],
             LIBDEPS=[
@@ -173,7 +214,6 @@ commonFiles = [ "shell/mongo.cpp",
                 "util/concurrency/rwlockimpl.cpp",
                 "util/text_startuptest.cpp",
                 'util/signal_win32.cpp',
-                "util/version_reporting.cpp",
                 ]
 
 extraCommonLibdeps = []

@@ -65,12 +65,7 @@ namespace mongo {
 
     SSLParams sslGlobalParams;
 
-#ifndef MONGO_CONFIG_SSL   
-    const std::string getSSLVersion(const std::string &prefix, const std::string &suffix) {
-        return "";
-    }
-#else
-
+#ifdef MONGO_CONFIG_SSL
 // Old copies of OpenSSL will not have constants to disable protocols they don't support.
 // Define them to values we can OR together safely to generically disable these protocols across
 // all versions of OpenSSL.
@@ -80,11 +75,6 @@ namespace mongo {
 #ifndef SSL_OP_NO_TLSv1_2
 #define SSL_OP_NO_TLSv1_2 0
 #endif
-
-
-    const std::string getSSLVersion(const std::string &prefix, const std::string &suffix) {
-        return prefix + SSLeay_version(SSLEAY_VERSION) + suffix;
-    }
 
     namespace {
 
