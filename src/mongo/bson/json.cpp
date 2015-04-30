@@ -27,7 +27,7 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
 
-#include "mongo/db/json.h"
+#include "mongo/bson/json.h"
 
 #include <boost/scoped_ptr.hpp>
 

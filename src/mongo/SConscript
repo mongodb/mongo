@@ -58,7 +58,7 @@ env.Library('bson', [
         'bson/bsonobj.cpp',
         'bson/bsonobjbuilder.cpp',
         'bson/bsontypes.cpp',
-        'db/json.cpp'
+        'bson/json.cpp'
         ], LIBDEPS=[
         '$BUILD_DIR/mongo/platform/platform',
         'base/base',
