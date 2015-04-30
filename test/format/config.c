@@ -101,7 +101,7 @@ config_setup(void)
 	 * tested as well.
 	 */
 	if ((g.uri = malloc(256)) == NULL)
-		die(errno, "malloc");
+		testutil_die(errno, "malloc");
 	strcpy(g.uri, DATASOURCE("file") ? "file:" : "table:");
 	if (DATASOURCE("helium"))
 		strcat(g.uri, "dev1/");
@@ -125,9 +125,10 @@ config_setup(void)
 
 	/* Required shared libraries. */
 	if (DATASOURCE("helium") && access(HELIUM_PATH, R_OK) != 0)
-		die(errno, "Levyx/helium shared library: %s", HELIUM_PATH);
+		testutil_die(errno,
+		    "Levyx/helium shared library: %s", HELIUM_PATH);
 	if (DATASOURCE("kvsbdb") && access(KVS_BDB_PATH, R_OK) != 0)
-		die(errno, "kvsbdb shared library: %s", KVS_BDB_PATH);
+		testutil_die(errno, "kvsbdb shared library: %s", KVS_BDB_PATH);
 
 	/* Some data-sources don't support user-specified collations. */
 	if (DATASOURCE("helium") || DATASOURCE("kvsbdb"))
@@ -178,14 +179,15 @@ config_setup(void)
 	if (!config_is_perm("key_max") && g.c_key_max < g.c_key_min)
 		g.c_key_max = g.c_key_min;
 	if (g.c_key_min > g.c_key_max)
-		die(EINVAL, "key_min may not be larger than key_max");
+		testutil_die(EINVAL, "key_min may not be larger than key_max");
 
 	if (!config_is_perm("value_min") && g.c_value_min > g.c_value_max)
 		g.c_value_min = g.c_value_max;
 	if (!config_is_perm("value_max") && g.c_value_max < g.c_value_min)
 		g.c_value_max = g.c_value_min;
 	if (g.c_value_min > g.c_value_max)
-		die(EINVAL, "value_min may not be larger than value_max");
+		testutil_die(EINVAL,
+		    "value_min may not be larger than value_max");
 
 	/* Reset the key count. */
 	g.key_cnt = 0;
@@ -325,7 +327,7 @@ config_print(int error_display)
 		fp = stdout;
 	else
 		if ((fp = fopen(g.home_config, "w")) == NULL)
-			die(errno, "fopen: %s", g.home_config);
+			testutil_die(errno, "fopen: %s", g.home_config);
 
 	fprintf(fp, "############################################\n");
 	fprintf(fp, "#  RUN PARAMETERS\n");
@@ -359,7 +361,7 @@ config_file(const char *name)
 	char *p, buf[256];
 
 	if ((fp = fopen(name, "r")) == NULL)
-		die(errno, "fopen: %s", name);
+		testutil_die(errno, "fopen: %s", name);
 	while (fgets(buf, sizeof(buf), fp) != NULL) {
 		for (p = buf; *p != '\0' && *p != '\n'; ++p)
 			;
@@ -446,7 +448,7 @@ config_single(const char *s, int perm)
 			*cp->vstr = strdup(ep);
 		}
 		if (*cp->vstr == NULL)
-			die(errno, "malloc");
+			testutil_die(errno, "malloc");
 
 		return;
 	}
@@ -489,7 +491,7 @@ config_map_file_type(const char *s, u_int *vp)
 	    strcmp(s, "row-store") == 0)
 		*vp = ROW;
 	else
-		die(EINVAL, "illegal file type configuration: %s", s);
+		testutil_die(EINVAL, "illegal file type configuration: %s", s);
 }
 
 /*
@@ -506,7 +508,7 @@ config_map_checksum(const char *s, u_int *vp)
 	else if (strcmp(s, "uncompressed") == 0)
 		*vp = CHECKSUM_UNCOMPRESSED;
 	else
-		die(EINVAL, "illegal checksum configuration: %s", s);
+		testutil_die(EINVAL, "illegal checksum configuration: %s", s);
 }
 
 /*
@@ -533,7 +535,8 @@ config_map_compression(const char *s, u_int *vp)
 	else if (strcmp(s, "zlib-noraw") == 0)
 		*vp = COMPRESS_ZLIB_NO_RAW;
 	else
-		die(EINVAL, "illegal compression configuration: %s", s);
+		testutil_die(EINVAL,
+		    "illegal compression configuration: %s", s);
 }
 
 /*
@@ -552,7 +555,7 @@ config_map_isolation(const char *s, u_int *vp)
 	else if (strcmp(s, "snapshot") == 0)
 		*vp = ISOLATION_SNAPSHOT;
 	else
-		die(EINVAL, "illegal isolation configuration: %s", s);
+		testutil_die(EINVAL, "illegal isolation configuration: %s", s);
 }
 
 /*

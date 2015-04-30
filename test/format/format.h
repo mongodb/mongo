@@ -50,11 +50,7 @@
 #endif
 #include <time.h>
 
-#ifdef _WIN32
-#include "windows_shim.h"
-#endif
-
-#include <wiredtiger.h>
+#include "test_util.i"
 #include <wiredtiger_ext.h>
 
 #ifdef BDB
@@ -321,9 +317,3 @@ void	 wts_read_scan(void);
 void	 wts_salvage(void);
 void	 wts_stats(void);
 void	 wts_verify(const char *);
-
-void	 die(int, const char *, ...)
-#if defined(__GNUC__)
-__attribute__((__noreturn__))
-#endif
-;

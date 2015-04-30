@@ -33,7 +33,6 @@ GLOBAL g;
 static int  handle_error(WT_EVENT_HANDLER *, WT_SESSION *, int, const char *);
 static int  handle_message(WT_EVENT_HANDLER *, WT_SESSION *, const char *);
 static void onint(int);
-static int  path_setup(const char *);
 static int  cleanup(void);
 static int  usage(void);
 static int  wt_connect(const char *);
@@ -41,22 +40,24 @@ static int  wt_shutdown(void);
 
 extern int __wt_optind;
 extern char *__wt_optarg;
+static char home[512];
 
 int
 main(int argc, char *argv[])
 {
 	table_type ttype;
 	int ch, cnt, ret, runs;
-	const char *config_open, *home;
+	char *working_dir;
+	const char *config_open;
 
-	if ((g.progname = strrchr(argv[0], '/')) == NULL)
+	if ((g.progname = strrchr(argv[0], DIR_DELIM)) == NULL)
 		g.progname = argv[0];
 	else
 		++g.progname;
 
 	config_open = NULL;
 	ret = 0;
-	home = NULL;
+	working_dir = NULL;
 	ttype = MIX;
 	g.checkpoint_name = "WiredTigerCheckpoint";
 	g.nkeys = 10000;
@@ -75,7 +76,7 @@ main(int argc, char *argv[])
 			config_open = __wt_optarg;
 			break;
 		case 'h':			/* wiredtiger_open config */
-			home = __wt_optarg;
+			working_dir = __wt_optarg;
 			break;
 		case 'k':			/* rows */
 			g.nkeys = (u_int)atoi(__wt_optarg);
@@ -125,11 +126,11 @@ main(int argc, char *argv[])
 	if (argc != 0)
 		return (usage());
 
+	if ((ret = testutil_work_dir_from_path(home, 512, working_dir)) != 0)
+		testutil_die(ret, "provided directory name is too long");
+
 	/* Clean up on signal. */
 	(void)signal(SIGINT, onint);
-
-	if ((ret = path_setup(home)) != 0)
-		return (ret);
 
 	printf("%s: process %" PRIu64 "\n", g.progname, (uint64_t)getpid());
 	for (cnt = 1; (runs == 0 || cnt <= runs) && g.status == 0; ++cnt) {
@@ -200,6 +201,8 @@ wt_connect(const char *config_open)
 	int ret;
 	char config[128];
 
+	testutil_make_work_dir(home);
+
 	snprintf(config, sizeof(config),
 	    "create,statistics=(fast),error_prefix=\"%s\",cache_size=1GB%s%s",
 	    g.progname,
@@ -207,7 +210,7 @@ wt_connect(const char *config_open)
 	    config_open == NULL ? "" : config_open);
 
 	if ((ret = wiredtiger_open(
-	    g.home, &event_handler, config, &g.conn)) != 0)
+	    home, &event_handler, config, &g.conn)) != 0)
 		return (log_print_err("wiredtiger_open", ret, 1));
 	return (0);
 }
@@ -241,7 +244,9 @@ cleanup(void)
 {
 	g.running = 0;
 	g.ntables_created = 0;
-	return (system(g.home_init));
+
+	testutil_clean_work_dir(home);
+	return (0);
 }
 
 static int
@@ -277,7 +282,7 @@ onint(int signo)
 {
 	WT_UNUSED(signo);
 
-	(void)cleanup();
+	testutil_clean_work_dir(home);
 
 	fprintf(stderr, "\n");
 	exit(EXIT_FAILURE);
@@ -305,25 +310,6 @@ log_print_err(const char *m, int e, int fatal)
  * path_setup --
  *	Build the standard paths and shell commands we use.
  */
-static int
-path_setup(const char *home)
-{
-	size_t len;
-
-	/* Home directory. */
-	if ((g.home = strdup(home == NULL ? "WT_TEST" : home)) == NULL)
-		return (log_print_err("malloc", ENOMEM, 1));
-
-	/* Home directory initialize command: remove everything */
-#undef	CMD
-#define	CMD	"mkdir -p %s && cd %s && rm -rf `ls`"
-	len = (strlen(g.home) * 2) + strlen(CMD) + 1;
-	if ((g.home_init = malloc(len)) == NULL)
-		return (log_print_err("malloc", ENOMEM, 1));
-	snprintf(g.home_init, len, CMD, g.home, g.home);
-	return (0);
-}
-
 const char *
 type_to_string(table_type type)
 {

@@ -38,7 +38,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#include <wiredtiger.h>
+#include "test_util.i"
 #include "wt_internal.h"
 
 #define	FNAME		"file:wt.%03d"		/* File name */
@@ -60,9 +60,3 @@ void load(const char *);
 int  rw_start(u_int, u_int);
 void stats(void);
 void verify(const char *);
-
-void die(int, const char *, ...)
-#if defined(__GNUC__)
-__attribute__((noreturn))
-#endif
-;

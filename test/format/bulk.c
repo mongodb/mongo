@@ -41,7 +41,7 @@ wts_load(void)
 	conn = g.wts_conn;
 
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		die(ret, "connection.open_session");
+		testutil_die(ret, "connection.open_session");
 
 	if (g.logging != 0)
 		(void)g.wt_api->msg_printf(g.wt_api, session,
@@ -56,7 +56,7 @@ wts_load(void)
 	    !DATASOURCE("kvsbdb") && !DATASOURCE("helium");
 	if ((ret = session->open_cursor(session, g.uri, NULL,
 	    is_bulk ? "bulk" : NULL, &cursor)) != 0)
-		die(ret, "session.open_cursor");
+		testutil_die(ret, "session.open_cursor");
 
 	/* Set up the default key buffer. */
 	key_gen_setup(&keybuf);
@@ -114,7 +114,7 @@ wts_load(void)
 		}
 
 		if ((ret = cursor->insert(cursor)) != 0)
-			die(ret, "cursor.insert");
+			testutil_die(ret, "cursor.insert");
 
 #ifdef HAVE_BERKELEY_DB
 		if (SINGLETHREADED)
@@ -123,14 +123,14 @@ wts_load(void)
 	}
 
 	if ((ret = cursor->close(cursor)) != 0)
-		die(ret, "cursor.close");
+		testutil_die(ret, "cursor.close");
 
 	if (g.logging != 0)
 		(void)g.wt_api->msg_printf(g.wt_api, session,
 		    "=============== bulk load stop ===============");
 
 	if ((ret = session->close(session, NULL)) != 0)
-		die(ret, "session.close");
+		testutil_die(ret, "session.close");
 
 	free(keybuf);
 	free(valbuf);
