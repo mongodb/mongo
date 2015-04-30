@@ -315,11 +315,6 @@ serverOnlyFiles = [ "db/background.cpp",
                     "db/storage_options.cpp",
                     "db/ttl.cpp",
                     "db/write_concern.cpp",
-                    "s/d_merge.cpp",
-                    "s/d_migrate.cpp",
-                    "s/d_split.cpp",
-                    "s/d_state.cpp",
-                    "s/distlock_test.cpp",
                     "util/compress.cpp",
                     "util/logfile.cpp",
                 ]
@@ -379,7 +374,9 @@ serveronlyLibdeps = ["s/coreshard",
                      'util/mmap',
                      'util/elapsed_tracker',
                      '$BUILD_DIR/third_party/shim_snappy',
-                     'client/parallel']
+                     'client/parallel',
+                     's/serveronly',
+                 ]
 
 if wiredtiger:
     serveronlyLibdeps.append( 'db/storage/wiredtiger/storage_wiredtiger' )

@@ -312,3 +312,16 @@ env.CppUnitTest(
         "mongoscore",
     ],
 )
+
+env.Library(
+    target='serveronly',
+    source=[
+        "d_merge.cpp",
+        "d_migrate.cpp",
+        "d_split.cpp",
+        "d_state.cpp",
+        "distlock_test.cpp",
+    ],
+    LIBDEPS=[
+    ],
+)
