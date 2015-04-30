@@ -1,4 +1,4 @@
-/*! @m_page{{c},encryption,Encryptors}
+/*! @m_page{{c,java},encryption,Encryptors}
 
 @section encryption_overview Overview of Encryption in WiredTiger
 @ref encryption_custom "Custom encryption engines" may be used to
@@ -19,7 +19,7 @@ under load. Access to any such \em paging or \em swap devices must be
 considered when planning the security of a system.
 
 The encryption extension must be loaded in the ::wiredtiger_open call.
-See @subpage extensions for details on how extensions are loaded.
+See @subpage_single extensions for details on how extensions are loaded.
 Also, encryption is specified using \c encryption= in the configuration
 for the ::wiredtiger_open call. This configuration establishes
 the encryption algorithm and keys to be used for database log files and a subset
@@ -85,8 +85,10 @@ are stored in WiredTiger metadata using the system encryptor.
 @section encryption_custom Custom encryption engines
 
 WiredTiger may be extended by adding custom encryption engines
-that we call \em encryptors.
-See @subpage extensions for general details on extending WiredTiger,
+that we call \em encryptors. Custom encryptors must be coded in the C language.
+Once packaged, they can be used in any language.
+
+See @subpage_single extensions for general details on extending WiredTiger,
 and see WT_ENCRYPTOR for the encryptor interface.
 
 Custom encryptors are registered by calling WT_CONNECTION::add_encryptor,

@@ -25,9 +25,7 @@ each of which is ordered by one or more columns.
 - @subpage lsm
 - @subpage file_formats
 - @subpage compression
-@m_if{c}
 - @subpage encryption
-@m_endif
 
 <h2>Programming notes</h2>
 - @subpage threads
