@@ -148,7 +148,7 @@ __wt_session_can_wait(WT_SESSION_IMPL *session)
 	 * highjack the thread for eviction.
 	 */
 	if (F_ISSET(session,
-	    WT_SESSION_NO_CACHE_CHECK | WT_SESSION_SCHEMA_LOCKED))
+	    WT_SESSION_NO_CACHE_CHECK | WT_SESSION_LOCKED_SCHEMA))
 		return (0);
 
 	return (1);
@@ -170,7 +170,7 @@ __wt_cache_full_check(WT_SESSION_IMPL *session)
 	 * block eviction), we don't want to highjack the thread for eviction.
 	 */
 	if (F_ISSET(session, WT_SESSION_NO_CACHE_CHECK |
-	    WT_SESSION_SCHEMA_LOCKED | WT_SESSION_HANDLE_LIST_LOCKED))
+	    WT_SESSION_LOCKED_HANDLE_LIST | WT_SESSION_LOCKED_SCHEMA))
 		return (0);
 
 	/*
