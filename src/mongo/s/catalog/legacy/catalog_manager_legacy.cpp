@@ -388,8 +388,6 @@ namespace {
     void CatalogManagerLegacy::shutDown() {
         invariant(_distLockManager);
         _distLockManager->shutDown();
-
-        _consistencyCheckerThread.join();
     }
 
     Status CatalogManagerLegacy::enableSharding(const std::string& dbName) {
