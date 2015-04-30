@@ -32,7 +32,10 @@ env.Library(
     LIBDEPS = [
         'record_store_v1',
         'record_access_tracker',
-        'btree']
+        'btree',
+        '$BUILD_DIR/mongo/util/logfile',
+        '$BUILD_DIR/mongo/util/compress',
+    ]
     )
 
 env.Library(

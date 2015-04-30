@@ -411,3 +411,25 @@ env.CppUnitTest(
         'foundation',
     ],
 )
+
+compressEnv = env.Clone()
+compressEnv.InjectThirdPartyIncludePaths(libraries=['snappy'])
+compressEnv
+compressEnv.Library(
+    target='compress',
+    source=[
+        'compress.cpp',
+    ],
+    LIBDEPS=[
+    ],
+)
+
+env.Library(
+    target='logfile',
+    source=[
+        'logfile.cpp',
+    ],
+    LIBDEPS=[
+    ],
+)
+

@@ -315,8 +315,6 @@ serverOnlyFiles = [ "db/background.cpp",
                     "db/storage_options.cpp",
                     "db/ttl.cpp",
                     "db/write_concern.cpp",
-                    "util/compress.cpp",
-                    "util/logfile.cpp",
                 ]
 
 if has_option( 'use-cpu-profiler' ):
