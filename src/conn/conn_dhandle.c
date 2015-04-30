@@ -295,6 +295,22 @@ __wt_conn_btree_open(
 
 	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_CLOSING));
 
+	/*
+	 * If the handle is already open, it has to be closed so it can
+	 * be reopened with a new configuration.
+	 *
+	 * This call can return EBUSY if there's an update in the
+	 * object that's not yet globally visible.  That's not a
+	 * problem because it can only happen when we're switching from
+	 * a normal handle to a "special" one, so we're returning EBUSY
+	 * to an attempt to verify or do other special operations.  The
+	 * reverse won't happen because when the handle from a verify
+	 * or other special operation is closed, there won't be updates
+	 * in the tree that can block the close.
+	 */
+	if (F_ISSET(dhandle, WT_DHANDLE_OPEN))
+		WT_RET(__wt_conn_btree_sync_and_close(session, 0, 0));
+
 	/* Discard any previous configuration, set up the new configuration. */
 	__conn_btree_config_clear(session);
 	WT_RET(__conn_btree_config_set(session));

@@ -438,31 +438,11 @@ retry:		/* Try to lock the handle. */
 		    !LF_ISSET(WT_BTREE_SPECIAL_FLAGS)))
 			break;
 
-		/*
-		 * If the handle is already open, it has to be closed so it can
-		 * be reopened with a new configuration.
-		 *
-		 * This call can return EBUSY if there's an update in the
-		 * object that's not yet globally visible.  That's not a
-		 * problem because it can only happen when we're switching from
-		 * a normal handle to a "special" one, so we're returning EBUSY
-		 * to an attempt to verify or do other special operations.  The
-		 * reverse won't happen because when the handle from a verify
-		 * or other special operation is closed, there won't be updates
-		 * in the tree that can block the close.
-		 */
-		if (F_ISSET(dhandle, WT_DHANDLE_OPEN)) {
-			WT_WITH_SCHEMA_LOCK(session, ret =
-			    __wt_conn_btree_sync_and_close(session, 0, 0));
-			if (ret != 0)
-				goto openerr;
-		}
-
 		WT_ASSERT(session, F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE));
 
 		/* Open the handle. */
 		if ((ret = __wt_conn_btree_open(session, cfg, flags)) != 0) {
-openerr:		F_CLR(dhandle, WT_DHANDLE_EXCLUSIVE);
+			F_CLR(dhandle, WT_DHANDLE_EXCLUSIVE);
 			WT_TRET(__wt_writeunlock(session, dhandle->rwlock));
 			session->dhandle = NULL;
 			return (ret);
