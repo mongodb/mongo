@@ -177,17 +177,14 @@ namespace {
             }
 
         private:
-            bool _passthrough(const string& db,  DBConfigPtr conf, const BSONObj& cmdObj , int options , BSONObjBuilder& result ) {
+            bool _passthrough(const string& db, DBConfigPtr conf, const BSONObj& cmdObj, int options, BSONObjBuilder& result) {
                 ShardConnection conn(conf->getPrimary().getConnString(), "");
-                BSONObj res;
-                bool ok = conn->runCommand( db , cmdObj , res , passOptions() ? options : 0 );
-                if ( ! ok && res["code"].numberInt() == SendStaleConfigCode ) {
-                    conn.done();
-                    throw RecvStaleConfigException( "command failed because of stale config", res );
-                }
 
-                result.appendElements( res );
+                BSONObj res;
+                bool ok = conn->runCommand(db, cmdObj, res, passOptions() ? options : 0);
                 conn.done();
+
+                result.appendElements(res);
                 return ok;
             }
         };
