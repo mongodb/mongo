@@ -546,6 +546,7 @@ __session_salvage(WT_SESSION *wt_session, const char *uri, const char *config)
 	session = (WT_SESSION_IMPL *)wt_session;
 
 	SESSION_API_CALL(session, salvage, config, cfg);
+
 	/* Block out checkpoints to avoid spurious EBUSY errors. */
 	WT_WITH_CHECKPOINT_LOCK(session,
 	    WT_WITH_SCHEMA_LOCK(session, ret =
@@ -1109,8 +1110,7 @@ __wt_open_session(WT_CONNECTION_IMPL *conn,
 	WT_STAT_FAST_CONN_INCR(session, session_open);
 
 err:	__wt_spin_unlock(session, &conn->api_lock);
-	if (ret != 0)
-		return (ret);
+	WT_RET(ret);
 
 	/*
 	 * Acquiring the metadata handle requires the schema lock; we've seen
