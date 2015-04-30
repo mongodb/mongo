@@ -125,8 +125,20 @@ struct __wt_table {
 } while (0)
 
 /*
+ * WT_WITH_TABLE_LOCK --
+ *	Acquire the table lock, perform an operation, drop the lock.
+ */
+#define	WT_WITH_TABLE_LOCK(session, op) do {				\
+	WT_ASSERT(session,						\
+	    F_ISSET(session, WT_SESSION_LOCKED_TABLE) ||		\
+	    !F_ISSET(session, WT_SESSION_LOCKED_HANDLE_LIST));		\
+	WT_WITH_LOCK(session,						\
+	    &S2C(session)->table_lock, WT_SESSION_LOCKED_TABLE, op);	\
+} while (0)
+
+/*
  * WT_WITHOUT_LOCKS --
- *	Drop the schema lock and/or the handle list lock, perform an operation,
+ *	Drop the handle, table and/or schema locks, perform an operation,
  *	re-acquire the lock(s).
  */
 #define	WT_WITHOUT_LOCKS(session, op) do {			\
@@ -162,16 +174,4 @@ struct __wt_table {
 		__wt_spin_lock(session, &__conn->dhandle_lock);	\
 		F_SET(session, WT_SESSION_LOCKED_HANDLE_LIST);	\
 	}							\
-} while (0)
-
-/*
- * WT_WITH_TABLE_LOCK --
- *	Acquire the table lock, perform an operation, drop the lock.
- */
-#define	WT_WITH_TABLE_LOCK(session, op) do {				\
-	WT_ASSERT(session,						\
-	    F_ISSET(session, WT_SESSION_LOCKED_TABLE) ||		\
-	    !F_ISSET(session, WT_SESSION_LOCKED_HANDLE_LIST));		\
-	WT_WITH_LOCK(session,						\
-	    &S2C(session)->table_lock, WT_SESSION_LOCKED_TABLE, op);	\
 } while (0)
