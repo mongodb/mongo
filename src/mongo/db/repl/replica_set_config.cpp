@@ -359,7 +359,7 @@ namespace {
             }
         }
         else {
-            if (WriteConcernOptions::kMajority != _defaultWriteConcern.wMode &&
+            if ("majority" != _defaultWriteConcern.wMode &&
                     !findCustomWriteMode(_defaultWriteConcern.wMode).isOK()) {
                 return Status(ErrorCodes::BadValue, str::stream() <<
                               "Default write concern requires undefined write mode " <<
@@ -377,7 +377,7 @@ namespace {
 
     Status ReplicaSetConfig::checkIfWriteConcernCanBeSatisfied(
             const WriteConcernOptions& writeConcern) const {
-        if (!writeConcern.wMode.empty() && writeConcern.wMode != WriteConcernOptions::kMajority) {
+        if (!writeConcern.wMode.empty() && writeConcern.wMode != "majority") {
             StatusWith<ReplicaSetTagPattern> tagPatternStatus =
                     findCustomWriteMode(writeConcern.wMode);
             if (!tagPatternStatus.isOK()) {

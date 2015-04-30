@@ -33,6 +33,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/ops/update_request.h"
+#include "mongo/db/write_concern_options.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/s/write_ops/batched_delete_document.h"
@@ -94,6 +95,7 @@ namespace mongo {
          * times.
          */
         void execInserts( const BatchedCommandRequest& request,
+                          const WriteConcernOptions& originalWC,
                           std::vector<WriteErrorDetail*>* errors );
 
         /**

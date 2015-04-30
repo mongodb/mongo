@@ -46,8 +46,6 @@ namespace mongo {
         static const BSONObj Acknowledged;
         static const BSONObj Unacknowledged;
 
-        static const std::string kMajority; // = "majority"
-
         WriteConcernOptions() { reset(); }
 
         WriteConcernOptions(int numNodes,
