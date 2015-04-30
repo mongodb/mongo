@@ -13,7 +13,7 @@ enabled using the \c log=(enabled) configuration to ::wiredtiger_open.
 When logging is enabled, WiredTiger writes records to the log for each
 transaction.
 
-Transactions define which updates are made durable together see
+Transactions define which updates are made durable together; see
 @ref transactions for details.  By default, log records are flushed to
 disk by WT_SESSION::commit_transaction, ensuring that, once
 WT_SESSION::commit_transaction returns successfully, updates performed
