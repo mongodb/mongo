@@ -330,8 +330,10 @@ __session_dhandle_sweep(WT_SESSION_IMPL *session)
 		if (dhandle != session->dhandle &&
 		    dhandle->session_inuse == 0 &&
 		    (F_ISSET(dhandle, WT_DHANDLE_DEAD) ||
-		    now - dhandle->timeofdeath > conn->sweep_idle_time)) {
+		    (dhandle->timeofdeath != 0 &&
+		    now - dhandle->timeofdeath > conn->sweep_idle_time))) {
 			WT_STAT_FAST_CONN_INCR(session, dh_session_handles);
+			WT_ASSERT(session, !WT_IS_METADATA(dhandle));
 			__session_discard_btree(session, dhandle_cache);
 		}
 		dhandle_cache = dhandle_cache_next;
@@ -372,6 +374,7 @@ __session_dhandle_find(
 retry:	SLIST_FOREACH(dhandle_cache, &session->dhhash[bucket], hashl) {
 		dhandle = dhandle_cache->dhandle;
 		if (F_ISSET(dhandle, WT_DHANDLE_DEAD)) {
+			WT_ASSERT(session, !WT_IS_METADATA(dhandle));
 			__session_discard_btree(session, dhandle_cache);
 			/* We deleted our entry, retry from the start. */
 			goto retry;

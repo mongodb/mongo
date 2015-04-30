@@ -109,7 +109,6 @@ __wt_conn_dhandle_find(
 	 * need new files again soon, until they are cached by all sessions.
 	 * Find the right hash bucket to insert into as well.
 	 */
-	WT_ASSERT(session, F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED));
 	bucket = dhandle->name_hash % WT_HASH_ARRAY_SIZE;
 	WT_CONN_DHANDLE_INSERT(conn, dhandle, bucket);
 
@@ -314,10 +313,10 @@ __wt_conn_btree_open(
 		++S2C(session)->open_btree_count;
 
 	if (0) {
-err:		/* If the open failed, close the handle. */
+err:		F_CLR(btree, WT_BTREE_SPECIAL_FLAGS);
+		/* If the open failed, close the handle. */
 		if (F_ISSET(dhandle, WT_DHANDLE_OPEN))
 			WT_TRET(__wt_conn_btree_sync_and_close(session, 0, 0));
-		F_CLR(btree, WT_BTREE_SPECIAL_FLAGS);
 	}
 
 	return (ret);

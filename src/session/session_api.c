@@ -953,7 +953,7 @@ __wt_open_internal_session(WT_CONNECTION_IMPL *conn, const char *name,
 
 	*sessionp = NULL;
 
-	WT_RET(__wt_open_session(conn, NULL, NULL, &session));
+	WT_RET(__wt_open_session(conn, NULL, NULL, open_metadata, &session));
 	session->name = name;
 
 	/*
@@ -971,19 +971,6 @@ __wt_open_internal_session(WT_CONNECTION_IMPL *conn, const char *name,
 	if (!uses_dhandles)
 		F_SET(session, WT_SESSION_NO_DATA_HANDLES);
 
-	/*
-	 * Acquiring the metadata handle requires the schema lock; we've seen
-	 * problems in the past where a worker thread has acquired the schema
-	 * lock unexpectedly, relatively late in the run, and deadlocked. Be
-	 * defensive, get it now.  The metadata file may not exist when the
-	 * connection first creates its default session or the shared cache
-	 * pool creates its sessions, let our caller decline this work.
-	 */
-	if (open_metadata) {
-		WT_ASSERT(session, !F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
-		WT_RET(__wt_metadata_open(session));
-	}
-
 	*sessionp = session;
 	return (0);
 }
@@ -995,7 +982,7 @@ __wt_open_internal_session(WT_CONNECTION_IMPL *conn, const char *name,
  */
 int
 __wt_open_session(WT_CONNECTION_IMPL *conn,
-    WT_EVENT_HANDLER *event_handler, const char *config,
+    WT_EVENT_HANDLER *event_handler, const char *config, int open_metadata,
     WT_SESSION_IMPL **sessionp)
 {
 	static const WT_SESSION stds = {
@@ -1131,5 +1118,21 @@ __wt_open_session(WT_CONNECTION_IMPL *conn,
 	WT_STAT_FAST_CONN_INCR(session, session_open);
 
 err:	__wt_spin_unlock(session, &conn->api_lock);
-	return (ret);
+	if (ret != 0)
+		return (ret);
+
+	/*
+	 * Acquiring the metadata handle requires the schema lock; we've seen
+	 * problems in the past where a session has acquired the schema lock
+	 * unexpectedly, relatively late in the run, and deadlocked. Be
+	 * defensive, get it now.  The metadata file may not exist when the
+	 * connection first creates its default session or the shared cache
+	 * pool creates its sessions, let our caller decline this work.
+	 */
+	if (open_metadata) {
+		WT_ASSERT(session, !F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
+		WT_RET(__wt_metadata_open(session_ret));
+	}
+
+	return (0);
 }

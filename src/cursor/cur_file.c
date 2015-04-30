@@ -509,8 +509,10 @@ __wt_curfile_open(WT_SESSION_IMPL *session, const char *uri,
 	if (WT_PREFIX_MATCH(uri, "file:")) {
 		/*
 		 * If we are opening a bulk cursor, get the handle while
-		 * holding the checkpoint lock.  This prevents a bulk cursor
-		 * open failing with EBUSY due to a database-wide checkpoint.
+		 * holding the checkpoint and schema locks.  This prevents a
+		 * bulk cursor open failing with EBUSY due to a database-wide
+		 * checkpoint.  It also allows bulk opens to first close the
+		 * tree if it is open in cache.
 		 */
 		if (bulk)
 			__wt_spin_lock(

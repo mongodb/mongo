@@ -574,7 +574,7 @@ extern int __wt_session_copy_values(WT_SESSION_IMPL *session);
 extern int __wt_open_cursor(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, const char *cfg[], WT_CURSOR **cursorp);
 extern int __wt_session_create_strip(WT_SESSION *wt_session, const char *v1, const char *v2, char **value_ret);
 extern int __wt_open_internal_session(WT_CONNECTION_IMPL *conn, const char *name, int uses_dhandles, int open_metadata, WT_SESSION_IMPL **sessionp);
-extern int __wt_open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler, const char *config, WT_SESSION_IMPL **sessionp);
+extern int __wt_open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler, const char *config, int open_metadata, WT_SESSION_IMPL **sessionp);
 extern int __wt_compact_uri_analyze(WT_SESSION_IMPL *session, const char *uri, int *skip);
 extern int __wt_session_compact( WT_SESSION *wt_session, const char *uri, const char *config);
 extern int __wt_session_lock_dhandle( WT_SESSION_IMPL *session, uint32_t flags, int *is_deadp);
