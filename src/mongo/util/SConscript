@@ -369,3 +369,13 @@ env.Library(
         "signal_handlers_synchronous",
     ],
 )
+
+env.CppUnitTest(
+    target="unowned_ptr_test",
+    source=[
+        "unowned_ptr_test.cpp",
+    ],
+    LIBDEPS=[
+        # None since unowned_ptr is header-only.
+    ],
+)

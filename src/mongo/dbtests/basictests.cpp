@@ -40,7 +40,6 @@
 #include "mongo/util/base64.h"
 #include "mongo/util/compress.h"
 #include "mongo/util/paths.h"
-#include "mongo/util/ptr.h"
 #include "mongo/util/queue.h"
 #include "mongo/util/stringutils.h"
 #include "mongo/util/text.h"
@@ -364,48 +363,6 @@ namespace BasicTests {
         }
     };
 
-    class PtrTests {
-    public:
-        void run() {
-            scoped_ptr<int> p1 (new int(1));
-            boost::shared_ptr<int> p2 (new int(2));
-            scoped_ptr<const int> p3 (new int(3));
-            boost::shared_ptr<const int> p4 (new int(4));
-
-            //non-const
-            ASSERT_EQUALS( p1.get() , ptr<int>(p1) );
-            ASSERT_EQUALS( p2.get() , ptr<int>(p2) );
-            ASSERT_EQUALS( p2.get() , ptr<int>(p2.get()) ); // T* constructor
-            ASSERT_EQUALS( p2.get() , ptr<int>(ptr<int>(p2)) ); // copy constructor
-            ASSERT_EQUALS( *p2      , *ptr<int>(p2));
-            ASSERT_EQUALS( p2.get() , ptr<boost::shared_ptr<int> >(&p2)->get() ); // operator->
-
-            //const
-            ASSERT_EQUALS( p1.get() , ptr<const int>(p1) );
-            ASSERT_EQUALS( p2.get() , ptr<const int>(p2) );
-            ASSERT_EQUALS( p2.get() , ptr<const int>(p2.get()) );
-            ASSERT_EQUALS( p3.get() , ptr<const int>(p3) );
-            ASSERT_EQUALS( p4.get() , ptr<const int>(p4) );
-            ASSERT_EQUALS( p4.get() , ptr<const int>(p4.get()) );
-            ASSERT_EQUALS( p2.get() , ptr<const int>(ptr<const int>(p2)) );
-            ASSERT_EQUALS( p2.get() , ptr<const int>(ptr<int>(p2)) ); // constizing copy constructor
-            ASSERT_EQUALS( *p2      , *ptr<int>(p2));
-            ASSERT_EQUALS( p2.get() , ptr<const boost::shared_ptr<int> >(&p2)->get() );
-
-            //bool context
-            ASSERT( ptr<int>(p1) );
-            ASSERT( !ptr<int>(NULL) );
-            ASSERT( !ptr<int>() );
-
-#if 0
-            // These shouldn't compile
-            ASSERT_EQUALS( p3.get() , ptr<int>(p3) );
-            ASSERT_EQUALS( p4.get() , ptr<int>(p4) );
-            ASSERT_EQUALS( p2.get() , ptr<int>(ptr<const int>(p2)) );
-#endif
-        }
-    };
-
     struct StringSplitterTest {
 
         void test( string s ) {
@@ -551,8 +508,6 @@ namespace BasicTests {
             add< sleeptest >();
             add< SleepBackoffTest >();
             add< AssertTests >();
-
-            add< PtrTests >();
 
             add< StringSplitterTest >();
             add< IsValidUTF8Test >();

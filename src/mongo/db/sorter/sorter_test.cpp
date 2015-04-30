@@ -377,7 +377,7 @@ namespace mongo {
             }
 
             // add data to the sorter
-            virtual void addData(ptr<IWSorter> sorter) {
+            virtual void addData(unowned_ptr<IWSorter> sorter) {
                 sorter->add(2,-2);
                 sorter->add(1,-1);
                 sorter->add(0,0);
@@ -408,7 +408,7 @@ namespace mongo {
                 return boost::shared_ptr<IWSorter>(IWSorter::make(adjustSortOptions(opts), comp));
             }
 
-            boost::shared_ptr<IWIterator> done(ptr<IWSorter> sorter) {
+            boost::shared_ptr<IWIterator> done(unowned_ptr<IWSorter> sorter) {
                 return boost::shared_ptr<IWIterator>(sorter->done());
             }
         };
@@ -417,7 +417,7 @@ namespace mongo {
             virtual SortOptions adjustSortOptions(SortOptions opts) {
                 return opts.Limit(5);
             }
-            void addData(ptr<IWSorter> sorter) {
+            void addData(unowned_ptr<IWSorter> sorter) {
                 sorter->add(0,0);
                 sorter->add(3,-3);
                 sorter->add(4,-4);
@@ -434,7 +434,7 @@ namespace mongo {
         };
 
         class Dupes : public Basic {
-            void addData(ptr<IWSorter> sorter) {
+            void addData(unowned_ptr<IWSorter> sorter) {
                 sorter->add(1,-1);
                 sorter->add(-1,1);
                 sorter->add(1,-1);
@@ -475,7 +475,7 @@ namespace mongo {
                 return opts.MaxMemoryUsageBytes(MEM_LIMIT).ExtSortAllowed();
             }
 
-            void addData(ptr<IWSorter> sorter) {
+            void addData(unowned_ptr<IWSorter> sorter) {
                 for (int i=0; i<NUM_ITEMS; i++)
                     sorter->add(_array[i], -_array[i]);
 

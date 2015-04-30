@@ -38,7 +38,7 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/stdx/memory.h"
-#include "mongo/util/ptr.h"
+#include "mongo/util/unowned_ptr.h"
 
 namespace mongo {
 
@@ -101,12 +101,12 @@ namespace mongo {
      *
      * Should be used for declaring and changing conditions, not for testing inserts.
      */
-    void insertToIndex(ptr<OperationContext> txn,
-                       ptr<SortedDataInterface> index,
+    void insertToIndex(unowned_ptr<OperationContext> txn,
+                       unowned_ptr<SortedDataInterface> index,
                        std::initializer_list<IndexKeyEntry> toInsert);
 
-    inline void insertToIndex(ptr<HarnessHelper> harness,
-                              ptr<SortedDataInterface> index,
+    inline void insertToIndex(unowned_ptr<HarnessHelper> harness,
+                              unowned_ptr<SortedDataInterface> index,
                               std::initializer_list<IndexKeyEntry> toInsert) {
         insertToIndex(harness->newOperationContext(), index, toInsert);
     }
@@ -117,13 +117,13 @@ namespace mongo {
      *
      * Should be used for declaring and changing conditions, not for testing removes.
      */
-    void removeFromIndex(ptr<OperationContext> txn,
-                         ptr<SortedDataInterface> index,
+    void removeFromIndex(unowned_ptr<OperationContext> txn,
+                         unowned_ptr<SortedDataInterface> index,
                          std::initializer_list<IndexKeyEntry> toRemove);
 
-    inline void removeFromIndex(ptr<HarnessHelper> harness,
-                               ptr<SortedDataInterface> index,
-                               std::initializer_list<IndexKeyEntry> toRemove) {
+    inline void removeFromIndex(unowned_ptr<HarnessHelper> harness,
+                                unowned_ptr<SortedDataInterface> index,
+                                std::initializer_list<IndexKeyEntry> toRemove) {
         removeFromIndex(harness->newOperationContext(), index, toRemove);
     }
 

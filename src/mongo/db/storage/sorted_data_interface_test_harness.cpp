@@ -48,8 +48,8 @@ namespace mongo {
         return index;
     }
 
-    void insertToIndex(ptr<OperationContext> txn,
-                       ptr<SortedDataInterface> index,
+    void insertToIndex(unowned_ptr<OperationContext> txn,
+                       unowned_ptr<SortedDataInterface> index,
                        std::initializer_list<IndexKeyEntry> toInsert) {
         WriteUnitOfWork wuow(txn);
         for (auto&& entry : toInsert) {
@@ -58,8 +58,8 @@ namespace mongo {
         wuow.commit();
     }
 
-    void removeFromIndex(ptr<OperationContext> txn,
-                         ptr<SortedDataInterface> index,
+    void removeFromIndex(unowned_ptr<OperationContext> txn,
+                         unowned_ptr<SortedDataInterface> index,
                          std::initializer_list<IndexKeyEntry> toRemove) {
         WriteUnitOfWork wuow(txn);
         for (auto&& entry : toRemove) {

@@ -62,7 +62,7 @@
 #include "mongo/util/bufreader.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/print.h"
-#include "mongo/util/ptr.h"
+#include "mongo/util/unowned_ptr.h"
 
 namespace mongo {
     namespace sorter {
@@ -365,7 +365,8 @@ namespace mongo {
             class STLComparator { // uses greater rather than less-than to maintain a MinHeap
             public:
                 explicit STLComparator(const Comparator& comp) : _comp(comp) {}
-                bool operator () (ptr<const Stream> lhs, ptr<const Stream> rhs) const {
+                bool operator () (unowned_ptr<const Stream> lhs,
+                                  unowned_ptr<const Stream> rhs) const {
                     // first compare data
                     dassertCompIsSane(_comp, lhs->current(), rhs->current());
                     int ret = _comp(lhs->current(), rhs->current());
