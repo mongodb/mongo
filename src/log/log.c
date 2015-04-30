@@ -362,7 +362,7 @@ __log_decompress(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out)
 	compressor = conn->log_compressor;
 	if (compressor == NULL || compressor->decompress == NULL)
 		WT_RET_MSG(session, WT_ERROR,
-		    "log_read: Compressed record with "
+		    "log_decompress: Compressed record with "
 		    "no configured compressor");
 	uncompressed_size = logrec->mem_len;
 	WT_RET(__wt_scr_alloc(session, 0, out));
@@ -407,7 +407,7 @@ __log_decrypt(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out)
 	    (encryptor = kencryptor->encryptor) == NULL ||
 	    encryptor->decrypt == NULL)
 		WT_ERR_MSG(session, WT_ERROR,
-		    "log_read: Encrypted record with "
+		    "log_decrypt: Encrypted record with "
 		    "no configured decrypt method");
 
 	/*
@@ -457,9 +457,18 @@ __log_decrypt(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out)
 		WT_ERR_MSG(session, EINVAL,
 		    "Invalid decryption of log record");
 	/*
+	 * This length is now the full decrypted size, including the header.
+	 */
+	result_len += WT_LOG_ENCRYPT_SKIP;
+	/*
 	 * Copy in the skipped header bytes.  This overwrites the checksum.
 	 */
 	memcpy((*out)->mem, in->mem, WT_LOG_ENCRYPT_SKIP);
+	/*
+	 * The original buffer was the maximum size needed.  Set the buffer
+	 * to the actual size now.
+	 */
+	WT_ERR(__wt_buf_initsize(session, *out, result_len));
 
 err:	if (ret != 0)
 		__wt_scr_free(session, out);
