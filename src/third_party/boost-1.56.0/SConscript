@@ -16,7 +16,10 @@ threadlib_env.Append(CPPDEFINES=['BOOST_THREAD_BUILD_LIB'])
 threadlib_env.Library('boost_thread', [
                     'libs/thread/src/future.cpp',
                     'libs/thread/src/tss_null.cpp'
-                    ] + boost_thread_source)
+                    ] + boost_thread_source,
+                    LIBDEPS=[
+                        'boost_system',
+                    ])
 
 env.Library('boost_filesystem', [
         'libs/filesystem/src/codecvt_error_category.cpp',
@@ -27,6 +30,9 @@ env.Library('boost_filesystem', [
         'libs/filesystem/src/unique_path.cpp',
         'libs/filesystem/src/utf8_codecvt_facet.cpp',
         'libs/filesystem/src/windows_file_codecvt.cpp',
+        ],
+        LIBDEPS=[
+            'boost_system',
         ])
 
 env.Library('boost_program_options', [
@@ -47,4 +53,7 @@ env.Library('boost_chrono', [
         'libs/chrono/src/chrono.cpp',
         'libs/chrono/src/process_cpu_clocks.cpp',
         'libs/chrono/src/thread_clock.cpp',
+        ],
+        LIBDEPS=[
+            'boost_system',
         ])
