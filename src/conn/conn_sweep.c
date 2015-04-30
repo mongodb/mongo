@@ -256,7 +256,7 @@ __sweep_server(void *arg)
 
 		WT_ERR(__sweep_flush(session));
 
-		WT_WITH_DHANDLE_LOCK(session,
+		WT_WITH_HANDLE_LIST_LOCK(session,
 		    ret = __sweep_remove_handles(session));
 		WT_ERR(ret);
 	}

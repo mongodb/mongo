@@ -110,7 +110,7 @@ __wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
 	 *
 	 * We're holding the schema lock which serializes with checkpoints.
 	 */
-	WT_ASSERT(session, F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
+	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_SCHEMA));
 
 	/*
 	 * Get the tree handle's flush lock which blocks threads writing leaf

@@ -397,7 +397,7 @@ retry:	SLIST_FOREACH(dhandle_cache, &session->dhhash[bucket], hashl) {
 	 * We didn't find a match in the session cache, search the shared
 	 * handle list and cache the handle we find.
 	 */
-	WT_WITH_DHANDLE_LOCK(session, ret =
+	WT_WITH_HANDLE_LIST_LOCK(session, ret =
 	    __session_dhandle_find_shared(session, uri, checkpoint));
 	if (ret == 0)
 		ret = __session_add_dhandle(session, NULL);
@@ -446,13 +446,13 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 		 * reopen handles in the meantime.  A combination of the schema
 		 * and handle list locks are used to enforce this.
 		 */
-		if (!F_ISSET(session, WT_SESSION_SCHEMA_LOCKED) ||
-		    !F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED)) {
+		if (!F_ISSET(session, WT_SESSION_LOCKED_SCHEMA) ||
+		    !F_ISSET(session, WT_SESSION_LOCKED_HANDLE_LIST)) {
 			F_CLR(dhandle, WT_DHANDLE_EXCLUSIVE);
 			WT_RET(__wt_writeunlock(session, dhandle->rwlock));
 
 			WT_WITH_SCHEMA_LOCK(session,
-			    WT_WITH_DHANDLE_LOCK(session, ret =
+			    WT_WITH_HANDLE_LIST_LOCK(session, ret =
 				__wt_session_get_btree(
 				session, uri, checkpoint, cfg, flags)));
 

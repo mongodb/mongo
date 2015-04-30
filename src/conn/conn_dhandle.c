@@ -77,7 +77,7 @@ __wt_conn_dhandle_find(
 	conn = S2C(session);
 
 	/* We must be holding the handle list lock at a higher level. */
-	WT_ASSERT(session, F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED));
+	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_HANDLE_LIST));
 
 	bucket = __wt_hash_city64(uri, strlen(uri)) % WT_HASH_ARRAY_SIZE;
 	if (checkpoint == NULL) {
@@ -164,7 +164,7 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session, int final, int force)
 	 * a handle lock (specifically, checkpoint).
 	 */
 	no_schema_lock = 0;
-	if (!F_ISSET(session, WT_SESSION_SCHEMA_LOCKED)) {
+	if (!F_ISSET(session, WT_SESSION_LOCKED_SCHEMA)) {
 		no_schema_lock = 1;
 		F_SET(session, WT_SESSION_NO_SCHEMA_LOCK);
 	}
@@ -383,7 +383,7 @@ __wt_conn_btree_apply(WT_SESSION_IMPL *session,
 
 	conn = S2C(session);
 
-	WT_ASSERT(session, F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED));
+	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_HANDLE_LIST));
 
 	/*
 	 * If we're given a URI, then we walk only the hash list for that
@@ -473,7 +473,7 @@ __wt_conn_btree_apply_single(WT_SESSION_IMPL *session,
 
 	conn = S2C(session);
 
-	WT_ASSERT(session, F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED));
+	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_HANDLE_LIST));
 
 	hash = __wt_hash_city64(uri, strlen(uri));
 	bucket = hash % WT_HASH_ARRAY_SIZE;
@@ -520,7 +520,7 @@ __wt_conn_dhandle_close_all(
 
 	conn = S2C(session);
 
-	WT_ASSERT(session, F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED));
+	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_HANDLE_LIST));
 	WT_ASSERT(session, session->dhandle == NULL);
 
 	bucket = __wt_hash_city64(uri, strlen(uri)) % WT_HASH_ARRAY_SIZE;
@@ -581,7 +581,7 @@ __conn_dhandle_remove(WT_SESSION_IMPL *session, int final)
 	dhandle = session->dhandle;
 	bucket = dhandle->name_hash % WT_HASH_ARRAY_SIZE;
 
-	WT_ASSERT(session, F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED));
+	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_HANDLE_LIST));
 
 	/* Check if the handle was reacquired by a session while we waited. */
 	if (!final &&
@@ -621,11 +621,11 @@ __wt_conn_dhandle_discard_single(WT_SESSION_IMPL *session, int final, int force)
 	 * Kludge: interrupt the eviction server in case it is holding the
 	 * handle list lock.
 	 */
-	if (!F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED))
+	if (!F_ISSET(session, WT_SESSION_LOCKED_HANDLE_LIST))
 		F_SET(S2C(session)->cache, WT_CACHE_CLEAR_WALKS);
 
 	/* Try to remove the handle, protected by the data handle lock. */
-	WT_WITH_DHANDLE_LOCK(session,
+	WT_WITH_HANDLE_LIST_LOCK(session,
 	    WT_TRET(__conn_dhandle_remove(session, final)));
 
 	/*
