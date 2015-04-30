@@ -306,6 +306,11 @@ namespace mongo {
          */
         Status checkValidation(OperationContext* txn, const BSONObj& document) const;
 
+        /**
+         * Returns a non-ok Status if validator is not legal for this collection.
+         */
+        StatusWith<std::unique_ptr<MatchExpression>> parseValidator(const BSONObj& validator) const;
+
         Status recordStoreGoingToMove( OperationContext* txn,
                                        const RecordId& oldLocation,
                                        const char* oldBuffer,

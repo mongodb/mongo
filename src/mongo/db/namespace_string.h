@@ -109,6 +109,7 @@ namespace mongo {
         bool isOplog() const { return oplog( _ns ); }
         bool isSpecialCommand() const { return coll().startsWith("$cmd.sys"); }
         bool isSpecial() const { return special( _ns ); }
+        bool isOnInternalDb() const { return internalDb(db()); }
         bool isNormal() const { return normal( _ns ); }
         bool isListCollectionsGetMore() const;
         bool isListIndexesGetMore() const;
@@ -155,6 +156,16 @@ namespace mongo {
         static bool oplog(StringData ns);
 
         static bool special(StringData ns);
+
+        /**
+         * Returns true for DBs with special meaning to mongodb.
+         */
+        static bool internalDb(StringData ns) {
+            if (ns == "admin") return true;
+            if (ns == "local") return true;
+            if (ns == "config") return true;
+            return false;
+        }
 
         /**
          * samples:

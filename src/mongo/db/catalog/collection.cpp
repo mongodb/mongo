@@ -86,23 +86,6 @@ namespace {
 
         return Status::OK();
     }
-
-    StatusWith<std::unique_ptr<MatchExpression>> parseValidator(const BSONObj& validator) {
-        if (validator.isEmpty())
-            return {nullptr};
-
-        {
-            auto status = checkValidatorForBannedExpressions(validator);
-            if (!status.isOK())
-                return status;
-        }
-
-        auto statusWithRawPtr = MatchExpressionParser::parse(validator);
-        if (!statusWithRawPtr.isOK())
-            return statusWithRawPtr.getStatus();
-
-        return {std::unique_ptr<MatchExpression>(statusWithRawPtr.getValue())};
-    }
 }
 
     using boost::scoped_ptr;
@@ -234,6 +217,34 @@ namespace {
         return {ErrorCodes::DocumentValidationFailure, "Document failed validation"};
     }
 
+    StatusWith<std::unique_ptr<MatchExpression>> Collection::parseValidator(
+            const BSONObj& validator) const {
+        if (validator.isEmpty())
+            return {nullptr};
+
+        if (ns().isSystem()) {
+            return {ErrorCodes::InvalidOptions,
+                    "Document validators not allowed on system collections."};
+        }
+
+        if (ns().isOnInternalDb()) {
+            return {ErrorCodes::InvalidOptions,
+                    str::stream() << "Document validators are not allowed on collections in"
+                                  << " the " << ns().db() << " database"};
+        }
+
+        {
+            auto status = checkValidatorForBannedExpressions(validator);
+            if (!status.isOK())
+                return status;
+        }
+
+        auto statusWithRawPtr = MatchExpressionParser::parse(validator);
+        if (!statusWithRawPtr.isOK())
+            return statusWithRawPtr.getStatus();
+
+        return {std::unique_ptr<MatchExpression>(statusWithRawPtr.getValue())};
+    }
 
     StatusWith<RecordId> Collection::insertDocument(OperationContext* txn,
                                                     const DocWriter* doc,
