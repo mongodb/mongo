@@ -67,7 +67,7 @@ env.CppUnitTest(
         "scoped_db_conn_test.cpp",
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/coredb",
+        "$BUILD_DIR/mongo/db/coredb",
         "$BUILD_DIR/mongo/coreserver",
         "$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init",
         "$BUILD_DIR/mongo/util/net/message_server_port",

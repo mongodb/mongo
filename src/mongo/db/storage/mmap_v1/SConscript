@@ -88,7 +88,7 @@ env.CppUnitTest(
     LIBDEPS=[
         '$BUILD_DIR/mongo/serveronly',
         '$BUILD_DIR/mongo/coreserver',
-        '$BUILD_DIR/mongo/coredb',
+        '$BUILD_DIR/mongo/db/coredb',
         '$BUILD_DIR/mongo/util/ntservice_mock',
         ],
     NO_CRUTCH=True,

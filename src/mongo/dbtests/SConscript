@@ -102,7 +102,7 @@ dbtest = env.Program(
         'updatetests.cpp',
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/coredb",
+        "$BUILD_DIR/mongo/db/coredb",
         "$BUILD_DIR/mongo/coreserver",
         "$BUILD_DIR/mongo/db/auth/authmocks",
         "$BUILD_DIR/mongo/db/query/query",

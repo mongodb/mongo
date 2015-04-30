@@ -25,7 +25,7 @@ env.Library(
         '$BUILD_DIR/mongo/base/base',
         '$BUILD_DIR/mongo/bson/bson',
         '$BUILD_DIR/mongo/client/clientdriver',
-        '$BUILD_DIR/mongo/coredb',
+        '$BUILD_DIR/mongo/db/coredb',
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/db/query/getmore_request',
         '$BUILD_DIR/mongo/db/query/lite_parsed_query',
@@ -291,7 +291,7 @@ env.CppUnitTest('isself_test',
                 LIBDEPS=[
                     '$BUILD_DIR/mongo/serveronly',
                     '$BUILD_DIR/mongo/coreserver',
-                    '$BUILD_DIR/mongo/coredb',
+                    '$BUILD_DIR/mongo/db/coredb',
                     "$BUILD_DIR/mongo/util/ntservice_mock",
                 ],
                 NO_CRUTCH = True)

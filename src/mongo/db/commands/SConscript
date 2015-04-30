@@ -19,7 +19,7 @@ env.CppUnitTest(
         "index_filter_commands_test.cpp",
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/coredb",
+        "$BUILD_DIR/mongo/db/coredb",
         "$BUILD_DIR/mongo/coreserver",
         "$BUILD_DIR/mongo/serveronly",
         "$BUILD_DIR/mongo/util/ntservice_mock",
@@ -33,7 +33,7 @@ env.CppUnitTest(
         "mr_test.cpp",
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/coredb",
+        "$BUILD_DIR/mongo/db/coredb",
         "$BUILD_DIR/mongo/coreserver",
         "$BUILD_DIR/mongo/serveronly",
         "$BUILD_DIR/mongo/util/ntservice_mock",
@@ -47,7 +47,7 @@ env.CppUnitTest(
         "plan_cache_commands_test.cpp",
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/coredb",
+        "$BUILD_DIR/mongo/db/coredb",
         "$BUILD_DIR/mongo/coreserver",
         "$BUILD_DIR/mongo/serveronly",
         "$BUILD_DIR/mongo/util/ntservice_mock",
