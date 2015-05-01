@@ -36,6 +36,7 @@ env.Library(
         '$BUILD_DIR/mongo/util/logfile',
         '$BUILD_DIR/mongo/util/compress',
         '$BUILD_DIR/mongo/util/file_allocator',
+        '$BUILD_DIR/mongo/util/paths',
     ]
     )
 

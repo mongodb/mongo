@@ -104,6 +104,7 @@ env.Library(
         'storage_engine_lock_file_${TARGET_OS_FAMILY}.cpp',
         ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/util/paths',
         ]
     )
 

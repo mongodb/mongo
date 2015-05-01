@@ -422,6 +422,7 @@ compressEnv.Library(
         'compress.cpp',
     ],
     LIBDEPS=[
+        'paths',
     ],
 )
 
@@ -431,6 +432,7 @@ env.Library(
         'logfile.cpp',
     ],
     LIBDEPS=[
+        'paths',
     ],
 )
 
@@ -438,6 +440,16 @@ env.Library(
     target='file_allocator',
     source=[
         'file_allocator.cpp',
+    ],
+    LIBDEPS=[
+        'paths',
+    ],
+)
+
+env.Library(
+    target='paths',
+    source=[
+        'paths.cpp',
     ],
     LIBDEPS=[
     ],
