@@ -2324,6 +2324,18 @@ namespace {
         return "$setUnion";
     }
 
+    /* ----------------------- ExpressionIsArray ---------------------------- */
+
+    Value ExpressionIsArray::evaluateInternal(Variables* vars) const {
+        Value argument = vpOperand[0]->evaluateInternal(vars);
+        return Value(argument.getType() == Array);
+    }
+
+    REGISTER_EXPRESSION("$isArray", ExpressionIsArray::parse);
+    const char *ExpressionIsArray::getOpName() const {
+        return "$isArray";
+    }
+
     /* ----------------------- ExpressionSize ---------------------------- */
 
     Value ExpressionSize::evaluateInternal(Variables* vars) const {
