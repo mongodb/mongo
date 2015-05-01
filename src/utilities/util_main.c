@@ -31,12 +31,12 @@ main(int argc, char *argv[])
 	size_t len;
 	int ch, major_v, minor_v, tret, (*func)(WT_SESSION *, int, char *[]);
 	int logoff, recover;
-	char *p;
-	const char *cmd_config, *config, *p1, *p2, *p3, *secretkey, *rec_config;
+	char *p, *secretkey;
+	const char *cmd_config, *config, *p1, *p2, *p3, *rec_config;
+
 
 	conn = NULL;
 	p = NULL;
-	secretkey = NULL;
 
 	/* Get the program name. */
 	if ((progname = strrchr(argv[0], '/')) == NULL)
