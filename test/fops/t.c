@@ -27,7 +27,6 @@
  */
 
 #include "thread.h"
-#include "test_util.i"
 
 WT_CONNECTION *conn;				/* WiredTiger connection */
 pthread_rwlock_t single;			/* Single thread */
@@ -71,16 +70,17 @@ main(int argc, char *argv[])
 	u_int nthreads;
 	int ch, cnt, ret, runs;
 	char *config_open, *working_dir;
+
 	working_dir = NULL;
 
-	//Remove directories
+	/* Remove directories */
 	if ((progname = strrchr(argv[0], DIR_DELIM)) == NULL)
 		progname = argv[0];
 	else
 		++progname;
 
 	if ((ret = pthread_rwlock_init(&single, NULL)) != 0)
-		die(ret, "pthread_rwlock_init: single");
+		testutil_die(ret, "pthread_rwlock_init: single");
 
 	config_open = NULL;
 	nops = 1000;
@@ -121,7 +121,7 @@ main(int argc, char *argv[])
 		return (usage());
 
 	if ((ret = testutil_work_dir_from_path(home, 512, working_dir)) != 0)
-		die(ret, "provided directory name is too long");
+		testutil_die(ret, "provided directory name is too long");
 
 	/* Clean up on signal. */
 	(void)signal(SIGINT, onint);
@@ -173,7 +173,7 @@ wt_startup(char *config_open)
 	    config_open == NULL ? "" : config_open);
 	if ((ret = wiredtiger_open(
 	    home, &event_handler, config_buf, &conn)) != 0)
-		die(ret, "wiredtiger_open");
+		testutil_die(ret, "wiredtiger_open");
 }
 
 /*
@@ -186,7 +186,7 @@ wt_shutdown(void)
 	int ret;
 
 	if ((ret = conn->close(conn, NULL)) != 0)
-		die(ret, "conn.close");
+		testutil_die(ret, "conn.close");
 }
 
 /*
@@ -260,7 +260,7 @@ usage(void)
 	    progname);
 	fprintf(stderr, "%s",
 	    "\t-C specify wiredtiger_open configuration arguments\n"
-	    "\t-h home (default 'RUNDIR')\n"
+	    "\t-h home (default 'WT_TEST')\n"
 	    "\t-l specify a log file\n"
 	    "\t-n set number of operations each thread does\n"
 	    "\t-r set number of runs\n"

@@ -389,12 +389,12 @@ env.Append(BUILDERS={'SmokeTest' : Builder(action = builder_smoke_test)})
 
 #Build the tests and setup the "scons test" target
 
-#Don't build bloom on Windows, its broken
-#t = env.Program("t_bloom",
-#    "test/bloom/test_bloom.c",
-#    LIBS=[wtlib] + wtlibs)
-#env.Alias("test", env.SmokeTest(t))
-#Default(t)
+#Don't test bloom on Windows, its broken
+t = env.Program("t_bloom",
+    "test/bloom/test_bloom.c",
+    LIBS=[wtlib] + wtlibs)
+#env.Alias("check", env.SmokeTest(t))
+Default(t)
 
 #env.Program("t_checkpoint",
     #["test/checkpoint/checkpointer.c",
@@ -402,11 +402,11 @@ env.Append(BUILDERS={'SmokeTest' : Builder(action = builder_smoke_test)})
     #"test/checkpoint/workers.c"],
     #LIBS=[wtlib])
 
-#t = env.Program("t_huge",
-#    "test/huge/huge.c",
-#    LIBS=[wtlib] + wtlibs)
-#env.Alias("test", env.SmokeTest(t))
-#Default(t)
+t = env.Program("t_huge",
+    "test/huge/huge.c",
+    LIBS=[wtlib] + wtlibs)
+#env.Alias("check", env.SmokeTest(t))
+Default(t)
 
 t = env.Program("t_fops",
     ["test/fops/file.c",
@@ -414,7 +414,7 @@ t = env.Program("t_fops",
     "test/fops/t.c"],
     LIBS=[wtlib, shim] + wtlibs)
 env.Append(CPPPATH=["test/utility"])
-env.Alias("test", env.SmokeTest(t))
+env.Alias("check", env.SmokeTest(t))
 Default(t)
 
 if useBdb:

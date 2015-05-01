@@ -44,10 +44,7 @@
 #include <unistd.h>
 #endif
 
-#ifdef _WIN32
-#include "windows_shim.h"
-#endif
-
+#include "test_util.i"
 #include <wiredtiger.h>
 
 extern WT_CONNECTION *conn;			/* WiredTiger connection */
