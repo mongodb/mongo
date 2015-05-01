@@ -444,7 +444,6 @@ extern int __wt_calloc(WT_SESSION_IMPL *session, size_t number, size_t size, voi
 extern int __wt_realloc(WT_SESSION_IMPL *session, size_t *bytes_allocated_ret, size_t bytes_to_allocate, void *retp);
 extern int __wt_realloc_aligned(WT_SESSION_IMPL *session, size_t *bytes_allocated_ret, size_t bytes_to_allocate, void *retp);
 extern int __wt_strndup(WT_SESSION_IMPL *session, const void *str, size_t len, void *retp);
-extern int __wt_strdup(WT_SESSION_IMPL *session, const char *str, void *retp);
 extern void __wt_free_int(WT_SESSION_IMPL *session, const void *p_arg);
 extern int __wt_dirlist(WT_SESSION_IMPL *session, const char *dir, const char *prefix, uint32_t flags, char ***dirlist, u_int *countp);
 extern int __wt_dlopen(WT_SESSION_IMPL *session, const char *path, WT_DLH **dlhp);
