@@ -454,3 +454,12 @@ env.Library(
     LIBDEPS=[
     ],
 )
+
+env.Library(
+    target='password',
+    source=[
+        'password.cpp',
+    ],
+    LIBDEPS=[
+    ],
+)
