@@ -849,11 +849,11 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 	 */
 	for (;;) {
 		parent = ref->home;
-		F_CAS_ATOMIC(parent, WT_PAGE_SPLITTING, ret);
+		F_CAS_ATOMIC(parent, WT_PAGE_SPLIT_LOCKED, ret);
 		if (ret == 0) {
 			if (parent == ref->home)
 				break;
-			F_CLR_ATOMIC(parent, WT_PAGE_SPLITTING);
+			F_CLR_ATOMIC(parent, WT_PAGE_SPLIT_LOCKED);
 			continue;
 		}
 		/*
@@ -1086,7 +1086,7 @@ err:	if (!complete)
 			if (next_ref->state == WT_REF_SPLIT)
 				next_ref->state = WT_REF_DELETED;
 		}
-	F_CLR_ATOMIC(parent, WT_PAGE_SPLITTING);
+	F_CLR_ATOMIC(parent, WT_PAGE_SPLIT_LOCKED);
 
 	if (hazard)
 		WT_TRET(__wt_hazard_clear(session, parent));

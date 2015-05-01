@@ -3234,7 +3234,7 @@ __rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	 * split during a checkpoint.
 	 */
 	for (;;) {
-		F_CAS_ATOMIC(page, WT_PAGE_SPLITTING, ret);
+		F_CAS_ATOMIC(page, WT_PAGE_SPLIT_LOCKED, ret);
 		if (ret == 0) {
 			break;
 		}
@@ -3321,7 +3321,7 @@ __rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		__rec_copy_incr(session, r, val);
 	} WT_INTL_FOREACH_END;
 
-	F_CLR_ATOMIC(page, WT_PAGE_SPLITTING);
+	F_CLR_ATOMIC(page, WT_PAGE_SPLIT_LOCKED);
 
 	/* Write the remnant page. */
 	return (__rec_split_finish(session, r));
@@ -4060,7 +4060,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	 * deadlock when performing an in-memory split during a checkpoint.
 	 */
 	for (;;) {
-		F_CAS_ATOMIC(page, WT_PAGE_SPLITTING, ret);
+		F_CAS_ATOMIC(page, WT_PAGE_SPLIT_LOCKED, ret);
 		if (ret == 0) {
 			break;
 		}
@@ -4225,7 +4225,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		__rec_key_state_update(r, ovfl_key);
 	} WT_INTL_FOREACH_END;
 
-	F_CLR_ATOMIC(page, WT_PAGE_SPLITTING);
+	F_CLR_ATOMIC(page, WT_PAGE_SPLIT_LOCKED);
 
 	/* Write the remnant page. */
 	return (__rec_split_finish(session, r));

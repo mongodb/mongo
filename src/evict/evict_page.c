@@ -271,7 +271,7 @@ __evict_child_check(WT_SESSION_IMPL *session, WT_REF *parent)
  */
 static int
 __evict_review(
-    WT_SESSION_IMPL *session, WT_REF *ref,  int *inmem_splitp, uint32_t flags)
+    WT_SESSION_IMPL *session, WT_REF *ref, int *inmem_splitp, uint32_t flags)
 {
 	WT_DECL_RET;
 	WT_PAGE *page;
