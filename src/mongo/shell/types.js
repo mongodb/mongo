@@ -214,12 +214,6 @@ Array.stdDev = function(arr){
     return Math.sqrt(sum / arr.length);
 }
 
-if (typeof Array.isArray != "function"){
-    Array.isArray = function(arr){
-        return arr != undefined && arr.constructor == Array
-    }
-}
-
 // Object
 Object.extend = function(dst, src, deep){
     for (var k in src){

@@ -149,10 +149,6 @@ Mongo.prototype.getReadPrefTagSet = function () {
     return this._readPrefTagSet;
 };
 
-var isArray = function(maybeArray) {
-    return Object.prototype.toString.call(maybeArray) === '[object Array]';
-};
-
 // Returns a readPreference object of the type expected by mongos.
 Mongo.prototype.getReadPref = function () {
     var obj = {}, mode, tagSet;
@@ -164,7 +160,7 @@ Mongo.prototype.getReadPref = function () {
     }
     // Server Selection Spec: - if readPref mode is "primary" then the tags field MUST
     // be absent. Ensured by setReadPref.
-    if (isArray(tagSet = this.getReadPrefTagSet())) {
+    if (Array.isArray(tagSet = this.getReadPrefTagSet())) {
         obj.tags = tagSet;
     }
 
