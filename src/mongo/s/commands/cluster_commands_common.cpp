@@ -30,6 +30,9 @@
 
 #include "mongo/s/commands/cluster_commands_common.h"
 
+#include "mongo/db/commands.h"
+#include "mongo/s/cursors.h"
+
 namespace mongo {
 
     int getUniqueCodeFromCommandResults(const std::vector<Strategy::CommandResult>& results) {
@@ -59,6 +62,50 @@ namespace mongo {
 
         // Otherwise, shards with errors agree on the error code; return that code
         return commonErrCode;
+    }
+
+    bool appendEmptyResultSet(BSONObjBuilder& result, Status status, const std::string& ns) {
+        invariant(!status.isOK());
+
+        if (status == ErrorCodes::DatabaseNotFound) {
+            result << "result" << BSONArray()
+                   << "cursor" << BSON("id" << 0LL <<
+                                       "ns" << ns <<
+                                       "firstBatch" << BSONArray());
+            return true;
+        }
+
+        return Command::appendCommandStatus(result, status);
+    }
+
+    Status storePossibleCursor(const std::string& server, const BSONObj& cmdResult) {
+        if (cmdResult["ok"].trueValue() && cmdResult.hasField("cursor")) {
+            BSONElement cursorIdElt = cmdResult.getFieldDotted("cursor.id");
+
+            if (cursorIdElt.type() != mongo::NumberLong) {
+                return Status(ErrorCodes::TypeMismatch,
+                                str::stream() << "expected \"cursor.id\" field from shard "
+                                              << "response to have NumberLong type, instead "
+                                              << "got: " << typeName(cursorIdElt.type()));
+            }
+
+            const long long cursorId = cursorIdElt.Long();
+            if (cursorId != 0) {
+                BSONElement cursorNsElt = cmdResult.getFieldDotted("cursor.ns");
+                if (cursorNsElt.type() != mongo::String) {
+                    return Status(ErrorCodes::TypeMismatch,
+                                    str::stream() << "expected \"cursor.ns\" field from "
+                                                  << "shard response to have String type, "
+                                                  << "instead got: "
+                                                  << typeName(cursorNsElt.type()));
+                }
+
+                const std::string cursorNs = cursorNsElt.String();
+                cursorCache.storeRef(server, cursorId, cursorNs);
+            }
+        }
+
+        return Status::OK();
     }
 
 } // namespace mongo

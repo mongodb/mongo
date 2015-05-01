@@ -30,7 +30,6 @@
 
 #pragma once
 
-#include "mongo/platform/basic.h"
 #include "chunk.h"
 #include "request.h"
 
