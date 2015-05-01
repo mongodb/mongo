@@ -47,7 +47,7 @@ assert.eq(t.count(), 30);
 var loggedWarning = false;
 var log = db.adminCommand({getLog: "global"}).log;
 var msg = RegExp("ttl indexes require the expireAfterSeconds" +
-                 " field to be numeric but received a type of:");
+                 " field to be numeric but received a type of");
 assertEntryMatches(log, msg);
 
 // Part 2
