@@ -650,10 +650,8 @@ __wt_encryptor_config(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval,
 	kenc->encryptor = encryptor;
 	SLIST_INSERT_HEAD(&nenc->keyedlh, kenc, l);
 	SLIST_INSERT_HEAD(&nenc->keyedhashlh[bucket], kenc, hashl);
-out:
-	__wt_spin_unlock(session, &conn->encryptor_lock);
-	locked = 0;
 
+out:	__wt_spin_unlock(session, &conn->encryptor_lock);
 	*kencryptorp = kenc;
 	return (0);
 
