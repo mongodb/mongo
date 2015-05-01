@@ -45,8 +45,7 @@ __conn_dhandle_alloc(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_rwlock_alloc(session, &dhandle->rwlock, "data handle"));
 	dhandle->name_hash = __wt_hash_city64(uri, strlen(uri));
 	WT_ERR(__wt_strdup(session, uri, &dhandle->name));
-	if (checkpoint != NULL)
-		WT_ERR(__wt_strdup(session, checkpoint, &dhandle->checkpoint));
+	WT_ERR(__wt_strdup(session, checkpoint, &dhandle->checkpoint));
 
 	/* TODO: abstract this out for other data handle types */
 	WT_ERR(__wt_calloc_one(session, &btree));

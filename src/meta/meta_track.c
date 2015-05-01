@@ -386,10 +386,8 @@ __wt_meta_track_fileop(
 	WT_RET(__meta_track_next(session, &trk));
 
 	trk->op = WT_ST_FILEOP;
-	if (olduri != NULL)
-		WT_RET(__wt_strdup(session, olduri, &trk->a));
-	if (newuri != NULL)
-		WT_RET(__wt_strdup(session, newuri, &trk->b));
+	WT_RET(__wt_strdup(session, olduri, &trk->a));
+	WT_RET(__wt_strdup(session, newuri, &trk->b));
 	return (0);
 }
 
