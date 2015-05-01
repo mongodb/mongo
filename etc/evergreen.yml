@@ -163,6 +163,14 @@ functions:
         git checkout r3.1.2
         . ./${set_tools_gopath|set_gopath.sh}
 
+        # In RHEL 5.5, /usr/bin/ld can't handle --build-id parameters, so
+        # use a wrapper if it's present on the system
+        #
+        if [ -d /opt/ldwrapper/bin ]
+        then
+          export PATH=/opt/ldwrapper/bin:$PATH
+        fi
+
         for i in bsondump mongostat mongofiles mongoexport mongoimport mongorestore mongodump mongotop mongooplog; do
              ${gorootvars} go build -ldflags "-X github.com/mongodb/mongo-tools/common/options.Gitspec $(git rev-parse HEAD)" ${tooltags|} -o "../mongo-tools/$i${exe|}" $i/main/$i.go
              echo $i;
