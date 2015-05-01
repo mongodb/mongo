@@ -85,6 +85,24 @@ class test_encrypt04(wttest.WiredTigerTestCase, suite_subprocess):
         self.pr(`conn`)
         return conn
 
+    def create_records(self, cursor, r, low, high):
+        for idx in xrange(low, high):
+            start = r.randint(0,9)
+            key = self.bigvalue[start:r.randint(0,100)] + str(idx)
+            val = self.bigvalue[start:r.randint(0,10000)] + str(idx)
+            cursor.set_key(key)
+            cursor.set_value(val)
+            cursor.insert()
+
+    def check_records(self, cursor, r, low, high):
+        for idx in xrange(low, high):
+            start = r.randint(0,9)
+            key = self.bigvalue[start:r.randint(0,100)] + str(idx)
+            val = self.bigvalue[start:r.randint(0,10000)] + str(idx)
+            cursor.set_key(key)
+            self.assertEqual(cursor.search(), 0)
+            self.assertEquals(cursor.get_value(), val)
+
     # Return the wiredtiger_open extension argument for a shared library.
     def extensionArg(self, exts):
         extfiles = []
@@ -115,13 +133,7 @@ class test_encrypt04(wttest.WiredTigerTestCase, suite_subprocess):
         cursor = self.session.open_cursor(self.uri, None)
         r = random.Random()
         r.seed(0)
-        for idx in xrange(1,self.nrecords):
-            start = r.randint(0,9)
-            key = self.bigvalue[start:r.randint(0,100)] + str(idx)
-            val = self.bigvalue[start:r.randint(0,10000)] + str(idx)
-            cursor.set_key(key)
-            cursor.set_value(val)
-            cursor.insert()
+        self.create_records(cursor, r, 0, self.nrecords)
         cursor.close()
 
         # Now intentially expose the test to mismatched configuration
@@ -155,13 +167,22 @@ class test_encrypt04(wttest.WiredTigerTestCase, suite_subprocess):
             self.reopen_conn()
             cursor = self.session.open_cursor(self.uri, None)
             r.seed(0)
-            for idx in xrange(1,self.nrecords):
-                start = r.randint(0,9)
-                key = self.bigvalue[start:r.randint(0,100)] + str(idx)
-                val = self.bigvalue[start:r.randint(0,10000)] + str(idx)
-                cursor.set_key(key)
-                self.assertEqual(cursor.search(), 0)
-                self.assertEquals(cursor.get_value(), val)
+            self.check_records(cursor, r, 0, self.nrecords)
+
+            if not is_same:
+                # With a configuration that has changed, we do a further test.
+                # Add some more items with the current configuration.
+                self.create_records(cursor, r, self.nrecords, self.nrecords * 2)
+                cursor.close()
+
+                # Force the cache to disk, so we read
+                # compressed/encrypted pages from disk.
+                # Now read both sets of data.
+                self.reopen_conn()
+                cursor = self.session.open_cursor(self.uri, None)
+                r.seed(0)
+                self.check_records(cursor, r, 0, self.nrecords)
+                self.check_records(cursor, r, self.nrecords, self.nrecords * 2)
             cursor.close()
         
 
