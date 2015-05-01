@@ -3924,7 +3924,7 @@ buildvariants:
 - name: ubuntu1404-debug-asan
   display_name: z ASAN SSL Ubuntu 1404 64-bit DEBUG
   run_on:
-  - ubuntu1404-test
+  - ubuntu1404-build
   stepback: false
   batchtime: 1440 # 3.5 days
   expansions:
@@ -3935,8 +3935,6 @@ buildvariants:
     test_flags: --continue-on-failure
   tasks:
   - name: compile
-    distros:
-    - ubuntu1404-build
   - name: aggregation
   - name: aggregation_WT
   - name: aggregation_auth
