@@ -181,8 +181,11 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 skip_evict:
 			/*
 			 * Check if we need an autocommit transaction.
+			 * Starting a transaction can trigger eviction, so skip
+			 * it if eviction isn't permitted.
 			 */
-			return (__wt_txn_autocommit_check(session));
+			return (LF_ISSET(WT_READ_NO_EVICT) ? 0 :
+			    __wt_txn_autocommit_check(session));
 		WT_ILLEGAL_VALUE(session);
 		}
 

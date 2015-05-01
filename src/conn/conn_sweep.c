@@ -249,14 +249,14 @@ __sweep_server(void *arg)
 
 		/* Close handles if we have reached the configured limit */
 		if (conn->open_file_count >= conn->sweep_handles_min) {
-			WT_WITH_DHANDLE_LOCK(session,
+			WT_WITH_HANDLE_LIST_LOCK(session,
 			    ret = __sweep_expire(session));
 			WT_ERR(ret);
 		}
 
 		WT_ERR(__sweep_flush(session));
 
-		WT_WITH_DHANDLE_LOCK(session,
+		WT_WITH_HANDLE_LIST_LOCK(session,
 		    ret = __sweep_remove_handles(session));
 		WT_ERR(ret);
 	}

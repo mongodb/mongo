@@ -38,7 +38,7 @@
 } while (0)
 
 #define	F_CAS_ATOMIC(p, mask, ret) do {					\
-	uint8_t __orig;						\
+	uint8_t __orig;							\
 	ret = 0;							\
 	do {								\
 		__orig = (p)->flags_atomic;				\
