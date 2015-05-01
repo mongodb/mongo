@@ -2198,7 +2198,6 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux-debug
     push_arch: x86_64
-    logger_url: "http://buildlogger-test-2014121502-1.10gen-mci.4085.mongodbdns.com:8080/"
     test_flags: --continue-on-failure
     compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/dbg_on/opt_on"
     has_debugsymbols: true
