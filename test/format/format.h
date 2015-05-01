@@ -128,7 +128,6 @@ typedef struct {
 	char *home_bdb;				/* BDB directory */
 	char *home_config;			/* Run CONFIG file path */
 	char *home_init;			/* Initialize home command */
-	char *home_kvs;				/* KVS directory */
 	char *home_log;				/* Operation log file path */
 	char *home_rand;			/* RNG log file path */
 	char *home_salvage_copy;		/* Salvage copy command */
