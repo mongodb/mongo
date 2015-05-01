@@ -971,7 +971,7 @@ namespace {
                     mongoutils::str::stream() << "_id entries for user documents must be of "
                             "the form <dbname>.<username>.  Found: " << idstr);
         }
-        return StatusWith<UserName>(UserName(idstr.substr(splitPoint),
+        return StatusWith<UserName>(UserName(idstr.substr(splitPoint + 1),
                                              idstr.substr(0, splitPoint)));
     }
 
