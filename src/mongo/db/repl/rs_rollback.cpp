@@ -37,6 +37,8 @@
 
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/client.h"
 #include "mongo/db/cloner.h"
@@ -147,7 +149,8 @@ namespace {
         // collections to drop
         set<string> toDrop;
 
-        set<string> collectionsToResync;
+        set<string> collectionsToResyncData;
+        set<string> collectionsToResyncMetadata;
 
         Timestamp commonPoint;
         RecordId commonPointOurDiskloc;
@@ -205,7 +208,7 @@ namespace {
             }
             else if (cmdname == "drop") {
                 string ns = nss.db().toString() + '.' + first.valuestr();
-                fixUpInfo.collectionsToResync.insert(ns);
+                fixUpInfo.collectionsToResyncData.insert(ns);
                 return;
             }
             else if (cmdname == "dropIndexes" || cmdname == "deleteIndexes") {
@@ -214,7 +217,7 @@ namespace {
                 warning() << "rollback of dropIndexes is slow in this version of "
                           << "mongod";
                 string ns = nss.db().toString() + '.' + first.valuestr();
-                fixUpInfo.collectionsToResync.insert(ns);
+                fixUpInfo.collectionsToResyncData.insert(ns);
                 return;
             }
             else if (cmdname == "renameCollection") {
@@ -223,8 +226,8 @@ namespace {
                           << "mongod";
                 string from = first.valuestr();
                 string to = obj["to"].String();
-                fixUpInfo.collectionsToResync.insert(from);
-                fixUpInfo.collectionsToResync.insert(to);
+                fixUpInfo.collectionsToResyncData.insert(from);
+                fixUpInfo.collectionsToResyncData.insert(to);
                 return;
             }
             else if (cmdname == "dropDatabase") {
@@ -234,10 +237,20 @@ namespace {
                 throw RSFatalException();
             }
             else if (cmdname == "collMod") {
-                if (obj.nFields() == 2 && obj["usePowerOf2Sizes"].type() == Bool) {
-                    log() << "not rolling back change of usePowerOf2Sizes: " << obj;
-                }
-                else {
+                const auto ns = NamespaceString(cmd->parseNs(nss.db().toString(), obj));
+                for (auto field : obj) {
+                    const auto modification = field.fieldNameStringData();
+                    if (modification == cmdname) {
+                        continue; // Skipping command name.
+                    }
+
+                    if (modification == "validator"
+                            || modification == "usePowerOf2Sizes"
+                            || modification == "noPadding") {
+                        fixUpInfo.collectionsToResyncMetadata.insert(ns);
+                        continue;
+                    }
+
                     severe() << "cannot rollback a collMod command: " << obj;
                     throw RSFatalException();
                 }
@@ -459,12 +472,13 @@ namespace {
         setMinValid(txn, minValid);
 
         // any full collection resyncs required?
-        if (!fixUpInfo.collectionsToResync.empty()) {
-            for (set<string>::iterator it = fixUpInfo.collectionsToResync.begin();
-                    it != fixUpInfo.collectionsToResync.end();
-                    it++) {
-                string ns = *it;
-                log() << "rollback 4.1 coll resync " << ns;
+        if (!fixUpInfo.collectionsToResyncData.empty()
+                || !fixUpInfo.collectionsToResyncMetadata.empty()) {
+
+            for (const string& ns : fixUpInfo.collectionsToResyncData) {
+                log() << "rollback 4.1.1 coll resync " << ns;
+
+                fixUpInfo.collectionsToResyncMetadata.erase(ns);
 
                 const NamespaceString nss(ns);
 
@@ -491,6 +505,49 @@ namespace {
                     uassert(15909, str::stream() << "replSet rollback error resyncing collection "
                                                  << ns << ' ' << errmsg, ok);
                 }
+            }
+
+            for (const string& ns : fixUpInfo.collectionsToResyncMetadata) {
+                log() << "rollback 4.1.2 coll metadata resync " << ns;
+
+                const NamespaceString nss(ns);
+                auto db = dbHolder().openDb(txn, nss.db().toString());
+                invariant(db);
+                auto collection = db->getCollection(ns);
+                invariant(collection);
+                auto cce = collection->getCatalogEntry();
+
+                const std::list<BSONObj> info =
+                    them->getCollectionInfos(nss.db().toString(), BSON("name" << nss.coll()));
+
+                if (info.empty()) {
+                    // Collection dropped by "them" so we should drop it too.
+                    log() << ns << " not found on remote host, dropping";
+                    fixUpInfo.toDrop.insert(ns);
+                    continue;
+                }
+
+                invariant(info.size() == 1);
+
+                CollectionOptions options;
+                auto status = options.parse(info.front());
+                if (!status.isOK()) {
+                    throw RSFatalException(str::stream() << "Failed to parse options "
+                                                         << info.front() << ": "
+                                                         << status.toString());
+                }
+
+                WriteUnitOfWork wuow(txn);
+                if (options.flagsSet || cce->getCollectionOptions(txn).flagsSet) {
+                    cce->updateFlags(txn, options.flags);
+                }
+
+                status = collection->setValidator(txn, options.validator);
+                if (!status.isOK()) {
+                    throw RSFatalException(str::stream() << "Failed to set validator: "
+                                                         << status.toString());
+                }
+                wuow.commit();
             }
 
             // we did more reading from primary, so check it again for a rollback (which would mess
@@ -601,7 +658,7 @@ namespace {
             BSONObj pattern = doc._id.wrap(); // { _id : ... }
             try {
                 verify(doc.ns && *doc.ns);
-                if (fixUpInfo.collectionsToResync.count(doc.ns)) {
+                if (fixUpInfo.collectionsToResyncData.count(doc.ns)) {
                     // we just synced this entire collection
                     continue;
                 }
