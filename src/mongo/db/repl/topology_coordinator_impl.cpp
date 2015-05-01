@@ -2143,6 +2143,7 @@ namespace {
     Status TopologyCoordinatorImpl::processReplSetDeclareElectionWinner(
             const ReplSetDeclareElectionWinnerArgs& args,
             long long* responseTerm) {
+        *responseTerm = _term;
         if (args.getReplSetName() != _rsConfig.getReplSetName()) {
             return {ErrorCodes::BadValue, "replSet name does not match"};
         }
@@ -2156,8 +2157,8 @@ namespace {
 
         if (args.getTerm() > _term) {
             _term = args.getTerm();
+            *responseTerm = _term;
         }
-        *responseTerm = _term;
 
         _currentPrimaryIndex = _rsConfig.findMemberIndexByConfigId(args.getWinnerId());
         return Status::OK();
