@@ -383,6 +383,9 @@ namespace {
             b.append("tags", a.done());
         }
         b.append("me", myConfig().h.toString());
+        if (isp) {
+            b.append("electionId", getElectionId());
+        }
     }
 
     /** @param cfgString <setname>/<seedhost1>,<seedhost2> */
