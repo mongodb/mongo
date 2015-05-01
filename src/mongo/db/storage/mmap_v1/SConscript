@@ -35,6 +35,7 @@ env.Library(
         'btree',
         '$BUILD_DIR/mongo/util/logfile',
         '$BUILD_DIR/mongo/util/compress',
+        '$BUILD_DIR/mongo/util/file_allocator',
     ]
     )
 
