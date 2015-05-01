@@ -808,6 +808,7 @@ strtouq
 struct
 structs
 su
+subdirectory
 subgetraw
 subgets
 subinit
