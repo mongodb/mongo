@@ -12,7 +12,7 @@ mongobridge = env.Program(
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/coredb",
         "$BUILD_DIR/mongo/coreserver",
-        "$BUILD_DIR/mongo/serveronly",
+        "$BUILD_DIR/mongo/db/serveronly",
         "$BUILD_DIR/mongo/util/ntservice_mock",
         "$BUILD_DIR/mongo/util/options_parser/options_parser_init",
         "$BUILD_DIR/mongo/util/signal_handlers_synchronous",

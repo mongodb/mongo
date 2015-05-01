@@ -15,7 +15,6 @@ Import("has_option")
 Import("get_option")
 Import("usev8")
 Import("use_system_version_of_library")
-Import("wiredtiger")
 
 # Boost we need everywhere. 's2' is spammed in all over the place by
 # db/geo unfortunately. pcre is also used many places.
@@ -191,198 +190,6 @@ env.CppUnitTest(
     LIBDEPS=["mongocommon"]
 )
 
-# mongod files - also files used in tools. present in dbtests, but not in mongos and not in client
-# libs.
-serverOnlyFiles = [ "db/background.cpp",
-                    "db/catalog/apply_ops.cpp",
-                    "db/catalog/create_collection.cpp",
-                    "db/catalog/coll_mod.cpp",
-                    "db/catalog/collection.cpp",
-                    "db/catalog/collection_compact.cpp",
-                    "db/catalog/collection_info_cache.cpp",
-                    "db/catalog/capped_utils.cpp",
-                    "db/catalog/cursor_manager.cpp",
-                    "db/catalog/database.cpp",
-                    "db/catalog/database_holder.cpp",
-                    "db/catalog/drop_collection.cpp",
-                    "db/catalog/drop_database.cpp",
-                    "db/catalog/drop_indexes.cpp",
-                    "db/catalog/rename_collection.cpp",
-                    "db/catalog/index_catalog.cpp",
-                    "db/catalog/index_catalog_entry.cpp",
-                    "db/catalog/index_create.cpp",
-                    "db/db_raii.cpp",
-                    "db/clientcursor.cpp",
-                    "db/cloner.cpp",
-                    "db/commands/apply_ops.cpp",
-                    "db/commands/cleanup_orphaned_cmd.cpp",
-                    "db/commands/clone.cpp",
-                    "db/commands/clone_collection.cpp",
-                    "db/commands/collection_to_capped.cpp",
-                    "db/commands/compact.cpp",
-                    "db/commands/copydb.cpp",
-                    "db/commands/copydb_start_commands.cpp",
-                    "db/commands/count.cpp",
-                    "db/commands/create_indexes.cpp",
-                    "db/commands/current_op.cpp",
-                    "db/commands/cursor_responses.cpp",
-                    "db/commands/dbhash.cpp",
-                    "db/commands/distinct.cpp",
-                    "db/commands/drop_indexes.cpp",
-                    "db/commands/explain_cmd.cpp",
-                    "db/commands/find_and_modify.cpp",
-                    "db/commands/find_cmd.cpp",
-                    "db/commands/fsync.cpp",
-                    "db/commands/geo_near_cmd.cpp",
-                    "db/commands/get_last_error.cpp",
-                    "db/commands/getmore_cmd.cpp",
-                    "db/commands/group.cpp",
-                    "db/commands/index_filter_commands.cpp",
-                    "db/commands/kill_op.cpp",
-                    "db/commands/list_collections.cpp",
-                    "db/commands/list_databases.cpp",
-                    "db/commands/list_indexes.cpp",
-                    "db/commands/merge_chunks_cmd.cpp",
-                    "db/commands/mr.cpp",
-                    "db/commands/oplog_note.cpp",
-                    "db/commands/parallel_collection_scan.cpp",
-                    "db/commands/pipeline_command.cpp",
-                    "db/commands/plan_cache_commands.cpp",
-                    "db/commands/rename_collection.cpp",
-                    "db/commands/repair_cursor.cpp",
-                    "db/commands/test_commands.cpp",
-                    'db/commands/top_command.cpp',
-                    "db/commands/touch.cpp",
-                    "db/commands/validate.cpp",
-                    "db/commands/write_commands/batch_executor.cpp",
-                    "db/commands/write_commands/write_commands.cpp",
-                    "db/commands/writeback_compatibility_shim.cpp",
-                    "db/dbcommands.cpp",
-                    "db/dbdirectclient.cpp",
-                    "db/dbeval.cpp",
-                    "db/dbhelpers.cpp",
-                    "db/driverHelpers.cpp",
-                    "db/geo/haystack.cpp",
-                    "db/service_context_d.cpp",
-                    "db/index/2d_access_method.cpp",
-                    "db/index/btree_access_method.cpp",
-                    "db/index/fts_access_method.cpp",
-                    "db/index/hash_access_method.cpp",
-                    "db/index/haystack_access_method.cpp",
-                    "db/index/index_access_method.cpp",
-                    "db/index/s2_access_method.cpp",
-                    "db/index_builder.cpp",
-                    "db/index_legacy.cpp",
-                    "db/index_rebuilder.cpp",
-                    "db/instance.cpp",
-                    "db/introspect.cpp",
-                    "db/matcher/expression_where.cpp",
-                    "db/operation_context_impl.cpp",
-                    "db/op_observer.cpp",
-                    "db/ops/delete.cpp",
-                    "db/ops/insert.cpp",
-                    "db/ops/parsed_delete.cpp",
-                    "db/ops/parsed_update.cpp",
-                    "db/ops/update.cpp",
-                    "db/ops/update_lifecycle_impl.cpp",
-                    "db/ops/update_result.cpp",
-                    "db/pipeline/document_source_cursor.cpp",
-                    "db/pipeline/pipeline_d.cpp",
-                    "db/prefetch.cpp",
-                    "db/range_deleter_db_env.cpp",
-                    "db/range_deleter_service.cpp",
-                    "db/repair_database.cpp",
-                    "db/repl/bgsync.cpp",
-                    "db/repl/initial_sync.cpp",
-                    "db/repl/master_slave.cpp",
-                    "db/repl/minvalid.cpp",
-                    "db/repl/oplog.cpp",
-                    "db/repl/oplogreader.cpp",
-                    "db/repl/replication_coordinator_external_state_impl.cpp",
-                    "db/repl/replication_info.cpp",
-                    "db/repl/resync.cpp",
-                    "db/repl/rs_initialsync.cpp",
-                    "db/repl/rs_rollback.cpp",
-                    "db/repl/rs_sync.cpp",
-                    "db/repl/sync.cpp",
-                    "db/repl/sync_source_feedback.cpp",
-                    "db/repl/sync_tail.cpp",
-                    "db/stats/fill_locker_info.cpp",
-                    "db/stats/lock_server_status_section.cpp",
-                    "db/stats/range_deleter_server_status.cpp",
-                    "db/stats/snapshots.cpp",
-                    "db/storage/storage_init.cpp",
-                    "db/storage_options.cpp",
-                    "db/ttl.cpp",
-                    "db/write_concern.cpp",
-                ]
-
-if has_option( 'use-cpu-profiler' ):
-    serverOnlyFiles.append( 'db/commands/cpuprofile.cpp' )
-    env.Append(LIBS=['unwind'])
-    # If we are building with our internal gperftools, add the necessary include path.
-    #
-    # NOTE: This is pretty bad because it will spam this include path into many files that
-    # don't require it, but because of the way things are currently set up, it is not easy to
-    # scope it more narrowly. Better would be if the commands were a library, and could be
-    # conditionally made to depend on this file, as a library and then we could easily scope
-    # just to this file.
-    env.InjectThirdPartyIncludePaths('tcmalloc')
-
-serveronlyEnv = env.Clone()
-serveronlyEnv.InjectThirdPartyIncludePaths(libraries=['snappy'])
-serveronlyLibdeps = ["s/coreshard",
-                     'db/curop',
-                     "db/auth/authmongod",
-                     "db/fts/ftsmongod",
-                     "db/common",
-                     "db/concurrency/lock_manager",
-                     "db/concurrency/write_conflict_exception",
-                     "db/ops/update_driver",
-                     "db/global_timestamp",
-                     "db/catalog/index_key_validate",
-                     'db/range_deleter',
-                     'scripting/scripting_server',
-                     "db/update_index_data",
-                     's/metadata',
-                     's/batch_write_types',
-                     's/catalog/legacy/catalog_manager_legacy',
-                     's/client/sharding_connection_hook',
-                     "db/catalog/collection_options",
-                     "db/exec/working_set",
-                     "db/exec/exec",
-                     "db/index/index_descriptor",
-                     "db/query/query",
-                     "db/repl/repl_settings",
-                     "db/repl/network_interface_impl",
-                     "db/repl/replication_executor",
-                     "db/repl/repl_coordinator_impl",
-                     "db/repl/topology_coordinator_impl",
-                     "db/repl/replset_commands",
-                     "db/repl/repl_coordinator_global",
-                     "db/repl/replication_executor",
-                     "db/repl/rslog",
-                     'db/startup_warnings_mongod',
-                     'db/stats/top',
-                     'db/storage/devnull/storage_devnull',
-                     'db/storage/in_memory/storage_in_memory',
-                     'db/storage/mmap_v1/storage_mmapv1',
-                     'db/storage/storage_engine_lock_file',
-                     'db/storage/storage_engine_metadata',
-                     'util/mmap',
-                     'util/elapsed_tracker',
-                     '$BUILD_DIR/third_party/shim_snappy',
-                     'client/parallel',
-                     's/serveronly',
-                 ]
-
-if wiredtiger:
-    serveronlyLibdeps.append( 'db/storage/wiredtiger/storage_wiredtiger' )
-    serveronlyLibdeps.append( '$BUILD_DIR/third_party/shim_wiredtiger')
-
-serveronlyEnv.Library("serveronly", serverOnlyFiles,
-                      LIBDEPS=serveronlyLibdeps )
-
 env.Library(
     target='coreserver',
     source=[
@@ -409,7 +216,7 @@ mongod = env.Program(
         "db/mongod_options",
         "db/mongodandmongos",
         "db/mongodwebserver",
-        "serveronly",
+        "db/serveronly",
         "util/ntservice",
     ],
 )
@@ -429,7 +236,7 @@ env.Install(
                     ],
                     LIBDEPS=[
                         "util/ntservice_mock",
-                        "serveronly",
+                        "db/serveronly",
                         "coreserver",
                         "db/coredb",
                         "util/signal_handlers_synchronous",
@@ -474,7 +281,7 @@ if env.TargetOSIs('osx') or env["_HAVEPCAP"]:
 
     sniffEnv.Install( '#/', sniffEnv.Program( "mongosniff", "tools/sniffer.cpp",
                                               LIBDEPS = [
-                                                 "serveronly",
+                                                 "db/serveronly",
                                                  "coreserver",
                                                  "db/coredb",
                                                  "util/signal_handlers_synchronous",
