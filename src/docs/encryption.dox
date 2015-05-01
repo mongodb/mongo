@@ -11,7 +11,7 @@ to demonstrate how encryption extensions are created.
 strong encryption algorithm, is intended to protect data stored in files
 (that is, <em>encryption at rest</em>). The table content (keys, values),
 the metadata pertaining to data (table, index, column names, and other
-configuration information) are well as the database log files are encrypted
+configuration information) as well as the database log files are encrypted
 on disk.  Decryption occurs when the data is read into memory; thus an
 attacker having the ability to directly read system memory will have access
 to unencrypted data. Many systems may also page memory to a backing disk
@@ -30,8 +30,9 @@ It is also possible to use different encryption options when individual
 data files are first created, using the \c encryption= configuration in
 the WT_SESSION::create call.  Such options override the default
 (<em>system</em>) encryption that was indicated in the ::wiredtiger_open
-call. It is possible to turn encryption off for individual files, or to
-use a different encryptor, or to specify a different \c keyid.
+call for the individual data file. It is possible to turn encryption off
+for individual files, to use a different encryptor, or to specify a
+different \c keyid.
 
 It is an error to specify encryption in a WT_SESSION::create call when it
 was not specified in the ::wiredtiger_open call. This prevents accidental
