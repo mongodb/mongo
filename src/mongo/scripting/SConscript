@@ -13,6 +13,9 @@ env.Library(
         'engine.cpp',
         'utils.cpp',
     ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/shell/mongojs',
+    ],
 )
 
 env.Library(
@@ -61,6 +64,7 @@ if usev8:
             'bson_template_evaluator',
             'scripting_common',
             '$BUILD_DIR/third_party/shim_v8',
+            '$BUILD_DIR/mongo/shell/mongojs',
         ],
     )
 else:

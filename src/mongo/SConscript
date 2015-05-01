@@ -142,8 +142,7 @@ env.Library('version',
                 '$BUILD_DIR/mongo/base/base'
             ])
 
-commonFiles = [ "shell/mongo.cpp",
-                "util/file_allocator.cpp",
+commonFiles = [ "util/file_allocator.cpp",
                 "util/paths.cpp",
                 "util/concurrency/task.cpp",
                 "util/password.cpp",
@@ -311,7 +310,8 @@ if not has_option('noshell') and usev8:
                     'db/catalog/index_key_validate',
                     'scripting/scripting',
                     'util/signal_handlers',
-                    'mongocommon'
+                    'mongocommon',
+                    'shell/mongojs',
                 ])
 
     # mongo shell options

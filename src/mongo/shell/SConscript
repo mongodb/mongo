@@ -34,3 +34,12 @@ env.JSHeader(
         "replsetbridge.js"
     ],
 )
+
+env.Library(
+    target='mongojs',
+    source=[
+        'mongo.cpp',
+    ],
+    LIBDEPS=[
+    ],
+)
