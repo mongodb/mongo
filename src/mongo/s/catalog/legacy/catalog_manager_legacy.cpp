@@ -34,6 +34,7 @@
 
 #include <iomanip>
 #include <map>
+#include <memory>
 #include <pcrecpp.h>
 #include <set>
 #include <vector>
@@ -45,6 +46,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/s/catalog/legacy/cluster_client_internal.h"
 #include "mongo/s/catalog/legacy/config_coordinator.h"
 #include "mongo/s/catalog/type_actionlog.h"
 #include "mongo/s/catalog/type_changelog.h"
@@ -72,7 +74,6 @@
 
 namespace mongo {
 
-    using std::auto_ptr;
     using std::map;
     using std::pair;
     using std::set;
@@ -890,7 +891,9 @@ namespace {
 
         ScopedDbConnection conn(_configServerConnectionString, 30.0);
 
-        auto_ptr<DBClientCursor> cursor = conn->query(CollectionType::ConfigNS, b.obj());
+        std::unique_ptr<DBClientCursor> cursor(_safeCursor(conn->query(CollectionType::ConfigNS,
+                                                                       b.obj())));
+
         while (cursor->more()) {
             const BSONObj collObj = cursor->next();
 
@@ -1124,7 +1127,8 @@ namespace {
                                                     vector<string>* dbs) {
         ScopedDbConnection conn(_configServerConnectionString, 30.0);
         BSONObj prim = BSON(DatabaseType::primary(shardName));
-        boost::scoped_ptr<DBClientCursor> cursor(conn->query(DatabaseType::ConfigNS, prim));
+        std::unique_ptr<DBClientCursor> cursor(_safeCursor(conn->query(DatabaseType::ConfigNS,
+                                                                       prim)));
 
         while (cursor->more()) {
             BSONObj shard = cursor->nextSafe();
@@ -1137,8 +1141,9 @@ namespace {
     Status CatalogManagerLegacy::getChunksForShard(const string& shardName,
                                                    vector<ChunkType>* chunks) {
         ScopedDbConnection conn(_configServerConnectionString, 30.0);
-        boost::scoped_ptr<DBClientCursor> cursor(conn->query(ChunkType::ConfigNS,
-                                                             BSON(ChunkType::shard(shardName))));
+        std::unique_ptr<DBClientCursor> cursor(
+            _safeCursor(conn->query(ChunkType::ConfigNS, BSON(ChunkType::shard(shardName)))));
+
         while (cursor->more()) {
             BSONObj chunkObj = cursor->nextSafe();
 
@@ -1158,7 +1163,8 @@ namespace {
 
     Status CatalogManagerLegacy::getAllShards(vector<ShardType>* shards) {
         ScopedDbConnection conn(_configServerConnectionString, 30.0);
-        boost::scoped_ptr<DBClientCursor> cursor(conn->query(ShardType::ConfigNS, BSONObj()));
+        std::unique_ptr<DBClientCursor> cursor(_safeCursor(conn->query(ShardType::ConfigNS,
+                                                                       BSONObj())));
         while (cursor->more()) {
             BSONObj shardObj = cursor->nextSafe();
 
@@ -1342,7 +1348,7 @@ namespace {
 
         for (unsigned i = 0; i < _configServers.size(); i++) {
             BSONObj result;
-            boost::scoped_ptr<ScopedDbConnection> conn;
+            std::unique_ptr<ScopedDbConnection> conn;
 
             try {
                 conn.reset(new ScopedDbConnection(_configServers[i], 30.0));
