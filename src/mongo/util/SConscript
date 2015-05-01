@@ -364,6 +364,7 @@ env.Library(
     target="signal_handlers",
     source=[
         "signal_handlers.cpp",
+        "signal_win32.cpp",
     ],
     LIBDEPS=[
         "foundation",

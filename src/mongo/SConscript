@@ -144,7 +144,6 @@ env.Library('version',
 
 commonFiles = [ "util/concurrency/task.cpp",
                 "util/concurrency/rwlockimpl.cpp",
-                'util/signal_win32.cpp',
                 ]
 
 extraCommonLibdeps = []
