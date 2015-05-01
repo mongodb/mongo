@@ -214,7 +214,7 @@ main(int argc, char *argv[])
 		goto err;
 	}
 	if (secretkey != NULL)
-		memset((char *)secretkey, 0, strlen(secretkey));
+		memset(secretkey, 0, strlen(secretkey));
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0) {
 		ret = util_err(NULL, ret, NULL);
 		goto err;
