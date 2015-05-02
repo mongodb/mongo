@@ -97,10 +97,8 @@ util_backup(WT_SESSION *session, int argc, char *argv[])
 		goto err;
 	}
 
-err:	if (config != NULL)
-		free(config);
-	if (cbuf != NULL)
-		free(cbuf);
+err:	free(config);
+	free(cbuf);
 
 	return (ret);
 }

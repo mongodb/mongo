@@ -49,8 +49,7 @@ util_list(WT_SESSION *session, int argc, char *argv[])
 
 	ret = list_print(session, name, cflag, vflag);
 
-	if (name != NULL)
-		free(name);
+	free(name);
 
 	return (ret);
 }
