@@ -31,8 +31,8 @@ main(int argc, char *argv[])
 	size_t len;
 	int ch, major_v, minor_v, tret, (*func)(WT_SESSION *, int, char *[]);
 	int logoff, recover;
-	char *p;
-	const char *cmd_config, *config, *p1, *p2, *p3, *secretkey, *rec_config;
+	char *p, *secretkey;
+	const char *cmd_config, *config, *p1, *p2, *p3, *rec_config;
 
 	conn = NULL;
 	p = NULL;
@@ -74,7 +74,11 @@ main(int argc, char *argv[])
 			cmd_config = __wt_optarg;
 			break;
 		case 'E':			/* secret key */
-			secretkey = __wt_optarg;
+			if ((secretkey = strdup(__wt_optarg)) == NULL) {
+				ret = util_err(NULL, errno, NULL);
+				goto err;
+			}
+			memset(__wt_optarg, 0, strlen(__wt_optarg));
 			break;
 		case 'h':			/* home directory */
 			home = __wt_optarg;
@@ -213,8 +217,6 @@ main(int argc, char *argv[])
 		ret = util_err(NULL, ret, NULL);
 		goto err;
 	}
-	if (secretkey != NULL)
-		memset((char *)secretkey, 0, strlen(secretkey));
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0) {
 		ret = util_err(NULL, ret, NULL);
 		goto err;
@@ -230,6 +232,8 @@ err:	if (conn != NULL && (tret = conn->close(conn, NULL)) != 0 && ret == 0)
 
 	if (p != NULL)
 		free(p);
+	if (secretkey != NULL)
+		free(secretkey);
 
 	return (ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
 }
