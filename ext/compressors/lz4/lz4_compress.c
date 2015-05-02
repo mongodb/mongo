@@ -247,6 +247,6 @@ lz4_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 int
 wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 {
-	return lz4_extension_init(connection, config);
+	return (lz4_extension_init(connection, config));
 }
 #endif
