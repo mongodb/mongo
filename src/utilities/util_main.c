@@ -230,10 +230,8 @@ main(int argc, char *argv[])
 err:	if (conn != NULL && (tret = conn->close(conn, NULL)) != 0 && ret == 0)
 		ret = tret;
 
-	if (p != NULL)
-		free(p);
-	if (secretkey != NULL)
-		free(secretkey);
+	free(p);
+	free(secretkey);
 
 	return (ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
 }
