@@ -334,14 +334,11 @@ rotate_terminate(WT_ENCRYPTOR *encryptor, WT_SESSION *session)
 	++my_crypto->num_calls;		/* Call count */
 
 	/* Free the allocated memory. */
-	if (my_crypto->password != NULL) {
-		free(my_crypto->password);
-		my_crypto->password = NULL;
-	}
-	if (my_crypto->keyid != NULL) {
-		free(my_crypto->keyid);
-		my_crypto->keyid = NULL;
-	}
+	free(my_crypto->password);
+	my_crypto->password = NULL;
+
+	free(my_crypto->keyid);
+	my_crypto->keyid = NULL;
 
 	if (encryptor != &my_crypto_global.encryptor)
 		free(encryptor);

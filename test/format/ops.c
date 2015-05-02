@@ -897,10 +897,7 @@ table_append_init(void)
 	g.append_max = (size_t)g.c_threads * 10;
 	g.append_cnt = 0;
 
-	if (g.append != NULL) {
-		free(g.append);
-		g.append = NULL;
-	}
+	free(g.append);
 	if ((g.append = calloc(g.append_max, sizeof(uint64_t))) == NULL)
 		die(errno, "calloc");
 }

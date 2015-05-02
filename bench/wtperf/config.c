@@ -113,10 +113,8 @@ config_free(CONFIG *cfg)
 		    config_opts[i].type == CONFIG_STRING_TYPE) {
 			pstr = (char **)
 			    ((unsigned char *)cfg + config_opts[i].offset);
-			if (*pstr != NULL) {
-				free(*pstr);
-				*pstr = NULL;
-			}
+			free(*pstr);
+			*pstr = NULL;
 		}
 	if (cfg->uris != NULL) {
 		for (i = 0; i < cfg->table_count; i++)
@@ -513,8 +511,7 @@ config_opt_file(CONFIG *cfg, const char *filename)
 
 err:	if (fd != -1)
 		(void)close(fd);
-	if (file_buf != NULL)
-		free(file_buf);
+	free(file_buf);
 	return (ret);
 }
 

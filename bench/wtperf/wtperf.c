@@ -654,8 +654,7 @@ op_err:			lprintf(cfg, ret, 0,
 	if (0) {
 err:		cfg->error = cfg->stop = 1;
 	}
-	if (cursors != NULL)
-		free(cursors);
+	free(cursors);
 
 	return (NULL);
 }
@@ -918,8 +917,7 @@ populate_thread(void *arg)
 	if (0) {
 err:		cfg->error = cfg->stop = 1;
 	}
-	if (cursors != NULL)
-		free(cursors);
+	free(cursors);
 
 	return (NULL);
 }

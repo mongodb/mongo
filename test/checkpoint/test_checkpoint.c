@@ -179,8 +179,7 @@ main(int argc, char *argv[])
 
 	/* Ensure that cleanup is done on error. */
 	(void)wt_shutdown();
-	if (g.cookies != NULL)
-		free(g.cookies);
+	free(g.cookies);
 	return (g.status);
 }
 
