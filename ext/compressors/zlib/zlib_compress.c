@@ -444,8 +444,7 @@ int zlib_extension_init(WT_CONNECTION *, WT_CONFIG_ARG *);
  *	support is included via extension loading.
  */
 int
-zlib_extension_init(
-    WT_CONNECTION *connection, WT_CONFIG_ARG *config)
+zlib_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 {
 	int ret;
 
@@ -468,8 +467,7 @@ zlib_extension_init(
  *	WiredTiger zlib compression extension.
  */
 int
-wiredtiger_extension_init(
-    WT_CONNECTION *connection, WT_CONFIG_ARG *config)
+wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 {
 	return (zlib_extension_init(connection, config));
 }
