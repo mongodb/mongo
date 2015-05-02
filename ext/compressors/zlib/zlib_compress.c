@@ -154,32 +154,6 @@ zlib_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 }
 
 /*
- * zlib_find_slot --
- *	Find the slot containing the target offset (binary search).
- */
-static inline uint32_t
-zlib_find_slot(uint64_t target, uint32_t *offsets, uint32_t slots)
-{
-	uint32_t base, indx, limit;
-
-	indx = 1;
-
-	/* Figure out which slot we got to: binary search */
-	if (target >= offsets[slots])
-		indx = slots;
-	else if (target > offsets[1])
-		for (base = 2, limit = slots - base; limit != 0; limit >>= 1) {
-			indx = base + (limit >> 1);
-			if (target < offsets[indx])
-				continue;
-			base = indx + 1;
-			--limit;
-		}
-
-	return (indx);
-}
-
-/*
  * zlib_decompress --
  *	WiredTiger zlib decompression.
  */
@@ -219,6 +193,32 @@ zlib_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 
 	return (ret == Z_OK ?
 	    0 : zlib_error(compressor, session, "inflate", ret));
+}
+
+/*
+ * zlib_find_slot --
+ *	Find the slot containing the target offset (binary search).
+ */
+static inline uint32_t
+zlib_find_slot(uint64_t target, uint32_t *offsets, uint32_t slots)
+{
+	uint32_t base, indx, limit;
+
+	indx = 1;
+
+	/* Figure out which slot we got to: binary search */
+	if (target >= offsets[slots])
+		indx = slots;
+	else if (target > offsets[1])
+		for (base = 2, limit = slots - base; limit != 0; limit >>= 1) {
+			indx = base + (limit >> 1);
+			if (target < offsets[indx])
+				continue;
+			base = indx + 1;
+			--limit;
+		}
+
+	return (indx);
 }
 
 /*
