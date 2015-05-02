@@ -650,10 +650,8 @@ __wt_encryptor_config(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval,
 	kenc->encryptor = encryptor;
 	SLIST_INSERT_HEAD(&nenc->keyedlh, kenc, l);
 	SLIST_INSERT_HEAD(&nenc->keyedhashlh[bucket], kenc, hashl);
-out:
-	__wt_spin_unlock(session, &conn->encryptor_lock);
-	locked = 0;
 
+out:	__wt_spin_unlock(session, &conn->encryptor_lock);
 	*kencryptorp = kenc;
 	return (0);
 
@@ -1123,8 +1121,7 @@ __conn_open_session(WT_CONNECTION *wt_conn,
 	CONNECTION_API_CALL(conn, session, open_session, config, cfg);
 	WT_UNUSED(cfg);
 
-	WT_ERR(__wt_open_session(conn, event_handler, config, &session_ret));
-
+	WT_ERR(__wt_open_session(conn, event_handler, config, 1, &session_ret));
 	*wt_sessionp = &session_ret->iface;
 
 err:	API_END_RET_NOTFOUND_MAP(session, ret);

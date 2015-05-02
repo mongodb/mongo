@@ -228,17 +228,6 @@ __wt_strndup(WT_SESSION_IMPL *session, const void *str, size_t len, void *retp)
 }
 
 /*
- * __wt_strdup --
- *	ANSI strdup function.
- */
-int
-__wt_strdup(WT_SESSION_IMPL *session, const char *str, void *retp)
-{
-	return (__wt_strndup(
-	    session, str, (str == NULL) ? 0 : strlen(str), retp));
-}
-
-/*
  * __wt_free_int --
  *	ANSI free function.
  */

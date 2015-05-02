@@ -31,8 +31,8 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 
 	/*
 	 * If anticipating a compressed or encrypted block, read into a scratch
-	 * buffer and decompress into the caller's buffer.  Else, read directly
-	 * into the caller's buffer.
+	 * buffer and process into the caller's buffer. Else, read directly into
+	 * the caller's buffer.
 	 */
 	if (btree->compressor == NULL && btree->kencryptor == NULL) {
 		WT_RET(bm->read(bm, session, buf, addr, addr_size));
@@ -90,10 +90,9 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 		    tmp_dst, encryptor_data_len, &result_len);
 
 		/*
-		 * It may be file corruption, which
-		 * is really, really bad, or it may be a mismatch of
-		 * encryption configuration, for example, an incorrect
-		 * secretkey.
+		 * It may be file corruption, which is really, really bad, or it
+		 * may be a mismatch of encryption configuration, for example,
+		 * an incorrect secretkey.
 		 */
 		if (ret != 0)
 			WT_ERR(F_ISSET(btree, WT_BTREE_VERIFY) ||
@@ -329,6 +328,7 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 			ip = ctmp;
 		}
 	}
+
 	/*
 	 * Optionally encrypt the data.  We need to add in the original
 	 * length, in case both compression and encryption are done.

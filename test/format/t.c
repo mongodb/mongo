@@ -282,17 +282,9 @@ startup(void)
 		g.rand_log = NULL;
 	}
 
-	/* Create home if it doesn't yet exist. */
-	if (access(g.home, X_OK) != 0 && mkdir(g.home, 0777) != 0)
-		die(errno, "mkdir: %s", g.home);
-
-	/* Remove the run's files except for rand. */
+	/* Create or initialize the home and data-source directories. */
 	if ((ret = system(g.home_init)) != 0)
 		die(ret, "home directory initialization failed");
-
-	/* Create the data-source directory. */
-	if (mkdir(g.home_kvs, 0777) != 0)
-		die(errno, "mkdir: %s", g.home_kvs);
 
 	/* Open/truncate the logging file. */
 	if (g.logging != 0 && (g.logfp = fopen(g.home_log, "w")) == NULL)
