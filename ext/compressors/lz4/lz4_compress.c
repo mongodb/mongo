@@ -168,20 +168,25 @@ lz4_find_slot(int target_arg, uint32_t *offsets, uint32_t slots)
 {
 	uint32_t base, indx, limit, target;
 
-	indx = 1;
+	indx = 1;					/* -Wuninitialized */
+
 	target = (uint32_t)target_arg;			/* Type conversion */
 
-	/* Figure out which slot we got to: binary search */
+	/* Fast check if we consumed it all, it's a likely result. */
 	if (target >= offsets[slots])
-		indx = slots;
-	else if (target > offsets[1])
-		for (base = 2, limit = slots - base; limit != 0; limit >>= 1) {
-			indx = base + (limit >> 1);
-			if (target < offsets[indx])
-				continue;
+		return (slots);
+
+	/*
+	 * Figure out which slot we got to: binary search. Note the test of
+	 * offset (slot + 1), that's (end-byte + 1) for slot.
+	 */
+	for (base = 0, limit = slots; limit != 0; limit >>= 1) {
+		indx = base + (limit >> 1);
+		if (target > offsets[indx + 1]) {
 			base = indx + 1;
 			--limit;
 		}
+	}
 
 	return (indx);
 }
