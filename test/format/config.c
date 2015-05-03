@@ -234,14 +234,17 @@ config_compression(void)
 		switch (MMRAND(1, 20)) {
 		case 1: case 2: case 3: case 4:		/* 20% no compression */
 			break;
-		case 5: case 6:				/* 10% bzip */
+		case 5:					/* 5% bzip */
 			cstr = "compression=bzip";
 			break;
-		case 7:					/* 5% bzip-raw */
+		case 6:					/* 5% bzip-raw */
 			cstr = "compression=bzip-raw";
 			break;
-		case 8: case 9: case 10: case 11:	/* 20% lz4 */
+		case 7: case 8: case 9: case 10:	/* 20% lz4 */
 			cstr = "compression=lz4";
+			break;
+		case 11:				/* 5% lz4-no-raw */
+			cstr = "compression=lz4-noraw";
 			break;
 		case 12: case 13: case 14: case 15:	/* 20% snappy */
 			cstr = "compression=snappy";
@@ -524,6 +527,8 @@ config_map_compression(const char *s, u_int *vp)
 		*vp = COMPRESS_BZIP_RAW;
 	else if (strcmp(s, "lz4") == 0)
 		*vp = COMPRESS_LZ4;
+	else if (strcmp(s, "lz4-noraw") == 0)
+		*vp = COMPRESS_LZ4_NO_RAW;
 	else if (strcmp(s, "lzo") == 0)
 		*vp = COMPRESS_LZO;
 	else if (strcmp(s, "snappy") == 0)

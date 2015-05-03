@@ -2,6 +2,7 @@
 
 @section version_254 Upgrading to Version 2.5.4
 <dl>
+
 <dt>File handle closing</dt>
 <dd>
 In WiredTiger, a separate thread of control periodically reviews open
@@ -13,6 +14,13 @@ handles are open. How often file handles are reviewed (the default is
 30 seconds), and how many file handles must be opened before review is
 triggered, can be configured using the \c file_manager configuration
 values to the ::wiredtiger_open call.
+</dd>
+
+<dt>LZ4 compression</dt>
+<dd>
+The LZ4 compression support has been updated in this release in non-backward
+compatible ways; tables and files compressed using LZ4 compression should be
+dumped and re-loaded into a new database.
 </dd>
 
 </dl><hr>
