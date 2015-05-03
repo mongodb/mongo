@@ -52,9 +52,22 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 			    "configured");
 
 		/*
-		 * We're allocating the exact number of bytes we're expecting
+		 * Size the buffer based on the in-memory bytes we're expecting
 		 * from decompression.
+		 *
+		 * XXX
+		 * The underlying LZ4 raw compression API may have compressed
+		 * more data than we're actually going to use, in other words,
+		 * the final in-memory size of the decompressed data isn't big
+		 * enough and LZ4 decompression might fail where the destination
+		 * buffer is too small. The target size for LZ4 raw compression
+		 * is the maximum page size: start with the maximum page size
+		 * to be sure we allocate enough room, then call one more time
+		 * to allow the in-memory size to override and set the buffer's
+		 * final size to the in-memory size.
 		 */
+		WT_ERR(__wt_buf_initsize(session,
+		    buf, WT_MAX(btree->maxleafpage, btree->maxintlpage)));
 		WT_ERR(__wt_buf_initsize(session, buf, dsk->mem_size));
 
 		/*
