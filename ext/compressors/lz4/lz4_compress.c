@@ -60,8 +60,10 @@ typedef struct {
  * Use fixed-size, 4B values (WiredTiger never writes buffers larger than 4GB).
  */
 typedef struct {
-	uint32_t compressed_byte_count;
-	uint32_t decompressed_return_count;
+	uint32_t compressed_len;	/* True compressed length */
+	uint32_t compressed_src;	/* True uncompressed source length */
+	uint32_t decompressed_return;	/* Decompression return value */
+	uint32_t unused;
 } LZ4_PREFIX;
 
 /*
@@ -108,8 +110,10 @@ lz4_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	 * the original size, return success.
 	 */
 	if (lz4_len != 0 && (size_t)lz4_len + sizeof(LZ4_PREFIX) < src_len) {
-		prefix.compressed_byte_count = (uint32_t)lz4_len;
-		prefix.decompressed_return_count = (uint32_t)src_len;
+		prefix.compressed_len = (uint32_t)lz4_len;
+		prefix.compressed_src = (uint32_t)src_len;
+		prefix.decompressed_return = (uint32_t)src_len;
+		prefix.unused = 0;
 		memcpy(dst, &prefix, sizeof(LZ4_PREFIX));
 
 		*result_lenp = (size_t)lz4_len + sizeof(LZ4_PREFIX);
@@ -131,27 +135,49 @@ lz4_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
     uint8_t *dst, size_t dst_len,
     size_t *result_lenp)
 {
+	WT_EXTENSION_API *wt_api;
 	LZ4_PREFIX prefix;
 	int decoded;
+	uint8_t *dst_tmp;
 
 	(void)src_len;					/* Unused parameters */
 
+	wt_api = ((LZ4_COMPRESSOR *)compressor)->wt_api;
+
 	/*
-	 * Retrieve the length of the compressed block and the decompressed
-	 * bytes to return from the start of the source buffer.
+	 * Retrieve the true length of the compressed block and source and the
+	 * decompressed bytes to return from the start of the source buffer.
 	 */
 	memcpy(&prefix, src, sizeof(LZ4_PREFIX));
 
 	/*
 	 * Decompress, starting after the prefix bytes. Use safe decompression:
 	 * we rely on decompression to detect corruption.
+	 *
+	 * Two code paths, one with and one without a bounce buffer. Our caller
+	 * doesn't store the length of the compressed source and so when using
+	 * raw compression, won't have provided us a large enough buffer, so we
+	 * have to allocate a scratch buffer.
 	 */
-	decoded = LZ4_decompress_safe((const char *)src + sizeof(LZ4_PREFIX),
-	    (char *)dst, (int)prefix.compressed_byte_count, (int)dst_len);
+	if (dst_len < prefix.compressed_src) {
+		if ((dst_tmp = wt_api->scr_alloc(
+		   wt_api, session, (size_t)prefix.compressed_src)) == NULL)
+			return (ENOMEM);
 
-	/* If decompression succeeded, return the uncompressed data length. */
+		decoded = LZ4_decompress_safe(
+		    (const char *)src + sizeof(LZ4_PREFIX), (char *)dst_tmp,
+		    (int)prefix.compressed_len, (int)prefix.compressed_src);
+
+		if (decoded >= 0)
+			memcpy(dst, dst_tmp, dst_len);
+		wt_api->scr_free(wt_api, session, dst_tmp);
+	} else
+		decoded = LZ4_decompress_safe(
+		    (const char *)src + sizeof(LZ4_PREFIX),
+		    (char *)dst, (int)prefix.compressed_len, (int)dst_len);
+
 	if (decoded >= 0) {
-		*result_lenp = prefix.decompressed_return_count;
+		*result_lenp = prefix.decompressed_return;
 		return (0);
 	}
 
@@ -210,12 +236,11 @@ lz4_compress_raw(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	(void)compressor;				/* Unused parameters */
 	(void)session;
 	(void)split_pct;
-	(void)extra;
 	(void)dst_len;
 	(void)final;
 
 	sourceSize = (int)offsets[slots];		/* Type conversion */
-	targetDestSize = (int)page_max;
+	targetDestSize = (int)(page_max - extra);
 
 	/* Compress, starting after the prefix bytes. */
 	lz4_len = LZ4_compress_destSize((const char *)src,
@@ -230,8 +255,10 @@ lz4_compress_raw(WT_COMPRESSOR *compressor, WT_SESSION *session,
 		slot = lz4_find_slot(sourceSize, offsets, slots);
 
 		if ((size_t)lz4_len + sizeof(LZ4_PREFIX) < offsets[slot]) {
-			prefix.compressed_byte_count = (uint32_t)lz4_len;
-			prefix.decompressed_return_count = offsets[slot];
+			prefix.compressed_len = (uint32_t)lz4_len;
+			prefix.compressed_src = (uint32_t)sourceSize;
+			prefix.decompressed_return = offsets[slot];
+			prefix.unused = 0;
 			memcpy(dst, &prefix, sizeof(LZ4_PREFIX));
 
 			*result_slotsp = slot;
