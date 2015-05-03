@@ -80,6 +80,8 @@ fop_start(u_int nthreads)
 	int ret;
 	void *thread_ret;
 
+	tids = NULL; /* Silence GCC 4.1 warning. */
+
 	/* Create statistics and thread structures. */
 	if ((run_stats = calloc(
 	    (size_t)(nthreads), sizeof(*run_stats))) == NULL ||
