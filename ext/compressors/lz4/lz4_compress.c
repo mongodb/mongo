@@ -236,6 +236,7 @@ lz4_compress_raw(WT_COMPRESSOR *compressor, WT_SESSION *session,
 
 			*result_slotsp = slot;
 			*result_lenp = (size_t)lz4_len + sizeof(LZ4_PREFIX);
+			return (0);
 		}
 	}
 
