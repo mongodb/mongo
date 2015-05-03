@@ -37,6 +37,8 @@ const char *config;				/* Object config */
 static char *progname;				/* Program name */
 static FILE *logfp;				/* Log file */
 
+char home[512];
+
 static int  handle_error(WT_EVENT_HANDLER *, WT_SESSION *, int, const char *);
 static int  handle_message(WT_EVENT_HANDLER *, WT_SESSION *, const char *);
 static void onint(int);
@@ -67,25 +69,31 @@ main(int argc, char *argv[])
 	};
 	u_int nthreads;
 	int ch, cnt, ret, runs;
-	char *config_open;
+	char *config_open, *working_dir;
 
-	if ((progname = strrchr(argv[0], '/')) == NULL)
+	working_dir = NULL;
+
+	/* Remove directories */
+	if ((progname = strrchr(argv[0], DIR_DELIM)) == NULL)
 		progname = argv[0];
 	else
 		++progname;
 
 	if ((ret = pthread_rwlock_init(&single, NULL)) != 0)
-		die(ret, "pthread_rwlock_init: single");
+		testutil_die(ret, "pthread_rwlock_init: single");
 
 	config_open = NULL;
 	nops = 1000;
 	nthreads = 10;
 	runs = 1;
 
-	while ((ch = __wt_getopt(progname, argc, argv, "C:l:n:r:t:")) != EOF)
+	while ((ch = __wt_getopt(progname, argc, argv, "C:h:l:n:r:t:")) != EOF)
 		switch (ch) {
 		case 'C':			/* wiredtiger_open config */
 			config_open = __wt_optarg;
+			break;
+		case 'h':
+			working_dir = __wt_optarg;
 			break;
 		case 'l':			/* log */
 			if ((logfp = fopen(__wt_optarg, "w")) == NULL) {
@@ -111,6 +119,9 @@ main(int argc, char *argv[])
 	argv += __wt_optind;
 	if (argc != 0)
 		return (usage());
+
+	if ((ret = testutil_work_dir_from_path(home, 512, working_dir)) != 0)
+		testutil_die(ret, "provided directory name is too long");
 
 	/* Clean up on signal. */
 	(void)signal(SIGINT, onint);
@@ -153,25 +164,16 @@ wt_startup(char *config_open)
 	int ret;
 	char config_buf[128];
 
-#undef	CMD
-#ifdef _WIN32
-#define	CMD "rd /s /q WT_TEST & mkdir WT_TEST"
-#else
-#define	CMD "rm -rf WT_TEST && mkdir WT_TEST"
-#endif
-
-	if ((ret = system(CMD)) != 0)
-		die(ret, "directory cleanup call failed");
+	testutil_make_work_dir(home);
 
 	snprintf(config_buf, sizeof(config_buf),
 	    "create,error_prefix=\"%s\",cache_size=5MB%s%s",
 	    progname,
 	    config_open == NULL ? "" : ",",
 	    config_open == NULL ? "" : config_open);
-
 	if ((ret = wiredtiger_open(
-	    "WT_TEST", &event_handler, config_buf, &conn)) != 0)
-		die(ret, "wiredtiger_open");
+	    home, &event_handler, config_buf, &conn)) != 0)
+		testutil_die(ret, "wiredtiger_open");
 }
 
 /*
@@ -184,7 +186,7 @@ wt_shutdown(void)
 	int ret;
 
 	if ((ret = conn->close(conn, NULL)) != 0)
-		die(ret, "conn.close");
+		testutil_die(ret, "conn.close");
 }
 
 /*
@@ -194,16 +196,7 @@ wt_shutdown(void)
 static void
 shutdown(void)
 {
-	int ret;
-
-#undef	CMD
-#ifdef _WIN32
-#define	CMD "if exist WT_TEST rd /s /q WT_TEST"
-#else
-#define	CMD "rm -rf WT_TEST"
-#endif
-	if ((ret = system(CMD)) != 0)
-		die(ret, "directory cleanup call failed");
+	testutil_clean_work_dir(home);
 }
 
 static int
@@ -255,25 +248,6 @@ onint(int signo)
 }
 
 /*
- * die --
- *	Report an error and quit.
- */
-void
-die(int e, const char *fmt, ...)
-{
-	va_list ap;
-
-	fprintf(stderr, "%s: ", progname);
-	va_start(ap, fmt);
-	vfprintf(stderr, fmt, ap);
-	va_end(ap);
-	if (e != 0)
-		fprintf(stderr, ": %s", wiredtiger_strerror(e));
-	fprintf(stderr, "\n");
-	exit(EXIT_FAILURE);
-}
-
-/*
  * usage --
  *	Display usage statement and exit failure.
  */
@@ -286,6 +260,7 @@ usage(void)
 	    progname);
 	fprintf(stderr, "%s",
 	    "\t-C specify wiredtiger_open configuration arguments\n"
+	    "\t-h home (default 'WT_TEST')\n"
 	    "\t-l specify a log file\n"
 	    "\t-n set number of operations each thread does\n"
 	    "\t-r set number of runs\n"

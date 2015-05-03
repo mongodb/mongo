@@ -336,67 +336,7 @@ if GetOption("lang-python"):
 shim = env.Library("window_shim",
         ["test/windows/windows_shim.c"])
 
-t = env.Program("t_bloom",
-    "test/bloom/test_bloom.c",
-    LIBS=[wtlib] + wtlibs)
-Default(t)
 
-#env.Program("t_checkpoint",
-    #["test/checkpoint/checkpointer.c",
-    #"test/checkpoint/test_checkpoint.c",
-    #"test/checkpoint/workers.c"],
-    #LIBS=[wtlib])
-
-t = env.Program("t_huge",
-    "test/huge/huge.c",
-    LIBS=[wtlib] + wtlibs)
-Default(t)
-
-t = env.Program("t_fops",
-    ["test/fops/file.c",
-    "test/fops/fops.c",
-    "test/fops/t.c"],
-    LIBS=[wtlib, shim] + wtlibs)
-Default(t)
-
-if useBdb:
-    benv = env.Clone()
-
-    benv.Append(CPPDEFINES=['BERKELEY_DB_PATH=\\"' + useBdb.replace("\\", "\\\\") + '\\"'])
-
-    t = benv.Program("t_format",
-        ["test/format/backup.c",
-        "test/format/bdb.c",
-        "test/format/bulk.c",
-        "test/format/compact.c",
-        "test/format/config.c",
-        "test/format/ops.c",
-        "test/format/salvage.c",
-        "test/format/t.c",
-        "test/format/util.c",
-        "test/format/wts.c"],
-         LIBS=[wtlib, shim, "libdb61"] + wtlibs)
-    Default(t)
-
-#env.Program("t_thread",
-    #["test/thread/file.c",
-    #"test/thread/rw.c",
-    #"test/thread/stats.c",
-    #"test/thread/t.c"],
-    #LIBS=[wtlib])
-
-#env.Program("t_salvage",
-    #["test/salvage/salvage.c"],
-    #LIBS=[wtlib])
-
-t = env.Program("wtperf", [
-    "bench/wtperf/config.c",
-    "bench/wtperf/misc.c",
-    "bench/wtperf/track.c",
-    "bench/wtperf/wtperf.c",
-    ],
-    LIBS=[wtlib, shim]  + wtlibs)
-Default(t)
 
 examples = [
     "ex_access",
@@ -418,9 +358,8 @@ examples = [
     "ex_thread",
     ]
 
-# WiredTiger Smoke Test suppor
+# WiredTiger Smoke Test support
 # Runs each test in a custom temporary directory
-#
 def run_smoke_test(x):
     print "Running Smoke Test: " + x
 
@@ -448,6 +387,77 @@ def builder_smoke_test(target, source, env):
 
 env.Append(BUILDERS={'SmokeTest' : Builder(action = builder_smoke_test)})
 
+#Build the tests and setup the "scons test" target
+
+#Don't test bloom on Windows, its broken
+t = env.Program("t_bloom",
+    "test/bloom/test_bloom.c",
+    LIBS=[wtlib] + wtlibs)
+#env.Alias("check", env.SmokeTest(t))
+Default(t)
+
+#env.Program("t_checkpoint",
+    #["test/checkpoint/checkpointer.c",
+    #"test/checkpoint/test_checkpoint.c",
+    #"test/checkpoint/workers.c"],
+    #LIBS=[wtlib])
+
+t = env.Program("t_huge",
+    "test/huge/huge.c",
+    LIBS=[wtlib] + wtlibs)
+#env.Alias("check", env.SmokeTest(t))
+Default(t)
+
+t = env.Program("t_fops",
+    ["test/fops/file.c",
+    "test/fops/fops.c",
+    "test/fops/t.c"],
+    LIBS=[wtlib, shim] + wtlibs)
+env.Append(CPPPATH=["test/utility"])
+env.Alias("check", env.SmokeTest(t))
+Default(t)
+
+if useBdb:
+    benv = env.Clone()
+
+    benv.Append(CPPDEFINES=['BERKELEY_DB_PATH=\\"' + useBdb.replace("\\", "\\\\") + '\\"'])
+
+    t = benv.Program("t_format",
+        ["test/format/backup.c",
+        "test/format/bdb.c",
+        "test/format/bulk.c",
+        "test/format/compact.c",
+        "test/format/config.c",
+        "test/format/ops.c",
+        "test/format/salvage.c",
+        "test/format/t.c",
+        "test/format/util.c",
+        "test/format/wts.c"],
+         LIBS=[wtlib, shim, "libdb61"] + wtlibs)
+    env.Alias("test", env.SmokeTest(t))
+    Default(t)
+
+#env.Program("t_thread",
+    #["test/thread/file.c",
+    #"test/thread/rw.c",
+    #"test/thread/stats.c",
+    #"test/thread/t.c"],
+    #LIBS=[wtlib])
+
+#env.Program("t_salvage",
+    #["test/salvage/salvage.c"],
+    #LIBS=[wtlib])
+
+t = env.Program("wtperf", [
+    "bench/wtperf/config.c",
+    "bench/wtperf/misc.c",
+    "bench/wtperf/track.c",
+    "bench/wtperf/wtperf.c",
+    ],
+    LIBS=[wtlib, shim]  + wtlibs)
+Default(t)
+
+#Build the Examples
 for ex in examples:
     if(ex in ['ex_all', 'ex_async', 'ex_thread']):
         exp = env.Program(ex, "examples/c/" + ex + ".c", LIBS=[wtlib, shim] + wtlibs)
