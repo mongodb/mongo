@@ -395,9 +395,7 @@ __log_decrypt(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out)
 	WT_DECL_RET;
 	WT_ENCRYPTOR *encryptor;
 	WT_KEYED_ENCRYPTOR *kencryptor;
-	size_t encryptor_data_len, result_len;
-	uint32_t clear_cksum, *tmp_cksump, unpadded_len;
-	uint8_t *dst, *src, *tmp_dst;
+	size_t result_len;
 
 	conn = S2C(session);
 	kencryptor = conn->kencryptor;
@@ -408,60 +406,14 @@ __log_decrypt(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out)
 		    "log_decrypt: Encrypted record with "
 		    "no configured decrypt method");
 
-	/*
-	 * There are a lot of sizes and offsets to keep track of here.
-	 * unpadded_len: the size of the encrypted log record in memory.  This
-	 *	was the encrypted log record size before log padding.
-	 * encryptor_data_len: the final size of the encrypted data
-	 *	without the log header and internal information.
-	 * result_len: the final decrypted size to use for checksum.
-	 *
-	 * For the decrypted output, we need to allocate a buffer large
-	 * enough for a record header and the decrypted data.
-	 */
-	unpadded_len = WT_STORE_SIZE(*((uint32_t *)
-	    ((uint8_t *)in->data + WT_LOG_ENCRYPT_SKIP)));
-	WT_ASSERT(session, unpadded_len > 0);
-	/*
-	 * The size of the new buffer should be the unpadded length less
-	 * the extra non-user data overhead added for encryption.
-	 */
 	WT_ERR(__wt_scr_alloc(session, 0, out));
-	WT_ERR(__wt_buf_initsize(session, *out, unpadded_len));
+	ret = __wt_decrypt(session, encryptor, WT_LOG_ENCRYPT_SKIP,
+	    in, out, &result_len);
 
-	src = (uint8_t *)in->mem + WT_LOG_ENCRYPT_SKIP + WT_ENCRYPT_LEN_SIZE;
-	encryptor_data_len = unpadded_len -
-	    (WT_LOG_ENCRYPT_SKIP + WT_ENCRYPT_LEN_SIZE);
-	dst = (uint8_t *)(*out)->mem + WT_LOG_ENCRYPT_SKIP;
-
-	/*
-	 * Hijack the last few bytes from the header we're skipping because
-	 * the checksum is the first thing in the buffer.  We will overwrite
-	 * the checksum after verifying it when we copy in the skipped header,
-	 * and then the real data will be at the right location in the buffer.
-	 */
-	tmp_dst = dst - WT_ENCRYPT_CKSUM_SIZE;
-	tmp_cksump = (uint32_t *)tmp_dst;
-	WT_ERR(encryptor->decrypt(encryptor, &session->iface,
-	    src, encryptor_data_len, tmp_dst, encryptor_data_len, &result_len));
-
-	/*
-	 * Verify the checksum of the pre-encrypted data matches a checksum
-	 * of the post-decrypted data.  They should be identical.
-	 */
-	result_len -= WT_ENCRYPT_CKSUM_SIZE;
-	clear_cksum = WT_STORE_SIZE(*tmp_cksump);
-	if (clear_cksum != __wt_cksum(dst, result_len))
-		WT_ERR_MSG(session, EINVAL,
-		    "Invalid decryption of log record");
 	/*
 	 * This length is now the full decrypted size, including the header.
 	 */
 	result_len += WT_LOG_ENCRYPT_SKIP;
-	/*
-	 * Copy in the skipped header bytes.  This overwrites the checksum.
-	 */
-	memcpy((*out)->mem, in->mem, WT_LOG_ENCRYPT_SKIP);
 	/*
 	 * The original buffer was the maximum size needed.  Set the buffer
 	 * to the actual size now.
@@ -1563,15 +1515,13 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	WT_DECL_ITEM(citem);
 	WT_DECL_ITEM(eitem);
 	WT_DECL_RET;
-	WT_ENCRYPTOR *encryptor;
 	WT_ITEM *ip;
 	WT_KEYED_ENCRYPTOR *kencryptor;
 	WT_LOG *log;
 	WT_LOG_RECORD *newlrp;
 	int compression_failed;
-	size_t dst_len, len, new_size, result_len, src_len, tmp_src_len;
-	uint32_t clear_cksum, orig_val, *tmp_cksump, *unpadded_lenp;
-	uint8_t *dst, *src, *tmp_src;
+	size_t dst_len, len, new_size, result_len, src_len;
+	uint8_t *dst, *src;
 
 	conn = S2C(session);
 	log = conn->log;
@@ -1654,68 +1604,15 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 		}
 	}
 	if ((kencryptor = conn->kencryptor) != NULL) {
-		encryptor = kencryptor->encryptor;
-
 		/*
 		 * Allocate enough space for the original record plus the
 		 * encryption size constant plus the length we store.
 		 */
-		new_size = ip->size + kencryptor->size_const +
-		    WT_ENCRYPT_LEN_SIZE + WT_ENCRYPT_CKSUM_SIZE;
+		__wt_encrypt_size(session, kencryptor, ip->size, &new_size);
 		WT_ERR(__wt_scr_alloc(session, new_size, &eitem));
 
-		/*
-		 * Initialize the new buffer with the original header
-		 * bytes and set up the new unpadded size that we add.
-		 */
-		memcpy(eitem->mem, ip->mem, WT_LOG_ENCRYPT_SKIP);
-		unpadded_lenp = (uint32_t *)
-		    ((uint8_t *)eitem->mem + WT_LOG_ENCRYPT_SKIP);
-		eitem->size = new_size;
-
-		/*
-		 * Set up the source and destination pointers and lengths
-		 * for the encryption function.  These point into the part
-		 * of the buffers beyond the headers.
-		 */
-		src = (uint8_t *)ip->mem + WT_LOG_ENCRYPT_SKIP;
-		src_len = ip->size - WT_LOG_ENCRYPT_SKIP;
-
-		/*
-		 * Hijack the last few bytes from the header we're skipping
-		 * because we inject the checksum as the first thing in
-		 * the source buffer for encryption.  Save the original
-		 * header value to restore afterward.
-		 */
-		clear_cksum = __wt_cksum(src, src_len);
-		tmp_src = src - WT_ENCRYPT_CKSUM_SIZE;
-		tmp_cksump = (uint32_t *)tmp_src;
-		orig_val = *tmp_cksump;
-		*tmp_cksump = WT_STORE_SIZE(clear_cksum);
-		tmp_src_len = src_len + WT_ENCRYPT_CKSUM_SIZE;
-
-		dst = (uint8_t *)eitem->mem +
-		    WT_LOG_ENCRYPT_SKIP + WT_ENCRYPT_LEN_SIZE;
-		dst_len = tmp_src_len + kencryptor->size_const;
-
-		/*
-		 * Send in the temporary source address and length that
-		 * includes the checksum we injected.
-		 */
-		ret = encryptor->encrypt(encryptor, &session->iface,
-		    tmp_src, tmp_src_len, dst, dst_len, &result_len);
-		/*
-		 * Immediately restore the original header value.
-		 */
-		*tmp_cksump = orig_val;
-		if (ret != 0)
-			goto err;
-		/*
-		 * The final result length includes the skipped lengths.
-		 */
-		result_len += WT_LOG_ENCRYPT_SKIP + WT_ENCRYPT_LEN_SIZE;
-
-		/* TODO: stats */
+		WT_ERR(__wt_encrypt(session, kencryptor,
+		    WT_LOG_ENCRYPT_SKIP, ip, eitem));
 
 		/*
 		 * Final setup of new buffer.  Set the flag for
@@ -1723,7 +1620,6 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 		 */
 		ip = eitem;
 		newlrp = (WT_LOG_RECORD *)eitem->mem;
-		*unpadded_lenp = WT_STORE_SIZE(result_len);
 		F_SET(newlrp, WT_LOG_RECORD_ENCRYPTED);
 		WT_ASSERT(session, new_size < UINT32_MAX &&
 		    ip->size < UINT32_MAX);
