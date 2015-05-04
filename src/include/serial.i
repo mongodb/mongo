@@ -255,15 +255,18 @@ __wt_update_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
 	 * obsolete check at a time, and to protect updates from disappearing
 	 * under reconciliation.
 	 */
-	if (upd->next != NULL) {
+	if (upd->next != NULL &&
+	    __wt_txn_visible_all(session, page->modify->obsolete_check_txn)) {
 		F_CAS_ATOMIC(page, WT_PAGE_SCANNING, ret);
 		/* If we can't lock it, don't scan, that's okay. */
 		if (ret != 0)
 			return (0);
-		obsolete = __wt_update_obsolete_check(session, upd->next);
+		obsolete = __wt_update_obsolete_check(session, page, upd->next);
 		F_CLR_ATOMIC(page, WT_PAGE_SCANNING);
-		if (obsolete != NULL)
+		if (obsolete != NULL) {
+			page->modify->obsolete_check_txn = WT_TXN_NONE;
 			__wt_update_obsolete_free(session, page, obsolete);
+		}
 	}
 
 	return (0);
