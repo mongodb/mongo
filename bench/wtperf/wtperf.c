@@ -90,7 +90,7 @@ static uint64_t	 wtperf_value_range(CONFIG *);
 #define	HELIUM_PATH							\
 	"../../ext/test/helium/.libs/libwiredtiger_helium.so"
 #define	HELIUM_CONFIG	",type=helium"
-#define INDEX_COL_NAMES	",columns=(key,val)"
+#define	INDEX_COL_NAMES	",columns=(key,val)"
 
 /* Retrieve an ID for the next insert operation. */
 static inline uint64_t
