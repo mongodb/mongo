@@ -58,12 +58,15 @@ typedef struct {
  * destination buffer as well.
  *
  * Use fixed-size, 4B values (WiredTiger never writes buffers larger than 4GB).
+ *
+ * The unused field is available for a mode flag if one is needed in the future,
+ * we guarantee it's 0.
  */
 typedef struct {
 	uint32_t compressed_len;	/* True compressed length */
 	uint32_t uncompressed_len;	/* True uncompressed source length */
 	uint32_t useful_len;		/* Decompression return value */
-	uint32_t unused;
+	uint32_t unused;		/* Guaranteed to be 0 */
 } LZ4_PREFIX;
 
 /*
