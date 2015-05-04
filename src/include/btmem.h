@@ -179,17 +179,20 @@ struct __wt_page_modify {
 	 */
 	uint64_t disk_snap_min;
 
-	/* The largest transaction ID seen on the page by reconciliation. */
-	uint64_t rec_max_txn;
-
 	/* The first unwritten transaction ID (approximate). */
 	uint64_t first_dirty_txn;
 
-	/* The largest update transaction ID (approximate). */
-	uint64_t update_txn;
-
 	/* In-memory split transaction ID. */
 	uint64_t inmem_split_txn;
+
+	/* Avoid checking for obsolete updates during checkpoints. */
+	uint64_t obsolete_check_txn;
+
+	/* The largest transaction ID seen on the page by reconciliation. */
+	uint64_t rec_max_txn;
+
+	/* The largest update transaction ID (approximate). */
+	uint64_t update_txn;
 
 	/* Dirty bytes added to the cache. */
 	size_t bytes_dirty;
