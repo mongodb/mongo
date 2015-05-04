@@ -32,11 +32,13 @@
 #include <utility>
 
 #include "mongo/db/jsobj.h"
+#include "mongo/s/catalog/type_chunk.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
 
     using mongo::BSONObj;
+    using mongo::ChunkType;
     using mongo::ConfigDiffTracker;
     using std::string;
     using std::pair;
@@ -55,13 +57,11 @@ namespace {
         DefaultDiffAdapter() {}
         virtual ~DefaultDiffAdapter() {}
 
-        virtual bool isTracked(const BSONObj& chunkDoc) const { return true; }
+        virtual bool isTracked(const ChunkType& chunk) const { return true; }
         virtual BSONObj maxFrom(const BSONObj& max) const { return max; }
 
-        virtual pair<BSONObj,BSONObj> rangeFor(const BSONObj& chunkDoc,
-                                               const BSONObj& min,
-                                               const BSONObj& max) const {
-            return make_pair(min, max);
+        virtual pair<BSONObj,BSONObj> rangeFor(const ChunkType& chunk) const {
+            return make_pair(chunk.getMin(), chunk.getMax());
         }
 
         virtual string shardFor(const string& name) const { return name; }

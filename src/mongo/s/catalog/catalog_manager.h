@@ -47,6 +47,7 @@ namespace mongo {
     class DatabaseType;
     class DistLockManager;
     class OperationContext;
+    class Query;
     class SettingsType;
     class Shard;
     class ShardKeyPattern;
@@ -223,6 +224,13 @@ namespace mongo {
          */
         virtual Status getChunksForShard(const std::string& shardName,
                                          std::vector<ChunkType>* chunks) = 0;
+
+        /**
+         * Gets all chunks (of type ChunkType) that satisfy a query.
+         * Returns a !OK status if an error occurs.
+         */
+        virtual Status getChunks(const Query& query,
+                                 std::vector<ChunkType>* chunks) = 0;
 
         /**
          * Retrieves all shards in this sharded cluster.

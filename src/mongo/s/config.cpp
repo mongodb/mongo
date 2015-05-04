@@ -96,7 +96,7 @@ namespace mongo {
     
     void CollectionInfo::shard(ChunkManager* manager) {
         // Do this *first* so we're invisible to everyone else
-        manager->loadExistingRanges(configServer.getPrimary().getConnString(), NULL);
+        manager->loadExistingRanges(nullptr);
 
         //
         // Collections with no chunks are unsharded, no matter what the collections entry says
@@ -384,7 +384,7 @@ namespace mongo {
             temp.reset(new ChunkManager(oldManager->getns(),
                                         oldManager->getShardKeyPattern(),
                                         oldManager->isUnique()));
-            temp->loadExistingRanges(configServer.getPrimary().getConnString(), oldManager.get());
+            temp->loadExistingRanges(oldManager.get());
 
             if ( temp->numChunks() == 0 ) {
                 // maybe we're not sharded any more

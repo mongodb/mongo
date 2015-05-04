@@ -34,6 +34,7 @@
 #include "mongo/logger/logger.h"
 #include "mongo/logger/logstream_builder.h"
 #include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/util/concurrency/thread_name.h"
 
 namespace mongo {
@@ -88,37 +89,29 @@ namespace mongo {
     }
 
     template<class ValType, class ShardType>
-    int ConfigDiffTracker<ValType, ShardType>::calculateConfigDiff(const std::string& config) {
+    int ConfigDiffTracker<ValType, ShardType>::calculateConfigDiff(CatalogManager* catalogManager) {
         verifyAttached();
 
         // Get the diff query required
         Query diffQuery = configDiffQuery();
 
-        ScopedDbConnection conn(config, 30.0);
-
         try {
 
-            // Open a cursor for the diff chunks
-            std::auto_ptr<DBClientCursor> cursor = conn->query(
-                    ChunkType::ConfigNS, diffQuery, 0, 0, 0, 0, ( kDebugBuild ? 2 : 1000000 ) );
-            verify( cursor.get() );
+            std::vector<ChunkType> chunks;
+            uassertStatusOK(catalogManager->getChunks(diffQuery, &chunks));
 
-            int diff = calculateConfigDiff( *cursor.get() );
-
-            conn.done();
-
-            return diff;
+            return calculateConfigDiff(chunks);
         }
         catch( DBException& e ){
             // Should only happen on connection errors
-            e.addContext( str::stream() << "could not calculate config difference for ns " << _ns << " on " << config );
+            e.addContext(str::stream() << "could not calculate config difference for ns " << _ns);
             throw;
         }
     }
 
     template < class ValType, class ShardType >
     int ConfigDiffTracker<ValType,ShardType>::
-        calculateConfigDiff( DBClientCursorInterface& diffCursor )
+        calculateConfigDiff(const std::vector<ChunkType>& chunks)
     {
         verifyAttached();
 
@@ -132,35 +125,22 @@ namespace mongo {
         //    shard for mongod) add them to the ranges
         //
 
-        std::vector<BSONObj> newTracked;
+        std::vector<ChunkType> newTracked;
         // Store epoch now so it doesn't change when we change max
         OID currEpoch = _maxVersion->epoch();
 
         _validDiffs = 0;
-        while( diffCursor.more() ){
-
-            BSONObj diffChunkDoc = diffCursor.next();
-
-            ChunkVersion chunkVersion = ChunkVersion::fromBSON(diffChunkDoc, ChunkType::DEPRECATED_lastmod());
-
-            if( diffChunkDoc[ChunkType::min()].type() != Object ||
-                diffChunkDoc[ChunkType::max()].type() != Object ||
-                diffChunkDoc[ChunkType::shard()].type() != String )
-            {
-                using namespace logger;
-                LogstreamBuilder(globalLogDomain(), getThreadName(), LogSeverity::Warning(),
-                                 LogComponent::kSharding)
-                          << "got invalid chunk document " << diffChunkDoc
-                          << " when trying to load differing chunks" << std::endl;
-                continue;
-            }
+        for (const ChunkType& chunk : chunks) {
+            ChunkVersion chunkVersion = ChunkVersion::fromBSON(chunk.toBSON(),
+                                                               ChunkType::DEPRECATED_lastmod());
 
             if( ! chunkVersion.isSet() || ! chunkVersion.hasEqualEpoch( currEpoch ) ){
 
                 using namespace logger;
                 LogstreamBuilder(globalLogDomain(), getThreadName(), LogSeverity::Warning(),
                                  LogComponent::kSharding)
-                          << "got invalid chunk version " << chunkVersion << " in document " << diffChunkDoc
+                          << "got invalid chunk version " << chunkVersion
+                          << " in document " << chunk.toString()
                           << " when trying to load differing chunks at version "
                           << ChunkVersion( _maxVersion->majorVersion(),
                                            _maxVersion->minorVersion(),
@@ -176,19 +156,18 @@ namespace mongo {
             if( chunkVersion > *_maxVersion ) *_maxVersion = chunkVersion;
 
             // Chunk version changes
-            ShardType shard = shardFor( diffChunkDoc[ChunkType::shard()].String() );
+            ShardType shard = shardFor(chunk.getShard());
             typename std::map<ShardType, ChunkVersion>::iterator shardVersionIt = _maxShardVersions->find( shard );
             if( shardVersionIt == _maxShardVersions->end() || shardVersionIt->second < chunkVersion ){
                 (*_maxShardVersions)[ shard ] = chunkVersion;
             }
 
             // See if we need to remove any chunks we are currently tracking b/c of this chunk's changes
-            removeOverlapping(diffChunkDoc[ChunkType::min()].Obj(),
-                              diffChunkDoc[ChunkType::max()].Obj());
+            removeOverlapping(chunk.getMin(), chunk.getMax());
 
             // Figure out which of the new chunks we need to track
             // Important - we need to actually own this doc, in case the cursor decides to getMore or unbuffer
-            if( isTracked( diffChunkDoc ) ) newTracked.push_back( diffChunkDoc.getOwned() );
+            if (isTracked(chunk)) newTracked.push_back(chunk);
         }
 
         using namespace logger;
@@ -202,22 +181,15 @@ namespace mongo {
                 << std::endl;
         }
 
-        for( std::vector<BSONObj>::iterator it = newTracked.begin(); it != newTracked.end(); it++ ){
-
-            BSONObj chunkDoc = *it;
-
-            // Important - we need to make sure we actually own the min and max here
-            BSONObj min = chunkDoc[ChunkType::min()].Obj().getOwned();
-            BSONObj max = chunkDoc[ChunkType::max()].Obj().getOwned();
-
+        for (const ChunkType& chunk : newTracked) {
             // Invariant enforced by sharding
             // It's possible to read inconsistent state b/c of getMore() and yielding, so we want
             // to detect as early as possible.
             // TODO: This checks for overlap, we also should check for holes here iff we're tracking
             // all chunks
-            if( isOverlapping( min, max ) ) return -1;
+            if(isOverlapping(chunk.getMin(), chunk.getMax())) return -1;
 
-            _currMap->insert( rangeFor( chunkDoc, min, max ) );
+            _currMap->insert(rangeFor(chunk));
         }
 
         return _validDiffs;

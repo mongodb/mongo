@@ -576,7 +576,7 @@ namespace mongo {
 
         string errMsg;
 
-        MetadataLoader mdLoader(configServer.getConnectionString());
+        MetadataLoader mdLoader;
         CollectionMetadata* remoteMetadataRaw = new CollectionMetadata();
         CollectionMetadataPtr remoteMetadata( remoteMetadataRaw );
 

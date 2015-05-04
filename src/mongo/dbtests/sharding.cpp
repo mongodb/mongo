@@ -32,7 +32,6 @@
 
 #include <boost/shared_ptr.hpp>
 
-#include "mongo/client/dbclientmockcursor.h"
 #include "mongo/client/parallel.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/operation_context_impl.h"
@@ -45,7 +44,6 @@
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/config.h"
-#include "mongo/util/log.h"
 
 namespace ShardingTests {
 
@@ -69,6 +67,18 @@ namespace ShardingTests {
 
         // Modding is bad, but don't really care in this case
         return max > 0 ? r % max : r;
+    }
+
+    //
+    // Converts array of raw BSONObj chunks to a vector of ChunkType
+    //
+    void convertBSONArrayToChunkTypes(const BSONArray& chunksArray,
+                                      std::vector<ChunkType>* chunksVector) {
+        for (const BSONElement& obj : chunksArray) {
+            auto chunkTypeRes = ChunkType::fromBSON(obj.Obj());
+            ASSERT(chunkTypeRes.isOK());
+            chunksVector->push_back(chunkTypeRes.getValue());
+        }
     }
 
     //
@@ -150,7 +160,7 @@ namespace ShardingTests {
 
             ShardKeyPattern shardKeyPattern(BSON("_id" << 1));
             ChunkManager manager(collName(), shardKeyPattern, false);
-            manager.createFirstChunks( shard().getConnString(), shard(), NULL, NULL );
+            manager.createFirstChunks(shard(), NULL, NULL );
 
             BSONObj firstChunk = _client.findOne(ChunkType::ConfigNS, BSONObj()).getOwned();
 
@@ -202,7 +212,7 @@ namespace ShardingTests {
             ShardKeyPattern shardKeyPattern(BSON(keyName << 1));
             ChunkManager manager(collName(), shardKeyPattern, false);
 
-            manager.createFirstChunks( shard().getConnString(), shard(), &splitKeys, NULL );
+            manager.createFirstChunks(shard(), &splitKeys, NULL );
         }
 
         void run(){
@@ -268,7 +278,7 @@ namespace ShardingTests {
             collType.setDropped(false);
 
             ChunkManager manager(collType);
-            manager.loadExistingRanges(shard().getConnString(), NULL);
+            manager.loadExistingRanges(nullptr);
 
             ASSERT(manager.getVersion().epoch() == version.epoch());
             ASSERT(manager.getVersion().minorVersion() == (numChunks - 1));
@@ -285,7 +295,7 @@ namespace ShardingTests {
             ChunkManager newManager(manager.getns(),
                                     manager.getShardKeyPattern(),
                                     manager.isUnique());
-            newManager.loadExistingRanges(shard().getConnString(), &manager);
+            newManager.loadExistingRanges(&manager);
 
             ASSERT( newManager.getVersion().toLong() == laterVersion.toLong() );
             ASSERT( newManager.getVersion().epoch() == laterVersion.epoch() );
@@ -311,11 +321,11 @@ namespace ShardingTests {
             DefaultDiffAdapter() {}
             virtual ~DefaultDiffAdapter() {}
 
-            virtual bool isTracked( const BSONObj& chunkDoc ) const { return true; }
+            virtual bool isTracked(const ChunkType& chunk) const { return true; }
             virtual BSONObj maxFrom( const BSONObj& max ) const { return max; }
 
-            virtual pair<BSONObj,BSONObj> rangeFor( const BSONObj& chunkDoc, const BSONObj& min, const BSONObj& max ) const {
-                return make_pair( min, max );
+            virtual pair<BSONObj,BSONObj> rangeFor(const ChunkType& chunk) const {
+                return make_pair(chunk.getMin(), chunk.getMax());
             }
 
             virtual string shardFor( const string& name ) const { return name; }
@@ -334,25 +344,32 @@ namespace ShardingTests {
 
             virtual bool isMinKeyIndexed() const { return false; }
 
-            virtual pair<BSONObj,BSONObj> rangeFor( const BSONObj& chunkDoc, const BSONObj& min, const BSONObj& max ) const {
-                return make_pair( max, min );
+            virtual pair<BSONObj,BSONObj> rangeFor(const ChunkType& chunk) const {
+                return make_pair(chunk.getMax(), chunk.getMin());
             }
         };
 
         // Allow validating with and without ranges (b/c our splits won't actually be updated by the diffs)
-        void validate( BSONArray chunks, ChunkVersion maxVersion, const VersionMap& maxShardVersions ){
-            validate( chunks, NULL, maxVersion, maxShardVersions );
+        void validate(const std::vector<ChunkType>& chunks,
+                      ChunkVersion maxVersion,
+                      const VersionMap& maxShardVersions) {
+            validate(chunks, NULL, maxVersion, maxShardVersions);
         }
 
-        void validate( BSONArray chunks, const RangeMap& ranges, ChunkVersion maxVersion, const VersionMap& maxShardVersions ){
-            validate( chunks, (RangeMap*)&ranges, maxVersion, maxShardVersions );
+        void validate(const std::vector<ChunkType>& chunks,
+                      const RangeMap& ranges,
+                      ChunkVersion maxVersion,
+                      const VersionMap& maxShardVersions) {
+            validate(chunks, (RangeMap*)&ranges, maxVersion, maxShardVersions);
         }
 
         // Validates that the ranges and versions are valid given the chunks
-        void validate( const BSONArray& chunks, RangeMap* ranges, ChunkVersion maxVersion, const VersionMap& maxShardVersions ){
+        void validate(const std::vector<ChunkType>& chunks,
+                      RangeMap* ranges,
+                      ChunkVersion maxVersion,
+                      const VersionMap& maxShardVersions) {
 
-            BSONObjIterator it( chunks );
-            int chunkCount = 0;
+            int chunkCount = chunks.size();
             ChunkVersion foundMaxVersion;
             VersionMap foundMaxShardVersions;
 
@@ -360,29 +377,30 @@ namespace ShardingTests {
             // Validate that all the chunks are there and collect versions
             //
 
-            while( it.more() ){
-
-                BSONObj chunkDoc = it.next().Obj();
-                chunkCount++;
+            for (const ChunkType& chunk : chunks) {
 
                 if( ranges != NULL ){
 
                     // log() << "Validating chunk " << chunkDoc << " size : " << ranges->size() << " vs " << chunkCount << endl;
 
-                    RangeMap::iterator chunkRange = ranges->find( _inverse ? chunkDoc["max"].Obj() : chunkDoc["min"].Obj() );
+                    RangeMap::iterator chunkRange = ranges->find(_inverse ?
+                                                                 chunk.getMax() :
+                                                                 chunk.getMin());
 
                     ASSERT( chunkRange != ranges->end() );
-                    ASSERT( chunkRange->second.woCompare( _inverse ? chunkDoc["min"].Obj() : chunkDoc["max"].Obj() ) == 0 );
+                    ASSERT(chunkRange->second.woCompare(_inverse ?
+                                                        chunk.getMin() :
+                                                        chunk.getMax()) == 0);
                 }
 
                 ChunkVersion version =
-                    ChunkVersion::fromBSON(chunkDoc[ChunkType::DEPRECATED_lastmod()]);
+                    ChunkVersion::fromBSON(chunk.toBSON()[ChunkType::DEPRECATED_lastmod()]);
                 if( version > foundMaxVersion ) foundMaxVersion = version;
 
                 ChunkVersion shardMaxVersion =
-                    foundMaxShardVersions[chunkDoc[ChunkType::shard()].String()];
+                    foundMaxShardVersions[chunk.getShard()];
                 if( version > shardMaxVersion ) {
-                    foundMaxShardVersions[chunkDoc[ChunkType::shard()].String() ] = version;
+                    foundMaxShardVersions[chunk.getShard()] = version;
                 }
             }
 
@@ -440,6 +458,9 @@ namespace ShardingTests {
                 if( i >= 0 ){
                     BSONObjBuilder chunkB;
 
+                    chunkB.append(ChunkType::name(), "$dummyname");
+                    chunkB.append(ChunkType::ns(), "$dummyns");
+
                     chunkB.append(ChunkType::min(), lastSplitPt );
                     chunkB.append(ChunkType::max(), splitPt );
 
@@ -460,8 +481,6 @@ namespace ShardingTests {
 
             // log() << "Chunks generated : " << chunks << endl;
 
-            DBClientMockCursor chunksCursor( chunks );
-
             // Setup the empty ranges and versions first
             RangeMap ranges;
             ChunkVersion maxVersion = ChunkVersion( 0, 0, OID() );
@@ -471,9 +490,12 @@ namespace ShardingTests {
             boost::shared_ptr< DefaultDiffAdapter > differ( _inverse ? new InverseDiffAdapter() : new DefaultDiffAdapter() );
             differ->attach( "test", ranges, maxVersion, maxShardVersions );
 
+            std::vector<ChunkType> chunksVector;
+            convertBSONArrayToChunkTypes(chunks, &chunksVector);
+
             // Validate initial load
-            differ->calculateConfigDiff( chunksCursor );
-            validate( chunks, ranges, maxVersion, maxShardVersions );
+            differ->calculateConfigDiff(chunksVector);
+            validate(chunksVector, ranges, maxVersion, maxShardVersions );
 
             // Generate a lot of diffs, and keep validating that updating from the diffs always
             // gives us the right ranges and versions
@@ -533,6 +555,12 @@ namespace ShardingTests {
                         rightB.append(ChunkType::min(), midPt );
                         rightB.append(chunk[ChunkType::max()] );
 
+                        // add required fields for ChunkType
+                        leftB.append(chunk[ChunkType::name()]);
+                        leftB.append(chunk[ChunkType::ns()]);
+                        rightB.append(chunk[ChunkType::name()]);
+                        rightB.append(chunk[ChunkType::ns()]);
+
                         leftB.append(chunk[ChunkType::shard()] );
                         rightB.append(chunk[ChunkType::shard()] );
 
@@ -582,6 +610,12 @@ namespace ShardingTests {
                             newShardB.append(chunk[ChunkType::max()]);
                             prevShardB.append(prevShardChunk[ChunkType::min()]);
                             prevShardB.append(prevShardChunk[ChunkType::max()]);
+
+                            // add required fields for ChunkType
+                            newShardB.append(chunk[ChunkType::name()]);
+                            newShardB.append(chunk[ChunkType::ns()]);
+                            prevShardB.append(chunk[ChunkType::name()]);
+                            prevShardB.append(chunk[ChunkType::ns()]);
 
                             int shardNum = rand( numShards );
                             newShardB.append(ChunkType::shard(),
@@ -634,11 +668,12 @@ namespace ShardingTests {
 
                 // log() << "Total number of chunks : " << numChunks << " iteration " << i << endl;
 
-                DBClientMockCursor diffCursor( diffs );
+                std::vector<ChunkType> chunksVector;
+                convertBSONArrayToChunkTypes(chunks, &chunksVector);
 
-                differ->calculateConfigDiff( diffCursor );
+                differ->calculateConfigDiff(chunksVector);
 
-                validate( chunks, ranges, maxVersion, maxShardVersions );
+                validate(chunksVector, ranges, maxVersion, maxShardVersions );
 
             }
 

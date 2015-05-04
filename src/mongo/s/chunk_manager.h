@@ -137,13 +137,12 @@ namespace mongo {
         //
 
         // Creates new chunks based on info in chunk manager
-        void createFirstChunks( const std::string& config,
-                                const Shard& primary,
-                                const std::vector<BSONObj>* initPoints,
-                                const std::vector<Shard>* initShards );
+        void createFirstChunks(const Shard& primary,
+                               const std::vector<BSONObj>* initPoints,
+                               const std::vector<Shard>* initShards);
 
         // Loads existing ranges based on info in chunk manager
-        void loadExistingRanges(const std::string& config, const ChunkManager* oldManager);
+        void loadExistingRanges(const ChunkManager* oldManager);
 
 
         // Helpers for load
@@ -218,8 +217,7 @@ namespace mongo {
         // helpers for loading
 
         // returns true if load was consistent
-        bool _load(const std::string& config,
-                   ChunkMap& chunks,
+        bool _load(ChunkMap& chunks,
                    std::set<Shard>& shards,
                    ShardVersionMap* shardVersions,
                    const ChunkManager* oldManager);

@@ -100,6 +100,8 @@ namespace mongo {
         virtual Status getChunksForShard(const std::string& shardName,
                                          std::vector<ChunkType>* chunks);
 
+        virtual Status getChunks(const Query& query, std::vector<ChunkType>* chunks);
+
         virtual Status getAllShards(std::vector<ShardType>* shards);
 
         virtual bool isShardHost(const ConnectionString& shardConnectionString);

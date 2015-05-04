@@ -93,7 +93,7 @@ namespace {
             CatalogManagerLegacy catalogManager;
             catalogManager.init(configLoc);
 
-            MetadataLoader loader(configLoc);
+            MetadataLoader loader;
             Status status = loader.makeCollectionMetadata(&catalogManager,
                                                           "test.foo",
                                                           "shard0000",
@@ -495,7 +495,7 @@ namespace {
             CatalogManagerLegacy catalogManager;
             catalogManager.init(configLoc);
 
-            MetadataLoader loader(configLoc);
+            MetadataLoader loader;
             Status status = loader.makeCollectionMetadata(&catalogManager,
                                                           "test.foo",
                                                           "shard0000",
@@ -842,7 +842,7 @@ namespace {
             CatalogManagerLegacy catalogManager;
             catalogManager.init(configLoc);
 
-            MetadataLoader loader(configLoc);
+            MetadataLoader loader;
             Status status = loader.makeCollectionMetadata(&catalogManager,
                                                           "test.foo",
                                                           "shard0000",
@@ -917,7 +917,7 @@ namespace {
             CatalogManagerLegacy catalogManager;
             catalogManager.init(configLoc);
 
-            MetadataLoader loader(configLoc);
+            MetadataLoader loader;
             Status status = loader.makeCollectionMetadata(&catalogManager,
                                                           "test.foo",
                                                           "shard0000",
@@ -1207,7 +1207,7 @@ namespace {
             CatalogManagerLegacy catalogManager;
             catalogManager.init(configLoc);
 
-            MetadataLoader loader(configLoc);
+            MetadataLoader loader;
             Status status = loader.makeCollectionMetadata(&catalogManager,
                                                           "test.foo",
                                                           "shard0000",

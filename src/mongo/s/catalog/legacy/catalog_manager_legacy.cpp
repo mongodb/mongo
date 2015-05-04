@@ -488,11 +488,10 @@ namespace {
         logChange(NULL, "shardCollection.start", ns, collectionDetail.obj());
 
         ChunkManagerPtr manager(new ChunkManager(ns, fieldsAndOrder, unique));
-        manager->createFirstChunks(_configServerConnectionString.toString(),
-                                   dbPrimary,
+        manager->createFirstChunks(dbPrimary,
                                    initPoints,
                                    initShards);
-        manager->loadExistingRanges(_configServerConnectionString.toString(), NULL);
+        manager->loadExistingRanges(nullptr);
 
         CollectionInfo collInfo;
         collInfo.useChunkManager(manager);
@@ -1140,15 +1139,26 @@ namespace {
 
     Status CatalogManagerLegacy::getChunksForShard(const string& shardName,
                                                    vector<ChunkType>* chunks) {
+        return getChunks(BSON(ChunkType::shard(shardName)), chunks);
+    }
+
+    Status CatalogManagerLegacy::getChunks(const Query& query,
+                                           vector<ChunkType>* chunks) {
         ScopedDbConnection conn(_configServerConnectionString, 30.0);
-        std::unique_ptr<DBClientCursor> cursor(
-            _safeCursor(conn->query(ChunkType::ConfigNS, BSON(ChunkType::shard(shardName)))));
+        std::unique_ptr<DBClientCursor> cursor(conn->query(ChunkType::ConfigNS,
+                                                           query));
+
+        if (!cursor.get()) {
+            conn.done();
+            return Status(ErrorCodes::HostUnreachable, "unable to open chunk cursor");
+        }
 
         while (cursor->more()) {
             BSONObj chunkObj = cursor->nextSafe();
 
             StatusWith<ChunkType> chunkRes = ChunkType::fromBSON(chunkObj);
             if (!chunkRes.isOK()) {
+                conn.done();
                 return Status(ErrorCodes::FailedToParse,
                               str::stream() << "Failed to parse chunk BSONObj: "
                                             << chunkRes.getStatus().reason());

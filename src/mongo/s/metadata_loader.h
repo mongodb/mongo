@@ -67,12 +67,7 @@ namespace mongo {
     class MetadataLoader {
     public:
 
-        /**
-         * Takes a connection std::string to the config servers to be used for loading data. Note
-         * that we make no restrictions about which connection std::string that is, including
-         * CUSTOM, which we rely on in testing.
-         */
-        explicit MetadataLoader( const ConnectionString& configLoc );
+        explicit MetadataLoader();
 
         ~MetadataLoader();
 
@@ -126,7 +121,6 @@ namespace mongo {
                                      CollectionMetadata* remoteMetadata ) const;
 
     private:
-        ConnectionString _configLoc;
 
         /**
          * Returns OK and fills in the internal state of 'metadata' with general collection
@@ -157,10 +151,11 @@ namespace mongo {
          * @return NamespaceNotFound if there are no chunks loaded and an epoch change is detected
          * TODO: @return FailedToParse
          */
-        Status initChunks( const std::string& ns,
-                           const std::string& shard,
-                           const CollectionMetadata* oldMetadata,
-                           CollectionMetadata* metadata ) const;
+        Status initChunks(CatalogManager* catalogManager,
+                          const std::string& ns,
+                          const std::string& shard,
+                          const CollectionMetadata* oldMetadata,
+                          CollectionMetadata* metadata ) const;
     };
 
 } // namespace mongo

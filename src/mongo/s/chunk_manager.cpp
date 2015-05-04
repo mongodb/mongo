@@ -73,7 +73,7 @@ namespace {
     public:
         CMConfigDiffTracker( ChunkManager* manager ) : _manager( manager ) { }
 
-        virtual bool isTracked( const BSONObj& chunkDoc ) const {
+        virtual bool isTracked(const ChunkType& chunk) const {
             // Mongos tracks all shards
             return true;
         }
@@ -84,9 +84,9 @@ namespace {
 
         virtual bool isMinKeyIndexed() const { return false; }
 
-        virtual pair<BSONObj,ChunkPtr> rangeFor( const BSONObj& chunkDoc, const BSONObj& min, const BSONObj& max ) const {
-            ChunkPtr c( new Chunk( _manager, chunkDoc ) );
-            return make_pair( max, c );
+        virtual pair<BSONObj,ChunkPtr> rangeFor(const ChunkType& chunk) const {
+            ChunkPtr c(new Chunk(_manager, chunk.toBSON()));
+            return make_pair(chunk.getMax(), c);
         }
 
         virtual string shardFor(const string& hostName) const {
@@ -138,7 +138,7 @@ namespace {
         _version = ChunkVersion::fromBSON(coll.toBSON());
     }
 
-    void ChunkManager::loadExistingRanges( const string& config, const ChunkManager* oldManager ) {
+    void ChunkManager::loadExistingRanges(const ChunkManager* oldManager ) {
         int tries = 3;
         while (tries--) {
             ChunkMap chunkMap;
@@ -146,7 +146,7 @@ namespace {
             ShardVersionMap shardVersions;
             Timer t;
 
-            bool success = _load(config, chunkMap, shards, &shardVersions, oldManager);
+            bool success = _load(chunkMap, shards, &shardVersions, oldManager);
 
             if( success ){
                 {
@@ -186,8 +186,7 @@ namespace {
         msgasserted(13282, "Couldn't load a valid config for " + _ns + " after 3 attempts. Please try again.");
     }
 
-    bool ChunkManager::_load(const string& config,
-                             ChunkMap& chunkMap,
+    bool ChunkManager::_load(ChunkMap& chunkMap,
                              set<Shard>& shards,
                              ShardVersionMap* shardVersions,
                              const ChunkManager* oldManager)
@@ -234,7 +233,7 @@ namespace {
         differ.attach( _ns, chunkMap, _version, *shardVersions );
 
         // Diff tracker should *always* find at least one chunk if collection exists
-        int diffsApplied = differ.calculateConfigDiff(config);
+        int diffsApplied = differ.calculateConfigDiff(grid.catalogManager());
         if( diffsApplied > 0 ){
 
             LOG(2) << "loaded " << diffsApplied << " chunks into new chunk manager for " << _ns
@@ -385,10 +384,9 @@ namespace {
         }
     }
 
-    void ChunkManager::createFirstChunks( const string& config,
-                                          const Shard& primary,
-                                          const vector<BSONObj>* initPoints,
-                                          const vector<Shard>* initShards )
+    void ChunkManager::createFirstChunks(const Shard& primary,
+                                         const vector<BSONObj>* initPoints,
+                                         const vector<Shard>* initShards)
     {
         // TODO distlock?
         // TODO: Race condition if we shard the collection and insert data while we split across

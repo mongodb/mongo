@@ -31,12 +31,13 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/client/dbclientcursor.h"
-#include "mongo/client/connpool.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/chunk_version.h"
 
 namespace mongo {
+
+    class ChunkType;
+    class CatalogManager;
 
     /**
      * This class manages and applies diffs from partial config server data reloads.  Because the
@@ -107,7 +108,7 @@ namespace mongo {
         //
 
         // Determines which chunks are actually being remembered by our RangeMap
-        virtual bool isTracked( const BSONObj& chunkDoc ) const = 0;
+        virtual bool isTracked(const ChunkType& chunk) const = 0;
 
         // Whether or not our RangeMap uses min or max keys
         virtual bool isMinKeyIndexed() const { return true; }
@@ -122,7 +123,7 @@ namespace mongo {
         // If we're indexing on the max of the chunk bound, implement minFrom
         virtual BSONObj minFrom( const ValType& max ) const { verify( false ); return BSONObj(); }
 
-        virtual std::pair<BSONObj,ValType> rangeFor( const BSONObj& chunkDoc, const BSONObj& min, const BSONObj& max ) const = 0;
+        virtual std::pair<BSONObj,ValType> rangeFor(const ChunkType& chunk) const = 0;
         virtual ShardType shardFor( const std::string& name ) const = 0;
 
         ///
@@ -140,17 +141,18 @@ namespace mongo {
         // Returns a subset of ranges overlapping the region min/max
         RangeOverlap overlappingRange( const BSONObj& min, const BSONObj& max );
 
-        // Finds and applies the changes to a collection from the config server specified
+        // Finds and applies the changes to a collection from the config servers via
+        // the catalog manager.
         // Also includes minor version changes for particular major-version chunks if explicitly
         // specified.
         // Returns the number of diffs processed, or -1 if the diffs were inconsistent
         // Throws a DBException on connection errors
-        int calculateConfigDiff(const std::string& config);
+        int calculateConfigDiff(CatalogManager* catalogManager);
 
-        // Applies changes to the config data from a cursor passed in
+        // Applies changes to the config data from a vector of chunks passed in
         // Returns the number of diffs processed, or -1 if the diffs were inconsistent
         // Throws a DBException on connection errors
-        int calculateConfigDiff( DBClientCursorInterface& diffCursor );
+        int calculateConfigDiff(const std::vector<ChunkType>& chunks);
 
         // Returns the query needed to find new changes to a collection from the config server
         // Needed only if a custom connection is required to the config server
