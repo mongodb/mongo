@@ -704,10 +704,8 @@ __conn_add_encryptor(WT_CONNECTION *wt_conn,
 	for (i = 0; i < WT_HASH_ARRAY_SIZE; i++)
 		SLIST_INIT(&nenc->keyedhashlh[i]);
 
-	__wt_spin_lock(session, &conn->encryptor_lock);
 	TAILQ_INSERT_TAIL(&conn->encryptqh, nenc, q);
 	nenc = NULL;
-	__wt_spin_unlock(session, &conn->encryptor_lock);
 
 err:	if (nenc != NULL) {
 		__wt_free(session, nenc->name);
@@ -732,7 +730,6 @@ __wt_conn_remove_encryptor(WT_SESSION_IMPL *session)
 
 	conn = S2C(session);
 
-	__wt_spin_lock(session, &conn->encryptor_lock);
 	while ((nenc = TAILQ_FIRST(&conn->encryptqh)) != NULL) {
 		while ((kenc = SLIST_FIRST(&nenc->keyedlh)) != NULL) {
 			/* Call any termination method. */
@@ -757,7 +754,6 @@ __wt_conn_remove_encryptor(WT_SESSION_IMPL *session)
 		__wt_free(session, nenc->name);
 		__wt_free(session, nenc);
 	}
-	__wt_spin_unlock(session, &conn->encryptor_lock);
 	return (ret);
 }
 
