@@ -284,9 +284,9 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 	 * Optionally encrypt the data.  We need to add in the original
 	 * length, in case both compression and encryption are done.
 	 */
-	if ((kencryptor = btree->kencryptor) != NULL &&
-	    kencryptor->encryptor != NULL &&
-	    kencryptor->encryptor->encrypt != NULL) {
+	if ((kencryptor = btree->kencryptor) != NULL) {
+		WT_ASSERT(session, kencryptor->encryptor != NULL);
+		WT_ASSERT(session, kencryptor->encryptor->encrypt != NULL);
 		/*
 		 * Get size needed for encrypted buffer.
 		 */
