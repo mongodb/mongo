@@ -159,6 +159,8 @@ ReplSetTest.prototype.getReplSetConfig = function() {
         member['host'] = this.host + ":" + port;
         if( this.nodeOptions[ "n" + i ] && this.nodeOptions[ "n" + i ].arbiter )
             member['arbiterOnly'] = true
+        if( this.nodeOptions[ "n" + i ] && typeof(this.nodeOptions[ "n" + i ].priority) == "number" )
+            member['priority'] = this.nodeOptions[ "n" + i ].priority;
             
         cfg.members.push(member);
     }
