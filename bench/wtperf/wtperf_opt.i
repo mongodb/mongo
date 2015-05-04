@@ -110,6 +110,8 @@ DEF_OPT_AS_UINT32(drop_tables, 0,
 DEF_OPT_AS_UINT32(icount, 5000,
     "number of records to initially populate. If multiple tables are "
     "configured the count is spread evenly across all tables.")
+DEF_OPT_AS_BOOL(index, 0,
+    "Whether to create an index on the value field.")
 DEF_OPT_AS_BOOL(insert_rmw, 0,
     "execute a read prior to each insert in workload phase")
 DEF_OPT_AS_UINT32(key_sz, 20, "key size")
@@ -119,7 +121,9 @@ DEF_OPT_AS_UINT32(min_throughput, 0,
 DEF_OPT_AS_UINT32(max_latency, 0,
     "abort if any latency measured exceeds this number of milliseconds."
     "Requires sample_interval to be configured")
-DEF_OPT_AS_BOOL(pareto, 0, "use pareto 80/20 distribution for random numbers")
+DEF_OPT_AS_UINT32(pareto, 0, "use pareto distribution for random numbers. Zero "
+    "to disable, otherwise a percentage indicating how aggressive the "
+    "distribution should be.")
 DEF_OPT_AS_UINT32(populate_ops_per_txn, 0,
     "number of operations to group into each transaction in the populate "
     "phase, zero for auto-commit")

@@ -41,8 +41,10 @@
 	#define	DIR_DELIM '/'
 	#define RM_COMMAND "rm -rf "
 #endif
+
 #define	DEFAULT_DIR "WT_TEST"
 #define	MKDIR_COMMAND "mkdir "
+
 /*
  * die --
  *	Report an error and quit.
@@ -77,7 +79,7 @@ testutil_work_dir_from_path(char *buffer, size_t inputSize, char *dir)
 		return (0);
 	}
 
-	/* 9 bytes for the directory and WT_TEST */
+	/* Additional bytes for the directory and WT_TEST. */
 	if (inputSize < strlen(dir) + sizeof(DEFAULT_DIR))
 		return (1);
 
@@ -92,15 +94,19 @@ testutil_work_dir_from_path(char *buffer, size_t inputSize, char *dir)
 static inline int
 testutil_clean_work_dir(char *dir)
 {
-	char *buffer;
 	size_t inputSize;
+	int ret;
+	char *buffer;
 
-	/* 10 bytes for the Windows rd command */
+	/* Additional bytes for the Windows rd command. */
 	inputSize = strlen(dir) + sizeof(RM_COMMAND);
-	buffer = (char*) malloc (inputSize);
+	if ((buffer = malloc(inputSize)) == NULL)
+		testutil_die(1, "Failed to allocate memory");
 
 	snprintf(buffer, inputSize, "%s%s", RM_COMMAND, dir);
-	return system(buffer);
+	ret = system(buffer);
+	free(buffer);
+	return (ret);
 }
 
 /*
@@ -110,19 +116,21 @@ testutil_clean_work_dir(char *dir)
 static inline void
 testutil_make_work_dir(char *dir)
 {
-	char *buffer;
 	size_t inputSize;
 	int ret;
+	char *buffer;
 
 	testutil_clean_work_dir(dir);
 
-	/* 7 bytes for the mkdir command */
+	/* Additional bytes for the mkdir command */
 	inputSize = strlen(dir) + sizeof(MKDIR_COMMAND);
-	buffer = (char*) malloc (inputSize);
+	if ((buffer = malloc(inputSize)) == NULL)
+		testutil_die(1, "Failed to allocate memory");
 
 	/* mkdir shares syntax between Windows and Linux */
 	snprintf(buffer, inputSize, "%s%s", MKDIR_COMMAND, dir);
 	if ((ret = system(buffer)) != 0)
 		testutil_die(ret, "directory create call of '%s%s' failed",
 		    MKDIR_COMMAND, dir);
+	free(buffer);
 }
