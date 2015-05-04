@@ -6,7 +6,11 @@
  * See the file LICENSE for redistribution information.
  */
 
-#define	WT_HASH_ARRAY_SIZE	512
+/*
+ * Default hash table size; use a prime number of buckets rather than assuming
+ * a good hash (Reference Sedgewick, Algorithms in C, "Hash Functions").
+ */
+#define	WT_HASH_ARRAY_SIZE	509
 
 /*******************************************
  * Global per-process structure.
@@ -153,12 +157,6 @@ struct __wt_named_extractor {
 	SLIST_REMOVE(&(conn)->fhlh, fh, __wt_fh, l);			\
 	SLIST_REMOVE(&(conn)->fhhash[bucket], fh, __wt_fh, hashl);	\
 } while (0)
-
-/*
- * Default hash table size; use a prime number of buckets rather than assuming
- * a good hash (Reference Sedgewick, Algorithms in C, "Hash Functions").
- */
-#define	WT_HASH_ARRAY_SIZE	509
 
 /*
  * WT_CONNECTION_IMPL --
