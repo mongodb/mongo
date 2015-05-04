@@ -227,6 +227,9 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
             
             var rs = new ReplSetTest( { name : setName , nodes : numReplicas , startPort : 31100 + ( i * 100 ), useHostName : otherParams.useHostname, keyFile : keyFile, shardSvr : true } );
             this._rs[i] = { setName : setName , test : rs , nodes : rs.startSet( rsDefaults ) , url : rs.getURL() };
+            if ( otherParams.rsNodeOptions ) {
+                rs.nodeOptions = Object.merge( rs.nodeOptions, otherParams.rsNodeOptions );
+            }
             rs.initiate();
             this["rs" + i] = rs
             
