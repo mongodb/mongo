@@ -410,16 +410,6 @@ __log_decrypt(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out)
 	ret = __wt_decrypt(session, encryptor, WT_LOG_ENCRYPT_SKIP,
 	    in, out, &result_len);
 
-	/*
-	 * This length is now the full decrypted size, including the header.
-	 */
-	result_len += WT_LOG_ENCRYPT_SKIP;
-	/*
-	 * The original buffer was the maximum size needed.  Set the buffer
-	 * to the actual size now.
-	 */
-	WT_ERR(__wt_buf_initsize(session, *out, result_len));
-
 err:	if (ret != 0)
 		__wt_scr_free(session, out);
 	return (ret);

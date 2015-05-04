@@ -19,8 +19,10 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 	WT_BM *bm;
 	WT_BTREE *btree;
 	WT_DECL_ITEM(tmp);
+	WT_DECL_ITEM(etmp);
 	WT_DECL_RET;
 	WT_ENCRYPTOR *encryptor;
+	WT_ITEM *ip;
 	const WT_PAGE_HEADER *dsk;
 	size_t result_len;
 
@@ -35,10 +37,12 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 	if (btree->compressor == NULL && btree->kencryptor == NULL) {
 		WT_RET(bm->read(bm, session, buf, addr, addr_size));
 		dsk = buf->data;
+		ip = NULL;
 	} else {
 		WT_RET(__wt_scr_alloc(session, 0, &tmp));
 		WT_ERR(bm->read(bm, session, tmp, addr, addr_size));
 		dsk = tmp->data;
+		ip = tmp;
 	}
 
 	/*
@@ -53,8 +57,9 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 			    "read encrypted block where no decryption engine "
 			    "configured");
 
+		WT_RET(__wt_scr_alloc(session, 0, &etmp));
 		ret = __wt_decrypt(session, encryptor, WT_BLOCK_ENCRYPT_SKIP,
-		    tmp, &buf, &result_len);
+		    ip, &etmp, &result_len);
 		/*
 		 * It may be file corruption, which
 		 * is really, really bad, or it may be a mismatch of
@@ -67,14 +72,8 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 			    WT_ERROR :
 			    __wt_illegal_value(session, btree->dhandle->name));
 
-		/*
-		 * Copy the resulting bytes from decrypt back to the tmp
-		 * buffer so a block that is also compressed can find it there.
-		 * Otherwise decompress is operating on the original data
-		 * on disk an not the encrypted data.
-		 */
-		memcpy((uint8_t *)tmp->data + WT_BLOCK_ENCRYPT_SKIP,
-		    (uint8_t *)buf->mem + WT_BLOCK_ENCRYPT_SKIP, result_len);
+		ip = etmp;
+		dsk = ip->data;
 	}
 	if (F_ISSET(dsk, WT_PAGE_COMPRESSED)) {
 		if (btree->compressor == NULL ||
@@ -99,10 +98,10 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 		 * byte length somehow, see the snappy compression extension for
 		 * an example.
 		 */
-		memcpy(buf->mem, tmp->data, WT_BLOCK_COMPRESS_SKIP);
+		memcpy(buf->mem, ip->data, WT_BLOCK_COMPRESS_SKIP);
 		ret = btree->compressor->decompress(
 		    btree->compressor, &session->iface,
-		    (uint8_t *)tmp->data + WT_BLOCK_COMPRESS_SKIP,
+		    (uint8_t *)ip->data + WT_BLOCK_COMPRESS_SKIP,
 		    tmp->size - WT_BLOCK_COMPRESS_SKIP,
 		    (uint8_t *)buf->mem + WT_BLOCK_COMPRESS_SKIP,
 		    dsk->mem_size - WT_BLOCK_COMPRESS_SKIP, &result_len);
@@ -120,20 +119,15 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 			    WT_ERROR :
 			    __wt_illegal_value(session, btree->dhandle->name));
 	} else
-		if (btree->compressor == NULL &&
-		    (btree->kencryptor == NULL ||
-		    F_ISSET(dsk, WT_PAGE_ENCRYPTED)))
-			buf->size = dsk->mem_size;
-		else
-			/*
-			 * We guessed wrong: there was a compressor, but this
-			 * block was not compressed, and now the page is in the
-			 * wrong buffer and the buffer may be of the wrong size.
-			 * This should be rare, but happens with small blocks
-			 * that aren't worth compressing.
-			 */
+		/*
+		 * If we uncompressed above, the page is in the correct buffer.
+		 * If we get here the data may be in the wrong buffer and the
+		 * buffer may be the wrong size.  If needed, get the page
+		 * into the destination buffer.
+		 */
+		if (ip != NULL)
 			WT_ERR(__wt_buf_set(
-			    session, buf, tmp->data, dsk->mem_size));
+			session, buf, ip->data, dsk->mem_size));
 
 	/* If the handle is a verify handle, verify the physical page. */
 	if (F_ISSET(btree, WT_BTREE_VERIFY)) {
@@ -151,6 +145,7 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 	WT_STAT_FAST_DATA_INCRV(session, cache_bytes_read, dsk->mem_size);
 
 err:	__wt_scr_free(session, &tmp);
+	__wt_scr_free(session, &etmp);
 	return (ret);
 }
 
