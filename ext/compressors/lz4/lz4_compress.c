@@ -61,8 +61,8 @@ typedef struct {
  */
 typedef struct {
 	uint32_t compressed_len;	/* True compressed length */
-	uint32_t compressed_src;	/* True uncompressed source length */
-	uint32_t decompressed_return;	/* Decompression return value */
+	uint32_t uncompressed_len;	/* True uncompressed source length */
+	uint32_t useful_len;		/* Decompression return value */
 	uint32_t unused;
 } LZ4_PREFIX;
 
@@ -111,8 +111,8 @@ lz4_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	 */
 	if (lz4_len != 0 && (size_t)lz4_len + sizeof(LZ4_PREFIX) < src_len) {
 		prefix.compressed_len = (uint32_t)lz4_len;
-		prefix.compressed_src = (uint32_t)src_len;
-		prefix.decompressed_return = (uint32_t)src_len;
+		prefix.uncompressed_len = (uint32_t)src_len;
+		prefix.useful_len = (uint32_t)src_len;
 		prefix.unused = 0;
 		memcpy(dst, &prefix, sizeof(LZ4_PREFIX));
 
@@ -159,14 +159,14 @@ lz4_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	 * raw compression, won't have provided us a large enough buffer, so we
 	 * have to allocate a scratch buffer.
 	 */
-	if (dst_len < prefix.compressed_src) {
+	if (dst_len < prefix.uncompressed_len) {
 		if ((dst_tmp = wt_api->scr_alloc(
-		   wt_api, session, (size_t)prefix.compressed_src)) == NULL)
+		   wt_api, session, (size_t)prefix.uncompressed_len)) == NULL)
 			return (ENOMEM);
 
 		decoded = LZ4_decompress_safe(
 		    (const char *)src + sizeof(LZ4_PREFIX), (char *)dst_tmp,
-		    (int)prefix.compressed_len, (int)prefix.compressed_src);
+		    (int)prefix.compressed_len, (int)prefix.uncompressed_len);
 
 		if (decoded >= 0)
 			memcpy(dst, dst_tmp, dst_len);
@@ -177,7 +177,7 @@ lz4_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 		    (char *)dst, (int)prefix.compressed_len, (int)dst_len);
 
 	if (decoded >= 0) {
-		*result_lenp = prefix.decompressed_return;
+		*result_lenp = prefix.useful_len;
 		return (0);
 	}
 
@@ -256,8 +256,8 @@ lz4_compress_raw(WT_COMPRESSOR *compressor, WT_SESSION *session,
 
 		if ((size_t)lz4_len + sizeof(LZ4_PREFIX) < offsets[slot]) {
 			prefix.compressed_len = (uint32_t)lz4_len;
-			prefix.compressed_src = (uint32_t)sourceSize;
-			prefix.decompressed_return = offsets[slot];
+			prefix.uncompressed_len = (uint32_t)sourceSize;
+			prefix.useful_len = offsets[slot];
 			prefix.unused = 0;
 			memcpy(dst, &prefix, sizeof(LZ4_PREFIX));
 
