@@ -236,9 +236,8 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session)
 		 * it gets a valid one.
 		 */
 		if ((id = s->id) != WT_TXN_NONE &&
-		    TXNID_LE(prev_oldest_id, id))
-			if (TXNID_LT(id, snap_min))
-				snap_min = id;
+		    TXNID_LE(prev_oldest_id, id) && TXNID_LT(id, snap_min))
+			snap_min = id;
 
 		/*
 		 * !!!
