@@ -267,8 +267,10 @@ namespace mongo {
             verbose = cmdObj["verbose"].trueValue();
             jsMode = cmdObj["jsMode"].trueValue();
             splitInfo = 0;
-            if (cmdObj.hasField("splitInfo"))
+
+            if (cmdObj.hasField("splitInfo")) {
                 splitInfo = cmdObj["splitInfo"].Int();
+            }
 
             jsMaxKeys = 500000;
             reduceTriggerRatio = 10.0;
