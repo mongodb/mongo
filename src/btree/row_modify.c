@@ -287,9 +287,11 @@ __wt_update_alloc(
  *	Check for obsolete updates.
  */
 WT_UPDATE *
-__wt_update_obsolete_check(WT_SESSION_IMPL *session, WT_UPDATE *upd)
+__wt_update_obsolete_check(
+    WT_SESSION_IMPL *session, WT_PAGE *page, WT_UPDATE *upd)
 {
 	WT_UPDATE *first, *next;
+	u_int count;
 
 	/*
 	 * This function identifies obsolete updates, and truncates them from
@@ -299,7 +301,7 @@ __wt_update_obsolete_check(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 	 *
 	 * Walk the list of updates, looking for obsolete updates at the end.
 	 */
-	for (first = NULL; upd != NULL; upd = upd->next)
+	for (first = NULL, count = 0; upd != NULL; upd = upd->next, count++)
 		if (__wt_txn_visible_all(session, upd->txnid)) {
 			if (first == NULL)
 				first = upd;
@@ -316,6 +318,14 @@ __wt_update_obsolete_check(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 	    (next = first->next) != NULL &&
 	    WT_ATOMIC_CAS8(first->next, next, NULL))
 		return (next);
+
+	/*
+	 * If the list is long, don't retry checks on this page until the
+	 * transaction state has moved forwards.
+	 */
+	if (count > 20)
+		page->modify->obsolete_check_txn =
+		    S2C(session)->txn_global.last_running;
 
 	return (NULL);
 }

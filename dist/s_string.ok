@@ -172,6 +172,7 @@ MEM
 MEMALIGN
 MERCHANTABILITY
 MSVC
+MULTIBLOCK
 MUTEX
 Manos
 MapViewOfFile
@@ -240,6 +241,7 @@ STAILQ
 STRUCT
 Scalability
 Scalable
+Sedgewick
 Seigh
 SetEndOfFile
 SetFilePointerEx
@@ -847,6 +849,7 @@ sys
 t's
 tV
 tablename
+testutil
 th
 tid
 timestamp

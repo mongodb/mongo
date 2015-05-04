@@ -76,7 +76,7 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 			/*
 			 * Evict the page.
 			 */
-			WT_ERR(__wt_evict(session, ref, 1));
+			WT_ERR(__wt_evict(session, ref, WT_EVICT_EXCLUSIVE));
 			break;
 		case WT_SYNC_DISCARD:
 			WT_ASSERT(session,

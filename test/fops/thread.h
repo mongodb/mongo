@@ -44,10 +44,7 @@
 #include <unistd.h>
 #endif
 
-#ifdef _WIN32
-#include "windows_shim.h"
-#endif
-
+#include "test_util.i"
 #include <wiredtiger.h>
 
 extern WT_CONNECTION *conn;			/* WiredTiger connection */
@@ -69,9 +66,3 @@ void obj_cursor(void);
 void obj_drop(void);
 void obj_upgrade(void);
 void obj_verify(void);
-
-void die(int, const char *, ...)
-#if defined(__GNUC__)
-__attribute__((noreturn))
-#endif
-;

@@ -155,6 +155,12 @@ struct __wt_named_extractor {
 } while (0)
 
 /*
+ * Default hash table size; use a prime number of buckets rather than assuming
+ * a good hash (Reference Sedgewick, Algorithms in C, "Hash Functions").
+ */
+#define	WT_HASH_ARRAY_SIZE	509
+
+/*
  * WT_CONNECTION_IMPL --
  *	Implementation of WT_CONNECTION
  */
