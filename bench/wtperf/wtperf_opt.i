@@ -146,7 +146,7 @@ DEF_OPT_AS_UINT32(sample_rate, 50,
     "two for every second operation, three for every third operation etc.")
 DEF_OPT_AS_CONFIG_STRING(sess_config, "", "session configuration string")
 DEF_OPT_AS_CONFIG_STRING(table_config,
-    "key_format=S,value_format=S,columns=(key,val),type=lsm,exclusive=true,"
+    "key_format=S,value_format=S,type=lsm,exclusive=true,"
     "allocation_size=4kb,internal_page_max=64kb,leaf_page_max=4kb,"
     "split_pct=100",
     "table configuration string")

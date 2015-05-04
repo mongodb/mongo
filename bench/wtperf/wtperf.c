@@ -90,6 +90,7 @@ static uint64_t	 wtperf_value_range(CONFIG *);
 #define	HELIUM_PATH							\
 	"../../ext/test/helium/.libs/libwiredtiger_helium.so"
 #define	HELIUM_CONFIG	",type=helium"
+#define INDEX_COL_NAMES	",columns=(key,val)"
 
 /* Retrieve an ID for the next insert operation. */
 static inline uint64_t
@@ -2127,7 +2128,7 @@ main(int argc, char *argv[])
 		if ((ret = config_opt_str(cfg, "conn_config", cc_buf)) != 0)
 			goto err;
 	}
-	if (cfg->verbose > 1 || cfg->helium_mount != NULL ||
+	if (cfg->verbose > 1 || cfg->index || cfg->helium_mount != NULL ||
 	    user_tconfig != NULL || cfg->compress_table != NULL) {
 		req_len = strlen(cfg->table_config) + strlen(HELIUM_CONFIG) +
 		    strlen(debug_tconfig) + 3;
@@ -2135,6 +2136,8 @@ main(int argc, char *argv[])
 			req_len += strlen(user_tconfig);
 		if (cfg->compress_table != NULL)
 			req_len += strlen(cfg->compress_table);
+		if (cfg->index)
+			req_len += strlen(INDEX_COL_NAMES);
 		if ((tc_buf = calloc(req_len, 1)) == NULL) {
 			ret = enomem(cfg);
 			goto err;
@@ -2142,8 +2145,9 @@ main(int argc, char *argv[])
 		/*
 		 * This is getting hard to parse.
 		 */
-		snprintf(tc_buf, req_len, "%s%s%s%s%s%s%s",
+		snprintf(tc_buf, req_len, "%s%s%s%s%s%s%s%s",
 		    cfg->table_config,
+		    cfg->index ? INDEX_COL_NAMES : "",
 		    cfg->compress_table ? cfg->compress_table : "",
 		    cfg->verbose > 1 ? ",": "",
 		    cfg->verbose > 1 ? debug_tconfig : "",
