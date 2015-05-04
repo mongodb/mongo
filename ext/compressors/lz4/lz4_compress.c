@@ -157,10 +157,14 @@ lz4_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	 * Decompress, starting after the prefix bytes. Use safe decompression:
 	 * we rely on decompression to detect corruption.
 	 *
-	 * Two code paths, one with and one without a bounce buffer. Our caller
-	 * doesn't store the length of the compressed source and so when using
-	 * raw compression, won't have provided us a large enough buffer, so we
-	 * have to allocate a scratch buffer.
+	 * Two code paths, one with and one without a bounce buffer. When doing
+	 * raw compression, we compress to a target size irrespective of row
+	 * boundaries, and return to our caller a "useful" compression length
+	 * based on the last complete row that was compressed. Our caller stores
+	 * that length, not the length of bytes actually compressed by LZ4. In
+	 * other words, our caller doesn't know how many bytes will result from
+	 * decompression, likely hasn't provided us a large enough buffer, and
+	 * we have to allocate a scratch buffer.
 	 */
 	if (dst_len < prefix.uncompressed_len) {
 		if ((dst_tmp = wt_api->scr_alloc(
