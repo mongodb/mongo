@@ -849,7 +849,7 @@ namespace {
         // This should not be able to deadlock, since we already hold the S journal lock, which
         // means all writers are kicked out. Readers always yield the journal lock if they block
         // waiting on any other lock.
-        invariant(LOCK_OK == _locker->lock(resourceIdMMAPV1Flush, MODE_X, UINT_MAX, true));
+        invariant(LOCK_OK == _locker->lock(resourceIdMMAPV1Flush, MODE_X, UINT_MAX, false));
 
         // Lock bumps the recursive count. Drop it back down so that the destructor doesn't
         // complain.
