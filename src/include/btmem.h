@@ -538,7 +538,7 @@ struct __wt_page {
 #define	WT_PAGE_REFUSE_DEEPEN	0x10	/* Don't deepen the tree at this page */
 #define	WT_PAGE_SCANNING	0x20	/* Obsolete updates are being scanned */
 #define	WT_PAGE_SPLIT_INSERT	0x40	/* A leaf page was split for append */
-#define	WT_PAGE_SPLITTING	0x80	/* An internal page is growing */
+#define	WT_PAGE_SPLIT_LOCKED	0x80	/* An internal page is growing */
 	uint8_t flags_atomic;		/* Atomic flags, use F_*_ATOMIC */
 
 	/*
