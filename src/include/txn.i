@@ -222,7 +222,7 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 	if (txn->isolation == TXN_ISO_SNAPSHOT) {
 		if (session->ncursors > 0)
 			WT_RET(__wt_session_copy_values(session));
-		__wt_txn_snapshot(session);
+		__wt_txn_get_snapshot(session);
 	}
 
 	F_SET(txn, TXN_RUNNING);
@@ -429,7 +429,7 @@ __wt_txn_cursor_op(WT_SESSION_IMPL *session)
 
 	if (txn->isolation != TXN_ISO_READ_UNCOMMITTED &&
 	    !F_ISSET(txn, TXN_HAS_SNAPSHOT))
-		__wt_txn_snapshot(session);
+		__wt_txn_get_snapshot(session);
 }
 
 /*
