@@ -128,6 +128,7 @@ namespace repl {
     public:
         OplogReader oplogReader;
 
+        void applyCommand(OperationContext* txn, const BSONObj& op);
         void applyOperation(OperationContext* txn, Database* db, const BSONObj& op);
         std::string hostName;    // ip addr or hostname plus optionally, ":<port>"
         std::string _sourceName;  // a logical source name.

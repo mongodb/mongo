@@ -136,19 +136,20 @@ namespace repl {
         const char *ns = op.getStringField("ns");
         verify(ns);
 
+        const char* opType = op["op"].valuestrsafe();
+
+        bool isCommand(opType[0] == 'c');
+        bool isNoOp(opType[0] == 'n');
+
         if ( (*ns == '\0') || (*ns == '.') ) {
             // this is ugly
             // this is often a no-op
             // but can't be 100% sure
-            if( *op.getStringField("op") != 'n' ) {
+            if (!isNoOp) {
                 error() << "skipping bad op in oplog: " << op.toString();
             }
             return true;
         }
-
-        const char* opType = op["op"].valuestrsafe();
-
-        bool isCommand(opType[0] == 'c');
 
         for ( int createCollection = 0; createCollection < 2; createCollection++ ) {
             try {
@@ -165,6 +166,11 @@ namespace repl {
                     // a command may need a global write lock. so we will conservatively go
                     // ahead and grab one here. suboptimal. :-(
                     globalWriteLock.reset(new Lock::GlobalWrite(txn->lockState()));
+                    
+                    // special case apply for commands to avoid implicit database creation
+                    Status status = applyCommand_inlock(txn, op);
+                    opsAppliedStats.increment();
+                    return status.isOK();
                 }
                 else if (isIndexBuild) {
                     dbLock.reset(new Lock::DBLock(txn->lockState(),
@@ -181,10 +187,14 @@ namespace repl {
                         continue;
                     }
                 }
-                else {
-                    // Unknown op?
+                else if (isNoOp) {
                     dbLock.reset(new Lock::DBLock(txn->lockState(),
                                                   nsToDatabaseSubstring(ns), MODE_X));
+                }
+                else {
+                    // unknown opType
+                    error() << "bad opType '" << opType << "' in oplog entry: " << op.toString();
+                    return false;
                 }
 
                 OldClientContext ctx(txn, ns);
@@ -202,8 +212,7 @@ namespace repl {
                 // to suppress errors when replaying oplog entries.
                 txn->setReplicatedWrites(false);
 
-                Status status =
-                    applyOperation_inlock(txn, ctx.db(), op, convertUpdateToUpsert);
+                Status status = applyOperation_inlock(txn, ctx.db(), op, convertUpdateToUpsert);
                 opsAppliedStats.increment();
                 return status.isOK();
             }

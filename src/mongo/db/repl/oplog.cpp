@@ -631,6 +631,7 @@ namespace {
 
         // operation type -- see logOp() comments for types
         const char *opType = fieldOp.valuestrsafe();
+        invariant(*opType != 'c'); // commands are processed in applyCommand_inlock()
 
         if ( *opType == 'i' ) {
             opCounters->gotInsert();
@@ -759,60 +760,6 @@ namespace {
             else
                 verify( opType[1] == 'b' ); // "db" advertisement
         }
-        else if ( *opType == 'c' ) {
-            // Applying commands in repl is done under Global W-lock, so it is safe to not
-            // perform the current DB checks after reacquiring the lock.
-            invariant(txn->lockState()->isW());
-            
-            bool done = false;
-
-            while (!done) {
-                ApplyOpMetadata curOpToApply = opsMap.find(o.firstElementFieldName())->second;
-                Status status = Status::OK();
-                try {
-                    status = curOpToApply.applyFunc(txn, ns, o);
-                }
-                catch (...) {
-                    status = exceptionToStatus();
-                }
-                switch (status.code()) {
-                case ErrorCodes::WriteConflict: {
-                    // Need to throw this up to a higher level where it will be caught and the
-                    // operation retried.
-                    throw WriteConflictException();
-                }
-                case ErrorCodes::BackgroundOperationInProgressForDatabase: {
-                    Lock::TempRelease release(txn->lockState());
-
-                    BackgroundOperation::awaitNoBgOpInProgForDb(nsToDatabaseSubstring(ns));
-                    break;
-                }
-                case ErrorCodes::BackgroundOperationInProgressForNamespace: {
-                    Lock::TempRelease release(txn->lockState());
-
-                    Command* cmd = Command::findCommand(o.firstElement().fieldName());
-                    invariant(cmd);
-                    BackgroundOperation::awaitNoBgOpInProgForNs(cmd->parseNs(nsToDatabase(ns), o));
-                    break;
-                }
-                default:
-                    if (_oplogCollectionName == masterSlaveOplogName) {
-                        error() << "Failed command " << o << " on " << nsToDatabaseSubstring(ns)
-                                << " with status " << status << " during oplog application";
-                    }
-                    else if (curOpToApply.acceptableErrors.find(status.code())
-                            == curOpToApply.acceptableErrors.end()) {
-                        error() << "Failed command " << o << " on " << nsToDatabaseSubstring(ns)
-                                << " with status " << status << " during oplog application";
-                        return status;
-                    }
-                    // fallthrough
-                case ErrorCodes::OK:
-                    done = true;
-                    break;
-                }
-            }
-        }
         else if ( *opType == 'n' ) {
             // no op
         }
@@ -829,6 +776,86 @@ namespace {
                 ns,
                 o,
                 fieldO2.isABSONObj() ? &o2 : NULL);
+        wuow.commit();
+
+        return Status::OK();
+    }
+
+    Status applyCommand_inlock(OperationContext* txn, const BSONObj& op) {
+        const char *names[] = { "o", "ns", "op" };
+        BSONElement fields[3];
+        op.getFields(3, names, fields);
+        BSONElement& fieldO = fields[0];
+        BSONElement& fieldNs = fields[1];
+        BSONElement& fieldOp = fields[2];
+
+        const char* opType = fieldOp.valuestrsafe();
+        invariant(*opType == 'c'); // only commands are processed here
+
+        BSONObj o;
+        if (fieldO.isABSONObj()) {
+            o = fieldO.embeddedObject();
+        }
+
+        const char* ns = fieldNs.valuestrsafe();
+
+        // Applying commands in repl is done under Global W-lock, so it is safe to not
+        // perform the current DB checks after reacquiring the lock.
+        invariant(txn->lockState()->isW());
+        
+        bool done = false;
+
+        while (!done) {
+            ApplyOpMetadata curOpToApply = opsMap.find(o.firstElementFieldName())->second;
+            Status status = Status::OK();
+            try {
+                status = curOpToApply.applyFunc(txn, ns, o);
+            }
+            catch (...) {
+                status = exceptionToStatus();
+            }
+            switch (status.code()) {
+            case ErrorCodes::WriteConflict: {
+                // Need to throw this up to a higher level where it will be caught and the
+                // operation retried.
+                throw WriteConflictException();
+            }
+            case ErrorCodes::BackgroundOperationInProgressForDatabase: {
+                Lock::TempRelease release(txn->lockState());
+
+                BackgroundOperation::awaitNoBgOpInProgForDb(nsToDatabaseSubstring(ns));
+                break;
+            }
+            case ErrorCodes::BackgroundOperationInProgressForNamespace: {
+                Lock::TempRelease release(txn->lockState());
+
+                Command* cmd = Command::findCommand(o.firstElement().fieldName());
+                invariant(cmd);
+                BackgroundOperation::awaitNoBgOpInProgForNs(cmd->parseNs(nsToDatabase(ns), o));
+                break;
+            }
+            default:
+                if (_oplogCollectionName == masterSlaveOplogName) {
+                    error() << "Failed command " << o << " on " << nsToDatabaseSubstring(ns)
+                            << " with status " << status << " during oplog application";
+                }
+                else if (curOpToApply.acceptableErrors.find(status.code())
+                        == curOpToApply.acceptableErrors.end()) {
+                    error() << "Failed command " << o << " on " << nsToDatabaseSubstring(ns)
+                            << " with status " << status << " during oplog application";
+                    return status;
+                }
+                // fallthrough
+            case ErrorCodes::OK:
+                done = true;
+                break;
+            }
+        }
+
+        // AuthorizationManager's logOp method registers a RecoveryUnit::Change
+        // and to do so we need to have begun a UnitOfWork
+        WriteUnitOfWork wuow(txn);
+        getGlobalAuthorizationManager()->logOp(txn, opType, ns, o, nullptr);
         wuow.commit();
 
         return Status::OK();

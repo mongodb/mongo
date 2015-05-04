@@ -91,8 +91,8 @@ namespace repl {
     void oplogCheckCloseDatabase(OperationContext* txn, Database * db);
 
     /**
-     * take an op and apply locally
-     * used for applying from an oplog
+     * Take a non-command op and apply it locally
+     * Used for applying from an oplog
      * @param convertUpdateToUpsert convert some updates to upserts for idempotency reasons
      * Returns failure status if the op was an update that could not be applied.
      */
@@ -100,6 +100,13 @@ namespace repl {
                                  Database* db,
                                  const BSONObj& op,
                                  bool convertUpdateToUpsert = false);
+
+    /**
+     * Take a command op and apply it locally
+     * Used for applying from an oplog
+     * Returns failure status if the op that could not be applied.
+     */
+    Status applyCommand_inlock(OperationContext* txn, const BSONObj& op);
 
     /**
      * Waits one second for the Timestamp from the oplog to change.
