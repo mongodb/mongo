@@ -196,7 +196,7 @@ wt_shutdown(void)
 static void
 shutdown(void)
 {
-	testutil_clean_work_dir(home);
+	(void)testutil_clean_work_dir(home);
 }
 
 static int
