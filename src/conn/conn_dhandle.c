@@ -330,9 +330,6 @@ __wt_conn_btree_open(
 
 	if (0) {
 err:		F_CLR(btree, WT_BTREE_SPECIAL_FLAGS);
-		/* If the open failed, close the handle. */
-		if (F_ISSET(dhandle, WT_DHANDLE_OPEN))
-			WT_TRET(__wt_conn_btree_sync_and_close(session, 0, 0));
 	}
 
 	return (ret);
