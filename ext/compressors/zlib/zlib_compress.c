@@ -68,14 +68,14 @@ typedef struct {
  */
 static int
 zlib_error(
-    WT_COMPRESSOR *compressor, WT_SESSION *session, const char *call, int zret)
+    WT_COMPRESSOR *compressor, WT_SESSION *session, const char *call, int error)
 {
 	WT_EXTENSION_API *wt_api;
 
 	wt_api = ((ZLIB_COMPRESSOR *)compressor)->wt_api;
 
 	(void)wt_api->err_printf(wt_api, session,
-	    "zlib error: %s: %s: %d", call, zError(zret), zret);
+	    "zlib error: %s: %s: %d", call, zError(error), error);
 	return (WT_ERROR);
 }
 
@@ -154,32 +154,6 @@ zlib_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 }
 
 /*
- * zlib_find_slot --
- *	Find the slot containing the target offset (binary search).
- */
-static inline uint32_t
-zlib_find_slot(uint64_t target, uint32_t *offsets, uint32_t slots)
-{
-	uint32_t base, indx, limit;
-
-	indx = 1;
-
-	/* Figure out which slot we got to: binary search */
-	if (target >= offsets[slots])
-		indx = slots;
-	else if (target > offsets[1])
-		for (base = 2, limit = slots - base; limit != 0; limit >>= 1) {
-			indx = base + (limit >> 1);
-			if (target < offsets[indx])
-				continue;
-			base = indx + 1;
-			--limit;
-		}
-
-	return (indx);
-}
-
-/*
  * zlib_decompress --
  *	WiredTiger zlib decompression.
  */
@@ -219,6 +193,32 @@ zlib_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 
 	return (ret == Z_OK ?
 	    0 : zlib_error(compressor, session, "inflate", ret));
+}
+
+/*
+ * zlib_find_slot --
+ *	Find the slot containing the target offset (binary search).
+ */
+static inline uint32_t
+zlib_find_slot(uint64_t target, uint32_t *offsets, uint32_t slots)
+{
+	uint32_t base, indx, limit;
+
+	indx = 1;
+
+	/* Figure out which slot we got to: binary search */
+	if (target >= offsets[slots])
+		indx = slots;
+	else if (target > offsets[1])
+		for (base = 2, limit = slots - base; limit != 0; limit >>= 1) {
+			indx = base + (limit >> 1);
+			if (target < offsets[indx])
+				continue;
+			base = indx + 1;
+			--limit;
+		}
+
+	return (indx);
 }
 
 /*
@@ -267,8 +267,7 @@ zlib_compress_raw(WT_COMPRESSOR *compressor, WT_SESSION *session,
 
 	/* Save the stream state in case the chosen data doesn't fit. */
 	if ((ret = deflateCopy(&last_zs, &zs)) != Z_OK)
-		return (zlib_error(
-		    compressor, session, "deflateCopy", ret));
+		return (zlib_error(compressor, session, "deflateCopy", ret));
 
 	/*
 	 * Strategy: take the available output size and compress that much
@@ -410,8 +409,8 @@ zlib_add_compressor(WT_CONNECTION *connection, int raw, const char *name)
 	ZLIB_COMPRESSOR *zlib_compressor;
 
 	/*
-	 * There are two almost identical zlib compressors: one supporting raw
-	 * compression, and one without.
+	 * There are two almost identical zlib compressors: one using raw
+	 * compression to target a specific block size, and one without.
 	 */
 	if ((zlib_compressor = calloc(1, sizeof(ZLIB_COMPRESSOR))) == NULL)
 		return (errno);
@@ -426,13 +425,13 @@ zlib_add_compressor(WT_CONNECTION *connection, int raw, const char *name)
 	zlib_compressor->wt_api = connection->get_extension_api(connection);
 
 	/*
-	 * between 0-10: level: see zlib manual.
+	 * Between 0-10: level: see zlib manual.
 	 */
 	zlib_compressor->zlib_level = Z_DEFAULT_COMPRESSION;
 
-	/* Load the standard compressor. */
+	/* Load the compressor. */
 	return (connection->add_compressor(
-	    connection, name, &zlib_compressor->compressor, NULL));
+	    connection, name, (WT_COMPRESSOR *)zlib_compressor, NULL));
 }
 
 int zlib_extension_init(WT_CONNECTION *, WT_CONFIG_ARG *);
@@ -440,12 +439,11 @@ int zlib_extension_init(WT_CONNECTION *, WT_CONFIG_ARG *);
 /*
  * zlib_extension_init --
  *	WiredTiger zlib compression extension - called directly when zlib
- *	support is built in, or via wiredtiger_extension_init when zlib
- *	support is included via extension loading.
+ * support is built in, or via wiredtiger_extension_init when zlib support
+ * is included via extension loading.
  */
 int
-zlib_extension_init(
-    WT_CONNECTION *connection, WT_CONFIG_ARG *config)
+zlib_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 {
 	int ret;
 
@@ -468,8 +466,7 @@ zlib_extension_init(
  *	WiredTiger zlib compression extension.
  */
 int
-wiredtiger_extension_init(
-    WT_CONNECTION *connection, WT_CONFIG_ARG *config)
+wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 {
 	return (zlib_extension_init(connection, config));
 }

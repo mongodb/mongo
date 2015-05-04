@@ -973,7 +973,7 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, int *freep)
 	 * be holes in the log file.
 	 */
 	WT_STAT_FAST_CONN_INCR(session, log_release_write_lsn);
-	while (LOG_CMP(&log->write_lsn, &slot->slot_release_lsn) != 0) {
+	while (WT_LOG_CMP(&log->write_lsn, &slot->slot_release_lsn) != 0) {
 		if (++yield_count < 1000)
 			__wt_yield();
 		else
@@ -1036,7 +1036,7 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, int *freep)
 		 * Sync the log file if needed.
 		 */
 		if (F_ISSET(slot, SLOT_SYNC) &&
-		    LOG_CMP(&log->sync_lsn, &slot->slot_end_lsn) < 0) {
+		    WT_LOG_CMP(&log->sync_lsn, &slot->slot_end_lsn) < 0) {
 			WT_ERR(__wt_verbose(session, WT_VERB_LOG,
 			    "log_release: sync log %s", log->log_fh->name));
 			WT_STAT_FAST_CONN_INCR(session, log_sync);
@@ -1485,7 +1485,7 @@ advance:
 
 	/* Truncate if we're in recovery. */
 	if (LF_ISSET(WT_LOGSCAN_RECOVER) &&
-	    LOG_CMP(&rd_lsn, &log->trunc_lsn) < 0)
+	    WT_LOG_CMP(&rd_lsn, &log->trunc_lsn) < 0)
 		WT_ERR(__log_truncate(session,
 		    &rd_lsn, WT_LOG_FILENAME, 0));
 
@@ -1758,13 +1758,13 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 			WT_ERR(__wt_log_slot_free(session, myslot.slot));
 	} else if (LF_ISSET(WT_LOG_FSYNC)) {
 		/* Wait for our writes to reach disk */
-		while (LOG_CMP(&log->sync_lsn, &lsn) <= 0 &&
+		while (WT_LOG_CMP(&log->sync_lsn, &lsn) <= 0 &&
 		    myslot.slot->slot_error == 0)
 			(void)__wt_cond_wait(
 			    session, log->log_sync_cond, 10000);
 	} else if (LF_ISSET(WT_LOG_FLUSH)) {
 		/* Wait for our writes to reach the OS */
-		while (LOG_CMP(&log->write_lsn, &lsn) <= 0 &&
+		while (WT_LOG_CMP(&log->write_lsn, &lsn) <= 0 &&
 		    myslot.slot->slot_error == 0)
 			(void)__wt_cond_wait(
 			    session, log->log_write_cond, 10000);

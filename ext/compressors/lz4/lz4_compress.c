@@ -43,15 +43,16 @@
 /* Local compressor structure. */
 typedef struct {
 	WT_COMPRESSOR compressor;		/* Must come first */
+
 	WT_EXTENSION_API *wt_api;		/* Extension API */
 } LZ4_COMPRESSOR;
 
 /*
- * wt_lz4_error --
+ * lz4_error --
  *	Output an error message, and return a standard error code.
  */
 static int
-wt_lz4_error(
+lz4_error(
     WT_COMPRESSOR *compressor, WT_SESSION *session, const char *call, int zret)
 {
 	WT_EXTENSION_API *wt_api;
@@ -64,11 +65,11 @@ wt_lz4_error(
 }
 
 /*
- *  wt_lz4_compress --
+ *  lz4_compress --
  *	WiredTiger LZ4 compression.
  */
 static int
-wt_lz4_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
+lz4_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
     uint8_t *src, size_t src_len,
     uint8_t *dst, size_t dst_len,
     size_t *result_lenp, int *compression_failed)
@@ -81,7 +82,7 @@ wt_lz4_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	 * call, but be paranoid and error if it isn't.
 	 */
 	if (dst_len < src_len + sizeof(size_t))
-		return (wt_lz4_error(compressor, session,
+		return (lz4_error(compressor, session,
 		    "LZ4 compress buffer too small", 0));
 
 	/* Store the length of the compressed block in the first 8 bytes. */
@@ -110,11 +111,11 @@ wt_lz4_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 }
 
 /*
- * wt_lz4_decompress --
+ * lz4_decompress --
  *	WiredTiger LZ4 decompression.
  */
 static int
-wt_lz4_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
+lz4_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
     uint8_t *src, size_t src_len,
     uint8_t *dst, size_t dst_len,
     size_t *result_lenp)
@@ -131,7 +132,7 @@ wt_lz4_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	if (src_data_len + sizeof(size_t) > src_len) {
 		(void)wt_api->err_printf(wt_api,
 		    session,
-		    "wt_lz4_decompress: stored size exceeds buffer size");
+		    "lz4_decompress: stored size exceeds buffer size");
 		return (WT_ERROR);
 	}
 
@@ -148,7 +149,7 @@ wt_lz4_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	    compressed_data, (char *)dst, (int)src_data_len, (int)dst_len);
 
 	if (decoded < 0)
-		return (wt_lz4_error(compressor, session,
+		return (lz4_error(compressor, session,
 		    "LZ4 decompress error", decoded));
 
 	/* return the uncompressed data length */
@@ -158,11 +159,11 @@ wt_lz4_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 }
 
 /*
- * wt_lz4_pre_size --
+ * lz4_pre_size --
  *	WiredTiger LZ4 destination buffer sizing for compression.
  */
 static int
-wt_lz4_pre_size(WT_COMPRESSOR *compressor, WT_SESSION *session,
+lz4_pre_size(WT_COMPRESSOR *compressor, WT_SESSION *session,
     uint8_t *src, size_t src_len,
     size_t *result_lenp)
 {
@@ -179,11 +180,11 @@ wt_lz4_pre_size(WT_COMPRESSOR *compressor, WT_SESSION *session,
 }
 
 /*
- * wt_lz4_terminate --
+ * lz4_terminate --
  *	WiredTiger LZ4 compression termination.
  */
 static int
-wt_lz4_terminate(WT_COMPRESSOR *compressor, WT_SESSION *session)
+lz4_terminate(WT_COMPRESSOR *compressor, WT_SESSION *session)
 {
 	(void)session;
 
@@ -221,11 +222,11 @@ lz4_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 	 * the compressor is terminated.  However, this approach is more general
 	 * purpose and supports multiple databases per application.
 	 */
-	lz4_compressor->compressor.compress = wt_lz4_compress;
+	lz4_compressor->compressor.compress = lz4_compress;
 	lz4_compressor->compressor.compress_raw = NULL;
-	lz4_compressor->compressor.decompress = wt_lz4_decompress;
-	lz4_compressor->compressor.pre_size = wt_lz4_pre_size;
-	lz4_compressor->compressor.terminate = wt_lz4_terminate;
+	lz4_compressor->compressor.decompress = lz4_decompress;
+	lz4_compressor->compressor.pre_size = lz4_pre_size;
+	lz4_compressor->compressor.terminate = lz4_terminate;
 
 	lz4_compressor->wt_api = connection->get_extension_api(connection);
 
@@ -246,6 +247,6 @@ lz4_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 int
 wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 {
-	return lz4_extension_init(connection, config);
+	return (lz4_extension_init(connection, config));
 }
 #endif

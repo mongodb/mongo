@@ -423,7 +423,7 @@ __lsm_manager_run_server(WT_SESSION_IMPL *session)
 		if (TAILQ_EMPTY(&conn->lsmqh))
 			continue;
 		__wt_spin_lock(session, &conn->dhandle_lock);
-		F_SET(session, WT_SESSION_HANDLE_LIST_LOCKED);
+		F_SET(session, WT_SESSION_LOCKED_HANDLE_LIST);
 		dhandle_locked = 1;
 		TAILQ_FOREACH(lsm_tree, &S2C(session)->lsmqh, q) {
 			if (!F_ISSET(lsm_tree, WT_LSM_TREE_ACTIVE))
@@ -483,13 +483,13 @@ __lsm_manager_run_server(WT_SESSION_IMPL *session)
 			}
 		}
 		__wt_spin_unlock(session, &conn->dhandle_lock);
-		F_CLR(session, WT_SESSION_HANDLE_LIST_LOCKED);
+		F_CLR(session, WT_SESSION_LOCKED_HANDLE_LIST);
 		dhandle_locked = 0;
 	}
 
 err:	if (dhandle_locked) {
 		__wt_spin_unlock(session, &conn->dhandle_lock);
-		F_CLR(session, WT_SESSION_HANDLE_LIST_LOCKED);
+		F_CLR(session, WT_SESSION_LOCKED_HANDLE_LIST);
 	}
 	return (ret);
 }

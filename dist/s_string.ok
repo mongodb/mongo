@@ -232,6 +232,7 @@ STAILQ
 STRUCT
 Scalability
 Scalable
+Sedgewick
 Seigh
 SetEndOfFile
 SetFilePointerEx
@@ -808,6 +809,7 @@ strtouq
 struct
 structs
 su
+subdirectory
 subgetraw
 subgets
 subinit
@@ -820,6 +822,7 @@ sys
 t's
 tV
 tablename
+testutil
 th
 tid
 timestamp

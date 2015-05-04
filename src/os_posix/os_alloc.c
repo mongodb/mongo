@@ -43,6 +43,12 @@ __wt_calloc(WT_SESSION_IMPL *session, size_t number, size_t size, void *retp)
 	void *p;
 
 	/*
+	 * Defensive: if our caller doesn't handle errors correctly, ensure a
+	 * free won't fail.
+	 */
+	*(void **)retp = NULL;
+
+	/*
 	 * !!!
 	 * This function MUST handle a NULL WT_SESSION_IMPL handle.
 	 */
@@ -219,17 +225,6 @@ __wt_strndup(WT_SESSION_IMPL *session, const void *str, size_t len, void *retp)
 
 	*(void **)retp = p;
 	return (0);
-}
-
-/*
- * __wt_strdup --
- *	ANSI strdup function.
- */
-int
-__wt_strdup(WT_SESSION_IMPL *session, const char *str, void *retp)
-{
-	return (__wt_strndup(
-	    session, str, (str == NULL) ? 0 : strlen(str), retp));
 }
 
 /*

@@ -96,8 +96,8 @@ __wt_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 		__wt_process.cache_pool = cp;
 		WT_ERR(__wt_verbose(session,
 		    WT_VERB_SHARED_CACHE, "Created cache pool %s", cp->name));
-	} else if (!updating && !WT_STRING_MATCH(
-	    __wt_process.cache_pool->name, pool_name, strlen(pool_name)))
+	} else if (!updating &&
+	    strcmp(__wt_process.cache_pool->name, pool_name) != 0)
 		/* Only a single cache pool is supported. */
 		WT_ERR_MSG(session, WT_ERROR,
 		    "Attempting to join a cache pool that does not exist: %s",
