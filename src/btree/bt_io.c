@@ -58,8 +58,8 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 			    "configured");
 
 		WT_RET(__wt_scr_alloc(session, 0, &etmp));
-		ret = __wt_decrypt(session, encryptor, WT_BLOCK_ENCRYPT_SKIP,
-		    ip, &etmp, &result_len);
+		ret = __wt_decrypt(session,
+		    encryptor, WT_BLOCK_ENCRYPT_SKIP, ip, &etmp);
 		/*
 		 * It may be file corruption, which
 		 * is really, really bad, or it may be a mismatch of

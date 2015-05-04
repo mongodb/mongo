@@ -395,7 +395,6 @@ __log_decrypt(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out)
 	WT_DECL_RET;
 	WT_ENCRYPTOR *encryptor;
 	WT_KEYED_ENCRYPTOR *kencryptor;
-	size_t result_len;
 
 	conn = S2C(session);
 	kencryptor = conn->kencryptor;
@@ -407,8 +406,7 @@ __log_decrypt(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out)
 		    "no configured decrypt method");
 
 	WT_ERR(__wt_scr_alloc(session, 0, out));
-	ret = __wt_decrypt(session, encryptor, WT_LOG_ENCRYPT_SKIP,
-	    in, out, &result_len);
+	ret = __wt_decrypt(session, encryptor, WT_LOG_ENCRYPT_SKIP, in, out);
 
 err:	if (ret != 0)
 		__wt_scr_free(session, out);

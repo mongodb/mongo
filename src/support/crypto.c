@@ -15,7 +15,7 @@
  */
 int
 __wt_decrypt(WT_SESSION_IMPL *session, WT_ENCRYPTOR *encryptor,
-    size_t skip, WT_ITEM *in, WT_ITEM **out, size_t *result_lenp)
+    size_t skip, WT_ITEM *in, WT_ITEM **out)
 {
 	WT_DECL_RET;
 	size_t encryptor_data_len, result_len;
@@ -53,8 +53,6 @@ __wt_decrypt(WT_SESSION_IMPL *session, WT_ENCRYPTOR *encryptor,
 	 */
 	result_len += skip;
 	WT_ERR(__wt_buf_initsize(session, *out, result_len));
-	if (result_lenp != NULL)
-		*result_lenp = result_len;
 err:
 	return (ret);
 }
