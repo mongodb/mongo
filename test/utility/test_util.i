@@ -93,6 +93,7 @@ static inline int
 testutil_clean_work_dir(char *dir)
 {
 	char *buffer;
+	int ret;
 	size_t inputSize;
 
 	/* 10 bytes for the Windows rd command */
@@ -100,7 +101,9 @@ testutil_clean_work_dir(char *dir)
 	buffer = (char*) malloc (inputSize);
 
 	snprintf(buffer, inputSize, "%s%s", RM_COMMAND, dir);
-	return system(buffer);
+	ret = system(buffer);
+	free(buffer);
+	return (ret);
 }
 
 /*
@@ -125,4 +128,5 @@ testutil_make_work_dir(char *dir)
 	if ((ret = system(buffer)) != 0)
 		testutil_die(ret, "directory create call of '%s%s' failed",
 		    MKDIR_COMMAND, dir);
+	free(buffer);
 }
