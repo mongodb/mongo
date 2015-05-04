@@ -101,7 +101,6 @@ lz4_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 
 	(void)compressor;				/* Unused parameters */
 	(void)session;
-	(void)src_len;
 	(void)dst_len;
 
 	/* Compress, starting after the prefix bytes. */
