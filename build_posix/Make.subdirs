@@ -20,6 +20,8 @@ examples/c
 lang/java JAVA
 examples/java JAVA
 lang/python PYTHON
+
+# Make the tests
 test/bloom
 test/checkpoint
 test/fops

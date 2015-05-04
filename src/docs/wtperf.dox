@@ -173,6 +173,8 @@ taken to do the drop.
 @par icount (unsigned int, default=5000)
 number of records to initially populate. If multiple tables are
 configured the count is spread evenly across all tables.
+@par index (boolean, default=false)
+Whether to create an index on the value field.
 @par insert_rmw (boolean, default=false)
 execute a read prior to each insert in workload phase
 @par key_sz (unsigned int, default=20)
@@ -183,8 +185,9 @@ sample_interval to be configured
 @par max_latency (unsigned int, default=0)
 abort if any latency measured exceeds this number of
 milliseconds.Requires sample_interval to be configured
-@par pareto (boolean, default=false)
-use pareto 80/20 distribution for random numbers
+@par pareto (unsigned int, default=0)
+use pareto distribution for random numbers. Zero to disable, otherwise
+a percentage indicating how aggressive the distribution should be.
 @par populate_ops_per_txn (unsigned int, default=0)
 number of operations to group into each transaction in the populate
 phase, zero for auto-commit
