@@ -373,7 +373,7 @@ namespace mongo {
             }
 
             if ( remove ) {
-                _appendHelper(result, doc, found, fields, whereCallback);
+                BSONObj oldDoc = doc.getOwned();
                 if ( found ) {
                     deleteObjects(txn, ctx.db(), ns, queryModified, PlanExecutor::YIELD_MANUAL,
                                   true, true);
@@ -389,6 +389,7 @@ namespace mongo {
                     le.appendNumber( "n" , 1 );
                     le.done();
                 }
+                _appendHelper(result, oldDoc, found, fields, whereCallback);
             }
             else {
                 // update
@@ -458,8 +459,9 @@ namespace mongo {
                 else {
                     // we found it or we're updating
 
+                    BSONObj oldDoc;
                     if ( ! returnNew ) {
-                        _appendHelper(result, doc, found, fields, whereCallback);
+                        oldDoc = doc.getOwned();
                     }
 
                     const NamespaceString requestNs(ns);
@@ -496,6 +498,9 @@ namespace mongo {
                     if (returnNew) {
                         dassert(!res.newObj.isEmpty());
                         _appendHelper(result, res.newObj, true, fields, whereCallback);
+                    }
+                    else {
+                        _appendHelper(result, oldDoc, found, fields, whereCallback);
                     }
 
                     BSONObjBuilder le( result.subobjStart( "lastErrorObject" ) );
