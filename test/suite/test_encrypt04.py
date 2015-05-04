@@ -35,22 +35,26 @@ import wiredtiger, wttest
 from wtscenario import multiply_scenarios, number_scenarios
 from suite_subprocess import suite_subprocess
 
-# Test basic encryption
+# Test basic encryption with mismatched configuration
 class test_encrypt04(wttest.WiredTigerTestCase, suite_subprocess):
 
     uri='table:test_encrypt04'
 
+    # For tests that are mismatching, we use a secretkey. The 'rotn'
+    # encryptor without a secretkey is too simple, and may leave
+    # substantional portions of its input unchanged - a root page decoded
+    # with simply the wrong keyid may appear valid when initially verified,
+    # but may result in error on first use. The odds that a real encryptor
+    # would leave a lot of its input unchanged is infinitesimally small.
     encrypt_scen_1 = [
         ('none', dict( name1='none', keyid1='', secretkey1='')),
-        ('rotn11', dict( name1='rotn', keyid1='11', secretkey1='')),
-        ('rotn17', dict( name1='rotn', keyid1='17', secretkey1='')),
+        ('rotn17abc', dict( name1='rotn', keyid1='17', secretkey1='ABC')),
         ('rotn11abc', dict( name1='rotn', keyid1='11', secretkey1='ABC')),
         ('rotn11xyz', dict( name1='rotn', keyid1='11', secretkey1='XYZ'))
     ]
     encrypt_scen_2 = [
         ('none', dict( name2='none', keyid2='', secretkey2='')),
-        ('rotn11', dict( name2='rotn', keyid2='11', secretkey2='')),
-        ('rotn17', dict( name2='rotn', keyid2='17', secretkey2='')),
+        ('rotn17abc', dict( name2='rotn', keyid2='17', secretkey2='ABC')),
         ('rotn11abc', dict( name2='rotn', keyid2='11', secretkey2='ABC')),
         ('rotn11xyz', dict( name2='rotn', keyid2='11', secretkey2='XYZ'))
     ]
