@@ -37,7 +37,7 @@ const char *config;				/* Object config */
 static char *progname;				/* Program name */
 static FILE *logfp;				/* Log file */
 
-char home[512];
+static char home[512];
 
 static int  handle_error(WT_EVENT_HANDLER *, WT_SESSION *, int, const char *);
 static int  handle_message(WT_EVENT_HANDLER *, WT_SESSION *, const char *);
