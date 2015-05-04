@@ -798,7 +798,8 @@ populate_thread(void *arg)
 	}
 
 	/* Do bulk loads if populate is single-threaded. */
-	cursor_config = cfg->populate_threads == 1 ? "bulk" : NULL;
+	cursor_config =
+	    (cfg->populate_threads == 1 && !cfg->index) ? "bulk" : NULL;
 	/* Create the cursors. */
 	cursors = calloc(cfg->table_count, sizeof(WT_CURSOR *));
 	if (cursors == NULL) {
@@ -1672,13 +1673,24 @@ create_tables(CONFIG *cfg)
 		}
 	}
 
-	for (i = 0; i < cfg->table_count; i++)
+	for (i = 0; i < cfg->table_count; i++) {
 		if ((ret = session->create(
 		    session, cfg->uris[i], cfg->table_config)) != 0) {
 			lprintf(cfg, ret, 0,
 			    "Error creating table %s", cfg->uris[i]);
 			return (ret);
 		}
+		if (cfg->index) {
+			snprintf(buf, 512, "index:%s:val_idx",
+			    cfg->uris[i] + strlen("table:"));
+			if ((ret = session->create(
+			    session, buf, "columns=(val)")) != 0) {
+				lprintf(cfg, ret, 0,
+				    "Error creating index %s", buf);
+				return (ret);
+			}
+		}
+	}
 
 	if ((ret = session->close(session, NULL)) != 0) {
 		lprintf(cfg, ret, 0, "Error closing session");
@@ -2351,15 +2363,16 @@ wtperf_rand(CONFIG_THREAD *thread)
 	rval = (uint64_t)__wt_random(thread->rnd);
 
 	/* Use Pareto distribution to give 80/20 hot/cold values. */
-	if (cfg->pareto) {
+	if (cfg->pareto != 0) {
 #define	PARETO_SHAPE	1.5
 		S1 = (-1 / PARETO_SHAPE);
-		S2 = wtperf_value_range(cfg) * 0.2 * (PARETO_SHAPE - 1);
+		S2 = wtperf_value_range(cfg) *
+		    (cfg->pareto / 100.0) * (PARETO_SHAPE - 1);
 		U = 1 - (double)rval / (double)UINT32_MAX;
 		rval = (pow(U, S1) - 1) * S2;
 		/*
 		 * This Pareto calculation chooses out of range values about
-		 * about 2% of the time, from my testing. That will lead to the
+		 * 2% of the time, from my testing. That will lead to the
 		 * first item in the table being "hot".
 		 */
 		if (rval > wtperf_value_range(cfg))
