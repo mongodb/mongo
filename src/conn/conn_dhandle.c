@@ -188,7 +188,7 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session, int final, int force)
 	 * invalid if the mapping is closed.
 	 */
 	if (!F_ISSET(btree,
-            WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY)) {
+	    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY)) {
 		if (force && (btree->bm == NULL || btree->bm->map == NULL))  {
 			WT_ERR(__conn_dhandle_mark_dead(session));
 			marked_dead = 1;
