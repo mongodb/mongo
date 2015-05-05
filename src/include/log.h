@@ -11,7 +11,7 @@
 #define	WT_LOG_TMPNAME	"WiredTigerTmplog"	/* Log temporary name */
 
 /* Logging subsystem declarations. */
-#define	LOG_ALIGN		128
+#define	WT_LOG_ALIGN			128
 #define	WT_LOG_SLOT_BUF_INIT_SIZE	64 * 1024
 
 #define	WT_INIT_LSN(l)	do {						\

@@ -416,9 +416,9 @@ __log_fill(WT_SESSION_IMPL *session,
 
 	logrec = (WT_LOG_RECORD *)record->mem;
 	/*
-	 * Call __wt_write.  For now the offset is the real byte offset.
-	 * If the offset becomes a unit of LOG_ALIGN this is where we would
-	 * multiply by LOG_ALIGN to get the real file byte offset for write().
+	 * Call __wt_write.  For now the offset is the real byte offset.  If the
+	 * offset becomes a unit of WT_LOG_ALIGN this is where we would multiply
+	 * by WT_LOG_ALIGN to get the real file byte offset for write().
 	 */
 	if (direct)
 		WT_ERR(__wt_write(session, myslot->slot->slot_fh,
@@ -874,7 +874,7 @@ __log_filesize(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t *eof)
 	*eof = 0;
 	WT_RET(__wt_filesize(session, fh, &log_size));
 	if (log == NULL)
-		allocsize = LOG_ALIGN;
+		allocsize = WT_LOG_ALIGN;
 	else
 		allocsize = log->allocsize;
 
@@ -1250,7 +1250,7 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 		 * records and larger allocation boundaries should always be
 		 * a multiple of this.
 		 */
-		allocsize = LOG_ALIGN;
+		allocsize = WT_LOG_ALIGN;
 		lastlog = 0;
 		firstlog = UINT32_MAX;
 		WT_RET(__log_get_files(session,
@@ -1277,7 +1277,7 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 	WT_ERR(__log_filesize(session, log_fh, &log_size));
 	rd_lsn = start_lsn;
 
-	WT_ERR(__wt_buf_initsize(session, &buf, LOG_ALIGN));
+	WT_ERR(__wt_buf_initsize(session, &buf, WT_LOG_ALIGN));
 	WT_ERR(__wt_scr_alloc(session, 0, decryptitem));
 	WT_ERR(__wt_scr_alloc(session, 0, uncitem));
 	for (;;) {
