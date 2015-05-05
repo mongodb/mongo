@@ -29,7 +29,7 @@ __wt_decrypt(WT_SESSION_IMPL *session, WT_ENCRYPTOR *encryptor,
 		    "corrupted encrypted item: padded size less than "
 		    "actual size");
 	/*
-	 * We're allocating the exact number of bytes we're expecting
+	 * We're allocating the number of bytes we're expecting
 	 * from decryption plus the unencrypted header.
 	 */
 	WT_ERR(__wt_buf_initsize(session, *out, encrypt_len));
@@ -43,13 +43,14 @@ __wt_decrypt(WT_SESSION_IMPL *session, WT_ENCRYPTOR *encryptor,
 	    dst, encryptor_data_len, &result_len));
 
 	/*
-	 * Copy in the skipped header bytes.  This overwrites the
-	 * checksum we verified.
+	 * Copy in the skipped header bytes.
 	 */
 	memcpy((*out)->mem, in->data, skip);
 	/*
-	 * Set result to the read decrypted length including the
-	 * skipped header size.  Set the size on the output buffer.
+	 * Set the real result length in the output buffer including
+	 * the skipped header size.  The encryptor may have done its
+	 * own padding so the the returned result length is the real data
+	 * length after decryption removes any of its padding.
 	 */
 	result_len += skip;
 	WT_ERR(__wt_buf_initsize(session, *out, result_len));
