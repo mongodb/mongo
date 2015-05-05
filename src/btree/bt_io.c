@@ -57,7 +57,7 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 			    "read encrypted block where no decryption engine "
 			    "configured");
 
-		WT_RET(__wt_scr_alloc(session, 0, &etmp));
+		WT_ERR(__wt_scr_alloc(session, 0, &etmp));
 		ret = __wt_decrypt(session,
 		    encryptor, WT_BLOCK_ENCRYPT_SKIP, ip, &etmp);
 		/*
