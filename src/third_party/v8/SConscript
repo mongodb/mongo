@@ -78,7 +78,7 @@ LIBRARY_FLAGS = {
   'msvc': {
     'all': {
       'CPPDEFINES':   ['WIN32'],
-      'CCFLAGS':      ['/W3', '/WX', '/wd4351', '/wd4355', '/wd4800'],
+      'CCFLAGS':      ['/W3', '/WX', '/wd4312', '/wd4311', '/wd4302', '/wd4091', '/wd4351', '/wd4355', '/wd4800'],
     },
     'arch:ia32': {
       'CPPDEFINES':   ['V8_TARGET_ARCH_IA32', '_USE_32BIT_TIME_T', 'V8_NO_FAST_TLS'],
