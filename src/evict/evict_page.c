@@ -314,20 +314,19 @@ __evict_review(
 	}
 
 	/* Check if the page can be evicted. */
-	if (!LF_ISSET(WT_EVICT_EXCLUSIVE) &&
-	    !__wt_page_can_evict(session, page, flags))
-		return (EBUSY);
-
-	/*
-	 * Check for an append-only workload needing an in-memory split; we
-	 * can't do this earlier because in-memory splits require exclusive
-	 * access. If an in-memory split completes, the page stays in memory
-	 * and the tree is left in the desired state: avoid the usual cleanup.
-	 */
 	if (!LF_ISSET(WT_EVICT_EXCLUSIVE)) {
-		WT_RET(__wt_split_insert(session, ref, inmem_splitp));
+		if (!__wt_page_can_evict(session, page, flags, inmem_splitp))
+			return (EBUSY);
+
+		/*
+		 * Check for an append-only workload needing an in-memory
+		 * split; we can't do this earlier because in-memory splits
+		 * require exclusive access. If an in-memory split completes,
+		 * the page stays in memory and the tree is left in the desired
+		 * state: avoid the usual cleanup.
+		 */
 		if (*inmem_splitp)
-			return (0);
+			return (__wt_split_insert(session, ref, inmem_splitp));
 	}
 
 	/*

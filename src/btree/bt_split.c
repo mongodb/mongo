@@ -857,11 +857,12 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 			continue;
 		}
 		/*
-		 * If the WT_EVICT_FORCE_SPLIT flag is set, we return EBUSY.
-		 * This avoids an infinite loop where we are trying to split a
-		 * page that is currently being accessed by a checkpoint.
+		 * If we're attempting an in-memory split and we can't lock the
+		 * parent, give up.  This avoids an infinite loop where we are
+		 * trying to split a page while its parent is being
+		 * checkpointed.
 		 */
-		if (LF_ISSET(WT_EVICT_FORCE_SPLIT))
+		if (LF_ISSET(WT_EVICT_INMEM_SPLIT))
 			return (EBUSY);
 		__wt_yield();
 	}
@@ -1373,7 +1374,7 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 	 */
 	page = NULL;
 	if ((ret = __split_parent(session,
-	    ref, split_ref, 2, parent_incr, WT_EVICT_FORCE_SPLIT)) != 0) {
+	    ref, split_ref, 2, parent_incr, WT_EVICT_INMEM_SPLIT)) != 0) {
 		/*
 		 * Move the insert list element back to the original page list.
 		 * For simplicity, the previous skip list pointers originally

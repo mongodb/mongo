@@ -953,7 +953,8 @@ __wt_ref_info(WT_SESSION_IMPL *session,
  *	Check whether a page can be evicted.
  */
 static inline int
-__wt_page_can_evict(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
+__wt_page_can_evict(
+    WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags, int *inmem_splitp)
 {
 	WT_BTREE *btree;
 	WT_PAGE_MODIFY *mod;
@@ -962,6 +963,8 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	btree = S2BT(session);
 	mod = page->modify;
 	txn_global = &S2C(session)->txn_global;
+	if (inmem_splitp != NULL)
+		*inmem_splitp = 0;
 
 	/* Pages that have never been modified can always be evicted. */
 	if (mod == NULL)
@@ -987,10 +990,12 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	 * has not already been a split on this page as the WT_PM_REC_MULTIBLOCK
 	 * flag is unset.
 	 */
-	if (LF_ISSET(WT_EVICT_FORCE_SPLIT) &&
-	    page->memory_footprint > btree->maxmempage &&
-	    btree->checkpointing && !F_ISSET(mod, WT_PM_REC_MULTIBLOCK))
+	if (page->memory_footprint > btree->maxmempage &&
+	    btree->checkpointing && !F_ISSET(mod, WT_PM_REC_MULTIBLOCK)) {
+		if (inmem_splitp != NULL)
+			*inmem_splitp = 1;
 		return (1);
+	}
 
 	/*
 	 * If the file is being checkpointed, we can't evict dirty pages:
@@ -1056,7 +1061,6 @@ __wt_page_release_evict(WT_SESSION_IMPL *session, WT_REF *ref)
 
 	btree = S2BT(session);
 	page = ref->page;
-	too_big = (page->memory_footprint > btree->maxmempage) ? 1 : 0;
 
 	/*
 	 * Take some care with order of operations: if we release the hazard
@@ -1071,8 +1075,9 @@ __wt_page_release_evict(WT_SESSION_IMPL *session, WT_REF *ref)
 	}
 
 	(void)WT_ATOMIC_ADD4(btree->evict_busy, 1);
-	/* We only want to trigger an in-memory split if the page is too big. */
-	if ((ret = __wt_evict_page(session, ref, too_big)) == 0) {
+
+	too_big = (page->memory_footprint > btree->maxmempage) ? 1 : 0;
+	if ((ret = __wt_evict_page(session, ref)) == 0) {
 		if (too_big)
 			WT_STAT_FAST_CONN_INCR(session, cache_eviction_force);
 		else
@@ -1132,9 +1137,8 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 	page = ref->page;
 	if (F_ISSET(btree, WT_BTREE_NO_EVICTION) ||
 	    LF_ISSET(WT_READ_NO_EVICT) ||
-	    page->read_gen != WT_READGEN_OLDEST ||
-	    !__wt_page_can_evict(session, page,
-	    WT_EVICT_CHECK_SPLITS | WT_EVICT_FORCE_SPLIT))
+	    page->read_gen != WT_READGEN_OLDEST || !__wt_page_can_evict(
+	    session, page, WT_EVICT_CHECK_SPLITS, NULL))
 		return (__wt_hazard_clear(session, page));
 
 	WT_RET_BUSY_OK(__wt_page_release_evict(session, ref));
