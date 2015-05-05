@@ -3292,6 +3292,10 @@ struct __wt_encryptor {
 	 * typically generate encrypted text that is larger than the
 	 * plain text input. Without such a call, WiredTiger would
 	 * have no way to know the worst case for the encrypted buffer size.
+         * The WiredTiger encryption infrastructure assumes that
+         * buffer sizing is not dependent on the number of bytes
+         * of input, that there is a one to one relationship in number
+         * of bytes needed between input and output.
 	 *
 	 * This callback cannot be NULL.
 	 *
