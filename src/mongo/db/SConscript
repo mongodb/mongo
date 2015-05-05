@@ -347,6 +347,7 @@ env.Library(
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/util/net/message_server_port",
+        "$BUILD_DIR/mongo/util/net/miniwebserver",
         "$BUILD_DIR/mongo/util/signal_handlers",
     ],
 )
@@ -361,6 +362,7 @@ env.Library(
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/coredb",
+        "$BUILD_DIR/mongo/util/net/miniwebserver",
         "mongodandmongos",
         'repl/repl_coordinator_global',
     ],

@@ -188,7 +188,6 @@ env.Library(
         'db/conn_pool_options.cpp',
         'db/log_process_details.cpp',
         'db/stats/counters.cpp',
-        'util/net/miniwebserver.cpp',
     ],
     LIBDEPS=[
         'mongocommon',
