@@ -21,3 +21,12 @@ env.CppUnitTest(
         'top',
     ],
 )
+
+env.Library(
+    target='counters',
+    source=[
+        'counters.cpp',
+    ],
+    LIBDEPS=[
+    ],
+)

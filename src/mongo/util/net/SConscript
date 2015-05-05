@@ -63,6 +63,9 @@ env.Library(
     source=[
         "message_server_port.cpp",
     ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/stats/counters',
+    ],
 )
 
 env.Library(
