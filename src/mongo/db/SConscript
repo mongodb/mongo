@@ -691,3 +691,12 @@ env.Library(
     ],
     LIBDEPS=[],
 )
+
+env.Library(
+    target='conn_pool_options',
+    source=[
+        'conn_pool_options.cpp',
+    ],
+    LIBDEPS=[
+    ],
+)

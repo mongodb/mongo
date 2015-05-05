@@ -184,9 +184,7 @@ env.CppUnitTest(
 
 env.Library(
     target='coreserver',
-    source=[
-        'db/conn_pool_options.cpp',
-    ],
+    source=[],
     LIBDEPS=[
         'mongocommon',
         'util/decorable',
@@ -202,6 +200,7 @@ mongod = env.Program(
     LIBDEPS=[
         "db/coredb",
         "coreserver",
+        "db/conn_pool_options",
         "db/mongod_options",
         "db/mongodandmongos",
         "db/mongodwebserver",
@@ -253,6 +252,7 @@ env.Install(
             "s/coreshard",
             "util/ntservice",
             "db/mongodandmongos",
+            "db/conn_pool_options",
             '$BUILD_DIR/mongo/util/options_parser/options_parser_init',
         ]))
 
