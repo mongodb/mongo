@@ -953,9 +953,12 @@ __wt_ref_info(WT_SESSION_IMPL *session,
  *	Check whether a page can be split in memory.
  */
 static inline int
-__wt_page_can_split(WT_BTREE *btree, WT_PAGE *page)
+__wt_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
+	WT_BTREE *btree;
 	WT_INSERT_HEAD *ins_head;
+
+	btree = S2BT(session);
 
 	/*
 	 * Only split a page once, otherwise workloads that update in the middle
@@ -1051,7 +1054,7 @@ __wt_page_can_evict(
 	 * has not already been a split on this page as the WT_PM_REC_MULTIBLOCK
 	 * flag is unset.
 	 */
-	if (__wt_page_can_split(btree, page)) {
+	if (__wt_page_can_split(session, page)) {
 		if (inmem_splitp != NULL)
 			*inmem_splitp = 1;
 		return (1);

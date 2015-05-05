@@ -1117,7 +1117,6 @@ err:	if (!complete)
 int
 __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 {
-	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_DECL_ITEM(key);
 	WT_INSERT *ins, **insp, *moved_ins, *prev_ins;
@@ -1127,12 +1126,11 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 	size_t page_decr, parent_incr, right_incr;
 	int i;
 
-	btree = S2BT(session);
 	page = ref->page;
 	right = NULL;
 	page_decr = parent_incr = right_incr = 0;
 
-	WT_ASSERT(session, __wt_page_can_split(btree, page));
+	WT_ASSERT(session, __wt_page_can_split(session, page));
 
 	/* Find the last item on the page. */
 	ins_head = page->pg_row_entries == 0 ?
