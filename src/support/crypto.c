@@ -49,7 +49,7 @@ __wt_decrypt(WT_SESSION_IMPL *session, WT_ENCRYPTOR *encryptor,
 	/*
 	 * Set the real result length in the output buffer including
 	 * the skipped header size.  The encryptor may have done its
-	 * own padding so the the returned result length is the real data
+	 * own padding so the returned result length is the real data
 	 * length after decryption removes any of its padding.
 	 */
 	result_len += skip;
