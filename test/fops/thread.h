@@ -45,7 +45,6 @@
 #endif
 
 #include "test_util.i"
-#include <wiredtiger.h>
 
 extern WT_CONNECTION *conn;			/* WiredTiger connection */
 
