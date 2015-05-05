@@ -472,6 +472,7 @@ coredbEnv.Library(
         'exec/working_set',
         'index/key_generator',
         'index_names',
+        'log_process_details',
         'matcher/expressions',
         'matcher/expressions_geo',
         'matcher/expressions_text',
@@ -679,4 +680,12 @@ serveronlyEnv.Library(
     target="serveronly",
     source=serverOnlyFiles,
     LIBDEPS=serveronlyLibdeps,
+)
+
+env.Library(
+    target='log_process_details',
+    source=[
+        'log_process_details.cpp',
+    ],
+    LIBDEPS=[],
 )

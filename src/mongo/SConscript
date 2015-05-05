@@ -186,7 +186,6 @@ env.Library(
     target='coreserver',
     source=[
         'db/conn_pool_options.cpp',
-        'db/log_process_details.cpp',
         'db/stats/counters.cpp',
     ],
     LIBDEPS=[
