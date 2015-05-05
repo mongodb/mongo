@@ -289,8 +289,7 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 		/*
 		 * Get size needed for encrypted buffer.
 		 */
-		__wt_encrypt_size(session,
-		    kencryptor, ip->size, &size);
+		__wt_encrypt_size(session, kencryptor, ip->size, &size);
 
 		WT_ERR(bm->write_size(bm, session, &size));
 		WT_ERR(__wt_scr_alloc(session, size, &etmp));
