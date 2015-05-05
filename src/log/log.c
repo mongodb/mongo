@@ -341,8 +341,7 @@ __log_acquire(WT_SESSION_IMPL *session, uint64_t recsize, WT_LOGSLOT *slot)
 
 /*
  * __log_decompress --
- *	Decompress a log record.  The result is put into a scratch
- *	buffer that the caller must free.
+ *	Decompress a log record.
  */
 static int
 __log_decompress(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM *out)
@@ -383,8 +382,7 @@ __log_decompress(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM *out)
 
 /*
  * __log_decrypt --
- *	Decrypt a log record.  The result is put into a scratch
- *	buffer that the caller must free.
+ *	Decrypt a log record.
  */
 static int
 __log_decrypt(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM *out)
