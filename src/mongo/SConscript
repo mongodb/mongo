@@ -142,51 +142,16 @@ env.Library('version',
                 '$BUILD_DIR/mongo/base/base'
             ])
 
-commonFiles = []
-
-extraCommonLibdeps = []
-
-if env['MONGO_BUILD_SASL_CLIENT']:
-    extraCommonLibdeps.append('client/cyrus_sasl_client_session')
-
-env.Library('mongocommon', commonFiles,
-            LIBDEPS=['bson/bson',
-                     'util/background_job',
-                     '$BUILD_DIR/mongo/client/clientdriver',
-                     'util/fail_point',
-                     'util/foundation',
-                     'db/service_context',
-                     'db/lasterror',
-                     'db/mongohasher',
-                     'db/namespace_string',
-                     'util/net/network',
-                     'util/processinfo',
-                     'util/concurrency/spin_lock',
-                     'util/stacktrace',
-                     'util/stringutils',
-                     'util/concurrency/synchronization',
-                     'util/concurrency/thread_name',
-                     'util/md5',
-                     'version',
-                     '$BUILD_DIR/third_party/shim_pcrecpp',
-                     '$BUILD_DIR/third_party/murmurhash3/murmurhash3',
-                     '$BUILD_DIR/third_party/shim_boost',
-                     '$BUILD_DIR/mongo/util/options_parser/options_parser',
-                     '$BUILD_DIR/mongo/util/progress_meter',
-                     ] +
-                     extraCommonLibdeps)
-
 env.CppUnitTest(
     target="util/version_test",
     source=["util/version_test.cpp"],
-    LIBDEPS=["mongocommon"]
+    LIBDEPS=[]
 )
 
 env.Library(
     target='coreserver',
     source=[],
     LIBDEPS=[
-        'mongocommon',
         'util/decorable',
     ],
 )
@@ -248,7 +213,6 @@ env.Install(
             "s/mongoscore",
             "coreserver",
             "db/coredb",
-            "mongocommon",
             "s/coreshard",
             "util/ntservice",
             "db/mongodandmongos",
@@ -299,8 +263,8 @@ if not has_option('noshell') and usev8:
                     'db/index/external_key_generator',
                     'db/catalog/index_key_validate',
                     'scripting/scripting',
+                    'util/processinfo',
                     'util/signal_handlers',
-                    'mongocommon',
                     'shell/mongojs',
                 ])
 
@@ -318,6 +282,8 @@ if not has_option('noshell') and usev8:
         LIBDEPS=["$BUILD_DIR/third_party/shim_pcrecpp",
                  "shell_options",
                  "shell_core",
+                 "db/server_options_core",
+                 "client/clientdriver",
                  "$BUILD_DIR/mongo/util/password",
                  ])
 

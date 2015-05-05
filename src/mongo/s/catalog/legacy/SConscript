@@ -37,7 +37,6 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
         '$BUILD_DIR/mongo/s/coreshard',
         '$BUILD_DIR/mongo/s/mongoscore',
-        '$BUILD_DIR/mongo/mongocommon',
     ]
 )
 

@@ -113,7 +113,6 @@ env.CppUnitTest(
     source = 'storage_engine_lock_file_test.cpp',
     LIBDEPS=[
         'storage_engine_lock_file',
-        '$BUILD_DIR/mongo/mongocommon',
     ],
 )
 

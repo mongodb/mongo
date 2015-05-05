@@ -64,8 +64,9 @@ env.Library(
         ],
     LIBDEPS= [
         'extent',
-        '$BUILD_DIR/mongo/mongocommon',  # for ProgressMeter
         '$BUILD_DIR/mongo/db/commands/server_status_core',
+        '$BUILD_DIR/mongo/util/concurrency/spin_lock',
+        '$BUILD_DIR/mongo/util/progress_meter',
         ]
     )
 
@@ -114,6 +115,7 @@ env.CppUnitTest(
     source=['record_store_v1_simple_test.cpp',
             ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/util/decorable',
         'record_store_v1_test_help'
         ]
     )
@@ -123,6 +125,7 @@ env.CppUnitTest(
     source=['record_store_v1_capped_test.cpp',
             ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/util/decorable',
         'record_store_v1_test_help'
         ]
     )
@@ -160,7 +163,6 @@ env.Library(
         ],
     LIBDEPS= [
         'btree',
-        '$BUILD_DIR/mongo/mongocommon',  # for ProgressMeter
         '$BUILD_DIR/mongo/db/storage/mmap_v1/record_store_v1_test_help',
         ]
     )
@@ -170,6 +172,7 @@ env.CppUnitTest(
     source=['btree/btree_logic_test.cpp'
             ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/util/decorable',
         'btree_test_help'
         ]
     )

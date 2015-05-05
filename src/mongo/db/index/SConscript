@@ -23,6 +23,7 @@ env.Library(
             '$BUILD_DIR/mongo/db/geo/geometry',
             '$BUILD_DIR/mongo/db/geo/geoparser',
             '$BUILD_DIR/mongo/db/index_names',
+            '$BUILD_DIR/mongo/db/mongohasher',
             '$BUILD_DIR/third_party/s2/s2',
         ],
 )

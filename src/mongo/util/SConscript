@@ -369,6 +369,7 @@ env.Library(
     LIBDEPS=[
         "foundation",
         "signal_handlers_synchronous",
+        "$BUILD_DIR/mongo/db/service_context",
     ],
 )
 

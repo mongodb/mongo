@@ -65,6 +65,7 @@ if usev8:
             'scripting_common',
             '$BUILD_DIR/third_party/shim_v8',
             '$BUILD_DIR/mongo/shell/mongojs',
+            '$BUILD_DIR/mongo/db/service_context',
         ],
     )
 else:
