@@ -66,8 +66,6 @@ typedef struct {
 	char *password;		/* Saved password */
 } MY_CRYPTO;
 
-MY_CRYPTO my_crypto_global;
-
 #define	CHKSUM_LEN	4
 #define	IV_LEN		16
 
@@ -339,8 +337,7 @@ rotate_terminate(WT_ENCRYPTOR *encryptor, WT_SESSION *session)
 	free(my_crypto->keyid);
 	my_crypto->keyid = NULL;
 
-	if (encryptor != &my_crypto_global.encryptor)
-		free(encryptor);
+	free(encryptor);
 
 	return (0);
 }
@@ -357,9 +354,10 @@ add_my_encryptors(WT_CONNECTION *connection)
 	int ret;
 
 	/*
-	 * Initialize our one encryptor.
+	 * Initialize our top level encryptor.
 	 */
-	m = &my_crypto_global;
+	if ((m = calloc(1, sizeof(MY_CRYPTO))) == NULL)
+		return (errno);
 	wt = (WT_ENCRYPTOR *)&m->encryptor;
 	wt->encrypt = rotate_encrypt;
 	wt->decrypt = rotate_decrypt;
