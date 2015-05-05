@@ -1457,6 +1457,20 @@ struct __wt_session {
 	 */
 	int __F(transaction_pinned_range)(WT_SESSION* session, uint64_t *range);
 
+	/*!
+	 * Wait for a transaction to become synchronized.
+	 *
+	 * @snippet ex_all.c Transaction sync
+	 *
+	 * @param session the session handle
+	 * @configstart{WT_SESSION.transaction_sync, see dist/api_data.py}
+	 * @config{timeout, maximum amount of time to wait for background sync
+	 * in seconds.  A value of zero disables the timeout., an integer;
+	 * default \c 0.}
+	 * @configend
+	 * @errors
+	 */
+	int __F(transaction_sync)(WT_SESSION *session, const char *config);
 	/*! @} */
 };
 
@@ -2113,8 +2127,8 @@ struct __wt_connection {
  * WT_SESSION::begin_transaction., a boolean flag; default \c false.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;method, the method used to ensure log records
  * are stable on disk\, see @ref tune_durability for more information., a
- * string\, chosen from the following options: \c "dsync"\, \c "fsync"\, \c
- * "none"; default \c fsync.}
+ * string\, chosen from the following options: \c "background"\, \c "dsync"\, \c
+ * "fsync"\, \c "none"; default \c fsync.}
  * @config{ ),,}
  * @config{use_environment_priv, use the \c WIREDTIGER_CONFIG and \c
  * WIREDTIGER_HOME environment variables regardless of whether or not the
@@ -3525,8 +3539,10 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_TXN_PINNED_RANGE			1140
 /*! transaction: transactions rolled back */
 #define	WT_STAT_CONN_TXN_ROLLBACK			1141
+/*! transaction: transaction sync calls */
+#define	WT_STAT_CONN_TXN_SYNC				1142
 /*! connection: total write I/Os */
-#define	WT_STAT_CONN_WRITE_IO				1142
+#define	WT_STAT_CONN_WRITE_IO				1143
 
 /*!
  * @}

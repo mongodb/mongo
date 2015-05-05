@@ -285,6 +285,11 @@ static const WT_CONFIG_CHECK confchk_WT_SESSION_salvage[] = {
 	{ NULL, NULL, NULL, NULL, NULL, 0 }
 };
 
+static const WT_CONFIG_CHECK confchk_WT_SESSION_transaction_sync[] = {
+	{ "timeout", "int", NULL, NULL, NULL, 0 },
+	{ NULL, NULL, NULL, NULL, NULL, 0 }
+};
+
 static const WT_CONFIG_CHECK confchk_WT_SESSION_verify[] = {
 	{ "dump_address", "boolean", NULL, NULL, NULL, 0 },
 	{ "dump_blocks", "boolean", NULL, NULL, NULL, 0 },
@@ -410,7 +415,7 @@ static const WT_CONFIG_CHECK
     confchk_wiredtiger_open_transaction_sync_subconfigs[] = {
 	{ "enabled", "boolean", NULL, NULL, NULL, 0 },
 	{ "method", "string",
-	    NULL, "choices=[\"dsync\",\"fsync\",\"none\"]",
+	    NULL, "choices=[\"background\",\"dsync\",\"fsync\",\"none\"]",
 	    NULL, 0 },
 	{ NULL, NULL, NULL, NULL, NULL, 0 }
 };
@@ -806,6 +811,10 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	{ "WT_SESSION.strerror",
 	  "",
 	  NULL, 0
+	},
+	{ "WT_SESSION.transaction_sync",
+	  "timeout=0",
+	  confchk_WT_SESSION_transaction_sync, 1
 	},
 	{ "WT_SESSION.truncate",
 	  "",

@@ -611,7 +611,7 @@ common_wiredtiger_open = [
         Config('method', 'fsync', r'''
             the method used to ensure log records are stable on disk, see
             @ref tune_durability for more information''',
-            choices=['dsync', 'fsync', 'none']),
+            choices=['background', 'dsync', 'fsync', 'none']),
         ]),
 ]
 
@@ -754,6 +754,13 @@ methods = {
         type='boolean'),
 ]),
 'WT_SESSION.strerror' : Method([]),
+'WT_SESSION.transaction_sync' : Method([
+    Config('timeout', '0', r'''
+        maximum amount of time to wait for background sync in seconds.
+        A value of zero disables the timeout''',
+        type='int'),
+]),
+
 'WT_SESSION.truncate' : Method([]),
 'WT_SESSION.upgrade' : Method([]),
 'WT_SESSION.verify' : Method([

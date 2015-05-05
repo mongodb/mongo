@@ -74,6 +74,7 @@ __session_clear(WT_SESSION_IMPL *session)
 	memset(session, 0, WT_SESSION_CLEAR_SIZE(session));
 	session->hazard_size = 0;
 	session->nhazard = 0;
+	WT_INIT_LSN(&session->bg_sync_lsn);
 }
 
 /*
@@ -850,6 +851,78 @@ err:	API_END_RET(session, ret);
 }
 
 /*
+ * __session_transaction_sync --
+ *	WT_SESSION->transaction_sync method.
+ */
+static int
+__session_transaction_sync(WT_SESSION *wt_session, const char *config)
+{
+	WT_CONFIG_ITEM cval;
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+	WT_LOG *log;
+	WT_SESSION_IMPL *session;
+	struct timespec end, now;
+	uint64_t wait_secs;
+
+	session = (WT_SESSION_IMPL *)wt_session;
+	conn = S2C(session);
+	/*
+	 * If logging is not enabled there is nothing to do.
+	 */
+	if (!FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED))
+		return (0);
+	SESSION_API_CALL(session, transaction_sync, config, cfg);
+	WT_STAT_FAST_CONN_INCR(session, txn_sync);
+
+	log = conn->log;
+	ret = 0;
+
+	/*
+	 * If there is no background sync LSN in this session, there
+	 * is nothing to do.
+	 */
+	if (WT_IS_INIT_LSN(&session->bg_sync_lsn))
+		goto err;
+
+	/*
+	 * If our LSN is smaller than the current sync LSN then our
+	 * transaction is stable.  We're done.
+	 */
+	if (WT_LOG_CMP(&session->bg_sync_lsn, &log->sync_lsn) <= 0)
+		goto err;
+
+	/*
+	 * Our LSN is not yet stable.  Wait and check again depending on the
+	 * timeout.
+	 */
+	WT_ERR(__wt_config_gets_def(session, cfg, "timeout", 0, &cval));
+	if (cval.len != 0)
+		wait_secs = (uint64_t)cval.val;
+
+	if (wait_secs == 0)
+		WT_ERR(ETIMEDOUT);
+
+	WT_ERR(__wt_epoch(session, &end));
+	end.tv_sec += wait_secs;
+
+	/*
+	 * Keep checking the LSNs until we find it is stable or we reach
+	 * our timeout.
+	 */
+	while (WT_LOG_CMP(&session->bg_sync_lsn, &log->sync_lsn) > 0) {
+		WT_ERR(__wt_epoch(session, &now));
+		if (WT_TIMECMP(now, end) <= 0)
+			WT_ERR(__wt_cond_wait(
+			    session, log->log_sync_cond, WT_MILLION));
+		else
+			WT_ERR(ETIMEDOUT);
+	}
+
+err:	API_END_RET(session, ret);
+}
+
+/*
  * __session_checkpoint --
  *	WT_SESSION->checkpoint method.
  */
@@ -997,7 +1070,8 @@ __wt_open_session(WT_CONNECTION_IMPL *conn,
 		__session_commit_transaction,
 		__session_rollback_transaction,
 		__session_checkpoint,
-		__session_transaction_pinned_range
+		__session_transaction_pinned_range,
+		__session_transaction_sync
 	};
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session, *session_ret;

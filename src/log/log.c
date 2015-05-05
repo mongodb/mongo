@@ -1769,6 +1769,22 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 			(void)__wt_cond_wait(
 			    session, log->log_write_cond, 10000);
 	}
+	/*
+	 * Advance the background sync LSN if needed and it is later than
+	 * another transaction.
+	 */
+	if (LF_ISSET(WT_LOG_BACKGROUND) &&
+	    WT_LOG_CMP(&session->bg_sync_lsn, &lsn) <= 0) {
+		session->bg_sync_lsn = lsn;
+		/*
+		 * Advance the logging subsystem background sync LSN if
+		 * needed.
+		 */
+		__wt_spin_lock(session, &log->log_sync_lock);
+		if (WT_LOG_CMP(&lsn, &log->bg_sync_lsn) > 0)
+			log->bg_sync_lsn = lsn;
+		__wt_spin_unlock(session, &log->log_sync_lock);
+	}
 err:
 	if (locked)
 		__wt_spin_unlock(session, &log->log_slot_lock);

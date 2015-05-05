@@ -30,7 +30,9 @@ __logmgr_sync_cfg(WT_SESSION_IMPL *session, const char **cfg)
 	WT_RET(
 	    __wt_config_gets(session, cfg, "transaction_sync.method", &cval));
 	FLD_CLR(conn->txn_logsync, WT_LOG_DSYNC | WT_LOG_FSYNC);
-	if (WT_STRING_MATCH("dsync", cval.str, cval.len))
+	if (WT_STRING_MATCH("background", cval.str, cval.len))
+		FLD_SET(conn->txn_logsync, WT_LOG_BACKGROUND);
+	else if (WT_STRING_MATCH("dsync", cval.str, cval.len))
 		FLD_SET(conn->txn_logsync, WT_LOG_DSYNC);
 	else if (WT_STRING_MATCH("fsync", cval.str, cval.len))
 		FLD_SET(conn->txn_logsync, WT_LOG_FSYNC);
@@ -280,7 +282,7 @@ __log_close_server(void *arg)
 	WT_DECL_RET;
 	WT_FH *close_fh;
 	WT_LOG *log;
-	WT_LSN close_end_lsn, close_lsn;
+	WT_LSN close_end_lsn, close_lsn, min_lsn;
 	WT_SESSION_IMPL *session;
 	int locked;
 
@@ -321,10 +323,40 @@ __log_close_server(void *arg)
 			WT_ERR(__wt_cond_signal(session, log->log_sync_cond));
 			locked = 0;
 			__wt_spin_unlock(session, &log->log_sync_lock);
-		} else
-			/* Wait until the next event. */
-			WT_ERR(__wt_cond_wait(session,
-			    conn->log_close_cond, WT_MILLION));
+		}
+		/*
+		 * If a later thread asked for a background sync, do it now.
+		 */
+		if (WT_LOG_CMP(&log->bg_sync_lsn, &log->sync_lsn)) {
+			/*
+			 * Save the latest write LSN which is the minimum
+			 * we will have written to disk.
+			 */
+			min_lsn = log->write_lsn;
+			/*
+			 * The sync LSN we asked for better be smaller than
+			 * the current written LSN.
+			 */
+			WT_ASSERT(session,
+			    WT_LOG_CMP(&log->bg_sync_lsn, &min_lsn) <= 0);
+			WT_ERR(__wt_fsync(session, log->log_fh));
+			__wt_spin_lock(session, &log->log_sync_lock);
+			locked = 1;
+			/*
+			 * The sync LSN could have advanced while we were
+			 * writing to disk.
+			 */
+			if (WT_LOG_CMP(&log->sync_lsn, &min_lsn) <= 0) {
+				log->sync_lsn = min_lsn;
+				WT_ERR(__wt_cond_signal(
+				    session, log->log_sync_cond));
+			}
+			locked = 0;
+			__wt_spin_unlock(session, &log->log_sync_lock);
+		}
+		/* Wait until the next event. */
+		WT_ERR(__wt_cond_wait(
+		    session, conn->log_close_cond, WT_MILLION));
 	}
 
 	if (0) {
