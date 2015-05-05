@@ -74,14 +74,13 @@ __wt_encrypt(WT_SESSION_IMPL *session,
 
 	unpadded_lenp = (uint32_t *)((uint8_t *)out->mem + skip);
 
-	/* Skip the header bytes of the destination data. */
+	/*
+	 * Skip the header bytes and the length we store in the destination data.
+	 * Add in the encryptor size constant to the expected destination length.
+	 */
 	dst = (uint8_t *)out->mem + skip + WT_ENCRYPT_LEN_SIZE;
 	dst_len = src_len + kencryptor->size_const;
 
-	/*
-	 * Send in the temporary source address and length that includes the
-	 * checksum we injected.
-	 */
 	WT_RET(kencryptor->encryptor->encrypt(kencryptor->encryptor,
 	    &session->iface, src, src_len, dst, dst_len, &result_len));
 
