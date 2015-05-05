@@ -148,10 +148,11 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session, int final, int force)
 	WT_BTREE *btree;
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
-	int no_schema_lock;
+	int marked_dead, no_schema_lock;
 
-	dhandle = session->dhandle;
 	btree = S2BT(session);
+	dhandle = session->dhandle;
+	marked_dead = 0;
 
 	if (!F_ISSET(dhandle, WT_DHANDLE_OPEN))
 		return (0);
@@ -187,18 +188,27 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session, int final, int force)
 	 * invalid if the mapping is closed.
 	 */
 	if (!F_ISSET(btree,
-	    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY))
-		WT_ERR(force && (btree->bm == NULL || btree->bm->map == NULL) ?
-		    __conn_dhandle_mark_dead(session) :
-		    __wt_checkpoint_close(session, final));
+            WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY)) {
+		if (force && (btree->bm == NULL || btree->bm->map == NULL))  {
+			WT_ERR(__conn_dhandle_mark_dead(session));
+			marked_dead = 1;
+		} else
+			WT_ERR(__wt_checkpoint_close(session, final));
+	}
 
 	WT_TRET(__wt_btree_close(session));
-	if (!force || final) {
+	/*
+	 * If we marked a handle as dead it will be closed by sweep, via
+	 * another call to sync and close.
+	 */
+	if (!marked_dead) {
 		F_CLR(dhandle, WT_DHANDLE_OPEN);
 		if (dhandle->checkpoint == NULL)
 			--S2C(session)->open_btree_count;
 	}
-	F_CLR(btree, WT_BTREE_SPECIAL_FLAGS);
+	WT_ASSERT(session,
+	    F_ISSET(dhandle, WT_DHANDLE_DEAD) ||
+	    !F_ISSET(dhandle, WT_DHANDLE_OPEN));
 
 err:	__wt_spin_unlock(session, &dhandle->close_lock);
 

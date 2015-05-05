@@ -170,6 +170,8 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 
 	btree->bulk_load_ok = 0;
 
+	F_CLR(btree, WT_BTREE_SPECIAL_FLAGS);
+
 	return (ret);
 }
 
