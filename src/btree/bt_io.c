@@ -18,8 +18,8 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 {
 	WT_BM *bm;
 	WT_BTREE *btree;
-	WT_DECL_ITEM(tmp);
 	WT_DECL_ITEM(etmp);
+	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
 	WT_ENCRYPTOR *encryptor;
 	WT_ITEM *ip;
@@ -61,10 +61,9 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 		ret = __wt_decrypt(session,
 		    encryptor, WT_BLOCK_ENCRYPT_SKIP, ip, &etmp);
 		/*
-		 * It may be file corruption, which
-		 * is really, really bad, or it may be a mismatch of
-		 * encryption configuration, for example, an incorrect
-		 * secretkey.
+		 * It may be file corruption, which is really, really bad, or
+		 * may be a mismatch of encryption configuration, for example,
+		 * an incorrect secretkey.
 		 */
 		if (ret != 0)
 			WT_ERR(F_ISSET(btree, WT_BTREE_VERIFY) ||
@@ -127,7 +126,7 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 		 */
 		if (ip != NULL)
 			WT_ERR(__wt_buf_set(
-			session, buf, ip->data, dsk->mem_size));
+			    session, buf, ip->data, dsk->mem_size));
 
 	/* If the handle is a verify handle, verify the physical page. */
 	if (F_ISSET(btree, WT_BTREE_VERIFY)) {
