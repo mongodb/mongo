@@ -396,20 +396,22 @@ __log_decrypt(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out)
 	WT_ENCRYPTOR *encryptor;
 	WT_KEYED_ENCRYPTOR *kencryptor;
 
+	*out = NULL;
+
 	conn = S2C(session);
 	kencryptor = conn->kencryptor;
 	if (kencryptor == NULL ||
 	    (encryptor = kencryptor->encryptor) == NULL ||
 	    encryptor->decrypt == NULL)
-		WT_ERR_MSG(session, WT_ERROR,
+		WT_RET_MSG(session, WT_ERROR,
 		    "log_decrypt: Encrypted record with "
 		    "no configured decrypt method");
 
-	WT_ERR(__wt_scr_alloc(session, 0, out));
-	ret = __wt_decrypt(session, encryptor, WT_LOG_ENCRYPT_SKIP, in, out);
-
-err:	if (ret != 0)
+	WT_RET(__wt_scr_alloc(session, 0, out));
+	if ((ret = __wt_decrypt(
+	    session, encryptor, WT_LOG_ENCRYPT_SKIP, in, out)) != 0)
 		__wt_scr_free(session, out);
+
 	return (ret);
 }
 
