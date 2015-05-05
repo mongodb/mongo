@@ -46,3 +46,21 @@ env.CppUnitTest(
         '$BUILD_DIR/third_party/shim_boost',
     ],
 )
+
+env.Library(
+    target='task',
+    source=[
+        'task.cpp',
+    ],
+    LIBDEPS=[
+    ],
+)
+
+env.Library(
+    target='rwlock',
+    source=[
+        'rwlockimpl.cpp',
+    ],
+    LIBDEPS=[
+    ],
+)

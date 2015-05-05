@@ -142,9 +142,7 @@ env.Library('version',
                 '$BUILD_DIR/mongo/base/base'
             ])
 
-commonFiles = [ "util/concurrency/task.cpp",
-                "util/concurrency/rwlockimpl.cpp",
-                ]
+commonFiles = []
 
 extraCommonLibdeps = []
 

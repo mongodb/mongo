@@ -113,6 +113,7 @@ dbtest = env.Program(
         "$BUILD_DIR/mongo/s/cluster_ops",
         "$BUILD_DIR/mongo/s/cluster_ops_impl",
         "$BUILD_DIR/mongo/db/serveronly",
+        "$BUILD_DIR/mongo/util/concurrency/rwlock",
         "$BUILD_DIR/mongo/util/signal_handlers_synchronous",
         "$BUILD_DIR/mongo/util/paths",
         "mocklib",
