@@ -171,8 +171,6 @@ rotn_encrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 
 	(void)session;		/* Unused */
 
-	if (src == NULL)
-		return (0);
 	if (dst_len < src_len + CHKSUM_LEN + IV_LEN)
 		return (ENOMEM);
 
@@ -222,8 +220,6 @@ rotn_decrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 
 	(void)session;		/* Unused */
 
-	if (src == NULL)
-		return (0);
 	/*
 	 * Make sure it is big enough.
 	 */
@@ -374,7 +370,7 @@ err:	free(rotn_encryptor->keyid);
 	free(rotn_encryptor->shift_forw);
 	free(rotn_encryptor->shift_back);
 	free(rotn_encryptor);
-	return (EPERM);
+	return (ret);
 }
 /*! [WT_ENCRYPTOR presize] */
 
