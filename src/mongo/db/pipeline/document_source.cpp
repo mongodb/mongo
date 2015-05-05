@@ -52,12 +52,12 @@ namespace mongo {
         pSource = pTheSource;
     }
 
-    bool DocumentSource::coalesce(
-        const intrusive_ptr<DocumentSource> &pNextSource) {
+    bool DocumentSource::coalesce(const intrusive_ptr<DocumentSource> &pNextSource) {
         return false;
     }
 
-    void DocumentSource::optimize() {
+    intrusive_ptr<DocumentSource> DocumentSource::optimize() {
+        return this;
     }
 
     void DocumentSource::dispose() {

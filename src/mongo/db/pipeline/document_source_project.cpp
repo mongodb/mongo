@@ -79,9 +79,10 @@ namespace mongo {
         return out.freeze();
     }
 
-    void DocumentSourceProject::optimize() {
+    intrusive_ptr<DocumentSource> DocumentSourceProject::optimize() {
         intrusive_ptr<Expression> pE(pEO->optimize());
         pEO = boost::dynamic_pointer_cast<ExpressionObject>(pE);
+        return this;
     }
 
     Value DocumentSourceProject::serialize(bool explain) const {

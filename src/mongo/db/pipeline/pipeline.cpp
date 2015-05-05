@@ -305,9 +305,13 @@ namespace mongo {
 
     void Pipeline::Optimizations::Local::optimizeEachDocumentSource(Pipeline* pipeline) {
         SourceContainer& sources = pipeline->sources;
+        SourceContainer newSources;
         for (SourceContainer::iterator it(sources.begin()); it != sources.end(); ++it) {
-            (*it)->optimize();
+            if (auto out = (*it)->optimize()) {
+                newSources.push_back(std::move(out));
+            }
         }
+        pipeline->sources = std::move(newSources);
     }
 
     void Pipeline::Optimizations::Local::duplicateMatchBeforeInitalRedact(Pipeline* pipeline) {

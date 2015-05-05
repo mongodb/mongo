@@ -83,6 +83,10 @@ namespace mongo {
         return Value(DOC(getSourceName() << _skip));
     }
 
+    intrusive_ptr<DocumentSource> DocumentSourceSkip::optimize() {
+        return _skip == 0 ? nullptr : this;
+    }
+
     intrusive_ptr<DocumentSourceSkip> DocumentSourceSkip::create(
         const intrusive_ptr<ExpressionContext> &pExpCtx) {
         intrusive_ptr<DocumentSourceSkip> pSource(
