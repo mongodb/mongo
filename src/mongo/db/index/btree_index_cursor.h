@@ -46,9 +46,12 @@ namespace mongo {
         bool isEOF() const;
 
         /**
-         * Called from btree.cpp when we're about to delete a Btree bucket.
+         * Called from btree.cpp when we're about to delete a Btree bucket. The index descriptor
+         * is needed as just the DiskLoc of the bucket is not unique across databases, which might
+         * result in incorrect invalidation of cursors in other unlocked databases.
          */
-        static void aboutToDeleteBucket(const DiskLoc& bucket);
+        static void aboutToDeleteBucket(const IndexCatalogEntry* index,
+                                        const DiskLoc& bucket);
 
         virtual Status setOptions(const CursorOptions& options);
 

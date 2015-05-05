@@ -63,13 +63,14 @@ namespace mongo {
 
     bool BtreeIndexCursor::isEOF() const { return _bucket.isNull(); }
 
-    void BtreeIndexCursor::aboutToDeleteBucket(const DiskLoc& bucket) {
+    void BtreeIndexCursor::aboutToDeleteBucket(const IndexCatalogEntry* index,
+                                               const DiskLoc& bucket) {
         SimpleMutex::scoped_lock lock(_activeCursorsMutex);
         for (unordered_set<BtreeIndexCursor*>::iterator i = _activeCursors.begin();
              i != _activeCursors.end(); ++i) {
 
             BtreeIndexCursor* ic = *i;
-            if (bucket == ic->_bucket) {
+            if (bucket == ic->_bucket && ic->_btreeState == index) {
                 ic->_keyOffset = -1;
             }
         }

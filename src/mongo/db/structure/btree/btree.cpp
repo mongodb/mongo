@@ -859,7 +859,7 @@ namespace mongo {
 
     template< class V >
     void BtreeBucket<V>::delBucket(IndexCatalogEntry* btreeState, const DiskLoc thisLoc ) {
-        BtreeIndexCursor::aboutToDeleteBucket(thisLoc);
+        BtreeIndexCursor::aboutToDeleteBucket(btreeState, thisLoc);
         verify( !isHead() );
 
         DiskLoc ll = this->parent;
@@ -1000,7 +1000,7 @@ namespace mongo {
             ll.btree<V>()->childForPos( indexInParent( thisLoc ) ).writing() = this->nextChild;
         }
         BTREE(this->nextChild)->parent.writing() = this->parent;
-        BtreeIndexCursor::aboutToDeleteBucket(thisLoc);
+        BtreeIndexCursor::aboutToDeleteBucket(btreeState, thisLoc);
         deallocBucket( btreeState, thisLoc );
     }
 
