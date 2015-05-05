@@ -148,14 +148,6 @@ env.CppUnitTest(
     LIBDEPS=[]
 )
 
-env.Library(
-    target='coreserver',
-    source=[],
-    LIBDEPS=[
-        'util/decorable',
-    ],
-)
-
 mongod = env.Program(
     target="mongod",
     source=[
@@ -164,7 +156,6 @@ mongod = env.Program(
     ],
     LIBDEPS=[
         "db/coredb",
-        "coreserver",
         "db/conn_pool_options",
         "db/mongod_options",
         "db/mongodandmongos",
@@ -190,7 +181,6 @@ env.Install(
                     LIBDEPS=[
                         "util/ntservice_mock",
                         "db/serveronly",
-                        "coreserver",
                         "db/coredb",
                         "util/signal_handlers_synchronous",
                     ]),
@@ -211,7 +201,6 @@ env.Install(
             's/client/sharding_connection_hook',
             's/commands/cluster_commands',
             "s/mongoscore",
-            "coreserver",
             "db/coredb",
             "s/coreshard",
             "util/ntservice",
@@ -235,7 +224,6 @@ if env.TargetOSIs('osx') or env["_HAVEPCAP"]:
     sniffEnv.Install( '#/', sniffEnv.Program( "mongosniff", "tools/sniffer.cpp",
                                               LIBDEPS = [
                                                  "db/serveronly",
-                                                 "coreserver",
                                                  "db/coredb",
                                                  "util/signal_handlers_synchronous",
                                               ] ) )

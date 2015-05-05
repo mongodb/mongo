@@ -83,7 +83,6 @@ env.CppUnitTest(
         'catalog/legacy/catalog_manager_legacy',
         'metadata',
         '$BUILD_DIR/mongo/db/coredb',
-        '$BUILD_DIR/mongo/coreserver',
         '$BUILD_DIR/mongo/s/coreshard',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
         '$BUILD_DIR/mongo/dbtests/mocklib',
@@ -226,7 +225,6 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/coredb',
-        '$BUILD_DIR/mongo/coreserver',
         '$BUILD_DIR/mongo/s/coreshard',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
         '$BUILD_DIR/mongo/s/mongoscore',
@@ -288,7 +286,6 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/coredb',
-        '$BUILD_DIR/mongo/coreserver',
         "$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init",
         'coreshard',
         'mongoscore',
@@ -302,7 +299,6 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/coredb",
-        "$BUILD_DIR/mongo/coreserver",
         "$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init",
         "$BUILD_DIR/mongo/util/net/message_server_port",
         "$BUILD_DIR/mongo/dbtests/mocklib",

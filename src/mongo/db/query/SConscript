@@ -63,7 +63,6 @@ env.CppUnitTest(
     LIBDEPS=[
         "query",
         "$BUILD_DIR/mongo/db/serveronly",
-        "$BUILD_DIR/mongo/coreserver",
         "$BUILD_DIR/mongo/db/coredb",
         "$BUILD_DIR/mongo/dbtests/mocklib",
         "$BUILD_DIR/mongo/util/ntservice_mock",
@@ -309,7 +308,6 @@ env.CppUnitTest(
         "query",
         "query_planner_test_fixture",
         "$BUILD_DIR/mongo/db/serveronly",
-        "$BUILD_DIR/mongo/coreserver",
         "$BUILD_DIR/mongo/db/coredb",
         "$BUILD_DIR/mongo/dbtests/mocklib",
         "$BUILD_DIR/mongo/util/ntservice_mock",
