@@ -2558,9 +2558,9 @@ namespace {
             lastVote.setTerm(args.getTerm());
             lastVote.setCandidateId(args.getCandidateId());
 
-            Status status = _externalState->storeLocalConfigDocument(txn, lastVote.toBSON());
+            Status status = _externalState->storeLocalLastVoteDocument(txn, lastVote);
             if (!status.isOK()) {
-                error() << "replSetReconfig failed to store config document; " << status;
+                error() << "replSetRequestVotes failed to store LastVote document; " << status;
                 return status;
             }
 
