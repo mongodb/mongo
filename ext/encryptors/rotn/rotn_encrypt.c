@@ -87,7 +87,7 @@ typedef struct {
 /*
  * make_cksum --
  *	This is where one would call a checksum function on the encrypted
- *	buffer.  Here we just put random values in it.
+ *	buffer.  Here we just put a constant value in it.
  */
 static void
 make_cksum(uint8_t *dst)
@@ -97,13 +97,13 @@ make_cksum(uint8_t *dst)
 	 * Assume array is big enough for the checksum.
 	 */
 	for (i = 0; i < CHKSUM_LEN; i++)
-		dst[i] = (uint8_t)random();
+		dst[i] = 'C';
 }
 
 /*
  * make_iv --
  *	This is where one would generate the initialization vector.
- *	Here we just put random values in it.
+ *	Here we just put a constant value in it.
  */
 static void
 make_iv(uint8_t *dst)
@@ -113,7 +113,7 @@ make_iv(uint8_t *dst)
 	 * Assume array is big enough for the initialization vector.
 	 */
 	for (i = 0; i < IV_LEN; i++)
-		dst[i] = (uint8_t)random();
+		dst[i] = 'I';
 }
 
 /*
@@ -176,6 +176,10 @@ rotn_encrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	if (dst_len < src_len + CHKSUM_LEN + IV_LEN)
 		return (ENOMEM);
 
+	/*
+	 * !!! Most implementations would verify any needed
+	 * checksum and initialize the IV here.
+	 */
 	i = CHKSUM_LEN + IV_LEN;
 	memcpy(&dst[i], &src[0], src_len);
 	/*
