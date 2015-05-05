@@ -348,6 +348,11 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_strndup(
 	    session, cval.str, cval.len, &lsm_tree->collator_name));
 
+	WT_ERR(__wt_config_gets(session, cfg, "cache_resident", &cval));
+	if (cval.val != 0)
+		WT_ERR_MSG(session, EINVAL,
+		    "The cache_resident flag is not compatible with LSM");
+
 	WT_ERR(__wt_config_gets(session, cfg, "lsm.auto_throttle", &cval));
 	if (cval.val)
 		F_SET(lsm_tree, WT_LSM_TREE_THROTTLE);

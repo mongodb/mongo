@@ -996,9 +996,10 @@ struct __wt_session {
 	 * builtin support for \c "bzip2"\, \c "snappy"\, \c "lz4" or \c "zlib"
 	 * compression\, these names are also available.  See @ref compression
 	 * for more information., a string; default \c none.}
-	 * @config{cache_resident, do not ever evict the object's pages; see
-	 * @ref tuning_cache_resident for more information., a boolean flag;
-	 * default \c false.}
+	 * @config{cache_resident, do not ever evict the object's pages from
+	 * cache.  Not compatible with LSM tables; see @ref
+	 * tuning_cache_resident for more information., a boolean flag; default
+	 * \c false.}
 	 * @config{checksum, configure block checksums; permitted values are
 	 * <code>on</code> (checksum all blocks)\, <code>off</code> (checksum no
 	 * blocks) and <code>uncompresssed</code> (checksum only blocks which
