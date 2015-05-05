@@ -1783,6 +1783,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 
 	WT_CONFIG_ITEM cval, keyid, secretkey, sval;
 	WT_CONNECTION_IMPL *conn;
+	WT_DECL_ITEM(encbuf);
 	WT_DECL_ITEM(i1);
 	WT_DECL_ITEM(i2);
 	WT_DECL_ITEM(i3);
@@ -1790,7 +1791,6 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	const WT_NAME_FLAG *ft;
 	WT_SESSION_IMPL *session;
 	const char *base_merge, *enc_cfg[] = { NULL, NULL };
-	char buf[512];
 	char version[64];
 
 	/* Leave lots of space for optional additional configuration. */
@@ -1989,11 +1989,12 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_ERR(__wt_config_gets_none(session, cfg, "encryption.keyid", &keyid));
 	WT_ERR(__wt_config_gets_none(session, cfg, "encryption.secretkey",
 	    &secretkey));
-	WT_ERR_TEST(snprintf(buf, sizeof(buf),
+	WT_ERR(__wt_scr_alloc(session, 0, &encbuf));
+	WT_ERR(__wt_buf_fmt(session, encbuf,
 	    "(name=%.*s,keyid=%.*s,secretkey=%.*s)",
 	    (int)cval.len, cval.str, (int)keyid.len, keyid.str,
-	    (int)secretkey.len, secretkey.str) >= (int)sizeof(buf), ENOMEM);
-	enc_cfg[0] = buf;
+	    (int)secretkey.len, secretkey.str));
+	enc_cfg[0] = (char *)encbuf->data;
 	WT_ERR(__wt_encryptor_config(session, &cval, &keyid,
 	    (WT_CONFIG_ARG *)enc_cfg, &conn->kencryptor));
 
@@ -2029,6 +2030,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	*wt_connp = &conn->iface;
 
 err:	/* Discard the scratch buffers. */
+	__wt_scr_free(session, &encbuf);
 	__wt_scr_free(session, &i1);
 	__wt_scr_free(session, &i2);
 	__wt_scr_free(session, &i3);
