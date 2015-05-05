@@ -1184,8 +1184,7 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 	wt_off_t log_size;
 	uint32_t allocsize, cksum, firstlog, lastlog, lognum, rdup_len, reclen;
 	u_int i, logcount;
-	int eol;
-	int firstrecord;
+	int eol, firstrecord;
 	char **logfiles;
 
 	conn = S2C(session);
@@ -1193,8 +1192,8 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 	log_fh = NULL;
 	logcount = 0;
 	logfiles = NULL;
-	firstrecord = 1;
 	eol = 0;
+	firstrecord = 1;
 	WT_CLEAR(buf);
 
 	/*
