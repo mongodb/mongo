@@ -896,15 +896,6 @@ int _main( int argc, char* argv[], char **envp ) {
 }
 
 #ifdef _WIN32
-// gperftools/windows/patch_functions.cc normally defines this function,
-// but we do not link this file since it would dynamically patch our functions.
-// We override the behavior of this function to no-patch functions, but instead
-// simply to do nothing
-// TCMalloc calls this via a static initializer
-void PatchWindowsFunctions() {
-    // Intentionally left empty
-}
-
 int wmain(int argc, wchar_t* argvW[], wchar_t* envpW[]) {
     static mongo::StaticObserver staticObserver;
     int returnCode;

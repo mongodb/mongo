@@ -307,4 +307,13 @@
 // TODO(csilvers): include windows/port.h in every relevant source file instead?
 #include "windows/port.h"
 
+// gperftools/windows/patch_functions.cc normally defines this function,
+// but we do not link this file since it would dynamically patch our functions.
+// We override the behavior of this function to no-patch functions, but instead
+// simply to do nothing
+// TCMalloc calls this via a static initializer
+static void PatchWindowsFunctions() {
+    // Intentionally left empty
+}
+
 #endif  /* GOOGLE_PERFTOOLS_WINDOWS_CONFIG_H_ */
