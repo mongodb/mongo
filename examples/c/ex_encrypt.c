@@ -48,7 +48,6 @@ int add_my_encryptors(WT_CONNECTION *connection);
 static const char *home = NULL;
 
 #define	SYS_KEYID	"system"
-#define	SYS_BADPW	"bad_password"
 #define	SYS_PW		"system_password"
 #define	USER1_KEYID	"user1"
 #define	USER2_KEYID	"user2"
