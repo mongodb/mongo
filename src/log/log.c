@@ -8,9 +8,8 @@
 
 #include "wt_internal.h"
 
-static int __log_decompress(WT_SESSION_IMPL *, WT_ITEM *, WT_ITEM **);
-static int __log_write_internal(WT_SESSION_IMPL *, WT_ITEM *, WT_LSN *,
-    uint32_t);
+static int __log_write_internal(
+	WT_SESSION_IMPL *, WT_ITEM *, WT_LSN *, uint32_t);
 
 #define	WT_LOG_COMPRESS_SKIP	(offsetof(WT_LOG_RECORD, record))
 #define	WT_LOG_ENCRYPT_SKIP	(offsetof(WT_LOG_RECORD, record))
@@ -346,7 +345,7 @@ __log_acquire(WT_SESSION_IMPL *session, uint64_t recsize, WT_LOGSLOT *slot)
  *	buffer that the caller must free.
  */
 static int
-__log_decompress(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out)
+__log_decompress(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM *out)
 {
 	WT_COMPRESSOR *compressor;
 	WT_CONNECTION_IMPL *conn;
@@ -363,12 +362,11 @@ __log_decompress(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out)
 		    "log_decompress: Compressed record with "
 		    "no configured compressor");
 	uncompressed_size = logrec->mem_len;
-	WT_RET(__wt_scr_alloc(session, 0, out));
-	WT_RET(__wt_buf_initsize(session, *out, uncompressed_size));
-	memcpy((*out)->mem, in->mem, skip);
+	WT_RET(__wt_buf_initsize(session, out, uncompressed_size));
+	memcpy(out->mem, in->mem, skip);
 	WT_RET(compressor->decompress(compressor, &session->iface,
 	    (uint8_t *)in->mem + skip, in->size - skip,
-	    (uint8_t *)(*out)->mem + skip,
+	    (uint8_t *)out->mem + skip,
 	    uncompressed_size - skip, &result_len));
 
 	/*
@@ -389,14 +387,11 @@ __log_decompress(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out)
  *	buffer that the caller must free.
  */
 static int
-__log_decrypt(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out)
+__log_decrypt(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM *out)
 {
 	WT_CONNECTION_IMPL *conn;
-	WT_DECL_RET;
 	WT_ENCRYPTOR *encryptor;
 	WT_KEYED_ENCRYPTOR *kencryptor;
-
-	*out = NULL;
 
 	conn = S2C(session);
 	kencryptor = conn->kencryptor;
@@ -407,12 +402,7 @@ __log_decrypt(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out)
 		    "log_decrypt: Encrypted record with "
 		    "no configured decrypt method");
 
-	WT_RET(__wt_scr_alloc(session, 0, out));
-	if ((ret = __wt_decrypt(
-	    session, encryptor, WT_LOG_ENCRYPT_SKIP, in, out)) != 0)
-		__wt_scr_free(session, out);
-
-	return (ret);
+	WT_RET(__wt_decrypt(session, encryptor, WT_LOG_ENCRYPT_SKIP, in, out));
 }
 
 /*
@@ -1288,7 +1278,10 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 	    session, 0, &log_fh, WT_LOG_FILENAME, start_lsn.file));
 	WT_ERR(__log_filesize(session, log_fh, &log_size));
 	rd_lsn = start_lsn;
+
 	WT_ERR(__wt_buf_initsize(session, &buf, LOG_ALIGN));
+	WT_ERR(__wt_scr_alloc(session, 0, decryptitem));
+	WT_ERR(__wt_scr_alloc(session, 0, uncitem));
 	for (;;) {
 		if (rd_lsn.offset + allocsize > log_size) {
 advance:
@@ -1417,8 +1410,6 @@ advance:
 			}
 			WT_ERR((*func)(session,
 			    &cbbuf, &rd_lsn, &next_lsn, cookie, firstrecord));
-			__wt_scr_free(session, &decryptitem);
-			__wt_scr_free(session, &uncitem);
 
 			firstrecord = 0;
 
@@ -1435,11 +1426,14 @@ advance:
 		    &rd_lsn, WT_LOG_FILENAME, 0));
 
 err:	WT_STAT_FAST_CONN_INCR(session, log_scans);
+
 	if (logfiles != NULL)
 		__wt_log_files_free(session, logfiles, logcount);
+
 	__wt_buf_free(session, &buf);
 	__wt_scr_free(session, &decryptitem);
 	__wt_scr_free(session, &uncitem);
+
 	/*
 	 * If the caller wants one record and it is at the end of log,
 	 * return WT_NOTFOUND.
