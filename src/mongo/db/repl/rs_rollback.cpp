@@ -259,10 +259,10 @@ namespace {
         fixUpInfo.toRefetch.insert(doc);
     }
 
-    void syncRollbackFindCommonPoint(OperationContext* txn, 
-                                     DBClientConnection* them, 
-                                     FixUpInfo& fixUpInfo) {
+    StatusWith<FixUpInfo> syncRollbackFindCommonPoint(OperationContext* txn,
+                                                      DBClientConnection* them) {
         OldClientContext ctx(txn, rsOplogName);
+        FixUpInfo fixUpInfo;
 
         boost::scoped_ptr<PlanExecutor> exec(
                 InternalPlanner::collectionScan(txn,
@@ -274,7 +274,7 @@ namespace {
         RecordId ourLoc;
 
         if (PlanExecutor::ADVANCED != exec->getNext(&ourObj, &ourLoc)) {
-            throw RSFatalException("our oplog empty or unreadable");
+            return StatusWith<FixUpInfo>(ErrorCodes::OplogStartMissing, "no oplog during initsync");
         }
 
         const Query query = Query().sort(reverseNaturalObj);
@@ -317,7 +317,7 @@ namespace {
                     log() << "rollback findcommonpoint scanned : " << scanned;
                     fixUpInfo.commonPoint = ourTime;
                     fixUpInfo.commonPointOurDiskloc = ourLoc;
-                    return;
+                    break;
                 }
 
                 refetch(fixUpInfo, ourObj);
@@ -366,6 +366,8 @@ namespace {
                 ourTime = ourObj["ts"].timestamp();
             }
         }
+
+        return StatusWith<FixUpInfo>(fixUpInfo);
     }
 
     bool copyCollectionFromRemote(OperationContext* txn,
@@ -792,7 +794,18 @@ namespace {
 
             log() << "rollback 2 FindCommonPoint";
             try {
-                syncRollbackFindCommonPoint(txn, oplogreader->conn(), how);
+                StatusWith<FixUpInfo> res = syncRollbackFindCommonPoint(txn, oplogreader->conn());
+                if (!res.isOK()) {
+                    switch (res.getStatus().code()) {
+                        case ErrorCodes::OplogStartMissing:
+                            return 1;
+                        default:
+                            throw new RSFatalException(res.getStatus().toString());
+                    }
+                }
+                else {
+                    how  = res.getValue();
+                }
             }
             catch (RSFatalException& e) {
                 error() << string(e.what());
