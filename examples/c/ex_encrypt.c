@@ -34,7 +34,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
 #ifndef _WIN32
 #include <unistd.h>
 #else
@@ -76,7 +75,7 @@ MY_CRYPTO my_crypto_global;
 /*
  * make_cksum --
  *	This is where one would call a checksum function on the encrypted
- *	buffer.  Here we just put random values in it.
+ *	buffer.  Here we just put a constant value in it.
  */
 static void
 make_cksum(uint8_t *dst)
@@ -86,13 +85,13 @@ make_cksum(uint8_t *dst)
 	 * Assume array is big enough for the checksum.
 	 */
 	for (i = 0; i < CHKSUM_LEN; i++)
-		dst[i] = (uint8_t)rand();
+		dst[i] = 'C';
 }
 
 /*
  * make_iv --
  *	This is where one would generate the initialization vector.
- *	Here we just put random values in it.
+ *	Here we just put a constant value in it.
  */
 static void
 make_iv(uint8_t *dst)
@@ -102,7 +101,7 @@ make_iv(uint8_t *dst)
 	 * Assume array is big enough for the initialization vector.
 	 */
 	for (i = 0; i < IV_LEN; i++)
-		dst[i] = (uint8_t)rand();
+		dst[i] = 'I';
 }
 
 /*
@@ -159,7 +158,8 @@ rotate_decrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	}
 
 	/*
-	 * !!! Most implementations would verify the checksum here.
+	 * !!! Most implementations would verify any needed
+	 * checksum and initialize the IV here.
 	 */
 	/*
 	 * Copy the encrypted data to the destination buffer and then
@@ -451,8 +451,6 @@ main(void)
 	} else
 		home = NULL;
 
-	srand((unsigned long)time(NULL));
-
 	ret = wiredtiger_open(home, NULL, WT_OPEN_CONFIG_GOOD, &conn);
 
 	ret = conn->open_session(conn, NULL, NULL, &session);
@@ -541,34 +539,6 @@ main(void)
 	 * by reading the data from disk, forcing decryption.
 	 */
 	printf("REOPEN and VERIFY encrypted data\n");
-
-	/*
-	 * Confirm we detect a bad password.
-	 */
-	ret = wiredtiger_open(home, NULL, WT_OPEN_CONFIG_COMMON
-	    "encryption=(name=rotn,keyid=" SYS_KEYID
-	    ",secretkey=" SYS_BADPW ")", &conn);
-	if (ret != EPERM) {
-		fprintf(stderr, "Did not detect bad password\n");
-		exit(EXIT_FAILURE);
-	}
-	/*
-	 * Confirm we detect no password.
-	 */
-	ret = wiredtiger_open(home, NULL, WT_OPEN_CONFIG_COMMON
-	    "encryption=(name=rotn,keyid=" SYS_KEYID ")", &conn);
-	if (ret != EPERM) {
-		fprintf(stderr, "Did not detect missing password\n");
-		exit(EXIT_FAILURE);
-	}
-	/*
-	 * Confirm we detect not using encryption at all.
-	 */
-	ret = wiredtiger_open(home, NULL, WT_OPEN_CONFIG_COMMON, &conn);
-	if (ret != EPERM) {
-		fprintf(stderr, "Did not detect no encryption\n");
-		exit(EXIT_FAILURE);
-	}
 
 	ret = wiredtiger_open(home, NULL, WT_OPEN_CONFIG_GOOD, &conn);
 
