@@ -39,6 +39,11 @@ __wt_decrypt(WT_SESSION_IMPL *session,
 
 	WT_RET(encryptor->decrypt(encryptor, &session->iface,
 	    src, encryptor_data_len, dst, encryptor_data_len, &result_len));
+	/*
+	 * We require encryption to be byte for byte.  It should not expand
+	 * the data.
+	 */
+	WT_ASSERT(session, result_len <= encryptor_data_len);
 
 	/*
 	 * Copy in the skipped header bytes.
@@ -84,6 +89,11 @@ __wt_encrypt(WT_SESSION_IMPL *session,
 
 	WT_RET(kencryptor->encryptor->encrypt(kencryptor->encryptor,
 	    &session->iface, src, src_len, dst, dst_len, &result_len));
+	/*
+	 * We require encryption to be byte for byte.  It should never expand
+	 * the data.
+	 */
+	WT_ASSERT(session, result_len <= dst_len);
 
 	/*
 	 * The final result length includes the skipped lengths.
