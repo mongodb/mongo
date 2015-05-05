@@ -949,6 +949,67 @@ __wt_ref_info(WT_SESSION_IMPL *session,
 }
 
 /*
+ * __wt_page_can_split --
+ *	Check whether a page can be split in memory.
+ */
+static inline int
+__wt_page_can_split(WT_BTREE *btree, WT_PAGE *page)
+{
+	WT_INSERT_HEAD *ins_head;
+
+	/*
+	 * Only split a page once, otherwise workloads that update in the middle
+	 * of the page could continually split without benefit.
+	 */
+	if (F_ISSET_ATOMIC(page, WT_PAGE_SPLIT_INSERT))
+		return (0);
+
+	/*
+	 * Check for pages with append-only workloads. A common application
+	 * pattern is to have multiple threads frantically appending to the
+	 * tree. We want to reconcile and evict this page, but we'd like to
+	 * do it without making the appending threads wait. If we're not
+	 * discarding the tree, check and see if it's worth doing a split to
+	 * let the threads continue before doing eviction.
+	 *
+	 * Ignore anything other than large, dirty row-store leaf pages.
+	 *
+	 * XXX KEITH
+	 * Need a better test for append-only workloads.
+	 */
+	if (page->type != WT_PAGE_ROW_LEAF ||
+	    page->memory_footprint < btree->maxmempage ||
+	    !__wt_page_is_modified(page))
+		return (0);
+
+	/* Don't split a page that is pending a multi-block split. */
+	if (F_ISSET(page->modify, WT_PM_REC_MULTIBLOCK))
+		return (0);
+
+	/*
+	 * There is no point splitting if the list is small, no deep items is
+	 * our heuristic for that. (A 1/4 probability of adding a new skiplist
+	 * level means there will be a new 6th level for roughly each 4KB of
+	 * entries in the list. If we have at least two 6th level entries, the
+	 * list is at least large enough to work with.)
+	 *
+	 * The following code requires at least two items on the insert list,
+	 * this test serves the additional purpose of confirming that.
+	 */
+#define	WT_MIN_SPLIT_SKIPLIST_DEPTH	WT_MIN(6, WT_SKIP_MAXDEPTH - 1)
+	ins_head = page->pg_row_entries == 0 ?
+	    WT_ROW_INSERT_SMALLEST(page) :
+	    WT_ROW_INSERT_SLOT(page, page->pg_row_entries - 1);
+	if (ins_head == NULL ||
+	    ins_head->head[WT_MIN_SPLIT_SKIPLIST_DEPTH] == NULL ||
+	    ins_head->head[WT_MIN_SPLIT_SKIPLIST_DEPTH] ==
+	    ins_head->tail[WT_MIN_SPLIT_SKIPLIST_DEPTH])
+		return (0);
+
+	return (1);
+}
+
+/*
  * __wt_page_can_evict --
  *	Check whether a page can be evicted.
  */
@@ -990,8 +1051,7 @@ __wt_page_can_evict(
 	 * has not already been a split on this page as the WT_PM_REC_MULTIBLOCK
 	 * flag is unset.
 	 */
-	if (page->memory_footprint > btree->maxmempage &&
-	    btree->checkpointing && !F_ISSET(mod, WT_PM_REC_MULTIBLOCK)) {
+	if (__wt_page_can_split(btree, page)) {
 		if (inmem_splitp != NULL)
 			*inmem_splitp = 1;
 		return (1);

@@ -326,7 +326,7 @@ __evict_review(
 		 * state: avoid the usual cleanup.
 		 */
 		if (*inmem_splitp)
-			return (__wt_split_insert(session, ref, inmem_splitp));
+			return (__wt_split_insert(session, ref));
 	}
 
 	/*
