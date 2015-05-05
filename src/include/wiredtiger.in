@@ -3233,6 +3233,8 @@ struct __wt_encryptor {
 	 * of \c dst_len.  The destination buffer will be at least src_len
 	 * plus the size returned by that WT_ENCRYPT::sizing.
 	 *
+	 * This callback cannot be NULL.
+	 *
 	 * @param[in] src the data to encrypt
 	 * @param[in] src_len the length of the data to encrypt
 	 * @param[in] dst the destination buffer
@@ -3264,6 +3266,8 @@ struct __wt_encryptor {
 	 *
 	 * If the \c dst buffer is not big enough to hold the decrypted
 	 * data, the callback should return an error.
+	 *
+	 * This callback cannot be NULL.
 	 *
 	 * @param[in] src the data to decrypt
 	 * @param[in] src_len the length of the data to decrypt

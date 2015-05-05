@@ -688,6 +688,11 @@ __conn_add_encryptor(WT_CONNECTION *wt_conn,
 		WT_ERR_MSG(session, EINVAL,
 		    "invalid name for an encryptor: %s", name);
 
+	if (encryptor->encrypt == NULL || encryptor->decrypt == NULL ||
+	    encryptor->sizing == NULL)
+		WT_ERR_MSG(session, EINVAL,
+		    "encryptor: %s: required callbacks not set", name);
+
 	/*
 	 * Verify that terminate is set if customize is set. We could relax this
 	 * restriction and give an error if customize returns an encryptor and
