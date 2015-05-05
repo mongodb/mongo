@@ -42,9 +42,6 @@ struct __wt_txn_global {
 	 */
 	volatile uint64_t oldest_id;
 
-	/* The oldest session found in the last scan. */
-	uint32_t oldest_session;
-
 	/* Count of scanning threads, or -1 for exclusive access. */
 	volatile int32_t scan_count;
 
