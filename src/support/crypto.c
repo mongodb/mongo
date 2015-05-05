@@ -15,7 +15,7 @@
  */
 int
 __wt_decrypt(WT_SESSION_IMPL *session,
-    WT_ENCRYPTOR *encryptor, size_t skip, WT_ITEM *in, WT_ITEM **out)
+    WT_ENCRYPTOR *encryptor, size_t skip, WT_ITEM *in, WT_ITEM *out)
 {
 	size_t encryptor_data_len, result_len;
 	uint32_t encrypt_len;
@@ -31,11 +31,11 @@ __wt_decrypt(WT_SESSION_IMPL *session,
 	 * We're allocating the number of bytes we're expecting
 	 * from decryption plus the unencrypted header.
 	 */
-	WT_RET(__wt_buf_initsize(session, *out, encrypt_len));
+	WT_RET(__wt_buf_initsize(session, out, encrypt_len));
 
 	src = (uint8_t *)in->data + skip + WT_ENCRYPT_LEN_SIZE;
 	encryptor_data_len = encrypt_len - (skip + WT_ENCRYPT_LEN_SIZE);
-	dst = (uint8_t *)(*out)->mem + skip;
+	dst = (uint8_t *)out->mem + skip;
 
 	WT_RET(encryptor->decrypt(encryptor, &session->iface,
 	    src, encryptor_data_len, dst, encryptor_data_len, &result_len));
@@ -43,7 +43,7 @@ __wt_decrypt(WT_SESSION_IMPL *session,
 	/*
 	 * Copy in the skipped header bytes.
 	 */
-	memcpy((*out)->mem, in->data, skip);
+	memcpy(out->mem, in->data, skip);
 
 	/*
 	 * Set the real result length in the output buffer including the skipped
@@ -51,7 +51,7 @@ __wt_decrypt(WT_SESSION_IMPL *session,
 	 * returned result length is the real data length after decryption
 	 * removes any of its padding.
 	 */
-	(*out)->size = result_len + skip;
+	out->size = result_len + skip;
 
 	return (0);
 }
@@ -75,8 +75,9 @@ __wt_encrypt(WT_SESSION_IMPL *session,
 	unpadded_lenp = (uint32_t *)((uint8_t *)out->mem + skip);
 
 	/*
-	 * Skip the header bytes and the length we store in the destination data.
-	 * Add in the encryptor size constant to the expected destination length.
+	 * Skip the header bytes and the length we store in the destination
+	 * data. Add in the encryptor size constant to the expected destination
+	 * length.
 	 */
 	dst = (uint8_t *)out->mem + skip + WT_ENCRYPT_LEN_SIZE;
 	dst_len = src_len + kencryptor->size_const;

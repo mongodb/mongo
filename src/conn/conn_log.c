@@ -535,9 +535,9 @@ __wt_logmgr_create(WT_SESSION_IMPL *session, const char *cfg[])
 	    &log->log_archive_lock, "log archive lock"));
 	if (FLD_ISSET(conn->direct_io, WT_FILE_TYPE_LOG))
 		log->allocsize =
-		    WT_MAX((uint32_t)conn->buffer_alignment, LOG_ALIGN);
+		    WT_MAX((uint32_t)conn->buffer_alignment, WT_LOG_ALIGN);
 	else
-		log->allocsize = LOG_ALIGN;
+		log->allocsize = WT_LOG_ALIGN;
 	WT_INIT_LSN(&log->alloc_lsn);
 	WT_INIT_LSN(&log->ckpt_lsn);
 	WT_INIT_LSN(&log->first_lsn);

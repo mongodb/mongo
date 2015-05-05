@@ -8,9 +8,8 @@
 
 #include "wt_internal.h"
 
-static int __log_decompress(WT_SESSION_IMPL *, WT_ITEM *, WT_ITEM **);
-static int __log_write_internal(WT_SESSION_IMPL *, WT_ITEM *, WT_LSN *,
-    uint32_t);
+static int __log_write_internal(
+	WT_SESSION_IMPL *, WT_ITEM *, WT_LSN *, uint32_t);
 
 #define	WT_LOG_COMPRESS_SKIP	(offsetof(WT_LOG_RECORD, record))
 #define	WT_LOG_ENCRYPT_SKIP	(offsetof(WT_LOG_RECORD, record))
@@ -342,11 +341,10 @@ __log_acquire(WT_SESSION_IMPL *session, uint64_t recsize, WT_LOGSLOT *slot)
 
 /*
  * __log_decompress --
- *	Decompress a log record.  The result is put into a scratch
- *	buffer that the caller must free.
+ *	Decompress a log record.
  */
 static int
-__log_decompress(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out)
+__log_decompress(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM *out)
 {
 	WT_COMPRESSOR *compressor;
 	WT_CONNECTION_IMPL *conn;
@@ -363,12 +361,11 @@ __log_decompress(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out)
 		    "log_decompress: Compressed record with "
 		    "no configured compressor");
 	uncompressed_size = logrec->mem_len;
-	WT_RET(__wt_scr_alloc(session, 0, out));
-	WT_RET(__wt_buf_initsize(session, *out, uncompressed_size));
-	memcpy((*out)->mem, in->mem, skip);
+	WT_RET(__wt_buf_initsize(session, out, uncompressed_size));
+	memcpy(out->mem, in->mem, skip);
 	WT_RET(compressor->decompress(compressor, &session->iface,
 	    (uint8_t *)in->mem + skip, in->size - skip,
-	    (uint8_t *)(*out)->mem + skip,
+	    (uint8_t *)out->mem + skip,
 	    uncompressed_size - skip, &result_len));
 
 	/*
@@ -385,18 +382,14 @@ __log_decompress(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out)
 
 /*
  * __log_decrypt --
- *	Decrypt a log record.  The result is put into a scratch
- *	buffer that the caller must free.
+ *	Decrypt a log record.
  */
 static int
-__log_decrypt(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out)
+__log_decrypt(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM *out)
 {
 	WT_CONNECTION_IMPL *conn;
-	WT_DECL_RET;
 	WT_ENCRYPTOR *encryptor;
 	WT_KEYED_ENCRYPTOR *kencryptor;
-
-	*out = NULL;
 
 	conn = S2C(session);
 	kencryptor = conn->kencryptor;
@@ -407,12 +400,7 @@ __log_decrypt(WT_SESSION_IMPL *session, WT_ITEM *in, WT_ITEM **out)
 		    "log_decrypt: Encrypted record with "
 		    "no configured decrypt method");
 
-	WT_RET(__wt_scr_alloc(session, 0, out));
-	if ((ret = __wt_decrypt(
-	    session, encryptor, WT_LOG_ENCRYPT_SKIP, in, out)) != 0)
-		__wt_scr_free(session, out);
-
-	return (ret);
+	return (__wt_decrypt(session, encryptor, WT_LOG_ENCRYPT_SKIP, in, out));
 }
 
 /*
@@ -428,9 +416,9 @@ __log_fill(WT_SESSION_IMPL *session,
 
 	logrec = (WT_LOG_RECORD *)record->mem;
 	/*
-	 * Call __wt_write.  For now the offset is the real byte offset.
-	 * If the offset becomes a unit of LOG_ALIGN this is where we would
-	 * multiply by LOG_ALIGN to get the real file byte offset for write().
+	 * Call __wt_write.  For now the offset is the real byte offset.  If the
+	 * offset becomes a unit of WT_LOG_ALIGN this is where we would multiply
+	 * by WT_LOG_ALIGN to get the real file byte offset for write().
 	 */
 	if (direct)
 		WT_ERR(__wt_write(session, myslot->slot->slot_fh,
@@ -886,7 +874,7 @@ __log_filesize(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t *eof)
 	*eof = 0;
 	WT_RET(__wt_filesize(session, fh, &log_size));
 	if (log == NULL)
-		allocsize = LOG_ALIGN;
+		allocsize = WT_LOG_ALIGN;
 	else
 		allocsize = log->allocsize;
 
@@ -1185,19 +1173,19 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
     void *cookie, int firstrecord), void *cookie)
 {
 	WT_CONNECTION_IMPL *conn;
+	WT_DECL_ITEM(buf);
 	WT_DECL_ITEM(decryptitem);
 	WT_DECL_ITEM(uncitem);
 	WT_DECL_RET;
 	WT_FH *log_fh;
-	WT_ITEM buf, cbbuf;
+	WT_ITEM *cbbuf;
 	WT_LOG *log;
 	WT_LOG_RECORD *logrec;
 	WT_LSN end_lsn, next_lsn, rd_lsn, start_lsn;
 	wt_off_t log_size;
 	uint32_t allocsize, cksum, firstlog, lastlog, lognum, rdup_len, reclen;
 	u_int i, logcount;
-	int eol;
-	int firstrecord;
+	int eol, firstrecord;
 	char **logfiles;
 
 	conn = S2C(session);
@@ -1205,9 +1193,8 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 	log_fh = NULL;
 	logcount = 0;
 	logfiles = NULL;
-	firstrecord = 1;
 	eol = 0;
-	WT_CLEAR(buf);
+	firstrecord = 1;
 
 	/*
 	 * If the caller did not give us a callback function there is nothing
@@ -1262,7 +1249,7 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 		 * records and larger allocation boundaries should always be
 		 * a multiple of this.
 		 */
-		allocsize = LOG_ALIGN;
+		allocsize = WT_LOG_ALIGN;
 		lastlog = 0;
 		firstlog = UINT32_MAX;
 		WT_RET(__log_get_files(session,
@@ -1288,7 +1275,10 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 	    session, 0, &log_fh, WT_LOG_FILENAME, start_lsn.file));
 	WT_ERR(__log_filesize(session, log_fh, &log_size));
 	rd_lsn = start_lsn;
-	WT_ERR(__wt_buf_initsize(session, &buf, LOG_ALIGN));
+
+	WT_ERR(__wt_scr_alloc(session, WT_LOG_ALIGN, &buf));
+	WT_ERR(__wt_scr_alloc(session, 0, &decryptitem));
+	WT_ERR(__wt_scr_alloc(session, 0, &uncitem));
 	for (;;) {
 		if (rd_lsn.offset + allocsize > log_size) {
 advance:
@@ -1321,16 +1311,16 @@ advance:
 		/*
 		 * Read the minimum allocation size a record could be.
 		 */
-		WT_ASSERT(session, buf.memsize >= allocsize);
+		WT_ASSERT(session, buf->memsize >= allocsize);
 		WT_ERR(__wt_read(session,
-		    log_fh, rd_lsn.offset, (size_t)allocsize, buf.mem));
+		    log_fh, rd_lsn.offset, (size_t)allocsize, buf->mem));
 		/*
 		 * First 4 bytes is the real record length.  See if we
 		 * need to read more than the allocation size.  We expect
 		 * that we rarely will have to read more.  Most log records
 		 * will be fairly small.
 		 */
-		reclen = *(uint32_t *)buf.mem;
+		reclen = *(uint32_t *)buf->mem;
 		/*
 		 * Log files are pre-allocated.  We never expect a zero length
 		 * unless we've reached the end of the log.  The log can be
@@ -1355,16 +1345,16 @@ advance:
 			 * We need to round up and read in the full padded
 			 * record, especially for direct I/O.
 			 */
-			WT_ERR(__wt_buf_grow(session, &buf, rdup_len));
+			WT_ERR(__wt_buf_grow(session, buf, rdup_len));
 			WT_ERR(__wt_read(session,
-			    log_fh, rd_lsn.offset, (size_t)rdup_len, buf.mem));
+			    log_fh, rd_lsn.offset, (size_t)rdup_len, buf->mem));
 			WT_STAT_FAST_CONN_INCR(session, log_scan_rereads);
 		}
 		/*
 		 * We read in the record, verify checksum.
 		 */
-		buf.size = reclen;
-		logrec = (WT_LOG_RECORD *)buf.mem;
+		buf->size = reclen;
+		logrec = (WT_LOG_RECORD *)buf->mem;
 		cksum = logrec->checksum;
 		logrec->checksum = 0;
 		logrec->checksum = __wt_cksum(logrec, logrec->len);
@@ -1406,19 +1396,17 @@ advance:
 			 */
 			cbbuf = buf;
 			if (F_ISSET(logrec, WT_LOG_RECORD_ENCRYPTED)) {
-				WT_ERR(__log_decrypt(session,
-				    &cbbuf, &decryptitem));
-				cbbuf = *decryptitem;
+				WT_ERR(__log_decrypt(
+				    session, cbbuf, decryptitem));
+				cbbuf = decryptitem;
 			}
 			if (F_ISSET(logrec, WT_LOG_RECORD_COMPRESSED)) {
-				WT_ERR(__log_decompress(session, &cbbuf,
-				    &uncitem));
-				cbbuf = *uncitem;
+				WT_ERR(__log_decompress(
+				    session, cbbuf, uncitem));
+				cbbuf = uncitem;
 			}
 			WT_ERR((*func)(session,
-			    &cbbuf, &rd_lsn, &next_lsn, cookie, firstrecord));
-			__wt_scr_free(session, &decryptitem);
-			__wt_scr_free(session, &uncitem);
+			    cbbuf, &rd_lsn, &next_lsn, cookie, firstrecord));
 
 			firstrecord = 0;
 
@@ -1435,11 +1423,14 @@ advance:
 		    &rd_lsn, WT_LOG_FILENAME, 0));
 
 err:	WT_STAT_FAST_CONN_INCR(session, log_scans);
+
 	if (logfiles != NULL)
 		__wt_log_files_free(session, logfiles, logcount);
-	__wt_buf_free(session, &buf);
+
+	__wt_scr_free(session, &buf);
 	__wt_scr_free(session, &decryptitem);
 	__wt_scr_free(session, &uncitem);
+
 	/*
 	 * If the caller wants one record and it is at the end of log,
 	 * return WT_NOTFOUND.
