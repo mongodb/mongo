@@ -103,6 +103,7 @@ namespace {
     using boost::scoped_ptr;
     using mongo::WriteConcernOptions;
     using mongo::repl::ReplicationCoordinator;
+    using mongo::repl::OpTime;
 
     const int kDefaultWTimeoutMs = 60 * 1000;
     const WriteConcernOptions DefaultWriteConcern(2, WriteConcernOptions::NONE, kDefaultWTimeoutMs);
@@ -2221,7 +2222,7 @@ namespace mongo {
 
             // if running on a replicated system, we'll need to flush the docs we cloned to the secondaries
 
-            Timestamp lastOpApplied = repl::ReplClientInfo::forClient(txn->getClient()).getLastOp();
+            OpTime lastOpApplied = repl::ReplClientInfo::forClient(txn->getClient()).getLastOp();
 
             {
                 // 4. do bulk of mods
@@ -2392,8 +2393,8 @@ namespace mongo {
                    BSONObj max,
                    BSONObj shardKeyPattern,
                    const BSONObj& xfer,
-                   Timestamp* lastOpApplied) {
-            Timestamp dummy;
+                   OpTime* lastOpApplied) {
+            OpTime dummy;
             if ( lastOpApplied == NULL ) {
                 lastOpApplied = &dummy;
             }
@@ -2507,7 +2508,7 @@ namespace mongo {
          * writeConcern (if not empty) have applied till the specified lastOp.
          */
         bool opReplicatedEnough(const OperationContext* txn,
-                                const Timestamp& lastOpApplied,
+                                const OpTime& lastOpApplied,
                                 const WriteConcernOptions& writeConcern) {
             WriteConcernOptions majorityWriteConcern;
             majorityWriteConcern.wTimeout = -1;
@@ -2534,10 +2535,10 @@ namespace mongo {
                                 const std::string& ns,
                                 BSONObj min,
                                 BSONObj max,
-                                const Timestamp& lastOpApplied,
+                                const OpTime& lastOpApplied,
                                 const WriteConcernOptions& writeConcern) {
             if (!opReplicatedEnough(txn, lastOpApplied, writeConcern)) {
-                Timestamp op( lastOpApplied );
+                OpTime op( lastOpApplied );
                 OCCASIONALLY warning() << "migrate commit waiting for a majority of slaves for '"
                                        << ns << "' " << min << " -> " << max
                                        << " waiting for: " << op

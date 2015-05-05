@@ -64,7 +64,7 @@ namespace repl {
         virtual StatusWith<LastVote> loadLocalLastVoteDocument(OperationContext* txn);
         virtual Status storeLocalLastVoteDocument(OperationContext* txn, const LastVote& lastVote);
         virtual void setGlobalTimestamp(const Timestamp& newTime);
-        virtual StatusWith<Timestamp> loadLastOpTime(OperationContext* txn);
+        virtual StatusWith<OpTime> loadLastOpTime(OperationContext* txn);
         virtual void closeConnections();
         virtual void killAllUserOperations(OperationContext* txn);
         virtual void clearShardingState();
@@ -96,7 +96,7 @@ namespace repl {
         /**
          * Sets the return value for subsequent calls to loadLastOpTimeApplied.
          */
-        void setLastOpTime(const StatusWith<Timestamp>& lastApplied);
+        void setLastOpTime(const StatusWith<OpTime>& lastApplied);
 
         /**
          * Sets the return value for subsequent calls to storeLocalConfigDocument().
@@ -125,7 +125,7 @@ namespace repl {
     private:
         StatusWith<BSONObj> _localRsConfigDocument;
         StatusWith<LastVote> _localRsLastVoteDocument;
-        StatusWith<Timestamp>  _lastOpTime;
+        StatusWith<OpTime>  _lastOpTime;
         std::vector<HostAndPort> _selfHosts;
         bool _canAcquireGlobalSharedLock;
         Status _storeLocalConfigDocumentStatus;

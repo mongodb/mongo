@@ -57,7 +57,7 @@ namespace repl {
         virtual StatusWith<LastVote> loadLocalLastVoteDocument(OperationContext* txn);
         virtual Status storeLocalLastVoteDocument(OperationContext* txn, const LastVote& lastVote);
         virtual void setGlobalTimestamp(const Timestamp& newTime);
-        virtual StatusWith<Timestamp> loadLastOpTime(OperationContext* txn);
+        virtual StatusWith<OpTime> loadLastOpTime(OperationContext* txn);
         virtual HostAndPort getClientHostAndPort(const OperationContext* txn);
         virtual void closeConnections();
         virtual void killAllUserOperations(OperationContext* txn);

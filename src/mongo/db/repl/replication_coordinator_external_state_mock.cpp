@@ -141,13 +141,13 @@ namespace repl {
     void ReplicationCoordinatorExternalStateMock::setGlobalTimestamp(const Timestamp& newTime) {
     }
 
-    StatusWith<Timestamp> ReplicationCoordinatorExternalStateMock::loadLastOpTime(
+    StatusWith<OpTime> ReplicationCoordinatorExternalStateMock::loadLastOpTime(
         OperationContext* txn) {
         return _lastOpTime;
     }
 
     void ReplicationCoordinatorExternalStateMock::setLastOpTime(
-        const StatusWith<Timestamp>& lastApplied) {
+        const StatusWith<OpTime>& lastApplied) {
         _lastOpTime = lastApplied;
     }
 

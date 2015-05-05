@@ -29,7 +29,6 @@
 #pragma once
 
 #include <tuple>
-#include <utility>
 
 #include "mongo/bson/timestamp.h"
 
@@ -44,45 +43,54 @@ namespace repl {
 
     class OpTime {
     public:
+        // The default term after the first time upgrading from protocol version 0.
+        //
+        // This is also the first term for nodes that were recently started up but have not
+        // yet joined the cluster, all in protocol version 1.
+        static const long long kDefaultTerm = 0;
+
         OpTime() = default;
-        OpTime(Timestamp ts, long long term) : _timestamp(std::move(ts)), _term(term) {}
+        OpTime(Timestamp ts, long long term);
 
-        Timestamp getTimestamp() const {
-            return _timestamp;
-        }
+        Timestamp getTimestamp() const;
 
-        long long getTerm() const {
-            return _term;
-        }
+        long long getTerm() const;
 
-        inline bool operator==(const OpTime& rhs) {
+        std::string toString() const;
+
+        // Returns true when this OpTime is not yet initialized.
+        bool isNull() const;
+
+        inline bool operator==(const OpTime& rhs) const {
             return std::tie(_term, _timestamp) == std::tie(rhs._term, rhs._timestamp);
         }
 
-        inline bool operator<(const OpTime& rhs) {
+        inline bool operator<(const OpTime& rhs) const {
             // Compare term first, then the opTimes.
             return std::tie(_term, _timestamp) < std::tie(rhs._term, rhs._timestamp);
         }
 
-        inline bool operator!=(const OpTime& rhs) {
+        inline bool operator!=(const OpTime& rhs) const {
             return !(*this == rhs);
         }
 
-        inline bool operator<=(const OpTime& rhs) {
+        inline bool operator<=(const OpTime& rhs) const {
             return *this < rhs || *this == rhs;
         }
 
-        inline bool operator>(const OpTime& rhs) {
+        inline bool operator>(const OpTime& rhs) const {
             return !(*this <= rhs);
         }
 
-        inline bool operator>=(const OpTime& rhs) {
+        inline bool operator>=(const OpTime& rhs) const {
             return !(*this < rhs);
         }
 
+        friend std::ostream& operator<<(std::ostream& out, const OpTime& opTime);
+
     private:
         Timestamp _timestamp;
-        long long _term = -1;
+        long long _term = kDefaultTerm;
     };
 
 } // namespace repl

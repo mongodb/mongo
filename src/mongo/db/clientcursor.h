@@ -135,6 +135,8 @@ namespace mongo {
         // Replication-related stuff.  TODO: Document and clean.
         //
 
+        // Used to report replication position only in master-slave,
+        // so we keep them as TimeStamp rather than OpTime.
         void updateSlaveLocation(OperationContext* txn);
         void slaveReadTill( const Timestamp& t ) { _slaveReadTill = t; }
         /** Just for testing. */
@@ -249,7 +251,7 @@ namespace mongo {
         // deletion after an interval of inactivity.  Defaults to false.
         bool _isNoTimeout;
 
-        // TODO: document better.
+        // The replication position only used in master-slave.
         Timestamp _slaveReadTill;
 
         // How long has the cursor been idle?

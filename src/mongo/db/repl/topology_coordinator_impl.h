@@ -126,6 +126,7 @@ namespace repl {
         virtual HostAndPort getSyncSourceAddress() const;
         virtual std::vector<HostAndPort> getMaybeUpHostAndPorts() const;
         virtual int getMaintenanceCount() const;
+        virtual long long getTerm() const;
         virtual void setForceSyncSourceIndex(int index);
         virtual HostAndPort chooseNewSyncSource(Date_t now, 
                                                 const Timestamp& lastOpApplied);
@@ -188,7 +189,7 @@ namespace repl {
         virtual bool stepDownIfPending();
         virtual Date_t getStepDownTime() const;
         virtual void prepareCursorResponseInfo(BSONObjBuilder* objBuilder,
-                                               const Timestamp& lastCommitttedOpTime) const;
+                                               const OpTime& lastCommitttedOpTime) const;
         Status processReplSetDeclareElectionWinner(const ReplSetDeclareElectionWinnerArgs& args,
                                                    long long* responseTerm);
         virtual void processReplSetRequestVotes(const ReplSetRequestVotesArgs& args,

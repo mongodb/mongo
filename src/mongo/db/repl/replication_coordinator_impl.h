@@ -121,7 +121,7 @@ namespace repl {
 
         virtual ReplicationCoordinator::StatusAndDuration awaitReplication(
                 const OperationContext* txn,
-                const Timestamp& ts,
+                const OpTime& opTime,
                 const WriteConcernOptions& writeConcern);
 
         virtual ReplicationCoordinator::StatusAndDuration awaitReplicationOfLastOpForClient(
@@ -148,15 +148,13 @@ namespace repl {
 
         virtual Status setLastOptimeForSlave(const OID& rid, const Timestamp& ts);
 
-        virtual void setMyLastOptime(const Timestamp& ts);
+        virtual void setMyLastOptime(const OpTime& opTime);
 
         virtual void resetMyLastOptime();
 
         virtual void setMyHeartbeatMessage(const std::string& msg);
 
-        virtual Timestamp getMyLastOptime() const;
-
-        virtual OpTime getMyLastOptimeV1() const override;
+        virtual OpTime getMyLastOptime() const override;
 
         virtual ReadAfterOpTimeResponse waitUntilOpTime(
                 const OperationContext* txn,
@@ -226,7 +224,7 @@ namespace repl {
 
         virtual bool buildsIndexes() override;
 
-        virtual std::vector<HostAndPort> getHostsWrittenTo(const Timestamp& op) override;
+        virtual std::vector<HostAndPort> getHostsWrittenTo(const OpTime& op) override;
 
         virtual std::vector<HostAndPort> getOtherNodesInReplSet() const override;
 
@@ -244,7 +242,7 @@ namespace repl {
 
         virtual bool shouldChangeSyncSource(const HostAndPort& currentSource) override;
 
-        virtual Timestamp getLastCommittedOpTime() const override;
+        virtual OpTime getLastCommittedOpTime() const override;
 
         virtual Status processReplSetRequestVotes(OperationContext* txn,
                                                   const ReplSetRequestVotesArgs& args,
@@ -279,7 +277,7 @@ namespace repl {
         /**
          * Simple wrapper around _setLastOptime_inlock to make it easier to test.
          */
-        Status setLastOptime_forTest(long long cfgVer, long long memberId, const Timestamp& ts);
+        Status setLastOptime_forTest(long long cfgVer, long long memberId, const OpTime& opTime);
 
     private:
         ReplicationCoordinatorImpl(const ReplSettings& settings,
@@ -335,7 +333,7 @@ namespace repl {
         // Struct that holds information about nodes in this replication group, mainly used for
         // tracking replication progress for write concern satisfaction.
         struct SlaveInfo {
-            Timestamp opTime; // Our last known OpTime that this slave has replicated to.
+            OpTime opTime; // Our last known OpTime that this slave has replicated to.
             HostAndPort hostAndPort; // Client address of the slave.
             int memberId; // Id of the node in the replica set config, or -1 if we're not a replSet.
             OID rid; // RID of the node.
@@ -366,11 +364,11 @@ namespace repl {
         void _addSlaveInfo_inlock(const SlaveInfo& slaveInfo);
 
         /**
-         * Updates the item in _slaveInfo pointed to by 'slaveInfo' with the given OpTime 'ts'
+         * Updates the item in _slaveInfo pointed to by 'slaveInfo' with the given OpTime 'opTime'
          * and wakes up any threads waiting for replication that now have their write concern
          * satisfied.
          */
-        void _updateSlaveInfoOptime_inlock(SlaveInfo* slaveInfo, Timestamp ts);
+        void _updateSlaveInfoOptime_inlock(SlaveInfo* slaveInfo, const OpTime& opTime);
 
         /**
          * Returns the index into _slaveInfo where data corresponding to ourself is stored.
@@ -487,25 +485,25 @@ namespace repl {
                 const Timer* timer,
                 boost::unique_lock<boost::mutex>* lock,
                 const OperationContext* txn,
-                const Timestamp& ts,
+                const OpTime& opTime,
                 const WriteConcernOptions& writeConcern);
 
         /*
          * Returns true if the given writeConcern is satisfied up to "optime" or is unsatisfiable.
          */
-        bool _doneWaitingForReplication_inlock(const Timestamp& opTime,
+        bool _doneWaitingForReplication_inlock(const OpTime& opTime,
                                                const WriteConcernOptions& writeConcern);
 
         /**
          * Helper for _doneWaitingForReplication_inlock that takes an integer write concern.
          */
-        bool _haveNumNodesReachedOpTime_inlock(const Timestamp& opTime, int numNodes);
+        bool _haveNumNodesReachedOpTime_inlock(const OpTime& opTime, int numNodes);
 
         /**
          * Helper for _doneWaitingForReplication_inlock that takes a tag pattern representing a
          * named write concern mode.
          */
-        bool _haveTaggedNodesReachedOpTime_inlock(const Timestamp& opTime,
+        bool _haveTaggedNodesReachedOpTime_inlock(const OpTime& opTime,
                                                   const ReplicaSetTagPattern& tagPattern);
 
         Status _checkIfWriteConcernCanBeSatisfied_inlock(
@@ -536,9 +534,7 @@ namespace repl {
 
         int _getMyId_inlock() const;
 
-        Timestamp _getMyLastOptime_inlock() const;
-
-        OpTime _getMyLastOptimeV1_inlock() const;
+        OpTime _getMyLastOptime_inlock() const;
 
         /**
          * Bottom half of setFollowerMode.
@@ -568,11 +564,11 @@ namespace repl {
          * _mutex.  The passed in lock must already be locked.  It is unspecified what state the
          * lock will be in after this method finishes.
          *
-         * This function has the same rules for "ts" as setMyLastOptime(), unless
+         * This function has the same rules for "opTime" as setMyLastOptime(), unless
          * "isRollbackAllowed" is true.
          */
         void _setMyLastOptime_inlock(boost::unique_lock<boost::mutex>* lock,
-                                     const Timestamp& ts,
+                                     const OpTime& opTime,
                                      bool isRollbackAllowed);
 
         /**
@@ -599,7 +595,7 @@ namespace repl {
          *
          * Updates the optime associated with the member at "memberIndex" in our config.
          */
-        void _updateOpTimeFromHeartbeat_inlock(int memberIndex, Timestamp optime);
+        void _updateOpTimeFromHeartbeat_inlock(int memberIndex, const OpTime& optime);
 
         /**
          * Starts a heartbeat for each member in the current config.  Called within the executor
@@ -652,7 +648,7 @@ namespace repl {
          */
         void _finishLoadLocalConfig(const ReplicationExecutor::CallbackData& cbData,
                                     const ReplicaSetConfig& localConfig,
-                                    const StatusWith<Timestamp>& lastOpTimeStatus);
+                                    const StatusWith<OpTime>& lastOpTimeStatus);
 
         /**
          * Callback that finishes the work of processReplSetInitiate() inside the replication
@@ -956,7 +952,7 @@ namespace repl {
         AtomicUInt32 _canServeNonLocalReads;                                              // (S)
 
         // OpTime of the latest committed operation. Matches the concurrency level of _slaveInfo.
-        Timestamp _lastCommittedOpTime;                                                   // (M)
+        OpTime _lastCommittedOpTime;                                                      // (M)
 
         // Data Replicator used to replicate data
         DataReplicator _dr;                                                               // (S)

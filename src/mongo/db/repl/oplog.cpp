@@ -70,6 +70,7 @@
 #include "mongo/db/ops/update.h"
 #include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/repl/bgsync.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/stats/counters.h"
@@ -159,7 +160,8 @@ namespace {
             hashNew = 0;
         }
 
-        replCoord->setMyLastOptime(ts);
+        // TODO(siyuan) Use current term
+        replCoord->setMyLastOptime(OpTime(ts, 0));
         return std::pair<Timestamp,long long>(ts, hashNew);
     }
 
@@ -310,13 +312,14 @@ namespace {
         OplogDocWriter writer( partial, obj );
         checkOplogInsert( _localOplogCollection->insertDocument( txn, &writer, false ) );
 
-        ReplClientInfo::forClient(txn->getClient()).setLastOp( slot.first );
+        // TODO(siyuan) set term when logging ops.
+        ReplClientInfo::forClient(txn->getClient()).setLastOp( OpTime(slot.first, 0) );
     }
 
-    Timestamp writeOpsToOplog(OperationContext* txn, const std::deque<BSONObj>& ops) {
+    OpTime writeOpsToOplog(OperationContext* txn, const std::deque<BSONObj>& ops) {
         ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
 
-        Timestamp lastOptime;
+        OpTime lastOptime;
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
             lastOptime = replCoord->getMyLastOptime();
             invariant(!ops.empty());
@@ -342,16 +345,18 @@ namespace {
                  ++it) {
                 const BSONObj& op = *it;
                 const Timestamp ts = op["ts"].timestamp();
+                // TODO(siyuan) Parse "term" and fill this out
+                const OpTime optime = OpTime(ts, 0);
 
                 checkOplogInsert(_localOplogCollection->insertDocument(txn, op, false));
 
-                if (!(lastOptime < ts)) {
+                if (!(lastOptime < optime)) {
                     severe() << "replication oplog stream went back in time. "
-                        "previous timestamp: " << lastOptime << " newest timestamp: " << ts
+                        "previous timestamp: " << lastOptime << " newest timestamp: " << optime
                              << ". Op being applied: " << op;
                     fassertFailedNoTrace(18905);
                 }
-                lastOptime = ts;
+                lastOptime = optime;
             }
             wunit.commit();
         } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "writeOps", _localOplogCollection->ns().ns());
@@ -871,6 +876,7 @@ namespace {
         }
     }
 
+    // TODO(siyuan) Change to OpTime after adding term to oplog.
     void setNewOptime(const Timestamp& newTime) {
         boost::lock_guard<boost::mutex> lk(newOpMutex);
         setGlobalTimestamp(newTime);

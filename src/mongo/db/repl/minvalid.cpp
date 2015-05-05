@@ -70,6 +70,7 @@ namespace {
         } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "setInitialSyncFlags", minvalidNS);
     }
 
+    // TODO(siyuan) Change minValid to OpTime
     void setMinValid(OperationContext* ctx, Timestamp ts) {
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
             ScopedTransaction transaction(ctx, MODE_IX);

@@ -318,18 +318,18 @@ namespace repl {
             txn->recoveryUnit()->goingToAwaitCommit();
         }
 
-        Timestamp lastOpTime = writeOpsToOplog(txn, ops);
+        OpTime lastOpTime = writeOpsToOplog(txn, ops);
 
         if (mustAwaitCommit) {
             txn->recoveryUnit()->awaitCommit();
         }
         ReplClientInfo::forClient(txn->getClient()).setLastOp(lastOpTime);
         replCoord->setMyLastOptime(lastOpTime);
-        setNewOptime(lastOpTime);
+        setNewOptime(lastOpTime.getTimestamp());
 
         BackgroundSync::get()->notify(txn);
 
-        return lastOpTime;
+        return lastOpTime.getTimestamp();
     }
 
     void SyncTail::fillWriterVectors(const std::deque<BSONObj>& ops,
@@ -451,7 +451,7 @@ namespace {
         }
 
         Timestamp minvalid = getMinValid(txn);
-        if (minvalid > replCoord->getMyLastOptime()) {
+        if (minvalid > replCoord->getMyLastOptime().getTimestamp()) {
             return;
         }
 

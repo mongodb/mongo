@@ -125,6 +125,7 @@ namespace {
 
     TopologyCoordinatorImpl::TopologyCoordinatorImpl(Seconds maxSyncSourceLagSecs) :
         _role(Role::follower),
+        _term(0),
         _currentPrimaryIndex(-1),
         _forceSyncSourceIndex(-1),
         _maxSyncSourceLagSecs(maxSyncSourceLagSecs),
@@ -2040,6 +2041,10 @@ namespace {
         return _maintenanceModeCalls;
     }
 
+    long long TopologyCoordinatorImpl::getTerm() const {
+        return _term;
+    }
+
     bool TopologyCoordinatorImpl::shouldChangeSyncSource(const HostAndPort& currentSource,
                                                          Date_t now) const {
         // Methodology:
@@ -2091,10 +2096,10 @@ namespace {
 
     void TopologyCoordinatorImpl::prepareCursorResponseInfo(
             BSONObjBuilder* objBuilder,
-            const Timestamp& lastCommittedOpTime) const {
+            const OpTime& lastCommittedOpTime) const {
         objBuilder->append("term", _term);
-        objBuilder->append("lastOpCommittedTimestamp", lastCommittedOpTime.getSecs());
-        objBuilder->append("lastOpCommittedTerm", lastCommittedOpTime.getInc());
+        objBuilder->append("lastOpCommittedTimestamp", lastCommittedOpTime.getTimestamp());
+        objBuilder->append("lastOpCommittedTerm", lastCommittedOpTime.getTerm());
         objBuilder->append("configVersion", _rsConfig.getConfigVersion());
         objBuilder->append("primaryId", _rsConfig.getMemberAt(_currentPrimaryIndex).getId());
     }

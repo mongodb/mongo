@@ -158,7 +158,7 @@ env.CppUnitTest('replica_set_config_checks_test',
                     'repl_coordinator_impl',
                     'replmocks'
                 ])
-                
+
 env.CppUnitTest(
     target='data_replicator_test',
     source=[
@@ -226,6 +226,7 @@ env.Library('repl_coordinator_interface',
              'replication_coordinator_external_state.cpp'],
             LIBDEPS=[
                 '$BUILD_DIR/mongo/util/net/hostandport',
+                'optime',
                 'reporter',
             ])
 
@@ -254,6 +255,7 @@ env.Library('read_after_optime_args',
             LIBDEPS=[
                 '$BUILD_DIR/mongo/base/base',
                 '$BUILD_DIR/mongo/bson/util/bson_extract',
+                'optime',
             ])
 
 env.Library('replica_set_messages',
@@ -280,6 +282,7 @@ env.Library('replica_set_messages',
                 '$BUILD_DIR/mongo/bson/util/bson_extract',
                 '$BUILD_DIR/mongo/util/net/hostandport',
                 '$BUILD_DIR/mongo/db/common',
+                'optime',
             ])
 
 env.CppUnitTest('replica_set_config_test',
@@ -478,3 +481,10 @@ env.CppUnitTest(
     LIBDEPS=['replica_set_messages']
 )
 
+env.Library(target='optime',
+            source=[
+                'optime.cpp',
+            ],
+            LIBDEPS=[
+                '$BUILD_DIR/mongo/bson/bson',
+            ])

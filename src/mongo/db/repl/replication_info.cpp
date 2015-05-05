@@ -178,7 +178,8 @@ namespace repl {
             }
 
             BSONObjBuilder result;
-            result.append("latestOptime", replCoord->getMyLastOptime());
+            // TODO(siyuan) Output term of OpTime
+            result.append("latestOptime", replCoord->getMyLastOptime().getTimestamp());
 
             const std::string& oplogNS =
                 replCoord->getReplicationMode() == ReplicationCoordinator::modeReplSet ?

@@ -1196,7 +1196,7 @@ namespace {
         subobj.appendOID(kGLEStatsElectionIdFieldName, const_cast<OID*>(&oid));
         subobj.done();
     }
-} // unnamed namespace
+} // namespace
 
     /**
      * this handles
@@ -1369,7 +1369,7 @@ namespace {
                 shardingState.enabled()) {
             appendGLEHelperData(
                     result,
-                    repl::ReplClientInfo::forClient(txn->getClient()).getLastOp(),
+                    repl::ReplClientInfo::forClient(txn->getClient()).getLastOp().getTimestamp(),
                     replCoord->getElectionId());
         }
         return;

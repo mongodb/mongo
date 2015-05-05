@@ -249,35 +249,36 @@ namespace {
         setNewOptime(newTime);
     }
 
-    StatusWith<Timestamp> ReplicationCoordinatorExternalStateImpl::loadLastOpTime(
+    StatusWith<OpTime> ReplicationCoordinatorExternalStateImpl::loadLastOpTime(
             OperationContext* txn) {
 
         // TODO: handle WriteConflictExceptions below
         try {
             BSONObj oplogEntry;
             if (!Helpers::getLast(txn, rsOplogName.c_str(), oplogEntry)) {
-                return StatusWith<Timestamp>(
+                return StatusWith<OpTime>(
                         ErrorCodes::NoMatchingDocument,
                         str::stream() << "Did not find any entries in " << rsOplogName);
             }
             BSONElement tsElement = oplogEntry[tsFieldName];
             if (tsElement.eoo()) {
-                return StatusWith<Timestamp>(
+                return StatusWith<OpTime>(
                         ErrorCodes::NoSuchKey,
                         str::stream() << "Most recent entry in " << rsOplogName << " missing \"" <<
                         tsFieldName << "\" field");
             }
             if (tsElement.type() != bsonTimestamp) {
-                return StatusWith<Timestamp>(
+                return StatusWith<OpTime>(
                         ErrorCodes::TypeMismatch,
                         str::stream() << "Expected type of \"" << tsFieldName <<
                         "\" in most recent " << rsOplogName <<
                         " entry to have type Timestamp, but found " << typeName(tsElement.type()));
             }
-            return StatusWith<Timestamp>(tsElement.timestamp());
+            // TODO(siyuan) add term
+            return StatusWith<OpTime>(OpTime(tsElement.timestamp(), 0));
         }
         catch (const DBException& ex) {
-            return StatusWith<Timestamp>(ex.toStatus());
+            return StatusWith<OpTime>(ex.toStatus());
         }
     }
 

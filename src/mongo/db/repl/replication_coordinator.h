@@ -170,9 +170,9 @@ namespace repl {
         virtual void clearSyncSourceBlacklist() = 0;
 
         /**
-         * Blocks the calling thread for up to writeConcern.wTimeout millis, or until "ts" has been
-         * replicated to at least a set of nodes that satisfies the writeConcern, whichever comes
-         * first. A writeConcern.wTimeout of 0 indicates no timeout (block forever) and a
+         * Blocks the calling thread for up to writeConcern.wTimeout millis, or until "opTime" has
+         * been replicated to at least a set of nodes that satisfies the writeConcern, whichever
+         * comes first. A writeConcern.wTimeout of 0 indicates no timeout (block forever) and a
          * writeConcern.wTimeout of -1 indicates return immediately after checking. Return codes:
          * ErrorCodes::ExceededTimeLimit if the writeConcern.wTimeout is reached before
          *     the data has been sufficiently replicated
@@ -183,7 +183,7 @@ namespace repl {
          * ErrorCodes::Interrupted if the operation was killed with killop()
          */
         virtual StatusAndDuration awaitReplication(const OperationContext* txn,
-                                                   const Timestamp& ts,
+                                                   const OpTime& opTime,
                                                    const WriteConcernOptions& writeConcern) = 0;
 
         /**
@@ -220,8 +220,8 @@ namespace repl {
          * a standalone, or is writing to the local database.
          *
          * If a node was started with the replSet argument, but has not yet received a config, it
-         * will not be able to receive writes to a database other than local (it will not be treated
-         * as standalone node).
+         * will not be able to receive writes to a database other than local (it will not be
+         * treated as standalone node).
          *
          * NOTE: This function can only be meaningfully called while the caller holds the global
          * lock in some mode other than MODE_NONE.
@@ -262,12 +262,13 @@ namespace repl {
         /**
          * Updates our internal tracking of the last OpTime applied to this node.
          *
-         * The new value of "ts" must be no less than any prior value passed to this method, and it
-         * is the caller's job to properly synchronize this behavior.  The exception to this rule is
-         * that after calls to resetLastOpTimeFromOplog(), the minimum acceptable value for "ts" is
-         * reset based on the contents of the oplog, and may go backwards due to rollback.
+         * The new value of "opTime" must be no less than any prior value passed to this method, and
+         * it is the caller's job to properly synchronize this behavior.  The exception to this rule
+         * is that after calls to resetLastOpTimeFromOplog(), the minimum acceptable value for
+         * "opTime" is reset based on the contents of the oplog, and may go backwards due to
+         * rollback.
          */
-        virtual void setMyLastOptime(const Timestamp& ts) = 0;
+        virtual void setMyLastOptime(const OpTime& opTime) = 0;
 
         /**
          * Same as above, but used during places we need to zero our last optime.
@@ -280,14 +281,9 @@ namespace repl {
         virtual void setMyHeartbeatMessage(const std::string& msg) = 0;
 
         /**
-         * Returns the last optime recorded by setMyLastOptimeV1.
-         */
-        virtual OpTime getMyLastOptimeV1() const = 0;
-
-        /**
          * Returns the last optime recorded by setMyLastOptime.
          */
-        virtual Timestamp getMyLastOptime() const = 0;
+        virtual OpTime getMyLastOptime() const = 0;
 
         /**
          * Waits until the optime of the current node is at least the opTime specified in
@@ -538,7 +534,7 @@ namespace repl {
         /**
          * Returns a vector of members that have applied the operation with OpTime 'op'.
          */
-        virtual std::vector<HostAndPort> getHostsWrittenTo(const Timestamp& op) = 0;
+        virtual std::vector<HostAndPort> getHostsWrittenTo(const OpTime& op) = 0;
 
         /**
          * Returns a vector of the members other than ourself in the replica set, as specified in
@@ -589,7 +585,7 @@ namespace repl {
          * Committed means a majority of the voting nodes of the config are known to have the
          * operation in their oplogs.  This implies such ops will never be rolled back.
          */
-        virtual Timestamp getLastCommittedOpTime() const = 0;
+        virtual OpTime getLastCommittedOpTime() const = 0;
 
         /*
         * Handles an incoming replSetRequestVotes command.

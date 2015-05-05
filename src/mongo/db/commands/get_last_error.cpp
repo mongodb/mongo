@@ -133,28 +133,35 @@ namespace mongo {
             Client& c = *txn->getClient();
             if (repl::getGlobalReplicationCoordinator()->getReplicationMode() ==
                 repl::ReplicationCoordinator::modeReplSet) {
-                const Timestamp lastOp = repl::ReplClientInfo::forClient(c).getLastOp();
+                const repl::OpTime lastOp = repl::ReplClientInfo::forClient(c).getLastOp();
                 if (!lastOp.isNull()) {
-                    result.append("lastOp", lastOp);
+                    result.append("lastOp", lastOp.getTimestamp());
+                    // TODO(siyuan) Add "lastOpTerm"
                 }
             }
 
             // for sharding; also useful in general for debugging
             result.appendNumber( "connectionId" , c.getConnectionId() );
 
-            Timestamp lastOpTime;
+            Timestamp lastTimestamp;
             BSONField<Timestamp> wOpTimeField("wOpTime");
             FieldParser::FieldState extracted = FieldParser::extract(cmdObj, wOpTimeField, 
-                                                                     &lastOpTime, &errmsg);
+                                                                     &lastTimestamp, &errmsg);
             if (!extracted) {
                 result.append("badGLE", cmdObj);
                 appendCommandStatus(result, false, errmsg);
                 return false;
             }
+
+            repl::OpTime lastOpTime;
             bool lastOpTimePresent = extracted != FieldParser::FIELD_NONE;
             if (!lastOpTimePresent) {
                 // Use the client opTime if no wOpTime is specified
                 lastOpTime = repl::ReplClientInfo::forClient(c).getLastOp();
+                // TODO(siyuan) Fix mongos to supply wOpTimeTerm, then parse out that value here
+            } else {
+                // TODO(siyuan) Don't use the default term after fixing mongos.
+                lastOpTime = repl::OpTime(lastTimestamp, repl::OpTime::kDefaultTerm);
             }
             
             OID electionId;

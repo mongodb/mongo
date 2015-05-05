@@ -103,6 +103,12 @@ namespace repl {
          */
         virtual int getMaintenanceCount() const = 0;
 
+        /**
+         * Gets the latest term this member is aware of. If this member is the primary,
+         * it's the current term of the replica set.
+         */
+        virtual long long getTerm() const = 0;
+
         ////////////////////////////////////////////////////////////
         //
         // Basic state manipulation methods.
@@ -359,7 +365,7 @@ namespace repl {
          * Prepares a BSONObj describing the current term, primary, and lastOp information.
          */
         virtual void prepareCursorResponseInfo(BSONObjBuilder* objBuilder,
-                                               const Timestamp& lastCommittedOpTime) const = 0;
+                                               const OpTime& lastCommittedOpTime) const = 0;
 
         /**
          * Writes into 'output' all the information needed to generate a summary of the current

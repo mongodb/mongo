@@ -66,7 +66,7 @@ namespace repl {
 
         virtual ReplicationCoordinator::StatusAndDuration awaitReplication(
                 const OperationContext* txn,
-                const Timestamp& ts,
+                const OpTime& opTime,
                 const WriteConcernOptions& writeConcern);
 
         virtual ReplicationCoordinator::StatusAndDuration awaitReplicationOfLastOpForClient(
@@ -93,15 +93,13 @@ namespace repl {
 
         virtual Status setLastOptimeForSlave(const OID& rid, const Timestamp& ts);
 
-        virtual void setMyLastOptime(const Timestamp& ts);
+        virtual void setMyLastOptime(const OpTime& opTime);
 
         virtual void resetMyLastOptime();
 
         virtual void setMyHeartbeatMessage(const std::string& msg);
 
-        virtual OpTime getMyLastOptimeV1() const;
-
-        virtual Timestamp getMyLastOptime() const;
+        virtual OpTime getMyLastOptime() const;
 
         virtual ReadAfterOpTimeResponse waitUntilOpTime(
                         const OperationContext* txn,
@@ -170,7 +168,7 @@ namespace repl {
 
         virtual bool buildsIndexes();
 
-        virtual std::vector<HostAndPort> getHostsWrittenTo(const Timestamp& op);
+        virtual std::vector<HostAndPort> getHostsWrittenTo(const OpTime& op);
 
         virtual std::vector<HostAndPort> getOtherNodesInReplSet() const;
 
@@ -186,7 +184,7 @@ namespace repl {
 
         virtual bool shouldChangeSyncSource(const HostAndPort& currentSource);
 
-        virtual Timestamp getLastCommittedOpTime() const;
+        virtual OpTime getLastCommittedOpTime() const;
 
         virtual Status processReplSetRequestVotes(OperationContext* txn,
                                                   const ReplSetRequestVotesArgs& args,

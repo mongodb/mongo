@@ -220,7 +220,9 @@ namespace {
     bool _initialSyncApplyOplog( OperationContext* ctx,
                                  repl::SyncTail& syncer,
                                  OplogReader* r) {
-        const Timestamp startOpTime = getGlobalReplicationCoordinator()->getMyLastOptime();
+        // TODO(siyuan) Change to OpTime after adding term to op logs.
+        const Timestamp startOpTime = getGlobalReplicationCoordinator()->getMyLastOptime()
+                .getTimestamp();
         BSONObj lastOp;
 
         // If the fail point is set, exit failing.
@@ -412,10 +414,10 @@ namespace {
         std::deque<BSONObj> ops;
         ops.push_back(lastOp);
 
-        Timestamp lastOptime = writeOpsToOplog(&txn, ops);
+        OpTime lastOptime = writeOpsToOplog(&txn, ops);
         ReplClientInfo::forClient(txn.getClient()).setLastOp(lastOptime);
         replCoord->setMyLastOptime(lastOptime);
-        setNewOptime(lastOptime);
+        setNewOptime(lastOptime.getTimestamp());
 
         std::string msg = "oplog sync 1 of 3";
         log() << msg;
@@ -464,7 +466,9 @@ namespace {
         {
             ScopedTransaction scopedXact(&txn, MODE_IX);
             AutoGetDb autodb(&txn, "local", MODE_X);
-            Timestamp lastOpTimeWritten(getGlobalReplicationCoordinator()->getMyLastOptime());
+            // TODO(siyuan) Change to OpTime after adding term to op logs.
+            Timestamp lastOpTimeWritten(
+                getGlobalReplicationCoordinator()->getMyLastOptime().getTimestamp());
             log() << "set minValid=" << lastOpTimeWritten;
 
             // Initial sync is now complete.  Flag this by setting minValid to the last thing

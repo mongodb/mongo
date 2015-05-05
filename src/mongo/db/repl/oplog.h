@@ -35,6 +35,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/disallow_copying.h"
 #include "mongo/util/concurrency/mutex.h"
+#include "mongo/db/repl/optime.h"
 
 namespace mongo {
     class BSONObj;
@@ -58,7 +59,7 @@ namespace repl {
     // used internally by replication secondaries after they have applied ops.  Updates the global
     // optime.
     // Returns the optime for the last op inserted.
-    Timestamp writeOpsToOplog(OperationContext* txn,
+    OpTime writeOpsToOplog(OperationContext* txn,
                            const std::deque<BSONObj>& ops);
 
     extern std::string rsOplogName;

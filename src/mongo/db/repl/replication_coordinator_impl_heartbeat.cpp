@@ -129,7 +129,7 @@ namespace {
         const bool isUnauthorized = (responseStatus.code() == ErrorCodes::Unauthorized) ||
                                     (responseStatus.code() == ErrorCodes::AuthenticationFailed);
         const Date_t now = _replExecutor.now();
-        const Timestamp lastApplied = getMyLastOptime();  // Locks and unlocks _mutex.
+        const Timestamp lastApplied = getMyLastOptime().getTimestamp();  // Locks and unlocks _mutex.
         Milliseconds networkTime(0);
         StatusWith<ReplSetHeartbeatResponse> hbStatusResponse(hbResponse);
 
@@ -164,8 +164,10 @@ namespace {
                 hbStatusResponse.getValue().getState() != MemberState::RS_PRIMARY) {
             boost::unique_lock<boost::mutex> lk(_mutex);
             if (hbStatusResponse.getValue().getVersion() == _rsConfig.getConfigVersion()) {
+                // Use current term so terms never go back.
                 _updateOpTimeFromHeartbeat_inlock(targetIndex,
-                                                  hbStatusResponse.getValue().getOpTime());
+                                                  OpTime(hbStatusResponse.getValue().getOpTime(),
+                                                         _topCoord->getTerm()));
                 // TODO: Enable with Data Replicator
                 //lk.unlock();
                 //_dr.slavesHaveProgressed();
@@ -183,7 +185,7 @@ namespace {
     }
 
     void ReplicationCoordinatorImpl::_updateOpTimeFromHeartbeat_inlock(int targetIndex,
-                                                                       Timestamp optime) {
+                                                                       const OpTime& optime) {
         invariant(_selfIndex >= 0);
         invariant(targetIndex >= 0);
 

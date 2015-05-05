@@ -91,7 +91,7 @@ namespace {
                                                  BSON("_id" << 2 << "host" << "node2:12345") )),
                     HostAndPort("node1", 12345));
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-        getReplCoord()->setMyLastOptime(Timestamp(100, 0));
+        getReplCoord()->setMyLastOptime(OpTime(Timestamp(100, 0), 0));
         simulateSuccessfulElection();
 
         BSONObjBuilder result;
@@ -122,7 +122,7 @@ namespace {
                                                  BSON("_id" << 2 << "host" << "node2:12345") )),
                     HostAndPort("node1", 12345));
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-        getReplCoord()->setMyLastOptime(Timestamp(100, 0));
+        getReplCoord()->setMyLastOptime(OpTime(Timestamp(100, 0), 0));
         simulateSuccessfulElection();
 
         BSONObjBuilder result;
@@ -150,7 +150,7 @@ namespace {
                                                  BSON("_id" << 2 << "host" << "node2:12345") )),
                     HostAndPort("node1", 12345));
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-        getReplCoord()->setMyLastOptime(Timestamp(100, 0));
+        getReplCoord()->setMyLastOptime(OpTime(Timestamp(100, 0), 0));
         simulateSuccessfulElection();
 
         BSONObjBuilder result;
@@ -206,7 +206,7 @@ namespace {
                                                  BSON("_id" << 2 << "host" << "node2:12345") )),
                     HostAndPort("node1", 12345));
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-        getReplCoord()->setMyLastOptime(Timestamp(100, 0));
+        getReplCoord()->setMyLastOptime(OpTime(Timestamp(100, 0), 0));
         simulateSuccessfulElection();
 
         Status status(ErrorCodes::InternalError, "Not Set");
@@ -242,11 +242,11 @@ namespace {
                                                  BSON("_id" << 2 << "host" << "node2:12345") )),
                     HostAndPort("node1", 12345));
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-        getReplCoord()->setMyLastOptime(Timestamp(100, 0));
+        getReplCoord()->setMyLastOptime(OpTime(Timestamp(100, 0), 0));
         simulateSuccessfulElection();
 
         Status status(ErrorCodes::InternalError, "Not Set");
-        getExternalState()->setStoreLocalConfigDocumentStatus(Status(ErrorCodes::OutOfDiskSpace, 
+        getExternalState()->setStoreLocalConfigDocumentStatus(Status(ErrorCodes::OutOfDiskSpace,
                                                                      "The test set this"));
         boost::thread reconfigThread(stdx::bind(doReplSetReconfig, getReplCoord(), &status));
 
@@ -280,7 +280,7 @@ namespace {
                                                  BSON("_id" << 2 << "host" << "node2:12345") )),
                     HostAndPort("node1", 12345));
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-        getReplCoord()->setMyLastOptime(Timestamp(100, 0));
+        getReplCoord()->setMyLastOptime(OpTime(Timestamp(100, 0), 0));
         simulateSuccessfulElection();
 
         Status status(ErrorCodes::InternalError, "Not Set");
@@ -315,7 +315,7 @@ namespace {
         init();
         start(HostAndPort("node1", 12345));
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-        getReplCoord()->setMyLastOptime(Timestamp(100, 0));
+        getReplCoord()->setMyLastOptime(OpTime(Timestamp(100, 0), 0));
 
         // initiate
         Status status(ErrorCodes::InternalError, "Not Set");
@@ -353,7 +353,7 @@ namespace {
                                                  BSON("_id" << 2 << "host" << "node2:12345"))),
                     HostAndPort("node1", 12345));
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-        getReplCoord()->setMyLastOptime(Timestamp(100, 0));
+        getReplCoord()->setMyLastOptime(OpTime(Timestamp(100, 0), 0));
         simulateSuccessfulElection();
 
         Status status(ErrorCodes::InternalError, "Not Set");
@@ -390,7 +390,7 @@ namespace {
                                                  BSON("_id" << 2 << "host" << "node2:12345") )),
                     HostAndPort("node1", 12345));
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-        getReplCoord()->setMyLastOptime(Timestamp(100,0));
+        getReplCoord()->setMyLastOptime(OpTime(Timestamp(100,0), 0));
         simulateSuccessfulElection();
         ASSERT_TRUE(getReplCoord()->getMemberState().primary());
 
@@ -442,10 +442,10 @@ namespace {
                                                  BSON("_id" << 2 << "host" << "node2:12345") )),
                     HostAndPort("node1", 12345));
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-        getReplCoord()->setMyLastOptime(Timestamp(100,0));
+        getReplCoord()->setMyLastOptime(OpTime(Timestamp(100,0), 0));
         simulateSuccessfulElection();
         ASSERT_TRUE(getReplCoord()->getMemberState().primary());
- 
+
         // start reconfigThread
         Status status(ErrorCodes::InternalError, "Not Set");
         boost::thread reconfigThread(stdx::bind(doReplSetReconfig, getReplCoord(), &status));
@@ -501,7 +501,7 @@ namespace {
                                                  BSON("_id" << 2 << "host" << "node2:12345") )),
                     HostAndPort("node1", 12345));
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-        getReplCoord()->setMyLastOptime(Timestamp(100, 0));
+        getReplCoord()->setMyLastOptime(OpTime(Timestamp(100, 0), 0));
 
         // fail before forced
         BSONObjBuilder result;

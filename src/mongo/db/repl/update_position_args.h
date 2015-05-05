@@ -31,6 +31,7 @@
 #include <vector>
 
 #include "mongo/db/jsobj.h"
+#include "mongo/db/repl/optime.h"
 
 namespace mongo {
 
@@ -44,10 +45,10 @@ namespace repl {
     class UpdatePositionArgs {
     public:
         struct UpdateInfo {
-            UpdateInfo(const OID& anRid, const Timestamp& aTs, long long aCfgver, long long aMemberId);
+            UpdateInfo(const OID& anRid, const OpTime& aTs, long long aCfgver, long long aMemberId);
 
             OID rid;
-            Timestamp ts;
+            OpTime ts;
             long long cfgver;
             long long memberId;
         };

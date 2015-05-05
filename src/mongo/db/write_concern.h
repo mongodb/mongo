@@ -36,6 +36,10 @@ namespace mongo {
     class OperationContext;
     template <typename T> class StatusWith;
 
+    namespace repl {
+        class OpTime;
+    }
+
     /**
      * If txn->getWriteConcern() indicates a durable commit level,
      * marks the RecoveryUnit associated with "txn" appropriately.
@@ -94,7 +98,7 @@ namespace mongo {
      * Returns UnknownReplWriteConcern if the wMode specified was not enforceable
      */
     Status waitForWriteConcern( OperationContext* txn,
-                                const Timestamp& replOpTime,
+                                const repl::OpTime& replOpTime,
                                 WriteConcernResult* result );
 
 

@@ -354,8 +354,8 @@ namespace mongo {
             repl::ReplicationCoordinator* replCoord = repl::getGlobalReplicationCoordinator();
             const repl::ReplicationCoordinator::Mode replMode = replCoord->getReplicationMode();
             if (replMode != repl::ReplicationCoordinator::modeNone) {
-                response->setLastOp(
-                        repl::ReplClientInfo::forClient(_txn->getClient()).getLastOp());
+                response->setLastOp(repl::ReplClientInfo::forClient(_txn->getClient()).getLastOp()
+                        .getTimestamp());
                 if (replMode == repl::ReplicationCoordinator::modeReplSet) {
                     response->setElectionId(replCoord->getElectionId());
                 }

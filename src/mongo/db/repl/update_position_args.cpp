@@ -40,7 +40,7 @@ namespace repl {
 
 
     UpdatePositionArgs::UpdateInfo::UpdateInfo(
-            const OID& anRid, const Timestamp& aTs, long long aCfgver, long long aMemberId)
+            const OID& anRid, const OpTime& aTs, long long aCfgver, long long aMemberId)
         : rid(anRid), ts(aTs), cfgver(aCfgver), memberId(aMemberId) {}
 
 namespace {
@@ -115,7 +115,8 @@ namespace {
             if (!status.isOK())
                 return status;
 
-            _updates.push_back(UpdateInfo(rid, ts, cfgver, memberID));
+            // TODO(siyuan) parse and fill term whem adding it to update position command.
+            _updates.push_back(UpdateInfo(rid, OpTime(ts, 0), cfgver, memberID));
         }
 
         return Status::OK();
@@ -133,7 +134,7 @@ namespace {
                     update != updatesEnd();
                     ++update) {
                 updateArray.append(BSON(kMemberRIDFieldName << update->rid <<
-                                        kOpTimeFieldName << update->ts <<
+                                        kOpTimeFieldName << update->ts.getTimestamp() <<
                                         kConfigVersionFieldName << update->cfgver <<
                                         kMemberIdFieldName << update->memberId));
             }

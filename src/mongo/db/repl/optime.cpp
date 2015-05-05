@@ -26,34 +26,39 @@
  *    it in the license file.
  */
 
-#pragma once
+#include <ostream>
+#include <sstream>
+#include <string>
+#include <utility>
 
-#include "mongo/bson/oid.h"
-#include "mongo/db/client.h"
 #include "mongo/db/repl/optime.h"
 
 namespace mongo {
-
-    class BSONObjBuilder;
-    class Client;
-
 namespace repl {
 
-    class ReplClientInfo {
-    public:
-        static const Client::Decoration<ReplClientInfo> forClient;
+    OpTime::OpTime(Timestamp ts, long long term) : _timestamp(std::move(ts)), _term(term) {}
 
-        void setLastOp(const OpTime& op) { _lastOp = op; }
-        OpTime getLastOp() const { return _lastOp; }
+    Timestamp OpTime::getTimestamp() const {
+        return _timestamp;
+    }
 
-        // Only used for master/slave
-        void setRemoteID(OID rid) { _remoteId = rid; }
-        OID getRemoteID() const { return _remoteId; }
+    long long OpTime::getTerm() const {
+        return _term;
+    }
 
-    private:
-        OpTime _lastOp = OpTime();
-        OID _remoteId = OID();
-    };
+    bool OpTime::isNull() const {
+        return _timestamp.isNull();
+    }
 
-}  // namespace repl
-}  // namespace mongo
+    std::string OpTime::toString() const {
+        std::stringstream ss;
+        ss << "(term: " << _term << ", timestamp: " << _timestamp.toStringPretty() << ")";
+        return ss.str();
+    }
+
+    std::ostream& operator<<(std::ostream& out, const OpTime& opTime) {
+        return out << opTime.toString();
+    }
+
+} // namespace repl
+} // namespace mongo

@@ -32,6 +32,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -133,7 +134,7 @@ namespace repl {
          * Gets the last optime of an operation performed on this host, from stable
          * storage.
          */
-        virtual StatusWith<Timestamp> loadLastOpTime(OperationContext* txn) = 0;
+        virtual StatusWith<OpTime> loadLastOpTime(OperationContext* txn) = 0;
 
         /**
          * Returns the HostAndPort of the remote client connected to us that initiated the operation

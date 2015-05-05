@@ -84,7 +84,7 @@ namespace repl {
 
     ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorMock::awaitReplication(
             const OperationContext* txn,
-            const Timestamp& ts,
+            const OpTime& opTime,
             const WriteConcernOptions& writeConcern) {
         // TODO
         return StatusAndDuration(Status::OK(), Milliseconds(0));
@@ -134,17 +134,13 @@ namespace repl {
         // TODO
     }
 
-    void ReplicationCoordinatorMock::setMyLastOptime(const Timestamp& ts) {}
+    void ReplicationCoordinatorMock::setMyLastOptime(const OpTime& opTime) {}
 
     void ReplicationCoordinatorMock::resetMyLastOptime() {}
 
-    OpTime ReplicationCoordinatorMock::getMyLastOptimeV1() const {
-        return OpTime();
-    }
-
-    Timestamp ReplicationCoordinatorMock::getMyLastOptime() const {
+    OpTime ReplicationCoordinatorMock::getMyLastOptime() const {
         // TODO
-        return Timestamp();
+        return OpTime();
     }
 
     ReadAfterOpTimeResponse ReplicationCoordinatorMock::waitUntilOpTime(
@@ -269,7 +265,7 @@ namespace repl {
         return true;
     }
 
-    std::vector<HostAndPort> ReplicationCoordinatorMock::getHostsWrittenTo(const Timestamp& op) {
+    std::vector<HostAndPort> ReplicationCoordinatorMock::getHostsWrittenTo(const OpTime& op) {
         return std::vector<HostAndPort>();
     }
 
@@ -308,8 +304,8 @@ namespace repl {
         invariant(false);
     }
 
-    Timestamp ReplicationCoordinatorMock::getLastCommittedOpTime() const {
-        return Timestamp();
+    OpTime ReplicationCoordinatorMock::getLastCommittedOpTime() const {
+        return OpTime();
     }
 
     Status ReplicationCoordinatorMock::processReplSetRequestVotes(

@@ -120,9 +120,9 @@ namespace {
 
 
         invariant(_rsConfig.getMemberAt(_selfIndex).isElectable());
-        Timestamp lastOpTimeApplied(_getMyLastOptime_inlock());
+        OpTime lastOpTimeApplied(_getMyLastOptime_inlock());
 
-        if (lastOpTimeApplied == Timestamp()) {
+        if (lastOpTimeApplied.isNull()) {
             log() << "not trying to elect self, "
                 "do not yet have a complete set of data from any point in time";
             return;
@@ -137,7 +137,7 @@ namespace {
 
         StatusWith<ReplicationExecutor::EventHandle> nextPhaseEvh = _freshnessChecker->start(
                 &_replExecutor,
-                lastOpTimeApplied,
+                lastOpTimeApplied.getTimestamp(),
                 _rsConfig,
                 _selfIndex,
                 _topCoord->getMaybeUpHostAndPorts(),
@@ -273,7 +273,9 @@ namespace {
         if (!cbData.status.isOK()) {
             return;
         }
-        if (_topCoord->checkShouldStandForElection(_replExecutor.now(), getMyLastOptime())) {
+        if (_topCoord->checkShouldStandForElection(_replExecutor.now(),
+                                                   getMyLastOptime().getTimestamp()))
+        {
             _startElectSelf();
         }
     }
