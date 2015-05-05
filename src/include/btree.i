@@ -949,11 +949,76 @@ __wt_ref_info(WT_SESSION_IMPL *session,
 }
 
 /*
+ * __wt_page_can_split --
+ *	Check whether a page can be split in memory.
+ */
+static inline int
+__wt_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	WT_BTREE *btree;
+	WT_INSERT_HEAD *ins_head;
+
+	btree = S2BT(session);
+
+	/*
+	 * Only split a page once, otherwise workloads that update in the middle
+	 * of the page could continually split without benefit.
+	 */
+	if (F_ISSET_ATOMIC(page, WT_PAGE_SPLIT_INSERT))
+		return (0);
+
+	/*
+	 * Check for pages with append-only workloads. A common application
+	 * pattern is to have multiple threads frantically appending to the
+	 * tree. We want to reconcile and evict this page, but we'd like to
+	 * do it without making the appending threads wait. If we're not
+	 * discarding the tree, check and see if it's worth doing a split to
+	 * let the threads continue before doing eviction.
+	 *
+	 * Ignore anything other than large, dirty row-store leaf pages.
+	 *
+	 * XXX KEITH
+	 * Need a better test for append-only workloads.
+	 */
+	if (page->type != WT_PAGE_ROW_LEAF ||
+	    page->memory_footprint < btree->maxmempage ||
+	    !__wt_page_is_modified(page))
+		return (0);
+
+	/* Don't split a page that is pending a multi-block split. */
+	if (F_ISSET(page->modify, WT_PM_REC_MULTIBLOCK))
+		return (0);
+
+	/*
+	 * There is no point splitting if the list is small, no deep items is
+	 * our heuristic for that. (A 1/4 probability of adding a new skiplist
+	 * level means there will be a new 6th level for roughly each 4KB of
+	 * entries in the list. If we have at least two 6th level entries, the
+	 * list is at least large enough to work with.)
+	 *
+	 * The following code requires at least two items on the insert list,
+	 * this test serves the additional purpose of confirming that.
+	 */
+#define	WT_MIN_SPLIT_SKIPLIST_DEPTH	WT_MIN(6, WT_SKIP_MAXDEPTH - 1)
+	ins_head = page->pg_row_entries == 0 ?
+	    WT_ROW_INSERT_SMALLEST(page) :
+	    WT_ROW_INSERT_SLOT(page, page->pg_row_entries - 1);
+	if (ins_head == NULL ||
+	    ins_head->head[WT_MIN_SPLIT_SKIPLIST_DEPTH] == NULL ||
+	    ins_head->head[WT_MIN_SPLIT_SKIPLIST_DEPTH] ==
+	    ins_head->tail[WT_MIN_SPLIT_SKIPLIST_DEPTH])
+		return (0);
+
+	return (1);
+}
+
+/*
  * __wt_page_can_evict --
  *	Check whether a page can be evicted.
  */
 static inline int
-__wt_page_can_evict(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
+__wt_page_can_evict(
+    WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags, int *inmem_splitp)
 {
 	WT_BTREE *btree;
 	WT_PAGE_MODIFY *mod;
@@ -962,6 +1027,8 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	btree = S2BT(session);
 	mod = page->modify;
 	txn_global = &S2C(session)->txn_global;
+	if (inmem_splitp != NULL)
+		*inmem_splitp = 0;
 
 	/* Pages that have never been modified can always be evicted. */
 	if (mod == NULL)
@@ -987,10 +1054,11 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	 * has not already been a split on this page as the WT_PM_REC_MULTIBLOCK
 	 * flag is unset.
 	 */
-	if (LF_ISSET(WT_EVICT_FORCE_SPLIT) &&
-	    page->memory_footprint > btree->maxmempage &&
-	    btree->checkpointing && !F_ISSET(mod, WT_PM_REC_MULTIBLOCK))
+	if (__wt_page_can_split(session, page)) {
+		if (inmem_splitp != NULL)
+			*inmem_splitp = 1;
 		return (1);
+	}
 
 	/*
 	 * If the file is being checkpointed, we can't evict dirty pages:
@@ -1056,7 +1124,6 @@ __wt_page_release_evict(WT_SESSION_IMPL *session, WT_REF *ref)
 
 	btree = S2BT(session);
 	page = ref->page;
-	too_big = (page->memory_footprint > btree->maxmempage) ? 1 : 0;
 
 	/*
 	 * Take some care with order of operations: if we release the hazard
@@ -1071,8 +1138,9 @@ __wt_page_release_evict(WT_SESSION_IMPL *session, WT_REF *ref)
 	}
 
 	(void)WT_ATOMIC_ADD4(btree->evict_busy, 1);
-	/* We only want to trigger an in-memory split if the page is too big. */
-	if ((ret = __wt_evict_page(session, ref, too_big)) == 0) {
+
+	too_big = (page->memory_footprint > btree->maxmempage) ? 1 : 0;
+	if ((ret = __wt_evict_page(session, ref)) == 0) {
 		if (too_big)
 			WT_STAT_FAST_CONN_INCR(session, cache_eviction_force);
 		else
@@ -1132,9 +1200,8 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 	page = ref->page;
 	if (F_ISSET(btree, WT_BTREE_NO_EVICTION) ||
 	    LF_ISSET(WT_READ_NO_EVICT) ||
-	    page->read_gen != WT_READGEN_OLDEST ||
-	    !__wt_page_can_evict(session, page,
-	    WT_EVICT_CHECK_SPLITS | WT_EVICT_FORCE_SPLIT))
+	    page->read_gen != WT_READGEN_OLDEST || !__wt_page_can_evict(
+	    session, page, WT_EVICT_CHECK_SPLITS, NULL))
 		return (__wt_hazard_clear(session, page));
 
 	WT_RET_BUSY_OK(__wt_page_release_evict(session, ref));

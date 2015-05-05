@@ -857,11 +857,12 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 			continue;
 		}
 		/*
-		 * If the WT_EVICT_FORCE_SPLIT flag is set, we return EBUSY.
-		 * This avoids an infinite loop where we are trying to split a
-		 * page that is currently being accessed by a checkpoint.
+		 * If we're attempting an in-memory split and we can't lock the
+		 * parent, give up.  This avoids an infinite loop where we are
+		 * trying to split a page while its parent is being
+		 * checkpointed.
 		 */
-		if (LF_ISSET(WT_EVICT_FORCE_SPLIT))
+		if (LF_ISSET(WT_EVICT_INMEM_SPLIT))
 			return (EBUSY);
 		__wt_yield();
 	}
@@ -1114,9 +1115,8 @@ err:	if (!complete)
  * list into a separate page.
  */
 int
-__wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
+__wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 {
-	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_DECL_ITEM(key);
 	WT_INSERT *ins, **insp, *moved_ins, *prev_ins;
@@ -1126,60 +1126,20 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 	size_t page_decr, parent_incr, right_incr;
 	int i;
 
-	*splitp = 0;
-
-	btree = S2BT(session);
 	page = ref->page;
 	right = NULL;
 	page_decr = parent_incr = right_incr = 0;
 
-	/*
-	 * Check for pages with append-only workloads. A common application
-	 * pattern is to have multiple threads frantically appending to the
-	 * tree. We want to reconcile and evict this page, but we'd like to
-	 * do it without making the appending threads wait. If we're not
-	 * discarding the tree, check and see if it's worth doing a split to
-	 * let the threads continue before doing eviction.
-	 *
-	 * Ignore anything other than large, dirty row-store leaf pages.
-	 *
-	 * XXX KEITH
-	 * Need a better test for append-only workloads.
-	 */
-	if (page->type != WT_PAGE_ROW_LEAF ||
-	    page->memory_footprint < btree->maxmempage ||
-	    !__wt_page_is_modified(page))
-		return (0);
+	WT_ASSERT(session, __wt_page_can_split(session, page));
 
-	/*
-	 * There is no point splitting if the list is small, no deep items is
-	 * our heuristic for that. (A 1/4 probability of adding a new skiplist
-	 * level means there will be a new 6th level for roughly each 4KB of
-	 * entries in the list. If we have at least two 6th level entries, the
-	 * list is at least large enough to work with.)
-	 *
-	 * The following code requires at least two items on the insert list,
-	 * this test serves the additional purpose of confirming that.
-	 */
-#define	WT_MIN_SPLIT_SKIPLIST_DEPTH	WT_MIN(6, WT_SKIP_MAXDEPTH - 1)
+	/* Find the last item on the page. */
 	ins_head = page->pg_row_entries == 0 ?
 	    WT_ROW_INSERT_SMALLEST(page) :
 	    WT_ROW_INSERT_SLOT(page, page->pg_row_entries - 1);
-	if (ins_head == NULL ||
-	    ins_head->head[WT_MIN_SPLIT_SKIPLIST_DEPTH] == NULL ||
-	    ins_head->head[WT_MIN_SPLIT_SKIPLIST_DEPTH] ==
-	    ins_head->tail[WT_MIN_SPLIT_SKIPLIST_DEPTH])
-		return (0);
-
-	/* Find the last item in the insert list. */
 	moved_ins = WT_SKIP_LAST(ins_head);
 
-	/*
-	 * Only split a page once, otherwise workloads that update in the middle
-	 * of the page could continually split without benefit.
-	 */
-	if (F_ISSET_ATOMIC(page, WT_PAGE_SPLIT_INSERT))
-		return (0);
+	/* Mark that this page has already been through an in-memory split. */
+	WT_ASSERT(session, !F_ISSET_ATOMIC(page, WT_PAGE_SPLIT_INSERT));
 	F_SET_ATOMIC(page, WT_PAGE_SPLIT_INSERT);
 
 	/*
@@ -1373,7 +1333,7 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 	 */
 	page = NULL;
 	if ((ret = __split_parent(session,
-	    ref, split_ref, 2, parent_incr, WT_EVICT_FORCE_SPLIT)) != 0) {
+	    ref, split_ref, 2, parent_incr, WT_EVICT_INMEM_SPLIT)) != 0) {
 		/*
 		 * Move the insert list element back to the original page list.
 		 * For simplicity, the previous skip list pointers originally
@@ -1395,9 +1355,6 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 
 		WT_ERR(ret);
 	}
-
-	/* Let our caller know that we split. */
-	*splitp = 1;
 
 	WT_STAT_FAST_CONN_INCR(session, cache_inmem_split);
 	WT_STAT_FAST_DATA_INCR(session, cache_inmem_split);

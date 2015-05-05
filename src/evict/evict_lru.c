@@ -666,7 +666,7 @@ __evict_clear_all_walks(WT_SESSION_IMPL *session)
  *	Evict a given page.
  */
 int
-__wt_evict_page(WT_SESSION_IMPL *session, WT_REF *ref, int inmem_split)
+__wt_evict_page(WT_SESSION_IMPL *session, WT_REF *ref)
 {
 	WT_DECL_RET;
 	WT_TXN *txn;
@@ -693,7 +693,7 @@ __wt_evict_page(WT_SESSION_IMPL *session, WT_REF *ref, int inmem_split)
 	WT_ASSERT(session,
 	    !F_ISSET(txn, TXN_HAS_ID) || !__wt_txn_visible(session, txn->id));
 
-	ret = __wt_evict(session, ref, inmem_split ? WT_EVICT_FORCE_SPLIT : 0);
+	ret = __wt_evict(session, ref, 0);
 	txn->isolation = saved_iso;
 
 	return (ret);
@@ -1232,8 +1232,8 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 		}
 
 fast:		/* If the page can't be evicted, give up. */
-		if (!__wt_page_can_evict(session,
-		    page, WT_EVICT_CHECK_SPLITS | WT_EVICT_FORCE_SPLIT))
+		if (!__wt_page_can_evict(
+		    session, page, WT_EVICT_CHECK_SPLITS, NULL))
 			continue;
 
 		/*
@@ -1438,7 +1438,7 @@ __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_server)
 		__wt_cache_dirty_decr(session, page);
 	}
 
-	WT_WITH_BTREE(session, btree, ret = __wt_evict_page(session, ref, 0));
+	WT_WITH_BTREE(session, btree, ret = __wt_evict_page(session, ref));
 
 	(void)WT_ATOMIC_SUB4(btree->evict_busy, 1);
 
