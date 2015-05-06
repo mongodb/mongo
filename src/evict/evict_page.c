@@ -130,7 +130,7 @@ err:		if (!LF_ISSET(WT_EVICT_EXCLUSIVE))
 		WT_STAT_FAST_DATA_INCR(session, cache_eviction_fail);
 	}
 
-done:	if ((inmem_split || (forced_eviction && ret == EBUSY)) &&
+done:	if (((inmem_split && ret == 0) || (forced_eviction && ret == EBUSY)) &&
 	    !F_ISSET(conn->cache, WT_CACHE_WOULD_BLOCK)) {
 		F_SET(conn->cache, WT_CACHE_WOULD_BLOCK);
 		WT_TRET(__wt_evict_server_wake(session));
