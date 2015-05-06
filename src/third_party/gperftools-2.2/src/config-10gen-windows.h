@@ -24,7 +24,11 @@
 #undef WIN32_OVERRIDE_ALLOCATORS
 
 /* Define to 1 if your libc has a snprintf implementation */
-#undef HAVE_SNPRINTF
+#if _MSC_VER < 1900
+# undef HAVE_SNPRINTF
+#else
+# define HAVE_SNPRINTF 1
+#endif
 
 /* Define to 1 if compiler supports __builtin_stack_pointer */
 #undef HAVE_BUILTIN_STACK_POINTER
@@ -129,7 +133,11 @@
 #undef HAVE_SCHED_H
 
 /* Define to 1 if you have the <stdint.h> header file. */
-#undef HAVE_STDINT_H
+#if _MSC_VER < 1900
+# undef HAVE_STDINT_H
+#else
+# define HAVE_STDINT_H 1
+#endif
 
 /* Define to 1 if you have the <stdlib.h> header file. */
 #define HAVE_STDLIB_H 1
@@ -303,6 +311,12 @@
 
 // We want to make sure not to ever try to #include heap-checker.h
 #define NO_HEAP_CHECK 1
+
+// VS2015 now defines struct timespec.
+#if _MSC_VER >= 1900
+#define _TIMESPEC_DEFINED 1
+#include <time.h>  // needed because port.h uses timespec in nanosleep().
+#endif
 
 // TODO(csilvers): include windows/port.h in every relevant source file instead?
 #include "windows/port.h"
