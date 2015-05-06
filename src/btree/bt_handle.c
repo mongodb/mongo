@@ -310,11 +310,21 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 	WT_RET(__wt_config_gets_none(session, cfg, "block_compressor", &cval));
 	WT_RET(__wt_compressor_config(session, &cval, &btree->compressor));
 
-	if (WT_IS_METADATA(btree->dhandle))
+	/*
+	 * We do not use __wt_config_gets_none here because "none"
+	 * and the empty string have different meanings.  The
+	 * empty string means inherit the system encryption setting
+	 * and "none" means this table is in the clear even if the
+	 * database is encrypted.  If this is the metadata handle
+	 * always inherit from the connection.
+	 */
+	WT_RET(__wt_config_gets(
+	    session, cfg, "encryption.name", &cval));
+	if (WT_IS_METADATA(btree->dhandle) || cval.len == 0) 
 		btree->kencryptor = conn->kencryptor;
+	else if (WT_STRING_MATCH("none", cval.str, cval.len))
+		btree->kencryptor = NULL;
 	else {
-		WT_RET(__wt_config_gets_none(
-		    session, cfg, "encryption.name", &cval));
 		WT_RET(__wt_config_gets_none(
 		    session, cfg, "encryption.keyid", &keyid));
 		WT_RET(__wt_config_gets(session, cfg, "encryption", &enc));
