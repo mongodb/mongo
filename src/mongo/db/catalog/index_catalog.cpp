@@ -596,6 +596,10 @@ namespace {
             if ( filterElement ) {
                 return Status( ErrorCodes::CannotCreateIndex, "_id index cannot be partial" );
             }
+
+            if ( isSparse ) {
+                return Status( ErrorCodes::CannotCreateIndex, "_id index cannot be sparse" );
+            }
         }
         else {
             // for non _id indexes, we check to see if replication has turned off all indexes
