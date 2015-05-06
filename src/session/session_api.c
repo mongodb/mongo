@@ -877,6 +877,7 @@ __session_transaction_sync(WT_SESSION *wt_session, const char *config)
 
 	log = conn->log;
 	ret = 0;
+	wait_secs = 0;
 
 	/*
 	 * If there is no background sync LSN in this session, there
