@@ -201,6 +201,7 @@ __wt_cache_stats_update(WT_SESSION_IMPL *session)
 	WT_STAT_SET(stats, cache_pages_dirty, cache->pages_dirty);
 
 	WT_STAT_SET(stats, cache_bytes_internal, cache->bytes_internal);
+	WT_STAT_SET(stats, cache_bytes_overflow, cache->bytes_overflow);
 	WT_STAT_SET(stats, cache_bytes_leaf, leaf);
 }
 

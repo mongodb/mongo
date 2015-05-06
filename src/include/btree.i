@@ -226,6 +226,11 @@ __wt_cache_page_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
 	/* Update the bytes in-memory to reflect the eviction. */
 	WT_CACHE_DECR(session, cache->bytes_inmem, page->memory_footprint);
 
+	/* Update the bytes_internal value to reflect the eviction */
+	if (WT_PAGE_IS_INTERNAL(page))
+		WT_CACHE_DECR(session,
+		    cache->bytes_internal, page->memory_footprint);
+
 	/* Update the cache's dirty-byte count. */
 	if (modify != NULL && modify->bytes_dirty != 0) {
 		if (cache->bytes_dirty < modify->bytes_dirty) {
