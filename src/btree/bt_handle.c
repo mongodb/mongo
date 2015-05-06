@@ -320,7 +320,7 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 	 */
 	WT_RET(__wt_config_gets(
 	    session, cfg, "encryption.name", &cval));
-	if (WT_IS_METADATA(btree->dhandle) || cval.len == 0) 
+	if (WT_IS_METADATA(btree->dhandle) || cval.len == 0)
 		btree->kencryptor = conn->kencryptor;
 	else if (WT_STRING_MATCH("none", cval.str, cval.len))
 		btree->kencryptor = NULL;
