@@ -561,25 +561,12 @@ namespace {
                                          << keyStatus.reason() );
         }
 
-        if ( IndexDescriptor::isIdIndexPattern( key ) ) {
-            BSONElement uniqueElt = spec["unique"];
-            if ( !uniqueElt.eoo() && !uniqueElt.trueValue() ) {
-                return Status( ErrorCodes::CannotCreateIndex, "_id index cannot be non-unique" );
-            }
-        }
-        else {
-            // for non _id indexes, we check to see if replication has turned off all indexes
-            // we _always_ created _id index
-            if (!repl::getGlobalReplicationCoordinator()->buildsIndexes()) {
-                // this is not exactly the right error code, but I think will make the most sense
-                return Status( ErrorCodes::IndexAlreadyExists, "no indexes per repl" );
-            }
-        }
+        const bool isSparse = spec["sparse"].trueValue();
 
         // Ensure if there is a filter, its valid.
         BSONElement filterElement = spec.getField("filter");
-        if ( filterElement.type() ) {
-            if ( spec["sparse"].trueValue() ) {
+        if ( filterElement ) {
+            if ( isSparse ) {
                 return Status( ErrorCodes::CannotCreateIndex,
                                "cannot mix \"filter\" and \"sparse\" options" );
             }
@@ -597,6 +584,25 @@ namespace {
             Status status = _checkValidFilterExpressions( filterExpr.get() );
             if (!status.isOK()) {
                 return status;
+            }
+        }
+
+        if ( IndexDescriptor::isIdIndexPattern( key ) ) {
+            BSONElement uniqueElt = spec["unique"];
+            if ( uniqueElt && !uniqueElt.trueValue() ) {
+                return Status( ErrorCodes::CannotCreateIndex, "_id index cannot be non-unique" );
+            }
+
+            if ( filterElement ) {
+                return Status( ErrorCodes::CannotCreateIndex, "_id index cannot be partial" );
+            }
+        }
+        else {
+            // for non _id indexes, we check to see if replication has turned off all indexes
+            // we _always_ created _id index
+            if (!repl::getGlobalReplicationCoordinator()->buildsIndexes()) {
+                // this is not exactly the right error code, but I think will make the most sense
+                return Status( ErrorCodes::IndexAlreadyExists, "no indexes per repl" );
             }
         }
 
