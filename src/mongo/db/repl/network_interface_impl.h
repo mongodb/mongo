@@ -40,6 +40,9 @@
 #include "mongo/stdx/list.h"
 
 namespace mongo {
+
+    class ConnectionPool;
+
 namespace repl {
 
     /**
@@ -87,8 +90,6 @@ namespace repl {
         std::string getNextCallbackWithGlobalLockThreadName();
 
     private:
-        class ConnectionPool;
-
         /**
          * Information describing an in-flight command.
          */

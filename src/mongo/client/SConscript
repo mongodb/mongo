@@ -33,6 +33,17 @@ env.Library('clientdriver', [
                      '$BUILD_DIR/mongo/rpc/command_status',
                      '$BUILD_DIR/mongo/util/net/network'
             ])
+            
+env.Library(
+    target='connection_pool',
+    source=[
+        'connection_pool.cpp',
+    ],
+    LIBDEPS=[
+        'clientdriver',
+        '$BUILD_DIR/mongo/db/auth/authorization_manager_global',
+    ]
+)
 
 env.CppUnitTest("replica_set_monitor_test",
                 ["replica_set_monitor_test.cpp"],
