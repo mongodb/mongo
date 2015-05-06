@@ -66,7 +66,7 @@ func (restore *MongoRestore) RestoreIntents() error {
 	for {
 		intent := restore.manager.Pop()
 		if intent == nil {
-			break
+			return nil
 		}
 		err := restore.RestoreIntent(intent)
 		if err != nil {

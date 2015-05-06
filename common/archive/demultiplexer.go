@@ -7,6 +7,8 @@ import (
 	"github.com/mongodb/mongo-tools/common/intents"
 	"github.com/mongodb/mongo-tools/common/log"
 	"gopkg.in/mgo.v2/bson"
+	"hash"
+	"hash/crc64"
 	"io"
 )
 
@@ -21,6 +23,7 @@ type DemuxOut interface {
 type Demultiplexer struct {
 	In                 io.Reader
 	outs               map[string]DemuxOut
+	hashes             map[string]hash.Hash64
 	currentNamespace   string
 	buf                [db.MaxBSONSize]byte
 	NamespaceChan      chan string
@@ -31,9 +34,10 @@ type Demultiplexer struct {
 func (demux *Demultiplexer) Run() error {
 	parser := Parser{In: demux.In}
 	err := parser.ReadAllBlocks(demux)
-	// TODO, actually figure out how get send this err back to the main thread
-	// instead of logging it here.
-	log.Logf(log.Always, "Demultiplexer finishing: %v", err)
+	if len(demux.outs) > 0 {
+		log.Logf(log.Always, "demux finishing when there are still outs (%v)", len(demux.outs))
+	}
+	log.Logf(log.DebugLow, "demux finishing (err:%v)", err)
 	return err
 }
 
@@ -58,23 +62,23 @@ func newError(msg string) error {
 	}
 }
 
-// newErrError creates a demuxError with a message as well as an underlying cause error
-func newErrError(msg string, err error) error {
+// newWrappedError creates a demuxError with a message as well as an underlying cause error
+func newWrappedError(msg string, err error) error {
 	return &demuxError{
 		Err: err,
 		Msg: msg,
 	}
 }
 
-// HeaderBSON is part of the ParserConsumer interface and recieves headers from parser.
-// Its main role is to implement opens and EOF's of the embedded stream.
+// HeaderBSON is part of the ParserConsumer interface and receives headers from parser.
+// Its main role is to implement opens and EOFs of the embedded stream.
 func (demux *Demultiplexer) HeaderBSON(buf []byte) error {
 	colHeader := NamespaceHeader{}
 	err := bson.Unmarshal(buf, &colHeader)
 	if err != nil {
-		return newErrError("header bson doesn't unmarshal as a collection header", err)
+		return newWrappedError("header bson doesn't unmarshal as a collection header", err)
 	}
-	log.Logf(log.DebugHigh, "NamespaceHeader: %v", colHeader)
+	log.Logf(log.DebugHigh, "demux namespaceHeader: %v", colHeader)
 	if colHeader.Database == "" {
 		return newError("collection header is missing a Database")
 	}
@@ -87,21 +91,32 @@ func (demux *Demultiplexer) HeaderBSON(buf []byte) error {
 			demux.NamespaceChan <- demux.currentNamespace
 			err := <-demux.NamespaceErrorChan
 			if err != nil {
-				return newErrError("block for non-open namespace", err)
+				return newWrappedError("failed arranging a consumer for new namespace", err)
 			}
 		}
 	}
 	if colHeader.EOF {
+		crc := int64(demux.hashes[demux.currentNamespace].Sum64())
+		if crc != colHeader.CRC {
+			return fmt.Errorf("CRC mismatch for namespace %v, %v!=%v",
+				demux.currentNamespace,
+				crc,
+				colHeader.CRC,
+			)
+		}
+		log.Logf(log.DebugHigh, "demux checksum for namespace %v is correct (%v)", demux.currentNamespace, demux.hashes[demux.currentNamespace].Sum64())
 		demux.outs[demux.currentNamespace].Close()
 		delete(demux.outs, demux.currentNamespace)
+		delete(demux.hashes, demux.currentNamespace)
+		// in case we get a BSONBody with this block, we want to ensure that that causes an error
 		demux.currentNamespace = ""
 	}
 	return nil
 }
 
-// End is part of the ParserConsumer interface and recieves the end of archive notification.
+// End is part of the ParserConsumer interface and receives the end of archive notification.
 func (demux *Demultiplexer) End() error {
-	//TODO, check that the outs are all closed here and error if they are not
+	log.Logf(log.DebugHigh, "demux End")
 	if len(demux.outs) != 0 {
 		openNss := []string{}
 		for ns := range demux.outs {
@@ -113,19 +128,24 @@ func (demux *Demultiplexer) End() error {
 	if demux.NamespaceChan != nil {
 		close(demux.NamespaceChan)
 	}
-	close(demux.NamespaceChan)
 	return nil
 }
 
-// BodyBSON is part of the ParserConsumer interface and recieves BSON bodys from the parser.
+// BodyBSON is part of the ParserConsumer interface and receives BSON bodies from the parser.
 // Its main role is to dispatch the body to the Read() function of the current DemuxOut.
 func (demux *Demultiplexer) BodyBSON(buf []byte) error {
 	if demux.currentNamespace == "" {
 		return newError("collection data without a collection header")
 	}
+	hash, ok := demux.hashes[demux.currentNamespace]
+	if !ok {
+		return newError("no checksum for current namespace " + demux.currentNamespace)
+	}
+	hash.Write(buf)
+
 	out, ok := demux.outs[demux.currentNamespace]
 	if !ok {
-		return newError("no intent currently reading collection " + demux.currentNamespace)
+		return newError("no demux consumer currently consuming namespace " + demux.currentNamespace)
 	}
 	_, err := out.Write(buf)
 	return err
@@ -135,16 +155,19 @@ func (demux *Demultiplexer) BodyBSON(buf []byte) error {
 func (demux *Demultiplexer) Open(ns string, out DemuxOut) {
 	// In the current implementation where this is either called before the demultiplexing is running
 	// or while the demutiplexer is inside of the NamespaceChan NamespaceErrorChan conversation
-	// I think that we don't need to lock outs, but I suspect that if the impleentation changes
-	// we may need to lock when outs is acceessed
+	// I think that we don't need to lock outs, but I suspect that if the implementation changes
+	// we may need to lock when outs is accessed
+	log.Logf(log.DebugHigh, "demux Open")
 	if demux.outs == nil {
 		demux.outs = make(map[string]DemuxOut)
+		demux.hashes = make(map[string]hash.Hash64)
 	}
 	demux.outs[ns] = out
+	demux.hashes[ns] = crc64.New(crc64.MakeTable(crc64.ECMA))
 }
 
-// RegularCollectionReceiver implements the intent.file interface.
-// RegularCollectonReceivers get paired with RegularCollectionSenders
+// RegularCollectionReceiver implements the intents.file interface.
+// RegularCollectionReceivers get paired with RegularCollectionSenders.
 type RegularCollectionReceiver struct {
 	readLenChan      <-chan int
 	readBufChan      chan<- []byte
@@ -196,18 +219,21 @@ func (receiver *RegularCollectionReceiver) Read(r []byte) (int, error) {
 	return wLen, nil
 }
 
-// Close is part of the intent.file interface. It currently does nothing. We can't close the regularCollectionSender before the
-// embedded stream reaches EOF. If this needs to be implemented, then we need to swap out the regularCollectionSender
-// with a null writer
+// Close is part of the intents.file interface. It currently does nothing. We can't close the
+// regularCollectionSender before the embedded stream reaches EOF. If this needs to be
+// implemented, then we need to swap out the regularCollectionSender with a null writer
 func (receiver *RegularCollectionReceiver) Close() error {
 	return nil
 }
 
-// Open is part of the intent.file interface.
-// It creates the chan's in the RegularCollectionReceiver and adds the RegularCollectionReceiver to the
-// set of RegularCollectonReceivers in the demultiplexer
+// Open is part of the intents.file interface.  It creates the chan's in the
+// RegularCollectionReceiver and adds the RegularCollectionReceiver to the set of
+// RegularCollectonReceivers in the demultiplexer
 func (receiver *RegularCollectionReceiver) Open() error {
-	// TODO move this implementation to some non intent.file method, to be called from prioritizer.Get
+	// TODO move this implementation to some non intents.file method, to be called from prioritizer.Get
+	// So that we don't have to enable this double open stuff.
+	// Currently the open needs to finish before the prioritizer.Get finishes, so we open the intents.file
+	// in prioritizer.Get even though it's going to get opened again in DumpIntent.
 	if receiver.isOpen {
 		return nil
 	}
@@ -221,7 +247,7 @@ func (receiver *RegularCollectionReceiver) Open() error {
 	return nil
 }
 
-// Write is part of the intent.file interface.
+// Write is part of the intents.file interface.
 // It does nothing, and only exists so that RegularCollectionReceiver fulfills the interface
 func (receiver *RegularCollectionReceiver) Write([]byte) (int, error) {
 	return 0, nil
@@ -236,13 +262,14 @@ type regularCollectionSender struct {
 // Write is part of the DemuxOut interface.
 func (sender *regularCollectionSender) Write(buf []byte) (int, error) {
 	//  As a writer, we need to write first, so that the reader can properly detect EOF
-	//  Additionally, the reader needs to know the write size, so that it can give us a properly
-	//  sized buffer. Sending the incomming buffersize fills both of these needs.
+	//  Additionally, the reader needs to know the write size, so that it can give us a
+	//  properly sized buffer. Sending the incomming buffersize fills both of these needs.
 	sender.readLenChan <- len(buf)
 	// Receive from the reader a buffer to put the bytes into
 	readBuf := <-sender.readBufChan
 	if len(readBuf) < len(buf) {
-		return 0, fmt.Errorf("readbuf is not large enough for incoming BodyBSON (%v<%v)", len(readBuf), len(buf))
+		return 0, fmt.Errorf("readbuf is not large enough for incoming BodyBSON (%v<%v)",
+			len(readBuf), len(buf))
 	}
 	copy(readBuf, buf)
 	// Send back the length of the data copied in to the buffer
@@ -250,14 +277,14 @@ func (sender *regularCollectionSender) Write(buf []byte) (int, error) {
 	return len(buf), nil
 }
 
-// Close is part of the DemuxOut interface. It only closes the readLenChan, as that is what will cause the
-// RegularCollectionReceiver.Read() to receive EOF
+// Close is part of the DemuxOut interface. It only closes the readLenChan, as that is what will
+// cause the RegularCollectionReceiver.Read() to receive EOF
 func (sender *regularCollectionSender) Close() error {
 	close(sender.readLenChan)
 	return nil
 }
 
-// SpecialCollectionCache implemnts both DemuxOut as well as intent.file
+// SpecialCollectionCache implemnts both DemuxOut as well as intents.file
 type SpecialCollectionCache struct {
 	Intent *intents.Intent
 	Demux  *Demultiplexer
@@ -274,7 +301,7 @@ func (cache *SpecialCollectionCache) Close() error {
 	return nil
 }
 
-// MutedCollection implements both DemuxOut as well as intent.file. It serves as a way to
+// MutedCollection implements both DemuxOut as well as intents.file. It serves as a way to
 // let the demutiplexer ignore certain embedded streams
 type MutedCollection struct {
 	Intent *intents.Intent

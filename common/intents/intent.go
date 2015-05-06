@@ -77,11 +77,15 @@ func (it *Intent) IsSystemIndexes() bool {
 	return it.C == "system.indexes" && it.BSONPath != ""
 }
 
-// Intent Manager
+func (intent *Intent) IsSpecialCollection() bool {
+	return intent.IsSystemIndexes() || intent.IsUsers() || intent.IsRoles() || intent.IsAuthVersion()
+}
 
 type Manager struct {
-	// map for merging metadata with BSON intents
-	intents        map[string]*Intent
+	// intents are for all of the regular user created collections
+	intents map[string]*Intent
+	// special intents are for all of the collections that are created by mongod
+	// and require special handling
 	specialIntents map[string]*Intent
 
 	// legacy mongorestore works in the order that paths are discovered,
@@ -195,8 +199,8 @@ func (manager *Manager) Put(intent *Intent) {
 	manager.intentsByDiscoveryOrder = append(manager.intentsByDiscoveryOrder, intent)
 }
 
-// Intents returns a slice containing all of the intents in the manager
-// Intents() is not thread safe
+// Intents returns a slice containing all of the intents in the manager.
+// Intents is not thread safe
 func (manager *Manager) Intents() []*Intent {
 	allIntents := []*Intent{}
 	for _, intent := range manager.intents {
@@ -319,6 +323,6 @@ func (manager *Manager) Finalize(pType PriorityType) {
 	manager.intentsByDiscoveryOrder = nil
 }
 
-func (manager *Manager) FinalizeWithPrioritizer(prioritizer IntentPrioritizer) {
+func (manager *Manager) UsePrioritizer(prioritizer IntentPrioritizer) {
 	manager.prioritizer = prioritizer
 }

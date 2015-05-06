@@ -23,14 +23,21 @@ const (
 	MetadataFileType
 )
 
-type bsonFileFile struct {
+// realBSONFile implements the intents.file interface. It lets intents read from real BSON files
+// ok disk via an embedded os.File
+// The Read, Write and Close methods of the intents.file interface is implemented here by the
+// embedded os.File, the Write will return an error and not succeed
+type realBSONFile struct {
 	*os.File
 	intent *intents.Intent
 }
 
-func (f *bsonFileFile) Open() (err error) {
+// Open is part of the intents.file interface. realBSONFiles need to be Opened before Read
+// can be called on them.
+func (f *realBSONFile) Open() (err error) {
 	if f.intent.BSONPath == "" {
-		return fmt.Errorf("No BSONPath for %v.%v", f.intent.DB, f.intent.C)
+		// this error shouldn't happen normally
+		return fmt.Errorf("error reading BSON file for %v", f.intent.Namespace())
 	}
 	f.File, err = os.Open(f.intent.BSONPath)
 	if err != nil {
@@ -39,14 +46,20 @@ func (f *bsonFileFile) Open() (err error) {
 	return nil
 }
 
-type metadataFileFile struct {
+// realMetadataFile implements the intents.file interface. It lets intents read from real
+// metadata.json files ok disk via an embedded os.File
+// The Read, Write and Close methods of the intents.file interface is implemented here by the
+// embedded os.File, the Write will return an error and not succeed
+type realMetadataFile struct {
 	*os.File
 	intent *intents.Intent
 }
 
-func (f *metadataFileFile) Open() (err error) {
+// Open is part of the intents.file interface. realMetadataFiles need to be Opened before Read
+// can be called on them.
+func (f *realMetadataFile) Open() (err error) {
 	if f.intent.MetadataPath == "" {
-		return fmt.Errorf("No MetadataPath for %v.%v", f.intent.DB, f.intent.C)
+		return fmt.Errorf("error reading Metadata file for %v", f.intent.Namespace())
 	}
 	f.File, err = os.Open(f.intent.MetadataPath)
 	if err != nil {
@@ -55,21 +68,28 @@ func (f *metadataFileFile) Open() (err error) {
 	return nil
 }
 
+// stdinFile implements the intents.file interface. They allow intents to read single collections
+// from standard input
 type stdinFile struct {
 	io.Reader
 	intent *intents.Intent
 }
 
+// Open is part of the intents.file interface. stdinFile needs to have Open called on it before
+// Read can be called on it.
 func (f *stdinFile) Open() error {
-	// I think that stdin should be duplicated in a cross platform fashion here.
 	f.Reader = os.Stdin
 	return nil
 }
 
+// Close is part of the intents.file interface. After Close is called, Read will fail.
 func (f *stdinFile) Close() error {
+	f.Reader = nil
 	return nil
 }
 
+// Write is part of the intents.file interface. Nobody should be writing to stdinFiles,
+// could probably justifiably panic here.
 func (f *stdinFile) Write(p []byte) (n int, err error) {
 	return 0, fmt.Errorf("can't write to standard output")
 }
@@ -97,19 +117,24 @@ func GetInfoFromFilename(filename string) (string, FileType) {
 
 // CreateAllIntents drills down into a dump folder, creating intents for all of
 // the databases and collections it finds.
-func (restore *MongoRestore) CreateAllIntents(dir archive.DirLike) error {
+func (restore *MongoRestore) CreateAllIntents(dir archive.DirLike, filterDB string, filterCollection string) error {
 	log.Logf(log.DebugHigh, "using %v as dump root directory", dir.Path())
 	foundOplog := false
 	entries, err := dir.ReadDir()
 	if err != nil {
 		return fmt.Errorf("error reading root dump folder: %v", err)
 	}
+	log.Logf(log.Always, "%v", entries)
 	for _, entry := range entries {
 		if entry.IsDir() {
 			if err = util.ValidateDBName(entry.Name()); err != nil {
 				return fmt.Errorf("invalid database name '%v': %v", entry.Name(), err)
 			}
-			err = restore.CreateIntentsForDB(entry.Name(), entry)
+			if filterDB == "" || entry.Name() == filterDB {
+				err = restore.CreateIntentsForDB(entry.Name(), filterCollection, entry, false)
+			} else {
+				err = restore.CreateIntentsForDB(entry.Name(), "", entry, true)
+			}
 			if err != nil {
 				return err
 			}
@@ -124,16 +149,37 @@ func (restore *MongoRestore) CreateAllIntents(dir archive.DirLike) error {
 					BSONPath: entry.Path(),
 					Size:     entry.Size(),
 				}
-				if restore.InputOptions.Archive {
+				if filterDB != "" || filterCollection != "" {
+					if restore.InputOptions.Archive == "" {
+						continue
+					} else {
+						mutedOut := &archive.MutedCollection{
+							Intent: oplogIntent,
+							Demux:  restore.archive.Demux,
+						}
+						restore.archive.Demux.Open(
+							oplogIntent.Namespace(),
+							mutedOut,
+						)
+						continue
+					}
+				}
+				if restore.InputOptions.Archive != "" {
 					// no need to check that we want to cache here
-					oplogIntent.BSONFile = &archive.RegularCollectionReceiver{Intent: oplogIntent, Demux: restore.archive.Demux}
+					oplogIntent.BSONFile =
+						&archive.RegularCollectionReceiver{
+							Intent: oplogIntent,
+							Demux:  restore.archive.Demux,
+						}
 				} else {
-					oplogIntent.BSONFile = &bsonFileFile{intent: oplogIntent}
+					oplogIntent.BSONFile = &realBSONFile{intent: oplogIntent}
 				}
 				restore.manager.Put(oplogIntent)
 			} else {
-				log.Logf(log.Always, `don't know what to do with file "%v", skipping...`,
-					entry.Path())
+				log.Logf(log.Always,
+					`don't know what to do with file "%v", skipping...`,
+					entry.Path(),
+				)
 			}
 		}
 	}
@@ -145,13 +191,14 @@ func (restore *MongoRestore) CreateAllIntents(dir archive.DirLike) error {
 
 // CreateIntentsForDB drills down into the dir folder, creating intents
 // for all of the collection dump files it finds for the db database.
-func (restore *MongoRestore) CreateIntentsForDB(db string, dir archive.DirLike) error {
-
+func (restore *MongoRestore) CreateIntentsForDB(db string, filterCollection string, dir archive.DirLike, mute bool) (err error) {
+	var entries []archive.DirLike
 	log.Logf(log.DebugHigh, "reading collections for database %v in %v", db, dir.Name())
-	entries, err := dir.ReadDir()
+	entries, err = dir.ReadDir()
 	if err != nil {
 		return fmt.Errorf("error reading db folder %v: %v", db, err)
 	}
+	log.Logf(log.Always, "%v", entries)
 	usesMetadataFiles := hasMetadataFiles(entries)
 	for _, entry := range entries {
 		if entry.IsDir() {
@@ -161,7 +208,7 @@ func (restore *MongoRestore) CreateIntentsForDB(db string, dir archive.DirLike) 
 			collection, fileType := GetInfoFromFilename(entry.Name())
 			switch fileType {
 			case BSONFileType:
-				var skip = false
+				var skip = mute
 				// Dumps of a single database (i.e. with the -d flag) may contain special
 				// db-specific collections that start with a "$" (for example, $admin.system.users
 				// holds the users for a database that was dumped with --dumpDbUsersAndRoles enabled).
@@ -187,21 +234,23 @@ func (restore *MongoRestore) CreateIntentsForDB(db string, dir archive.DirLike) 
 							"has .metadata.json files", db)
 					skip = true
 				}
+				if filterCollection != "" && filterCollection != collection {
+					skip = true
+				}
 				intent := &intents.Intent{
 					DB:       db,
 					C:        collection,
 					Size:     entry.Size(),
 					BSONPath: entry.Path(),
 				}
-				if restore.InputOptions.Archive {
+				if restore.InputOptions.Archive != "" {
 					if skip {
 						// adding the DemuxOut to the demux, but not adding the intent to the manager
 						mutedOut := &archive.MutedCollection{Intent: intent, Demux: restore.archive.Demux}
 						restore.archive.Demux.Open(intent.Namespace(), mutedOut)
 						continue
 					} else {
-						// TODO: refactor this code to make it much more concise
-						if intent.IsSystemIndexes() || intent.IsUsers() || intent.IsRoles() || intent.IsAuthVersion() {
+						if intent.IsSpecialCollection() {
 							intent.BSONFile = &archive.SpecialCollectionCache{Intent: intent, Demux: restore.archive.Demux}
 							restore.archive.Demux.Open(intent.Namespace(), intent.BSONFile)
 						} else {
@@ -212,7 +261,16 @@ func (restore *MongoRestore) CreateIntentsForDB(db string, dir archive.DirLike) 
 					if skip {
 						continue
 					}
-					intent.BSONFile = &bsonFileFile{intent: intent}
+					if restore.useStdin {
+						intent = &intents.Intent{
+							DB:       db,
+							C:        collection,
+							BSONPath: "-",
+						}
+						intent.BSONFile = &stdinFile{intent: intent}
+					} else {
+						intent.BSONFile = &realBSONFile{intent: intent}
+					}
 				}
 				log.Logf(log.Info, "found collection %v bson to restore", intent.Namespace())
 				restore.manager.Put(intent)
@@ -223,10 +281,10 @@ func (restore *MongoRestore) CreateIntentsForDB(db string, dir archive.DirLike) 
 					C:            collection,
 					MetadataPath: entry.Path(),
 				}
-				if restore.InputOptions.Archive {
+				if restore.InputOptions.Archive != "" {
 					intent.MetadataFile = &archive.MetadataPreludeFile{Intent: intent, Prelude: restore.archive.Prelude}
 				} else {
-					intent.MetadataFile = &metadataFileFile{intent: intent}
+					intent.MetadataFile = &realMetadataFile{intent: intent}
 				}
 				log.Logf(log.Info, "found collection %v metadata to restore", intent.Namespace())
 				restore.manager.Put(intent)
@@ -237,16 +295,6 @@ func (restore *MongoRestore) CreateIntentsForDB(db string, dir archive.DirLike) 
 		}
 	}
 	return nil
-}
-
-// helper for searching a list of FileInfo for metadata files
-func hasMetadataFiles(files []archive.DirLike) bool {
-	for _, file := range files {
-		if strings.HasSuffix(file.Name(), ".metadata.json") {
-			return true
-		}
-	}
-	return false
 }
 
 // CreateIntentForCollection builds an intent for the given database and collection name
@@ -293,17 +341,7 @@ func (restore *MongoRestore) CreateIntentForCollection(db string, collection str
 		BSONPath: dir.Path(),
 		Size:     dir.Size(),
 	}
-	if restore.InputOptions.Archive {
-		// TODO: refactor this code to make it much more concise
-		if intent.IsSystemIndexes() || intent.IsUsers() || intent.IsRoles() || intent.IsAuthVersion() {
-			intent.BSONFile = &archive.SpecialCollectionCache{Intent: intent, Demux: restore.archive.Demux}
-			restore.archive.Demux.Open(intent.Namespace(), intent.BSONFile)
-		} else {
-			intent.BSONFile = &archive.RegularCollectionReceiver{Intent: intent, Demux: restore.archive.Demux}
-		}
-	} else {
-		intent.BSONFile = &bsonFileFile{intent: intent}
-	}
+	intent.BSONFile = &realBSONFile{intent: intent}
 
 	// finally, check if it has a .metadata.json file in its folder
 	log.Logf(log.DebugLow, "scanning directory %v for metadata file", dir.Name())
@@ -321,11 +359,7 @@ func (restore *MongoRestore) CreateIntentForCollection(db string, collection str
 			metadataPath := entry.Path()
 			log.Logf(log.Info, "found metadata for collection at %v", metadataPath)
 			intent.MetadataPath = metadataPath
-			if restore.InputOptions.Archive {
-				intent.MetadataFile = &archive.MetadataPreludeFile{Intent: intent, Prelude: restore.archive.Prelude}
-			} else {
-				intent.MetadataFile = &metadataFileFile{intent: intent}
-			}
+			intent.MetadataFile = &realMetadataFile{intent: intent}
 			break
 		}
 	}
@@ -337,6 +371,16 @@ func (restore *MongoRestore) CreateIntentForCollection(db string, collection str
 	restore.manager.Put(intent)
 
 	return nil
+}
+
+// helper for searching a list of FileInfo for metadata files
+func hasMetadataFiles(files []archive.DirLike) bool {
+	for _, file := range files {
+		if strings.HasSuffix(file.Name(), ".metadata.json") {
+			return true
+		}
+	}
+	return false
 }
 
 // handleBSONInsteadOfDirectory updates -d and -c settings based on
@@ -371,68 +415,68 @@ func (restore *MongoRestore) handleBSONInsteadOfDirectory(path string) error {
 	return nil
 }
 
-type dirDirLike struct {
+type actualPath struct {
 	os.FileInfo
 	path   string
-	parent *dirDirLike
+	parent *actualPath
 }
 
-func newDirDirLike(dir string) (*dirDirLike, error) {
+func newActualPath(dir string) (*actualPath, error) {
 	stat, err := os.Stat(dir)
 	if err != nil {
 		return nil, err
 	}
 	path := filepath.Dir(filepath.Clean(dir))
-	parent := &dirDirLike{}
+	parent := &actualPath{}
 	parentStat, err := os.Stat(path)
 	if err == nil {
 		parent.FileInfo = parentStat
 		parent.path = filepath.Dir(path)
 	}
-	ddl := &dirDirLike{
+	ap := &actualPath{
 		FileInfo: stat,
 		path:     path,
 		parent:   parent,
 	}
-	return ddl, nil
+	return ap, nil
 }
 
-func (ddl dirDirLike) Path() string {
-	return filepath.Join(ddl.path, ddl.Name())
+func (ap actualPath) Path() string {
+	return filepath.Join(ap.path, ap.Name())
 }
 
-func (ddl dirDirLike) Parent() archive.DirLike {
+func (ap actualPath) Parent() archive.DirLike {
 	// returns nil if there is no parent
-	return ddl.parent
+	return ap.parent
 }
 
-func (ddl dirDirLike) ReadDir() ([]archive.DirLike, error) {
-	entries, err := ioutil.ReadDir(ddl.Path())
+func (ap actualPath) ReadDir() ([]archive.DirLike, error) {
+	entries, err := ioutil.ReadDir(ap.Path())
 	if err != nil {
 		return nil, err
 	}
 	var returnFileInfo = make([]archive.DirLike, 0, len(entries))
 	for _, entry := range entries {
 		returnFileInfo = append(returnFileInfo,
-			dirDirLike{
+			actualPath{
 				FileInfo: entry,
-				path:     ddl.Path(),
-				parent:   &ddl,
+				path:     ap.Path(),
+				parent:   &ap,
 			})
 	}
 	return returnFileInfo, nil
 }
 
-func (ddl dirDirLike) Stat() (archive.DirLike, error) {
-	stat, err := os.Stat(ddl.Path())
+func (ap actualPath) Stat() (archive.DirLike, error) {
+	stat, err := os.Stat(ap.Path())
 	if err != nil {
 		return nil, err
 	}
-	return &dirDirLike{FileInfo: stat, path: ddl.Path()}, nil
+	return &actualPath{FileInfo: stat, path: ap.Path()}, nil
 }
 
-func (ddl dirDirLike) IsDir() bool {
-	stat, err := os.Stat(ddl.Path())
+func (ap actualPath) IsDir() bool {
+	stat, err := os.Stat(ap.Path())
 	if err != nil {
 		return false
 	}

@@ -102,7 +102,7 @@ func TestGetDumpAuthVersion(t *testing.T) {
 					C:        "system.version",
 					BSONPath: "testdata/auth_version_3.bson",
 				}
-				intent.BSONFile = &bsonFileFile{intent: intent}
+				intent.BSONFile = &realBSONFile{intent: intent}
 				restore.manager.Put(intent)
 				version, err := restore.GetDumpAuthVersion()
 				So(err, ShouldBeNil)
@@ -116,7 +116,7 @@ func TestGetDumpAuthVersion(t *testing.T) {
 					C:        "system.version",
 					BSONPath: "testdata/auth_version_5.bson",
 				}
-				intent.BSONFile = &bsonFileFile{intent: intent}
+				intent.BSONFile = &realBSONFile{intent: intent}
 				restore.manager.Put(intent)
 				version, err := restore.GetDumpAuthVersion()
 				So(err, ShouldBeNil)
@@ -150,7 +150,7 @@ func TestGetDumpAuthVersion(t *testing.T) {
 					C:        "system.version",
 					BSONPath: "testdata/auth_version_3.bson",
 				}
-				intent.BSONFile = &bsonFileFile{intent: intent}
+				intent.BSONFile = &realBSONFile{intent: intent}
 				restore.manager.Put(intent)
 				version, err := restore.GetDumpAuthVersion()
 				So(err, ShouldBeNil)
@@ -164,7 +164,7 @@ func TestGetDumpAuthVersion(t *testing.T) {
 					C:        "system.version",
 					BSONPath: "testdata/auth_version_5.bson",
 				}
-				intent.BSONFile = &bsonFileFile{intent: intent}
+				intent.BSONFile = &realBSONFile{intent: intent}
 				restore.manager.Put(intent)
 				version, err := restore.GetDumpAuthVersion()
 				So(err, ShouldBeNil)

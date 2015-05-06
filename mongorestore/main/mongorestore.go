@@ -15,7 +15,7 @@ import (
 func main() {
 	go signals.Handle()
 	// initialize command-line opts
-	opts := options.New("mongorestore", mongorestore.Usage, 
+	opts := options.New("mongorestore", mongorestore.Usage,
 		options.EnabledOptions{Auth: true, Connection: true, Namespace: true})
 	inputOpts := &mongorestore.InputOptions{}
 	opts.AddOptions(inputOpts)
@@ -99,7 +99,6 @@ func getTargetDirFromArgs(extraArgs []string, dirFlag string) (string, error) {
 		return dirFlag, nil
 
 	default:
-		log.Log(log.Always, "using default 'dump' directory")
-		return "dump", nil
+		return "", nil
 	}
 }

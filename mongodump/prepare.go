@@ -1,6 +1,7 @@
 package mongodump
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/archive"
@@ -9,6 +10,7 @@ import (
 	"github.com/mongodb/mongo-tools/common/intents"
 	"github.com/mongodb/mongo-tools/common/log"
 	"gopkg.in/mgo.v2/bson"
+	"io"
 	"os"
 	"path"
 	"path/filepath"
@@ -20,38 +22,65 @@ type collectionInfo struct {
 	Options *bson.D `bson:"options"`
 }
 
-type bsonFileFile struct {
-	*os.File
+// realBSONFile implements the intents.file interface. It lets intents write to real BSON files
+// ok disk via an embedded bufio.Writer
+// The Write method of the intents.file interface is implemented here by the embedded bufio.Writer
+type realBSONFile struct {
+	*bufio.Writer
+	file   *os.File
 	intent *intents.Intent
 }
 
-func (f *bsonFileFile) Open() (err error) {
+// Open is part of the intents.file interface. realBSONFiles need to have Open called before
+// Read can be called
+func (f *realBSONFile) Open() (err error) {
 	if f.intent.BSONPath == "" {
-		return fmt.Errorf("No BSONPath for %v.%v", f.intent.DB, f.intent.C)
+		// This should not occur normally. All intents should have a BSONPath.
+		return fmt.Errorf("error creating BSON file without a path, namespace: %v",
+			f.intent.Namespace())
 	}
 	err = os.MkdirAll(path.Dir(f.intent.BSONPath), os.ModeDir|os.ModePerm)
 	if err != nil {
 		return fmt.Errorf("error creating BSON file %v: %v", f.intent.BSONPath, err)
 	}
-	f.File, err = os.Create(f.intent.BSONPath)
+	f.file, err = os.Create(f.intent.BSONPath)
 	if err != nil {
 		return fmt.Errorf("error creating BSON file %v: %v", f.intent.BSONPath, err)
 	}
+
+	// wrap writer in buffer to reduce load on disk
+	f.Writer = bufio.NewWriterSize(f.file, 32*1024)
+
 	return nil
 }
 
-type metadataFileFile struct {
+// Read is is part of the intents.file interface, Read on realBSONFile shouldn't be used.r
+// We could probabbly justifiably panic here.
+func (f *realBSONFile) Read([]byte) (int, error) {
+	return 0, io.EOF
+}
+
+// Close is part of the intents.file interface, Close on realBSONFiles gets called in DumpIntent
+func (f *realBSONFile) Close() error {
+	err := f.Writer.Flush()
+	if err != nil {
+		return err
+	}
+	return f.file.Close()
+}
+
+type realMetadataFile struct {
 	*os.File
 	intent *intents.Intent
 }
 
-func (f *metadataFileFile) Open() (err error) {
+func (f *realMetadataFile) Open() (err error) {
 	if f.intent.MetadataPath == "" {
 		return fmt.Errorf("No MetadataPath for %v.%v", f.intent.DB, f.intent.C)
 	}
 	err = os.MkdirAll(path.Dir(f.intent.BSONPath), os.ModeDir|os.ModePerm)
 	if err != nil {
-		return fmt.Errorf("error creating BSON file %v: %v", f.intent.BSONPath, err)
+		return fmt.Errorf("error creating Metadata file %v: %v", f.intent.BSONPath, err)
 	}
 	f.File, err = os.Create(f.intent.MetadataPath)
 	if err != nil {
@@ -60,21 +89,29 @@ func (f *metadataFileFile) Open() (err error) {
 	return nil
 }
 
+// stdoutFile implements the intents.file interface. stdoutFiles are used when single collections
+// are written directly (non-archive-mode) to standard out, via "--dir -"
 type stdoutFile struct {
 	*os.File
 	intent *intents.Intent
 }
 
+// Open is part of the intents.file interface.
 func (f *stdoutFile) Open() error {
 	f.File = os.Stdout
 	return nil
 }
 
+// Close is part of the intents.file interface. While we could actually close os.Stdout here,
+// that's actually a bad idea. Unsetting f.File here will cause future writes to fail, but that
+// shouldn't happen anyway.
 func (f *stdoutFile) Close() error {
 	f.File = nil
 	return nil
 }
 
+// Read is part of the intents.file interface. Nobody should be reading from stdoutFiles,
+// could probably justifiably panic here.
 func (f *stdoutFile) Read(p []byte) (n int, err error) {
 	return 0, fmt.Errorf("can't read from standard output")
 }
@@ -97,7 +134,16 @@ func (dump *MongoDump) shouldSkipCollection(colName string) bool {
 
 // outputPath creates a path for the collection to be written to (sans file extension).
 func (dump *MongoDump) outputPath(dbName, colName string) string {
-	return filepath.Join(dump.OutputOptions.Out, dbName, colName)
+	var root string
+	if dump.OutputOptions.Out == "" {
+		root = "dump"
+	} else {
+		root = dump.OutputOptions.Out
+	}
+	if dbName == "" {
+		return filepath.Join(root, colName)
+	}
+	return filepath.Join(root, dbName, colName)
 }
 
 // NewIntent creates a bare intent without populating the options.
@@ -111,26 +157,24 @@ func (dump *MongoDump) NewIntent(dbName, colName string, stdout bool) (*intents.
 	// add stdout flags if we're using stdout
 	if dump.useStdout {
 		intent.BSONFile = &stdoutFile{intent: intent}
-		// We don't actually need a stdoutMetadataFile type because none of the methods on the stdoutFile
-		// Make any use of the BSON or Metadata parts of the intent
 		intent.MetadataFile = &stdoutFile{intent: intent}
 	}
 
-	if dump.OutputOptions.Archive {
+	if dump.OutputOptions.Archive != "" {
 		intent.BSONFile = &archive.MuxIn{Intent: intent, Mux: dump.archive.Mux}
 	} else {
-		intent.BSONFile = &bsonFileFile{intent: intent}
+		intent.BSONFile = &realBSONFile{intent: intent}
 	}
 
 	if !intent.IsSystemIndexes() {
 		intent.MetadataPath = dump.outputPath(dbName, colName+".metadata.json")
-		if dump.OutputOptions.Archive {
-			intent.MetadataFile = &archive.Metadata{
+		if dump.OutputOptions.Archive != "" {
+			intent.MetadataFile = &archive.MetadataFile{
 				Intent: intent,
 				Buffer: &bytes.Buffer{},
 			}
 		} else {
-			intent.MetadataFile = &metadataFileFile{intent: intent}
+			intent.MetadataFile = &realMetadataFile{intent: intent}
 		}
 	}
 
@@ -158,20 +202,15 @@ func (dump *MongoDump) CreateOplogIntents() error {
 		return err
 	}
 
-	err = os.MkdirAll(dump.OutputOptions.Out, defaultPermissions)
-	if err != nil {
-		return err
-	}
-
 	oplogIntent := &intents.Intent{
 		DB:       "local",
 		C:        dump.oplogCollection,
-		BSONPath: filepath.Join(dump.OutputOptions.Out, "oplog.bson"),
+		BSONPath: dump.outputPath("oplog.bson", ""),
 	}
-	if dump.OutputOptions.Archive {
+	if dump.OutputOptions.Archive != "" {
 		oplogIntent.BSONFile = &archive.MuxIn{Mux: dump.archive.Mux, Intent: oplogIntent}
 	} else {
-		oplogIntent.BSONFile = &bsonFileFile{intent: oplogIntent}
+		oplogIntent.BSONFile = &realBSONFile{intent: oplogIntent}
 	}
 	dump.manager.Put(oplogIntent)
 	return nil
@@ -182,11 +221,7 @@ func (dump *MongoDump) CreateOplogIntents() error {
 // And then it adds the intents in to the manager
 func (dump *MongoDump) CreateUsersRolesVersionIntentsForDB(db string) error {
 
-	outDir := filepath.Join(dump.OutputOptions.Out, db)
-	err := os.MkdirAll(outDir, defaultPermissions)
-	if err != nil {
-		return err
-	}
+	outDir := dump.outputPath(db, "")
 
 	usersIntent := &intents.Intent{
 		DB:       "admin",
@@ -203,14 +238,14 @@ func (dump *MongoDump) CreateUsersRolesVersionIntentsForDB(db string) error {
 		C:        "system.version",
 		BSONPath: filepath.Join(outDir, "$admin.system.version.bson"),
 	}
-	if dump.OutputOptions.Archive {
+	if dump.OutputOptions.Archive != "" {
 		usersIntent.BSONFile = &archive.MuxIn{Intent: usersIntent, Mux: dump.archive.Mux}
 		rolesIntent.BSONFile = &archive.MuxIn{Intent: rolesIntent, Mux: dump.archive.Mux}
 		versionIntent.BSONFile = &archive.MuxIn{Intent: versionIntent, Mux: dump.archive.Mux}
 	} else {
-		usersIntent.BSONFile = &bsonFileFile{intent: usersIntent}
-		rolesIntent.BSONFile = &bsonFileFile{intent: rolesIntent}
-		versionIntent.BSONFile = &bsonFileFile{intent: versionIntent}
+		usersIntent.BSONFile = &realBSONFile{intent: usersIntent}
+		rolesIntent.BSONFile = &realBSONFile{intent: rolesIntent}
+		versionIntent.BSONFile = &realBSONFile{intent: versionIntent}
 	}
 	dump.manager.Put(usersIntent)
 	dump.manager.Put(rolesIntent)
@@ -280,12 +315,6 @@ func (dump *MongoDump) createIntentFromOptions(dbName string, ci *collectionInfo
 // and builds dump intents for each collection.
 func (dump *MongoDump) CreateIntentsForDatabase(dbName string) error {
 	// we must ensure folders for empty databases are still created, for legacy purposes
-	dbFolder := filepath.Join(dump.OutputOptions.Out, dbName)
-	// XXX move to the open
-	err := os.MkdirAll(dbFolder, defaultPermissions)
-	if err != nil {
-		return fmt.Errorf("error creating directory `%v`: %v", dbFolder, err)
-	}
 
 	session, err := dump.sessionProvider.GetSession()
 	if err != nil {

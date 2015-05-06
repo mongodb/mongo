@@ -2,6 +2,7 @@
 package mongorestore
 
 import (
+	"compress/gzip"
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/archive"
 	"github.com/mongodb/mongo-tools/common/auth"
@@ -13,7 +14,9 @@ import (
 	"github.com/mongodb/mongo-tools/common/util"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
+	"io"
 	"os"
+	"path/filepath"
 	"sync"
 )
 
@@ -140,6 +143,10 @@ func (restore *MongoRestore) ParseAndValidateOptions() error {
 	// a single dash signals reading from stdin
 	if restore.TargetDirectory == "-" {
 		restore.useStdin = true
+		if restore.InputOptions.Archive != "" {
+			return fmt.Errorf(
+				"cannot restore from \"-\" when --archive is specified")
+		}
 		if restore.ToolOptions.Collection == "" {
 			return fmt.Errorf("cannot restore from stdin without a specified collection")
 		}
@@ -160,18 +167,29 @@ func (restore *MongoRestore) Restore() error {
 	// Build up all intents to be restored
 	restore.manager = intents.NewIntentManager()
 
-	if restore.InputOptions.Archive {
+	if restore.InputOptions.Archive != "" {
+		archiveReader, err := restore.getArchiveReader()
+		if err != nil {
+			return err
+		}
 		restore.archive = &archive.Reader{
-			In:      os.Stdin,
+			In:      archiveReader,
 			Prelude: &archive.Prelude{},
 		}
 		err = restore.archive.Prelude.Read(restore.archive.In)
 		if err != nil {
-			return nil
+			return err
 		}
-		target = restore.archive.Prelude.NewPreludeExplorer()
+		target, err = restore.archive.Prelude.NewPreludeExplorer()
+		if err != nil {
+			return err
+		}
 	} else {
-		target, err = newDirDirLike(restore.TargetDirectory)
+		if restore.TargetDirectory == "" {
+			restore.TargetDirectory = "dump"
+			log.Log(log.Always, "using default 'dump' directory")
+		}
+		target, err = newActualPath(restore.TargetDirectory)
 		if err != nil {
 			return err
 		}
@@ -196,34 +214,52 @@ func (restore *MongoRestore) Restore() error {
 			restore.OutputOptions.NumParallelCollections)
 		restore.OutputOptions.NumInsertionWorkers = restore.OutputOptions.NumParallelCollections
 	}
+	if restore.InputOptions.Archive != "" {
+		if int(restore.archive.Prelude.Header.ConcurrentCollections) > restore.OutputOptions.NumParallelCollections {
+			restore.OutputOptions.NumParallelCollections = int(restore.archive.Prelude.Header.ConcurrentCollections)
+			restore.OutputOptions.NumInsertionWorkers = int(restore.archive.Prelude.Header.ConcurrentCollections)
+			log.Logf(log.Always,
+				"setting number of parallel collections to number of parallel collections in archive (%v)",
+				restore.archive.Prelude.Header.ConcurrentCollections,
+			)
+		}
+	}
 
 	// Create the demux before intent creation, because muted archive intents need
 	// to register themselves with the demux directly
-	if restore.InputOptions.Archive {
+	if restore.InputOptions.Archive != "" {
 		restore.archive.Demux = &archive.Demultiplexer{
 			In: restore.archive.In,
 		}
 	}
 
 	switch {
+	case restore.InputOptions.Archive != "":
+		log.Logf(log.Always,
+			"creating intents for archive")
+		err = restore.CreateAllIntents(target, restore.ToolOptions.DB, restore.ToolOptions.Collection)
 	case restore.ToolOptions.DB == "" && restore.ToolOptions.Collection == "":
 		log.Logf(log.Always,
 			"building a list of dbs and collections to restore from %v dir",
 			target.Path())
-		err = restore.CreateAllIntents(target)
+		err = restore.CreateAllIntents(target, "", "")
 	case restore.ToolOptions.DB != "" && restore.ToolOptions.Collection == "":
 		log.Logf(log.Always,
 			"building a list of collections to restore from %v dir",
 			target.Path())
 		err = restore.CreateIntentsForDB(
 			restore.ToolOptions.DB,
-			target)
+			"",
+			target,
+			false,
+		)
 	case restore.ToolOptions.DB != "" && restore.ToolOptions.Collection != "":
 		log.Logf(log.Always, "checking for collection data in %v", target.Path())
 		err = restore.CreateIntentForCollection(
 			restore.ToolOptions.DB,
 			restore.ToolOptions.Collection,
-			target)
+			target,
+		)
 	}
 	if err != nil {
 		return fmt.Errorf("error scanning filesystem: %v", err)
@@ -234,7 +270,7 @@ func (restore *MongoRestore) Restore() error {
 			"remove the 'config' directory from the dump directory first")
 	}
 
-	if restore.InputOptions.Archive {
+	if restore.InputOptions.Archive != "" {
 		namespaceChan := make(chan string, 1)
 		namespaceErrorChan := make(chan error)
 		restore.archive.Demux.NamespaceChan = namespaceChan
@@ -246,14 +282,19 @@ func (restore *MongoRestore) Restore() error {
 			ns := <-namespaceChan
 			intent := restore.manager.IntentForNamespace(ns)
 			if intent == nil {
-				return fmt.Errorf("No intent for collection in archive: %v", ns)
+				return fmt.Errorf("no intent for collection in archive: %v", ns)
 			}
-			if intent.IsSystemIndexes() || intent.IsUsers() || intent.IsRoles() || intent.IsAuthVersion() {
-				log.Logf(log.DebugLow, "eating namespace %v", ns)
+			if intent.IsSystemIndexes() ||
+				intent.IsUsers() ||
+				intent.IsRoles() ||
+				intent.IsAuthVersion() {
+				log.Logf(log.DebugLow, "special collection %v found", ns)
 				namespaceErrorChan <- nil
 			} else {
-				// Put the ns back on the chan so that the demultiplexer can start correctly
-				log.Logf(log.DebugLow, "shoving namespace back on the ns chan %v", ns)
+				// Put the ns back on the announcement chan so that the
+				// demultiplexer can start correctly
+				log.Logf(log.DebugLow, "first non special collection %v found."+
+					" The demultiplexer will handle it and the remainder", ns)
 				namespaceChan <- ns
 				break
 			}
@@ -285,8 +326,8 @@ func (restore *MongoRestore) Restore() error {
 	}
 
 	// Restore the regular collections
-	if restore.InputOptions.Archive {
-		restore.manager.FinalizeWithPrioritizer(restore.archive.Demux.NewPrioritizer(restore.manager))
+	if restore.InputOptions.Archive != "" {
+		restore.manager.UsePrioritizer(restore.archive.Demux.NewPrioritizer(restore.manager))
 	} else if restore.OutputOptions.NumParallelCollections > 1 {
 		restore.manager.Finalize(intents.MultiDatabaseLTF)
 	} else {
@@ -325,4 +366,34 @@ func (restore *MongoRestore) Restore() error {
 
 	log.Log(log.Always, "done")
 	return nil
+}
+
+func (restore *MongoRestore) getArchiveReader() (rc io.ReadCloser, err error) {
+	if restore.InputOptions.Archive == "-" {
+		rc = os.Stdin
+	} else {
+		targetStat, err := os.Stat(restore.InputOptions.Archive)
+		if err != nil {
+			return nil, err
+		}
+		if targetStat.IsDir() {
+			defaultArchiveFilePath := filepath.Join(restore.InputOptions.Archive, "archive")
+			if restore.InputOptions.Gzip {
+				defaultArchiveFilePath = defaultArchiveFilePath + ".gz"
+			}
+			rc, err = os.Open(defaultArchiveFilePath)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			rc, err = os.Open(restore.InputOptions.Archive)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+	if restore.InputOptions.Gzip {
+		return gzip.NewReader(rc)
+	}
+	return rc, nil
 }

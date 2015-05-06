@@ -10,22 +10,22 @@ import (
 )
 
 type testConsumer struct {
-	oobd []string // header data
-	ibd  []string // body data
-	eof  bool
+	headers []string // header data
+	bodies  []string // body data
+	eof     bool
 }
 
 func (tc *testConsumer) HeaderBSON(b []byte) error {
 	ss := strStruct{}
 	err := bson.Unmarshal(b, &ss)
-	tc.oobd = append(tc.oobd, ss.Str)
+	tc.headers = append(tc.headers, ss.Str)
 	return err
 }
 
 func (tc *testConsumer) BodyBSON(b []byte) error {
 	ss := strStruct{}
 	err := bson.Unmarshal(b, &ss)
-	tc.ibd = append(tc.ibd, ss.Str)
+	tc.bodies = append(tc.bodies, ss.Str)
 	return err
 }
 
@@ -60,8 +60,8 @@ func TestParsing(t *testing.T) {
 			err := parser.ReadBlock(tc)
 			So(err, ShouldBeNil)
 			So(tc.eof, ShouldBeFalse)
-			So(tc.oobd[0], ShouldEqual, "header")
-			So(tc.ibd[0], ShouldEqual, "body")
+			So(tc.headers[0], ShouldEqual, "header")
+			So(tc.bodies[0], ShouldEqual, "body")
 
 			err = parser.ReadBlock(tc)
 			So(err, ShouldEqual, io.EOF)
@@ -82,10 +82,10 @@ func TestParsing(t *testing.T) {
 			err := parser.ReadBlock(tc)
 			So(err, ShouldBeNil)
 			So(tc.eof, ShouldBeFalse)
-			So(tc.oobd[0], ShouldEqual, "header")
-			So(tc.ibd[0], ShouldEqual, "body0")
-			So(tc.ibd[1], ShouldEqual, "body1")
-			So(tc.ibd[2], ShouldEqual, "body2")
+			So(tc.headers[0], ShouldEqual, "header")
+			So(tc.bodies[0], ShouldEqual, "body0")
+			So(tc.bodies[1], ShouldEqual, "body1")
+			So(tc.bodies[2], ShouldEqual, "body2")
 
 			err = parser.ReadBlock(tc)
 			So(err, ShouldEqual, io.EOF)
@@ -126,8 +126,8 @@ func TestParsing(t *testing.T) {
 			err := parser.ReadBlock(tc)
 			So(err, ShouldNotBeNil)
 			So(tc.eof, ShouldBeFalse)
-			So(tc.oobd[0], ShouldEqual, "header")
-			So(tc.ibd[0], ShouldEqual, "body")
+			So(tc.headers[0], ShouldEqual, "header")
+			So(tc.bodies[0], ShouldEqual, "body")
 		})
 		Convey("a block with a missing terminator shoud result in a non-EOF error", func() {
 			buf := bytes.Buffer{}
@@ -141,8 +141,8 @@ func TestParsing(t *testing.T) {
 			err := parser.ReadBlock(tc)
 			So(err, ShouldNotBeNil)
 			So(tc.eof, ShouldBeFalse)
-			So(tc.oobd[0], ShouldEqual, "header")
-			So(tc.ibd, ShouldBeNil)
+			So(tc.headers[0], ShouldEqual, "header")
+			So(tc.bodies, ShouldBeNil)
 		})
 	})
 	return

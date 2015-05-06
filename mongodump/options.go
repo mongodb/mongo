@@ -21,10 +21,11 @@ func (_ *InputOptions) Name() string {
 
 // OutputOptions defines the set of options for writing dump data.
 type OutputOptions struct {
-	Out                        string   `long:"out" short:"o" description:"output directory, or '-' for stdout (defaults to 'dump')" default:"dump" default-mask:"-"`
+	Out                        string   `long:"out" short:"o" description:"output directory, or '-' for stdout (defaults to 'dump')" default-mask:"-"`
+	Gzip                       bool     `long:"gzip" description:"compress archive our collection output with Gzip"`
 	Repair                     bool     `long:"repair" description:"try to recover documents from damaged data files (not supported by all storage engines)"`
 	Oplog                      bool     `long:"oplog" description:"use oplog for taking a point-in-time snapshot"`
-	Archive                    bool     `long:"archive" description:"dump in to a dump-archive instead of a directory"`
+	Archive                    string   `long:"archive" optional:"true" optional-value:"-" description:"dump in to the specified dump-archive instead of a directory"`
 	DumpDBUsersAndRoles        bool     `long:"dumpDbUsersAndRoles" description:"dump user and role definitions for the specified database"`
 	ExcludedCollections        []string `long:"excludeCollection" description:"collection to exclude from the dump (may be specified multiple times to exclude additional collections)"`
 	ExcludedCollectionPrefixes []string `long:"excludeCollectionsWithPrefix" description:"exclude all collections from the dump that have the given prefix (may be specified multiple times to exclude additional prefixes)"`

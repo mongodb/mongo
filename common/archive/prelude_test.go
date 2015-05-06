@@ -35,7 +35,7 @@ func TestPrelude(t *testing.T) {
 
 		archivePrelude := &Prelude{
 			Header: &Header{
-				ArchiveFormatVersion: "version-foo",
+				FormatVersion: "version-foo",
 			},
 			NamespaceMetadatas: []*CollectionMetadata{cm1, cm2, cm3, cm4},
 			DBS:                []string{"db1", "db2", "db3"},

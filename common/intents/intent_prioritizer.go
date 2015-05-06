@@ -11,7 +11,6 @@ const (
 	Legacy PriorityType = iota
 	LongestTaskFirst
 	MultiDatabaseLTF
-	ArchiveOrder
 )
 
 // IntentPrioritizer encapsulates the logic of scheduling intents

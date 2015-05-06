@@ -50,9 +50,9 @@ func TestCreateAllIntents(t *testing.T) {
 		log.SetWriter(&buff)
 
 		Convey("running CreateAllIntents should succeed", func() {
-			ddl, err := newDirDirLike("testdata/testdirs/")
+			ddl, err := newActualPath("testdata/testdirs/")
 			So(err, ShouldBeNil)
-			So(mr.CreateAllIntents(ddl), ShouldBeNil)
+			So(mr.CreateAllIntents(ddl, "", ""), ShouldBeNil)
 			mr.manager.Finalize(intents.Legacy)
 
 			Convey("and reading the intents should show alphabetical order", func() {
@@ -118,9 +118,9 @@ func TestCreateIntentsForDB(t *testing.T) {
 		log.SetWriter(&buff)
 
 		Convey("running CreateIntentsForDB should succeed", func() {
-			ddl, err := newDirDirLike("testdata/testdirs/db1")
+			ddl, err := newActualPath("testdata/testdirs/db1")
 			So(err, ShouldBeNil)
-			err = mr.CreateIntentsForDB("myDB", ddl)
+			err = mr.CreateIntentsForDB("myDB", "", ddl, false)
 			So(err, ShouldBeNil)
 			mr.manager.Finalize(intents.Legacy)
 
@@ -215,7 +215,7 @@ func TestCreateIntentsForCollection(t *testing.T) {
 		log.SetWriter(&buff)
 
 		Convey("running CreateIntentForCollection on a file without metadata", func() {
-			ddl, err := newDirDirLike(util.ToUniversalPath("testdata/testdirs/db1/c2.bson"))
+			ddl, err := newActualPath(util.ToUniversalPath("testdata/testdirs/db1/c2.bson"))
 			So(err, ShouldBeNil)
 			err = mr.CreateIntentForCollection("myDB", "myC", ddl)
 			So(err, ShouldBeNil)
@@ -226,7 +226,7 @@ func TestCreateIntentsForCollection(t *testing.T) {
 				So(i0, ShouldNotBeNil)
 				So(i0.DB, ShouldEqual, "myDB")
 				So(i0.C, ShouldEqual, "myC")
-				ddl, err := newDirDirLike(util.ToUniversalPath("testdata/testdirs/db1/c2.bson"))
+				ddl, err := newActualPath(util.ToUniversalPath("testdata/testdirs/db1/c2.bson"))
 				So(err, ShouldBeNil)
 				So(i0.BSONPath, ShouldEqual, ddl.Path())
 				i1 := mr.manager.Pop()
@@ -241,7 +241,7 @@ func TestCreateIntentsForCollection(t *testing.T) {
 		})
 
 		Convey("running CreateIntentForCollection on a file *with* metadata", func() {
-			ddl, err := newDirDirLike(util.ToUniversalPath("testdata/testdirs/db1/c1.bson"))
+			ddl, err := newActualPath(util.ToUniversalPath("testdata/testdirs/db1/c1.bson"))
 			So(err, ShouldBeNil)
 			err = mr.CreateIntentForCollection("myDB", "myC", ddl)
 			So(err, ShouldBeNil)
@@ -265,14 +265,14 @@ func TestCreateIntentsForCollection(t *testing.T) {
 		})
 
 		Convey("running CreateIntentForCollection on a non-existent file", func() {
-			_, err := newDirDirLike("aaaaaaaaaaaaaa.bson")
+			_, err := newActualPath("aaaaaaaaaaaaaa.bson")
 			Convey("should fail", func() {
 				So(err, ShouldNotBeNil)
 			})
 		})
 
 		Convey("running CreateIntentForCollection on a directory", func() {
-			ddl, err := newDirDirLike("testdata")
+			ddl, err := newActualPath("testdata")
 			So(err, ShouldBeNil)
 			err = mr.CreateIntentForCollection(
 				"myDB", "myC", ddl)
@@ -283,7 +283,7 @@ func TestCreateIntentsForCollection(t *testing.T) {
 		})
 
 		Convey("running CreateIntentForCollection on non-bson file", func() {
-			ddl, err := newDirDirLike("testdata/testdirs/db1/c1.metadata.json")
+			ddl, err := newActualPath("testdata/testdirs/db1/c1.metadata.json")
 			So(err, ShouldBeNil)
 			err = mr.CreateIntentForCollection(
 				"myDB", "myC", ddl)

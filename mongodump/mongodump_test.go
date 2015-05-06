@@ -232,14 +232,6 @@ func TestMongoDumpValidateOptions(t *testing.T) {
 	Convey("With a MongoDump instance", t, func() {
 		md := simpleMongoDumpInstance()
 
-		Convey("we are only allowed to dump to stdout when a single collection is specified", func() {
-			md.OutputOptions.Out = "-"
-
-			err := md.Init()
-			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldContainSubstring, "can only dump a single collection to stdout")
-		})
-
 		Convey("we cannot dump a collection when a database specified", func() {
 			md.ToolOptions.Namespace.Collection = "some_collection"
 			md.ToolOptions.Namespace.DB = ""
@@ -421,7 +413,7 @@ func TestMongoDumpBSON(t *testing.T) {
 
 				})
 
-				Convey("that does not exist. The dumped directory shouldn't contain any bson files", func() {
+				Convey("that does not exist. The dumped directory shouldn't be created", func() {
 					md.OutputOptions.Out = "dump"
 					md.ToolOptions.Namespace.DB = "nottestdb"
 					err = md.Dump()
@@ -432,16 +424,9 @@ func TestMongoDumpBSON(t *testing.T) {
 
 					dumpDir := util.ToUniversalPath(filepath.Join(path, "dump"))
 					dumpDBDir := util.ToUniversalPath(filepath.Join(dumpDir, "nottestdb"))
-					So(fileDirExists(dumpDir), ShouldBeTrue)
-					So(fileDirExists(dumpDBDir), ShouldBeTrue)
 
-					countColls, err := countNonIndexBSONFiles(dumpDBDir)
-					So(err, ShouldBeNil)
-					So(countColls, ShouldEqual, 0)
-
-					Reset(func() {
-						So(os.RemoveAll(dumpDir), ShouldBeNil)
-					})
+					So(fileDirExists(dumpDir), ShouldBeFalse)
+					So(fileDirExists(dumpDBDir), ShouldBeFalse)
 				})
 
 			})

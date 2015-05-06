@@ -2,7 +2,7 @@
 package mongodump
 
 import (
-	"bufio"
+	"compress/gzip"
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/archive"
 	"github.com/mongodb/mongo-tools/common/auth"
@@ -18,6 +18,7 @@ import (
 	"gopkg.in/mgo.v2/bson"
 	"io"
 	"os"
+	"path/filepath"
 	"time"
 )
 
@@ -74,6 +75,8 @@ func (dump *MongoDump) ValidateOptions() error {
 		return fmt.Errorf("--db is required when --excludeCollectionsWithPrefix is specified")
 	case dump.OutputOptions.Repair && dump.InputOptions.Query != "":
 		return fmt.Errorf("cannot run a query with --repair enabled")
+	case dump.OutputOptions.Out != "" && dump.OutputOptions.Archive != "":
+		return fmt.Errorf("--out not allowed when --archive is specified")
 	}
 	return nil
 }
@@ -83,9 +86,6 @@ func (dump *MongoDump) Init() error {
 	err := dump.ValidateOptions()
 	if err != nil {
 		return fmt.Errorf("bad option: %v", err)
-	}
-	if dump.OutputOptions.Out == "-" {
-		dump.useStdout = true
 	}
 	dump.sessionProvider, err = db.NewSessionProvider(*dump.ToolOptions)
 	if err != nil {
@@ -141,18 +141,35 @@ func (dump *MongoDump) Dump() error {
 		}
 	}
 
-	if dump.OutputOptions.Archive {
+	if dump.OutputOptions.Archive != "" {
+		//getArchiveOut gives us a WriteCloser to which we should write the archive
+		archiveOut, err := dump.getArchiveOut()
+		if err != nil {
+			return err
+		}
 		dump.archive = &archive.Writer{
-			Out: os.Stdout,
-			Mux: &archive.Multiplexer{Out: os.Stdout, Control: make(chan byte)},
+			// The archive.Writer needs its own copy of archiveOut because things
+			// like the prelude are not written by the multiplexer.
+			Out: archiveOut,
+			Mux: archive.NewMultiplexer(archiveOut),
 		}
 		go dump.archive.Mux.Run()
-	}
-	defer func() {
-		if dump.OutputOptions.Archive {
+		defer func() {
+			// The Mux runs until its Control is closed
 			close(dump.archive.Mux.Control)
-		}
-	}()
+			muxErr := <-dump.archive.Mux.Completed
+			archiveOut.Close()
+			if muxErr != nil {
+				if err != nil {
+					err = fmt.Errorf("%v && %v", err, muxErr)
+				} else {
+					err = muxErr
+				}
+			} else {
+				log.Logf(log.DebugLow, "mux completed successfully")
+			}
+		}()
+	}
 
 	// switch on what kind of execution to do
 	switch {
@@ -208,14 +225,14 @@ func (dump *MongoDump) Dump() error {
 		return fmt.Errorf("error dumping metadata: %v", err)
 	}
 
-	if dump.OutputOptions.Archive {
+	if dump.OutputOptions.Archive != "" {
 		dump.archive.Prelude, err = archive.NewPrelude(dump.manager, dump.ToolOptions.HiddenOptions.MaxProcs)
 		if err != nil {
 			return fmt.Errorf("creating archive prelude: %v", err)
 		}
 		err = dump.archive.Prelude.Write(dump.archive.Out)
 		if err != nil {
-			return fmt.Errorf("error writing metadata in to archive: %v", err)
+			return fmt.Errorf("error writing metadata into archive: %v", err)
 		}
 	}
 
@@ -259,7 +276,7 @@ func (dump *MongoDump) Dump() error {
 	}
 
 	// IO Phase II
-	// normal collections
+	// regular collections
 
 	// TODO, either remove this debug or improve the language
 	log.Logf(log.DebugHigh, "dump phase II: regular collections")
@@ -370,7 +387,7 @@ func (dump *MongoDump) DumpIntents() error {
 	return nil
 }
 
-// DumpCollection dumps the specified database's collection.
+// DumpIntent dumps the specified database's collection.
 func (dump *MongoDump) DumpIntent(intent *intents.Intent) error {
 	session, err := dump.sessionProvider.GetSession()
 	if err != nil {
@@ -482,9 +499,6 @@ func (dump *MongoDump) dumpIterToWriter(
 		}
 	}()
 
-	// wrap writer in buffer to reduce load on disk
-	w := bufio.NewWriterSize(writer, 32*1024)
-
 	// while there are still results in the database,
 	// grab results from the goroutine and write them to filesystem
 	for {
@@ -495,18 +509,13 @@ func (dump *MongoDump) dumpIterToWriter(
 			}
 			break
 		}
-		_, err := w.Write(buff)
+		_, err := writer.Write(buff)
 		if err != nil {
 			return fmt.Errorf("error writing to file: %v", err)
 		}
 		progressCount.Inc(1)
 	}
 
-	// flush all remaining disk writes then exit
-	err := w.Flush()
-	if err != nil {
-		return fmt.Errorf("error flushing file writer: %v", err)
-	}
 	return nil
 }
 
@@ -525,7 +534,7 @@ func (dump *MongoDump) DumpUsersAndRolesForDB(db string) error {
 	intent := dump.manager.Users()
 	err = intent.BSONFile.Open()
 	if err != nil {
-		return fmt.Errorf("error dumping db users: %v", err)
+		return fmt.Errorf("error opening output stream for dumping Users: %v", err)
 	}
 	defer intent.BSONFile.Close()
 	err = dump.dumpQueryToWriter(usersQuery, intent)
@@ -537,7 +546,7 @@ func (dump *MongoDump) DumpUsersAndRolesForDB(db string) error {
 	intent = dump.manager.Roles()
 	err = intent.BSONFile.Open()
 	if err != nil {
-		return fmt.Errorf("error dumping db users: %v", err)
+		return fmt.Errorf("error opening output stream for dumping Roles: %v", err)
 	}
 	defer intent.BSONFile.Close()
 	err = dump.dumpQueryToWriter(rolesQuery, intent)
@@ -549,7 +558,7 @@ func (dump *MongoDump) DumpUsersAndRolesForDB(db string) error {
 	intent = dump.manager.AuthVersion()
 	err = intent.BSONFile.Open()
 	if err != nil {
-		return fmt.Errorf("error dumping db users: %v", err)
+		return fmt.Errorf("error opening output stream for dumping AuthVersion: %v", err)
 	}
 	defer intent.BSONFile.Close()
 	err = dump.dumpQueryToWriter(versionQuery, intent)
@@ -610,4 +619,62 @@ func (dump *MongoDump) DumpMetadata() error {
 		}
 	}
 	return nil
+}
+
+// nopCloseWriter implements io.WriteCloser. It wraps up a io.Writer, and adds a no-op Close
+type nopCloseWriter struct {
+	io.Writer
+}
+
+// Close does nothing on nopCloseWriters
+func (*nopCloseWriter) Close() error {
+	return nil
+}
+
+// wrappedWriterCloser implements io.WriteCloser. It wraps up two WriteClosers. The Write methond
+// of the io.WriteCloser is implemented by the embedded io.WriteCloser
+type wrappedWriterCloser struct {
+	io.WriteCloser
+	wrappedWriter io.WriteCloser
+}
+
+// Close is part of the io.WriteCloser interface. Close closes both the embedded io.WriteCloser as
+// well as the wrapped io.WriteCloser
+func (wwc *wrappedWriterCloser) Close() error {
+	err := wwc.WriteCloser.Close()
+	if err != nil {
+		return err
+	}
+	return wwc.wrappedWriter.Close()
+}
+
+func (dump *MongoDump) getArchiveOut() (out io.WriteCloser, err error) {
+	if dump.OutputOptions.Archive == "-" {
+		out = &nopCloseWriter{os.Stdout}
+	} else {
+		targetStat, err := os.Stat(dump.OutputOptions.Archive)
+		if err == nil && targetStat.IsDir() {
+			defaultArchiveFilePath :=
+				filepath.Join(dump.OutputOptions.Archive, "archive")
+			if dump.OutputOptions.Gzip {
+				defaultArchiveFilePath = defaultArchiveFilePath + ".gz"
+			}
+			out, err = os.Create(defaultArchiveFilePath)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			out, err = os.Create(dump.OutputOptions.Archive)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+	if dump.OutputOptions.Gzip {
+		return &wrappedWriterCloser{
+			WriteCloser:   gzip.NewWriter(out),
+			wrappedWriter: out,
+		}, nil
+	}
+	return out, nil
 }

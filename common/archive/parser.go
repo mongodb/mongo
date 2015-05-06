@@ -13,7 +13,7 @@ import (
 //   zero or more body BSON documents
 //   a four byte terminator (0xFFFFFFFF)
 
-// ParserConsumer is the interface that one needs to implent to consume data from the Parser
+// ParserConsumer is the interface that one needs to implement to consume data from the Parser
 type ParserConsumer interface {
 	HeaderBSON([]byte) error
 	BodyBSON([]byte) error
@@ -48,8 +48,8 @@ func newParserError(msg string) error {
 	}
 }
 
-// newParserErrError creates a parserError with a message as well as an underlying cause error
-func newParserErrError(msg string, err error) error {
+// newParserWrappedError creates a parserError with a message as well as an underlying cause error
+func newParserWrappedError(msg string, err error) error {
 	return &parserError{
 		Err: err,
 		Msg: msg,
@@ -61,14 +61,14 @@ func newParserErrError(msg string, err error) error {
 // If they are a terminator, true,nil are returned. If they are a BSON length,
 // then the remainder of the BSON document are read in to the parser, otherwise
 // an error is returned.
-func (parse *Parser) readBSONOrTerminator() (bool, error) {
+func (parse *Parser) readBSONOrTerminator() (isTerminator bool, err error) {
 	parse.length = 0
-	_, err := io.ReadAtLeast(parse.In, parse.buf[0:4], 4)
+	_, err = io.ReadFull(parse.In, parse.buf[0:4])
 	if err == io.EOF {
 		return false, err
 	}
 	if err != nil {
-		return false, newParserErrError("head length or terminator", err)
+		return false, newParserWrappedError("I/O error reading length or terminator", err)
 	}
 	size := int32(
 		(uint32(parse.buf[0]) << 0) |
@@ -85,13 +85,13 @@ func (parse *Parser) readBSONOrTerminator() (bool, error) {
 	// TODO Because we're reusing this same buffer for all of our IO, we are basically guaranteeing that we'll
 	// copy the bytes twice.  At some point we should fix this. It's slightly complex, because we'll need consumer
 	// methods closing one buffer and acquiring another
-	_, err = io.ReadAtLeast(parse.In, parse.buf[4:size], int(size)-4)
+	_, err = io.ReadFull(parse.In, parse.buf[4:size])
 	if err != nil {
 		// any error, including EOF is an error so we wrap it up
-		return false, newParserErrError("read bson", err)
+		return false, newParserWrappedError("read bson", err)
 	}
 	if parse.buf[size-1] != 0x00 {
-		return false, newParserError("bson doesn't end with a null byte")
+		return false, newParserError(fmt.Sprintf("bson (size: %v, byte: %d) doesn't end with a null byte", size, parse.buf[size-1]))
 	}
 	parse.length = int(size)
 	return false, nil
@@ -112,7 +112,7 @@ func (parse *Parser) ReadAllBlocks(consumer ParserConsumer) (err error) {
 // ReadBlock reads one archive block ( header + body* + terminator )
 // calling consumer.HeaderBSON() on the header, consumer.BodyBSON() on each piece of body,
 // and consumer.EOF() when EOF is encountered before any data was read.
-// It returns nil if a whole block was read, io.EOF is nothing was read,
+// It returns nil if a whole block was read, io.EOF if nothing was read,
 // and a parserError if there was any io error in the middle of the block,
 // if either of the consumer methods return error, or if there was any sort of
 // parsing failure.
@@ -121,7 +121,7 @@ func (parse *Parser) ReadBlock(consumer ParserConsumer) (err error) {
 	if err == io.EOF {
 		handlerErr := consumer.End()
 		if handlerErr != nil {
-			return newParserErrError("ParserConsumer.End", handlerErr)
+			return newParserWrappedError("ParserConsumer.End", handlerErr)
 		}
 		return err
 	}
@@ -133,19 +133,19 @@ func (parse *Parser) ReadBlock(consumer ParserConsumer) (err error) {
 	}
 	err = consumer.HeaderBSON(parse.buf[:parse.length])
 	if err != nil {
-		return newParserErrError("ParserConsumer.HeaderBSON()", err)
+		return newParserWrappedError("ParserConsumer.HeaderBSON()", err)
 	}
 	for {
 		isTerminator, err = parse.readBSONOrTerminator()
 		if err != nil { // all errors, including EOF are errors here
-			return err
+			return newParserWrappedError("ParserConsumer.BodyBSON()", err)
 		}
 		if isTerminator {
 			return nil
 		}
 		err = consumer.BodyBSON(parse.buf[:parse.length])
 		if err != nil {
-			return newParserErrError("ParserConsumer.BodyBSON()", err)
+			return newParserWrappedError("ParserConsumer.BodyBSON()", err)
 		}
 	}
 }
