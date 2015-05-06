@@ -159,7 +159,8 @@ file_config = format_meta + [
         @ref file_formats_compression for more information''',
         min='0'),
     Config('encryption', '', r'''
-        configure an encryptor for file blocks''',
+        configure an encryptor for file blocks. When a table is created,
+        its encryptor is also used for any related indices or column group''',
         type='category', subconfig=[
         Config('name', 'none', r'''
             Permitted values are \c "none"
@@ -552,7 +553,11 @@ common_wiredtiger_open = [
         use \c O_DIRECT''',
         type='list', choices=['checkpoint', 'data', 'log']),
     Config('encryption', '', r'''
-        configure an encryptor for system wide metadata and logs''',
+        configure an encryptor for system wide metadata and logs.
+        If a system wide encryptor is set, it is also used for
+        encrypting data files and tables, unless encryption configuration
+        is explicitly set for them when they are created with
+        WT_SESSION::create''',
         type='category', subconfig=[
         Config('name', 'none', r'''
             Permitted values are \c "none"
