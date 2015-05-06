@@ -755,9 +755,10 @@ methods = {
 ]),
 'WT_SESSION.strerror' : Method([]),
 'WT_SESSION.transaction_sync' : Method([
-    Config('timeout', '0', r'''
-        maximum amount of time to wait for background sync in seconds.
-        A value of zero disables the timeout''',
+    Config('timeout_ms', '0', r'''
+        maximum amount of time to wait for background sync to complete in
+        milliseconds.  A value of zero disables the timeout and returns
+        immediately''',
         type='int'),
 ]),
 

@@ -286,7 +286,7 @@ static const WT_CONFIG_CHECK confchk_WT_SESSION_salvage[] = {
 };
 
 static const WT_CONFIG_CHECK confchk_WT_SESSION_transaction_sync[] = {
-	{ "timeout", "int", NULL, NULL, NULL, 0 },
+	{ "timeout_ms", "int", NULL, NULL, NULL, 0 },
 	{ NULL, NULL, NULL, NULL, NULL, 0 }
 };
 
@@ -813,7 +813,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  NULL, 0
 	},
 	{ "WT_SESSION.transaction_sync",
-	  "timeout=0",
+	  "timeout_ms=0",
 	  confchk_WT_SESSION_transaction_sync, 1
 	},
 	{ "WT_SESSION.truncate",

@@ -1459,15 +1459,17 @@ struct __wt_session {
 	int __F(transaction_pinned_range)(WT_SESSION* session, uint64_t *range);
 
 	/*!
-	 * Wait for a transaction to become synchronized.
+	 * Wait for a transaction to become synchronized.  This method is
+	 * only useful when ::wiredtiger_open is configured with the
+	 * \c background setting for \c transaction_sync.
 	 *
 	 * @snippet ex_all.c Transaction sync
 	 *
 	 * @param session the session handle
 	 * @configstart{WT_SESSION.transaction_sync, see dist/api_data.py}
-	 * @config{timeout, maximum amount of time to wait for background sync
-	 * in seconds.  A value of zero disables the timeout., an integer;
-	 * default \c 0.}
+	 * @config{timeout_ms, maximum amount of time to wait for background
+	 * sync to complete in milliseconds.  A value of zero disables the
+	 * timeout and returns immediately., an integer; default \c 0.}
 	 * @configend
 	 * @errors
 	 */

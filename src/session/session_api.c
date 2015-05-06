@@ -862,8 +862,8 @@ __session_transaction_sync(WT_SESSION *wt_session, const char *config)
 	WT_DECL_RET;
 	WT_LOG *log;
 	WT_SESSION_IMPL *session;
-	struct timespec end, now;
-	uint64_t wait_secs;
+	struct timespec now, start;
+	uint64_t timeout_ms, waited_ms;
 
 	session = (WT_SESSION_IMPL *)wt_session;
 	conn = S2C(session);
@@ -877,7 +877,7 @@ __session_transaction_sync(WT_SESSION *wt_session, const char *config)
 
 	log = conn->log;
 	ret = 0;
-	wait_secs = 0;
+	timeout_ms = waited_ms = 0;
 
 	/*
 	 * If there is no background sync LSN in this session, there
@@ -897,23 +897,23 @@ __session_transaction_sync(WT_SESSION *wt_session, const char *config)
 	 * Our LSN is not yet stable.  Wait and check again depending on the
 	 * timeout.
 	 */
-	WT_ERR(__wt_config_gets_def(session, cfg, "timeout", 0, &cval));
+	WT_ERR(__wt_config_gets_def(session, cfg, "timeout_ms", 0, &cval));
 	if (cval.len != 0)
-		wait_secs = (uint64_t)cval.val;
+		timeout_ms = (uint64_t)cval.val;
 
-	if (wait_secs == 0)
+	if (timeout_ms == 0)
 		WT_ERR(ETIMEDOUT);
 
-	WT_ERR(__wt_epoch(session, &end));
-	end.tv_sec += wait_secs;
-
+	WT_ERR(__wt_epoch(session, &start));
 	/*
 	 * Keep checking the LSNs until we find it is stable or we reach
 	 * our timeout.
 	 */
 	while (WT_LOG_CMP(&session->bg_sync_lsn, &log->sync_lsn) > 0) {
+		__wt_cond_signal(session, conn->log_close_cond);
 		WT_ERR(__wt_epoch(session, &now));
-		if (WT_TIMECMP(now, end) <= 0)
+		waited_ms = WT_TIMEDIFF(now, start) / WT_MILLION;
+		if (waited_ms < timeout_ms)
 			WT_ERR(__wt_cond_wait(
 			    session, log->log_sync_cond, WT_MILLION));
 		else
