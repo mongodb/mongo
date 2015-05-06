@@ -49,23 +49,28 @@ class test_encrypt06(wttest.WiredTigerTestCase):
         ('none', dict(
             sys_encrypt='none', sys_encrypt_args='', encryptmeta=False,
             file0_encrypt='none', file0_encrypt_args='', encrypt0=False,
-            file1_encrypt='none', file1_encrypt_args='', encrypt1=False)),
+            file1_encrypt='none', file1_encrypt_args='', encrypt1=False,
+            file2_encrypt='none', file2_encrypt_args='', encrypt2=False)),
         ('rotn-implied', dict(
             sys_encrypt='rotn', sys_encrypt_args=key11, encryptmeta=True,
             file0_encrypt=None, file0_encrypt_args='', encrypt0=True,
-            file1_encrypt=None, file1_encrypt_args='', encrypt1=True)),
+            file1_encrypt=None, file1_encrypt_args='', encrypt1=True,
+            file2_encrypt=None, file2_encrypt_args='', encrypt2=True)),
         ('rotn-all', dict(
             sys_encrypt='rotn', sys_encrypt_args=key11, encryptmeta=True,
             file0_encrypt='rotn', file0_encrypt_args=key13, encrypt0=True,
-            file1_encrypt='rotn', file1_encrypt_args=key13, encrypt1=True)),
+            file1_encrypt='rotn', file1_encrypt_args=key13, encrypt1=True,
+            file2_encrypt='rotn', file2_encrypt_args=key13, encrypt2=True)),
         ('rotn-sys', dict(
             sys_encrypt='rotn', sys_encrypt_args=key11, encryptmeta=True,
             file0_encrypt='none', file0_encrypt_args='', encrypt0=False,
-            file1_encrypt='none', file1_encrypt_args='', encrypt1=False)),
+            file1_encrypt='none', file1_encrypt_args='', encrypt1=False,
+            file2_encrypt='none', file2_encrypt_args='', encrypt2=False)),
         ('rotn-file0', dict(
             sys_encrypt='rotn', sys_encrypt_args=key11, encryptmeta=True,
             file0_encrypt='rotn', file0_encrypt_args=key13, encrypt0=True,
-            file1_encrypt='none', file1_encrypt_args='', encrypt1=False)),
+            file1_encrypt='none', file1_encrypt_args='', encrypt1=False,
+            file2_encrypt='none', file2_encrypt_args='', encrypt2=False)),
     ]
     scenarios = number_scenarios(encrypt)
     nrecords = 1000
@@ -124,15 +129,19 @@ class test_encrypt06(wttest.WiredTigerTestCase):
     def test_encrypt(self):
         uri0 = 'table:test_encrypt06-0'
         uri1 = 'table:test_encrypt06-1'
+        uri2 = 'table:test_encrypt06-2'
 
         enc0 = self.encrypt_file_params(self.file0_encrypt,
                                         self.file0_encrypt_args)
         enc1 = self.encrypt_file_params(self.file1_encrypt,
                                         self.file1_encrypt_args)
+        enc2 = self.encrypt_file_params(self.file2_encrypt,
+                                        self.file2_encrypt_args)
 
         # This is the clear text that we'll be looking for
         txt0 = 'AbCdEfG'
         txt1 = 'aBcDeFg'
+        txt2 = 'AAbbCCd'
 
         # Make a bunch of column group and indices,
         # we want to see if any information is leaked anywhere.
@@ -145,6 +154,7 @@ class test_encrypt06(wttest.WiredTigerTestCase):
 
         self.session.create(uri0, sharedparam + 'colgroups=(g00,g01)' + enc0)
         self.session.create(uri1, sharedparam + 'colgroups=(g10,g11)' + enc1)
+        self.session.create(uri2, sharedparam + enc2)
         self.session.create('colgroup:test_encrypt06-0:g00', 'columns=(v0,v1)')
         self.session.create('colgroup:test_encrypt06-0:g01', 'columns=(v2,v3)')
         self.session.create('colgroup:test_encrypt06-1:g10', 'columns=(v0,v1)')
@@ -158,16 +168,21 @@ class test_encrypt06(wttest.WiredTigerTestCase):
 
         c0 = self.session.open_cursor(uri0, None)
         c1 = self.session.open_cursor(uri1, None)
+        c2 = self.session.open_cursor(uri2, None)
         for idx in xrange(1,self.nrecords):
             c0.set_key(str(idx) + txt0)
             c1.set_key(str(idx) + txt1)
+            c2.set_key(str(idx) + txt2)
             c0.set_value(txt0 * (idx % 97), txt0 * 3, txt0 * 5, txt0 * 7)
             c1.set_value(txt1 * (idx % 97), txt1 * 3, txt1 * 5, txt1 * 7)
-            c1.insert()
+            c2.set_value(txt2 * (idx % 97), txt2 * 3, txt2 * 5, txt2 * 7)
             c0.insert()
+            c1.insert()
+            c2.insert()
 
         c0.close()
         c1.close()
+        c2.close()
             
         # Force everything to disk so we can examine it
         self.close_conn()
@@ -178,6 +193,8 @@ class test_encrypt06(wttest.WiredTigerTestCase):
                          not self.match_string_in_rundir(txt0))
         self.assertEqual(self.encrypt1,
                          not self.match_string_in_rundir(txt1))
+        self.assertEqual(self.encrypt2,
+                         not self.match_string_in_rundir(txt2))
         
 
 if __name__ == '__main__':
