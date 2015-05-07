@@ -623,6 +623,36 @@ namespace mongo {
     };
 
 
+    class ExpressionFilter final : public Expression {
+    public:
+        // virtuals from Expression
+        boost::intrusive_ptr<Expression> optimize() final;
+        Value serialize(bool explain) const final;
+        Value evaluateInternal(Variables* vars) const final;
+        void addDependencies(DepsTracker* deps,
+                             std::vector<std::string>* path=NULL) const final;
+
+        static boost::intrusive_ptr<Expression> parse(
+            BSONElement expr,
+            const VariablesParseState& vps);
+
+    private:
+        ExpressionFilter(std::string varName,
+                         Variables::Id varId,
+                         boost::intrusive_ptr<Expression> input,
+                         boost::intrusive_ptr<Expression> filter);
+
+        // The name of the variable to set to each element in the array.
+        std::string _varName;
+        // The id of the variable to set.
+        Variables::Id _varId;
+        // The array to iterate over.
+        boost::intrusive_ptr<Expression> _input;
+        // The expression determining whether each element should be present in the result array.
+        boost::intrusive_ptr<Expression> _filter;
+    };
+
+
     class ExpressionHour : public ExpressionFixedArity<ExpressionHour, 1> {
     public:
         // virtuals from ExpressionNary

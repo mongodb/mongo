@@ -166,7 +166,6 @@ namespace mongo {
         friend BSONObjBuilder& operator << (BSONObjBuilderValueStream& builder, const Value& val);
 
         /** Coerce a value to a bool using BSONElement::trueValue() rules.
-         *  Some types unsupported.  SERVER-6120
          */
         bool coerceToBool() const;
 

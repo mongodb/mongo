@@ -1472,6 +1472,112 @@ namespace {
         }
     }
 
+    /* ------------------------- ExpressionFilter ----------------------------- */
+
+    REGISTER_EXPRESSION("$filter", ExpressionFilter::parse);
+    intrusive_ptr<Expression> ExpressionFilter::parse(BSONElement expr,
+                                                      const VariablesParseState& vpsIn) {
+
+        verify(str::equals(expr.fieldName(), "$filter"));
+
+        uassert(28646, "$filter only supports an object as it's argument",
+                expr.type() == Object);
+
+        // "cond" must be parsed after "as" regardless of BSON order.
+        BSONElement inputElem;
+        BSONElement asElem;
+        BSONElement condElem;
+        for (auto elem : expr.Obj()) {
+            if (str::equals(elem.fieldName(), "input")) {
+                inputElem = elem;
+            } else if (str::equals(elem.fieldName(), "as")) {
+                asElem = elem;
+            } else if (str::equals(elem.fieldName(), "cond")) {
+                condElem = elem;
+            } else {
+                uasserted(28647, str::stream()
+                        << "Unrecognized parameter to $filter: " << elem.fieldName());
+            }
+        }
+
+        uassert(28648, "Missing 'input' parameter to $filter",
+                !inputElem.eoo());
+        uassert(28649, "Missing 'as' parameter to $filter",
+                !asElem.eoo());
+        uassert(28650, "Missing 'cond' parameter to $filter",
+                !condElem.eoo());
+
+        // Parse "input", only has outer variables.
+        intrusive_ptr<Expression> input = parseOperand(inputElem, vpsIn);
+
+        // Parse "as".
+        VariablesParseState vpsSub(vpsIn); // vpsSub gets our variable, vpsIn doesn't.
+        string varName = asElem.str();
+        Variables::uassertValidNameForUserWrite(varName);
+        Variables::Id varId = vpsSub.defineVariable(varName);
+
+        // Parse "cond", has access to "as" variable.
+        intrusive_ptr<Expression> cond = parseOperand(condElem, vpsSub);
+
+        return new ExpressionFilter(std::move(varName), varId, std::move(input), std::move(cond));
+    }
+
+    ExpressionFilter::ExpressionFilter(string varName,
+                                       Variables::Id varId,
+                                       intrusive_ptr<Expression> input,
+                                       intrusive_ptr<Expression> filter)
+        : _varName(std::move(varName))
+        , _varId(varId)
+        , _input(std::move(input))
+        , _filter(std::move(filter))
+    {}
+
+    intrusive_ptr<Expression> ExpressionFilter::optimize() {
+        // TODO handle when _input is constant.
+        _input = _input->optimize();
+        _filter = _filter->optimize();
+        return this;
+    }
+
+    Value ExpressionFilter::serialize(bool explain) const {
+        return Value(DOC("$filter" << DOC("input" << _input->serialize(explain)
+                                       << "as" << _varName
+                                       << "cond" << _filter->serialize(explain)
+                                       )));
+    }
+
+    Value ExpressionFilter::evaluateInternal(Variables* vars) const {
+        // We are guaranteed at parse time that this isn't using our _varId.
+        const Value inputVal = _input->evaluateInternal(vars);
+        if (inputVal.nullish())
+            return Value(BSONNULL);
+
+        uassert(28651, str::stream() << "input to $filter must be an Array not "
+                                     << typeName(inputVal.getType()),
+                inputVal.getType() == Array);
+
+        const vector<Value>& input = inputVal.getArray();
+
+        if (input.empty())
+            return inputVal;
+
+        vector<Value> output;
+        for (const auto& elem : input) {
+            vars->setValue(_varId, elem);
+
+            if (_filter->evaluateInternal(vars).coerceToBool()) {
+                output.push_back(std::move(elem));
+            }
+        }
+
+        return Value(std::move(output));
+    }
+
+    void ExpressionFilter::addDependencies(DepsTracker* deps, vector<string>* path) const {
+        _input->addDependencies(deps);
+        _filter->addDependencies(deps);
+    }
+
     /* ------------------------- ExpressionLet ----------------------------- */
 
     REGISTER_EXPRESSION("$let", ExpressionLet::parse);
