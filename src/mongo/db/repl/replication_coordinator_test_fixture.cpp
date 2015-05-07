@@ -160,7 +160,7 @@ namespace {
 
     ResponseStatus ReplCoordTest::makeResponseStatus(const BSONObj& doc, Milliseconds millis) {
         log() << "Responding with " << doc;
-        return ResponseStatus(ReplicationExecutor::RemoteCommandResponse(doc, millis));
+        return ResponseStatus(RemoteCommandResponse(doc, millis));
     }
 
     void ReplCoordTest::simulateSuccessfulElection() {
@@ -174,7 +174,7 @@ namespace {
             log() << "Waiting on network in state " << replCoord->getMemberState();
             getNet()->enterNetwork();
             const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
-            const ReplicationExecutor::RemoteCommandRequest& request = noi->getRequest();
+            const RemoteCommandRequest& request = noi->getRequest();
             log() << request.target.toString() << " processing " << request.cmdObj;
             ReplSetHeartbeatArgs hbArgs;
             if (hbArgs.initialize(request.cmdObj).isOK()) {
@@ -236,7 +236,7 @@ namespace {
             getNet()->enterNetwork();
             net->runUntil(net->now() + 10000);
             const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
-            const ReplicationExecutor::RemoteCommandRequest& request = noi->getRequest();
+            const RemoteCommandRequest& request = noi->getRequest();
             log() << request.target.toString() << " processing " << request.cmdObj;
             ReplSetHeartbeatArgs hbArgs;
             if (hbArgs.initialize(request.cmdObj).isOK()) {

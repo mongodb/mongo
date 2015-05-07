@@ -98,7 +98,7 @@ namespace repl {
         _updatePositionSource->prepareReplSetUpdatePositionCommand(&cmd);
         StatusWith<ReplicationExecutor::CallbackHandle> scheduleResult =
             _executor->scheduleRemoteCommand(
-                ReplicationExecutor::RemoteCommandRequest(_target, "admin", cmd.obj()),
+                RemoteCommandRequest(_target, "admin", cmd.obj()),
                 stdx::bind(&Reporter::_callback, this, stdx::placeholders::_1));
 
         if (!scheduleResult.isOK()) {

@@ -19,16 +19,13 @@ env.Library(
     target='network_interface_impl',
     source=[
         'network_interface_impl.cpp',
-        'network_interface_impl_downconvert_find_getmore.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base/base',
         '$BUILD_DIR/mongo/bson/bson',
-        '$BUILD_DIR/mongo/client/connection_pool',
+        '$BUILD_DIR/mongo/client/remote_command_executor',
         '$BUILD_DIR/mongo/db/coredb',
         '$BUILD_DIR/mongo/db/common',
-        '$BUILD_DIR/mongo/db/query/getmore_request',
-        '$BUILD_DIR/mongo/db/query/lite_parsed_query',
         ])
 
 env.Library(

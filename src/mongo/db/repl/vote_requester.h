@@ -59,9 +59,9 @@ namespace repl {
                       long long term,
                       OpTime lastOplogEntry);
             virtual ~Algorithm();
-            virtual std::vector<ReplicationExecutor::RemoteCommandRequest> getRequests() const;
+            virtual std::vector<RemoteCommandRequest> getRequests() const;
             virtual void processResponse(
-                    const ReplicationExecutor::RemoteCommandRequest& request,
+                    const RemoteCommandRequest& request,
                     const ResponseStatus& response);
             virtual bool hasReceivedSufficientResponses() const;
 

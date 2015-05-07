@@ -70,11 +70,11 @@ namespace repl {
 
     QuorumChecker::~QuorumChecker() {}
 
-    std::vector<ReplicationExecutor::RemoteCommandRequest> QuorumChecker::getRequests() const {
+    std::vector<RemoteCommandRequest> QuorumChecker::getRequests() const {
         const bool isInitialConfig = _rsConfig->getConfigVersion() == 1;
         const MemberConfig& myConfig = _rsConfig->getMemberAt(_myIndex);
 
-        std::vector<ReplicationExecutor::RemoteCommandRequest> requests;
+        std::vector<RemoteCommandRequest> requests;
         if (hasReceivedSufficientResponses()) {
             return requests;
         }
@@ -97,7 +97,7 @@ namespace repl {
                 // No need to check self for liveness or unreadiness.
                 continue;
             }
-            requests.push_back(ReplicationExecutor::RemoteCommandRequest(
+            requests.push_back(RemoteCommandRequest(
                                        _rsConfig->getMemberAt(i).getHostAndPort(),
                                        "admin",
                                        hbRequest,
@@ -108,7 +108,7 @@ namespace repl {
     }
 
     void QuorumChecker::processResponse(
-            const ReplicationExecutor::RemoteCommandRequest& request,
+            const RemoteCommandRequest& request,
             const ResponseStatus& response) {
 
         _tabulateHeartbeatResponse(request, response);
@@ -178,7 +178,7 @@ namespace repl {
     }
 
     void QuorumChecker::_tabulateHeartbeatResponse(
-            const ReplicationExecutor::RemoteCommandRequest& request,
+            const RemoteCommandRequest& request,
             const ResponseStatus& response) {
 
         ++_numResponses;

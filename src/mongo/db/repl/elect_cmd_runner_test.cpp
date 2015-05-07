@@ -48,8 +48,6 @@ namespace mongo {
 namespace repl {
 namespace {
 
-    typedef ReplicationExecutor::RemoteCommandRequest RemoteCommandRequest;
-
     class ElectCmdRunnerTest : public mongo::unittest::Test {
     public:
         void startTest(ElectCmdRunner* electCmdRunner,
@@ -202,7 +200,7 @@ namespace {
         ASSERT_EQUALS(HostAndPort("h1"), noi->getRequest().target);
         _net->scheduleResponse(noi,
                                startDate + 10,
-                               ResponseStatus(ReplicationExecutor::RemoteCommandResponse(
+                               ResponseStatus(RemoteCommandResponse(
                                                       BSON("ok" << 1 <<
                                                            "vote" << 1 <<
                                                            "round" << 380865962699346850ll),

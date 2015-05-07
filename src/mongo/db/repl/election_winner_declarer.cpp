@@ -52,7 +52,7 @@ namespace repl {
 
     ElectionWinnerDeclarer::Algorithm::~Algorithm() {}
 
-    std::vector<ReplicationExecutor::RemoteCommandRequest>
+    std::vector<RemoteCommandRequest>
     ElectionWinnerDeclarer::Algorithm::getRequests() const {
         BSONObjBuilder declareElectionWinnerCmdBuilder;
         declareElectionWinnerCmdBuilder.append("replSetDeclareElectionWinner", 1);
@@ -61,9 +61,9 @@ namespace repl {
         declareElectionWinnerCmdBuilder.append("term", _term);
         const BSONObj declareElectionWinnerCmd = declareElectionWinnerCmdBuilder.obj();
 
-        std::vector<ReplicationExecutor::RemoteCommandRequest> requests;
+        std::vector<RemoteCommandRequest> requests;
         for (const auto& target : _targets) {
-            requests.push_back(ReplicationExecutor::RemoteCommandRequest(
+            requests.push_back(RemoteCommandRequest(
                         target,
                         "admin",
                         declareElectionWinnerCmd,
@@ -74,7 +74,7 @@ namespace repl {
     }
 
     void ElectionWinnerDeclarer::Algorithm::processResponse(
-            const ReplicationExecutor::RemoteCommandRequest& request,
+            const RemoteCommandRequest& request,
             const ResponseStatus& response) {
         _responsesProcessed++;
         Status cmdResponseStatus = getStatusFromCommandResult(response.getValue().data);

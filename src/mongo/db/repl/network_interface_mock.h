@@ -82,7 +82,7 @@ namespace repl {
         virtual void signalWorkAvailable();
         virtual Date_t now();
         virtual void startCommand(const ReplicationExecutor::CallbackHandle& cbHandle,
-                                  const ReplicationExecutor::RemoteCommandRequest& request,
+                                  const RemoteCommandRequest& request,
                                   const RemoteCommandCompletionFn& onFinish);
         virtual void cancelCommand(const ReplicationExecutor::CallbackHandle& cbHandle);
         OperationContext* createOperationContext() override;
@@ -263,7 +263,7 @@ namespace repl {
     public:
         NetworkOperation();
         NetworkOperation(const ReplicationExecutor::CallbackHandle& cbHandle,
-                         const ReplicationExecutor::RemoteCommandRequest& theRequest,
+                         const RemoteCommandRequest& theRequest,
                          Date_t theRequestDate,
                          const RemoteCommandCompletionFn& onFinish);
         ~NetworkOperation();
@@ -290,7 +290,7 @@ namespace repl {
         /**
          * Gets the request that initiated this operation.
          */
-        const ReplicationExecutor::RemoteCommandRequest& getRequest() const { return _request; }
+        const RemoteCommandRequest& getRequest() const { return _request; }
 
         /**
          * Gets the virtual time at which the operation was started.
@@ -319,7 +319,7 @@ namespace repl {
         Date_t _nextConsiderationDate;
         Date_t _responseDate;
         ReplicationExecutor::CallbackHandle _cbHandle;
-        ReplicationExecutor::RemoteCommandRequest _request;
+        RemoteCommandRequest _request;
         ResponseStatus _response;
         RemoteCommandCompletionFn _onFinish;
     };

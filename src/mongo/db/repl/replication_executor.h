@@ -38,7 +38,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/client/remote_command_executor.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/repl/task_runner.h"
 #include "mongo/platform/compiler.h"
@@ -116,12 +116,7 @@ namespace repl {
         class EventHandle;
         class NetworkInterface;
         struct RemoteCommandCallbackData;
-        struct RemoteCommandRequest;
-        struct RemoteCommandResponse;
         typedef StatusWith<RemoteCommandResponse> ResponseStatus;
-
-        static const Milliseconds kNoTimeout;
-        static const Date_t kNoExpirationDate;
 
         /**
          * Type of a regular callback function.
@@ -514,36 +509,6 @@ namespace repl {
         CallbackHandle myHandle;
         Status status;
         OperationContext* txn;
-    };
-
-    /**
-     * Type of object describing a command to execute against a remote MongoDB node.
-     */
-    struct ReplicationExecutor::RemoteCommandRequest {
-        RemoteCommandRequest();
-        RemoteCommandRequest(const HostAndPort& theTarget,
-                             const std::string& theDbName,
-                             const BSONObj& theCmdObj,
-                             const Milliseconds timeoutMillis = kNoTimeout);
-
-        // Returns diagnostic info.
-        std::string getDiagnosticString();
-
-        HostAndPort target;
-        std::string dbname;
-        BSONObj cmdObj;
-        Milliseconds timeout;
-        Date_t expirationDate;  // Set by scheduleRemoteCommand.
-    };
-
-    struct ReplicationExecutor::RemoteCommandResponse {
-        RemoteCommandResponse() : data(), elapsedMillis(Milliseconds(0)) {}
-        RemoteCommandResponse(BSONObj obj, Milliseconds millis)
-            : data(obj),
-              elapsedMillis(millis) {}
-
-        BSONObj data;
-        Milliseconds elapsedMillis;
     };
 
     /**

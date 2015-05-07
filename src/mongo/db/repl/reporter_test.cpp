@@ -100,7 +100,7 @@ namespace {
         NetworkInterfaceMock* net = getNet();
         ASSERT_TRUE(net->hasReadyRequests());
         ReplicationExecutor::Milliseconds millis(0);
-        ReplicationExecutor::RemoteCommandResponse response(obj, millis);
+        RemoteCommandResponse response(obj, millis);
         ReplicationExecutor::ResponseStatus responseStatus(response);
         net->scheduleResponse(net->getNextReadyRequest(), net->now(), responseStatus);
     }

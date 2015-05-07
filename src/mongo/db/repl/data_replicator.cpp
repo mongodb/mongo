@@ -52,8 +52,8 @@ namespace repl {
 
     using CBHStatus = StatusWith<ReplicationExecutor::CallbackHandle>;
     using CallbackFn = ReplicationExecutor::CallbackFn;
-    using Request = ReplicationExecutor::RemoteCommandRequest;
-    using Response = ReplicationExecutor::RemoteCommandResponse;
+    using Request = RemoteCommandRequest;
+    using Response = RemoteCommandResponse;
     using CommandCallbackData = ReplicationExecutor::RemoteCommandCallbackData;
 //    typedef void (*run_func)();
 

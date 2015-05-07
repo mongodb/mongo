@@ -46,6 +46,19 @@ env.Library(
     ]
 )
 
+env.Library(
+    target='remote_command_executor',
+    source=[
+        'remote_command_executor.cpp',
+        'remote_command_executor_impl.cpp',
+    ],
+    LIBDEPS=[
+        'connection_pool',
+        '$BUILD_DIR/mongo/db/query/getmore_request',
+        '$BUILD_DIR/mongo/db/query/lite_parsed_query',
+    ]
+)
+
 env.CppUnitTest("replica_set_monitor_test",
                 ["replica_set_monitor_test.cpp"],
                 LIBDEPS=["clientdriver"])

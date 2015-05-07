@@ -38,7 +38,6 @@
 #include "mongo/client/connection_pool.h"
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context_impl.h"
-#include "mongo/db/repl/network_interface_impl_downconvert_find_getmore.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
@@ -61,8 +60,9 @@ namespace {
         _lastFullUtilizationDate(),
         _isExecutorRunnable(false),
         _inShutdown(false),
+        _commandExec(kMessagingPortKeepOpen),
         _numActiveNetworkRequests(0) {
-        _connPool.reset(new ConnectionPool(kMessagingPortKeepOpen));
+
     }
 
     NetworkInterfaceImpl::~NetworkInterfaceImpl() { }
@@ -126,7 +126,7 @@ namespace {
         ThreadList threadsToJoin;
         swap(threadsToJoin, _threads);
         lk.unlock();
-        _connPool->closeAllInUseConnections();
+        _commandExec.shutdown();
         std::for_each(threadsToJoin.begin(),
                       threadsToJoin.end(),
                       stdx::bind(&boost::thread::join, stdx::placeholders::_1));
@@ -198,7 +198,7 @@ namespace {
             ++_numActiveNetworkRequests;
             --_numIdleThreads;
             lk.unlock();
-            ResponseStatus result = _runCommand(todo.request);
+            ResponseStatus result = _commandExec.runCommand(todo.request);
             LOG(2) << "Network status of sending " << todo.request.cmdObj.firstElementFieldName() <<
                 " to " << todo.request.target << " was " << result.getStatus();
             todo.onFinish(result);
@@ -229,7 +229,7 @@ namespace {
 
     void NetworkInterfaceImpl::startCommand(
             const ReplicationExecutor::CallbackHandle& cbHandle,
-            const ReplicationExecutor::RemoteCommandRequest& request,
+            const RemoteCommandRequest& request,
             const RemoteCommandCompletionFn& onFinish) {
         LOG(2) << "Scheduling " << request.cmdObj.firstElementFieldName() << " to " <<
             request.target;
@@ -271,96 +271,6 @@ namespace {
 
     Date_t NetworkInterfaceImpl::now() {
         return curTimeMillis64();
-    }
-
-    namespace {
-
-        /**
-         * Calculates the timeout for a network operation expiring at "expDate", given
-         * that it is now "nowDate".
-         *
-         * Returns 0 to indicate no expiration date, a number of milliseconds until "expDate", or
-         * ErrorCodes::ExceededTimeLimit if "expDate" is not later than "nowDate".
-         *
-         * TODO: Change return type to StatusWith<Milliseconds> once Milliseconds supports default
-         * construction or StatusWith<T> supports not constructing T when the result is a non-OK
-         * status.
-         */
-        StatusWith<int64_t> getTimeoutMillis(const Date_t expDate, const Date_t nowDate) {
-            if (expDate == ReplicationExecutor::kNoExpirationDate) {
-                return StatusWith<int64_t>(0);
-            }
-            if (expDate <= nowDate) {
-                return StatusWith<int64_t>(
-                        ErrorCodes::ExceededTimeLimit,
-                        str::stream() << "Went to run command, but it was too late. "
-                        "Expiration was set to " << dateToISOStringUTC(expDate));
-            }
-            return StatusWith<int64_t>(expDate.asInt64() -  nowDate.asInt64());
-        }
-
-    } //namespace
-
-    ResponseStatus NetworkInterfaceImpl::_runCommand(
-            const ReplicationExecutor::RemoteCommandRequest& request) {
-
-        try {
-            BSONObj output;
-
-            const Date_t requestStartDate = now();
-            StatusWith<int64_t> timeoutMillis = getTimeoutMillis(request.expirationDate,
-                                                                 requestStartDate);
-            if (!timeoutMillis.isOK()) {
-                return ResponseStatus(timeoutMillis.getStatus());
-            }
-
-            ConnectionPool::ConnectionPtr conn(_connPool.get(),
-                                               request.target,
-                                               requestStartDate,
-                                               Milliseconds(timeoutMillis.getValue()));
-            bool ok = conn.get()->runCommand(request.dbname, request.cmdObj, output);
-
-            // If remote server does not support either find or getMore commands, down convert
-            // to using DBClientInterface::query()/getMore().
-            // TODO: Perform down conversion based on wire protocol version.
-            //       Refer to the down conversion implementation in the shell.
-            if (!ok &&
-                getStatusFromCommandResult(output).code() == ErrorCodes::CommandNotFound) {
-
-                // 'commandName' will be an empty string if the command object is an empty BSON
-                // document.
-                StringData commandName = request.cmdObj.firstElement().fieldNameStringData();
-                if (commandName == "find") {
-                    runDownconvertedFindCommand(
-                        conn.get(),
-                        request.dbname,
-                        request.cmdObj,
-                        &output);
-                }
-                else if (commandName == "getMore") {
-                    runDownconvertedGetMoreCommand(
-                        conn.get(),
-                        request.dbname,
-                        request.cmdObj,
-                        &output);
-                }
-            }
-            const Date_t requestFinishDate = now();
-            conn.done(requestFinishDate);
-            return ResponseStatus(Response(output,
-                                           Milliseconds(requestFinishDate - requestStartDate)));
-        }
-        catch (const DBException& ex) {
-            return ResponseStatus(ex.toStatus());
-        }
-        catch (const std::exception& ex) {
-            return ResponseStatus(
-                    ErrorCodes::UnknownError,
-                    str::stream() << "Sending command " << request.cmdObj << " on database "
-                                  << request.dbname << " over network to "
-                                  << request.target.toString() << " received exception "
-                                  << ex.what());
-        }
     }
 
     OperationContext* NetworkInterfaceImpl::createOperationContext() {

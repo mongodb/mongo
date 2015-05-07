@@ -224,7 +224,7 @@ namespace {
 
         StatusWith<ReplicationExecutor::CallbackHandle> scheduleResult =
             _executor->scheduleRemoteCommand(
-                ReplicationExecutor::RemoteCommandRequest(_source, _dbname, cmdObj),
+                RemoteCommandRequest(_source, _dbname, cmdObj),
                 stdx::bind(&Fetcher::_callback, this, stdx::placeholders::_1, batchFieldName));
 
         if (!scheduleResult.isOK()) {

@@ -26,36 +26,31 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/platform/basic.h"
 
-#include <string>
+#include "mongo/client/remote_command_executor.h"
 
-#include "mongo/base/status.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
-    class BSONObj;
-    class DBClientConnection;
+    std::string RemoteCommandRequest::toString() const {
+        str::stream out;
+        out << "RemoteCommand -- target:" << target.toString() << " db:" << dbname;
 
-namespace repl {
+        if (expirationDate != kNoExpirationDate) {
+            out << " expDate:" << expirationDate.toString();
+        }
 
-    /**
-     * Run find command as a downconverted DBClientInterface::query() on remote servers
-     * that do not support the find command.
-     */
-    Status runDownconvertedFindCommand(DBClientConnection* conn,
-                                       const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       BSONObj* output);
+        out << " cmd:" << cmdObj.toString();
+        return out;
+    }
 
-    /**
-     * Run getMore command as a downconverted DBClientInterface::getMore() on remote servers
-     * that do not support the find command.
-     */
-    Status runDownconvertedGetMoreCommand(DBClientConnection* conn,
-                                          const std::string& dbname,
-                                          const BSONObj& cmdObj,
-                                          BSONObj* output);
+    std::string RemoteCommandResponse::toString() const {
+        str::stream out;
+        out << "RemoteResponse -- " << " cmd:" << data.toString();
 
-} // namespace repl
+        return out;
+    }
+
 } // namespace mongo

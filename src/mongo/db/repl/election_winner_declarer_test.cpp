@@ -48,8 +48,6 @@ namespace {
 
     using unittest::assertGet;
 
-    using RemoteCommandRequest = ReplicationExecutor::RemoteCommandRequest;
-
     bool stringContains(const std::string &haystack, const std::string& needle) {
         return haystack.find(needle) != std::string::npos;
     }

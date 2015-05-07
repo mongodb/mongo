@@ -48,8 +48,6 @@ namespace mongo {
 namespace repl {
 namespace {
 
-    typedef ReplicationExecutor::RemoteCommandRequest RemoteCommandRequest;
-
     class ReplCoordElectTest : public ReplCoordTest {
     protected:
         void simulateEnoughHeartbeatsForElectability();
@@ -63,7 +61,7 @@ namespace {
         net->enterNetwork();
         for (int i = 0; i < rsConfig.getNumMembers() - 1; ++i) {
             const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
-            const ReplicationExecutor::RemoteCommandRequest& request = noi->getRequest();
+            const RemoteCommandRequest& request = noi->getRequest();
             log() << request.target.toString() << " processing " << request.cmdObj;
             ReplSetHeartbeatArgs hbArgs;
             if (hbArgs.initialize(request.cmdObj).isOK()) {
@@ -93,7 +91,7 @@ namespace {
         net->enterNetwork();
         for (int i = 0; i < rsConfig.getNumMembers() - 1; ++i) {
             const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
-            const ReplicationExecutor::RemoteCommandRequest& request = noi->getRequest();
+            const RemoteCommandRequest& request = noi->getRequest();
             log() << request.target.toString() << " processing " << request.cmdObj;
             if (request.cmdObj.firstElement().fieldNameStringData() == "replSetFresh") {
                 net->scheduleResponse(noi, net->now(), makeResponseStatus(
@@ -241,7 +239,7 @@ namespace {
         net->enterNetwork();
         while (net->hasReadyRequests()) {
             const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
-            const ReplicationExecutor::RemoteCommandRequest& request = noi->getRequest();
+            const RemoteCommandRequest& request = noi->getRequest();
             log() << request.target.toString() << " processing " << request.cmdObj;
             if (request.target != HostAndPort("node2", 12345)) {
                 net->blackHole(noi);
@@ -288,7 +286,7 @@ namespace {
         net->enterNetwork();
         while (net->hasReadyRequests()) {
             const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
-            const ReplicationExecutor::RemoteCommandRequest& request = noi->getRequest();
+            const RemoteCommandRequest& request = noi->getRequest();
             log() << request.target.toString() << " processing " << request.cmdObj;
             if (request.target != HostAndPort("node2", 12345)) {
                 net->blackHole(noi);
@@ -372,7 +370,7 @@ namespace {
         net->enterNetwork();
         for (int i = 0; i < 2; ++i) {
             const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
-            const ReplicationExecutor::RemoteCommandRequest& request = noi->getRequest();
+            const RemoteCommandRequest& request = noi->getRequest();
             log() << request.target.toString() << " processing " << request.cmdObj;
             ReplSetHeartbeatArgs hbArgs;
             if (hbArgs.initialize(request.cmdObj).isOK()) {

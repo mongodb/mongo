@@ -48,7 +48,6 @@ namespace repl {
 namespace {
 
     typedef ReplicationCoordinator::ReplSetReconfigArgs ReplSetReconfigArgs;
-    typedef ReplicationExecutor::RemoteCommandRequest RemoteCommandRequest;
 
     TEST_F(ReplCoordTest, ReconfigBeforeInitialized) {
         // start up but do not initiate
@@ -216,7 +215,7 @@ namespace {
         NetworkInterfaceMock* net = getNet();
         getNet()->enterNetwork();
         const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
-        const ReplicationExecutor::RemoteCommandRequest& request = noi->getRequest();
+        const RemoteCommandRequest& request = noi->getRequest();
         repl::ReplSetHeartbeatArgs hbArgs;
         ASSERT_OK(hbArgs.initialize(request.cmdObj));
         repl::ReplSetHeartbeatResponse hbResp;
@@ -254,7 +253,7 @@ namespace {
         NetworkInterfaceMock* net = getNet();
         getNet()->enterNetwork();
         const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
-        const ReplicationExecutor::RemoteCommandRequest& request = noi->getRequest();
+        const RemoteCommandRequest& request = noi->getRequest();
         repl::ReplSetHeartbeatArgs hbArgs;
         ASSERT_OK(hbArgs.initialize(request.cmdObj));
         repl::ReplSetHeartbeatResponse hbResp;
@@ -363,7 +362,7 @@ namespace {
         NetworkInterfaceMock* net = getNet();
         getNet()->enterNetwork();
         const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
-        const ReplicationExecutor::RemoteCommandRequest& request = noi->getRequest();
+        const RemoteCommandRequest& request = noi->getRequest();
         repl::ReplSetHeartbeatArgs hbArgs;
         ASSERT_OK(hbArgs.initialize(request.cmdObj));
         repl::ReplSetHeartbeatResponse hbResp;

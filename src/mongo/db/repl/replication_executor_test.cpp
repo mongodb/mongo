@@ -48,15 +48,15 @@ namespace repl {
 
 namespace {
 
-    bool operator==(const ReplicationExecutor::RemoteCommandRequest lhs,
-                    const ReplicationExecutor::RemoteCommandRequest rhs) {
+    bool operator==(const RemoteCommandRequest lhs,
+                    const RemoteCommandRequest rhs) {
         return lhs.target == rhs.target &&
             lhs.dbname == rhs.dbname &&
             lhs.cmdObj == rhs.cmdObj;
     }
 
-    bool operator!=(const ReplicationExecutor::RemoteCommandRequest lhs,
-                    const ReplicationExecutor::RemoteCommandRequest rhs) {
+    bool operator!=(const RemoteCommandRequest lhs,
+                    const RemoteCommandRequest rhs) {
         return !(lhs == rhs);
     }
 
@@ -309,14 +309,14 @@ namespace {
         ASSERT_EQUALS(status3, ErrorCodes::CallbackCanceled);
     }
 
-    std::string getRequestDescription(const ReplicationExecutor::RemoteCommandRequest& request) {
+    std::string getRequestDescription(const RemoteCommandRequest& request) {
         return mongoutils::str::stream() << "Request(" << request.target.toString() << ", " <<
             request.dbname << ", " << request.cmdObj << ')';
     }
 
     static void setStatusOnRemoteCommandCompletion(
             const ReplicationExecutor::RemoteCommandCallbackData& cbData,
-            const ReplicationExecutor::RemoteCommandRequest& expectedRequest,
+            const RemoteCommandRequest& expectedRequest,
             Status* outStatus) {
 
         if (cbData.request != expectedRequest) {
@@ -335,7 +335,7 @@ namespace {
         ReplicationExecutor& executor = getExecutor();
         launchExecutorThread();
         Status status1(ErrorCodes::InternalError, "Not mutated");
-        const ReplicationExecutor::RemoteCommandRequest request(
+        const RemoteCommandRequest request(
                 HostAndPort("localhost", 27017),
                 "mydb",
                 BSON("whatsUp" << "doc"));
@@ -362,7 +362,7 @@ namespace {
     TEST_F(ReplicationExecutorTest, ScheduleAndCancelRemoteCommand) {
         ReplicationExecutor& executor = getExecutor();
         Status status1(ErrorCodes::InternalError, "Not mutated");
-        const ReplicationExecutor::RemoteCommandRequest request(
+        const RemoteCommandRequest request(
                 HostAndPort("localhost", 27017),
                 "mydb",
                 BSON("whatsUp" << "doc"));
@@ -453,7 +453,7 @@ namespace {
         ReplicationExecutor& executor = getExecutor();
         Status status(ErrorCodes::InternalError, "");
         launchExecutorThread();
-        const ReplicationExecutor::RemoteCommandRequest request(
+        const RemoteCommandRequest request(
                 HostAndPort("lazy", 27017),
                 "admin",
                 BSON("sleep" << 1),
@@ -480,7 +480,7 @@ namespace {
     TEST_F(ReplicationExecutorTest, CallbackHandleComparison) {
         ReplicationExecutor& executor = getExecutor();
         Status status(ErrorCodes::InternalError, "");
-        const ReplicationExecutor::RemoteCommandRequest request(
+        const RemoteCommandRequest request(
                 HostAndPort("lazy", 27017),
                 "admin",
                 BSON("cmd" << 1));

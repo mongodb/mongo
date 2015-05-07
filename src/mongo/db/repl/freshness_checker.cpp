@@ -79,7 +79,7 @@ namespace repl {
 
     FreshnessChecker::Algorithm::~Algorithm() {}
 
-    std::vector<ReplicationExecutor::RemoteCommandRequest>
+    std::vector<RemoteCommandRequest>
     FreshnessChecker::Algorithm::getRequests() const {
         const MemberConfig& selfConfig = _rsConfig.getMemberAt(_selfIndex);
 
@@ -94,12 +94,12 @@ namespace repl {
         freshCmdBuilder.append("id", selfConfig.getId());
         const BSONObj replSetFreshCmd = freshCmdBuilder.obj();
 
-        std::vector<ReplicationExecutor::RemoteCommandRequest> requests;
+        std::vector<RemoteCommandRequest> requests;
         for (std::vector<HostAndPort>::const_iterator it = _targets.begin();
              it != _targets.end();
              ++it) {
             invariant(*it != selfConfig.getHostAndPort());
-            requests.push_back(ReplicationExecutor::RemoteCommandRequest(
+            requests.push_back(RemoteCommandRequest(
                         *it,
                         "admin",
                         replSetFreshCmd,
@@ -127,7 +127,7 @@ namespace repl {
     }
 
     void FreshnessChecker::Algorithm::processResponse(
-                    const ReplicationExecutor::RemoteCommandRequest& request,
+                    const RemoteCommandRequest& request,
                     const ResponseStatus& response) {
         ++_responsesProcessed;
         bool votingMember = _isVotingMember(request.target);

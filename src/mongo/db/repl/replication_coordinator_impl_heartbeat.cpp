@@ -55,8 +55,8 @@ namespace mongo {
 namespace repl {
 
 namespace {
+
     typedef StatusWith<ReplicationExecutor::CallbackHandle> CBHStatus;
-    typedef ReplicationExecutor::RemoteCommandRequest CmdRequest;
     typedef ReplicationExecutor::CallbackHandle CBHandle;
 
 }  //namespace
@@ -77,7 +77,10 @@ namespace {
                     _settings.ourSetName(),
                     target);
 
-        const CmdRequest request(target, "admin", hbRequest.first.toBSON(), hbRequest.second);
+        const RemoteCommandRequest request(target,
+                                           "admin",
+                                           hbRequest.first.toBSON(),
+                                           hbRequest.second);
         const ReplicationExecutor::RemoteCommandCallbackFn callback = stdx::bind(
                 &ReplicationCoordinatorImpl::_handleHeartbeatResponse,
                 this,
@@ -252,7 +255,7 @@ namespace {
 }  // namespace
 
     void ReplicationCoordinatorImpl::_requestRemotePrimaryStepdown(const HostAndPort& target) {
-        CmdRequest request(target, "admin", BSON("replSetStepDown" << 1));
+        RemoteCommandRequest request(target, "admin", BSON("replSetStepDown" << 1));
 
         log() << "Requesting " << target << " step down from primary";
         CBHStatus cbh = _replExecutor.scheduleRemoteCommand(

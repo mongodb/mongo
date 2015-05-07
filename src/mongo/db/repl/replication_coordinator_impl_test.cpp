@@ -270,8 +270,7 @@ namespace {
         getNet()->scheduleResponse(
                 noi,
                 startDate + 10,
-                ResponseStatus(ReplicationExecutor::RemoteCommandResponse(hbResp.toBSON(),
-                                                                          Milliseconds(8))));
+                ResponseStatus(RemoteCommandResponse(hbResp.toBSON(), Milliseconds(8))));
         getNet()->runUntil(startDate + 10);
         getNet()->exitNetwork();
         ASSERT_EQUALS(startDate + 10, getNet()->now());
@@ -990,7 +989,7 @@ namespace {
         getNet()->runUntil(getNet()->now() + 2000);
         ASSERT(getNet()->hasReadyRequests());
         NetworkInterfaceMock::NetworkOperationIterator noi = getNet()->getNextReadyRequest();
-        ReplicationExecutor::RemoteCommandRequest request = noi->getRequest();
+        RemoteCommandRequest request = noi->getRequest();
         log() << request.target.toString() << " processing " << request.cmdObj;
         ReplSetHeartbeatArgs hbArgs;
         if (hbArgs.initialize(request.cmdObj).isOK()) {
@@ -1178,7 +1177,7 @@ namespace {
         getNet()->runUntil(getNet()->now() + 2000);
         ASSERT(getNet()->hasReadyRequests());
         NetworkInterfaceMock::NetworkOperationIterator noi = getNet()->getNextReadyRequest();
-        ReplicationExecutor::RemoteCommandRequest request = noi->getRequest();
+        RemoteCommandRequest request = noi->getRequest();
         log() << request.target.toString() << " processing " << request.cmdObj;
         ReplSetHeartbeatArgs hbArgs;
         if (hbArgs.initialize(request.cmdObj).isOK()) {
@@ -1700,7 +1699,7 @@ namespace {
         NetworkInterfaceMock* net = getNet();
         getNet()->enterNetwork();
         const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
-        const ReplicationExecutor::RemoteCommandRequest& request = noi->getRequest();
+        const RemoteCommandRequest& request = noi->getRequest();
         repl::ReplSetHeartbeatArgs hbArgs;
         ASSERT_OK(hbArgs.initialize(request.cmdObj));
         repl::ReplSetHeartbeatResponse hbResp;
@@ -1770,7 +1769,7 @@ namespace {
         NetworkInterfaceMock* net = getNet();
         getNet()->enterNetwork();
         const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
-        const ReplicationExecutor::RemoteCommandRequest& request = noi->getRequest();
+        const RemoteCommandRequest& request = noi->getRequest();
         repl::ReplSetHeartbeatArgs hbArgs;
         ASSERT_OK(hbArgs.initialize(request.cmdObj));
         repl::ReplSetHeartbeatResponse hbResp;
@@ -1838,7 +1837,7 @@ namespace {
         NetworkInterfaceMock* net = getNet();
         getNet()->enterNetwork();
         const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
-        const ReplicationExecutor::RemoteCommandRequest& request = noi->getRequest();
+        const RemoteCommandRequest& request = noi->getRequest();
         repl::ReplSetHeartbeatArgs hbArgs;
         ASSERT_OK(hbArgs.initialize(request.cmdObj));
         repl::ReplSetHeartbeatResponse hbResp;

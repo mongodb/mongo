@@ -61,7 +61,7 @@ namespace repl {
 
     VoteRequester::Algorithm::~Algorithm() {}
 
-    std::vector<ReplicationExecutor::RemoteCommandRequest>
+    std::vector<RemoteCommandRequest>
     VoteRequester::Algorithm::getRequests() const {
         BSONObjBuilder requestVotesCmdBuilder;
         requestVotesCmdBuilder.append("replSetDeclareElectionWinner", 1);
@@ -77,9 +77,9 @@ namespace repl {
 
         const BSONObj requestVotesCmd = requestVotesCmdBuilder.obj();
 
-        std::vector<ReplicationExecutor::RemoteCommandRequest> requests;
+        std::vector<RemoteCommandRequest> requests;
         for (const auto& target : _targets) {
-            requests.push_back(ReplicationExecutor::RemoteCommandRequest(
+            requests.push_back(RemoteCommandRequest(
                         target,
                         "admin",
                         requestVotesCmd,
@@ -90,7 +90,7 @@ namespace repl {
     }
 
     void VoteRequester::Algorithm::processResponse(
-            const ReplicationExecutor::RemoteCommandRequest& request,
+            const RemoteCommandRequest& request,
             const ResponseStatus& response) {
         _responsesProcessed++;
         if (!response.isOK()) { // failed response

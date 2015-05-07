@@ -51,8 +51,6 @@ namespace {
 
     using unittest::assertGet;
 
-    typedef ReplicationExecutor::RemoteCommandRequest RemoteCommandRequest;
-
     bool stringContains(const std::string &haystack, const std::string& needle) {
         return haystack.find(needle) != std::string::npos;
     }
@@ -189,7 +187,7 @@ namespace {
             _net->scheduleResponse(
                     noi,
                     startDate + 10,
-                    ResponseStatus(ReplicationExecutor::RemoteCommandResponse(
+                    ResponseStatus(RemoteCommandResponse(
                                            BSON("ok" << 1 <<
                                                 "id" << 2 <<
                                                 "set" << "rs0" <<
@@ -257,7 +255,7 @@ namespace {
             _net->scheduleResponse(
                     noi,
                     startDate + 10,
-                    ResponseStatus(ReplicationExecutor::RemoteCommandResponse(
+                    ResponseStatus(RemoteCommandResponse(
                                            BSON("ok" << 1 <<
                                                 "id" << 2 <<
                                                 "set" << "rs0" <<
@@ -303,7 +301,7 @@ namespace {
             _net->scheduleResponse(
                     noi,
                     startDate + 10,
-                    ResponseStatus(ReplicationExecutor::RemoteCommandResponse(
+                    ResponseStatus(RemoteCommandResponse(
                                            BSON("ok" << 1 <<
                                                 "id" << 2 <<
                                                 "set" << "rs0" <<
@@ -347,7 +345,7 @@ namespace {
             _net->scheduleResponse(
                     noi,
                     startDate + 10,
-                    ResponseStatus(ReplicationExecutor::RemoteCommandResponse(
+                    ResponseStatus(RemoteCommandResponse(
                                            BSON("ok" << 1 <<
                                                 "id" << 2 <<
                                                 "set" << "rs0" <<
@@ -394,7 +392,7 @@ namespace {
             _net->scheduleResponse(
                     noi,
                     startDate + 10,
-                    ResponseStatus(ReplicationExecutor::RemoteCommandResponse(
+                    ResponseStatus(RemoteCommandResponse(
                                            BSON("ok" << 1 <<
                                                 "id" << 2 <<
                                                 "set" << "rs0" <<
@@ -469,7 +467,7 @@ namespace {
             _net->scheduleResponse(
                     noi,
                     startDate + 10,
-                    ResponseStatus(ReplicationExecutor::RemoteCommandResponse(
+                    ResponseStatus(RemoteCommandResponse(
                                            responseBuilder.obj(),
                                            Milliseconds(8))));
         }
@@ -530,7 +528,7 @@ namespace {
                 _net->scheduleResponse(
                         noi,
                         startDate + 20,
-                        ResponseStatus(ReplicationExecutor::RemoteCommandResponse(
+                        ResponseStatus(RemoteCommandResponse(
                                                responseBuilder.obj(),
                                                Milliseconds(8))));
             }
@@ -545,7 +543,7 @@ namespace {
                 _net->scheduleResponse(
                         noi,
                         startDate + 10,
-                        ResponseStatus(ReplicationExecutor::RemoteCommandResponse(
+                        ResponseStatus(RemoteCommandResponse(
                                                responseBuilder.obj(),
                                                Milliseconds(8))));
             }
@@ -609,7 +607,7 @@ namespace {
             _net->scheduleResponse(
                     noi,
                     startDate + 10,
-                    ResponseStatus(ReplicationExecutor::RemoteCommandResponse(
+                    ResponseStatus(RemoteCommandResponse(
                                            responseBuilder.obj(),
                                            Milliseconds(8))));
         }
@@ -669,7 +667,7 @@ namespace {
             _net->scheduleResponse(
                     noi,
                     startDate + 10,
-                    ResponseStatus(ReplicationExecutor::RemoteCommandResponse(
+                    ResponseStatus(RemoteCommandResponse(
                                            responseBuilder.obj(),
                                            Milliseconds(8))));
         }
@@ -733,7 +731,7 @@ namespace {
                 _net->scheduleResponse(
                         noi,
                         startDate + 20,
-                        ResponseStatus(ReplicationExecutor::RemoteCommandResponse(
+                        ResponseStatus(RemoteCommandResponse(
                                                responseBuilder.obj(),
                                                Milliseconds(8))));
             }
@@ -748,7 +746,7 @@ namespace {
                 _net->scheduleResponse(
                         noi,
                         startDate + 10,
-                        ResponseStatus(ReplicationExecutor::RemoteCommandResponse(
+                        ResponseStatus(RemoteCommandResponse(
                                                responseBuilder.obj(),
                                                Milliseconds(8))));
             }
@@ -816,7 +814,7 @@ namespace {
                 _net->scheduleResponse(
                         noi,
                         startDate + 10,
-                        ResponseStatus(ReplicationExecutor::RemoteCommandResponse(
+                        ResponseStatus(RemoteCommandResponse(
                                                responseBuilder.obj(),
                                                Milliseconds(8))));
             }

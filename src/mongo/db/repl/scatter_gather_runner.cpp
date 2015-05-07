@@ -95,7 +95,7 @@ namespace repl {
                 stdx::placeholders::_1,
                 this);
 
-        std::vector<ReplicationExecutor::RemoteCommandRequest> requests = _algorithm->getRequests();
+        std::vector<RemoteCommandRequest> requests = _algorithm->getRequests();
         for (size_t i = 0; i < requests.size(); ++i) {
             const StatusWith<ReplicationExecutor::CallbackHandle> cbh =
                 executor->scheduleRemoteCommand(requests[i], cb);

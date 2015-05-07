@@ -143,7 +143,7 @@ namespace repl {
                                                     const BSONObj& obj) {
         auto net = getNet();
         ReplicationExecutor::Milliseconds millis(0);
-        ReplicationExecutor::RemoteCommandResponse response(obj, millis);
+        RemoteCommandResponse response(obj, millis);
         ReplicationExecutor::ResponseStatus responseStatus(response);
         net->scheduleResponse(noi, net->now(), responseStatus);
     }

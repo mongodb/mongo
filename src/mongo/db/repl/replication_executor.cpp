@@ -43,9 +43,6 @@ namespace {
     stdx::function<void ()> makeNoExcept(const stdx::function<void ()> &fn);
 }  // namespace
 
-    const ReplicationExecutor::Milliseconds ReplicationExecutor::kNoTimeout(-1);
-    const Date_t ReplicationExecutor::kNoExpirationDate(-1);
-
     ReplicationExecutor::ReplicationExecutor(NetworkInterface* netInterface, int64_t prngSeed) :
         _random(prngSeed),
         _networkInterface(netInterface),
@@ -236,7 +233,7 @@ namespace {
     static void remoteCommandFinished(
             const ReplicationExecutor::CallbackData& cbData,
             const ReplicationExecutor::RemoteCommandCallbackFn& cb,
-            const ReplicationExecutor::RemoteCommandRequest& request,
+            const RemoteCommandRequest& request,
             const ResponseStatus& response) {
 
         if (cbData.status.isOK()) {
@@ -255,7 +252,7 @@ namespace {
     static void remoteCommandFailedEarly(
             const ReplicationExecutor::CallbackData& cbData,
             const ReplicationExecutor::RemoteCommandCallbackFn& cb,
-            const ReplicationExecutor::RemoteCommandRequest& request) {
+            const RemoteCommandRequest& request) {
 
         invariant(!cbData.status.isOK());
         cb(ReplicationExecutor::RemoteCommandCallbackData(
@@ -543,35 +540,6 @@ namespace {
         txn(theTxn) {
     }
 
-    ReplicationExecutor::RemoteCommandRequest::RemoteCommandRequest() :
-        timeout(kNoTimeout),
-        expirationDate(kNoExpirationDate) {
-    }
-
-    ReplicationExecutor::RemoteCommandRequest::RemoteCommandRequest(
-            const HostAndPort& theTarget,
-            const std::string& theDbName,
-            const BSONObj& theCmdObj,
-            const Milliseconds timeoutMillis) :
-        target(theTarget),
-        dbname(theDbName),
-        cmdObj(theCmdObj),
-        timeout(timeoutMillis) {
-        if (timeoutMillis == kNoTimeout) {
-            expirationDate = kNoExpirationDate;
-        }
-    }
-
-    std::string ReplicationExecutor::RemoteCommandRequest::getDiagnosticString() {
-        str::stream out;
-        out << "RemoteCommand -- target:" << target.toString() << " db:" << dbname;
-
-        if (expirationDate  != kNoExpirationDate)
-            out << " expDate:" << expirationDate.toString();
-
-        out << " cmd:" << cmdObj.getOwned().toString();
-        return out;
-    }
 
     ReplicationExecutor::RemoteCommandCallbackData::RemoteCommandCallbackData(
             ReplicationExecutor* theExecutor,

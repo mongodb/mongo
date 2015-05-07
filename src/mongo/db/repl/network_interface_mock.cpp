@@ -73,7 +73,7 @@ namespace repl {
 
     void NetworkInterfaceMock::startCommand(
             const ReplicationExecutor::CallbackHandle& cbHandle,
-            const ReplicationExecutor::RemoteCommandRequest& request,
+            const RemoteCommandRequest& request,
             const RemoteCommandCompletionFn& onFinish) {
 
         boost::lock_guard<boost::mutex> lk(_mutex);
@@ -353,7 +353,7 @@ namespace repl {
         return _waitingToRunMask & kExecutorThread;
     }
 
-    static const StatusWith<ReplicationExecutor::RemoteCommandResponse> kUnsetResponse(
+    static const StatusWith<RemoteCommandResponse> kUnsetResponse(
             ErrorCodes::InternalError,
             "NetworkOperation::_response never set");
 
@@ -368,7 +368,7 @@ namespace repl {
 
     NetworkInterfaceMock::NetworkOperation::NetworkOperation(
             const ReplicationExecutor::CallbackHandle& cbHandle,
-            const ReplicationExecutor::RemoteCommandRequest& theRequest,
+            const RemoteCommandRequest& theRequest,
             Date_t theRequestDate,
             const RemoteCommandCompletionFn& onFinish)
         : _requestDate(theRequestDate),

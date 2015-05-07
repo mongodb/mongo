@@ -60,11 +60,11 @@ namespace repl {
 
     ElectCmdRunner::Algorithm::~Algorithm() {}
 
-    std::vector<ReplicationExecutor::RemoteCommandRequest>
+    std::vector<RemoteCommandRequest>
     ElectCmdRunner::Algorithm::getRequests() const {
 
         const MemberConfig& selfConfig = _rsConfig.getMemberAt(_selfIndex);
-        std::vector<ReplicationExecutor::RemoteCommandRequest> requests;
+        std::vector<RemoteCommandRequest> requests;
         BSONObjBuilder electCmdBuilder;
         electCmdBuilder.append("replSetElect", 1);
         electCmdBuilder.append("set", _rsConfig.getReplSetName());
@@ -80,7 +80,7 @@ namespace repl {
              ++it) {
 
             invariant(*it != selfConfig.getHostAndPort());
-            requests.push_back(ReplicationExecutor::RemoteCommandRequest(
+            requests.push_back(RemoteCommandRequest(
                         *it,
                         "admin",
                         replSetElectCmd,
@@ -107,7 +107,7 @@ namespace repl {
     }
 
     void ElectCmdRunner::Algorithm::processResponse(
-            const ReplicationExecutor::RemoteCommandRequest& request,
+            const RemoteCommandRequest& request,
             const ResponseStatus& response) {
 
         ++_actualResponses;

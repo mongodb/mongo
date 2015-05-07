@@ -59,9 +59,9 @@ namespace repl {
         QuorumChecker(const ReplicaSetConfig* rsConfig, int myIndex);
         virtual ~QuorumChecker();
 
-        virtual std::vector<ReplicationExecutor::RemoteCommandRequest> getRequests() const;
+        virtual std::vector<RemoteCommandRequest> getRequests() const;
         virtual void processResponse(
-                const ReplicationExecutor::RemoteCommandRequest& request,
+                const RemoteCommandRequest& request,
                 const ResponseStatus& response);
 
         virtual bool hasReceivedSufficientResponses() const;
@@ -80,9 +80,8 @@ namespace repl {
         /**
          * Updates the QuorumChecker state based on the data from a single heartbeat response.
          */
-        void _tabulateHeartbeatResponse(
-                const ReplicationExecutor::RemoteCommandRequest& request,
-                const ResponseStatus& response);
+        void _tabulateHeartbeatResponse(const RemoteCommandRequest& request,
+                                        const ResponseStatus& response);
 
         // Pointer to the replica set configuration for which we're checking quorum.
         const ReplicaSetConfig* const _rsConfig;
