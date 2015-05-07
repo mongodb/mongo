@@ -7,6 +7,7 @@ env.Library(
     source=[
         "canonical_query.cpp",
         "query_settings.cpp",
+        "index_entry.cpp",
         "index_tag.cpp",
         "parsed_projection.cpp",
         "plan_cache.cpp",

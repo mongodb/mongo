@@ -466,11 +466,13 @@ namespace {
             // The first false means not multikey.
             // The second false means not sparse.
             // The third arg is the index name and I am egotistical.
+            // The NULL means no filter expression.
             params.indices.push_back(IndexEntry(keyPattern,
                                                 multikey,
                                                 false,
                                                 false,
                                                 "hari_king_of_the_stove",
+                                                NULL,
                                                 BSONObj()));
         }
 
@@ -480,6 +482,7 @@ namespace {
                                                 sparse,
                                                 false,
                                                 "note_to_self_dont_break_build",
+                                                NULL,
                                                 BSONObj()));
         }
 

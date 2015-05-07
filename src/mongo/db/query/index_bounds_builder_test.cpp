@@ -570,6 +570,7 @@ namespace {
                                           true, // sparse
                                           false, // unique
                                           "exists_true_sparse",
+                                          nullptr, // filterExpr
                                           BSONObj());
         BSONObj obj = fromjson("{a: {$exists: true}}");
         auto_ptr<MatchExpression> expr(parseMatchExpression(obj));

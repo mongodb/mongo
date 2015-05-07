@@ -153,6 +153,7 @@ namespace mongo {
                                                         desc->isSparse(),
                                                         desc->unique(),
                                                         desc->indexName(),
+                                                        ice->getFilterExpression(),
                                                         desc->infoObj()));
         }
 
@@ -1365,6 +1366,7 @@ namespace {
         QueryPlannerParams plannerParams;
         plannerParams.options = QueryPlannerParams::NO_TABLE_SCAN;
 
+        // TODO Need to check if query is compatible with any partial indexes.  SERVER-17854.
         IndexCatalog::IndexIterator ii = collection->getIndexCatalog()->getIndexIterator(txn,false);
         while (ii.more()) {
             const IndexDescriptor* desc = ii.next();
@@ -1377,6 +1379,7 @@ namespace {
                                                            desc->isSparse(),
                                                            desc->unique(),
                                                            desc->indexName(),
+                                                           NULL,
                                                            desc->infoObj()));
             }
         }

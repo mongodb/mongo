@@ -564,7 +564,7 @@ namespace {
         // Must use "shard key" index
         plannerParams.options = QueryPlannerParams::NO_TABLE_SCAN;
         IndexEntry indexEntry(key, accessMethod, false /* multiKey */, false /* sparse */,
-                              false /* unique */, "shardkey", BSONObj());
+                              false /* unique */, "shardkey", NULL /* filterExpr */, BSONObj());
         plannerParams.indices.push_back(indexEntry);
 
         OwnedPointerVector<QuerySolution> solutions;

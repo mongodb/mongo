@@ -63,6 +63,7 @@ namespace mongo {
                                             false, // sparse
                                             false, // unique
                                             "hari_king_of_the_stove",
+                                            NULL, // filterExpr
                                             BSONObj()));
     }
 
@@ -72,6 +73,7 @@ namespace mongo {
                                             sparse,
                                             false, // unique
                                             "note_to_self_dont_break_build",
+                                            NULL, // filterExpr
                                             BSONObj()));
     }
 
@@ -81,6 +83,7 @@ namespace mongo {
                                             sparse,
                                             unique,
                                             "sql_query_walks_into_bar_and_says_can_i_join_you?",
+                                            NULL, // filterExpr
                                             BSONObj()));
     }
 
@@ -90,6 +93,7 @@ namespace mongo {
                                             false, // sparse
                                             false, // unique
                                             "foo",
+                                            NULL, // filterExpr
                                             infoObj));
     }
 

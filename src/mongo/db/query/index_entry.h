@@ -36,6 +36,8 @@
 
 namespace mongo {
 
+    class MatchExpression;
+
     /**
      * This name sucks, but every name involving 'index' is used somewhere.
      */
@@ -49,12 +51,14 @@ namespace mongo {
                    bool sp,
                    bool unq,
                    const std::string& n,
+                   const MatchExpression* fe,
                    const BSONObj& io)
             : keyPattern(kp),
               multikey(mk),
               sparse(sp),
               unique(unq),
               name(n),
+              filterExpr(fe),
               infoObj(io) {
 
             type = IndexNames::nameToType(accessMethod);
@@ -68,12 +72,14 @@ namespace mongo {
                    bool sp,
                    bool unq,
                    const std::string& n,
+                   const MatchExpression* fe,
                    const BSONObj& io)
             : keyPattern(kp),
               multikey(mk),
               sparse(sp),
               unique(unq),
               name(n),
+              filterExpr(fe),
               infoObj(io) {
 
             type = IndexNames::nameToType(IndexNames::findPluginName(keyPattern));
@@ -88,6 +94,7 @@ namespace mongo {
               sparse(false),
               unique(false),
               name("test_foo"),
+              filterExpr(nullptr),
               infoObj(BSONObj()) {
 
             type = IndexNames::nameToType(IndexNames::findPluginName(keyPattern));
@@ -103,6 +110,8 @@ namespace mongo {
 
         std::string name;
 
+        const MatchExpression* filterExpr;
+
         // Geo indices have extra parameters.  We need those available to plan correctly.
         BSONObj infoObj;
 
@@ -110,24 +119,7 @@ namespace mongo {
         // by the keyPattern?)
         IndexType type;
 
-        std::string toString() const {
-            mongoutils::str::stream ss;
-            ss << "kp: "  << keyPattern.toString();
-
-            if (multikey) {
-                ss << " multikey";
-            }
-
-            if (sparse) {
-                ss << " sparse";
-            }
-
-            if (!infoObj.isEmpty()) {
-                ss << " io: " << infoObj.toString();
-            }
-
-            return ss;
-        }
+        std::string toString() const;
     };
 
 }  // namespace mongo
