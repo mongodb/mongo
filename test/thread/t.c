@@ -25,6 +25,7 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
+
 #include "thread.h"
 
 WT_CONNECTION *conn;				/* WiredTiger connection */
@@ -54,7 +55,7 @@ int
 main(int argc, char *argv[])
 {
 	u_int readers, writers;
-	int ch, cnt, runs, ret;
+	int ch, cnt, ret, runs;
 	char *config_open, *working_dir;
 
 	if ((progname = strrchr(argv[0], DIR_DELIM)) == NULL)

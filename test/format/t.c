@@ -112,9 +112,9 @@ main(int argc, char *argv[])
 	/* If it's a replay, use the home directory's CONFIG file. */
 	if (g.replay) {
 		if (config != NULL)
-			testutil_die(EINVAL, "-c incompatible with -r");
+			die(EINVAL, "-c incompatible with -r");
 		if (access(g.home_config, R_OK) != 0)
-			testutil_die(ENOENT, "%s", g.home_config);
+			die(ENOENT, "%s", g.home_config);
 		config = g.home_config;
 	}
 
@@ -157,9 +157,9 @@ main(int argc, char *argv[])
 	 * to single-thread last-record updates.
 	 */
 	if ((ret = pthread_rwlock_init(&g.append_lock, NULL)) != 0)
-		testutil_die(ret, "pthread_rwlock_init: append lock");
+		die(ret, "pthread_rwlock_init: append lock");
 	if ((ret = pthread_rwlock_init(&g.backup_lock, NULL)) != 0)
-		testutil_die(ret, "pthread_rwlock_init: backup lock");
+		die(ret, "pthread_rwlock_init: backup lock");
 
 	/* Seed the random number generator. */
 	srand((u_int)(0xdeadbeef ^ (u_int)time(NULL)));
@@ -252,9 +252,9 @@ main(int argc, char *argv[])
 	config_print(0);
 
 	if ((ret = pthread_rwlock_destroy(&g.append_lock)) != 0)
-		testutil_die(ret, "pthread_rwlock_destroy: append lock");
+		die(ret, "pthread_rwlock_destroy: append lock");
 	if ((ret = pthread_rwlock_destroy(&g.backup_lock)) != 0)
-		testutil_die(ret, "pthread_rwlock_destroy: backup lock");
+		die(ret, "pthread_rwlock_destroy: backup lock");
 
 	config_clear();
 
@@ -284,15 +284,47 @@ startup(void)
 
 	/* Create or initialize the home and data-source directories. */
 	if ((ret = system(g.home_init)) != 0)
-		testutil_die(ret, "home directory initialization failed");
+		die(ret, "home directory initialization failed");
 
 	/* Open/truncate the logging file. */
 	if (g.logging != 0 && (g.logfp = fopen(g.home_log, "w")) == NULL)
-		testutil_die(errno, "fopen: %s", g.home_log);
+		die(errno, "fopen: %s", g.home_log);
 
 	/* Open/truncate the random number logging file. */
 	if ((g.rand_log = fopen(g.home_rand, g.replay ? "r" : "w")) == NULL)
-		testutil_die(errno, "%s", g.home_rand);
+		die(errno, "%s", g.home_rand);
+}
+
+/*
+ * die --
+ *	Report an error and quit, dumping the configuration.
+ */
+void
+die(int e, const char *fmt, ...)
+{
+	va_list ap;
+
+	if (fmt != NULL) {				/* Death message. */
+		fprintf(stderr, "%s: ", g.progname);
+		va_start(ap, fmt);
+		vfprintf(stderr, fmt, ap);
+		va_end(ap);
+		if (e != 0)
+			fprintf(stderr, ": %s", wiredtiger_strerror(e));
+		fprintf(stderr, "\n");
+	}
+
+	/* Flush/close any logging information. */
+	if (g.logfp != NULL)
+		(void)fclose(g.logfp);
+	if (g.rand_log != NULL)
+		(void)fclose(g.rand_log);
+
+	/* Display the configuration that failed. */
+	if (g.run_cnt)
+		config_print(1);
+
+	exit(EXIT_FAILURE);
 }
 
 /*

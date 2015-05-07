@@ -40,7 +40,6 @@ static int  wt_shutdown(void);
 
 extern int __wt_optind;
 extern char *__wt_optarg;
-static char home[512];
 
 int
 main(int argc, char *argv[])
@@ -126,11 +125,11 @@ main(int argc, char *argv[])
 	if (argc != 0)
 		return (usage());
 
-	if ((ret = testutil_work_dir_from_path(home, 512, working_dir)) != 0)
-		testutil_die(ret, "provided directory name is too long");
-
 	/* Clean up on signal. */
 	(void)signal(SIGINT, onint);
+
+	if ((ret = testutil_work_dir_from_path(g.home, 512, working_dir)) != 0)
+		testutil_die(ret, "provided directory name is too long");
 
 	printf("%s: process %" PRIu64 "\n", g.progname, (uint64_t)getpid());
 	for (cnt = 1; (runs == 0 || cnt <= runs) && g.status == 0; ++cnt) {
@@ -201,7 +200,7 @@ wt_connect(const char *config_open)
 	int ret;
 	char config[128];
 
-	testutil_make_work_dir(home);
+	testutil_make_work_dir(g.home);
 
 	snprintf(config, sizeof(config),
 	    "create,statistics=(fast),error_prefix=\"%s\",cache_size=1GB%s%s",
@@ -210,7 +209,7 @@ wt_connect(const char *config_open)
 	    config_open == NULL ? "" : config_open);
 
 	if ((ret = wiredtiger_open(
-	    home, &event_handler, config, &g.conn)) != 0)
+	    g.home, &event_handler, config, &g.conn)) != 0)
 		return (log_print_err("wiredtiger_open", ret, 1));
 	return (0);
 }
@@ -245,7 +244,7 @@ cleanup(void)
 	g.running = 0;
 	g.ntables_created = 0;
 
-	testutil_clean_work_dir(home);
+	testutil_clean_work_dir(g.home);
 	return (0);
 }
 
@@ -282,7 +281,7 @@ onint(int signo)
 {
 	WT_UNUSED(signo);
 
-	testutil_clean_work_dir(home);
+	cleanup(g.home);
 
 	fprintf(stderr, "\n");
 	exit(EXIT_FAILURE);
