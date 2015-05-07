@@ -1028,15 +1028,15 @@ struct __wt_session {
 	 * file_formats_compression for more information., an integer greater
 	 * than or equal to 0; default \c 0.}
 	 * @config{encryption = (, configure an encryptor for file blocks.  When
-	 * a table is created\, its encryptor is also used for any related
-	 * indices or column group., a set of related configuration options
-	 * defined below.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;keyid, An identifier
-	 * that identifies a unique instance of the encryptor.  It is stored in
-	 * clear text\, and thus is available when the wiredtiger database is
-	 * reopened.  On the first use of a (name\, keyid) combination\, the
-	 * WT_ENCRYPTOR::customize function is called with the keyid as an
-	 * argument., a string; default empty.}
+	 * a table is created\, its encryptor is not implicitly used for any
+	 * related indices or column groups., a set of related configuration
+	 * options defined below.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;keyid, An
+	 * identifier that identifies a unique instance of the encryptor.  It is
+	 * stored in clear text\, and thus is available when the wiredtiger
+	 * database is reopened.  On the first use of a (name\, keyid)
+	 * combination\, the WT_ENCRYPTOR::customize function is called with the
+	 * keyid as an argument., a string; default empty.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;name, Permitted values are \c "none"
 	 * or custom encryption engine name created with
 	 * WT_CONNECTION::add_encryptor.  See @ref encryption for more

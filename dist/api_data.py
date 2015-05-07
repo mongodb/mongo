@@ -160,7 +160,8 @@ file_config = format_meta + [
         min='0'),
     Config('encryption', '', r'''
         configure an encryptor for file blocks. When a table is created,
-        its encryptor is also used for any related indices or column group''',
+        its encryptor is not implicitly used for any related indices
+        or column groups''',
         type='category', subconfig=[
         Config('name', 'none', r'''
             Permitted values are \c "none"

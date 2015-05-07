@@ -34,6 +34,12 @@ call for the individual data file. It is possible to turn encryption off
 for individual files, to use a different encryptor, or to specify a
 different \c keyid.
 
+Overriding the system encryption for a table does not override
+the system encryption for indices on that table, nor does it override
+the system encryption for column groups specified on that table.
+Encryption for column groups and indices must specified when they
+are created, if they are to be different than the system encryption.
+
 It is an error to specify encryption in a WT_SESSION::create call when it
 was not specified in the ::wiredtiger_open call. This prevents accidental
 exposure of the file's data in log files, which would be written in the
