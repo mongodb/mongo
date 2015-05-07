@@ -71,7 +71,7 @@ namespace {
                  BatchedCommandResponse::errCode(-1) <<
                  BatchedCommandResponse::errMessage("this batch didn't work") <<
                  BatchedCommandResponse::n(0) <<
-                 BatchedCommandResponse::lastOp(Date_t(1)) <<
+                 BatchedCommandResponse::lastOp(mongo::Timestamp(1ULL)) <<
                  BatchedCommandResponse::writeErrors() << writeErrorsArray <<
                  BatchedCommandResponse::writeConcernError() << writeConcernError);
 

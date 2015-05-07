@@ -66,11 +66,14 @@ namespace mongo {
         case Bool:
             return *l.value() - *r.value();
         case bsonTimestamp:
-        case Date:
+        case Date: {
+            const unsigned long long lULL = l.date().toULL();
+            const unsigned long long rULL = r.date().toULL();
             // unsigned dates for old version
-            if ( l.date() < r.date() )
+            if (lULL < rULL)
                 return -1;
-            return l.date() == r.date() ? 0 : 1;
+            return lULL == rULL ? 0 : 1;
+        }
         case NumberLong:
             if( r.type() == NumberLong ) {
                 long long L = l._numberLong();

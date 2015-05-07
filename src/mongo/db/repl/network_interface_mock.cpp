@@ -41,13 +41,10 @@ namespace repl {
     NetworkInterfaceMock::NetworkInterfaceMock()
         : _waitingToRunMask(0),
           _currentlyRunning(kNoThread),
+          _now(fassertStatusOK(18653, dateFromISOString("2014-08-01T00:00:00Z"))),
           _hasStarted(false),
           _inShutdown(false),
-          _executorNextWakeupDate(~0ULL) {
-
-        StatusWith<Date_t> initialNow = dateFromISOString("2014-08-01T00:00:00Z");
-        fassert(18653, initialNow.getStatus());
-        _now = initialNow.getValue();
+          _executorNextWakeupDate(Date_t::max()) {
     }
 
     NetworkInterfaceMock::~NetworkInterfaceMock() {

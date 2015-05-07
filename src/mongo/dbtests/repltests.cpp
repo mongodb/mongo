@@ -343,7 +343,7 @@ namespace ReplTests {
             }
             void check() const {
                 BSONObj o = _client.findOne( ns(), QUERY( "a" << 1 ) );
-                ASSERT( 0 != o.getField( "t" ).date() );
+                ASSERT( Date_t{} != o.getField( "t" ).date() );
                 ASSERT_EQUALS( date_, o.getField( "t" ).date() );
             }
             void reset() const {
@@ -432,7 +432,7 @@ namespace ReplTests {
             }
             void check() const {
                 BSONObj o = _client.findOne( ns(), QUERY( "_id" << 1 ) );
-                ASSERT( 0 != o.getField( "t" ).date() );
+                ASSERT( Date_t{} != o.getField( "t" ).date() );
                 ASSERT_EQUALS( date_, o.getField( "t" ).date() );
             }
             void reset() const {

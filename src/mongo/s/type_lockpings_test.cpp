@@ -39,7 +39,7 @@ namespace {
 
     TEST(Validity, MissingFields) {
         LockpingsType lockPing;
-        BSONObj objNoProcess = BSON(LockpingsType::ping(time(0)));
+        BSONObj objNoProcess = BSON(LockpingsType::ping(Date_t::now()));
         string errMsg;
         ASSERT(lockPing.parseBSON(objNoProcess, &errMsg));
         ASSERT_EQUALS(errMsg, "");
@@ -54,13 +54,13 @@ namespace {
     TEST(Validity, Valid) {
         LockpingsType lockPing;
         BSONObj obj = BSON(LockpingsType::process("host.local:27017:1352918870:16807") <<
-                           LockpingsType::ping(1ULL));
+                           LockpingsType::ping(Date_t::fromMillisSinceEpoch(1)));
         string errMsg;
         ASSERT(lockPing.parseBSON(obj, &errMsg));
         ASSERT_EQUALS(errMsg, "");
         ASSERT_TRUE(lockPing.isValid(NULL));
         ASSERT_EQUALS(lockPing.getProcess(), "host.local:27017:1352918870:16807");
-        ASSERT_EQUALS(lockPing.getPing(), 1ULL);
+        ASSERT_EQUALS(lockPing.getPing(), Date_t::fromMillisSinceEpoch(1));
     }
 
     TEST(Validity, BadType) {

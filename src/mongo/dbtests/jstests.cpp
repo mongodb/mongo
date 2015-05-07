@@ -428,7 +428,7 @@ namespace JSTests {
                 BSONObj o;
                 {
                     BSONObjBuilder b;
-                    b.appendDate( "d" , 123456789 );
+                    b.appendDate( "d" , Date_t::fromMillisSinceEpoch(123456789) );
                     o = b.obj();
                 }
                 s->setObject( "x" , o );
@@ -530,7 +530,7 @@ namespace JSTests {
 
             {
                 BSONObj t = b.done();
-                ASSERT_EQUALS( 1234000U , t["d"].timestampTime() );
+                ASSERT_EQUALS( Date_t::fromMillisSinceEpoch(1234000) , t["d"].timestampTime() );
                 ASSERT_EQUALS( 9876U , t["d"].timestampInc() );
             }
 
@@ -545,8 +545,8 @@ namespace JSTests {
             ASSERT_EQUALS( bsonTimestamp , out["d"].type() );
 
             ASSERT_EQUALS( 9876U , out["d"].timestampInc() );
-            ASSERT_EQUALS( 1234000U , out["d"].timestampTime() );
-            ASSERT_EQUALS( 123456789U , out["a"].date() );
+            ASSERT_EQUALS( Date_t::fromMillisSinceEpoch(1234000) , out["d"].timestampTime() );
+            ASSERT_EQUALS( Date_t::fromMillisSinceEpoch(123456789) , out["a"].date() );
 
             delete s;
         }
@@ -1617,7 +1617,7 @@ namespace JSTests {
         class Date : public TestRoundTrip {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
-                b.appendDate( "a", 0 );
+                b.appendDate( "a", Date_t() );
                 return b.obj();
             }
             virtual string json() const {
@@ -1628,7 +1628,7 @@ namespace JSTests {
         class DateNonzero : public TestRoundTrip {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
-                b.appendDate( "a", 100 );
+                b.appendDate( "a", Date_t::fromMillisSinceEpoch(100) );
                 return b.obj();
             }
             virtual string json() const {
@@ -1639,7 +1639,7 @@ namespace JSTests {
         class DateNegative : public TestRoundTrip {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
-                b.appendDate( "a", -1 );
+                b.appendDate( "a", Date_t::fromMillisSinceEpoch(-1) );
                 return b.obj();
             }
             virtual string json() const {

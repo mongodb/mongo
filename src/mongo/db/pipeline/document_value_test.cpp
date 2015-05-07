@@ -525,7 +525,7 @@ namespace DocumentTests {
         class Date {
         public:
             void run() {
-                Value value = Value(Date_t(999));
+                Value value = Value(Date_t::fromMillisSinceEpoch(999));
                 ASSERT_EQUALS( 999, value.getDate() );
                 ASSERT_EQUALS( mongo::Date, value.getType() );
                 assertRoundTrips( value );
@@ -807,7 +807,7 @@ namespace DocumentTests {
 
             /** Coerce Date(0) to bool. */
             class DateToBool : public ToBoolTrue {
-                Value value() { return Value(Date_t(0)); }
+                Value value() { return Value(Date_t{}); }
             };
             
             /** Coerce js literal regex to bool. */
@@ -1014,7 +1014,7 @@ namespace DocumentTests {
 
             /** Coerce date to date. */
             class DateToDate : public ToDateBase {
-                Value value() { return Value(Date_t(888)); }
+                Value value() { return Value(Date_t::fromMillisSinceEpoch(888)); }
                 long long expected() { return 888; }
             };
 
@@ -1083,7 +1083,7 @@ namespace DocumentTests {
             
             /** Coerce date to string. */
             class DateToString : public ToStringBase {
-                Value value() { return Value(Date_t(1234567890LL*1000)); }
+                Value value() { return Value(Date_t::fromMillisSinceEpoch(1234567890LL*1000)); }
                 string expected() { return "2009-02-13T23:31:30"; } // from js
             };
 
@@ -1120,7 +1120,7 @@ namespace DocumentTests {
             class DateToTimestamp {
             public:
                 void run() {
-                    ASSERT_THROWS( Value(Date_t(1010)).coerceToTimestamp(),
+                    ASSERT_THROWS( Value(Date_t::fromMillisSinceEpoch(1010)).coerceToTimestamp(),
                                    UserException );
                 }
             };
@@ -1261,10 +1261,16 @@ namespace DocumentTests {
                 assertComparison( 1, true, false );
 
                 // Date.
-                assertComparison( 0, Date_t( 555 ), Date_t( 555 ) );
-                assertComparison( 1, Date_t( 555 ), Date_t( 554 ) );
+                assertComparison( 0,
+                                  Date_t::fromMillisSinceEpoch( 555 ),
+                                  Date_t::fromMillisSinceEpoch( 555 ) );
+                assertComparison( 1,
+                                  Date_t::fromMillisSinceEpoch( 555 ),
+                                  Date_t::fromMillisSinceEpoch( 554 ) );
                 // Negative date.
-                assertComparison( 1, Date_t( 0 ), Date_t( -1 ) );
+                assertComparison( 1,
+                                  Date_t::fromMillisSinceEpoch( 0 ),
+                                  Date_t::fromMillisSinceEpoch( -1 ) );
 
                 // Regex.
                 assertComparison( 0, fromjson( "{'':/a/}" ), fromjson( "{'':/a/}" ) );
@@ -1290,8 +1296,8 @@ namespace DocumentTests {
                 assertComparison(-1, Value(vector<Value>()), Value(BSONBinData("", 0, MD5Type)));
                 assertComparison(-1, Value(BSONBinData("", 0, MD5Type)), Value(mongo::OID()));
                 assertComparison(-1, Value(mongo::OID()), Value(false));
-                assertComparison(-1, Value(false), Value(Date_t(0)));
-                assertComparison(-1, Value(Date_t(0)), Value(Timestamp()));
+                assertComparison(-1, Value(false), Value(Date_t()));
+                assertComparison(-1, Value(Date_t()), Value(Timestamp()));
                 assertComparison(-1, Value(Timestamp()), Value(BSONRegEx("")));
                 assertComparison(-1, Value(BSONRegEx("")), Value(BSONDBRef("", mongo::OID())));
                 assertComparison(-1, Value(BSONDBRef("", mongo::OID())), Value(BSONCode("")));

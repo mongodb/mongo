@@ -404,9 +404,8 @@ namespace repl {
 
             static const Seconds leaseTime;
 
-            VoteLease() : when(0), whoId(-1) { }
             Date_t when;
-            int whoId;
+            int whoId = -1;
             HostAndPort whoHostAndPort;
         } _voteLease;
 

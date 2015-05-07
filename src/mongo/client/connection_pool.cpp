@@ -39,22 +39,17 @@
 namespace mongo {
 namespace {
 
-    const unsigned long long kNeverTooStale = std::numeric_limits<unsigned long long>::max();
+    const Date_t kNeverTooStale = Date_t::max();
 
-    // 5 Minutes (Note: Must be larger than kMaxConnectionAge below)
-    const long long kCleanUpInterval = 5 * 60 * 1000;
+    const Minutes kCleanUpInterval(5); // Note: Must be larger than kMaxConnectionAge below)
     const Seconds kMaxConnectionAge(30);
 
 } // namespace
 
-    ConnectionPool::ConnectionPool(int messagingPortTags)
-        : _messagingPortTags(messagingPortTags),
-          _lastCleanUpTime(0ULL) {
-
-    }
+    ConnectionPool::ConnectionPool(int messagingPortTags) : _messagingPortTags(messagingPortTags) {}
 
     ConnectionPool::~ConnectionPool() {
-        cleanUpOlderThan(Date_t(~0ULL));
+        cleanUpOlderThan(Date_t::max());
 
         invariant(_connections.empty());
         invariant(_inUseConnections.empty());
@@ -91,8 +86,7 @@ namespace {
     }
 
     bool ConnectionPool::_shouldKeepConnection(Date_t now, const ConnectionInfo& connInfo) const {
-        const Date_t expirationDate =
-                connInfo.creationDate + kMaxConnectionAge.total_milliseconds();
+        const Date_t expirationDate = connInfo.creationDate + kMaxConnectionAge;
         if (expirationDate <= now) {
             return false;
         }
@@ -120,7 +114,7 @@ namespace {
                     ConnectionList connList = _connections.find(itr->first)->second;
                     _cleanUpOlderThan_inlock(now, &connList);
                     invariant(connList.empty());
-                    itr->second = Date_t(kNeverTooStale);
+                    itr->second = kNeverTooStale;
                 }
             }
 
@@ -144,7 +138,7 @@ namespace {
             _cleanUpOlderThan_inlock(now, &hostConns->second);
             if (hostConns->second.empty()) {
                 // prevent host from causing unnecessary cleanups
-                _lastUsedHosts[hostConns->first] = Date_t(kNeverTooStale);
+                _lastUsedHosts[hostConns->first] = kNeverTooStale;
                 break;
             }
 
@@ -157,9 +151,9 @@ namespace {
             try {
                 if (candidate->conn->isStillConnected()) {
                     // setSoTimeout takes a double representing the number of seconds for send and
-                    // receive timeouts.  Thus, we must take total_milliseconds() and divide by
+                    // receive timeouts.  Thus, we must take count() and divide by
                     // 1000.0 to get the number of seconds with a fractional part.
-                    candidate->conn->setSoTimeout(timeout.total_milliseconds() / 1000.0);
+                    candidate->conn->setSoTimeout(timeout.count() / 1000.0);
                     return candidate;
                 }
             }
@@ -178,9 +172,9 @@ namespace {
         std::auto_ptr<DBClientConnection> conn(new DBClientConnection);
 
         // setSoTimeout takes a double representing the number of seconds for send and receive
-        // timeouts.  Thus, we must take total_milliseconds() and divide by 1000.0 to get the number
+        // timeouts.  Thus, we must take count() and divide by 1000.0 to get the number
         // of seconds with a fractional part.
-        conn->setSoTimeout(timeout.total_milliseconds() / 1000.0);
+        conn->setSoTimeout(timeout.count() / 1000.0);
         std::string errmsg;
         uassert(28640,
                 str::stream() << "Failed attempt to connect to "

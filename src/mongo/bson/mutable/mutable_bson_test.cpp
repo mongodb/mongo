@@ -556,7 +556,7 @@ namespace {
         t0.setValueTimestamp(mongo::Timestamp());
         ASSERT_EQUALS(mongo::bsonTimestamp, t0.getType());
 
-        t0.setValueDate(12345LL);
+        t0.setValueDate(mongo::Date_t::fromMillisSinceEpoch(12345LL));
         ASSERT_EQUALS(mongo::Date, t0.getType());
 
         t0.setValueDouble(123.45);
@@ -2740,7 +2740,7 @@ namespace {
     }
 
     TEST(DocumentInPlace, DateLifecycle) {
-        mongo::BSONObj obj(BSON("x" << mongo::Date_t(1000)));
+        mongo::BSONObj obj(BSON("x" << mongo::Date_t::fromMillisSinceEpoch(1000)));
         mmb::Document doc(obj, mmb::Document::kInPlaceEnabled);
 
         mmb::Element x = doc.root().leftChild();
@@ -2748,13 +2748,13 @@ namespace {
         mmb::DamageVector damages;
         const char* source = NULL;
 
-        x.setValueDate(mongo::Date_t(20000));
+        x.setValueDate(mongo::Date_t::fromMillisSinceEpoch(20000));
         ASSERT_TRUE(doc.getInPlaceUpdates(&damages, &source));
         ASSERT_EQUALS(1U, damages.size());
         apply(&obj, damages, source);
         ASSERT_TRUE(x.hasValue());
         ASSERT_TRUE(x.isType(mongo::Date));
-        ASSERT_EQUALS(mongo::Date_t(20000), x.getValueDate());
+        ASSERT_EQUALS(mongo::Date_t::fromMillisSinceEpoch(20000), x.getValueDate());
 
         // TODO: When in-place updates for leaf elements is implemented, add tests here.
     }
@@ -2788,7 +2788,7 @@ namespace {
     }
 
     TEST(DocumentInPlace, TimestampLifecycle) {
-        mongo::BSONObj obj(BSON("x" << mongo::Timestamp(mongo::Date_t(1000))));
+        mongo::BSONObj obj(BSON("x" << mongo::Timestamp(mongo::Date_t::fromMillisSinceEpoch(1000))));
         mmb::Document doc(obj, mmb::Document::kInPlaceEnabled);
 
         mmb::Element x = doc.root().leftChild();
@@ -2796,13 +2796,13 @@ namespace {
         mmb::DamageVector damages;
         const char* source = NULL;
 
-        x.setValueTimestamp(mongo::Timestamp(mongo::Date_t(20000)));
+        x.setValueTimestamp(mongo::Timestamp(mongo::Date_t::fromMillisSinceEpoch(20000)));
         ASSERT_TRUE(doc.getInPlaceUpdates(&damages, &source));
         ASSERT_EQUALS(1U, damages.size());
         apply(&obj, damages, source);
         ASSERT_TRUE(x.hasValue());
         ASSERT_TRUE(x.isType(mongo::bsonTimestamp));
-        ASSERT_TRUE(mongo::Timestamp(mongo::Date_t(20000)) == x.getValueTimestamp());
+        ASSERT_TRUE(mongo::Timestamp(20000U) == x.getValueTimestamp());
 
         // TODO: When in-place updates for leaf elements is implemented, add tests here.
     }

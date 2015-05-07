@@ -274,7 +274,7 @@ namespace {
         if (_heartbeatTimeoutPeriod < Seconds(0)) {
             return Status(ErrorCodes::BadValue, str::stream() << kSettingsFieldName << '.' <<
                           kHeartbeatTimeoutFieldName << " field value must be non-negative, "
-                          "but found " << _heartbeatTimeoutPeriod.total_seconds());
+                          "but found " << _heartbeatTimeoutPeriod.count());
         }
         if (_members.size() > kMaxMembers || _members.empty()) {
             return Status(ErrorCodes::BadValue, str::stream() <<
@@ -539,7 +539,7 @@ namespace {
 
         BSONObjBuilder settingsBuilder(configBuilder.subobjStart(kSettingsFieldName));
         settingsBuilder.append(kChainingAllowedFieldName, _chainingAllowed);
-        settingsBuilder.append(kHeartbeatTimeoutFieldName, _heartbeatTimeoutPeriod.total_seconds());
+        settingsBuilder.appendIntOrLL(kHeartbeatTimeoutFieldName, _heartbeatTimeoutPeriod.count());
 
         BSONObjBuilder gleModes(settingsBuilder.subobjStart(kGetLastErrorModesFieldName));
         for (StringMap<ReplicaSetTagPattern>::const_iterator mode =

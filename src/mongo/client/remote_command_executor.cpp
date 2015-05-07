@@ -34,9 +34,8 @@
 
 namespace mongo {
 
-    const Milliseconds RemoteCommandRequest::kNoTimeout(-1);
-    const Date_t RemoteCommandRequest::kNoExpirationDate(-1);
-
+    const Milliseconds RemoteCommandRequest::kNoTimeout{-1};
+    const Date_t RemoteCommandRequest::kNoExpirationDate{Date_t::max()};
 
     std::string RemoteCommandRequest::toString() const {
         str::stream out;

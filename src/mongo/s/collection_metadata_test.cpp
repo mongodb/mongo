@@ -69,7 +69,7 @@ namespace {
             collType.setNs(NamespaceString{"test.foo"});
             collType.setKeyPattern( BSON("a" << 1) );
             collType.setUnique( false );
-            collType.setUpdatedAt( 1ULL );
+            collType.setUpdatedAt( Date_t::fromMillisSinceEpoch(1) );
             collType.setEpoch( epoch );
             ASSERT_OK(collType.validate());
 
@@ -477,7 +477,7 @@ namespace {
             collType.setNs(NamespaceString{"test.foo"});
             collType.setKeyPattern(BSON("a" << 1));
             collType.setUnique(false);
-            collType.setUpdatedAt(1ULL);
+            collType.setUpdatedAt(Date_t::fromMillisSinceEpoch(1));
             collType.setEpoch(epoch);
             _dummyConfig->insert(CollectionType::ConfigNS, collType.toBSON());
 
@@ -485,7 +485,8 @@ namespace {
                     ChunkType::ns("test.foo") <<
                     ChunkType::min(BSON("a" << 10)) <<
                     ChunkType::max(BSON("a" << 20)) <<
-                    ChunkType::DEPRECATED_lastmod(chunkVersion.toLong()) <<
+                    ChunkType::DEPRECATED_lastmod(
+                            Date_t::fromMillisSinceEpoch(chunkVersion.toLong())) <<
                     ChunkType::DEPRECATED_epoch(epoch) <<
                     ChunkType::shard("shard0000"));
             _dummyConfig->insert( ChunkType::ConfigNS, fooSingle );
@@ -824,15 +825,17 @@ namespace {
             collType.setNs(NamespaceString{"test.foo"});
             collType.setKeyPattern(BSON("a" << 1));
             collType.setUnique(false);
-            collType.setUpdatedAt(1ULL);
+            collType.setUpdatedAt(Date_t::fromMillisSinceEpoch(1));
             collType.setEpoch(epoch);
             _dummyConfig->insert(CollectionType::ConfigNS, collType.toBSON());
 
-            BSONObj fooSingle = BSON(ChunkType::name("test.foo-a_MinKey") <<
+            BSONObj fooSingle = BSON(
+                    ChunkType::name("test.foo-a_MinKey") <<
                     ChunkType::ns("test.foo") <<
                     ChunkType::min(BSON("a" << MINKEY << "b" << MINKEY)) <<
                     ChunkType::max(BSON("a" << MAXKEY << "b" << MAXKEY)) <<
-                    ChunkType::DEPRECATED_lastmod(chunkVersion.toLong()) <<
+                    ChunkType::DEPRECATED_lastmod(Date_t::fromMillisSinceEpoch(
+                                                          chunkVersion.toLong())) <<
                     ChunkType::DEPRECATED_epoch(epoch) <<
                     ChunkType::shard("shard0000"));
             _dummyConfig->insert( ChunkType::ConfigNS, fooSingle );
@@ -892,25 +895,31 @@ namespace {
             collType.setNs(NamespaceString{"test.foo"});
             collType.setKeyPattern(BSON("a" << 1));
             collType.setUnique(false);
-            collType.setUpdatedAt(1ULL);
+            collType.setUpdatedAt(Date_t::fromMillisSinceEpoch(1));
             collType.setEpoch(epoch);
             _dummyConfig->insert(CollectionType::ConfigNS, collType.toBSON());
 
-            _dummyConfig->insert( ChunkType::ConfigNS, BSON(ChunkType::name("test.foo-a_10") <<
-                    ChunkType::ns("test.foo") <<
-                    ChunkType::min(BSON("a" << 10 << "b" << 0)) <<
-                    ChunkType::max(BSON("a" << 20 << "b" << 0)) <<
-                    ChunkType::DEPRECATED_lastmod(chunkVersion.toLong()) <<
-                    ChunkType::DEPRECATED_epoch(epoch) <<
-                    ChunkType::shard("shard0000")) );
+            _dummyConfig->insert(
+                    ChunkType::ConfigNS,
+                    BSON(ChunkType::name("test.foo-a_10") <<
+                         ChunkType::ns("test.foo") <<
+                         ChunkType::min(BSON("a" << 10 << "b" << 0)) <<
+                         ChunkType::max(BSON("a" << 20 << "b" << 0)) <<
+                         ChunkType::DEPRECATED_lastmod(Date_t::fromMillisSinceEpoch(
+                                                               chunkVersion.toLong())) <<
+                         ChunkType::DEPRECATED_epoch(epoch) <<
+                         ChunkType::shard("shard0000")) );
 
-            _dummyConfig->insert( ChunkType::ConfigNS, BSON(ChunkType::name("test.foo-a_10") <<
-                    ChunkType::ns("test.foo") <<
-                    ChunkType::min(BSON("a" << 30 << "b" << 0)) <<
-                    ChunkType::max(BSON("a" << 40 << "b" << 0)) <<
-                    ChunkType::DEPRECATED_lastmod(chunkVersion.toLong()) <<
-                    ChunkType::DEPRECATED_epoch(epoch) <<
-                    ChunkType::shard("shard0000")) );
+            _dummyConfig->insert(
+                    ChunkType::ConfigNS,
+                    BSON(ChunkType::name("test.foo-a_10") <<
+                         ChunkType::ns("test.foo") <<
+                         ChunkType::min(BSON("a" << 30 << "b" << 0)) <<
+                         ChunkType::max(BSON("a" << 40 << "b" << 0)) <<
+                         ChunkType::DEPRECATED_lastmod(Date_t::fromMillisSinceEpoch(
+                                                               chunkVersion.toLong())) <<
+                         ChunkType::DEPRECATED_epoch(epoch) <<
+                         ChunkType::shard("shard0000")) );
 
             ConnectionString configLoc = ConnectionString(HostAndPort(CONFIG_HOST_PORT));
             ASSERT(configLoc.isValid());
@@ -1164,7 +1173,7 @@ namespace {
                 collType.setNs(NamespaceString{"x.y"});
                 collType.setKeyPattern(BSON("a" << 1));
                 collType.setUnique(false);
-                collType.setUpdatedAt(1ULL);
+                collType.setUpdatedAt(Date_t::fromMillisSinceEpoch(1));
                 collType.setEpoch(epoch);
                 _dummyConfig->insert(CollectionType::ConfigNS, collType.toBSON());
             }
@@ -1175,7 +1184,8 @@ namespace {
                         ChunkType::ns("x.y") <<
                         ChunkType::min(BSON("a" << MINKEY)) <<
                         ChunkType::max(BSON("a" << 10)) <<
-                        ChunkType::DEPRECATED_lastmod(version.toLong()) <<
+                        ChunkType::DEPRECATED_lastmod(
+                                Date_t::fromMillisSinceEpoch(version.toLong())) <<
                         ChunkType::DEPRECATED_epoch(version.epoch()) <<
                         ChunkType::shard("shard0000")) );
             }
@@ -1186,7 +1196,8 @@ namespace {
                         ChunkType::ns("x.y") <<
                         ChunkType::min(BSON("a" << 10)) <<
                         ChunkType::max(BSON("a" << 20)) <<
-                        ChunkType::DEPRECATED_lastmod(version.toLong()) <<
+                        ChunkType::DEPRECATED_lastmod(
+                                Date_t::fromMillisSinceEpoch(version.toLong())) <<
                         ChunkType::DEPRECATED_epoch(version.epoch()) <<
                         ChunkType::shard("shard0000")) );
             }
@@ -1197,7 +1208,8 @@ namespace {
                         ChunkType::ns("x.y") <<
                         ChunkType::min(BSON("a" << 30)) <<
                         ChunkType::max(BSON("a" << MAXKEY)) <<
-                        ChunkType::DEPRECATED_lastmod(version.toLong()) <<
+                        ChunkType::DEPRECATED_lastmod(
+                                Date_t::fromMillisSinceEpoch(version.toLong())) <<
                         ChunkType::DEPRECATED_epoch(version.epoch()) <<
                         ChunkType::shard("shard0000")) );
             }

@@ -85,7 +85,7 @@ namespace {
         CollectionType collInfo;
         collInfo.setNs(NamespaceString{"test.foo"});
         collInfo.setKeyPattern(BSON("a" << 1));
-        collInfo.setUpdatedAt( 0 );
+        collInfo.setUpdatedAt( Date_t() );
         collInfo.setEpoch( OID() );
         collInfo.setDropped( true );
         ASSERT_OK(collInfo.validate());
@@ -159,7 +159,7 @@ namespace {
 
         CollectionType collInfo;
         collInfo.setNs(NamespaceString{"test.foo"});
-        collInfo.setUpdatedAt(1ULL);
+        collInfo.setUpdatedAt(Date_t::fromMillisSinceEpoch(1));
         collInfo.setKeyPattern( BSON("a" << 1) );
         collInfo.setEpoch( OID::gen() );
         ASSERT_OK(collInfo.validate());
@@ -204,7 +204,7 @@ namespace {
             collType.setNs(NamespaceString{"test.foo"});
             collType.setKeyPattern(BSON("a" << 1));
             collType.setUnique(false);
-            collType.setUpdatedAt(1ULL);
+            collType.setUpdatedAt(Date_t::fromMillisSinceEpoch(1));
             collType.setEpoch(epoch);
             _dummyConfig->insert(CollectionType::ConfigNS, collType.toBSON());
         }
@@ -247,7 +247,7 @@ namespace {
             collType.setNs(NamespaceString{"test.foo"});
             collType.setKeyPattern( BSON("a" << 1) );
             collType.setUnique( false );
-            collType.setUpdatedAt( 1ULL );
+            collType.setUpdatedAt( Date_t::fromMillisSinceEpoch(1) );
             collType.setEpoch( epoch );
             ASSERT_OK(collType.validate());
 
@@ -314,15 +314,17 @@ namespace {
             collType.setNs(NamespaceString{"test.foo"});
             collType.setKeyPattern(BSON("a" << 1));
             collType.setUnique(false);
-            collType.setUpdatedAt(1ULL);
+            collType.setUpdatedAt(Date_t::fromMillisSinceEpoch(1));
             collType.setEpoch(epoch);
             _dummyConfig->insert(CollectionType::ConfigNS, collType.toBSON());
 
-            BSONObj fooSingle = BSON(ChunkType::name("test.foo-a_MinKey") <<
+            BSONObj fooSingle = BSON(
+                    ChunkType::name("test.foo-a_MinKey") <<
                     ChunkType::ns("test.foo") <<
                     ChunkType::min(BSON("a" << MINKEY)) <<
                     ChunkType::max(BSON("a" << MAXKEY)) <<
-                    ChunkType::DEPRECATED_lastmod(_maxCollVersion.toLong()) <<
+                    ChunkType::DEPRECATED_lastmod(Date_t::fromMillisSinceEpoch(
+                                                          _maxCollVersion.toLong())) <<
                     ChunkType::DEPRECATED_epoch(epoch) <<
                     ChunkType::shard("shard0000"));
             _dummyConfig->insert( ChunkType::ConfigNS, fooSingle );
@@ -463,7 +465,7 @@ namespace {
             CollectionType coll;
             coll.setNs(NamespaceString{ns});
             coll.setKeyPattern( BSON( "a" << 1 ) );
-            coll.setUpdatedAt( 1ULL );
+            coll.setUpdatedAt( Date_t::fromMillisSinceEpoch(1) );
             coll.setEpoch( epoch );
             ASSERT_OK(coll.validate());
 

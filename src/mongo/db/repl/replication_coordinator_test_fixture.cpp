@@ -191,7 +191,7 @@ namespace {
                 net->scheduleResponse(noi, net->now(), makeResponseStatus(
                                               BSON("ok" << 1 <<
                                                    "fresher" << false <<
-                                                   "opTime" << Date_t(Timestamp(0, 0).asULL()) <<
+                                                   "opTime" << Date_t() <<
                                                    "veto" << false)));
             }
             else if (request.cmdObj.firstElement().fieldNameStringData() == "replSetElect") {
@@ -234,7 +234,7 @@ namespace {
         while (replCoord->getMemberState().primary()) {
             log() << "Waiting on network in state " << replCoord->getMemberState();
             getNet()->enterNetwork();
-            net->runUntil(net->now() + 10000);
+            net->runUntil(net->now() + Seconds(10));
             const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
             const RemoteCommandRequest& request = noi->getRequest();
             log() << request.target.toString() << " processing " << request.cmdObj;

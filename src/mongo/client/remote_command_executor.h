@@ -39,7 +39,6 @@ namespace mongo {
 
     template<typename T> class StatusWith;
 
-
     /**
      * Type of object describing a command to execute against a remote MongoDB node.
      */

@@ -43,7 +43,7 @@ namespace {
 
     TEST(ChunkType, MissingRequiredFields) {
         ChunkType chunk;
-        BSONArray version = BSON_ARRAY(Date_t(1) << OID::gen());
+        BSONArray version = BSON_ARRAY(Date_t::fromMillisSinceEpoch(1) << OID::gen());
 
         BSONObj objModNS = BSON(ChunkType::name("test.mycol-a_MinKey") <<
                                 ChunkType::min(BSON("a" << 10 << "b" << 10)) <<
@@ -78,7 +78,7 @@ namespace {
     }
 
     TEST(ChunkType, DifferentNumberOfColumns) {
-        BSONArray version = BSON_ARRAY(Date_t(1) << OID::gen());
+        BSONArray version = BSON_ARRAY(Date_t::fromMillisSinceEpoch(1) << OID::gen());
         BSONObj obj = BSON(ChunkType::name("test.mycol-a_MinKey") <<
                            ChunkType::ns("test.mycol") <<
                            ChunkType::min(BSON("a" << 10 << "b" << 10)) <<
@@ -91,7 +91,7 @@ namespace {
     }
 
     TEST(ChunkType, DifferentColumns) {
-        BSONArray version = BSON_ARRAY(Date_t(1) << OID::gen());
+        BSONArray version = BSON_ARRAY(Date_t::fromMillisSinceEpoch(1) << OID::gen());
         BSONObj obj = BSON(ChunkType::name("test.mycol-a_MinKey") <<
                            ChunkType::ns("test.mycol") <<
                            ChunkType::min(BSON("a" << 10)) <<
@@ -104,7 +104,7 @@ namespace {
     }
 
     TEST(ChunkType, NotAscending) {
-        BSONArray version = BSON_ARRAY(Date_t(1) << OID::gen());
+        BSONArray version = BSON_ARRAY(Date_t::fromMillisSinceEpoch(1) << OID::gen());
         BSONObj obj = BSON(ChunkType::name("test.mycol-a_MinKey") <<
                            ChunkType::ns("test.mycol") <<
                            ChunkType::min(BSON("a" << 20)) <<
@@ -119,7 +119,7 @@ namespace {
     TEST(ChunkType, NewFormatVersion) {
         ChunkType chunk;
         OID epoch = OID::gen();
-        BSONArray version = BSON_ARRAY(Date_t(1) << epoch);
+        BSONArray version = BSON_ARRAY(Date_t::fromMillisSinceEpoch(1) << epoch);
         BSONObj obj = BSON(ChunkType::name("test.mycol-a_MinKey") <<
                            ChunkType::ns("test.mycol") <<
                            ChunkType::min(BSON("a" << 10)) <<
@@ -148,7 +148,7 @@ namespace {
                            ChunkType::ns("test.mycol") <<
                            ChunkType::min(BSON("a" << 10)) <<
                            ChunkType::max(BSON("a" << 20)) <<
-                           ChunkType::DEPRECATED_lastmod(Date_t(1)) <<
+                           ChunkType::DEPRECATED_lastmod(Date_t::fromMillisSinceEpoch(1)) <<
                            ChunkType::DEPRECATED_epoch(epoch) <<
                            ChunkType::shard("shard0001"));
         StatusWith<ChunkType> chunkRes = ChunkType::fromBSON(obj);

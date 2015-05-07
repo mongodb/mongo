@@ -186,8 +186,7 @@ namespace mongo {
             break;
 
         case Date:
-            // this is really signed but typed as unsigned for historical reasons
-            _storage.dateValue = static_cast<long long>(elem.date().millis);
+            _storage.dateValue = elem.date().toMillisSinceEpoch();
             break;
 
         case RegEx: {
@@ -288,7 +287,7 @@ namespace mongo {
         case NumberDouble: return builder << val.getDouble();
         case String:       return builder << val.getStringData();
         case Bool:         return builder << val.getBool();
-        case Date:         return builder << Date_t(val.getDate());
+        case Date:         return builder << Date_t::fromMillisSinceEpoch(val.getDate());
         case bsonTimestamp:    return builder << val.getTimestamp();
         case Object:       return builder << val.getDocument();
         case Symbol:       return builder << BSONSymbol(val.getStringData());
@@ -1018,7 +1017,7 @@ namespace mongo {
         case NumberLong:   return Value(buf.read<long long>());
         case NumberDouble: return Value(buf.read<double>());
         case Bool:         return Value(bool(buf.read<char>()));
-        case Date:         return Value(Date_t(buf.read<long long>()));
+        case Date:         return Value(Date_t::fromMillisSinceEpoch(buf.read<long long>()));
         case bsonTimestamp:  return Value(buf.read<Timestamp>());
 
         // types that are like strings

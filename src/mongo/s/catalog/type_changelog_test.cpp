@@ -53,7 +53,7 @@ namespace {
         BSONObj obj = BSON(ChangelogType::changeID("host.local-2012-11-21T19:14:10-8") <<
                            ChangelogType::server("host.local") <<
                            ChangelogType::clientAddr("192.168.0.189:51128") <<
-                           ChangelogType::time(1ULL) <<
+                           ChangelogType::time(Date_t::fromMillisSinceEpoch(1)) <<
                            ChangelogType::what("split") <<
                            ChangelogType::ns("test.test") <<
                            ChangelogType::details(BSON("dummy" << "info")));
@@ -64,7 +64,7 @@ namespace {
         ASSERT_EQUALS(logEntry.getChangeID(), "host.local-2012-11-21T19:14:10-8");
         ASSERT_EQUALS(logEntry.getServer(), "host.local");
         ASSERT_EQUALS(logEntry.getClientAddr(), "192.168.0.189:51128");
-        ASSERT_EQUALS(logEntry.getTime(), 1ULL);
+        ASSERT_EQUALS(logEntry.getTime(), Date_t::fromMillisSinceEpoch(1));
         ASSERT_EQUALS(logEntry.getWhat(), "split");
         ASSERT_EQUALS(logEntry.getNS(), "test.test");
         ASSERT_EQUALS(logEntry.getDetails(), BSON("dummy" << "info"));
@@ -74,7 +74,7 @@ namespace {
         ChangelogType logEntry;
         BSONObj obj = BSON(ChangelogType::server("host.local") <<
                            ChangelogType::clientAddr("192.168.0.189:51128") <<
-                           ChangelogType::time(1ULL) <<
+                           ChangelogType::time(Date_t::fromMillisSinceEpoch(1)) <<
                            ChangelogType::what("split") <<
                            ChangelogType::ns("test.test") <<
                            ChangelogType::details(BSON("dummy" << "info")));
@@ -88,7 +88,7 @@ namespace {
         ChangelogType logEntry;
         BSONObj obj = BSON(ChangelogType::changeID("host.local-2012-11-21T19:14:10-8") <<
                            ChangelogType::clientAddr("192.168.0.189:51128") <<
-                           ChangelogType::time(1ULL) <<
+                           ChangelogType::time(Date_t::fromMillisSinceEpoch(1)) <<
                            ChangelogType::what("split") <<
                            ChangelogType::ns("test.test") <<
                            ChangelogType::details(BSON("dummy" << "info")));
@@ -102,7 +102,7 @@ namespace {
         ChangelogType logEntry;
         BSONObj obj = BSON(ChangelogType::changeID("host.local-2012-11-21T19:14:10-8") <<
                            ChangelogType::server("host.local") <<
-                           ChangelogType::time(1ULL) <<
+                           ChangelogType::time(Date_t::fromMillisSinceEpoch(1)) <<
                            ChangelogType::what("split") <<
                            ChangelogType::ns("test.test") <<
                            ChangelogType::details(BSON("dummy" << "info")));
@@ -131,7 +131,7 @@ namespace {
         BSONObj obj = BSON(ChangelogType::changeID("host.local-2012-11-21T19:14:10-8") <<
                            ChangelogType::server("host.local") <<
                            ChangelogType::clientAddr("192.168.0.189:51128") <<
-                           ChangelogType::time(1ULL) <<
+                           ChangelogType::time(Date_t::fromMillisSinceEpoch(1)) <<
                            ChangelogType::ns("test.test") <<
                            ChangelogType::details(BSON("dummy" << "info")));
         string errMsg;
@@ -145,7 +145,7 @@ namespace {
         BSONObj obj = BSON(ChangelogType::changeID("host.local-2012-11-21T19:14:10-8") <<
                            ChangelogType::server("host.local") <<
                            ChangelogType::clientAddr("192.168.0.189:51128") <<
-                           ChangelogType::time(1ULL) <<
+                           ChangelogType::time(Date_t::fromMillisSinceEpoch(1)) <<
                            ChangelogType::what("split") <<
                            ChangelogType::details(BSON("dummy" << "info")));
         string errMsg;
@@ -159,7 +159,7 @@ namespace {
         BSONObj obj = BSON(ChangelogType::changeID("host.local-2012-11-21T19:14:10-8") <<
                            ChangelogType::server("host.local") <<
                            ChangelogType::clientAddr("192.168.0.189:51128") <<
-                           ChangelogType::time(1ULL) <<
+                           ChangelogType::time(Date_t::fromMillisSinceEpoch(1)) <<
                            ChangelogType::what("split") <<
                            ChangelogType::ns("test.test"));
         string errMsg;

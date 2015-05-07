@@ -129,9 +129,7 @@ namespace mongo {
                 : id(_id), lastPing(_lastPing), remote(_remote), ts(_ts){
             }
 
-            PingData()
-                : id(""), lastPing(0), remote(0), ts(){
-            }
+            PingData() : id(""), ts() {}
 
             std::string id;
             Date_t lastPing;

@@ -91,9 +91,7 @@ namespace mongo {
         explicit Value(const UndefinedLabeler&)   : _storage(Undefined) {} // BSONUndefined
         explicit Value(const MinKeyLabeler&)      : _storage(MinKey) {}    // MINKEY
         explicit Value(const MaxKeyLabeler&)      : _storage(MaxKey) {}    // MAXKEY
-        explicit Value(const Date_t& date)
-            : _storage(Date, static_cast<long long>(date.millis)) // millis really signed
-        {}
+        explicit Value(const Date_t& date) : _storage(Date, date.toMillisSinceEpoch()) {}
 
         // TODO: add an unsafe version that can share storage with the BSONElement
         /// Deep-convert from BSONElement to Value
@@ -317,7 +315,7 @@ namespace mongo {
 
     inline Timestamp Value::getTimestamp() const {
         verify(getType() == bsonTimestamp);
-        return Date_t(_storage.timestampValue);
+        return Timestamp(_storage.timestampValue);
     }
 
     inline const char* Value::getRegex() const {

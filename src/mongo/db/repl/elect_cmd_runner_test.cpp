@@ -199,15 +199,15 @@ namespace {
         ASSERT_EQUALS(stripRound(electRequest), stripRound(noi->getRequest().cmdObj));
         ASSERT_EQUALS(HostAndPort("h1"), noi->getRequest().target);
         _net->scheduleResponse(noi,
-                               startDate + 10,
+                               startDate + Milliseconds(10),
                                ResponseStatus(RemoteCommandResponse(
                                                       BSON("ok" << 1 <<
                                                            "vote" << 1 <<
                                                            "round" << 380865962699346850ll),
                                                       Milliseconds(8))));
-        _net->runUntil(startDate + 10);
+        _net->runUntil(startDate + Milliseconds(10));
         _net->exitNetwork();
-        ASSERT_EQUALS(startDate + 10, _net->now());
+        ASSERT_EQUALS(startDate + Milliseconds(10), _net->now());
         waitForTest();
         ASSERT_EQUALS(electCmdRunner.getReceivedVotes(), 2);
     }

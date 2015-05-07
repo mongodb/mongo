@@ -47,18 +47,18 @@ namespace {
     TEST(CollectionType, Basic) {
         const OID oid = OID::gen();
         StatusWith<CollectionType> status = CollectionType::fromBSON(
-                                                BSON(CollectionType::fullNs("db.coll") <<
-                                                     CollectionType::epoch(oid) <<
-                                                     CollectionType::updatedAt(1ULL) <<
-                                                     CollectionType::keyPattern(BSON("a" << 1)) <<
-                                                     CollectionType::unique(true)));
+                BSON(CollectionType::fullNs("db.coll") <<
+                     CollectionType::epoch(oid) <<
+                     CollectionType::updatedAt(Date_t::fromMillisSinceEpoch(1)) <<
+                     CollectionType::keyPattern(BSON("a" << 1)) <<
+                     CollectionType::unique(true)));
         ASSERT_TRUE(status.isOK());
 
         CollectionType coll = status.getValue();
         ASSERT_TRUE(coll.validate().isOK());
         ASSERT(coll.getNs() == NamespaceString{"db.coll"});
         ASSERT_EQUALS(coll.getEpoch(), oid);
-        ASSERT_EQUALS(coll.getUpdatedAt(), 1ULL);
+        ASSERT_EQUALS(coll.getUpdatedAt(), Date_t::fromMillisSinceEpoch(1));
         ASSERT_EQUALS(coll.getKeyPattern(), BSON("a" << 1));
         ASSERT_EQUALS(coll.getUnique(), true);
         ASSERT_EQUALS(coll.getAllowBalance(), true);
@@ -68,11 +68,11 @@ namespace {
     TEST(CollectionType, InvalidCollectionNamespace) {
         const OID oid = OID::gen();
         StatusWith<CollectionType> result = CollectionType::fromBSON(
-                                                BSON(CollectionType::fullNs("foo\\bar.coll") <<
-                                                     CollectionType::epoch(oid) <<
-                                                     CollectionType::updatedAt(1ULL) <<
-                                                     CollectionType::keyPattern(BSON("a" << 1)) <<
-                                                     CollectionType::unique(true)));
+                BSON(CollectionType::fullNs("foo\\bar.coll") <<
+                     CollectionType::epoch(oid) <<
+                     CollectionType::updatedAt(Date_t::fromMillisSinceEpoch(1)) <<
+                     CollectionType::keyPattern(BSON("a" << 1)) <<
+                     CollectionType::unique(true)));
         ASSERT_TRUE(result.isOK());
         CollectionType collType = result.getValue();
         ASSERT_FALSE(collType.validate().isOK());
@@ -81,11 +81,11 @@ namespace {
     TEST(CollectionType, BadType) {
         const OID oid = OID::gen();
         StatusWith<CollectionType> status = CollectionType::fromBSON(
-                                                BSON(CollectionType::fullNs() << 1 <<
-                                                     CollectionType::epoch(oid) <<
-                                                     CollectionType::updatedAt(1ULL) <<
-                                                     CollectionType::keyPattern(BSON("a" << 1)) <<
-                                                     CollectionType::unique(true)));
+                BSON(CollectionType::fullNs() << 1 <<
+                     CollectionType::epoch(oid) <<
+                     CollectionType::updatedAt(Date_t::fromMillisSinceEpoch(1)) <<
+                     CollectionType::keyPattern(BSON("a" << 1)) <<
+                     CollectionType::unique(true)));
 
         ASSERT_FALSE(status.isOK());
     }

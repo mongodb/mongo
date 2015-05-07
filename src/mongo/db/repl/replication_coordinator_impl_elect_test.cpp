@@ -97,7 +97,8 @@ namespace {
                 net->scheduleResponse(noi, net->now(), makeResponseStatus(
                                               BSON("ok" << 1 <<
                                                    "fresher" << false <<
-                                                   "opTime" << Date_t(Timestamp(0, 0).asULL()) <<
+                                                   "opTime" << Date_t::fromMillisSinceEpoch(
+                                                           Timestamp(0, 0).asLL()) <<
                                                    "veto" << false)));
             }
             else {
@@ -354,7 +355,7 @@ namespace {
         BSONObjBuilder respObj2;
         respObj2 << "ok" << 1;
         hbResp2.addToBSON(&respObj2);
-        net->runUntil(net->now() + 10*1000); // run until we've sent a heartbeat request
+        net->runUntil(net->now() + Seconds(10)); // run until we've sent a heartbeat request
         const NetworkInterfaceMock::NetworkOperationIterator noi2 = net->getNextReadyRequest();
         net->scheduleResponse(noi2, net->now(), makeResponseStatus(respObj2.obj()));
         net->runReadyNetworkOperations();

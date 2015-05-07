@@ -41,9 +41,6 @@ namespace repl {
 
     MemberHeartbeatData::MemberHeartbeatData() :
         _health(-1),
-        _upSince(0),
-        _lastHeartbeat(0),
-        _lastHeartbeatRecv(0),
         _authIssue(false) {
 
         _lastResponse.setState(MemberState::RS_UNKNOWN);
@@ -55,7 +52,7 @@ namespace repl {
                                           const HostAndPort& host,
                                           ReplSetHeartbeatResponse hbResponse) {
         _health = 1;
-        if (_upSince == 0) {
+        if (_upSince == Date_t()) {
             _upSince = now;
         }
         _authIssue = false;
@@ -82,7 +79,7 @@ namespace repl {
     void MemberHeartbeatData::setDownValues(Date_t now, const std::string& heartbeatMessage) {
 
         _health = 0;
-        _upSince = 0;
+        _upSince = Date_t();
         _lastHeartbeat = now;
         _authIssue = false;
 
@@ -96,7 +93,7 @@ namespace repl {
 
     void MemberHeartbeatData::setAuthIssue(Date_t now) {
         _health = 0;  // set health to 0 so that this doesn't count towards majority.
-        _upSince = 0;
+        _upSince = Date_t();
         _lastHeartbeat = now;
         _authIssue = true;
 

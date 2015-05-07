@@ -679,20 +679,26 @@ namespace JsobjTests {
                 {
                     {
                         // check signed dates with new key format
-                        KeyV1Owned a( BSONObjBuilder().appendDate("", -50).obj() );
-                        KeyV1Owned b( BSONObjBuilder().appendDate("", 50).obj() );
+                        KeyV1Owned a( BSONObjBuilder().appendDate(
+                                              "", Date_t::fromMillisSinceEpoch(-50)).obj() );
+                        KeyV1Owned b( BSONObjBuilder().appendDate(
+                                              "", Date_t::fromMillisSinceEpoch(50)).obj() );
                         ASSERT( a.woCompare(b, Ordering::make(BSONObj())) < 0 );
                     }
                     {
                         // backward compatibility
-                        KeyBson a( BSONObjBuilder().appendDate("", -50).obj() );
-                        KeyBson b( BSONObjBuilder().appendDate("", 50).obj() );
+                        KeyBson a( BSONObjBuilder().appendDate(
+                                           "", Date_t::fromMillisSinceEpoch(-50)).obj() );
+                        KeyBson b( BSONObjBuilder().appendDate(
+                                           "", Date_t::fromMillisSinceEpoch(50)).obj() );
                         ASSERT( a.woCompare(b, Ordering::make(BSONObj())) > 0 );
                     }
                     {
                         // this is an uncompactable key:
-                        BSONObj uc1 = BSONObjBuilder().appendDate("", -50).appendCode("", "abc").obj();
-                        BSONObj uc2 = BSONObjBuilder().appendDate("", 55).appendCode("", "abc").obj();
+                        BSONObj uc1 = BSONObjBuilder().appendDate(
+                                "", Date_t::fromMillisSinceEpoch(-50)).appendCode("", "abc").obj();
+                        BSONObj uc2 = BSONObjBuilder().appendDate(
+                                "", Date_t::fromMillisSinceEpoch(55)).appendCode("", "abc").obj();
                         ASSERT( uc1.woCompare(uc2, Ordering::make(BSONObj())) < 0 );
                         {
                             KeyV1Owned a(uc1);
@@ -1308,10 +1314,11 @@ namespace JsobjTests {
         public:
             void run() {
                 OID oid;
-                const Date_t base( ::time( 0 ) );
+                const Date_t base(Date_t::now());
                 oid.init( base );
 
-                ASSERT_EQUALS( base.millis / 1000, oid.asDateT().millis / 1000 );
+                ASSERT_EQUALS(base.toMillisSinceEpoch() / 1000,
+                              oid.asDateT().toMillisSinceEpoch() / 1000);
                 ASSERT_EQUALS( base.toTimeT(), oid.asTimeT() );
             }
         };
@@ -1320,14 +1327,14 @@ namespace JsobjTests {
         public:
             void run() {
                 OID min, oid, max;
-                Date_t now = jsTime();
+                Date_t now = Date_t::now();
                 oid.init(); // slight chance this has different time. If its a problem, can change.
                 min.init(now);
                 max.init(now, true);
 
-                ASSERT_EQUALS( (unsigned)oid.asTimeT() , now/1000 );
-                ASSERT_EQUALS( (unsigned)min.asTimeT() , now/1000 );
-                ASSERT_EQUALS( (unsigned)max.asTimeT() , now/1000 );
+                ASSERT_EQUALS( oid.asTimeT() , now.toTimeT() );
+                ASSERT_EQUALS( min.asTimeT() , now.toTimeT() );
+                ASSERT_EQUALS( max.asTimeT() , now.toTimeT() );
                 ASSERT( BSON("" << min).woCompare( BSON("" << oid) ) < 0  );
                 ASSERT( BSON("" << max).woCompare( BSON("" << oid)  )> 0  );
             }
@@ -1543,9 +1550,9 @@ namespace JsobjTests {
     class DateBuilder {
     public:
         void run() {
-            BSONObj o = BSON("" << Date_t(1234567890));
+            BSONObj o = BSON("" << Date_t::fromMillisSinceEpoch(1234567890));
             ASSERT( o.firstElement().type() == Date );
-            ASSERT( o.firstElement().date() == Date_t(1234567890) );
+            ASSERT( o.firstElement().date() == Date_t::fromMillisSinceEpoch(1234567890) );
         }
     };
 
@@ -1568,22 +1575,17 @@ namespace JsobjTests {
     class TimeTBuilder {
     public:
         void run() {
-            Date_t before = jsTime();
-            sleepmillis(2);
-            time_t now = jsTime().toTimeT();
-            sleepmillis(2);
-            Date_t after = jsTime();
-
+            Date_t aDate = Date_t::now();
+            time_t aTime = aDate.toTimeT();
             BSONObjBuilder b;
-            b.appendTimeT("now", now);
+            b.appendTimeT("now", aTime);
             BSONObj o = b.obj();
 
             ASSERT( o.valid() );
 
             BSONElement e = o["now"];
-            ASSERT( e.type() == Date );
-            ASSERT( e.date()/1000 >= before/1000 );
-            ASSERT( e.date()/1000 <= after/1000 );
+            ASSERT_EQUALS(Date,  e.type());
+            ASSERT_EQUALS(aTime, e.date().toTimeT());
         }
     };
 
@@ -1819,7 +1821,7 @@ namespace JsobjTests {
             objb.appendTimeT(objb.numStr(i++), dt);
             arrb.appendTimeT(dt);
 
-            Date_t date(0);
+            Date_t date{};
             objb.appendDate(objb.numStr(i++), date);
             arrb.appendDate(date);
 

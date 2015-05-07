@@ -62,10 +62,10 @@ namespace {
 
     TEST(ReadAfterResponse, WaitedWithDuration) {
         ReadAfterOpTimeResponse response(Status(ErrorCodes::InternalError, "test"),
-                                         boost::posix_time::milliseconds(7));
+                                         stdx::chrono::milliseconds(7));
 
         ASSERT_TRUE(response.didWait());
-        ASSERT_EQUALS(7, response.getDuration().total_milliseconds());
+        ASSERT_EQUALS(Milliseconds(7), response.getDuration());
         ASSERT_EQ(ErrorCodes::InternalError, response.getStatus().code());
 
         BSONObjBuilder builder;

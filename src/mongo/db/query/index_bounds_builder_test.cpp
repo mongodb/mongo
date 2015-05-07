@@ -271,7 +271,7 @@ namespace {
 
     TEST(IndexBoundsBuilderTest, TranslateLtDate) {
         IndexEntry testIndex = IndexEntry(BSONObj());
-        BSONObj obj = BSON("a" << LT << Date_t(5000));
+        BSONObj obj = BSON("a" << LT << Date_t::fromMillisSinceEpoch(5000));
         auto_ptr<MatchExpression> expr(parseMatchExpression(obj));
         BSONElement elt = obj.firstElement();
         OrderedIntervalList oil;

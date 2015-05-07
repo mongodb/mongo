@@ -89,17 +89,17 @@ namespace {
         MessageLogDomain domain;
 
         // Appending to the domain before attaching the appender does not affect the appender.
-        domain.append(MessageEventEphemeral(0ULL, LogSeverity::Log(), "", "1"));
+        domain.append(MessageEventEphemeral(Date_t(), LogSeverity::Log(), "", "1"));
         ASSERT_EQUALS(0, dynamic_cast<CountAppender*>(countAppender.get())->getCount());
 
         // Appending to the domain after attaching the appender does affect the appender.
         MessageLogDomain::AppenderHandle handle = domain.attachAppender(countAppender);
-        domain.append(MessageEventEphemeral(0ULL, LogSeverity::Log(), "", "2"));
+        domain.append(MessageEventEphemeral(Date_t(), LogSeverity::Log(), "", "2"));
         countAppender = domain.detachAppender(handle);
         ASSERT_EQUALS(1, dynamic_cast<CountAppender*>(countAppender.get())->getCount());
 
         // Appending to the domain after detaching the appender does not affect the appender.
-        domain.append(MessageEventEphemeral(0ULL, LogSeverity::Log(), "", "3"));
+        domain.append(MessageEventEphemeral(Date_t(), LogSeverity::Log(), "", "3"));
         ASSERT_EQUALS(1, dynamic_cast<CountAppender*>(countAppender.get())->getCount());
     }
 
@@ -383,7 +383,7 @@ namespace {
 
     // Log severity should always be logged as a single capital letter.
     TEST_F(LogTestUnadornedEncoder, MessageEventDetailsEncoderLogSeverity) {
-        Date_t d(curTimeMillis64());
+        Date_t d = Date_t::now();
         StringData ctx("WHAT", StringData::LiteralTag());
         StringData msg("HUH", StringData::LiteralTag());
         // Severe is indicated by (F)atal.
@@ -406,7 +406,7 @@ namespace {
 
     // Non-default log component short name should always be logged.
     TEST_F(LogTestUnadornedEncoder, MessageEventDetailsEncoderLogComponent) {
-        Date_t d(curTimeMillis64());
+        Date_t d = Date_t::now();
         StringData ctx("WHAT", StringData::LiteralTag());
         StringData msg("HUH", StringData::LiteralTag());
         for (int i = 0; i < int(LogComponent::kNumLogComponents); ++i) {

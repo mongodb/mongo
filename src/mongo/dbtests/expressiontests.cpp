@@ -177,7 +177,7 @@ namespace ExpressionTests {
         
         /** Single Date argument. */
         class Date : public SingleOperandBase {
-            BSONObj operand() { return BSON( "" << Date_t(12345) ); }
+            BSONObj operand() { return BSON( "" << Date_t::fromMillisSinceEpoch(12345) ); }
         };
 
         /** Single null argument. */
@@ -258,8 +258,8 @@ namespace ExpressionTests {
         /** Adding an int and a Date produces a Date. */
         class IntDate : public TwoOperandBase {
             BSONObj operand1() { return BSON( "" << 6 ); }
-            BSONObj operand2() { return BSON( "" << Date_t(123450) ); }
-            BSONObj expectedResult() { return BSON( "" << Date_t(123456) ); }
+            BSONObj operand2() { return BSON( "" << Date_t::fromMillisSinceEpoch(123450) ); }
+            BSONObj expectedResult() { return BSON( "" << Date_t::fromMillisSinceEpoch(123456) ); }
         };
         
         /** Adding a long and a double produces a double. */

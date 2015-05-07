@@ -144,7 +144,7 @@ TEST(KeyStringTest, AllTypesSimple) {
     ROUNDTRIP(BSON("" << BSONUndefined));
     ROUNDTRIP(BSON("" << OID("abcdefabcdefabcdefabcdef")));
     ROUNDTRIP(BSON("" << true));
-    ROUNDTRIP(BSON("" << Date_t(123123123)));
+    ROUNDTRIP(BSON("" << Date_t::fromMillisSinceEpoch(123123123)));
     ROUNDTRIP(BSON("" << BSONRegEx("asdf", "x")));
     ROUNDTRIP(BSON("" << BSONDBRef("db.c", OID("010203040506070809101112"))));
     ROUNDTRIP(BSON("" << BSONCode("abc_code")));
@@ -420,7 +420,7 @@ const std::vector<BSONObj>& getInterestingElements() {
     elements.push_back(BSON("" << BSONNULL));
     elements.push_back(BSON("" << BSONUndefined));
     elements.push_back(BSON("" << OID("abcdefabcdefabcdefabcdef")));
-    elements.push_back(BSON("" << Date_t(123)));
+    elements.push_back(BSON("" << Date_t::fromMillisSinceEpoch(123)));
     elements.push_back(BSON("" << BSONCode("abc_code")));
     elements.push_back(BSON("" << BSONCode(ball)));
     elements.push_back(BSON("" << BSONCode(ball00n)));

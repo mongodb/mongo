@@ -422,7 +422,7 @@ namespace {
         if (haveDate) {
             if (totalType == NumberDouble)
                 longTotal = static_cast<long long>(doubleTotal);
-            return Value(Date_t(longTotal));
+            return Value(Date_t::fromMillisSinceEpoch(longTotal));
         }
         else if (totalType == NumberLong) {
             return Value(longTotal);
@@ -2548,7 +2548,7 @@ namespace {
             }
             else if (rhs.numeric()) {
                 long long millisSinceEpoch = lhs.getDate() - rhs.coerceToLong();
-                return Value(Date_t(millisSinceEpoch));
+                return Value(Date_t::fromMillisSinceEpoch(millisSinceEpoch));
             }
             else {
                 uasserted(16613, str::stream() << "cant $subtract a "

@@ -46,7 +46,7 @@ namespace {
         ASSERT_EQUALS(0, mc.getId());
         ASSERT_EQUALS(HostAndPort("localhost", 12345), mc.getHostAndPort());
         ASSERT_EQUALS(1.0, mc.getPriority());
-        ASSERT_EQUALS(0, mc.getSlaveDelay().total_seconds());
+        ASSERT_EQUALS(Seconds(0), mc.getSlaveDelay());
         ASSERT_TRUE(mc.isVoter());
         ASSERT_FALSE(mc.isHidden());
         ASSERT_FALSE(mc.isArbiter());
@@ -79,7 +79,7 @@ namespace {
                       mc.initialize(BSON("_id" << "0" << "host" << "localhost:12345"),
                                     &tagConfig));
         ASSERT_EQUALS(ErrorCodes::TypeMismatch,
-                      mc.initialize(BSON("_id" << Date_t(0) << "host" << "localhost:12345"),
+                      mc.initialize(BSON("_id" << Date_t() << "host" << "localhost:12345"),
                                     &tagConfig));
     }
 
@@ -161,7 +161,9 @@ namespace {
                                 &tagConfig));
 
         ASSERT_EQUALS(ErrorCodes::TypeMismatch,
-                      mc.initialize(BSON("_id" << 0 << "host" << "h" << "votes" << Date_t(2)),
+                      mc.initialize(BSON("_id" << 0 <<
+                                         "host" << "h" <<
+                                         "votes" << Date_t::fromMillisSinceEpoch(2)),
                                     &tagConfig));
     }
 
@@ -179,7 +181,9 @@ namespace {
         ASSERT_EQUALS(100.8, mc.getPriority());
 
         ASSERT_EQUALS(ErrorCodes::TypeMismatch,
-                      mc.initialize(BSON("_id" << 0 << "host" << "h" << "priority" << Date_t(2)),
+                      mc.initialize(BSON("_id" << 0 <<
+                                         "host" << "h" <<
+                                         "priority" << Date_t::fromMillisSinceEpoch(2)),
                                     &tagConfig));
     }
 
@@ -188,7 +192,7 @@ namespace {
         MemberConfig mc;
         ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host" << "h" << "slaveDelay" << 100),
                                 &tagConfig));
-        ASSERT_EQUALS(100, mc.getSlaveDelay().total_seconds());
+        ASSERT_EQUALS(Seconds(100), mc.getSlaveDelay());
     }
 
     TEST(MemberConfig, ParseTags) {

@@ -88,7 +88,7 @@ namespace repl {
         BSONObjBuilder freshCmdBuilder;
         freshCmdBuilder.append("replSetFresh", 1);
         freshCmdBuilder.append("set", _rsConfig.getReplSetName());
-        freshCmdBuilder.append("opTime", Date_t(_lastOpTimeApplied.asULL()));
+        freshCmdBuilder.append("opTime", Date_t::fromMillisSinceEpoch(_lastOpTimeApplied.asLL()));
         freshCmdBuilder.append("who", selfConfig.getHostAndPort().toString());
         freshCmdBuilder.appendIntOrLL("cfgver", _rsConfig.getConfigVersion());
         freshCmdBuilder.append("id", selfConfig.getId());

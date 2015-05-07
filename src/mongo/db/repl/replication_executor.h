@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/date_time/posix_time/posix_time_types.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/thread/condition_variable.hpp>
 #include <boost/thread/mutex.hpp>
@@ -110,7 +109,6 @@ namespace repl {
     class ReplicationExecutor {
         MONGO_DISALLOW_COPYING(ReplicationExecutor);
     public:
-        typedef boost::posix_time::milliseconds Milliseconds;
         struct CallbackData;
         class CallbackHandle;
         class EventHandle;

@@ -426,7 +426,7 @@ namespace JsonTests {
 
             void run() {
                 BSONObjBuilder b;
-                b.appendDate( "a", 0 );
+                b.appendDate( "a", Date_t() );
                 BSONObj built = b.done();
                 ASSERT_EQUALS( "{ \"a\" : { \"$date\" : \"1969-12-31T19:00:00.000-0500\" } }",
                                built.jsonString( Strict ) );
@@ -435,7 +435,7 @@ namespace JsonTests {
 
                 // Test dates above our maximum formattable date.  See SERVER-13760.
                 BSONObjBuilder b2;
-                b2.appendDate("a", 32535262800000ULL);
+                b2.appendDate("a", Date_t::fromMillisSinceEpoch(32535262800000LL));
                 BSONObj built2 = b2.done();
                 ASSERT_EQUALS(
                             "{ \"a\" : { \"$date\" : { \"$numberLong\" : \"32535262800000\" } } }",
@@ -451,7 +451,7 @@ namespace JsonTests {
         public:
             void run() {
                 BSONObjBuilder b;
-                b.appendDate( "a", -1 );
+                b.appendDate( "a", Date_t::fromMillisSinceEpoch(-1) );
                 BSONObj built = b.done();
                 ASSERT_EQUALS( "{ \"a\" : { \"$date\" : { \"$numberLong\" : \"-1\" } } }",
                                built.jsonString( Strict ) );
@@ -565,7 +565,7 @@ namespace JsonTests {
                 b.appendUndefined( "h" );
                 b.append( "i" , oid );
                 b.appendBool( "j" , 1 );
-                b.appendDate( "k" , 123 );
+                b.appendDate( "k" , Date_t::fromMillisSinceEpoch(123) );
                 b.appendNull( "l" );
                 b.appendRegex( "m" , "a" );
                 b.appendDBRef( "n" , "foo" , oid );
@@ -592,6 +592,7 @@ namespace JsonTests {
             virtual ~Base() {}
             void run() {
                 ASSERT( fromjson( json() ).valid() );
+                assertEquals( bson(), fromjson( json() ), "mode: json-to-bson" );
                 assertEquals( bson(), fromjson( tojson( bson() ) ), "mode: <default>" );
                 assertEquals( bson(), fromjson( tojson( bson(), Strict ) ), "mode: strict" );
                 assertEquals( bson(), fromjson( tojson( bson(), TenGen ) ), "mode: tengen" );
@@ -1532,7 +1533,7 @@ namespace JsonTests {
         class Date : public Base {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
-                b.appendDate( "a", 0 );
+                b.appendDate( "a", Date_t() );
                 return b.obj();
             }
             virtual string json() const {
@@ -1540,21 +1541,10 @@ namespace JsonTests {
             }
         };
 
-        class DateNegZero : public Base {
-            virtual BSONObj bson() const {
-                BSONObjBuilder b;
-                b.appendDate( "a", -0 );
-                return b.obj();
-            }
-            virtual string json() const {
-                return "{ \"a\" : { \"$date\" : -0 } }";
-            }
-        };
-
         class DateNonzero : public Base {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
-                b.appendDate( "a", 1000000000 );
+                b.appendDate( "a", Date_t::fromMillisSinceEpoch(1000000000) );
                 return b.obj();
             }
             virtual string json() const {
@@ -1654,7 +1644,7 @@ namespace JsonTests {
         class DateStrictMaxUnsigned : public Base {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
-                b.appendDate( "a", -1 );
+                b.appendDate( "a", Date_t::fromMillisSinceEpoch(-1) );
                 return b.obj();
             }
             virtual string json() const {
@@ -1668,7 +1658,7 @@ namespace JsonTests {
         class DateMaxUnsigned : public Base {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
-                b.appendDate( "a", -1 );
+                b.appendDate( "a", Date_t::fromMillisSinceEpoch(-1) );
                 return b.obj();
             }
             virtual string json() const {
@@ -1682,7 +1672,7 @@ namespace JsonTests {
         class DateStrictNegative : public Base {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
-                b.appendDate( "a", -1 );
+                b.appendDate( "a", Date_t::fromMillisSinceEpoch(-1) );
                 return b.obj();
             }
             virtual string json() const {
@@ -1693,7 +1683,7 @@ namespace JsonTests {
         class DateNegative : public Base {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
-                b.appendDate( "a", -1 );
+                b.appendDate( "a", Date_t::fromMillisSinceEpoch(-1) );
                 return b.obj();
             }
             virtual string json() const {
@@ -2598,8 +2588,8 @@ namespace JsonTests {
 
             BSONObj bson() const {
                 BSONObjBuilder e;
-                e.appendDate( "$gt" , 1257829200000LL );
-                e.appendDate( "$lt" , 1257829200100LL );
+                e.appendDate( "$gt" , Date_t::fromMillisSinceEpoch(1257829200000LL) );
+                e.appendDate( "$lt" , Date_t::fromMillisSinceEpoch(1257829200100LL) );
 
                 BSONObjBuilder b;
                 b.append( "time.valid" , e.obj() );
@@ -2812,7 +2802,6 @@ namespace JsonTests {
             // "1969-12-31T19:00:00-05:00" actually represents the Unix timestamp of zero, but we
             // cannot parse it because the body of the date is before 1970.
             //add< FromJsonTests::Date >();
-            //add< FromJsonTests::DateNegZero >();
             add< FromJsonTests::DateNonzero >();
             add< FromJsonTests::DateStrictTooLong >();
             add< FromJsonTests::DateTooLong >();

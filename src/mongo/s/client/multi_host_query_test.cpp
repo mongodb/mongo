@@ -245,7 +245,7 @@ namespace {
         }
 
         Date_t currentTimeMillis() {
-            return _mockTimeMillis;
+            return Date_t::fromMillisSinceEpoch(_mockTimeMillis);
         }
 
         void doBlockingQuerySwallowResult(const ConnectionString& host,
@@ -762,7 +762,7 @@ namespace {
         delete result.getValue();
 
         // Make sure we get the next result
-        result = queryOp.waitForNextResult(4000);
+        result = queryOp.waitForNextResult(Date_t::fromMillisSinceEpoch(4000));
 
         ASSERT_EQUALS(result.getStatus().code(), ErrorCodes::InternalError);
     }

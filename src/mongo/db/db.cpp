@@ -205,7 +205,7 @@ namespace mongo {
         toLog.append( "hostname", getHostNameCached() );
 
         toLog.appendTimeT( "startTime", time(0) );
-        toLog.append( "startTimeLocal", dateToCtimeString(curTimeMillis64()) );
+        toLog.append( "startTimeLocal", dateToCtimeString(Date_t::now()) );
 
         toLog.append("cmdLine", serverGlobalParams.parsedOpts);
         toLog.append( "pid", ProcessId::getCurrent().asLongLong() );

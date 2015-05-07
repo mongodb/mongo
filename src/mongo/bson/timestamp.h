@@ -30,51 +30,56 @@
 #include "mongo/base/data_view.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
-    /* Timestamp: A combination of current second plus an ordinal value.
+    /**
+     * Timestamp: A combination of a count of seconds since the POSIX epoch plus an ordinal value.
      */
-#pragma pack(4)
     class Timestamp {
-        unsigned i; // ordinal comes first so we can do a single 64 bit compare on little endian
-        unsigned secs;
     public:
+        // Maximum Timestamp value.
+        static Timestamp max();
+
+        /**
+         * DEPRECATED Constructor that builds a Timestamp from a Date_t by using the
+         * high-order 4 bytes of "date" for the "secs" field and the low-order 4 bytes
+         * for the "i" field.
+         */
+        explicit Timestamp(Date_t date) : Timestamp(date.toULL()) {}
+
+        /**
+         * DEPRECATED Constructor that builds a Timestamp from a 64-bit unsigned integer by using
+         * the high-order 4 bytes of "v" for the "secs" field and the low-order 4 bytes for the "i"
+         * field.
+         */
+        explicit Timestamp(unsigned long long v) : Timestamp(v >> 32, v) {}
+
+        Timestamp(Seconds s, unsigned increment) : Timestamp(s.count(), increment) {}
+
+        Timestamp(unsigned a, unsigned b) : i(b), secs(a) {
+            dassert(secs <= std::numeric_limits<int>::max());
+        }
+
+        Timestamp() = default;
+
         unsigned getSecs() const {
             return secs;
         }
+
         unsigned getInc() const {
             return i;
         }
 
-        Timestamp(Date_t date) {
-            reinterpret_cast<unsigned long long&>(*this) = date.millis;
-            dassert( (int)secs >= 0 );
-        }
-
-        Timestamp(unsigned a, unsigned b) {
-            secs = a;
-            i = b;
-            dassert( (int)secs >= 0 );
-        }
-        Timestamp( const Timestamp& other ) { 
-            secs = other.secs;
-            i = other.i;
-            dassert( (int)secs >= 0 );
-        }
-        Timestamp() {
-            secs = 0;
-            i = 0;
-        }
-
-        // Maximum Timestamp value.
-        static Timestamp max();
-
         unsigned long long asULL() const {
-            return reinterpret_cast<const unsigned long long*>(&i)[0];
+            unsigned long long result = secs;
+            result <<= 32;
+            result |= i;
+            return result;
         }
         long long asLL() const {
-            return reinterpret_cast<const long long*>(&i)[0];
+            return static_cast<long long>(asULL());
         }
 
         bool isNull() const { return secs == 0; }
@@ -86,31 +91,33 @@ namespace mongo {
         std::string toString() const;
 
         bool operator==(const Timestamp& r) const {
-            return i == r.i && secs == r.secs;
+            return tie() == r.tie();
         }
         bool operator!=(const Timestamp& r) const {
-            return !(*this == r);
+            return tie() != r.tie();
         }
         bool operator<(const Timestamp& r) const {
-            if ( secs != r.secs )
-                return secs < r.secs;
-            return i < r.i;
+            return tie() < r.tie();
         }
         bool operator<=(const Timestamp& r) const {
-            return *this < r || *this == r;
+            return tie() <= r.tie();
         }
         bool operator>(const Timestamp& r) const {
-            return !(*this <= r);
+            return tie() > r.tie();
         }
         bool operator>=(const Timestamp& r) const {
-            return !(*this < r);
+            return tie() >= r.tie();
         }
 
         // Append the BSON representation of this Timestamp to the given BufBuilder with the given
         // name. This lives here because Timestamp manages its own serialization format.
         void append(BufBuilder& builder, const StringData& fieldName) const;
 
+    private:
+        std::tuple<unsigned, unsigned> tie() const { return std::tie(secs, i); }
+
+        unsigned i = 0;
+        unsigned secs = 0;
     };
-#pragma pack()
 
 } // namespace mongo

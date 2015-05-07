@@ -161,7 +161,7 @@ namespace mongo {
                 return Status(ErrorCodes::BadValue, "invalid epoch");
             }
 
-            if (!_updatedAt.get()) {
+            if (Date_t() == _updatedAt.get()) {
                 return Status(ErrorCodes::BadValue, "invalid updated at timestamp");
             }
 
@@ -183,7 +183,7 @@ namespace mongo {
             builder.append(fullNs.name(), _fullNs->toString());
         }
         builder.append(epoch.name(), _epoch.get_value_or(OID()));
-        builder.append(updatedAt.name(), _updatedAt.get_value_or(0));
+        builder.append(updatedAt.name(), _updatedAt.get_value_or(Date_t()));
 
         // These fields are optional, so do not include them in the metadata for the purposes of
         // consuming less space on the config servers.

@@ -67,7 +67,7 @@ namespace logger {
             _contextName(contextName),
             _message(message) {}
 
-        uint64_t getDate() const { return _date; }
+        Date_t getDate() const { return _date; }
         LogSeverity getSeverity() const { return _severity; }
         LogComponent getComponent() const { return _component; }
         StringData getContextName() const { return _contextName; }

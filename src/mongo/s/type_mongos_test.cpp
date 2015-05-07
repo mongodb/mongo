@@ -40,7 +40,7 @@ namespace {
     TEST(Validity, MissingName) {
         MongosType mongos;
         string errMsg;
-        BSONObj obj = BSON(MongosType::ping(1ULL) <<
+        BSONObj obj = BSON(MongosType::ping(Date_t::fromMillisSinceEpoch(1)) <<
                            MongosType::up(100) <<
                            MongosType::waiting(false) <<
                            MongosType::mongoVersion("x.x.x") <<
@@ -79,7 +79,7 @@ namespace {
         MongosType mongos;
         string errMsg;
         BSONObj obj = BSON(MongosType::name("localhost:27017") <<
-                           MongosType::ping(1ULL) <<
+                           MongosType::ping(Date_t::fromMillisSinceEpoch(1)) <<
                            MongosType::waiting(false) <<
                            MongosType::mongoVersion("x.x.x") <<
                            MongosType::configVersion(0));
@@ -98,7 +98,7 @@ namespace {
         MongosType mongos;
         string errMsg;
         BSONObj obj = BSON(MongosType::name("localhost:27017") <<
-                           MongosType::ping(1ULL) <<
+                           MongosType::ping(Date_t::fromMillisSinceEpoch(1)) <<
                            MongosType::up(100) <<
                            MongosType::mongoVersion("x.x.x") <<
                            MongosType::configVersion(0));
@@ -117,7 +117,7 @@ namespace {
         MongosType mongos;
         string errMsg;
         BSONObj obj = BSON(MongosType::name("localhost:27017") <<
-                           MongosType::ping(1ULL) <<
+                           MongosType::ping(Date_t::fromMillisSinceEpoch(1)) <<
                            MongosType::up(100) <<
                            MongosType::waiting(false) <<
                            MongosType::configVersion(0));
@@ -138,7 +138,7 @@ namespace {
         MongosType mongos;
         string errMsg;
         BSONObj obj = BSON(MongosType::name("localhost:27017") <<
-                           MongosType::ping(1ULL) <<
+                           MongosType::ping(Date_t::fromMillisSinceEpoch(1)) <<
                            MongosType::up(100) <<
                            MongosType::waiting(false) <<
                            MongosType::mongoVersion("x.x.x"));
@@ -158,7 +158,7 @@ namespace {
     TEST(Validity, Valid) {
         MongosType mongos;
         BSONObj obj = BSON(MongosType::name("localhost:27017") <<
-                           MongosType::ping(1ULL) <<
+                           MongosType::ping(Date_t::fromMillisSinceEpoch(1)) <<
                            MongosType::up(100) <<
                            MongosType::waiting(false) <<
                            MongosType::mongoVersion("x.x.x") <<
@@ -168,7 +168,7 @@ namespace {
         ASSERT_EQUALS(errMsg, "");
         ASSERT_TRUE(mongos.isValid(NULL));
         ASSERT_EQUALS(mongos.getName(), "localhost:27017");
-        ASSERT_EQUALS(mongos.getPing(), 1ULL);
+        ASSERT_EQUALS(mongos.getPing(), Date_t::fromMillisSinceEpoch(1));
         ASSERT_EQUALS(mongos.getUp(), 100);
         ASSERT_EQUALS(mongos.getWaiting(), false);
         ASSERT_EQUALS(mongos.getMongoVersion(), "x.x.x");

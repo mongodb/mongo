@@ -293,8 +293,7 @@ namespace {
             scheduledRequest.expirationDate = RemoteCommandRequest::kNoExpirationDate;
         }
         else {
-            scheduledRequest.expirationDate =
-                _networkInterface->now() + scheduledRequest.timeout.total_milliseconds();
+            scheduledRequest.expirationDate = _networkInterface->now() + scheduledRequest.timeout;
         }
         boost::lock_guard<boost::mutex> lk(_mutex);
         StatusWith<CallbackHandle> handle = enqueueWork_inlock(
@@ -466,7 +465,7 @@ namespace {
                 return std::make_pair(WorkItem(), CallbackHandle());
             }
             lk.unlock();
-            if (nextWakeupDate == Date_t(~0ULL)) {
+            if (nextWakeupDate == Date_t::max()) {
                 _networkInterface->waitForWork();
             }
             else {
@@ -493,7 +492,7 @@ namespace {
         _readyQueue.splice(_readyQueue.end(), _sleepersQueue, _sleepersQueue.begin(), iter);
         if (iter == _sleepersQueue.end()) {
             // indicate no sleeper to wait for
-            return Date_t(~0ULL);
+            return Date_t::max();
         }
         return iter->readyDate;
     }

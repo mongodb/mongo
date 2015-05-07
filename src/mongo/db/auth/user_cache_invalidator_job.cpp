@@ -134,19 +134,16 @@ namespace {
 
     void UserCacheInvalidator::run() {
         Client::initThread("UserCacheInvalidator");
-        lastInvalidationTime = Date_t(curTimeMillis64());
+        lastInvalidationTime = Date_t::now();
 
         while (true) {
             boost::unique_lock<boost::mutex> lock(invalidationIntervalMutex);
-            Date_t sleepUntil = Date_t(
-                    lastInvalidationTime.millis + userCacheInvalidationIntervalSecs * 1000);
-            Date_t now(curTimeMillis64());
-            while (now.millis < sleepUntil.millis) {
-                invalidationIntervalChangedCondition.timed_wait(lock,
-                                                                Milliseconds(sleepUntil - now));
-                sleepUntil = Date_t(
-                        lastInvalidationTime.millis + (userCacheInvalidationIntervalSecs * 1000));
-                now = Date_t(curTimeMillis64());
+            Date_t sleepUntil = lastInvalidationTime + Seconds(userCacheInvalidationIntervalSecs);
+            Date_t now = Date_t::now();
+            while (now < sleepUntil) {
+                invalidationIntervalChangedCondition.wait_for(lock, sleepUntil - now);
+                sleepUntil = lastInvalidationTime + Seconds(userCacheInvalidationIntervalSecs);
+                now = Date_t::now();
             }
             lastInvalidationTime = now;
             lock.unlock();

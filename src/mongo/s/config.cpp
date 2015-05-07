@@ -135,7 +135,9 @@ namespace mongo {
         if (_cm) {
             invariant(!_dropped);
             coll.setEpoch(_cm->getVersion().epoch());
-            coll.setUpdatedAt(_cm->getVersion().toLong());
+            // TODO(schwerin): The following isn't really a date, but is stored as one in-memory and
+            // in config.collections, as a historical oddity.
+            coll.setUpdatedAt(Date_t::fromMillisSinceEpoch(_cm->getVersion().toLong()));
             coll.setKeyPattern(_cm->getShardKeyPattern().toBSON());
             coll.setUnique(_cm->isUnique());
         }
@@ -143,7 +145,7 @@ namespace mongo {
             invariant(_dropped);
             coll.setDropped(true);
             coll.setEpoch(ChunkVersion::DROPPED().epoch());
-            coll.setUpdatedAt(jsTime());
+            coll.setUpdatedAt(Date_t::now());
         }
 
         uassertStatusOK(grid.catalogManager()->updateCollection(ns, coll));

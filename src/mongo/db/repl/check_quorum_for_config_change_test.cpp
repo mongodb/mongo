@@ -190,12 +190,12 @@ namespace {
         const int numCommandsExpected = config.getNumMembers() - 1;
         for (int i = 0; i < numCommandsExpected; ++i) {
             _net->scheduleResponse(_net->getNextReadyRequest(),
-                                   startDate + 10,
+                                   startDate + Milliseconds(10),
                                    ResponseStatus(ErrorCodes::NoSuchKey, "No reply"));
         }
-        _net->runUntil(startDate + 10);
+        _net->runUntil(startDate + Milliseconds(10));
         _net->exitNetwork();
-        ASSERT_EQUALS(startDate + 10, _net->now());
+        ASSERT_EQUALS(startDate + Milliseconds(10), _net->now());
         Status status = waitForQuorumCheck();
         ASSERT_EQUALS(ErrorCodes::NodeNotFound, status);
         ASSERT_REASON_CONTAINS(
@@ -248,11 +248,11 @@ namespace {
             ASSERT(seenHosts.insert(request.target).second) <<
                 "Already saw " << request.target.toString();
             _net->scheduleResponse(noi,
-                                   startDate + 10,
+                                   startDate + Milliseconds(10),
                                    ResponseStatus(RemoteCommandResponse(
                                                           BSON("ok" << 1), Milliseconds(8))));
         }
-        _net->runUntil(startDate + 10);
+        _net->runUntil(startDate + Milliseconds(10));
         _net->exitNetwork();
         ASSERT_OK(waitForQuorumCheck());
     }
@@ -291,17 +291,17 @@ namespace {
                 "Already saw " << request.target.toString();
             if (request.target == HostAndPort("h2", 1)) {
                 _net->scheduleResponse(noi,
-                                       startDate + 10,
+                                       startDate + Milliseconds(10),
                                        ResponseStatus(ErrorCodes::NoSuchKey, "No response"));
             }
             else {
                 _net->scheduleResponse(noi,
-                                       startDate + 10,
+                                       startDate + Milliseconds(10),
                                        ResponseStatus(RemoteCommandResponse(
                                                               BSON("ok" << 1), Milliseconds(8))));
             }
         }
-        _net->runUntil(startDate + 10);
+        _net->runUntil(startDate + Milliseconds(10));
         _net->exitNetwork();
         Status status = waitForQuorumCheck();
         ASSERT_EQUALS(ErrorCodes::NodeNotFound, status);
@@ -346,19 +346,19 @@ namespace {
                 "Already saw " << request.target.toString();
             if (request.target == HostAndPort("h4", 1)) {
                 _net->scheduleResponse(noi,
-                                       startDate + 10,
+                                       startDate + Milliseconds(10),
                                        ResponseStatus(RemoteCommandResponse(
                                                               BSON("ok" << 0 << "mismatch" << true),
                                                               Milliseconds(8))));
             }
             else {
                 _net->scheduleResponse(noi,
-                                       startDate + 10,
+                                       startDate + Milliseconds(10),
                                        ResponseStatus(RemoteCommandResponse(
                                                               BSON("ok" << 1), Milliseconds(8))));
             }
         }
-        _net->runUntil(startDate + 10);
+        _net->runUntil(startDate + Milliseconds(10));
         _net->exitNetwork();
         Status status = waitForQuorumCheck();
         ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible, status);
@@ -402,7 +402,7 @@ namespace {
                 "Already saw " << request.target.toString();
             if (request.target == HostAndPort("h5", 1)) {
                 _net->scheduleResponse(noi,
-                                       startDate + 10,
+                                       startDate + Milliseconds(10),
                                        ResponseStatus(RemoteCommandResponse(
                                                               BSON("ok" << 0 <<
                                                                    "set" << "rs0" <<
@@ -411,12 +411,12 @@ namespace {
             }
             else {
                 _net->scheduleResponse(noi,
-                                       startDate + 10,
+                                       startDate + Milliseconds(10),
                                        ResponseStatus(RemoteCommandResponse(
                                                               BSON("ok" << 1), Milliseconds(8))));
             }
         }
-        _net->runUntil(startDate + 10);
+        _net->runUntil(startDate + Milliseconds(10));
         _net->exitNetwork();
         Status status = waitForQuorumCheck();
         ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible, status);
@@ -463,7 +463,7 @@ namespace {
                 "Already saw " << request.target.toString();
             if (request.target == HostAndPort("h5", 1)) {
                 _net->scheduleResponse(noi,
-                                       startDate + 10,
+                                       startDate + Milliseconds(10),
                                        ResponseStatus(RemoteCommandResponse(
                                                               BSON("ok" << 0 <<
                                                                    "set" << "rs0" <<
@@ -474,7 +474,7 @@ namespace {
                 _net->blackHole(noi);
             }
         }
-        _net->runUntil(startDate + 10);
+        _net->runUntil(startDate + Milliseconds(10));
         _net->exitNetwork();
         Status status = waitForQuorumCheck();
         ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible, status);
@@ -522,7 +522,7 @@ namespace {
             hbResp.noteHasData();
             if (request.target == HostAndPort("h5", 1)) {
                 _net->scheduleResponse(noi,
-                                       startDate + 10,
+                                       startDate + Milliseconds(10),
                                        ResponseStatus(RemoteCommandResponse(
                                                               hbResp.toBSON(),
                                                               Milliseconds(8))));
@@ -531,7 +531,7 @@ namespace {
                 _net->blackHole(noi);
             }
         }
-        _net->runUntil(startDate + 10);
+        _net->runUntil(startDate + Milliseconds(10));
         _net->exitNetwork();
         Status status = waitForQuorumCheck();
         ASSERT_EQUALS(ErrorCodes::CannotInitializeNodeWithData, status);
@@ -571,7 +571,7 @@ namespace {
                 "Already saw " << request.target.toString();
             if (request.target == HostAndPort("h1", 1)) {
                 _net->scheduleResponse(noi,
-                                       startDate + 10,
+                                       startDate + Milliseconds(10),
                                        ResponseStatus(RemoteCommandResponse(
                                                               BSON("ok" << 0 <<
                                                                    "set" << "rs0" <<
@@ -582,7 +582,7 @@ namespace {
                 _net->blackHole(noi);
             }
         }
-        _net->runUntil(startDate + 10);
+        _net->runUntil(startDate + Milliseconds(10));
         _net->exitNetwork();
         Status status = waitForQuorumCheck();
         ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible, status);
@@ -623,18 +623,18 @@ namespace {
                 "Already saw " << request.target.toString();
             if (request.target == HostAndPort("h2", 1)) {
                 _net->scheduleResponse(noi,
-                                       startDate + 10,
+                                       startDate + Milliseconds(10),
                                        ResponseStatus(RemoteCommandResponse(
                                                               BSON("ok" << 0 << "mismatch" << true),
                                                               Milliseconds(8))));
             }
             else {
                 _net->scheduleResponse(noi,
-                                       startDate + 10,
+                                       startDate + Milliseconds(10),
                                        ResponseStatus(ErrorCodes::NoSuchKey, "No response"));
             }
         }
-        _net->runUntil(startDate + 10);
+        _net->runUntil(startDate + Milliseconds(10));
         _net->exitNetwork();
         Status status = waitForQuorumCheck();
         ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible, status);
@@ -677,18 +677,18 @@ namespace {
                 "Already saw " << request.target.toString();
             if (request.target == HostAndPort("h1", 1) || request.target == HostAndPort("h5", 1)) {
                 _net->scheduleResponse(noi,
-                                       startDate + 10,
+                                       startDate + Milliseconds(10),
                                        ResponseStatus(RemoteCommandResponse(
                                                               BSON("ok" << 1),
                                                               Milliseconds(8))));
             }
             else {
                 _net->scheduleResponse(noi,
-                                       startDate + 10,
+                                       startDate + Milliseconds(10),
                                        ResponseStatus(ErrorCodes::NoSuchKey, "No response"));
             }
         }
-        _net->runUntil(startDate + 10);
+        _net->runUntil(startDate + Milliseconds(10));
         _net->exitNetwork();
         Status status = waitForQuorumCheck();
         ASSERT_EQUALS(ErrorCodes::NodeNotFound, status);
@@ -730,18 +730,18 @@ namespace {
                 "Already saw " << request.target.toString();
             if (request.target == HostAndPort("h5", 1)) {
                 _net->scheduleResponse(noi,
-                                       startDate + 10,
+                                       startDate + Milliseconds(10),
                                        ResponseStatus(RemoteCommandResponse(
                                                               BSON("ok" << 1),
                                                               Milliseconds(8))));
             }
             else {
                 _net->scheduleResponse(noi,
-                                       startDate + 10,
+                                       startDate + Milliseconds(10),
                                        ResponseStatus(ErrorCodes::NoSuchKey, "No response"));
             }
         }
-        _net->runUntil(startDate + 10);
+        _net->runUntil(startDate + Milliseconds(10));
         _net->exitNetwork();
         Status status = waitForQuorumCheck();
         ASSERT_EQUALS(ErrorCodes::NodeNotFound, status);
@@ -779,7 +779,7 @@ namespace {
                 "Already saw " << request.target.toString();
             if (request.target == HostAndPort("h1", 1) || request.target == HostAndPort("h2", 1)) {
                 _net->scheduleResponse(noi,
-                                       startDate + 10,
+                                       startDate + Milliseconds(10),
                                        ResponseStatus(RemoteCommandResponse(
                                                               BSON("ok" << 1),
                                                               Milliseconds(8))));
@@ -788,7 +788,7 @@ namespace {
                 _net->blackHole(noi);
             }
         }
-        _net->runUntil(startDate + 10);
+        _net->runUntil(startDate + Milliseconds(10));
         _net->exitNetwork();
         ASSERT_OK(waitForQuorumCheck());
     }

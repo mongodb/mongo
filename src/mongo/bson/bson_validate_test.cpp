@@ -157,7 +157,7 @@ namespace {
                                  "eight" << BSONDBRef( "rrr", OID( "01234567890123456789aaaa" ) ) <<
                                  "_id" << OID( "deadbeefdeadbeefdeadbeef" ) <<
                                  "nine" << BSONBinData( "\x69\xb7", 2, BinDataGeneral ) <<
-                                 "ten" << Date_t( 44 ) <<
+                                 "ten" << Date_t::fromMillisSinceEpoch( 44 ) <<
                                  "eleven" << BSONRegEx( "foooooo", "i" ) );
         
         int32_t fuzzFrequencies[] = { 2, 10, 20, 100, 1000 };
