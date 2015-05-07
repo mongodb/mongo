@@ -43,6 +43,55 @@ namespace {
         return std::unique_ptr<MatchExpression>(status.getValue());
     }
 
+    // Test sparse index discriminators for a simple sparse index.
+    TEST(PlanCacheIndexabilityTest, SparseIndexSimple) {
+        PlanCacheIndexabilityState state;
+        state.updateDiscriminators({IndexEntry(BSON("a" << 1),
+                                               false, // multikey
+                                               true, // sparse
+                                               false, // unique
+                                               "", // name
+                                               nullptr, // filterExpr
+                                               BSONObj())});
+
+        const IndexabilityDiscriminators& discriminators = state.getDiscriminators("a");
+        ASSERT_EQ(1U, discriminators.size());
+
+        const IndexabilityDiscriminator& disc = discriminators[0];
+        ASSERT_EQ(true, disc(parseMatchExpression(BSON("a" << 1)).get()));
+        ASSERT_EQ(false, disc(parseMatchExpression(BSON("a" << BSONNULL)).get()));
+    }
+
+    // Test sparse index discriminators for a compound sparse index.
+    TEST(PlanCacheIndexabilityTest, SparseIndexCompound) {
+        PlanCacheIndexabilityState state;
+        state.updateDiscriminators({IndexEntry(BSON("a" << 1 << "b" << 1),
+                                               false, // multikey
+                                               true, // sparse
+                                               false, // unique
+                                               "", // name
+                                               nullptr, // filterExpr
+                                               BSONObj())});
+
+        {
+            const IndexabilityDiscriminators& discriminators = state.getDiscriminators("a");
+            ASSERT_EQ(1U, discriminators.size());
+
+            const IndexabilityDiscriminator& disc = discriminators[0];
+            ASSERT_EQ(true, disc(parseMatchExpression(BSON("a" << 1)).get()));
+            ASSERT_EQ(false, disc(parseMatchExpression(BSON("a" << BSONNULL)).get()));
+        }
+
+        {
+            const IndexabilityDiscriminators& discriminators = state.getDiscriminators("b");
+            ASSERT_EQ(1U, discriminators.size());
+
+            const IndexabilityDiscriminator& disc = discriminators[0];
+            ASSERT_EQ(true, disc(parseMatchExpression(BSON("b" << 1)).get()));
+            ASSERT_EQ(false, disc(parseMatchExpression(BSON("b" << BSONNULL)).get()));
+        }
+    }
+
     // Test partial index discriminators for an index with a simple filter.
     TEST(PlanCacheIndexabilityTest, PartialIndexSimple) {
         BSONObj filterObj = BSON("f" << BSON("$gt" << 0));
@@ -141,6 +190,19 @@ namespace {
 
         ASSERT(state.getDiscriminators("a").empty());
         ASSERT(state.getDiscriminators("b").empty());
+    }
+
+    // Test that no discriminators are generated for a regular index.
+    TEST(PlanCacheIndexabilityTest, IndexNeitherSparseNorPartial) {
+        PlanCacheIndexabilityState state;
+        state.updateDiscriminators({IndexEntry(BSON("a" << 1),
+                                               false, // multikey
+                                               false, // sparse
+                                               false, // unique
+                                               "", // name
+                                               nullptr,
+                                               BSONObj())});
+        ASSERT(state.getDiscriminators("a").empty());
     }
 
 }  // namespace

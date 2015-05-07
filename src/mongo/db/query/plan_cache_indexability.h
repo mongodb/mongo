@@ -69,6 +69,18 @@ namespace mongo {
 
     private:
         /**
+         * Adds sparse index discriminators for the sparse index with the given key pattern to
+         * '_pathDiscriminatorsMap'.
+         *
+         * A sparse index discriminator distinguishes equality matches to null from other expression
+         * types.  For example, this allows the predicate {a: 1} to be considered of a different
+         * shape from the predicate {a: null}, if there is a sparse index defined with "a" as an
+         * element of the key pattern.  The former predicate is compatibile with this index, but the
+         * latter is not compatible.
+         */
+        void processSparseIndex(const BSONObj& keyPattern);
+
+        /**
          * Adds partial index discriminators for the partial index with the given filter expression
          * to '_pathDiscriminatorsMap'.
          *

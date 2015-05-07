@@ -1161,6 +1161,30 @@ namespace {
                        "$maxDistance:100}}}", "{}", "{}", "gnanrsp");
     }
 
+    // When a sparse index is present, computeKey() should generate different keys depending on
+    // whether or not the predicates in the given query can use the index.
+    TEST(PlanCacheTest, ComputeKeySparseIndex) {
+        PlanCache planCache;
+        planCache.notifyOfIndexEntries({IndexEntry(BSON("a" << 1),
+                                                   false, // multikey
+                                                   true, // sparse
+                                                   false, // unique
+                                                   "", // name
+                                                   nullptr, // filterExpr
+                                                   BSONObj())});
+
+        unique_ptr<CanonicalQuery> cqEqNumber(canonicalize("{a: 0}}"));
+        unique_ptr<CanonicalQuery> cqEqString(canonicalize("{a: 'x'}}"));
+        unique_ptr<CanonicalQuery> cqEqNull(canonicalize("{a: null}}"));
+
+        // 'cqEqNumber' and 'cqEqString' get the same key, since both are compatible with this
+        // index.
+        ASSERT_EQ(planCache.computeKey(*cqEqNumber), planCache.computeKey(*cqEqString));
+
+        // 'cqEqNull' gets a different key, since it is not compatible with this index.
+        ASSERT_NOT_EQUALS(planCache.computeKey(*cqEqNull), planCache.computeKey(*cqEqNumber));
+    }
+
     // When a partial index is present, computeKey() should generate different keys depending on
     // whether or not the predicates in the given query "match" the predicates in the partial index
     // filter.

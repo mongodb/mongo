@@ -41,6 +41,21 @@
 
 namespace mongo {
 
+    void PlanCacheIndexabilityState::processSparseIndex(const BSONObj& keyPattern) {
+        for (BSONElement elem : keyPattern) {
+            _pathDiscriminatorsMap[elem.fieldNameStringData()].push_back(
+                [] (const MatchExpression* queryExpr) {
+                    if (queryExpr->matchType() != MatchExpression::EQ) {
+                        return true;
+                    }
+                    const auto* queryExprEquality =
+                        static_cast<const EqualityMatchExpression*>(queryExpr);
+                    return !queryExprEquality->getData().isNull();
+                }
+            );
+        }
+    }
+
     void PlanCacheIndexabilityState::processPartialIndex(const MatchExpression* filterExpr) {
         invariant(filterExpr);
         for (size_t i = 0; i < filterExpr->numChildren(); ++i) {
@@ -73,6 +88,9 @@ namespace {
         _pathDiscriminatorsMap = PathDiscriminatorsMap();
 
         for (const IndexEntry& idx : indexEntries) {
+            if (idx.sparse) {
+                processSparseIndex(idx.keyPattern);
+            }
             if (idx.filterExpr) {
                 processPartialIndex(idx.filterExpr);
             }
