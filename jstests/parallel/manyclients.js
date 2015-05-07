@@ -13,7 +13,7 @@ t = new ParallelTester();
 numThreads = 125;
 buildInfo = db.adminCommand( "buildInfo" ).buildEnvironment
 
-if ( buildInfo.pointerSizeBits < 64 ||
+if ( buildInfo.bits < 64 ||
      buildInfo.target_os != "linux" ||
      buildInfo.debug ) {
     numThreads = 50;

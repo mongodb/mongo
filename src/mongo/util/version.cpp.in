@@ -207,7 +207,7 @@ namespace mongo {
                       << "target_os" << "@buildinfo_target_os@";
         buildvarsInfo.done();
 
-        result << "pointerSizeBits" << (int)sizeof(void*) * 8;
+        result << "bits" << (int)sizeof(void*) * 8;
         result.appendBool( "debug" , kDebugBuild );
         result.appendNumber("maxBsonObjectSize", BSONObjMaxUserSize);
     }
