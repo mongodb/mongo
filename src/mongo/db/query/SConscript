@@ -11,6 +11,7 @@ env.Library(
         "index_tag.cpp",
         "parsed_projection.cpp",
         "plan_cache.cpp",
+        "plan_cache_indexability.cpp",
         "plan_enumerator.cpp",
         "planner_access.cpp",
         "planner_analysis.cpp",
@@ -235,6 +236,16 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         "query_planner_test_fixture",
+    ],
+)
+
+env.CppUnitTest(
+    target="plan_cache_indexability_test",
+    source=[
+        "plan_cache_indexability_test.cpp"
+    ],
+    LIBDEPS=[
+        "query_planner",
     ],
 )
 
