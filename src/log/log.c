@@ -524,8 +524,13 @@ __log_openfile(WT_SESSION_IMPL *session,
 	WT_LOG *log;
 	WT_LOG_DESC *desc;
 	WT_LOG_RECORD *logrec;
+	uint32_t allocsize;
 
 	log = S2C(session)->log;
+	if (log == NULL)
+		allocsize = WT_LOG_ALIGN;
+	else
+		allocsize = log->allocsize;
 	WT_RET(__wt_scr_alloc(session, 0, &buf));
 	WT_ERR(__log_filename(session, id, file_prefix, buf));
 	WT_ERR(__wt_verbose(session, WT_VERB_LOG,
@@ -538,9 +543,9 @@ __log_openfile(WT_SESSION_IMPL *session,
 	 */
 	if (!ok_create) {
 		__wt_scr_free(session, &buf);
-		WT_ERR(__wt_scr_alloc(session, log->allocsize, &buf));
-		memset(buf->mem, 0, log->allocsize);
-		WT_ERR(__wt_read(session, *fh, 0, log->allocsize, buf->mem));
+		WT_ERR(__wt_scr_alloc(session, allocsize, &buf));
+		memset(buf->mem, 0, allocsize);
+		WT_ERR(__wt_read(session, *fh, 0, allocsize, buf->mem));
 		logrec = (WT_LOG_RECORD *)buf->mem;
 		desc = (WT_LOG_DESC *)logrec->record;
 		if (desc->log_magic != WT_LOG_MAGIC)
