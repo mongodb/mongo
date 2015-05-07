@@ -353,8 +353,7 @@ def installBinary( e, name ):
 def installExternalBinary( e, name_str ):
     name = env.File("#/%s" % add_exe(name_str))
     if not name.isfile():
-        print("ERROR: external binary not found: %s" % name)
-        Exit(1)
+        env.FatalError("ERROR: external binary not found: {0}", name)
 
     distBinaries.append(name)
     inst = e.Install( "$INSTALL_DIR/bin", name )
@@ -402,8 +401,7 @@ if sum(itertools.imap(lambda x: x.name == "LICENSE.txt", env['MODULE_BANNERS']))
 module_banner_filenames = set([f.name for f in env['MODULE_BANNERS']])
 if not len(module_banner_filenames) == len(env['MODULE_BANNERS']):
     # TODO: Be nice and identify conflicts in error.
-    print "ERROR: Filename conflicts exist in module banners."
-    Exit(-1)
+    env.FatalError("ERROR: Filename conflicts exist in module banners.")
 
 # Build a set of directories containing module banners, and use that
 # to build a --transform option for each directory so that the files
@@ -435,8 +433,7 @@ if has_option("use-new-tools"):
     env.Alias("dist", source='#/${SERVER_ARCHIVE}')
 else:
     def failDist(env, target, source):
-        print("ERROR: 'dist' target only valid with --use-new-tools.")
-        Exit(1)
+        env.FatalError("ERROR: 'dist' target only valid with --use-new-tools.")
     env.Alias("dist", [], [ failDist ] )
     env.AlwaysBuild("dist")
 

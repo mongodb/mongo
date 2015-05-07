@@ -628,14 +628,26 @@ del envDict
 env.AddMethod(env_os_is_wrapper, 'TargetOSIs')
 env.AddMethod(env_get_os_name_wrapper, 'GetTargetOSName')
 
+def fatal_error(env, msg, *args):
+    print msg.format(*args)
+    Exit(1)
+
+def conf_error(env, msg, *args):
+    print msg.format(*args)
+    print "See {0} for details".format(env['CONFIGURELOG'].abspath)
+
+    Exit(1)
+
+env.AddMethod(fatal_error, 'FatalError')
+env.AddMethod(conf_error, 'ConfError')
+
 if has_option('variables-help'):
     print env_vars.GenerateHelpText(env)
     Exit(0)
 
 unknown_vars = env_vars.UnknownVariables()
 if unknown_vars:
-    print "Unknown variables specified: {0}".format(", ".join(unknown_vars.keys()))
-    Exit(1)
+    env.FatalError("Unknown variables specified: {0}", ", ".join(unknown_vars.keys()))
 
 def set_config_header_define(env, varname, varval = 1):
     env['CONFIG_HEADER_DEFINES'][varname] = varval
@@ -741,11 +753,9 @@ detectConf = Configure(detectEnv, help=False, custom_tests = {
 })
 
 if not detectConf.CheckCXX():
-    print "C++ compiler %s doesn't work" % (detectEnv['CXX'])
-    Exit(1)
+    env.FatalError("C++ compiler {0} doesn't work", detectEnv['CXX'])
 if not detectConf.CheckCC():
-    print "C compiler %s doesn't work" % (detectEnv['CC'])
-    Exit(1)
+    env.FatalError("C compiler {0} doesn't work", detectEnv['CC'])
 
 toolchain_search_sequence = [ "GCC", "clang" ]
 if is_running_os('windows'):
@@ -756,12 +766,10 @@ for candidate_toolchain in toolchain_search_sequence:
         break
 
 if not detected_toolchain:
-    print "Couldn't identity the C++ compiler"
-    Exit(1)
+    env.FatalError("Couldn't identity the C++ compiler")
 
 if not detectConf.CheckForToolchain(detected_toolchain, "C", "CC", ".c"):
-    print "C compiler does not match identified C++ compiler"
-    Exit(1)
+    env.FatalError("C compiler does not match identified C++ compiler")
 
 # Now that we've detected the toolchain, we add methods to the env
 # to get the canonical name of the toolchain and to test whether
@@ -780,8 +788,7 @@ env.AddMethod(is_toolchain, 'ToolchainIs')
 
 if env['TARGET_ARCH']:
     if not detectConf.CheckForProcessor(env['TARGET_ARCH']):
-        print "Could not detect processor specified in TARGET_ARCH variable"
-        Exit(1)
+        env.ConfError("Could not detect processor specified in TARGET_ARCH variable")
 else:
     detected_processor = detectConf.CheckForProcessor(None)
     if not detected_processor:
@@ -791,8 +798,7 @@ else:
 if env['TARGET_OS'] not in os_macros:
     print "No special config for [{0}] which probably means it won't work".format(env['TARGET_OS'])
 elif not detectConf.CheckForOS(env['TARGET_OS']):
-    print "TARGET_OS is not supported by compiler"
-    Exit(1)
+    env.FatalError("TARGET_OS ({0}) is not supported by compiler", env['TARGET_OS'])
 
 detectConf.Finish()
 
@@ -806,11 +812,10 @@ env['TARGET_OS_FAMILY'] = 'posix' if env.TargetOSIs('posix') else env.GetTargetO
 
 if has_option("cache"):
     if has_option("release"):
-        print("Using the experimental --cache option is not permitted for --release builds")
-        Exit(1)
+        env.FatalError(
+            "Using the experimental --cache option is not permitted for --release builds")
     if has_option("gcov"):
-        print("Mixing --cache and --gcov doesn't work correctly yet. See SERVER-11084")
-        Exit(1)
+        env.FatalError("Mixing --cache and --gcov doesn't work correctly yet. See SERVER-11084")
     env.CacheDir(str(env.Dir(cacheDir)))
 
 if optBuild:
@@ -1104,9 +1109,8 @@ if get_option('wiredtiger') == 'on':
     # Wiredtiger only supports 64-bit architecture, and will fail to compile on 32-bit
     # so disable WiredTiger automatically on 32-bit since wiredtiger is on by default
     if env['TARGET_ARCH'] == 'i386':
-        print "WiredTiger is not supported on 32-bit platforms"
-        print "Re-run scons with --wiredtiger=off to build on 32-bit platforms"
-        Exit(1)
+        env.FatalError("WiredTiger is not supported on 32-bit platforms\n"
+            "Re-run scons with --wiredtiger=off to build on 32-bit platforms")
     else:
         wiredtiger = True
 
@@ -1136,8 +1140,8 @@ if not env.TargetOSIs('windows'):
 boostSuffixList = ["-mt", ""]
 if get_option("system-boost-lib-search-suffixes") is not None:
     if not use_system_version_of_library("boost"):
-        print("The --system-boost-lib-search-suffixes option is only valid with --use-system-boost")
-        Exit(1)
+        env.FatalError("The --system-boost-lib-search-suffixes option is only valid "
+            "with --use-system-boost")
     boostSuffixList = get_option("system-boost-lib-search-suffixes")
     if boostSuffixList == "":
         boostSuffixList = []
@@ -1219,8 +1223,7 @@ def doConfigure(myenv):
         }
         """ % (compiler_minimum_string, compiler_minimum_string))
     else:
-        print("Error: can't check compiler minimum; don't know this compiler...")
-        Exit(1)
+        myenv.ConfError("Error: can't check compiler minimum; don't know this compiler...")
 
     def CheckForMinimumCompiler(context, language):
         extension_for = {
@@ -1242,13 +1245,11 @@ def doConfigure(myenv):
 
     suppress_invalid = has_option("disable-minimum-compiler-version-enforcement")
     if releaseBuild and suppress_invalid:
-        print("--disable-minimum-compiler-version-enforcement is forbidden with --release")
-        Exit(1)
+        env.FatalError("--disable-minimum-compiler-version-enforcement is forbidden with --release")
 
     if not (c_compiler_validated and cxx_compiler_validated):
         if not suppress_invalid:
-            print("ERROR: Refusing to build with compiler that does not meet requirements")
-            Exit(1)
+            env.ConfError("ERROR: Refusing to build with compiler that does not meet requirements")
         print("WARNING: Ignoring failed compiler version check per explicit user request.")
         print("WARNING: The build may fail, binaries may crash, or may run but corrupt data...")
 
@@ -1277,8 +1278,7 @@ def doConfigure(myenv):
             return ret
 
         if env.ToolchainIs('msvc'):
-            print("AddFlagIfSupported is not currently supported with MSVC")
-            Exit(1)
+            env.FatalError("AddFlagIfSupported is not currently supported with MSVC")
 
         test_mutation = mutation
         if env.ToolchainIs('gcc'):
@@ -1389,22 +1389,19 @@ def doConfigure(myenv):
         min_version = get_option('osx-version-min')
         min_version_flag = '-mmacosx-version-min=%s' % (min_version)
         if not AddToCCFLAGSIfSupported(myenv, min_version_flag):
-            print( "Can't set minimum OS X version with this compiler" )
-            Exit(1)
+            myenv.ConfError("Can't set minimum OS X version with this compiler")
         myenv.AppendUnique(LINKFLAGS=[min_version_flag])
 
     usingLibStdCxx = False
     if has_option('libc++'):
         if not myenv.ToolchainIs('clang'):
-            print( 'libc++ is currently only supported for clang')
-            Exit(1)
+            myenv.ConfError('libc++ is currently only supported for clang')
         if env.TargetOSIs('osx') and has_option('osx-version-min') and versiontuple(min_version) < versiontuple('10.7'):
             print("Warning: You passed option 'libc++'. You probably want to also pass 'osx-version-min=10.7' or higher for libc++ support.")
         if AddToCXXFLAGSIfSupported(myenv, '-stdlib=libc++'):
             myenv.Append(LINKFLAGS=['-stdlib=libc++'])
         else:
-            print( 'libc++ requested, but compiler does not support -stdlib=libc++' )
-            Exit(1)
+            myenv.ConfError('libc++ requested, but compiler does not support -stdlib=libc++' )
     else:
         def CheckLibStdCxx(context):
             test_body = """
@@ -1427,11 +1424,9 @@ def doConfigure(myenv):
 
     if not myenv.ToolchainIs('msvc'):
         if not AddToCXXFLAGSIfSupported(myenv, '-std=c++11'):
-            print( 'Compiler does not honor -std=c++11' )
-            Exit(1)
+            myenv.ConfError('Compiler does not honor -std=c++11')
         if not AddToCFLAGSIfSupported(myenv, '-std=c99'):
-            print( "C++11 mode selected for C++ files, but can't enable C99 for C files" )
-            Exit(1)
+            myenv.ConfError("C++11 mode selected for C++ files, but can't enable C99 for C files")
 
     if using_system_version_of_cxx_libraries():
         print( 'WARNING: System versions of C++ libraries must be compiled with C++11 support' )
@@ -1462,8 +1457,7 @@ def doConfigure(myenv):
     })
 
     if not conf.CheckCxx11():
-        print( 'C++11 support is required to build MongoDB')
-        Exit(1)
+        myenv.ConfError('C++11 support is required to build MongoDB')
 
     conf.Finish()
 
@@ -1493,8 +1487,7 @@ def doConfigure(myenv):
         })
 
         if not conf.CheckModernLibStdCxx():
-            print("When using libstdc++, MongoDB requires libstdc++ 4.8.2 or newer")
-            Exit(1)
+            myenv.ConfError("When using libstdc++, MongoDB requires libstdc++ 4.8.2 or newer")
 
         conf.Finish()
 
@@ -1503,15 +1496,13 @@ def doConfigure(myenv):
         # dependencies, then turn on the debugging features in libstdc++.
         # TODO: Need a new check here.
         if not debugBuild:
-            print("--use-glibcxx-debug requires --dbg=on")
-            Exit(1)
+            myenv.ConfError("--use-glibcxx-debug requires --dbg=on")
         if not usingLibStdCxx:
-            print("--use-glibcxx-debug is only compatible with the GNU implementation of the "
-                  "C++ standard libary")
-            Exit(1)
+            myenv.ConfError("--use-glibcxx-debug is only compatible with the GNU implementation "
+                "of the C++ standard libary")
         if using_system_version_of_cxx_libraries():
-            print("--use-glibcxx-debug not compatible with system versions of C++ libraries.")
-            Exit(1)
+            myenv.ConfError("--use-glibcxx-debug not compatible with system versions of "
+                "C++ libraries.")
         myenv.Append(CPPDEFINES=["_GLIBCXX_DEBUG"]);
 
     # Check if we have a modern Windows SDK
@@ -1535,9 +1526,7 @@ def doConfigure(myenv):
         })
 
         if not conf.CheckWindowsSDKVersion():
-            print( 'Windows SDK Version 8.1 or higher is required to build MongoDB' )
-            Exit(1)
-
+            myenv.ConfError('Windows SDK Version 8.1 or higher is required to build MongoDB')
 
         conf.Finish()
 
@@ -1600,14 +1589,12 @@ def doConfigure(myenv):
     if has_option('sanitize'):
 
         if not myenv.ToolchainIs('clang', 'gcc'):
-            print( 'sanitize is only supported with clang or gcc')
-            Exit(1)
+            env.FatalError('sanitize is only supported with clang or gcc')
 
         if get_option('allocator') == 'tcmalloc':
             # There are multiply defined symbols between the sanitizer and
             # our vendorized tcmalloc.
-            print("Cannot use --sanitize with tcmalloc")
-            Exit(1)
+            env.FatalError("Cannot use --sanitize with tcmalloc")
 
         sanitizer_list = get_option('sanitize').split(',')
 
@@ -1636,8 +1623,7 @@ def doConfigure(myenv):
             myenv.Append(LINKFLAGS=[sanitizer_option])
             myenv.Append(CCFLAGS=['-fno-omit-frame-pointer'])
         else:
-            print( 'Failed to enable sanitizers with flag: ' + sanitizer_option )
-            Exit(1)
+            myenv.ConfError('Failed to enable sanitizers with flag: {0}', sanitizer_option )
 
         blackfiles_map = {
             "address" : myenv.File("#etc/asan.blacklist"),
@@ -1666,8 +1652,7 @@ def doConfigure(myenv):
             myenv['ENV']['LSAN_SYMBOLIZER_PATH'] = llvm_symbolizer
             tsan_options = "external_symbolizer_path=\"%s\" " % llvm_symbolizer
         elif using_lsan:
-            print("Using the leak sanitizer requires a valid symbolizer")
-            Exit(1)
+            myenv.ConfError("Using the leak sanitizer requires a valid symbolizer")
 
         if using_tsan:
             tsan_options += "suppressions=\"%s\" " % myenv.File("#etc/tsan.suppressions").abspath
@@ -1728,18 +1713,15 @@ def doConfigure(myenv):
                 if not conf.LinkHelloWorld():
                     conf.env.Append(LINKFLAGS=["-fuse-ld=gold"])
                     if not conf.LinkHelloWorld("(with -fuse-ld=gold)"):
-                        print("Error: Couldn't link with LTO")
-                        Exit(1)
+                        myenv.ConfError("Error: Couldn't link with LTO")
 
                 myenv = conf.Finish()
 
             else:
-                print( "Link time optimization requested, " +
-                       "but selected compiler does not honor -flto" )
-                Exit(1)
+                myenv.ConfError("Link time optimization requested, "
+                    "but selected compiler does not honor -flto" )
         else:
-            printf("Don't know how to enable --lto on current toolchain")
-            Exit(1)
+            myenv.ConfError("Don't know how to enable --lto on current toolchain")
 
     # We set this to work around https://gcc.gnu.org/bugzilla/show_bug.cgi?id=43052
     if not myenv.ToolchainIs('msvc'):
@@ -1892,17 +1874,14 @@ def doConfigure(myenv):
 
     if wiredtiger and use_system_version_of_library("wiredtiger"):
         if not conf.CheckCXXHeader( "wiredtiger.h" ):
-            print( "Cannot find wiredtiger headers" )
-            Exit(1)
+            myenv.ConfError("Cannot find wiredtiger headers")
         conf.FindSysLibDep("wiredtiger", ["wiredtiger"])
 
     if use_system_version_of_library("boost"):
         if not conf.CheckCXXHeader( "boost/filesystem/operations.hpp" ):
-            print( "can't find boost headers" )
-            Exit(1)
+            myenv.ConfError("can't find boost headers")
         if not conf.CheckBoostMinVersion():
-            print( "system's version of boost is too old. version 1.49 or better required")
-            Exit(1)
+            myenv.ConfError("system's version of boost is too old. version 1.49 or better required")
 
         conf.env.Append(CPPDEFINES=[("BOOST_THREAD_VERSION", "2")])
 
@@ -1953,13 +1932,12 @@ def doConfigure(myenv):
             "C", 
             "sasl_version_info(0, 0, 0, 0, 0, 0);", 
             autoadd=False ):
-        Exit(1)
+        myenv.ConfError("Couldn't find SASL header/libraries")
 
     # requires ports devel/libexecinfo to be installed
     if env.TargetOSIs('freebsd', 'openbsd'):
         if not conf.CheckLib("execinfo"):
-            print("Cannot find libexecinfo, please install devel/libexecinfo.")
-            Exit(1)
+            myenv.ConfError("Cannot find libexecinfo, please install devel/libexecinfo.")
 
     # 'tcmalloc' needs to be the last library linked. Please, add new libraries before this 
     # point.
@@ -1969,8 +1947,7 @@ def doConfigure(myenv):
     elif get_option('allocator') == 'system':
         pass
     else:
-        print "Invalid --allocator parameter: \"%s\"" % get_option('allocator')
-        Exit(1)
+        myenv.ConfError("Invalid --allocator parameter: \"{0}\"", get_option('allocator'))
 
     def CheckStdAtomic(context, base_type, extra_message):
         test_body = """
@@ -2008,11 +1985,10 @@ def doConfigure(myenv):
 
     if not check_all_atomics():
         if not conf.CheckLib('atomic', symbol=None, header=None, language='C', autoadd=1):
-            print "Some atomic ops are not intrinsically supported, but no libatomic found"
-            Exit(1)
+            myenv.ConfError("Some atomic ops are not intrinsically supported, but "
+                "no libatomic found")
         if not check_all_atomics(' with libatomic'):
-            print "The toolchain does not support std::atomic, cannot continue"
-            Exit(1)
+            myenv.ConfError("The toolchain does not support std::atomic, cannot continue")
 
     # ask each module to configure itself and the build environment.
     moduleconfig.configure_modules(mongo_modules, conf)
@@ -2028,8 +2004,7 @@ env.Tool("compilation_db")
 def checkErrorCodes():
     import buildscripts.errorcodes as x
     if x.checkErrorCodes() == False:
-        print( "next id to use:" + str( x.getNextCode() ) )
-        Exit(-1)
+        env.FatalError("next id to use: {0}", x.getNextCode())
 
 checkErrorCodes()
 
@@ -2064,7 +2039,7 @@ def getSystemInstallName():
 
 mongoCodeVersion = env['MONGO_CODE_VERSION']
 if mongoCodeVersion == None:
-    Exit(-1)
+    myenv.FatalError("Missing version information")
 
 if has_option('distname'):
     distName = GetOption( "distname" )
