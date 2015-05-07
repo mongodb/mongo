@@ -646,7 +646,6 @@ __split_multi_inmem(
 	 * when discarding the original page, and our caller will discard the
 	 * allocated page on error, when discarding the allocated WT_REF.
 	 */
-
 	WT_RET(__wt_page_inmem(session, ref,
 	    multi->skip_dsk, ((WT_PAGE_HEADER *)multi->skip_dsk)->mem_size,
 	    WT_PAGE_DISK_ALLOC, &page));

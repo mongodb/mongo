@@ -195,25 +195,10 @@ __evict_page_dirty_update(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 		break;
 	case WT_PM_REC_MULTIBLOCK:			/* Multiple blocks */
 		/*
-		 * There are two cases in this code.
-		 *
-		 * First, an in-memory page that got too large, we forcibly
-		 * evicted it, and there wasn't anything to write. (Imagine two
-		 * threads updating a small set keys on a leaf page. The page is
-		 * too large so we try to evict it, but after reconciliation
-		 * there's only a small amount of data (so it's a single page we
-		 * can't split), and because there are two threads, there's some
-		 * data we can't write (so we can't evict it). In that case, we
-		 * take advantage of the fact we have exclusive access to the
-		 * page and rewrite it in memory.)
-		 *
-		 * Second, a real split where we reconciled a page and it turned
-		 * into a lot of pages.
+		 * A real split where we reconciled a page and it turned into a
+		 * lot of pages.
 		 */
-		if (mod->mod_multi_entries == 1)
-			WT_RET(__wt_split_rewrite(session, ref));
-		else
-			WT_RET(__wt_split_multi(session, ref, exclusive));
+		WT_RET(__wt_split_multi(session, ref, exclusive));
 		break;
 	case WT_PM_REC_REPLACE: 			/* 1-for-1 page swap */
 		if (ref->addr != NULL && __wt_off_page(parent, ref->addr)) {
@@ -235,6 +220,20 @@ __evict_page_dirty_update(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 		__wt_ref_out(session, ref);
 		ref->addr = addr;
 		WT_PUBLISH(ref->state, WT_REF_DISK);
+		break;
+	case WT_PM_REC_REWRITE:
+		/*
+		 * An in-memory page that got too large, we forcibly evicted
+		 * it, and there wasn't anything to write. (Imagine two threads
+		 * updating a small set keys on a leaf page. The page is too
+		 * large so we try to evict it, but after reconciliation
+		 * there's only a small amount of data (so it's a single page
+		 * we can't split), and because there are two threads, there's
+		 * some data we can't write (so we can't evict it). In that
+		 * case, we take advantage of the fact we have exclusive access
+		 * to the page and rewrite it in memory.)
+		 */
+		WT_RET(__wt_split_rewrite(session, ref));
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}
