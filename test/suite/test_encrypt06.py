@@ -34,22 +34,35 @@ import os, run, random
 import wiredtiger, wttest
 from wtscenario import multiply_scenarios, number_scenarios
 
-# Test raw compression with encryption
+# Test encryption, when on, does not leak any information
 class test_encrypt06(wttest.WiredTigerTestCase):
 
     key11 = ',keyid=11,secretkey=XYZ'
     key13 = ',keyid=13'
+
+    # Test with various combinations of tables with or without indices
+    # and column groups, also with LSM.  When 'match' is False, we
+    # testing a potential misuse of the API: a table is opened with
+    # with its own encryption options (different from the system),
+    # but the indices and column groups do not specify encryption,
+    # so they'll get the system encryptor.
     storagetype = [
         ('table', dict(
-            uriprefix='table:', use_cg=False, use_index=False)),
+            uriprefix='table:', use_cg=False, use_index=False, match=True)),
         ('table-idx', dict(
-            uriprefix='table:', use_cg=False, use_index=True)),
+            uriprefix='table:', use_cg=False, use_index=True, match=True)),
         ('table-cg', dict(
-            uriprefix='table:', use_cg=True, use_index=False)),
+            uriprefix='table:', use_cg=True, use_index=False, match=True)),
         ('table-cg-idx', dict(
-            uriprefix='table:', use_cg=True, use_index=True)),
+            uriprefix='table:', use_cg=True, use_index=True, match=True)),
+        ('table-idx-unmatch', dict(
+            uriprefix='table:', use_cg=False, use_index=True, match=False)),
+        ('table-cg-unmatch', dict(
+            uriprefix='table:', use_cg=True, use_index=False, match=False)),
+        ('table-cg-idx-unmatch', dict(
+            uriprefix='table:', use_cg=True, use_index=True, match=False)),
         ('lsm', dict(
-            uriprefix='lsm:', use_cg=False, use_index=False)),
+            uriprefix='lsm:', use_cg=False, use_index=False, match=True)),
     ]
     encrypt = [
         ('none', dict(
@@ -131,6 +144,16 @@ class test_encrypt06(wttest.WiredTigerTestCase):
                 return True
         return False
 
+    def expected_encryption(self, exp):
+        expect = exp
+        # If we're expecting it to be unencrypted, but we (errantly)
+        # did not specify encryption on indices/columngroups,
+        # then column groups (if they exist) will be encrypted -
+        # there will be no data in the main table to be unencrypted.
+        if self.sys_encrypt != 'none' and not self.match and self.use_cg:
+            expect = True
+        return expect
+
     # Create a table, add key/values with specific lengths, then verify them.
     def test_encrypt(self):
         name0 = 'test_encrypt06-0'
@@ -158,6 +181,11 @@ class test_encrypt06(wttest.WiredTigerTestCase):
 
         cgparam = 'colgroups=(g00,g01)' if self.use_cg else ''
         s.create(pfx + name0, sharedparam + cgparam + enc0)
+
+        # Having unmatched encryption for colgroup or index is
+        # not recommended, but we check it.
+        if not self.match:
+            enc0 = ''
         if self.use_cg:
             s.create('colgroup:' + name0 + ':g00', 'columns=(v0,v1)' + enc0)
             s.create('colgroup:' + name0 + ':g01', 'columns=(v2,v3)' + enc0)
@@ -168,6 +196,9 @@ class test_encrypt06(wttest.WiredTigerTestCase):
 
         cgparam = 'colgroups=(g10,g11)' if self.use_cg else ''
         s.create(pfx + name1, sharedparam + cgparam + enc1)
+
+        if not self.match:
+            enc1 = ''
         if self.use_cg:
             s.create('colgroup:' + name1 + ':g10', 'columns=(v0,v1)' + enc1)
             s.create('colgroup:' + name1 + ':g11', 'columns=(v2,v3)' + enc1)
@@ -194,9 +225,10 @@ class test_encrypt06(wttest.WiredTigerTestCase):
 
         self.assertEqual(self.encryptmeta,
                          not self.match_string_in_rundir('MyKeyName'))
-        self.assertEqual(self.encrypt0,
+
+        self.assertEqual(self.expected_encryption(self.encrypt0),
                          not self.match_string_in_rundir(txt0))
-        self.assertEqual(self.encrypt1,
+        self.assertEqual(self.expected_encryption(self.encrypt1),
                          not self.match_string_in_rundir(txt1))
         
 
