@@ -68,9 +68,14 @@ func (restore *MongoRestore) MetadataFromJSON(jsonBytes []byte) (bson.D, []Index
 		return nil, nil, fmt.Errorf("error unmarshalling metadata as map: %v", err)
 	}
 	for i := range meta.Indexes {
-		// remove "key" and "v" from the map versions
+		// remove "key" from the map so we can decode it properly later
 		delete(metaAsMap.Indexes[i], "key")
+
+		// parse extra index fields
 		meta.Indexes[i].Options = metaAsMap.Indexes[i]
+		if err := bsonutil.ConvertJSONDocumentToBSON(meta.Indexes[i].Options); err != nil {
+			return nil, nil, fmt.Errorf("extended json error: %v", err)
+		}
 
 		// parse the values of the index keys, so we can support extended json
 		for pos, field := range meta.Indexes[i].Key {
