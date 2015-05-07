@@ -34,17 +34,23 @@ import os, run, random
 import wiredtiger, wttest
 from wtscenario import multiply_scenarios, number_scenarios
 
-# TODO - tmp code
-def tty_pr(s):
-    o = open('/dev/tty', 'w')
-    o.write(s + '\n')
-    o.close()
-
 # Test raw compression with encryption
 class test_encrypt06(wttest.WiredTigerTestCase):
 
     key11 = ',keyid=11,secretkey=XYZ'
     key13 = ',keyid=13'
+    storagetype = [
+        ('table', dict(
+            uriprefix='table:', use_cg=False, use_index=False)),
+        ('table-idx', dict(
+            uriprefix='table:', use_cg=False, use_index=True)),
+        ('table-cg', dict(
+            uriprefix='table:', use_cg=True, use_index=False)),
+        ('table-cg-idx', dict(
+            uriprefix='table:', use_cg=True, use_index=True)),
+        ('lsm', dict(
+            uriprefix='lsm:', use_cg=False, use_index=False)),
+    ]
     encrypt = [
         ('none', dict(
             sys_encrypt='none', sys_encrypt_args='', encryptmeta=False,
@@ -72,7 +78,7 @@ class test_encrypt06(wttest.WiredTigerTestCase):
             file1_encrypt='none', file1_encrypt_args='', encrypt1=False,
             file2_encrypt='none', file2_encrypt_args='', encrypt2=False)),
     ]
-    scenarios = number_scenarios(encrypt)
+    scenarios = number_scenarios(multiply_scenarios('.', encrypt, storagetype))
     nrecords = 1000
 
     # Override WiredTigerTestCase, we have extensions.
@@ -141,51 +147,47 @@ class test_encrypt06(wttest.WiredTigerTestCase):
         # This is the clear text that we'll be looking for
         txt0 = 'AbCdEfG'
         txt1 = 'aBcDeFg'
-        txt2 = 'AAbbCCd'
 
         # Make a bunch of column group and indices,
         # we want to see if any information is leaked anywhere.
         sharedparam = 'key_format=S,value_format=SSSS,' + \
                       'columns=(MyKeyName,v0,v1,v2,v3),'
 
-#        tty_pr('wiredtiger_open params: ' + self.open_params)
-#        tty_pr('table:' + name0 + ' create params: ' + sharedparam + enc0)
-#        tty_pr(uri1 + ' create params: ' + sharedparam + enc1)
-
         s = self.session
-        s.create('table:' + name0, sharedparam + 'colgroups=(g00,g01)' + enc0)
-        s.create('colgroup:' + name0 + ':g00', 'columns=(v0,v1)' + enc0)
-        s.create('colgroup:' + name0 + ':g01', 'columns=(v2,v3)' + enc0)
-        s.create('index:' + name0 + ':i00', 'columns=(v0)' + enc0)
-        s.create('index:' + name0 + ':i01', 'columns=(v1,v2)' + enc0)
-        s.create('index:' + name0 + ':i02', 'columns=(v3)' + enc0)
+        pfx = self.uriprefix
 
-        s.create('table:' + name1, sharedparam + 'colgroups=(g10,g11)' + enc1)
-        s.create('colgroup:' + name1 + ':g10', 'columns=(v0,v1)' + enc1)
-        s.create('colgroup:' + name1 + ':g11', 'columns=(v2,v3)' + enc1)
-        s.create('index:' + name1 + ':i10', 'columns=(v0)' + enc1)
-        s.create('index:' + name1 + ':i11', 'columns=(v1,v2)' + enc1)
-        s.create('index:' + name1 + ':i12', 'columns=(v3)' + enc1)
+        cgparam = 'colgroups=(g00,g01)' if self.use_cg else ''
+        s.create(pfx + name0, sharedparam + cgparam + enc0)
+        if self.use_cg:
+            s.create('colgroup:' + name0 + ':g00', 'columns=(v0,v1)' + enc0)
+            s.create('colgroup:' + name0 + ':g01', 'columns=(v2,v3)' + enc0)
+        if self.use_index:
+            s.create('index:' + name0 + ':i00', 'columns=(v0)' + enc0)
+            s.create('index:' + name0 + ':i01', 'columns=(v1,v2)' + enc0)
+            s.create('index:' + name0 + ':i02', 'columns=(v3)' + enc0)
 
-        s.create('table:' + name2, sharedparam + enc2)
+        cgparam = 'colgroups=(g10,g11)' if self.use_cg else ''
+        s.create(pfx + name1, sharedparam + cgparam + enc1)
+        if self.use_cg:
+            s.create('colgroup:' + name1 + ':g10', 'columns=(v0,v1)' + enc1)
+            s.create('colgroup:' + name1 + ':g11', 'columns=(v2,v3)' + enc1)
+        if self.use_index:
+            s.create('index:' + name1 + ':i10', 'columns=(v0)' + enc1)
+            s.create('index:' + name1 + ':i11', 'columns=(v1,v2)' + enc1)
+            s.create('index:' + name1 + ':i12', 'columns=(v3)' + enc1)
 
-        c0 = s.open_cursor('table:' + name0, None)
-        c1 = s.open_cursor('table:' + name1, None)
-        c2 = s.open_cursor('table:' + name2, None)
+        c0 = s.open_cursor(pfx + name0, None)
+        c1 = s.open_cursor(pfx + name1, None)
         for idx in xrange(1,self.nrecords):
             c0.set_key(str(idx) + txt0)
             c1.set_key(str(idx) + txt1)
-            c2.set_key(str(idx) + txt2)
             c0.set_value(txt0 * (idx % 97), txt0 * 3, txt0 * 5, txt0 * 7)
             c1.set_value(txt1 * (idx % 97), txt1 * 3, txt1 * 5, txt1 * 7)
-            c2.set_value(txt2 * (idx % 97), txt2 * 3, txt2 * 5, txt2 * 7)
             c0.insert()
             c1.insert()
-            c2.insert()
 
         c0.close()
         c1.close()
-        c2.close()
             
         # Force everything to disk so we can examine it
         self.close_conn()
@@ -196,8 +198,6 @@ class test_encrypt06(wttest.WiredTigerTestCase):
                          not self.match_string_in_rundir(txt0))
         self.assertEqual(self.encrypt1,
                          not self.match_string_in_rundir(txt1))
-        self.assertEqual(self.encrypt2,
-                         not self.match_string_in_rundir(txt2))
         
 
 if __name__ == '__main__':
