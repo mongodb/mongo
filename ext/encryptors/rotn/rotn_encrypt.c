@@ -71,7 +71,7 @@ typedef struct {
 
 	WT_EXTENSION_API *wt_api;	/* Extension API */
 
-	uint32_t rot_N;			/* rotN value */
+	int rot_N;			/* rotN value */
 	char *keyid;			/* Saved keyid */
 	char *secretkey;		/* Saved secretkey */
 	u_char *shift_forw;		/* Encrypt shift data from secretkey */
@@ -124,19 +124,17 @@ make_iv(uint8_t *dst)
  *	Perform rot-N on the buffer given.
  */
 static void
-do_rotate(uint8_t *buf, size_t len, uint32_t rotn)
+do_rotate(char *buf, size_t len, int rotn)
 {
 	uint32_t i;
 	/*
 	 * Now rotate.
 	 */
 	for (i = 0; i < len; i++) {
-		if (isalpha(buf[i])) {
-			if (islower(buf[i]))
-				buf[i] = ((buf[i] - 'a') + rotn) % 26 + 'a';
-			else
-				buf[i] = ((buf[i] - 'A') + rotn) % 26 + 'A';
-		}
+		if (islower(buf[i]))
+			buf[i] = ((buf[i] - 'a') + rotn) % 26 + 'a';
+		else if (isalpha(buf[i]))
+			buf[i] = ((buf[i] - 'A') + rotn) % 26 + 'A';
 	}
 }
 
@@ -187,7 +185,7 @@ rotn_encrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	 * the text.
 	 */
 	if (rotn_encryptor->shift_len == 0)
-		do_rotate(&dst[i], src_len, rotn_encryptor->rot_N);
+		do_rotate((char *)dst + i, src_len, rotn_encryptor->rot_N);
 	else
 		do_shift(&dst[i], src_len,
 		    rotn_encryptor->shift_forw, rotn_encryptor->shift_len);
@@ -248,7 +246,7 @@ rotn_decrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	 * !!! Most implementations would need the IV too.
 	 */
 	if (rotn_encryptor->shift_len == 0)
-		do_rotate(&dst[0], mylen, 26 - rotn_encryptor->rot_N);
+		do_rotate((char *)dst, mylen, 26 - rotn_encryptor->rot_N);
 	else
 		do_shift(&dst[0], mylen,
 		    rotn_encryptor->shift_back, rotn_encryptor->shift_len);
@@ -360,7 +358,7 @@ rotn_customize(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	 * In a real encryptor, we could use some sophisticated key management
 	 * here to map the keyid onto a secret key.
 	 */
-	rotn_encryptor->rot_N = (uint32_t)keyid_val;
+	rotn_encryptor->rot_N = keyid_val;
 
 	*customp = (WT_ENCRYPTOR *)rotn_encryptor;
 	return (0);
