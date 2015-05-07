@@ -48,13 +48,16 @@ namespace mongo {
     public:
         enum MatchType {
             // tree types
-            AND, OR, NOR, NOT,
+            AND, OR,
 
             // array types
             ELEM_MATCH_OBJECT, ELEM_MATCH_VALUE, SIZE,
 
             // leaf types
-            LTE, LT, EQ, GT, GTE, REGEX, MOD, EXISTS, MATCH_IN, NIN,
+            EQ, LTE, LT, GT, GTE, REGEX, MOD, EXISTS, MATCH_IN,
+
+            // Negations.
+            NOT, NIN, NOR,
 
             // special types
             TYPE_OPERATOR, GEO, WHERE,
