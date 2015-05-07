@@ -214,7 +214,7 @@ namespace mongo {
             BSONObj key = idx["key"].Obj();
             const string ns = idx["ns"].String();
             if ( key.nFields() != 1 ) {
-                error() << "key for ttl index can only have 1 field" << endl;
+                error() << "key for ttl index with ns " << ns << " can only have 1 field" << endl;
                 return true;
             }
             if ( !idx[secondsExpireField].isNumber() ) {
