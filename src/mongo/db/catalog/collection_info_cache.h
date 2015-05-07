@@ -106,6 +106,8 @@ namespace mongo {
          * Must be called under exclusive DB lock.
          */
         void computeIndexKeys( OperationContext* txn );
+
+        void updatePlanCacheIndexEntries( OperationContext* txn );
     };
 
 }  // namespace mongo

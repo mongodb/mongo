@@ -54,6 +54,7 @@ namespace {
     using boost::scoped_ptr;
     using std::auto_ptr;
     using std::string;
+    using std::unique_ptr;
     using std::vector;
 
     static const char* ns = "somebogusns";
@@ -1123,16 +1124,16 @@ namespace {
     // must be escaped.
     TEST(PlanCacheTest, ComputeKeyEscaped) {
         // Field name in query.
-        testComputeKey("{'a,[]~|': 1}", "{}", "{}", "eqa\\,\\[\\]\\~\\|");
+        testComputeKey("{'a,[]~|<>': 1}", "{}", "{}", "eqa\\,\\[\\]\\~\\|\\<\\>");
 
         // Field name in sort.
-        testComputeKey("{}", "{'a,[]~|': 1}", "{}", "an~aa\\,\\[\\]\\~\\|");
+        testComputeKey("{}", "{'a,[]~|<>': 1}", "{}", "an~aa\\,\\[\\]\\~\\|\\<\\>");
 
         // Field name in projection.
-        testComputeKey("{}", "{}", "{'a,[]~|': 1}", "an|1a\\,\\[\\]\\~\\|");
+        testComputeKey("{}", "{}", "{'a,[]~|<>': 1}", "an|1a\\,\\[\\]\\~\\|\\<\\>");
 
         // Value in projection.
-        testComputeKey("{}", "{}", "{a: 'foo,[]~|'}", "an|\"foo\\,\\[\\]\\~\\|\"a");
+        testComputeKey("{}", "{}", "{a: 'foo,[]~|<>'}", "an|\"foo\\,\\[\\]\\~\\|\\<\\>\"a");
     }
 
     // Cache keys for $geoWithin queries with legacy and GeoJSON coordinates should
@@ -1160,5 +1161,31 @@ namespace {
                        "$maxDistance:100}}}", "{}", "{}", "gnanrsp");
     }
 
+    // When a partial index is present, computeKey() should generate different keys depending on
+    // whether or not the predicates in the given query "match" the predicates in the partial index
+    // filter.
+    TEST(PlanCacheTest, ComputeKeyPartialIndex) {
+        BSONObj filterObj = BSON("f" << BSON("$gt" << 0));
+        unique_ptr<MatchExpression> filterExpr(parseMatchExpression(filterObj));
+
+        PlanCache planCache;
+        planCache.notifyOfIndexEntries({IndexEntry(BSON("a" << 1),
+                                                   false, // multikey
+                                                   false, // sparse
+                                                   false, // unique
+                                                   "", // name
+                                                   filterExpr.get(),
+                                                   BSONObj())});
+
+        unique_ptr<CanonicalQuery> cqGtNegativeFive(canonicalize("{f: {$gt: -5}}"));
+        unique_ptr<CanonicalQuery> cqGtZero(canonicalize("{f: {$gt: 0}}"));
+        unique_ptr<CanonicalQuery> cqGtFive(canonicalize("{f: {$gt: 5}}"));
+
+        // 'cqGtZero' and 'cqGtFive' get the same key, since both are compatible with this index.
+        ASSERT_EQ(planCache.computeKey(*cqGtZero), planCache.computeKey(*cqGtFive));
+
+        // 'cqGtNegativeFive' gets a different key, since it is not compatible with this index.
+        ASSERT_NOT_EQUALS(planCache.computeKey(*cqGtNegativeFive), planCache.computeKey(*cqGtZero));
+    }
 
 }  // namespace

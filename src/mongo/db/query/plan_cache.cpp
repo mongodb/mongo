@@ -51,6 +51,8 @@ namespace mongo {
 namespace {
 
     // Delimiters for cache key encoding.
+    const char kEncodeDiscriminatorsBegin = '<';
+    const char kEncodeDiscriminatorsEnd = '>';
     const char kEncodeChildrenBegin = '[';
     const char kEncodeChildrenEnd = ']';
     const char kEncodeChildrenSeparator = ',';
@@ -65,6 +67,8 @@ namespace {
         for (size_t i = 0; i < s.size(); ++i) {
             char c = s[i];
             switch (c) {
+            case kEncodeDiscriminatorsBegin:
+            case kEncodeDiscriminatorsEnd:
             case kEncodeChildrenBegin:
             case kEncodeChildrenEnd:
             case kEncodeChildrenSeparator:
@@ -439,6 +443,18 @@ namespace {
                                          keyBuilder);
         }
 
+        // Encode indexability.
+        const IndexabilityDiscriminators& discriminators =
+            _indexabilityState.getDiscriminators(tree->path());
+        if (!discriminators.empty()) {
+            *keyBuilder << kEncodeDiscriminatorsBegin;
+            // For each discriminator on this path, append the character '0' or '1'.
+            for (const IndexabilityDiscriminator& discriminator : discriminators) {
+                *keyBuilder << discriminator(tree);
+            }
+            *keyBuilder << kEncodeDiscriminatorsEnd;
+        }
+
         // Traverse child nodes.
         // Enclose children in [].
         if (tree->numChildren() > 0) {
@@ -679,6 +695,10 @@ namespace {
                << internalQueryCacheWriteOpsBetweenFlush
                << " write operations detected since last refresh.";
         clear();
+    }
+
+    void PlanCache::notifyOfIndexEntries(const std::vector<IndexEntry>& indexEntries) {
+        _indexabilityState.updateDiscriminators(indexEntries);
     }
 
 }  // namespace mongo

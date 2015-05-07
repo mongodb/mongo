@@ -57,6 +57,7 @@ namespace mongo {
         clearQueryCache();
         _keysComputed = false;
         computeIndexKeys( txn );
+        updatePlanCacheIndexEntries( txn );
         // query settings is not affected by info cache reset.
         // index filters should persist throughout life of collection
     }
@@ -143,6 +144,30 @@ namespace mongo {
 
     QuerySettings* CollectionInfoCache::getQuerySettings() const {
         return _querySettings.get();
+    }
+
+    void CollectionInfoCache::updatePlanCacheIndexEntries(OperationContext* txn) {
+        std::vector<IndexEntry> indexEntries;
+
+        // TODO We shouldn't need to include unfinished indexes, but we must here because the index
+        // catalog may be in an inconsistent state.  SERVER-18346.
+        const bool includeUnfinishedIndexes = true;
+        IndexCatalog::IndexIterator ii =
+            _collection->getIndexCatalog()->getIndexIterator(txn, includeUnfinishedIndexes);
+        while (ii.more()) {
+            const IndexDescriptor* desc = ii.next();
+            const IndexCatalogEntry* ice = ii.catalogEntry(desc);
+            indexEntries.emplace_back(desc->keyPattern(),
+                                      desc->getAccessMethodName(),
+                                      desc->isMultikey(txn),
+                                      desc->isSparse(),
+                                      desc->unique(),
+                                      desc->indexName(),
+                                      ice->getFilterExpression(),
+                                      desc->infoObj());
+        }
+
+        _planCache->notifyOfIndexEntries(indexEntries);
     }
 
 }

@@ -37,6 +37,7 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/index_tag.h"
 #include "mongo/db/query/lru_key_value.h"
+#include "mongo/db/query/plan_cache_indexability.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/platform/atomic_word.h"
 
@@ -332,7 +333,7 @@ namespace mongo {
         Status remove(const CanonicalQuery& canonicalQuery);
 
         /**
-         * Remove *all* entries.
+         * Remove *all* cached plans.  Does not clear index information.
          */
         void clear();
 
@@ -342,6 +343,8 @@ namespace mongo {
          *
          * This is provided in the public API simply as a convenience for consumers who need some
          * description of query shape (e.g. index filters).
+         *
+         * Callers must hold the collection lock when calling this method.
          */
         PlanCacheKey computeKey(const CanonicalQuery&) const;
 
@@ -383,7 +386,13 @@ namespace mongo {
         void notifyOfWriteOp();
 
         /**
+         * Updates internal state kept about the collection's indexes.  Must be called when the set
+         * of indexes on the associated collection have changed.
+         *
+         * Callers must hold the collection lock in exclusive mode when calling this method.
          */
+        void notifyOfIndexEntries(const std::vector<IndexEntry>& indexEntries);
+
     private:
         void encodeKeyForMatch(const MatchExpression* tree, StringBuilder* keyBuilder) const;
         void encodeKeyForSort(const BSONObj& sortObj, StringBuilder* keyBuilder) const;
@@ -400,6 +409,13 @@ namespace mongo {
 
         // Full namespace of collection.
         std::string _ns;
+
+        // Holds computed information about the collection's indexes.  Used for generating plan
+        // cache keys.
+        //
+        // Concurrent access is synchronized by the collection lock.  Multiple concurrent readers
+        // are allowed.
+        PlanCacheIndexabilityState _indexabilityState;
     };
 
 }  // namespace mongo
