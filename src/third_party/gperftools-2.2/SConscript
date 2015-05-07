@@ -70,8 +70,16 @@ def __checkMallocHookVolatile(check_context):
 
 conf = Configure(env.Clone(), custom_tests=dict(CheckMallocHookVolatile=__checkMallocHookVolatile))
 conf.CheckMallocHookVolatile()
-env = conf.Finish()
 
+if has_option('use-cpu-profiler'):
+    if not conf.CheckLib('unwind', autoadd=False):
+        env.ConfError("Compiling with --use-cpu-profiler requires having libunwind installed")
+    conf.env.AppendUnique(
+        CPPDEFINES=["NO_FRAME_POINTER", ("HAVE_LIBUNWIND_H", "1")],
+        SYSLIBDEPS=['unwind']
+    )
+
+env = conf.Finish()
 
 env.Append( CPPDEFINES=[ "NO_TCMALLOC_SAMPLES", "NO_HEAP_CHECK"] )
 
@@ -85,12 +93,6 @@ if not debugBuild:
 
 env.Prepend( CPPPATH=["src/"] )
 
-my_SYSLIBDEPS = []
-
-if has_option( 'use-cpu-profiler' ):
-    env.Append( CPPDEFINES=["NO_FRAME_POINTER", ("HAVE_LIBUNWIND_H", "1")] )
-    my_SYSLIBDEPS.append( "unwind" )
-
 def removeIfPresent(lst, item):
     try:
         lst.remove(item)
@@ -100,4 +102,7 @@ def removeIfPresent(lst, item):
 for to_remove in ['-Werror', "-Wsign-compare","-Wall"]:
     removeIfPresent(env['CCFLAGS'], to_remove)
 
-env.Library('tcmalloc_minimal', files, SYSLIBDEPS=my_SYSLIBDEPS)
+env.Library(
+    target='tcmalloc_minimal',
+    source=files,
+)

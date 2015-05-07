@@ -613,8 +613,7 @@ serverOnlyFiles = [
 ]
 
 if has_option('use-cpu-profiler'):
-    serverOnlyFiles.append('db/commands/cpuprofile.cpp')
-    env.Append(LIBS=['unwind'])
+    serverOnlyFiles.append('commands/cpuprofile.cpp')
     # If we are building with our internal gperftools, add the necessary include path.
     #
     # NOTE: This is pretty bad because it will spam this include path into many files that
