@@ -127,9 +127,9 @@ class test_encrypt06(wttest.WiredTigerTestCase):
 
     # Create a table, add key/values with specific lengths, then verify them.
     def test_encrypt(self):
-        uri0 = 'table:test_encrypt06-0'
-        uri1 = 'table:test_encrypt06-1'
-        uri2 = 'table:test_encrypt06-2'
+        name0 = 'test_encrypt06-0'
+        name1 = 'test_encrypt06-1'
+        name2 = 'test_encrypt06-2'
 
         enc0 = self.encrypt_file_params(self.file0_encrypt,
                                         self.file0_encrypt_args)
@@ -149,26 +149,29 @@ class test_encrypt06(wttest.WiredTigerTestCase):
                       'columns=(MyKeyName,v0,v1,v2,v3),'
 
 #        tty_pr('wiredtiger_open params: ' + self.open_params)
-#        tty_pr(uri0 + ' create params: ' + sharedparam + enc0)
+#        tty_pr('table:' + name0 + ' create params: ' + sharedparam + enc0)
 #        tty_pr(uri1 + ' create params: ' + sharedparam + enc1)
 
-        self.session.create(uri0, sharedparam + 'colgroups=(g00,g01)' + enc0)
-        self.session.create(uri1, sharedparam + 'colgroups=(g10,g11)' + enc1)
-        self.session.create(uri2, sharedparam + enc2)
-        self.session.create('colgroup:test_encrypt06-0:g00', 'columns=(v0,v1)')
-        self.session.create('colgroup:test_encrypt06-0:g01', 'columns=(v2,v3)')
-        self.session.create('colgroup:test_encrypt06-1:g10', 'columns=(v0,v1)')
-        self.session.create('colgroup:test_encrypt06-1:g11', 'columns=(v2,v3)')
-        self.session.create('index:test_encrypt06-0:i00', 'columns=(v0)')
-        self.session.create('index:test_encrypt06-0:i01', 'columns=(v1,v2)')
-        self.session.create('index:test_encrypt06-0:i02', 'columns=(v3)')
-        self.session.create('index:test_encrypt06-1:i10', 'columns=(v0)')
-        self.session.create('index:test_encrypt06-1:i11', 'columns=(v1,v2)')
-        self.session.create('index:test_encrypt06-1:i12', 'columns=(v3)')
+        s = self.session
+        s.create('table:' + name0, sharedparam + 'colgroups=(g00,g01)' + enc0)
+        s.create('colgroup:' + name0 + ':g00', 'columns=(v0,v1)' + enc0)
+        s.create('colgroup:' + name0 + ':g01', 'columns=(v2,v3)' + enc0)
+        s.create('index:' + name0 + ':i00', 'columns=(v0)' + enc0)
+        s.create('index:' + name0 + ':i01', 'columns=(v1,v2)' + enc0)
+        s.create('index:' + name0 + ':i02', 'columns=(v3)' + enc0)
 
-        c0 = self.session.open_cursor(uri0, None)
-        c1 = self.session.open_cursor(uri1, None)
-        c2 = self.session.open_cursor(uri2, None)
+        s.create('table:' + name1, sharedparam + 'colgroups=(g10,g11)' + enc1)
+        s.create('colgroup:' + name1 + ':g10', 'columns=(v0,v1)' + enc1)
+        s.create('colgroup:' + name1 + ':g11', 'columns=(v2,v3)' + enc1)
+        s.create('index:' + name1 + ':i10', 'columns=(v0)' + enc1)
+        s.create('index:' + name1 + ':i11', 'columns=(v1,v2)' + enc1)
+        s.create('index:' + name1 + ':i12', 'columns=(v3)' + enc1)
+
+        s.create('table:' + name2, sharedparam + enc2)
+
+        c0 = s.open_cursor('table:' + name0, None)
+        c1 = s.open_cursor('table:' + name1, None)
+        c2 = s.open_cursor('table:' + name2, None)
         for idx in xrange(1,self.nrecords):
             c0.set_key(str(idx) + txt0)
             c1.set_key(str(idx) + txt1)

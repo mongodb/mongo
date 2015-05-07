@@ -60,7 +60,7 @@ static const char *home = NULL;
 /*! [encryption example callback implementation] */
 typedef struct {
 	WT_ENCRYPTOR encryptor;	/* Must come first */
-	uint32_t rot_N;		/* rotN value */
+	int rot_N;		/* rotN value */
 	uint32_t num_calls;	/* Count of calls */
 	char *keyid;		/* Saved keyid */
 	char *password;		/* Saved password */
@@ -109,7 +109,7 @@ make_iv(uint8_t *dst)
  *	Perform rot-N on the buffer given.
  */
 static void
-do_rotate(uint8_t *buf, size_t len, uint32_t rotn)
+do_rotate(char *buf, size_t len, int rotn)
 {
 	uint32_t i;
 	/*
@@ -171,7 +171,7 @@ rotate_decrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	/*
 	 * !!! Most implementations would need the IV too.
 	 */
-	do_rotate(&dst[0], mylen, 26 - my_crypto->rot_N);
+	do_rotate((char *)dst, mylen, 26 - my_crypto->rot_N);
 	*result_lenp = mylen;
 	return (0);
 }
@@ -209,7 +209,7 @@ rotate_encrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	 * destination buffer.  Send in src_len as the length of
 	 * the text.
 	 */
-	do_rotate(&dst[i], src_len, my_crypto->rot_N);
+	do_rotate((char *)dst + i, src_len, my_crypto->rot_N);
 	/*
 	 * Checksum the encrypted buffer and add the IV.
 	 */

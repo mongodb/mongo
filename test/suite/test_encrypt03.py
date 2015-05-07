@@ -43,8 +43,10 @@ class test_encrypt03(wttest.WiredTigerTestCase):
     encrypt = [
         ('none', dict( sys_encrypt='none', sys_encrypt_args='',
             file_encrypt='rotn', file_encrypt_args=',keyid=13')),
-        ('noname', dict( sys_encrypt='rotn', sys_encrypt_args=',keyid=11',
-            file_encrypt='none', file_encrypt_args=',keyid=13')),
+        # This case is now permitted: it the system encryption is inherited by
+        # the table.
+        #('noname', dict( sys_encrypt='rotn', sys_encrypt_args=',keyid=11',
+        #    file_encrypt='none', file_encrypt_args=',keyid=13')),
     ]
     scenarios = number_scenarios(multiply_scenarios('.', types, encrypt))
 
