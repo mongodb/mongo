@@ -20,11 +20,11 @@ static int __clsm_open_cursors(WT_CURSOR_LSM *, int, u_int, uint32_t);
 static int __clsm_reset_cursors(WT_CURSOR_LSM *, WT_CURSOR *);
 
 /*
- * __clsm_request_switch --
+ * __wt_clsm_request_switch --
  *	Request an LSM tree switch for a cursor operation.
  */
-static inline int
-__clsm_request_switch(WT_CURSOR_LSM *clsm)
+inline int
+__wt_clsm_request_switch(WT_CURSOR_LSM *clsm)
 {
 	WT_DECL_RET;
 	WT_LSM_TREE *lsm_tree;
@@ -55,6 +55,41 @@ __clsm_request_switch(WT_CURSOR_LSM *clsm)
 }
 
 /*
+ * __wt_clsm_await_switch --
+ *	Wait for a switch to have completed in the LSM tree
+ */
+inline int
+__wt_clsm_await_switch(WT_CURSOR_LSM *clsm)
+{
+	WT_LSM_TREE *lsm_tree;
+	WT_SESSION_IMPL *session;
+	int waited;
+
+	lsm_tree = clsm->lsm_tree;
+	session = (WT_SESSION_IMPL *)clsm->iface.session;
+
+	/*
+	 * If there is no primary chunk, or a chunk has overflowed the hard
+	 * limit, which either means a worker thread has fallen behind or there
+	 * has just been a user-level checkpoint, wait until the tree changes.
+	 *
+	 * We used to switch chunks in the application thread here, but that is
+	 * problematic because there is a transaction in progress and it could
+	 * roll back, leaving the metadata inconsistent.
+	 */
+	for (waited = 0;
+	    lsm_tree->nchunks == 0 ||
+	    clsm->dsk_gen == lsm_tree->dsk_gen;
+	    ++waited) {
+		if (waited % 1000 == 0)
+			WT_RET(__wt_lsm_manager_push_entry(
+			    session, WT_LSM_WORK_SWITCH, 0, lsm_tree));
+		__wt_sleep(0, 10);
+	}
+	return (0);
+}
+
+/*
  * __clsm_enter_update --
  *	Make sure an LSM cursor is ready to perform an update.
  */
@@ -65,7 +100,7 @@ __clsm_enter_update(WT_CURSOR_LSM *clsm)
 	WT_LSM_CHUNK *primary_chunk;
 	WT_LSM_TREE *lsm_tree;
 	WT_SESSION_IMPL *session;
-	int hard_limit, have_primary, ovfl, waited;
+	int hard_limit, have_primary, ovfl;
 
 	lsm_tree = clsm->lsm_tree;
 	ovfl = 0;
@@ -109,30 +144,13 @@ __clsm_enter_update(WT_CURSOR_LSM *clsm)
 	}
 
 	/* Request a switch. */
-	WT_RET(__clsm_request_switch(clsm));
+	WT_RET(__wt_clsm_request_switch(clsm));
 
 	/* If we only overflowed the soft limit, we're done. */
 	if (have_primary && !hard_limit)
 		return (0);
 
-	/*
-	 * If there is no primary chunk, or it has overflowed the hard limit,
-	 * which either means a worker thread has fallen behind or there has
-	 * just been a user-level checkpoint, wait until the tree changes.
-	 *
-	 * We used to switch chunks in the application thread if we got to
-	 * here, but that is problematic because there is a transaction in
-	 * progress and it could roll back, leaving the metadata inconsistent.
-	 */
-	for (waited = 0;
-	    lsm_tree->nchunks == 0 ||
-	    clsm->dsk_gen == lsm_tree->dsk_gen;
-	    ++waited) {
-		if (waited % 1000 == 0)
-			WT_RET(__wt_lsm_manager_push_entry(
-			    session, WT_LSM_WORK_SWITCH, 0, lsm_tree));
-		__wt_sleep(0, 10);
-	}
+	WT_RET(__wt_clsm_await_switch(clsm));
 
 	return (0);
 }
@@ -1424,11 +1442,11 @@ err:	__clsm_leave(clsm);
 }
 
 /*
- * __clsm_close --
+ * __wt_clsm_close --
  *	WT_CURSOR->close method for the LSM cursor type.
  */
-static int
-__clsm_close(WT_CURSOR *cursor)
+int
+__wt_clsm_close(WT_CURSOR *cursor)
 {
 	WT_CURSOR_LSM *clsm;
 	WT_DECL_RET;
@@ -1482,14 +1500,17 @@ __wt_clsm_open(WT_SESSION_IMPL *session,
 	    __clsm_update,		/* update */
 	    __clsm_remove,		/* remove */
 	    __wt_cursor_reconfigure,	/* reconfigure */
-	    __clsm_close);		/* close */
+	    __wt_clsm_close);		/* close */
 	WT_CURSOR *cursor;
 	WT_CURSOR_LSM *clsm;
 	WT_DECL_RET;
 	WT_LSM_TREE *lsm_tree;
+	int bulk;
 
+	bulk = 0;
 	clsm = NULL;
 	cursor = NULL;
+	lsm_tree = NULL;
 
 	if (!WT_PREFIX_MATCH(uri, "lsm:"))
 		return (EINVAL);
@@ -1499,9 +1520,21 @@ __wt_clsm_open(WT_SESSION_IMPL *session,
 		WT_RET_MSG(session, EINVAL,
 		    "LSM does not support opening by checkpoint");
 
+	WT_RET(__wt_config_gets_def(session, cfg, "bulk", 0, &cval));
+	if (cval.val != 0)
+		bulk = 1;
+
 	/* Get the LSM tree. */
 	WT_WITH_HANDLE_LIST_LOCK(session,
-	    ret = __wt_lsm_tree_get(session, uri, 0, &lsm_tree));
+	    ret = __wt_lsm_tree_get(session, uri, bulk, &lsm_tree));
+	/*
+	 * Check whether the exclusive open for a bulk load succeeded, and
+	 * if it did ensure that it's safe to bulk load into the tree.
+	 */
+	if (bulk && (ret == EBUSY || lsm_tree->nchunks != 0))
+		WT_ERR_MSG(session, EINVAL,
+		    "Attempting to open a bulk cursor on a non-empty LSM tree");
+	/* Flag any errors from the tree get. */
 	WT_RET(ret);
 
 	WT_ERR(__wt_calloc_one(session, &clsm));
@@ -1524,9 +1557,14 @@ __wt_clsm_open(WT_SESSION_IMPL *session,
 	WT_STATIC_ASSERT(offsetof(WT_CURSOR_LSM, iface) == 0);
 	WT_ERR(__wt_cursor_init(cursor, cursor->uri, owner, cfg, cursorp));
 
+	if (bulk)
+		WT_ERR(__wt_clsm_open_bulk(clsm, cfg));
+
 	if (0) {
 err:		if (clsm != NULL)
-			WT_TRET(__clsm_close(cursor));
+			WT_TRET(__wt_clsm_close(cursor));
+		else if (lsm_tree != NULL)
+			__wt_lsm_tree_release(session, lsm_tree);
 	}
 
 	return (ret);
