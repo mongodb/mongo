@@ -43,15 +43,15 @@ check_copy(void)
 
 	if ((ret = conn->open_session(
 	    conn, NULL, NULL, &session)) != 0)
-		testutil_die(ret, "connection.open_session: %s", g.home_backup);
+		die(ret, "connection.open_session: %s", g.home_backup);
 
 	ret = session->verify(session, g.uri, NULL);
 	if (ret != 0)
-		testutil_die(ret,
+		die(ret,
 		    "session.verify: %s: %s", g.home_backup, g.uri);
 
 	if ((ret = conn->close(conn, NULL)) != 0)
-		testutil_die(ret, "connection.close: %s", g.home_backup);
+		die(ret, "connection.close: %s", g.home_backup);
 }
 
 /*
@@ -67,11 +67,11 @@ copy_file(const char *name)
 
 	len = strlen(g.home) + strlen(g.home_backup) + strlen(name) * 2 + 20;
 	if ((cmd = malloc(len)) == NULL)
-		testutil_die(errno, "malloc");
+		die(errno, "malloc");
 	(void)snprintf(cmd, len,
 	    "cp %s/%s %s/%s", g.home, name, g.home_backup, name);
 	if ((ret = system(cmd)) != 0)
-		testutil_die(ret, "backup copy: %s", cmd);
+		die(ret, "backup copy: %s", cmd);
 	free(cmd);
 }
 
@@ -99,7 +99,7 @@ backup(void *arg)
 
 	/* Open a session. */
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		testutil_die(ret, "connection.open_session");
+		die(ret, "connection.open_session");
 
 	/*
 	 * Perform a backup at somewhere under 10 seconds (so we get at
@@ -116,11 +116,11 @@ backup(void *arg)
 
 		/* Lock out named checkpoints */
 		if ((ret = pthread_rwlock_wrlock(&g.backup_lock)) != 0)
-			testutil_die(ret, "pthread_rwlock_wrlock: backup lock");
+			die(ret, "pthread_rwlock_wrlock: backup lock");
 
 		/* Re-create the backup directory. */
 		if ((ret = system(g.home_backup_init)) != 0)
-			testutil_die(ret, "backup directory creation failed");
+			die(ret, "backup directory creation failed");
 
 		/*
 		 * open_cursor can return EBUSY if a metadata operation is
@@ -130,26 +130,26 @@ backup(void *arg)
 		    "backup:", NULL, NULL, &backup_cursor)) == EBUSY)
 			sleep(1);
 		if (ret != 0)
-			testutil_die(ret, "session.open_cursor: backup");
+			die(ret, "session.open_cursor: backup");
 
 		while ((ret = backup_cursor->next(backup_cursor)) == 0) {
 			if ((ret =
 			    backup_cursor->get_key(backup_cursor, &key)) != 0)
-				testutil_die(ret, "cursor.get_key");
+				die(ret, "cursor.get_key");
 			copy_file(key);
 		}
 
 		if ((ret = backup_cursor->close(backup_cursor)) != 0)
-			testutil_die(ret, "cursor.close");
+			die(ret, "cursor.close");
 
 		if ((ret = pthread_rwlock_unlock(&g.backup_lock)) != 0)
-			testutil_die(ret, "pthread_rwlock_unlock: backup lock");
+			die(ret, "pthread_rwlock_unlock: backup lock");
 
 		check_copy();
 	}
 
 	if ((ret = session->close(session, NULL)) != 0)
-		testutil_die(ret, "session.close");
+		die(ret, "session.close");
 
 	return (NULL);
 }

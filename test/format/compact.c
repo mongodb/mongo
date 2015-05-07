@@ -49,7 +49,7 @@ compact(void *arg)
 	/* Open a session. */
 	conn = g.wts_conn;
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		testutil_die(ret, "connection.open_session");
+		die(ret, "connection.open_session");
 
 	/*
 	 * Perform compaction at somewhere under 15 seconds (so we get at
@@ -66,11 +66,11 @@ compact(void *arg)
 
 		if ((ret = session->compact(
 		    session, g.uri, NULL)) != 0 && ret != WT_ROLLBACK)
-			testutil_die(ret, "session.compact");
+			die(ret, "session.compact");
 	}
 
 	if ((ret = session->close(session, NULL)) != 0)
-		testutil_die(ret, "session.close");
+		die(ret, "session.close");
 
 	return (NULL);
 }

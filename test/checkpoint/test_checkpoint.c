@@ -281,7 +281,7 @@ onint(int signo)
 {
 	WT_UNUSED(signo);
 
-	cleanup(g.home);
+	cleanup();
 
 	fprintf(stderr, "\n");
 	exit(EXIT_FAILURE);
