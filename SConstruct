@@ -1359,6 +1359,13 @@ def doConfigure(myenv):
         # we explicitly disable it here.
         AddToCCFLAGSIfSupported(myenv, "-Wno-missing-braces")
 
+        # Suppress warnings about not consistently using override everywhere in a class. It seems
+        # very pedantic, and we have a fair number of instances.
+        AddToCCFLAGSIfSupported(myenv, "-Wno-inconsistent-missing-override")
+
+        # Don't issue warnings about potentially evaluated expressions
+        AddToCCFLAGSIfSupported(myenv, "-Wno-potentially-evaluated-expression")
+
     # Check if we need to disable null-conversion warnings
     if myenv.ToolchainIs('clang'):
         def CheckNullConversion(context):
