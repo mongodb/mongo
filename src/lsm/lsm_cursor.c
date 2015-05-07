@@ -1531,7 +1531,7 @@ __wt_clsm_open(WT_SESSION_IMPL *session,
 	 * Check whether the exclusive open for a bulk load succeeded, and
 	 * if it did ensure that it's safe to bulk load into the tree.
 	 */
-	if (bulk && (ret == EBUSY || lsm_tree->nchunks != 0))
+	if (bulk && (ret == EBUSY || (ret == 0 &&  lsm_tree->nchunks != 0)))
 		WT_ERR_MSG(session, EINVAL,
 		    "Attempting to open a bulk cursor on a non-empty LSM tree");
 	/* Flag any errors from the tree get. */
