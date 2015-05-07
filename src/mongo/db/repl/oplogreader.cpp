@@ -144,7 +144,7 @@ namespace repl {
     void OplogReader::connectToSyncSource(OperationContext* txn,
                                           Timestamp lastOpTimeFetched,
                                           ReplicationCoordinator* replCoord) {
-        const Timestamp sentinel(Milliseconds(curTimeMillis64()).total_seconds(), 0);
+        const Timestamp sentinel(duration_cast<Seconds>(Milliseconds(curTimeMillis64())), 0);
         Timestamp oldestOpTimeSeen = sentinel;
 
         invariant(conn() == NULL);
@@ -182,7 +182,7 @@ namespace repl {
                 LOG(2) << "can't connect to " << candidate.toString() <<
                     " to read operations";
                 resetConnection();
-                replCoord->blacklistSyncSource(candidate, Date_t(curTimeMillis64() + 10*1000));
+                replCoord->blacklistSyncSource(candidate, Date_t::now() + Seconds(10));
                 continue;
             }
             // Read the first (oldest) op and confirm that it's not newer than our last
@@ -193,8 +193,7 @@ namespace repl {
                 // This member's got a bad op in its oplog.
                 warning() << "oplog invalid format on node " << candidate.toString();
                 resetConnection();
-                replCoord->blacklistSyncSource(candidate, 
-                                               Date_t(curTimeMillis64() + 600*1000));
+                replCoord->blacklistSyncSource(candidate, Date_t::now() + Minutes(10));
                 continue;
             }
             Timestamp remoteOldOpTime = tsElem.timestamp();
@@ -202,8 +201,7 @@ namespace repl {
             if (lastOpTimeFetched < remoteOldOpTime) {
                 // We're too stale to use this sync source.
                 resetConnection();
-                replCoord->blacklistSyncSource(candidate, 
-                                               Date_t(curTimeMillis64() + 600*1000));
+                replCoord->blacklistSyncSource(candidate, Date_t::now() + Minutes(10));
                 if (oldestOpTimeSeen > remoteOldOpTime) {
                     warning() << "we are too stale to use " << candidate.toString() << 
                         " as a sync source";

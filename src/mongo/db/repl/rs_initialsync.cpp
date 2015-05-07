@@ -354,7 +354,7 @@ namespace {
         truncateAndResetOplog(&txn, replCoord, bgsync);
 
         OplogReader r;
-        Timestamp now(Milliseconds(curTimeMillis64()).total_seconds(), 0);
+        Timestamp now(duration_cast<Seconds>(Milliseconds(curTimeMillis64())), 0);
 
         while (r.getHost().empty()) {
             // We must prime the sync source selector so that it considers all candidates regardless

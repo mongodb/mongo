@@ -83,28 +83,28 @@ namespace mongo {
         // We always log the first cursors waiting message (so we have cursor ids in the logs).
         // After 15 minutes (the cursor timeout period), we start logging additional messages at
         // a 1 minute interval.
-        static const long long kLogCursorsThresholdMillis = 15 * 60 * 1000;
-        static const long long kLogCursorsIntervalMillis = 1 * 60 * 1000;
+        static const auto kLogCursorsThreshold = stdx::chrono::minutes{15};
+        static const auto kLogCursorsInterval = stdx::chrono::minutes{1};
 
         Date_t currentTime = jsTime();
-        long long elapsedMillisSinceQueued = 0;
+        Milliseconds elapsedMillisSinceQueued{0};
 
         // We always log the first message when lastLoggedTime == 0
-        if (entry->lastLoggedTS != 0) {
+        if (entry->lastLoggedTS != Date_t()) {
 
             if (currentTime > entry->stats.queueStartTS)
                 elapsedMillisSinceQueued = currentTime - entry->stats.queueStartTS;
 
             // Not logging, threshold not passed
-            if (elapsedMillisSinceQueued < kLogCursorsThresholdMillis)
+            if (elapsedMillisSinceQueued < kLogCursorsThreshold)
                 return;
 
-            long long elapsedMillisSinceLog = 0;
+            Milliseconds elapsedMillisSinceLog{0};
             if (currentTime > entry->lastLoggedTS)
                 elapsedMillisSinceLog = currentTime - entry->lastLoggedTS;
 
             // Not logging, logged a short time ago
-            if (elapsedMillisSinceLog < kLogCursorsIntervalMillis)
+            if (elapsedMillisSinceLog < kLogCursorsInterval)
                 return;
         }
 
@@ -119,9 +119,10 @@ namespace mongo {
         log() << "waiting for open cursors before removing range "
               << "[" << entry->options.range.minKey << ", " << entry->options.range.maxKey << ") "
               << "in " << entry->options.range.ns
-              << (entry->lastLoggedTS == 0 ?
+              << (entry->lastLoggedTS == Date_t() ?
                   string("") :
-                  string(str::stream() << ", elapsed secs: " << elapsedMillisSinceQueued / 1000))
+                  string(str::stream() << ", elapsed secs: " <<
+                         durationCount<Seconds>(elapsedMillisSinceQueued)))
               << ", cursor ids: [" << string(cursorList) << "]";
 
         entry->lastLoggedTS = currentTime;
@@ -276,21 +277,23 @@ namespace {
         repl::ReplicationCoordinator::StatusAndDuration replStatus =
                 repl::getGlobalReplicationCoordinator()->awaitReplicationOfLastOpForClient(
                         txn, writeConcern);
-        repl::ReplicationCoordinator::Milliseconds elapsedTime = replStatus.duration;
+        Milliseconds elapsedTime = replStatus.duration;
         if (replStatus.status.code() == ErrorCodes::ExceededTimeLimit) {
             *errMsg = str::stream() << "rangeDeleter timed out after "
-                                    << elapsedTime.total_seconds() << " seconds while waiting"
-                                    << " for deletions to be replicated to majority nodes";
+                                    << durationCount<Seconds>(elapsedTime)
+                                    << " seconds while waiting"
+                                       " for deletions to be replicated to majority nodes";
             log() << *errMsg;
         }
         else if (replStatus.status.code() == ErrorCodes::NotMaster) {
             *errMsg = str::stream() << "rangeDeleter no longer PRIMARY after "
-                                    << elapsedTime.total_seconds() << " seconds while waiting"
-                                    << " for deletions to be replicated to majority nodes";
+                                    << durationCount<Seconds>(elapsedTime)
+                                    << " seconds while waiting"
+                                       " for deletions to be replicated to majority nodes";
         }
         else {
-            LOG(elapsedTime.total_seconds() < 30 ? 1 : 0)
-                << "rangeDeleter took " << elapsedTime.total_seconds() << " seconds "
+            LOG(elapsedTime < Seconds(30) ? 1 : 0)
+                << "rangeDeleter took " << durationCount<Seconds>(elapsedTime) << " seconds "
                 << " waiting for deletes to be replicated to majority nodes";
 
             fassert(18512, replStatus.status);
@@ -601,10 +604,7 @@ namespace {
     }
 
     RangeDeleteEntry::RangeDeleteEntry(const RangeDeleterOptions& options)
-        : options(options),
-          notifyDone(NULL),
-          lastLoggedTS(0) {
-    }
+        : options(options), notifyDone(NULL) {}
 
     BSONObj RangeDeleteEntry::toBSON() const {
         BSONObjBuilder builder;

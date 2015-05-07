@@ -99,7 +99,7 @@ namespace mongo {
         _process.clear();
         _isProcessSet = false;
 
-        _ping = 0ULL;
+        _ping = Date_t();
         _isPingSet = false;
 
     }

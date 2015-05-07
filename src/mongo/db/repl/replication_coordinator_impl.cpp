@@ -801,8 +801,7 @@ namespace {
         while (ts > _getMyLastOptime_inlock()) {
             Status interruptedStatus = txn->checkForInterruptNoAssert();
             if (!interruptedStatus.isOK()) {
-                return ReadAfterOpTimeResponse(interruptedStatus,
-                        Milliseconds(timer.millis()));
+                return ReadAfterOpTimeResponse(interruptedStatus, Milliseconds(timer.millis()));
             }
 
             if (_inShutdown) {
@@ -811,14 +810,13 @@ namespace {
                         Milliseconds(timer.millis()));
             }
 
-            const auto elapsedMS = timer.millis();
-            if (timeout.total_milliseconds() > 0 &&
-                    elapsedMS > timeout.total_milliseconds()) {
+            const Microseconds elapsedTime{timer.micros()};
+            if (timeout > Microseconds::zero() && elapsedTime > timeout) {
                 return ReadAfterOpTimeResponse(
                         Status(ErrorCodes::ReadAfterOptimeTimeout,
                               str::stream() << "timed out waiting for opTime: "
                                             << ts.toStringPretty()),
-                        Milliseconds(timer.millis()));
+                        duration_cast<Milliseconds>(elapsedTime));
             }
 
             boost::condition_variable condVar;
@@ -828,21 +826,19 @@ namespace {
                                 nullptr, // Don't care about write concern.
                                 &condVar);
 
-            uint64_t maxTimeMicrosRemaining = txn->getRemainingMaxTimeMicros();
-            auto maxTimeMSRemaining = (maxTimeMicrosRemaining == 0) ?
-                    std::numeric_limits<uint64_t>::max() : (maxTimeMicrosRemaining / 1000);
-
-            auto timeoutMSRemaining = (timeout.total_milliseconds() == 0) ?
-                    std::numeric_limits<uint64_t>::max() :
-                    static_cast<uint64_t>(timeout.total_milliseconds() - elapsedMS);
-
-            auto sleepTimeMS = std::min(maxTimeMSRemaining, timeoutMSRemaining);
-
-            if (sleepTimeMS == std::numeric_limits<uint64_t>::max()) {
+            const Microseconds maxTimeMicrosRemaining{txn->getRemainingMaxTimeMicros()};
+            Microseconds waitTime = Microseconds::max();
+            if (maxTimeMicrosRemaining != Microseconds::zero()) {
+                waitTime = maxTimeMicrosRemaining;
+            }
+            if (timeout != Microseconds::zero()) {
+                waitTime = std::min<Microseconds>(timeout - elapsedTime, waitTime);
+            }
+            if (waitTime == Microseconds::max()) {
                 condVar.wait(lock);
             }
             else {
-                condVar.timed_wait(lock, Milliseconds(sleepTimeMS));
+                condVar.wait_for(lock, waitTime);
             }
         }
 
@@ -1142,7 +1138,7 @@ namespace {
                     condVar.wait(*lock);
                 }
                 else {
-                    condVar.timed_wait(*lock, Milliseconds(writeConcern.wTimeout - elapsed));
+                    condVar.wait_for(*lock, Milliseconds(writeConcern.wTimeout - elapsed));
                 }
             } catch (const boost::thread_interrupted&) {}
         }
@@ -1160,8 +1156,8 @@ namespace {
                                                 const Milliseconds& waitTime,
                                                 const Milliseconds& stepdownTime) {
         const Date_t startTime = _replExecutor.now();
-        const Date_t stepDownUntil(startTime.millis + stepdownTime.total_milliseconds());
-        const Date_t waitUntil(startTime.millis + waitTime.total_milliseconds());
+        const Date_t stepDownUntil = startTime + stepdownTime;
+        const Date_t waitUntil = startTime + waitTime;
 
         if (!getMemberState().primary()) {
             // Note this check is inherently racy - it's always possible for the node to
@@ -1177,7 +1173,8 @@ namespace {
         _externalState->killAllUserOperations(txn);
 
         if (lockState == LOCK_WAITING) {
-            lockState = txn->lockState()->lockGlobalComplete(stepdownTime.total_milliseconds());
+            lockState = txn->lockState()->lockGlobalComplete(
+                    durationCount<Milliseconds>(stepdownTime));
             if (lockState == LOCK_TIMEOUT) {
                 return Status(ErrorCodes::ExceededTimeLimit,
                               "Could not acquire the global shared lock within the amount of time "

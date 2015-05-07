@@ -37,30 +37,116 @@
 #include <boost/version.hpp>
 
 #include "mongo/base/status_with.h"
+#include "mongo/stdx/chrono.h"
 
 namespace mongo {
 
-    typedef boost::posix_time::milliseconds Milliseconds;
-    typedef boost::posix_time::seconds Seconds;
+    template <typename Allocator> class StringBuilderImpl;
+
+    using Microseconds = stdx::chrono::microseconds;
+    using Milliseconds = stdx::chrono::milliseconds;
+    using Seconds = stdx::chrono::seconds;
+    using Minutes = stdx::chrono::minutes;
+    using stdx::chrono::duration_cast;
 
     void time_t_to_Struct(time_t t, struct tm * buf , bool local = false );
     std::string time_t_to_String(time_t t);
     std::string time_t_to_String_short(time_t t);
 
-    struct Date_t {
-        // TODO: make signed (and look for related TODO's)
-        unsigned long long millis;
+    //
+    // Operators for putting durations to streams.
+    //
+
+    std::ostream& operator<<(std::ostream& os, Microseconds us);
+    std::ostream& operator<<(std::ostream& os, Milliseconds ms);
+    std::ostream& operator<<(std::ostream& os, Seconds s);
+
+    template <typename Allocator>
+    StringBuilderImpl<Allocator>& operator<<(StringBuilderImpl<Allocator>& os, Microseconds us);
+
+    template <typename Allocator>
+    StringBuilderImpl<Allocator>& operator<<(StringBuilderImpl<Allocator>& os, Milliseconds ms);
+
+    template <typename Allocator>
+    StringBuilderImpl<Allocator>& operator<<(StringBuilderImpl<Allocator>& os, Seconds s);
+
+    /**
+     * Convenience method for reading the count of a duration with specified units.
+     *
+     * Use when logging or comparing to integers, to ensure that you're using
+     * the units you intend.
+     *
+     * E.g., log() << durationCount<Seconds>(some duration) << " seconds";
+     */
+    template <typename DOut, typename DIn> long long durationCount(DIn d) {
+        return duration_cast<DOut>(d).count();
+    }
+
+    class Date_t {
+    public:
+        static Date_t max();
+        static Date_t now();
+
+        static Date_t fromMillisSinceEpoch(long long m) {
+            return Date_t(m);
+        }
+
+        template <typename Duration>
+        static Date_t fromDurationSinceEpoch(Duration d) {
+            return fromMillisSinceEpoch(durationCount<Milliseconds>(d));
+        }
+
         Date_t(): millis(0) {}
-        Date_t(unsigned long long m): millis(m) {}
-        operator unsigned long long&() { return millis; }
-        operator const unsigned long long&() const { return millis; }
+
         void toTm (tm *buf);
         std::string toString() const;
         time_t toTimeT() const;
         int64_t asInt64() const {
-            return static_cast<int64_t>(millis);
+            return toMillisSinceEpoch();
         }
+        unsigned long long toULL() const { return static_cast<unsigned long long>(asInt64()); }
+        Milliseconds toDurationSinceEpoch() const { return Milliseconds(toMillisSinceEpoch()); }
+        long long toMillisSinceEpoch() const { return static_cast<long long>(millis); }
         bool isFormatable() const;
+
+        template <typename Duration>
+        Date_t operator+(Duration d) const {
+            return { millis + duration_cast<Milliseconds>(d).count() };
+        }
+
+        template <typename Duration>
+        Date_t operator-(Duration d) const {
+            return *this + (-d);
+        }
+
+        Milliseconds operator-(Date_t other) const { return Milliseconds(millis - other.millis); }
+
+        bool operator==(Date_t other) const {
+            return toDurationSinceEpoch() == other.toDurationSinceEpoch();
+        }
+
+        bool operator!=(Date_t other) const { return !(*this == other); }
+
+        bool operator<(Date_t other) const {
+            return toDurationSinceEpoch() < other.toDurationSinceEpoch();
+        }
+
+        bool operator>(Date_t other) const {
+            return toDurationSinceEpoch() > other.toDurationSinceEpoch();
+        }
+
+        bool operator<=(Date_t other) const {
+            return !(*this > other);
+        }
+
+        bool operator>=(Date_t other) const {
+            return !(*this < other);
+        }
+
+    private:
+        Date_t(long long m): millis(m) {}
+
+        long long millis;
     };
 
     // uses ISO 8601 dates without trailing Z

@@ -534,8 +534,8 @@ namespace {
             status = getGlobalReplicationCoordinator()->stepDown(
                     txn,
                     force,
-                    ReplicationCoordinator::Milliseconds(secondaryCatchUpPeriodSecs * 1000),
-                    ReplicationCoordinator::Milliseconds(stepDownForSecs * 1000));
+                    Seconds(secondaryCatchUpPeriodSecs),
+                    Seconds(stepDownForSecs));
             return appendCommandStatus(result, status);
         }
     } cmdReplSetStepDown;

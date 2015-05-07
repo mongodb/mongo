@@ -402,7 +402,7 @@ namespace mongo {
         }
         
         if ( result["reloadConfig"].trueValue() ) {
-            if( result["version"].timestampTime() == 0 ){
+            if( result["version"].timestampTime() == Date_t() ){
 
                 warning() << "reloading full configuration for " << conf->name()
                           << ", connection state indicates significant version changes";

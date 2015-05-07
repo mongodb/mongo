@@ -755,8 +755,8 @@ namespace mongo {
             case CType::kBoolFalse: *stream << false; break;
 
             case CType::kDate:
-                *stream << Date_t(endian::bigToNative(readType<uint64_t>(reader,
-                                                                         inverted)) ^ (1LL << 63));
+                *stream << Date_t::fromMillisSinceEpoch(
+                        endian::bigToNative(readType<uint64_t>(reader, inverted)) ^ (1LL << 63));
                 break;
 
             case CType::kTimestamp:

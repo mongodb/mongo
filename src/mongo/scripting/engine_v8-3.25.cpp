@@ -1507,7 +1507,7 @@ namespace mongo {
         case mongo::Object:
             return mongoToLZV8(elem.embeddedObject(), readOnly);
         case mongo::Date:
-            return v8::Date::New(_isolate, (double) ((long long)elem.date().millis));
+            return v8::Date::New(_isolate, static_cast<double>(elem.date.toMillisSinceEpoch()));
         case mongo::Bool:
             return v8::Boolean::New(_isolate, elem.boolean());
         case mongo::EOO:

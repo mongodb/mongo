@@ -813,5 +813,15 @@ namespace {
         }
     }
 
+    TEST(TimeFormatting, DurationFormatting) {
+        ASSERT_EQUALS("52\xce\xbcs", static_cast<std::string>(str::stream() << Microseconds(52)));
+        ASSERT_EQUALS("52ms", static_cast<std::string>(str::stream() << Milliseconds(52)));
+        ASSERT_EQUALS("52s", static_cast<std::string>(str::stream() << Seconds(52)));
+
+        std::ostringstream os;
+        os << Milliseconds(52) << Microseconds(52) << Seconds(52);
+        ASSERT_EQUALS("52ms52\xce\xbcs52s", os.str());
+    }
+
 }  // namespace
 }  // namespace mongo

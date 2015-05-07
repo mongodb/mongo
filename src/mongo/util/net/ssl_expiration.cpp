@@ -32,14 +32,15 @@
 #include <string>
 
 #include "mongo/util/log.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
-    static const unsigned long long dayInMillis = 24 * 60 * 60 * 1000;
+    static const auto oneDay = stdx::chrono::hours(24);
 
     CertificateExpirationMonitor::CertificateExpirationMonitor(Date_t date)
         : _certExpiration(date)
-        , _lastCheckTime(Date_t(curTimeMillis64())) {
+        , _lastCheckTime(Date_t::now()) {
     }
 
     std::string CertificateExpirationMonitor::taskName() const {
@@ -47,30 +48,28 @@ namespace mongo {
     }
 
     void CertificateExpirationMonitor::taskDoWork() {
-        const unsigned long long timeSinceLastCheck = 
-            curTimeMillis64() - _lastCheckTime.millis;
+        const Milliseconds timeSinceLastCheck = Date_t::now() - _lastCheckTime;
 
-        if (timeSinceLastCheck < dayInMillis)
+        if (timeSinceLastCheck < oneDay)
             return;
 
-        const Date_t now = Date_t(curTimeMillis64());
+        const Date_t now = Date_t::now();
         _lastCheckTime = now;
 
-        if (_certExpiration.millis <= now.millis) {
+        if (_certExpiration <= now) {
             // The certificate has expired.
             warning() << "Server certificate is now invalid. It expired on "
-                      << dateToCtimeString(_certExpiration);
+                      << dateToISOStringUTC(_certExpiration);
             return;
         }
 
-        const unsigned long long remainingValidMillis =
-            _certExpiration.millis - now.millis;
+        const auto remainingValidDuration = _certExpiration - now;
 
-        if (remainingValidMillis / dayInMillis <= 30) {
+        if (remainingValidDuration <= 30 * oneDay) {
             // The certificate will expire in the next 30 days.
             warning() << "Server certificate will expire on "
-                      << dateToCtimeString(_certExpiration) << " in "
-                      << (remainingValidMillis / dayInMillis)
+                      << dateToISOStringUTC(_certExpiration) << " in "
+                      << durationCount<stdx::chrono::hours>(remainingValidDuration) / 24
                       << " days.";
         }
     }

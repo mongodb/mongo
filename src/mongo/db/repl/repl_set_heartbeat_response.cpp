@@ -90,13 +90,14 @@ namespace {
 
         builder->append(kOkFieldName, 1.0);
         if (_opTimeSet) {
-            builder->appendDate(kOpTimeFieldName, _opTime.asULL());
+            builder->appendDate(kOpTimeFieldName, Date_t::fromMillisSinceEpoch(_opTime.asLL()));
         }
         if (_timeSet) {
-            *builder << kTimeFieldName << _time.total_seconds();
+            *builder << kTimeFieldName << durationCount<Seconds>(_time);
         }
         if (_electionTimeSet) {
-            builder->appendDate(kElectionTimeFieldName, _electionTime.asULL());
+            builder->appendDate(kElectionTimeFieldName,
+                                Date_t::fromMillisSinceEpoch(_electionTime.asLL()));
         }
         if (_configSet) {
             *builder << kConfigFieldName << _config.toBSON();

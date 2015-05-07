@@ -46,7 +46,7 @@ namespace {
         ASSERT_EQUALS(0, mc.getId());
         ASSERT_EQUALS(HostAndPort("localhost", 12345), mc.getHostAndPort());
         ASSERT_EQUALS(1.0, mc.getPriority());
-        ASSERT_EQUALS(0, mc.getSlaveDelay().total_seconds());
+        ASSERT_EQUALS(Seconds(0), mc.getSlaveDelay());
         ASSERT_TRUE(mc.isVoter());
         ASSERT_FALSE(mc.isHidden());
         ASSERT_FALSE(mc.isArbiter());
@@ -188,7 +188,7 @@ namespace {
         MemberConfig mc;
         ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host" << "h" << "slaveDelay" << 100),
                                 &tagConfig));
-        ASSERT_EQUALS(100, mc.getSlaveDelay().total_seconds());
+        ASSERT_EQUALS(Seconds(100), mc.getSlaveDelay());
     }
 
     TEST(MemberConfig, ParseTags) {

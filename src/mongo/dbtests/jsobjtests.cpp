@@ -1311,7 +1311,8 @@ namespace JsobjTests {
                 const Date_t base( ::time( 0 ) );
                 oid.init( base );
 
-                ASSERT_EQUALS( base.millis / 1000, oid.asDateT().millis / 1000 );
+                ASSERT_EQUALS(base.toMillisSinceEpoch() / 1000,
+                              oid.asDateT().toMillisSinceEpoch() / 1000);
                 ASSERT_EQUALS( base.toTimeT(), oid.asTimeT() );
             }
         };

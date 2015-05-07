@@ -35,6 +35,7 @@
 #include "mongo/logger/log_component.h"
 #include "mongo/logger/log_severity.h"
 #include "mongo/logger/message_log_domain.h"
+#include "mongo/stdx/chrono.h"
 #include "mongo/util/exit_code.h"
 
 namespace mongo {
@@ -129,6 +130,12 @@ namespace logger {
         LogstreamBuilder& operator<<(long long x) { stream() << x; return *this; }
         LogstreamBuilder& operator<<(unsigned long long x) { stream() << x; return *this; }
         LogstreamBuilder& operator<<(bool x) { stream() << x; return *this; }
+
+        template <typename Rep, typename Period>
+        LogstreamBuilder& operator<<(stdx::chrono::duration<Rep, Period> d) {
+            stream() << d;
+            return *this;
+        }
 
         template <typename T>
         LogstreamBuilder& operator<<(const T& x) {

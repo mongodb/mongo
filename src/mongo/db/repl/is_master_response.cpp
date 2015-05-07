@@ -152,7 +152,7 @@ namespace {
         if (_buildIndexesSet)
             builder->append(kBuildIndexesFieldName, _buildIndexes);
         if (_slaveDelaySet)
-            builder->append(kSlaveDelayFieldName, _slaveDelay.total_seconds());
+            builder->appendIntOrLL(kSlaveDelayFieldName, durationCount<Seconds>(_slaveDelay));
         if (_tagsSet) {
             BSONObjBuilder tags(builder->subobjStart(kTagsFieldName));
             for (unordered_map<std::string, std::string>::const_iterator it = _tags.begin();

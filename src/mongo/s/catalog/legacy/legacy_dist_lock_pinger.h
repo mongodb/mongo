@@ -36,9 +36,9 @@
 #include "mongo/base/status.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/s/catalog/dist_lock_manager.h"
-#include "mongo/stdx/chrono.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/concurrency/mutex.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
@@ -51,7 +51,7 @@ namespace mongo {
         /**
          * Starts pinging the process id for the given lock.
          */
-        Status startPing(const DistributedLock& lock, stdx::chrono::milliseconds sleepTime);
+        Status startPing(const DistributedLock& lock, Milliseconds sleepTime);
 
         /**
          * Adds a distributed lock that has the given id to the unlock list. The unlock list
@@ -82,7 +82,7 @@ namespace mongo {
         void distLockPingThread(ConnectionString addr,
                                 long long clockSkew,
                                 const std::string& processId,
-                                stdx::chrono::milliseconds sleepTime);
+                                Milliseconds sleepTime);
 
         /**
          * Function for repeatedly pinging the process id. Also attempts to unlock all the
@@ -90,7 +90,7 @@ namespace mongo {
          */
         void _distLockPingThread(ConnectionString addr,
                                  const std::string& process,
-                                 stdx::chrono::milliseconds sleepTime);
+                                 Milliseconds sleepTime);
 
         /**
          * Returns true if a request has been made to stop pinging the give process id.
@@ -105,7 +105,7 @@ namespace mongo {
         /**
          * Blocks until duration has elapsed or if the ping thread is interrupted.
          */
-        void waitTillNextPingTime(stdx::chrono::milliseconds duration);
+        void waitTillNextPingTime(Milliseconds duration);
 
         //
         // All member variables are labeled with one of the following codes indicating the

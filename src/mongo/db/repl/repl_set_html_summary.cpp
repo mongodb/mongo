@@ -68,8 +68,7 @@ namespace {
     }
 
     unsigned int timeDifference(Date_t now, Date_t past) {
-        return static_cast<unsigned int> ((past ?
-                (now - past) / 1000 /* convert millis to secs */ : 0));
+        return static_cast<unsigned int>(past != Date_t() ? durationCount<Seconds>(now - past) : 0);
     }
 
     std::string stateAsHtml(const MemberState& s) {
@@ -174,7 +173,7 @@ namespace {
                 memberTable << td(red(str::stream() << memberHB.getHealth(), !up));
                 const unsigned int uptime = timeDifference(_now, memberHB.getUpSince());
                 memberTable << td(ago(uptime));
-                if (memberHB.getLastHeartbeat() == 0) {
+                if (memberHB.getLastHeartbeat() == Date_t()) {
                     memberTable << td("never");
                 }
                 else {
@@ -191,7 +190,7 @@ namespace {
                     memberTable << td( grey(str::stream() << "(was " << state << ')', true) );
                 }
                 memberTable << td(grey(memberHB.getLastHeartbeatMsg(), !up));
-                memberTable << td(memberHB.getLastHeartbeat() == 0 ?
+                memberTable << td(memberHB.getLastHeartbeat() == Date_t() ?
                         "?" : memberHB.getOpTime().toString());
             }
             memberTable << _tr();

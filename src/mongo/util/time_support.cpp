@@ -41,6 +41,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/platform/cstdint.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/mongoutils/str.h"
 
 #ifdef _WIN32
 #include <boost/date_time/filetime_functions.hpp>
@@ -64,12 +65,73 @@ timegm(struct tm *const tmp);
 
 namespace mongo {
 
+namespace {
+    template <typename Stream> Stream& streamPut(Stream& os, Microseconds us) {
+        return os << us.count() << "\xce\xbcs";
+    }
+
+    template <typename Stream> Stream& streamPut(Stream& os, Milliseconds ms) {
+        return os << ms.count() << "ms";
+    }
+
+    template <typename Stream> Stream& streamPut(Stream& os, Seconds s) {
+         return os << s.count() << 's';
+    }
+} // namespace
+
+    std::ostream& operator<<(std::ostream& os, Microseconds us) {
+        return streamPut(os, us);
+    }
+
+    std::ostream& operator<<(std::ostream& os, Milliseconds ms) {
+        return streamPut(os, ms);
+    }
+    std::ostream& operator<<(std::ostream& os, Seconds s) {
+        return streamPut(os, s);
+    }
+
+    template <typename Allocator>
+    StringBuilderImpl<Allocator>& operator<<(StringBuilderImpl<Allocator>& os, Microseconds us) {
+        return streamPut(os, us);
+    }
+
+    template <typename Allocator>
+    StringBuilderImpl<Allocator>& operator<<(StringBuilderImpl<Allocator>& os, Milliseconds ms) {
+        return streamPut(os, ms);
+    }
+
+    template <typename Allocator>
+    StringBuilderImpl<Allocator>& operator<<(StringBuilderImpl<Allocator>& os, Seconds s) {
+        return streamPut(os, s);
+    }
+
+    template StringBuilderImpl<StackAllocator>& operator<<(StringBuilderImpl<StackAllocator>&,
+                                                           Microseconds);
+    template StringBuilderImpl<StackAllocator>& operator<<(StringBuilderImpl<StackAllocator>&,
+                                                           Milliseconds);
+    template StringBuilderImpl<StackAllocator>& operator<<(StringBuilderImpl<StackAllocator>&,
+                                                           Seconds);
+    template StringBuilderImpl<TrivialAllocator>& operator<<(StringBuilderImpl<TrivialAllocator>&,
+                                                             Microseconds);
+    template StringBuilderImpl<TrivialAllocator>& operator<<(StringBuilderImpl<TrivialAllocator>&,
+                                                             Milliseconds);
+    template StringBuilderImpl<TrivialAllocator>& operator<<(StringBuilderImpl<TrivialAllocator>&,
+                                                             Seconds);
+
+    Date_t Date_t::max() {
+        return fromMillisSinceEpoch(std::numeric_limits<long long>::max());
+    }
+
+    Date_t Date_t::now() {
+        return fromMillisSinceEpoch(curTimeMillis64());
+    }
+
     bool Date_t::isFormatable() const {
         if (sizeof(time_t) == sizeof(int32_t)) {
-            return millis < 2147483647000ULL; // "2038-01-19T03:14:07Z"
+            return millis < 2147483647000LL; // "2038-01-19T03:14:07Z"
         }
         else {
-            return millis < 32535215999000ULL; // "3000-12-31T23:59:59Z"
+            return millis < 32535215999000LL; // "3000-12-31T23:59:59Z"
         }
     }
 
@@ -690,7 +752,11 @@ namespace {
 
         resultMillis += (tzAdjSecs * 1000);
 
-        return StatusWith<Date_t>(resultMillis);
+        if (resultMillis > static_cast<unsigned long long>(std::numeric_limits<long long>::max())) {
+            return {ErrorCodes::BadValue,
+                    str::stream() << dateString << " is too far in the future"};
+        }
+        return Date_t::fromMillisSinceEpoch(static_cast<long long>(resultMillis));
     }
 
 #undef MONGO_ISO_DATE_FMT_NO_TZ
@@ -976,11 +1042,11 @@ namespace {
         return ((unsigned long long)tv.tv_sec) * 1000 + tv.tv_usec / 1000;
     }
     Date_t jsTime() {
-        timeval tv;
-        gettimeofday(&tv, NULL);
-        unsigned long long t = tv.tv_usec / 1000;
-        return ((unsigned long long) tv.tv_sec * 1000) + t + getJSTimeVirtualSkew() + getJSTimeVirtualThreadSkew();
+        return Date_t::now() +
+            Milliseconds(getJSTimeVirtualThreadSkew()) +
+            Milliseconds(getJSTimeVirtualSkew());
     }
+
     unsigned long long curTimeMicros64() {
         timeval tv;
         gettimeofday(&tv, NULL);

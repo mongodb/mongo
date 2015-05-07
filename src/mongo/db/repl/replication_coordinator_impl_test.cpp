@@ -241,11 +241,11 @@ namespace {
         ASSERT_EQUALS(HostAndPort("node2", 54321), noi->getRequest().target);
         ASSERT_EQUALS("admin", noi->getRequest().dbname);
         ASSERT_EQUALS(hbArgs.toBSON(), noi->getRequest().cmdObj);
-        getNet()->scheduleResponse(noi, startDate + 10, ResponseStatus(ErrorCodes::NoSuchKey,
-                                                                       "No response"));
-        getNet()->runUntil(startDate + 10);
+        getNet()->scheduleResponse(noi, startDate + Milliseconds(10),
+                                   ResponseStatus(ErrorCodes::NoSuchKey, "No response"));
+        getNet()->runUntil(startDate + Milliseconds(10));
         getNet()->exitNetwork();
-        ASSERT_EQUALS(startDate + 10, getNet()->now());
+        ASSERT_EQUALS(startDate + Milliseconds(10), getNet()->now());
         prsiThread.join();
         ASSERT_EQUALS(ErrorCodes::NodeNotFound, status);
         ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
@@ -276,11 +276,11 @@ namespace {
         hbResp.setVersion(0);
         getNet()->scheduleResponse(
                 noi,
-                startDate + 10,
+                startDate + Milliseconds(10),
                 ResponseStatus(RemoteCommandResponse(hbResp.toBSON(), Milliseconds(8))));
-        getNet()->runUntil(startDate + 10);
+        getNet()->runUntil(startDate + Milliseconds(10));
         getNet()->exitNetwork();
-        ASSERT_EQUALS(startDate + 10, getNet()->now());
+        ASSERT_EQUALS(startDate + Milliseconds(10), getNet()->now());
         prsiThread.join();
         ASSERT_OK(status);
         ASSERT_EQUALS(ReplicationCoordinator::modeReplSet, getReplCoord()->getReplicationMode());
@@ -647,7 +647,7 @@ namespace {
         ReplicationAwaiter(ReplicationCoordinatorImpl* replCoord, OperationContext* txn) :
             _replCoord(replCoord), _finished(false),
             _result(ReplicationCoordinator::StatusAndDuration(
-                    Status::OK(), ReplicationCoordinator::Milliseconds(0))) {}
+                    Status::OK(), Milliseconds(0))) {}
 
         void setOpTime(const Timestamp& ot) {
             _optime = ot;
@@ -675,7 +675,7 @@ namespace {
             ASSERT(_finished);
             _finished = false;
             _result = ReplicationCoordinator::StatusAndDuration(
-                    Status::OK(), ReplicationCoordinator::Milliseconds(0));
+                    Status::OK(), Milliseconds(0));
         }
 
     private:
@@ -952,7 +952,7 @@ namespace {
         simulateSuccessfulElection();
 
         enterNetwork();
-        getNet()->runUntil(getNet()->now() + 2000);
+        getNet()->runUntil(getNet()->now() + Seconds(2));
         ASSERT(getNet()->hasReadyRequests());
         NetworkInterfaceMock::NetworkOperationIterator noi = getNet()->getNextReadyRequest();
         RemoteCommandRequest request = noi->getRequest();
@@ -979,7 +979,7 @@ namespace {
         ASSERT_TRUE(getReplCoord()->getMemberState().primary());
         ASSERT_OK(getReplCoord()->stepDown(&txn, false, Milliseconds(0), Milliseconds(1000)));
         enterNetwork(); // So we can safely inspect the topology coordinator
-        ASSERT_EQUALS(Date_t(getNet()->now().millis + 1000), getTopoCoord().getStepDownTime());
+        ASSERT_EQUALS(getNet()->now() + Seconds(1), getTopoCoord().getStepDownTime());
         ASSERT_TRUE(getTopoCoord().getMemberState().secondary());
         exitNetwork();
         ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
@@ -999,7 +999,7 @@ namespace {
         ASSERT_TRUE(getReplCoord()->getMemberState().primary());
         ASSERT_OK(getReplCoord()->stepDown(&txn, true, Milliseconds(0), Milliseconds(1000)));
         getNet()->enterNetwork(); // Must do this before inspecting the topocoord
-        Date_t stepdownUntil = Date_t(getNet()->now().millis + 1000);
+        Date_t stepdownUntil = getNet()->now() + Seconds(1);
         ASSERT_EQUALS(stepdownUntil, getTopoCoord().getStepDownTime());
         ASSERT_TRUE(getTopoCoord().getMemberState().secondary());
         ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
@@ -1103,11 +1103,11 @@ namespace {
         runner.reset();
         getNet()->enterNetwork();
         const Date_t startDate = getNet()->now();
-        while (startDate + 1000 < getNet()->now()) {
+        while (startDate + Milliseconds(1000) < getNet()->now()) {
             while (getNet()->hasReadyRequests()) {
                 getNet()->blackHole(getNet()->getNextReadyRequest());
             }
-            getNet()->runUntil(startDate + 1000);
+            getNet()->runUntil(startDate + Milliseconds(1000));
         }
         getNet()->exitNetwork();
         ASSERT_TRUE(getReplCoord()->getMemberState().primary());
@@ -1140,7 +1140,7 @@ namespace {
 
         // Make a secondary actually catch up
         enterNetwork();
-        getNet()->runUntil(getNet()->now() + 2000);
+        getNet()->runUntil(getNet()->now() + Milliseconds(2000));
         ASSERT(getNet()->hasReadyRequests());
         NetworkInterfaceMock::NetworkOperationIterator noi = getNet()->getNextReadyRequest();
         RemoteCommandRequest request = noi->getRequest();
@@ -1497,7 +1497,7 @@ namespace {
         ASSERT_TRUE(response.isPassive());
         ASSERT_FALSE(response.isHidden());
         ASSERT_TRUE(response.shouldBuildIndexes());
-        ASSERT_EQUALS(0, response.getSlaveDelay().total_seconds());
+        ASSERT_EQUALS(Seconds(0), response.getSlaveDelay());
         ASSERT_EQUALS(h4, response.getMe());
 
         std::vector<HostAndPort> hosts = response.getHosts();

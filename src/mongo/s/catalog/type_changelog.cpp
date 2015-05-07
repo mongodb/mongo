@@ -158,7 +158,7 @@ namespace mongo {
         _clientAddr.clear();
         _isClientAddrSet = false;
 
-        _time = 0ULL;
+        _time = Date_t();
         _isTimeSet = false;
 
         _what.clear();

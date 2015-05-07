@@ -186,7 +186,7 @@ namespace {
             ASSERT_EQUALS(HostAndPort("h1"), noi->getRequest().target);
             _net->scheduleResponse(
                     noi,
-                    startDate + 10,
+                    startDate + Milliseconds(10),
                     ResponseStatus(RemoteCommandResponse(
                                            BSON("ok" << 1 <<
                                                 "id" << 2 <<
@@ -196,9 +196,9 @@ namespace {
                                                 "opTime" << Date_t(Timestamp(0,0).asULL())),
                                            Milliseconds(8))));
         }
-        _net->runUntil(startDate + 10);
+        _net->runUntil(startDate + Milliseconds(10));
         _net->exitNetwork();
-        ASSERT_EQUALS(startDate + 10, _net->now());
+        ASSERT_EQUALS(startDate + Milliseconds(10), _net->now());
         waitOnChecker();
         ASSERT_EQUALS(shouldAbortElection(), FreshnessChecker::FreshnessTie);
     }
@@ -254,7 +254,7 @@ namespace {
             ASSERT_EQUALS(HostAndPort("h1"), noi->getRequest().target);
             _net->scheduleResponse(
                     noi,
-                    startDate + 10,
+                    startDate + Milliseconds(10),
                     ResponseStatus(RemoteCommandResponse(
                                            BSON("ok" << 1 <<
                                                 "id" << 2 <<
@@ -265,9 +265,9 @@ namespace {
                                                 "opTime" << Date_t(Timestamp(0,0).asULL())),
                                            Milliseconds(8))));
         }
-        _net->runUntil(startDate + 10);
+        _net->runUntil(startDate + Milliseconds(10));
         _net->exitNetwork();
-        ASSERT_EQUALS(startDate + 10, _net->now());
+        ASSERT_EQUALS(startDate + Milliseconds(10), _net->now());
         waitOnChecker();
 
         stopCapturingLogMessages();
@@ -300,7 +300,7 @@ namespace {
             ASSERT_EQUALS(HostAndPort("h1"), noi->getRequest().target);
             _net->scheduleResponse(
                     noi,
-                    startDate + 10,
+                    startDate + Milliseconds(10),
                     ResponseStatus(RemoteCommandResponse(
                                            BSON("ok" << 1 <<
                                                 "id" << 2 <<
@@ -310,9 +310,9 @@ namespace {
                                                 "opTime" << Date_t(Timestamp(10,0).asULL())),
                                            Milliseconds(8))));
         }
-        _net->runUntil(startDate + 10);
+        _net->runUntil(startDate + Milliseconds(10));
         _net->exitNetwork();
-        ASSERT_EQUALS(startDate + 10, _net->now());
+        ASSERT_EQUALS(startDate + Milliseconds(10), _net->now());
         waitOnChecker();
 
         stopCapturingLogMessages();
@@ -344,7 +344,7 @@ namespace {
             ASSERT_EQUALS(HostAndPort("h1"), noi->getRequest().target);
             _net->scheduleResponse(
                     noi,
-                    startDate + 10,
+                    startDate + Milliseconds(10),
                     ResponseStatus(RemoteCommandResponse(
                                            BSON("ok" << 1 <<
                                                 "id" << 2 <<
@@ -354,9 +354,9 @@ namespace {
                                                 "opTime" << 3),
                                            Milliseconds(8))));
         }
-        _net->runUntil(startDate + 10);
+        _net->runUntil(startDate + Milliseconds(10));
         _net->exitNetwork();
-        ASSERT_EQUALS(startDate + 10, _net->now());
+        ASSERT_EQUALS(startDate + Milliseconds(10), _net->now());
         waitOnChecker();
 
         stopCapturingLogMessages();
@@ -391,7 +391,7 @@ namespace {
             ASSERT_EQUALS(HostAndPort("h1"), noi->getRequest().target);
             _net->scheduleResponse(
                     noi,
-                    startDate + 10,
+                    startDate + Milliseconds(10),
                     ResponseStatus(RemoteCommandResponse(
                                            BSON("ok" << 1 <<
                                                 "id" << 2 <<
@@ -403,9 +403,9 @@ namespace {
                                                 "opTime" << Date_t(Timestamp(0,0).asULL())),
                                            Milliseconds(8))));
         }
-        _net->runUntil(startDate + 10);
+        _net->runUntil(startDate + Milliseconds(10));
         _net->exitNetwork();
-        ASSERT_EQUALS(startDate + 10, _net->now());
+        ASSERT_EQUALS(startDate + Milliseconds(10), _net->now());
         waitOnChecker();
 
         stopCapturingLogMessages();
@@ -466,14 +466,14 @@ namespace {
             }
             _net->scheduleResponse(
                     noi,
-                    startDate + 10,
+                    startDate + Milliseconds(10),
                     ResponseStatus(RemoteCommandResponse(
                                            responseBuilder.obj(),
                                            Milliseconds(8))));
         }
-        _net->runUntil(startDate + 10);
+        _net->runUntil(startDate + Milliseconds(10));
         _net->exitNetwork();
-        ASSERT_EQUALS(startDate + 10, _net->now());
+        ASSERT_EQUALS(startDate + Milliseconds(10), _net->now());
         waitOnChecker();
         stopCapturingLogMessages();
         ASSERT_EQUALS(shouldAbortElection(), FreshnessChecker::FresherNodeFound);
@@ -527,7 +527,7 @@ namespace {
                     "opTime" << Date_t(Timestamp(20,0).asULL());
                 _net->scheduleResponse(
                         noi,
-                        startDate + 20,
+                        startDate + Milliseconds(20),
                         ResponseStatus(RemoteCommandResponse(
                                                responseBuilder.obj(),
                                                Milliseconds(8))));
@@ -542,17 +542,17 @@ namespace {
                     "opTime" << Date_t(Timestamp(10,0).asULL());
                 _net->scheduleResponse(
                         noi,
-                        startDate + 10,
+                        startDate + Milliseconds(10),
                         ResponseStatus(RemoteCommandResponse(
                                                responseBuilder.obj(),
                                                Milliseconds(8))));
             }
         }
-        _net->runUntil(startDate + 10);
-        ASSERT_EQUALS(startDate + 10, _net->now());
+        _net->runUntil(startDate + Milliseconds(10));
+        ASSERT_EQUALS(startDate + Milliseconds(10), _net->now());
         ASSERT_EQUALS(0, countLogLinesContaining("not electing self, we are not freshest"));
-        _net->runUntil(startDate + 20);
-        ASSERT_EQUALS(startDate + 20, _net->now());
+        _net->runUntil(startDate + Milliseconds(20));
+        ASSERT_EQUALS(startDate + Milliseconds(20), _net->now());
         _net->exitNetwork();
         waitOnChecker();
         stopCapturingLogMessages();
@@ -606,14 +606,14 @@ namespace {
             }
             _net->scheduleResponse(
                     noi,
-                    startDate + 10,
+                    startDate + Milliseconds(10),
                     ResponseStatus(RemoteCommandResponse(
                                            responseBuilder.obj(),
                                            Milliseconds(8))));
         }
-        _net->runUntil(startDate + 10);
+        _net->runUntil(startDate + Milliseconds(10));
         _net->exitNetwork();
-        ASSERT_EQUALS(startDate + 10, _net->now());
+        ASSERT_EQUALS(startDate + Milliseconds(10), _net->now());
         waitOnChecker();
         stopCapturingLogMessages();
         ASSERT_EQUALS(shouldAbortElection(), FreshnessChecker::FresherNodeFound);
@@ -666,14 +666,14 @@ namespace {
             }
             _net->scheduleResponse(
                     noi,
-                    startDate + 10,
+                    startDate + Milliseconds(10),
                     ResponseStatus(RemoteCommandResponse(
                                            responseBuilder.obj(),
                                            Milliseconds(8))));
         }
-        _net->runUntil(startDate + 10);
+        _net->runUntil(startDate + Milliseconds(10));
         _net->exitNetwork();
-        ASSERT_EQUALS(startDate + 10, _net->now());
+        ASSERT_EQUALS(startDate + Milliseconds(10), _net->now());
         waitOnChecker();
         stopCapturingLogMessages();
         ASSERT_EQUALS(shouldAbortElection(), FreshnessChecker::FresherNodeFound);
@@ -730,7 +730,7 @@ namespace {
                     "opTime" << Date_t(Timestamp(10,0).asULL());
                 _net->scheduleResponse(
                         noi,
-                        startDate + 20,
+                        startDate + Milliseconds(20),
                         ResponseStatus(RemoteCommandResponse(
                                                responseBuilder.obj(),
                                                Milliseconds(8))));
@@ -745,18 +745,18 @@ namespace {
                     "opTime" << Date_t(Timestamp(10,0).asULL());
                 _net->scheduleResponse(
                         noi,
-                        startDate + 10,
+                        startDate + Milliseconds(10),
                         ResponseStatus(RemoteCommandResponse(
                                                responseBuilder.obj(),
                                                Milliseconds(8))));
             }
         }
-        _net->runUntil(startDate + 10);
-        ASSERT_EQUALS(startDate + 10, _net->now());
+        _net->runUntil(startDate + Milliseconds(10));
+        ASSERT_EQUALS(startDate + Milliseconds(10), _net->now());
         ASSERT_EQUALS(0, countLogLinesContaining("not electing self, h4:27017 would veto with '"
                                                  "errmsg: \"I'd rather you didn't\"'"));
-        _net->runUntil(startDate + 20);
-        ASSERT_EQUALS(startDate + 20, _net->now());
+        _net->runUntil(startDate + Milliseconds(20));
+        ASSERT_EQUALS(startDate + Milliseconds(20), _net->now());
         _net->exitNetwork();
         waitOnChecker();
         stopCapturingLogMessages();
@@ -799,7 +799,7 @@ namespace {
             if (target.host() == "h2" || target.host() == "h3") {
                 _net->scheduleResponse(
                         noi,
-                        startDate + 10,
+                        startDate + Milliseconds(10),
                         ResponseStatus(ErrorCodes::NoSuchKey, "No response"));
             }
             else {
@@ -813,15 +813,15 @@ namespace {
                     "opTime" << Date_t(Timestamp(0,0).asULL());
                 _net->scheduleResponse(
                         noi,
-                        startDate + 10,
+                        startDate + Milliseconds(10),
                         ResponseStatus(RemoteCommandResponse(
                                                responseBuilder.obj(),
                                                Milliseconds(8))));
             }
         }
-        _net->runUntil(startDate + 10);
+        _net->runUntil(startDate + Milliseconds(10));
         _net->exitNetwork();
-        ASSERT_EQUALS(startDate + 10, _net->now());
+        ASSERT_EQUALS(startDate + Milliseconds(10), _net->now());
         waitOnChecker();
         ASSERT_EQUALS(shouldAbortElection(),FreshnessChecker::None);
     }
