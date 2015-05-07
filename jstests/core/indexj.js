@@ -39,17 +39,17 @@ t.save( { a:1,b:2 } );
 t.save( { a:2,b:1 } );
 t.save( { a:2,b:2 } );
 
-assert.eq( 2, keysExamined( { a:{$in:[1,2]}, b:{$gt:1,$lt:2} }, {a:1,b:1} ) );
-assert.eq( 2, keysExamined( { a:{$in:[1,2]}, b:{$gt:1,$lt:2} }, {a:1,b:1}, {a:-1,b:-1} ) );
+assert.eq( 3, keysExamined( { a:{$in:[1,2]}, b:{$gt:1,$lt:2} }, {a:1,b:1} ) );
+assert.eq( 3, keysExamined( { a:{$in:[1,2]}, b:{$gt:1,$lt:2} }, {a:1,b:1}, {a:-1,b:-1} ) );
 
 t.save( {a:1,b:1} );
 t.save( {a:1,b:1} );
-assert.eq( 2, keysExamined( { a:{$in:[1,2]}, b:{$gt:1,$lt:2} }, {a:1,b:1} ) );
-assert.eq( 2, keysExamined( { a:{$in:[1,2]}, b:{$gt:1,$lt:2} }, {a:1,b:1} ) );
-assert.eq( 2, keysExamined( { a:{$in:[1,2]}, b:{$gt:1,$lt:2} }, {a:1,b:1}, {a:-1,b:-1} ) );
+assert.eq( 3, keysExamined( { a:{$in:[1,2]}, b:{$gt:1,$lt:2} }, {a:1,b:1} ) );
+assert.eq( 3, keysExamined( { a:{$in:[1,2]}, b:{$gt:1,$lt:2} }, {a:1,b:1} ) );
+assert.eq( 3, keysExamined( { a:{$in:[1,2]}, b:{$gt:1,$lt:2} }, {a:1,b:1}, {a:-1,b:-1} ) );
 
-assert.eq( 1, keysExamined( { a:{$in:[1,1.9]}, b:{$gt:1,$lt:2} }, {a:1,b:1} ) );
-assert.eq( 1, keysExamined( { a:{$in:[1.1,2]}, b:{$gt:1,$lt:2} }, {a:1,b:1}, {a:-1,b:-1} ) );
+assert.eq( 2, keysExamined( { a:{$in:[1,1.9]}, b:{$gt:1,$lt:2} }, {a:1,b:1} ) );
+assert.eq( 2, keysExamined( { a:{$in:[1.1,2]}, b:{$gt:1,$lt:2} }, {a:1,b:1}, {a:-1,b:-1} ) );
 
 t.save( { a:1,b:1.5} );
-assert.eq( 3, keysExamined( { a:{$in:[1,2]}, b:{$gt:1,$lt:2} }, {a:1,b:1} ), "F" );
+assert.eq( 4, keysExamined( { a:{$in:[1,2]}, b:{$gt:1,$lt:2} }, {a:1,b:1} ), "F" );

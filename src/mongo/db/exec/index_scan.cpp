@@ -171,8 +171,6 @@ namespace mongo {
                 break;
 
             case IndexBoundsChecker::DONE:
-                // This seems weird but it's the old definition of nscanned.
-                --_specificStats.keysExamined;
                 kv = boost::none;
                 break;
 
