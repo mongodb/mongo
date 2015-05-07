@@ -382,30 +382,23 @@ namespace mongo {
          */
         void notifyOfWriteOp();
 
-    private:
         /**
-         * Releases resources associated with each cache entry
-         * and clears map.
-         * Invoked by clear() and during destruction.
          */
-        void _clear();
+    private:
+        void encodeKeyForMatch(const MatchExpression* tree, StringBuilder* keyBuilder) const;
+        void encodeKeyForSort(const BSONObj& sortObj, StringBuilder* keyBuilder) const;
+        void encodeKeyForProj(const BSONObj& projObj, StringBuilder* keyBuilder) const;
 
         LRUKeyValue<PlanCacheKey, PlanCacheEntry> _cache;
 
-        /**
-         * Protects _cache.
-         */
+        // Protects _cache.
         mutable boost::mutex _cacheMutex;
 
-        /**
-         * Counter for write notifications since initialization or last clear() invocation.
-         * Starts at 0.
-         */
+        // Counter for write notifications since initialization or last clear() invocation.  Starts
+        // at 0.
         AtomicInt32 _writeOperations;
 
-        /**
-         * Full namespace of collection.
-         */
+        // Full namespace of collection.
         std::string _ns;
     };
 
