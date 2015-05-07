@@ -440,14 +440,14 @@ namespace {
 
         _catalog->_collection->getCatalogEntry()->indexBuildSuccess( _txn, _indexName );
 
-        _catalog->_collection->infoCache()->addedIndex( _txn );
-
         IndexDescriptor* desc = _catalog->findIndexByName( _txn, _indexName, true );
         fassert( 17330, desc );
         IndexCatalogEntry* entry = _catalog->_entries.find( desc );
         fassert( 17331, entry && entry == _entry );
 
         entry->setIsReady( true );
+
+        _catalog->_collection->infoCache()->addedIndex( _txn );
     }
 
     namespace {
