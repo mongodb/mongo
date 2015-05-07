@@ -85,10 +85,6 @@ namespace {
         }
 
         virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
-            if (cmdObj.firstElement().type() != String) {
-                return "";
-            }
-
             return cmdObj.firstElement().str();
         }
 

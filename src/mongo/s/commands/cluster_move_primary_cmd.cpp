@@ -91,7 +91,7 @@ namespace {
         }
 
         virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
-            return cmdObj.firstElement().valuestrsafe();
+            return cmdObj.firstElement().str();
         }
 
         virtual bool run(OperationContext* txn,
@@ -101,15 +101,15 @@ namespace {
                          std::string& errmsg,
                          BSONObjBuilder& result) {
 
-            const string dbname = parseNs("admin", cmdObj);
+            const string dbname = parseNs("", cmdObj);
 
-            if (dbname.size() == 0) {
-                errmsg = "no db";
+            if (dbname.empty() || !nsIsDbOnly(dbname)) {
+                errmsg = "invalid db name specified: " + dbname;
                 return false;
             }
 
-            if (dbname == "config") {
-                errmsg = "can't move config db";
+            if (dbname == "admin" || dbname == "config" || dbname == "local") {
+                errmsg = "can't move primary for " + dbname + " database";
                 return false;
             }
 
