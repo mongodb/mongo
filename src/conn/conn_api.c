@@ -1988,7 +1988,11 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	 * the metadata file.
 	 *
 	 * The encryption customize callback needs the fully realized set of
-	 * encryption args.
+	 * encryption args, as simply grabbing "encryption" doesn't work.
+	 * As an example, configuration for the current call may just be
+	 * "encryption=(secretkey=xxx)", with encryption.name,
+	 * encryption.keyid being 'inherited' from the stored base
+	 * configuration.
 	 */
 	WT_ERR(__wt_config_gets_none(session, cfg, "encryption.name", &cval));
 	WT_ERR(__wt_config_gets_none(session, cfg, "encryption.keyid", &keyid));
