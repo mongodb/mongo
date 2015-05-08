@@ -32,7 +32,6 @@
 #include <climits> // For UINT_MAX
 
 #include "mongo/db/concurrency/locker.h"
-#include "mongo/util/concurrency/rwlock.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {

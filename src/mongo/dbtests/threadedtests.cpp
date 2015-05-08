@@ -46,6 +46,7 @@
 #include "mongo/platform/bits.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/concurrency/mvar.h"
+#include "mongo/util/concurrency/rwlock.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/timer.h"
 #include "mongo/util/concurrency/synchronization.h"
