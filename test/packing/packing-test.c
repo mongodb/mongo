@@ -28,7 +28,7 @@
 
 #include <assert.h>
 
-#include "wt_internal.h"
+#include "wt_internal.h"			/* For __wt_XXX */
 
 static void
 check(const char *fmt, ...)

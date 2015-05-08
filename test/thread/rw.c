@@ -168,7 +168,7 @@ reader_op(WT_SESSION *session, WT_CURSOR *cursor, INFO *s)
 
 	key = &_key;
 
-	keyno = testutil_random(s->rnd) % nkeys + 1;
+	keyno = __wt_random(s->rnd) % nkeys + 1;
 	if (ftype == ROW) {
 		key->data = keybuf;
 		key->size = (uint32_t)
@@ -200,7 +200,7 @@ reader(void *arg)
 	id = (int)(uintptr_t)arg;
 	s = &run_info[id];
 	__wt_thread_id(tid, sizeof(tid));
-	testutil_random_init(s->rnd);
+	__wt_random_init(s->rnd);
 
 	printf(" read thread %2d starting: tid: %s, file: %s\n",
 	    id, tid, s->name);
@@ -253,7 +253,7 @@ writer_op(WT_SESSION *session, WT_CURSOR *cursor, INFO *s)
 	key = &_key;
 	value = &_value;
 
-	keyno = testutil_random(s->rnd) % nkeys + 1;
+	keyno = __wt_random(s->rnd) % nkeys + 1;
 	if (ftype == ROW) {
 		key->data = keybuf;
 		key->size = (uint32_t)
@@ -301,7 +301,7 @@ writer(void *arg)
 	id = (int)(uintptr_t)arg;
 	s = &run_info[id];
 	__wt_thread_id(tid, sizeof(tid));
-	testutil_random_init(s->rnd);
+	__wt_random_init(s->rnd);
 
 	printf("write thread %2d starting: tid: %s, file: %s\n",
 	    id, tid, s->name);

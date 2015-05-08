@@ -105,10 +105,10 @@ fop(void *arg)
 	sched_yield();		/* Get all the threads created. */
 
 	s = &run_stats[id];
-	testutil_random_init(rnd);
+	__wt_random_init(rnd);
 
 	for (i = 0; i < nops; ++i, sched_yield())
-		switch (testutil_random(rnd) % 9) {
+		switch (__wt_random(rnd) % 9) {
 		case 0:
 			++s->bulk;
 			obj_bulk();
