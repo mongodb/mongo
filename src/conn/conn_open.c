@@ -196,18 +196,16 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	 * now.
 	 */
 	if ((s = conn->sessions) != NULL)
-		for (i = 0; i < conn->session_size; ++s, ++i)
-			if (s != session) {
-				/*
-				 * If hash arrays were allocated,
-				 * free them now.
-				 */
-				if (s->dhhash != NULL)
-					__wt_free(session, s->dhhash);
-				if (s->tablehash != NULL)
-					__wt_free(session, s->tablehash);
-				__wt_free(session, s->hazard);
-			}
+		for (i = 0; i < conn->session_size; ++s, ++i) {
+			/*
+			 * If hash arrays were allocated, free them now.
+			 */
+			if (s->dhhash != NULL)
+				__wt_free(session, s->dhhash);
+			if (s->tablehash != NULL)
+				__wt_free(session, s->tablehash);
+			__wt_free(session, s->hazard);
+		}
 
 	/* Destroy the handle. */
 	WT_TRET(__wt_connection_destroy(conn));
