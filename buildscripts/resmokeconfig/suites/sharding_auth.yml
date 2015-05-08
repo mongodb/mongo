@@ -1,0 +1,28 @@
+# Section that is ignored by resmoke.py.
+config_variables:
+- &keyFile jstests/libs/authTestsKey
+- &keyFileData Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
+
+selector:
+  js_test:
+    roots:
+    - jstests/sharding/*.js
+    exclude_files:
+    # Skip any tests that run with auth explicitly.
+    - jstests/sharding/*[aA]uth*.js
+    # Skip these additional tests when running with auth enabled.
+    - jstests/sharding/sync[36].js
+    - jstests/sharding/parallel.js
+    - jstests/sharding/copydb_from_mongos.js  # SERVER-13080
+
+executor:
+  js_test:
+    config:
+      shell_options:
+        global_vars:
+          TestData:
+            auth: true
+            authMechanism: SCRAM-SHA-1
+            keyFile: *keyFile
+            keyFileData: *keyFileData
+        nodb: ''

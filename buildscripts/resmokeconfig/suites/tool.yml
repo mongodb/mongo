@@ -1,0 +1,11 @@
+selector:
+  js_test:
+    roots:
+    - jstests/tool/*.js
+
+# Tool tests start their own mongod's.
+executor:
+  js_test:
+    config:
+      shell_options:
+        nodb: ''

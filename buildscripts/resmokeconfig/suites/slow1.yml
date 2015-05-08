@@ -1,0 +1,16 @@
+selector:
+  js_test:
+    roots:
+    - jstests/slow1/*.js
+
+executor:
+  js_test:
+    hooks:
+    - class: CleanEveryN
+      n: 20
+    fixture:
+      class: MongoDFixture
+      mongod_options:
+        nopreallocj: ''
+        set_parameters:
+          enableTestCommands: 1

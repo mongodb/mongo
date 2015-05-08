@@ -1,0 +1,18 @@
+selector:
+  js_test:
+    roots:
+    - jstests/disk/*.js
+    exclude_files:
+    - jstests/disk/repair2.js  # SERVER-18256
+
+executor:
+  js_test:
+    hooks:
+    - class: CleanEveryN
+      n: 20
+    fixture:
+      class: MongoDFixture
+      mongod_options:
+        nopreallocj: ''
+        set_parameters:
+          enableTestCommands: 1

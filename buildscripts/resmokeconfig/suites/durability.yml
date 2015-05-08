@@ -1,0 +1,14 @@
+selector:
+  js_test:
+    roots:
+    - jstests/dur/*.js
+    exclude_files:
+    # Skip the passthrough test because it is run separately.
+    - jstests/dur/dur_jscore_passthrough.js
+
+# Durability tests start their own mongod's.
+executor:
+  js_test:
+    config:
+      shell_options:
+        nodb: ''

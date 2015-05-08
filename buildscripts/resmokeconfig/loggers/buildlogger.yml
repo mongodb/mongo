@@ -1,0 +1,13 @@
+logging:
+  executor:
+    format: '[%(name)s] %(message)s'
+    handlers:
+      - class: logging.StreamHandler
+  tests:
+    format: '[%(name)s] %(message)s'
+    handlers:
+      - class: buildlogger
+  fixture:
+    format: '%(message)s'
+    handlers:
+      - class: buildlogger

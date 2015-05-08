@@ -1,0 +1,10 @@
+selector:
+  js_test:
+    roots:
+    - jstests/sharding/*.js
+
+executor:
+  js_test:
+    config:
+      shell_options:
+        nodb: ''

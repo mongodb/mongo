@@ -2079,6 +2079,5 @@ env.AddMethod(injectMongoIncludePaths, 'InjectMongoIncludePaths')
 env.Alias("compiledb", env.CompilationDatabase('compile_commands.json'))
 
 env.SConscript('src/SConscript', variant_dir='$BUILD_DIR', duplicate=False)
-env.SConscript('SConscript.smoke')
 
 env.Alias('all', ['core', 'tools', 'dbtest', 'unittests'])

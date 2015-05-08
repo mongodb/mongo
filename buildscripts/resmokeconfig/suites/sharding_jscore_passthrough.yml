@@ -1,0 +1,61 @@
+selector:
+  js_test:
+    roots:
+    - jstests/core/*.js
+    exclude_files:
+    # These tests correctly fail under sharding:
+    - jstests/core/capped*.js
+    - jstests/core/apitest_db.js
+    - jstests/core/cursor6.js
+    - jstests/core/profile*.js
+    - jstests/core/dbhash.js
+    - jstests/core/dbhash2.js
+    - jstests/core/evalb.js
+    - jstests/core/evald.js
+    - jstests/core/eval_nolock.js
+    - jstests/core/explain_missing_database.js
+    - jstests/core/auth1.js
+    - jstests/core/auth2.js
+    - jstests/core/dropdb_race.js
+    # These tests might be fixed under sharding:
+    - jstests/core/apply_ops[12].js  # SERVER-1439
+    - jstests/core/count5.js  # SERVER-1444
+    - jstests/core/or4.js  # SERVER-1444
+    - jstests/core/shellkillop.js  # SERVER-1445
+    - jstests/core/update_setOnInsert.js  # SERVER-8653
+    - jstests/core/max_time_ms.js  # SERVER-2212
+    - jstests/core/fts_querylang.js  # SERVER-9063
+    - jstests/core/fts_projection.js
+    # Theses tests should not be run under sharding:
+    - jstests/core/dbadmin.js
+    - jstests/core/fsync.js  # Isn't supported through mongos.
+    - jstests/core/geo*.js
+    - jstests/core/index_bigkeys_nofail.js
+    - jstests/core/loglong.js
+    - jstests/core/notablescan.js
+    - jstests/core/collection_truncate.js  # Relies on the emptycapped test command, which isn't in mongos.
+    - jstests/core/compact*.js
+    - jstests/core/check_shard_index.js
+    - jstests/core/bench_test*.js
+    - jstests/core/mr_replaceIntoDB.js
+    - jstests/core/queryoptimizera.js
+    - jstests/core/indexStatsCommand.js
+    - jstests/core/storageDetailsCommand.js
+    - jstests/core/stages*.js
+    - jstests/core/top.js
+    - jstests/core/dbcase.js  # SERVER-11735
+    - jstests/core/dbcase2.js  # SERVER-11735
+
+executor:
+  js_test:
+    fixture:
+      class: ShardedClusterFixture
+      mongos_options:
+        set_parameters:
+          enableTestCommands: 1
+      mongod_options:
+        nopreallocj: ''
+        set_parameters:
+          enableTestCommands: 1
+      enable_sharding:
+      - test

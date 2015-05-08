@@ -1,0 +1,20 @@
+selector:
+  js_test:
+    roots:
+    - jstests/core/*.js
+    include_files:
+    - jstests/core/bulk*.js
+
+executor:
+  js_test:
+    config:
+      shell_options:
+        writeMode: legacy
+    hooks:
+    - class: CleanEveryN
+      n: 20
+    fixture:
+      class: MongoDFixture
+      mongod_options:
+        set_parameters:
+          enableTestCommands: 1

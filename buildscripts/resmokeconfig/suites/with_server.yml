@@ -1,0 +1,8 @@
+executor:
+  js_test:
+    fixture:
+      class: MongoDFixture
+      mongod_options:
+        nopreallocj: ''
+        set_parameters:
+          enableTestCommands: 1

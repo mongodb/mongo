@@ -1,0 +1,42 @@
+# Section that is ignored by resmoke.py.
+config_variables:
+- &keyFile jstests/libs/authTestsKey
+- &keyFileData Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
+
+selector:
+  js_test:
+    roots:
+    - jstests/core/*.js
+    exclude_files:
+    # Skip any tests that run with auth explicitly.
+    - jstests/core/*[aA]uth*.js
+    # Skip these additional tests when running with auth enabled.
+    - jstests/core/bench_test*.js
+
+executor:
+  js_test:
+    config:
+      shell_options:
+        global_vars:
+          TestData:
+            auth: true
+            authMechanism: SCRAM-SHA-1
+            keyFile: *keyFile
+            keyFileData: *keyFileData
+        eval: jsTest.authenticate(db.getMongo())
+        authenticationDatabase: local
+        authenticationMechanism: SCRAM-SHA-1
+        password: *keyFileData
+        username: __system
+    hooks:
+    - class: CleanEveryN
+      n: 20
+    fixture:
+      class: MongoDFixture
+      mongod_options:
+        auth: ''
+        keyFile: *keyFile
+        nopreallocj: ''
+        set_parameters:
+          enableTestCommands: 1
+          enableLocalhostAuthBypass: false

@@ -55,7 +55,6 @@ from pymongo.errors import OperationFailure
 from pymongo import ReadPreference
 
 import cleanbb
-import smoke
 import utils
 
 try:
@@ -1053,29 +1052,6 @@ def expand_suites(suites,expandUseDB=True):
     return tests
 
 
-def filter_tests_by_tag(tests, tag_query):
-    """Selects tests from a list based on a query over the tags in the tests."""
-
-    test_map = {}
-    roots = []
-    for test in tests:
-        root = os.path.abspath(test[0])
-        roots.append(root)
-        test_map[root] = test
-
-    new_style_tests = smoke.tests.build_tests(roots, extract_metadata=True)
-    new_style_tests = smoke.suites.build_suite(new_style_tests, tag_query)
-
-    print "\nTag query matches %s tests out of %s.\n" % (len(new_style_tests),
-                                                         len(tests))
-
-    tests = []
-    for new_style_test in new_style_tests:
-        tests.append(test_map[os.path.abspath(new_style_test.filename)])
-
-    return tests
-
-
 def add_exe(e):
     if os.sys.platform.startswith( "win" ) and not e.endswith( ".exe" ):
         e += ".exe"
@@ -1341,14 +1317,6 @@ def main():
     parser.add_option('--basisTechRootDirectory', dest='rlp_path', default=None,
                       help='Basis Tech Rosette Linguistics Platform root directory')
 
-    parser.add_option('--include-tags', dest='include_tags', default="", action='store',
-                      help='Filters jstests run by tag regex(es) - a tag in the test must match the regexes.  ' +
-                           'Specify single regex string or JSON array.')
-
-    parser.add_option('--exclude-tags', dest='exclude_tags', default="", action='store',
-                      help='Filters jstests run by tag regex(es) - no tags in the test must match the regexes.  ' +
-                           'Specify single regex string or JSON array.')
-
     global tests
     (options, tests) = parser.parse_args()
 
@@ -1402,22 +1370,6 @@ def main():
                 return True
 
         tests = filter( ignore_test, tests )
-
-    if options.include_tags or options.exclude_tags:
-
-        def to_regex_array(tags_option):
-            if not tags_option:
-                return []
-
-            tags_list = smoke.json_options.json_coerce(tags_option)
-            if isinstance(tags_list, basestring):
-                tags_list = [tags_list]
-
-            return map(re.compile, tags_list)
-
-        tests = filter_tests_by_tag(tests,
-            smoke.suites.RegexQuery(include_res=to_regex_array(options.include_tags),
-                                    exclude_res=to_regex_array(options.exclude_tags)))
 
     if not tests:
         print "warning: no tests specified"

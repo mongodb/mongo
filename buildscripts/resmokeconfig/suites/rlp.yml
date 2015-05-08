@@ -1,0 +1,18 @@
+selector:
+  js_test:
+    roots:
+    - src/mongo/db/modules/*/jstests/rlp/*.js
+
+executor:
+  js_test:
+    hooks:
+    - class: CleanEveryN
+      n: 20
+    fixture:
+      class: MongoDFixture
+      mongod_options:
+        nopreallocj: ''
+        basisTechRootDirectory: /opt/basis
+        set_parameters:
+          enableTestCommands: 1
+          rlpEnableExperimentalLanguagesForTesting: true

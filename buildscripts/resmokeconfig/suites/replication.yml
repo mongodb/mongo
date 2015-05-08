@@ -1,0 +1,10 @@
+selector:
+  js_test:
+    roots:
+    - jstests/repl/*.js
+
+executor:
+  js_test:
+    config:
+      shell_options:
+        nodb: ''

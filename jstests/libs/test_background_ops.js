@@ -186,8 +186,12 @@ startParallelOps = function( mongo, proc, args, context ){
           "bootstrapper( stored ); " +
         "}"
     
-          
-    var oldDB = db
+    // Save the global db object if it exists, so that we can restore it after starting the parallel
+    // shell.
+    var oldDB = undefined;
+    if (typeof db !== 'undefined') {
+        oldDB = db;
+    }
     db = mongo.getDB( "test" )
     
     jsTest.log( "Starting " + proc.name + " operations..." )

@@ -1,0 +1,17 @@
+selector:
+  js_test:
+    roots:
+    - jstests/aggregation/*.js
+
+executor:
+  js_test:
+    config: {}
+    hooks:
+    - class: CleanEveryN
+      n: 20
+    fixture:
+      class: MongoDFixture
+      mongod_options:
+        nopreallocj: ''
+        set_parameters:
+          enableTestCommands: 1

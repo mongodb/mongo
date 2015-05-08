@@ -1,0 +1,19 @@
+selector:
+  js_test:
+    roots:
+    - jstests/noPassthroughWithMongod/*.js
+    exclude_files:
+    # Skip the passthrough test because it is run separately.
+    - jstests/noPassthroughWithMongod/fluent_gle_passthrough.js
+
+executor:
+  js_test:
+    hooks:
+    - class: CleanEveryN
+      n: 20
+    fixture:
+      class: MongoDFixture
+      mongod_options:
+        nopreallocj: ''
+        set_parameters:
+          enableTestCommands: 1
