@@ -231,7 +231,7 @@ tasks:
           export MONGO_USE_BUILDLOGGER="true"
           export MONGO_BUILDER_NAME=MCI_${build_variant}
           export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
           export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
           export MONGO_PHASE="${task_name}_${execution}"
 
@@ -322,7 +322,7 @@ tasks:
           export MONGO_USE_BUILDLOGGER="true"
           export MONGO_BUILDER_NAME=MCI_${build_variant}
           export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
           export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
           export MONGO_PHASE="${task_name}_${execution}"
 
@@ -345,7 +345,7 @@ tasks:
           export MONGO_USE_BUILDLOGGER="true"
           export MONGO_BUILDER_NAME=MCI_${build_variant}
           export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
           export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
           export MONGO_PHASE="${task_name}_${execution}"
 
@@ -368,7 +368,7 @@ tasks:
           export MONGO_USE_BUILDLOGGER="true"
           export MONGO_BUILDER_NAME=MCI_${build_variant}
           export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
           export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
           export MONGO_PHASE="${task_name}_${execution}"
 
@@ -391,7 +391,7 @@ tasks:
           export MONGO_USE_BUILDLOGGER="true"
           export MONGO_BUILDER_NAME=MCI_${build_variant}
           export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
           export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
           export MONGO_PHASE="${task_name}_${execution}"
 
@@ -414,7 +414,7 @@ tasks:
           export MONGO_USE_BUILDLOGGER="true"
           export MONGO_BUILDER_NAME=MCI_${build_variant}
           export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
           export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
           export MONGO_PHASE="${task_name}_${execution}"
 
@@ -437,7 +437,7 @@ tasks:
           export MONGO_USE_BUILDLOGGER="true"
           export MONGO_BUILDER_NAME=MCI_${build_variant}
           export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
           export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
           export MONGO_PHASE="${task_name}_${execution}"
 
@@ -460,7 +460,7 @@ tasks:
           export MONGO_USE_BUILDLOGGER="true"
           export MONGO_BUILDER_NAME=MCI_${build_variant}
           export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
           export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
           export MONGO_PHASE="${task_name}_${execution}"
 
@@ -483,7 +483,7 @@ tasks:
           export MONGO_USE_BUILDLOGGER="true"
           export MONGO_BUILDER_NAME=MCI_${build_variant}
           export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
           export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
           export MONGO_PHASE="${task_name}_${execution}"
 
@@ -506,7 +506,7 @@ tasks:
           export MONGO_USE_BUILDLOGGER="true"
           export MONGO_BUILDER_NAME=MCI_${build_variant}
           export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
           export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
           export MONGO_PHASE="${task_name}_${execution}"
 
@@ -529,7 +529,7 @@ tasks:
           export MONGO_USE_BUILDLOGGER="true"
           export MONGO_BUILDER_NAME=MCI_${build_variant}
           export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
           export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
           export MONGO_PHASE="${task_name}_${execution}"
 
@@ -552,7 +552,7 @@ tasks:
           export MONGO_USE_BUILDLOGGER="true"
           export MONGO_BUILDER_NAME=MCI_${build_variant}
           export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
           export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
           export MONGO_PHASE="${task_name}_${execution}"
 
@@ -575,7 +575,7 @@ tasks:
           export MONGO_USE_BUILDLOGGER="true"
           export MONGO_BUILDER_NAME=MCI_${build_variant}
           export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
           export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
           export MONGO_PHASE="${task_name}_${execution}"
 
@@ -598,7 +598,7 @@ tasks:
           export MONGO_USE_BUILDLOGGER="true"
           export MONGO_BUILDER_NAME=MCI_${build_variant}
           export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
           export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
           export MONGO_PHASE="${task_name}_${execution}"
 
@@ -621,7 +621,7 @@ tasks:
           export MONGO_USE_BUILDLOGGER="true"
           export MONGO_BUILDER_NAME=MCI_${build_variant}
           export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
           export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
           export MONGO_PHASE="${task_name}_${execution}"
 
@@ -644,7 +644,7 @@ tasks:
           export MONGO_USE_BUILDLOGGER="true"
           export MONGO_BUILDER_NAME=MCI_${build_variant}
           export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
           export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
           export MONGO_PHASE="${task_name}_${execution}"
 
@@ -667,7 +667,7 @@ tasks:
           export MONGO_USE_BUILDLOGGER="true"
           export MONGO_BUILDER_NAME=MCI_${build_variant}
           export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
           export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
           export MONGO_PHASE="${task_name}_${execution}"
 
@@ -690,7 +690,7 @@ tasks:
           export MONGO_USE_BUILDLOGGER="true"
           export MONGO_BUILDER_NAME=MCI_${build_variant}
           export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
           export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
           export MONGO_PHASE="${task_name}_${execution}"
 
@@ -713,7 +713,7 @@ tasks:
           export MONGO_USE_BUILDLOGGER="true"
           export MONGO_BUILDER_NAME=MCI_${build_variant}
           export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
           export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
           export MONGO_PHASE="${task_name}_${execution}"
 
@@ -736,7 +736,7 @@ tasks:
           export MONGO_USE_BUILDLOGGER="true"
           export MONGO_BUILDER_NAME=MCI_${build_variant}
           export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
           export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
           export MONGO_PHASE="${task_name}_${execution}"
 
@@ -759,7 +759,7 @@ tasks:
           export MONGO_USE_BUILDLOGGER="true"
           export MONGO_BUILDER_NAME=MCI_${build_variant}
           export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
           export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
           export MONGO_PHASE="${task_name}_${execution}"
 
@@ -782,7 +782,7 @@ tasks:
           export MONGO_USE_BUILDLOGGER="true"
           export MONGO_BUILDER_NAME=MCI_${build_variant}
           export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
           export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
           export MONGO_PHASE="${task_name}_${execution}"
 
@@ -805,7 +805,7 @@ tasks:
           export MONGO_USE_BUILDLOGGER="true"
           export MONGO_BUILDER_NAME=MCI_${build_variant}
           export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
           export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
           export MONGO_PHASE="${task_name}_${execution}"
 
@@ -828,7 +828,7 @@ tasks:
           export MONGO_USE_BUILDLOGGER="true"
           export MONGO_BUILDER_NAME=MCI_${build_variant}
           export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
           export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
           export MONGO_PHASE="${task_name}_${execution}"
 
@@ -851,7 +851,7 @@ tasks:
           export MONGO_USE_BUILDLOGGER="true"
           export MONGO_BUILDER_NAME=MCI_${build_variant}
           export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
           export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
           export MONGO_PHASE="${task_name}_${execution}"
 
@@ -874,7 +874,7 @@ tasks:
           export MONGO_USE_BUILDLOGGER="true"
           export MONGO_BUILDER_NAME=MCI_${build_variant}
           export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
           export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
           export MONGO_PHASE="${task_name}_${execution}"
 
@@ -918,7 +918,7 @@ tasks:
           export MONGO_USE_BUILDLOGGER="true"
           export MONGO_BUILDER_NAME=MCI_${build_variant}
           export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
           export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
           export MONGO_PHASE="${task_name}_${execution}"
 
@@ -941,7 +941,7 @@ tasks:
           export MONGO_USE_BUILDLOGGER="true"
           export MONGO_BUILDER_NAME=MCI_${build_variant}
           export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
           export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
           export MONGO_PHASE="${task_name}_${execution}"
 
@@ -964,7 +964,7 @@ tasks:
           export MONGO_USE_BUILDLOGGER="true"
           export MONGO_BUILDER_NAME=MCI_${build_variant}
           export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
           export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
           export MONGO_PHASE="${task_name}_${execution}"
 
@@ -987,7 +987,7 @@ tasks:
           export MONGO_USE_BUILDLOGGER="true"
           export MONGO_BUILDER_NAME=MCI_${build_variant}
           export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
           export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
           export MONGO_PHASE="${task_name}_${execution}"
 
@@ -1010,14 +1010,14 @@ tasks:
           export MONGO_USE_BUILDLOGGER="true"
           export MONGO_BUILDER_NAME=MCI_${build_variant}
           export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
           export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
           export MONGO_PHASE="${task_name}_${execution}"
 
           cp mongodb*/bin/* .
           rm -rf /data/install /data/multiversion
           ${python|python} buildscripts/setup_multiversion_mongodb.py /data/install /data/multiversion "Linux/x86_64" "1.8" "2.0" "2.2" "2.4" "2.6"
-          PATH=$PATH:/data/multiversion ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} multiVersion
+          PATH=$PATH:/data/multiversion ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} multiVersion
 
 - name: noPassthrough
   depends_on:
@@ -1035,7 +1035,7 @@ tasks:
           export MONGO_USE_BUILDLOGGER="true"
           export MONGO_BUILDER_NAME=MCI_${build_variant}
           export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
           export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
           export MONGO_PHASE="${task_name}_${execution}"
 
@@ -1058,7 +1058,7 @@ tasks:
           export MONGO_USE_BUILDLOGGER="true"
           export MONGO_BUILDER_NAME=MCI_${build_variant}
           export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
           export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
           export MONGO_PHASE="${task_name}_${execution}"
 
@@ -1081,7 +1081,7 @@ tasks:
           export MONGO_USE_BUILDLOGGER="true"
           export MONGO_BUILDER_NAME=MCI_${build_variant}
           export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
           export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
           export MONGO_PHASE="${task_name}_${execution}"
 
@@ -1104,7 +1104,7 @@ tasks:
           export MONGO_USE_BUILDLOGGER="true"
           export MONGO_BUILDER_NAME=MCI_${build_variant}
           export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
           export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
           export MONGO_PHASE="${task_name}_${execution}"
 
@@ -1127,7 +1127,7 @@ tasks:
           export MONGO_USE_BUILDLOGGER="true"
           export MONGO_BUILDER_NAME=MCI_${build_variant}
           export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
           export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
           export MONGO_PHASE="${task_name}_${execution}"
 
@@ -1150,7 +1150,7 @@ tasks:
           export MONGO_USE_BUILDLOGGER="true"
           export MONGO_BUILDER_NAME=MCI_${build_variant}
           export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
           export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
           export MONGO_PHASE="${task_name}_${execution}"
 
@@ -1174,7 +1174,7 @@ tasks:
           export MONGO_USE_BUILDLOGGER="true"
           export MONGO_BUILDER_NAME=MCI_${build_variant}
           export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
           export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
           export MONGO_PHASE="${task_name}_${execution}"
 
@@ -1198,7 +1198,7 @@ tasks:
           export MONGO_USE_BUILDLOGGER="true"
           export MONGO_BUILDER_NAME=MCI_${build_variant}
           export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
           export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
           export MONGO_PHASE="${task_name}_${execution}"
 
@@ -1221,7 +1221,7 @@ tasks:
           export MONGO_USE_BUILDLOGGER="true"
           export MONGO_BUILDER_NAME=MCI_${build_variant}
           export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
           export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
           export MONGO_PHASE="${task_name}_${execution}"
 
@@ -1244,7 +1244,7 @@ tasks:
           export MONGO_USE_BUILDLOGGER="true"
           export MONGO_BUILDER_NAME=MCI_${build_variant}
           export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
           export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
           export MONGO_PHASE="${task_name}_${execution}"
 
@@ -1267,7 +1267,7 @@ tasks:
           export MONGO_USE_BUILDLOGGER="true"
           export MONGO_BUILDER_NAME=MCI_${build_variant}
           export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
           export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
           export MONGO_PHASE="${task_name}_${execution}"
 
@@ -1290,7 +1290,7 @@ tasks:
           export MONGO_USE_BUILDLOGGER="true"
           export MONGO_BUILDER_NAME=MCI_${build_variant}
           export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
           export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
           export MONGO_PHASE="${task_name}_${execution}"
 
@@ -1313,7 +1313,7 @@ tasks:
           export MONGO_USE_BUILDLOGGER="true"
           export MONGO_BUILDER_NAME=MCI_${build_variant}
           export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
           export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
           export MONGO_PHASE="${task_name}_${execution}"
 
@@ -1336,7 +1336,7 @@ tasks:
           export MONGO_USE_BUILDLOGGER="true"
           export MONGO_BUILDER_NAME=MCI_${build_variant}
           export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
           export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
           export MONGO_PHASE="${task_name}_${execution}"
 
@@ -1359,7 +1359,7 @@ tasks:
           export MONGO_USE_BUILDLOGGER="true"
           export MONGO_BUILDER_NAME=MCI_${build_variant}
           export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
           export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
           export MONGO_PHASE="${task_name}_${execution}"
 
@@ -1382,7 +1382,7 @@ tasks:
           export MONGO_USE_BUILDLOGGER="true"
           export MONGO_BUILDER_NAME=MCI_${build_variant}
           export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
           export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
           export MONGO_PHASE="${task_name}_${execution}"
 
@@ -1405,7 +1405,7 @@ tasks:
           export MONGO_USE_BUILDLOGGER="true"
           export MONGO_BUILDER_NAME=MCI_${build_variant}
           export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
           export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
           export MONGO_PHASE="${task_name}_${execution}"
 
@@ -1428,7 +1428,7 @@ tasks:
           export MONGO_USE_BUILDLOGGER="true"
           export MONGO_BUILDER_NAME=MCI_${build_variant}
           export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
           export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
           export MONGO_PHASE="${task_name}_${execution}"
 
@@ -1451,7 +1451,7 @@ tasks:
           export MONGO_USE_BUILDLOGGER="true"
           export MONGO_BUILDER_NAME=MCI_${build_variant}
           export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
           export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
           export MONGO_PHASE="${task_name}_${execution}"
 
@@ -1474,7 +1474,7 @@ tasks:
           export MONGO_USE_BUILDLOGGER="true"
           export MONGO_BUILDER_NAME=MCI_${build_variant}
           export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
           export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
           export MONGO_PHASE="${task_name}_${execution}"
 
@@ -1497,7 +1497,7 @@ tasks:
           export MONGO_USE_BUILDLOGGER="true"
           export MONGO_BUILDER_NAME=MCI_${build_variant}
           export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
           export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
           export MONGO_PHASE="${task_name}_${execution}"
 
@@ -1520,7 +1520,7 @@ tasks:
           export MONGO_USE_BUILDLOGGER="true"
           export MONGO_BUILDER_NAME=MCI_${build_variant}
           export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
           export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
           export MONGO_PHASE="${task_name}_${execution}"
 
@@ -1543,7 +1543,7 @@ tasks:
           export MONGO_USE_BUILDLOGGER="true"
           export MONGO_BUILDER_NAME=MCI_${build_variant}
           export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
           export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
           export MONGO_PHASE="${task_name}_${execution}"
 
@@ -1566,7 +1566,7 @@ tasks:
           export MONGO_USE_BUILDLOGGER="true"
           export MONGO_BUILDER_NAME=MCI_${build_variant}
           export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
           export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
           export MONGO_PHASE="${task_name}_${execution}"
 
@@ -1589,7 +1589,7 @@ tasks:
           export MONGO_USE_BUILDLOGGER="true"
           export MONGO_BUILDER_NAME=MCI_${build_variant}
           export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
           export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
           export MONGO_PHASE="${task_name}_${execution}"
 
@@ -1612,7 +1612,7 @@ tasks:
           export MONGO_USE_BUILDLOGGER="true"
           export MONGO_BUILDER_NAME=MCI_${build_variant}
           export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
           export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
           export MONGO_PHASE="${task_name}_${execution}"
 
@@ -1635,7 +1635,7 @@ tasks:
           export MONGO_USE_BUILDLOGGER="true"
           export MONGO_BUILDER_NAME=MCI_${build_variant}
           export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
           export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
           export MONGO_PHASE="${task_name}_${execution}"
 
@@ -1660,7 +1660,7 @@ tasks:
           export MONGO_USE_BUILDLOGGER="true"
           export MONGO_BUILDER_NAME=MCI_${build_variant}
           export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
           export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
           export MONGO_PHASE="${task_name}_${execution}"
 
@@ -1685,7 +1685,7 @@ tasks:
           export MONGO_USE_BUILDLOGGER="true"
           export MONGO_BUILDER_NAME=MCI_${build_variant}
           export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
           export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
           export MONGO_PHASE="${task_name}_${execution}"
 
@@ -1708,7 +1708,7 @@ tasks:
           export MONGO_USE_BUILDLOGGER="true"
           export MONGO_BUILDER_NAME=MCI_${build_variant}
           export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
           export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
           export MONGO_PHASE="${task_name}_${execution}"
 
@@ -1731,7 +1731,7 @@ tasks:
           export MONGO_USE_BUILDLOGGER="true"
           export MONGO_BUILDER_NAME=MCI_${build_variant}
           export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
           export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
           export MONGO_PHASE="${task_name}_${execution}"
 
@@ -1754,7 +1754,7 @@ tasks:
           export MONGO_USE_BUILDLOGGER="true"
           export MONGO_BUILDER_NAME=MCI_${build_variant}
           export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
+          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
           export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
           export MONGO_PHASE="${task_name}_${execution}"
 
