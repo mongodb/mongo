@@ -18,25 +18,39 @@
 # - 'task_id' (references the task id of the task the executor is working on).
 # - 'build_variant' (references the executing task's buildvariant).
 # - 'config_root' (references the root directory for the executor's configuration artifacts).
-# Others include:
-# - 'builder'
-# - 'builder_num'
-# - 'builde
 
 stepback: true
 
-functions:
-  "fetch source" :
-    command: git.get_project
-    params:
-      directory: src
-  "get buildnumber":
-    command: keyval.inc
-    params:
-      key: "${build_variant}_master"
-      destination: "builder_num"
+## Some variables for convenience:
+variables:
 
-  "fetch binaries" :
+# Used for tests that invoke resmoke.py and require no additional setup.
+- &task_template
+  name: template
+  depends_on:
+  - name: compile
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --help
+
+#######################################
+#            Functions                #
+#######################################
+
+functions:
+
+  "fetch artifacts" : &fetch_artifacts
+    command: s3.get
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      remote_file: mongodb-mongo-master/${build_variant}/${revision}/artifacts/${build_id}.tgz
+      bucket: mciuploads
+      extract_to: src
+
+  "fetch binaries" : &fetch_binaries
     command: s3.get
     params:
       aws_key: ${aws_key}
@@ -45,7 +59,20 @@ functions:
       bucket: mciuploads
       local_file: src/mongo-binaries.tgz
 
-  "setup credentials" :
+  "extract binaries" : &extract_binaries
+    command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        ${decompress|unzip} mongo-binaries.tgz
+
+  "get buildnumber" : &get_buildnumber
+    command: keyval.inc
+    params:
+      key: "${build_variant}_master"
+      destination: "builder_num"
+
+  "setup credentials" : &setup_credentials
     command: shell.exec
     params:
       working_dir: src
@@ -54,6 +81,9 @@ functions:
         cat > mci.buildlogger <<END_OF_CREDS
         slavename='${slave}'
         passwd='${passwd}'
+        builder='MCI_${build_variant}'
+        build_num=${builder_num}
+        build_phase='${task_name}_${execution}'
         END_OF_CREDS
 
   "upload debugsymbols" :
@@ -86,6 +116,7 @@ functions:
          'ubuntu1404',
          'debian71',
          'solaris-64-bit']
+
   "fetch debugsymbols archive" :
     command: s3.get
     params:
@@ -114,20 +145,7 @@ functions:
          'ubuntu1404',
          'debian71',
          'solaris-64-bit']
-  "extract binaries" :
-    command: shell.exec
-    params:
-      working_dir: src
-      script: |
-        ${decompress|unzip} mongo-binaries.tgz
-  "fetch artifacts" :
-    command: s3.get
-    params:
-      aws_key: ${aws_key}
-      aws_secret: ${aws_secret}
-      remote_file: mongodb-mongo-master/${build_variant}/${revision}/artifacts/${build_id}.tgz
-      bucket: mciuploads
-      extract_to: src
+
   "build rocksdb" :
     command: shell.exec
     params:
@@ -140,6 +158,7 @@ functions:
         cd rocksdb
         make static_lib
         fi
+
   "build new tools" :
     command: shell.exec
     params:
@@ -177,12 +196,48 @@ functions:
         done
         exit 0
 
+  # TODO: Remove the "install_pyyaml" function after PyYAML is installed on all build variants.
+  "install pyyaml" : &install_pyyaml
+    command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        if [ ${has_pyyaml_installed|false} = false ]; then
+          curl -s http://pyyaml.org/download/pyyaml/PyYAML-3.11.tar.gz --output PyYAML-3.11.tar.gz
+          ${decompress} PyYAML-3.11.tar.gz
+          # 7-Zip decompresses and untars as two separate steps.
+          if [ ${is_windows|false} = true ]; then
+            ${decompress} dist/PyYAML-3.11.tar
+          fi
+          cd PyYAML-3.11
+          ${python|python} setup.py install --user
+        fi
+
+  "do setup" :
+  - *fetch_artifacts
+  - *fetch_binaries
+  - *extract_binaries
+  - *get_buildnumber
+  - *setup_credentials
+  - *install_pyyaml
+
+  "run tests" :
+    command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        set -o errexit
+        set -o verbose
+
+        cp mongodb*/bin/* .
+        ${asan_symbolizer} ${enable_lsan} ${python|python} buildscripts/resmoke.py ${resmoke_args} ${test_flags} --log=buildlogger --reportFile=report.json
+
 pre:
   - command: shell.exec
     params:
       silent: true
       script: |
-        ${killall_mci|pkill -9 mongod; pkill -9 mongos; pkill -9 mongo; pkill -9 bsondump; pkill -9 mongoimport; pkill -9 mongoexport; pkill -9 mongodump; pkill -9 mongorestore; pkill -9 mongostat; pkill -9 mongofiles; pkill -9 mongooplog; pkill -9 mongotop; pkill -9 mongobridge; pkill -9 mongod-2.6; pkill -9 mongos-2.6; pkill -9 mongo-2.6; pkill -9 bsondump-2.6; pkill -9 mongoimport-2.6; pkill -9 mongoexport-2.6; pkill -9 mongodump-2.6; pkill -9 mongorestore-2.6; pkill -9 mongostat-2.6; pkill -9 mongofiles-2.6; pkill -9 mongooplog-2.6; pkill -9 mongotop-2.6; pkill -9 mongobridge-2.6; pkill -9 mongod-2.4; pkill -9 mongos-2.4; pkill -9 mongo-2.4; pkill -9 bsondump-2.4; pkill -9 mongoimport-2.4; pkill -9 mongoexport-2.4; pkill -9 mongodump-2.4; pkill -9 mongorestore-2.4; pkill -9 mongostat-2.4; pkill -9 mongofiles-2.4; pkill -9 mongooplog-2.4; pkill -9 mongotop-2.4; pkill -9 buildlogger.py; pkill -9 smoke.py; pkill -9 python; pkill -9 cl; pkill -9 lock_mgr_test; pkill -9 background_job_test; pkill -9 repl_coordinator_impl_heartbeat_test} >/dev/null 2>&1
+        ${killall_mci|pkill -9 mongod; pkill -9 mongos; pkill -9 mongo; pkill -9 bsondump; pkill -9 mongoimport; pkill -9 mongoexport; pkill -9 mongodump; pkill -9 mongorestore; pkill -9 mongostat; pkill -9 mongofiles; pkill -9 mongooplog; pkill -9 mongotop; pkill -9 mongobridge; pkill -9 mongod-2.6; pkill -9 mongos-2.6; pkill -9 mongo-2.6; pkill -9 bsondump-2.6; pkill -9 mongoimport-2.6; pkill -9 mongoexport-2.6; pkill -9 mongodump-2.6; pkill -9 mongorestore-2.6; pkill -9 mongostat-2.6; pkill -9 mongofiles-2.6; pkill -9 mongooplog-2.6; pkill -9 mongotop-2.6; pkill -9 mongobridge-2.6; pkill -9 mongod-2.4; pkill -9 mongos-2.4; pkill -9 mongo-2.4; pkill -9 bsondump-2.4; pkill -9 mongoimport-2.4; pkill -9 mongoexport-2.4; pkill -9 mongodump-2.4; pkill -9 mongorestore-2.4; pkill -9 mongostat-2.4; pkill -9 mongofiles-2.4; pkill -9 mongooplog-2.4; pkill -9 mongotop-2.4; pkill -9 resmoke.py; pkill -9 python; pkill -9 cl; pkill -9 lock_mgr_test; pkill -9 background_job_test; pkill -9 repl_coordinator_impl_heartbeat_test} >/dev/null 2>&1
         rm -rf src /data/db/*
         exit 0
 
@@ -194,7 +249,7 @@ post:
     params:
       silent: true
       script: |
-        ${killall_mci|pkill -9 mongod; pkill -9 mongos; pkill -9 mongo; pkill -9 bsondump; pkill -9 mongoimport; pkill -9 mongoexport; pkill -9 mongodump; pkill -9 mongorestore; pkill -9 mongostat; pkill -9 mongofiles; pkill -9 mongooplog; pkill -9 mongotop; pkill -9 mongobridge; pkill -9 mongod-2.6; pkill -9 mongos-2.6; pkill -9 mongo-2.6; pkill -9 bsondump-2.6; pkill -9 mongoimport-2.6; pkill -9 mongoexport-2.6; pkill -9 mongodump-2.6; pkill -9 mongorestore-2.6; pkill -9 mongostat-2.6; pkill -9 mongofiles-2.6; pkill -9 mongooplog-2.6; pkill -9 mongotop-2.6; pkill -9 mongobridge-2.6; pkill -9 mongod-2.4; pkill -9 mongos-2.4; pkill -9 mongo-2.4; pkill -9 bsondump-2.4; pkill -9 mongoimport-2.4; pkill -9 mongoexport-2.4; pkill -9 mongodump-2.4; pkill -9 mongorestore-2.4; pkill -9 mongostat-2.4; pkill -9 mongofiles-2.4; pkill -9 mongooplog-2.4; pkill -9 mongotop-2.4; pkill -9 buildlogger.py; pkill -9 smoke.py; pkill -9 python; pkill -9 cl; pkill -9 lock_mgr_test; pkill -9 background_job_test; pkill -9 repl_coordinator_impl_heartbeat_test} >/dev/null 2>&1
+        ${killall_mci|pkill -9 mongod; pkill -9 mongos; pkill -9 mongo; pkill -9 bsondump; pkill -9 mongoimport; pkill -9 mongoexport; pkill -9 mongodump; pkill -9 mongorestore; pkill -9 mongostat; pkill -9 mongofiles; pkill -9 mongooplog; pkill -9 mongotop; pkill -9 mongobridge; pkill -9 mongod-2.6; pkill -9 mongos-2.6; pkill -9 mongo-2.6; pkill -9 bsondump-2.6; pkill -9 mongoimport-2.6; pkill -9 mongoexport-2.6; pkill -9 mongodump-2.6; pkill -9 mongorestore-2.6; pkill -9 mongostat-2.6; pkill -9 mongofiles-2.6; pkill -9 mongooplog-2.6; pkill -9 mongotop-2.6; pkill -9 mongobridge-2.6; pkill -9 mongod-2.4; pkill -9 mongos-2.4; pkill -9 mongo-2.4; pkill -9 bsondump-2.4; pkill -9 mongoimport-2.4; pkill -9 mongoexport-2.4; pkill -9 mongodump-2.4; pkill -9 mongorestore-2.4; pkill -9 mongostat-2.4; pkill -9 mongofiles-2.4; pkill -9 mongooplog-2.4; pkill -9 mongotop-2.4; pkill -9 resmoke.py; pkill -9 python; pkill -9 cl; pkill -9 lock_mgr_test; pkill -9 background_job_test; pkill -9 repl_coordinator_impl_heartbeat_test} >/dev/null 2>&1
         exit 0
 
 timeout:
@@ -202,10 +257,12 @@ timeout:
     params:
       working_dir: src
       script: |
-        echo "Calling the Hang_Analyzer."
-        python ./buildscripts/hang_analyzer.py
+        echo "Calling the hang analyzer..."
+        python buildscripts/hang_analyzer.py
 
-### tasks to be run for the branch ###
+#######################################
+#               Tasks                 #
+#######################################
 
 tasks:
 
@@ -221,7 +278,8 @@ tasks:
         directory: src
     - func: "get buildnumber"
     - func: "setup credentials"
-    - func: "build new tools" #noop if ${newtools} is not "true"
+    - func: "install pyyaml"
+    - func: "build new tools" # noop if ${newtools} is not "true"
     - func: "build rocksdb" # noop if ${build_rocksdb} is not "true"
     - command: shell.exec
       params:
@@ -230,17 +288,11 @@ tasks:
           set -o errexit
           set -o verbose
 
-          export BUILDLOGGER_BUILDER=MCI_${build_variant}
-          export BUILDLOGGER_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export BUILDLOGGER_PHASE="${task_name}_${execution}"
-
           rm -rf ${install_directory|/data/mongo-install-directory}
           ${scons|scons} ${compile_flags|} --use-new-tools all dist ${msi_target|}
           ${python|python} -c "ver = open('version.txt','r').read().strip(); print 'suffix: latest' if ver[-1] == '-' else 'suffix: ' + ver; print 'version: ' + ver"  > compile_expansions.yml
           if [ "${has_debugsymbols|}" = "true" ]; then ${scons|scons} ${compile_flags|} --nostrip --use-new-tools dist; original_filename=$(ls | grep debugsymbols); mv $original_filename $(echo $original_filename | sed 's/debugsymbols-//' | sed 's/mongodb/debugsymbols-mongodb/'); fi
-          ${asan_symbolizer} ${enable_lsan} ${rlp_environment} ${python|python} buildscripts/smoke.py --with-cleanbb --mode files --from-file build/unittests.txt --dont-start-mongod  --report-file report.json core
+          ${asan_symbolizer} ${enable_lsan} ${rlp_environment} ${python|python} buildscripts/resmoke.py --jobs=${num_jobs_unittests|1} --suites=unittests ${test_flags} --log=buildlogger --reportFile=report.json
           mv mongodb*.${ext|tgz} mongodb-binaries.tgz
           mv debugsymbols-*.${ext|tgz} mongo-debugsymbols.tgz || true
     - command: archive.targz_pack
@@ -286,6 +338,8 @@ tasks:
         permissions: public-read
         content_type: application/tar
         display_name: Artifacts
+
+## lint ##
 - name: lint
   depends_on: []
   commands:
@@ -305,1415 +359,653 @@ tasks:
 
 ## integration test suites ##
 
-- name: aggregation
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          export BUILDLOGGER_BUILDER=MCI_${build_variant}
-          export BUILDLOGGER_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export BUILDLOGGER_PHASE="${task_name}_${execution}"
-
-          cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} aggregation
-
-- name: aggregation_auth
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          export BUILDLOGGER_BUILDER=MCI_${build_variant}
-          export BUILDLOGGER_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export BUILDLOGGER_PHASE="${task_name}_${execution}"
-
-          cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --auth aggregation
-
-- name: aggregation_WT
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          export BUILDLOGGER_BUILDER=MCI_${build_variant}
-          export BUILDLOGGER_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export BUILDLOGGER_PHASE="${task_name}_${execution}"
-
-          cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --storageEngine=wiredTiger aggregation
-
-- name: audit
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          export BUILDLOGGER_BUILDER=MCI_${build_variant}
-          export BUILDLOGGER_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export BUILDLOGGER_PHASE="${task_name}_${execution}"
-
-          cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} audit
-
-- name: audit_WT
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          export BUILDLOGGER_BUILDER=MCI_${build_variant}
-          export BUILDLOGGER_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export BUILDLOGGER_PHASE="${task_name}_${execution}"
-
-          cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --storageEngine=wiredTiger audit
-
-- name: auth
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          export BUILDLOGGER_BUILDER=MCI_${build_variant}
-          export BUILDLOGGER_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export BUILDLOGGER_PHASE="${task_name}_${execution}"
-
-          cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} auth
-
-- name: auth_WT
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          export BUILDLOGGER_BUILDER=MCI_${build_variant}
-          export BUILDLOGGER_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export BUILDLOGGER_PHASE="${task_name}_${execution}"
-
-          cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --storageEngine=wiredTiger auth
-
-- name: dbtest
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          export BUILDLOGGER_BUILDER=MCI_${build_variant}
-          export BUILDLOGGER_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export BUILDLOGGER_PHASE="${task_name}_${execution}"
-
-          cp mongodb*/bin/* .
-          ${asan_symbolizer} ${enable_lsan} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} dbtest
-
-- name: dbtest_WT
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          export BUILDLOGGER_BUILDER=MCI_${build_variant}
-          export BUILDLOGGER_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export BUILDLOGGER_PHASE="${task_name}_${execution}"
-
-          cp mongodb*/bin/* .
-          ${asan_symbolizer} ${enable_lsan} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --storageEngine=wiredTiger dbtest
-
-- name: disk
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          export BUILDLOGGER_BUILDER=MCI_${build_variant}
-          export BUILDLOGGER_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export BUILDLOGGER_PHASE="${task_name}_${execution}"
-
-          cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} disk
-
-- name: durability
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          export BUILDLOGGER_BUILDER=MCI_${build_variant}
-          export BUILDLOGGER_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export BUILDLOGGER_PHASE="${task_name}_${execution}"
-
-          cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} dur
-
-- name: failpoints
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          export BUILDLOGGER_BUILDER=MCI_${build_variant}
-          export BUILDLOGGER_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export BUILDLOGGER_PHASE="${task_name}_${execution}"
-
-          cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} failPoint
-
-- name: failpoints_auth
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          export BUILDLOGGER_BUILDER=MCI_${build_variant}
-          export BUILDLOGGER_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export BUILDLOGGER_PHASE="${task_name}_${execution}"
-
-          cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --auth failPoint
-
-- name: gle_auth
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          export BUILDLOGGER_BUILDER=MCI_${build_variant}
-          export BUILDLOGGER_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export BUILDLOGGER_PHASE="${task_name}_${execution}"
-
-          cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} gle --auth
-
-- name: gle_auth_WT
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          export BUILDLOGGER_BUILDER=MCI_${build_variant}
-          export BUILDLOGGER_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export BUILDLOGGER_PHASE="${task_name}_${execution}"
-
-          cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --storageEngine=wiredTiger gle --auth
-
-- name: gle_auth_write_cmd
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          export BUILDLOGGER_BUILDER=MCI_${build_variant}
-          export BUILDLOGGER_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export BUILDLOGGER_PHASE="${task_name}_${execution}"
-
-          cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} gle --auth --shell-write-mode commands
-
-- name: gle_auth_write_cmd_WT
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          export BUILDLOGGER_BUILDER=MCI_${build_variant}
-          export BUILDLOGGER_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export BUILDLOGGER_PHASE="${task_name}_${execution}"
-
-          cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --storageEngine=wiredTiger gle --auth --shell-write-mode commands
-
-- name: inMemoryExperiment
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          export BUILDLOGGER_BUILDER=MCI_${build_variant}
-          export BUILDLOGGER_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export BUILDLOGGER_PHASE="${task_name}_${execution}"
-
-          cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --storageEngine=inMemoryExperiment --report-file report.json ${test_flags|} js
-
-- name: jsCore
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          export BUILDLOGGER_BUILDER=MCI_${build_variant}
-          export BUILDLOGGER_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export BUILDLOGGER_PHASE="${task_name}_${execution}"
-
-          cp mongodb*/bin/* .
-          ${asan_symbolizer} ${enable_lsan} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --shell-write-mode commands jsCore
-
-- name: jsCore_WT
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          export BUILDLOGGER_BUILDER=MCI_${build_variant}
-          export BUILDLOGGER_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export BUILDLOGGER_PHASE="${task_name}_${execution}"
-
-          cp mongodb*/bin/* .
-          ${asan_symbolizer} ${enable_lsan} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --shell-write-mode commands --storageEngine=wiredTiger jsCore
-
-- name: jsCore_compatibility
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          export BUILDLOGGER_BUILDER=MCI_${build_variant}
-          export BUILDLOGGER_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export BUILDLOGGER_PHASE="${task_name}_${execution}"
-
-          cp mongodb*/bin/* .
-          ${asan_symbolizer} ${enable_lsan} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --shell-write-mode compatibility jsCore
-
-- name: jsCore_compatibility_WT
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          export BUILDLOGGER_BUILDER=MCI_${build_variant}
-          export BUILDLOGGER_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export BUILDLOGGER_PHASE="${task_name}_${execution}"
-
-          cp mongodb*/bin/* .
-          ${asan_symbolizer} ${enable_lsan} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --shell-write-mode compatibility  --storageEngine=wiredTiger jsCore
-
-- name: jsCore_auth
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          export BUILDLOGGER_BUILDER=MCI_${build_variant}
-          export BUILDLOGGER_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export BUILDLOGGER_PHASE="${task_name}_${execution}"
-
-          cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --shell-write-mode commands  --auth jsCore
-
-- name: jsCore_small_oplog
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          export BUILDLOGGER_BUILDER=MCI_${build_variant}
-          export BUILDLOGGER_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export BUILDLOGGER_PHASE="${task_name}_${execution}"
-
-          cp mongodb*/bin/* .
-          ${asan_symbolizer} ${enable_lsan} ${python|python} buildscripts/smoke.py --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --shell-write-mode commands  --small-oplog jsCore
-
-- name: jsCore_small_oplog_WT
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          export BUILDLOGGER_BUILDER=MCI_${build_variant}
-          export BUILDLOGGER_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export BUILDLOGGER_PHASE="${task_name}_${execution}"
-
-          cp mongodb*/bin/* .
-          ${asan_symbolizer} ${enable_lsan} ${python|python} buildscripts/smoke.py --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --shell-write-mode commands  --small-oplog --storageEngine=wiredTiger jsCore
-
-- name: jsCore_small_oplog_rs
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          export BUILDLOGGER_BUILDER=MCI_${build_variant}
-          export BUILDLOGGER_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export BUILDLOGGER_PHASE="${task_name}_${execution}"
-
-          cp mongodb*/bin/* .
-          ${asan_symbolizer} ${enable_lsan} ${python|python} buildscripts/smoke.py --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --shell-write-mode commands  --small-oplog-rs jsCore
-
-- name: jsCore_small_oplog_rs_WT
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          export BUILDLOGGER_BUILDER=MCI_${build_variant}
-          export BUILDLOGGER_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export BUILDLOGGER_PHASE="${task_name}_${execution}"
-
-          cp mongodb*/bin/* .
-          ${asan_symbolizer} ${enable_lsan} ${python|python} buildscripts/smoke.py --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --shell-write-mode commands  --small-oplog-rs --storageEngine=wiredTiger jsCore
-
-
-- name: mongo-perf
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          cp mongodb*/bin/* .
-          git clone git://github.com/mongodb/mongo-perf.git
-          cd mongo-perf/mongo-cxx-driver && ${scons|scons}
-          cd mongo-perf && ${scons|scons}
-          cd mongo-perf && touch mongod.conf
-          if [ "${build_variant|}" =  "linux-64-new-query-framework" ] ;  then cd mongo-perf && (echo "setParameter = newQueryFrameworkEnabled=1" | tee -a mongod.conf) fi
-          cd mongo-perf && ${python|python} runner.py --config mongod.conf --rhost mongoperf-db.10gen.cc --port 30000 --mongod ../mongod --label ${build_variant|}
-
-- name: mmap
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          export BUILDLOGGER_BUILDER=MCI_${build_variant}
-          export BUILDLOGGER_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export BUILDLOGGER_PHASE="${task_name}_${execution}"
-
-          cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} mmap_v1
-
-- name: mongosTest
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          export BUILDLOGGER_BUILDER=MCI_${build_variant}
-          export BUILDLOGGER_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export BUILDLOGGER_PHASE="${task_name}_${execution}"
-
-          cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} mongosTest
-
-- name: multiversion
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          export BUILDLOGGER_BUILDER=MCI_${build_variant}
-          export BUILDLOGGER_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export BUILDLOGGER_PHASE="${task_name}_${execution}"
-
-          cp mongodb*/bin/* .
-          rm -rf /data/install /data/multiversion
-          ${python|python} buildscripts/setup_multiversion_mongodb.py /data/install /data/multiversion "Linux/x86_64" "1.8" "2.0" "2.2" "2.4" "2.6" "3.0"
-          PATH=$PATH:/data/multiversion ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} multiVersion
-
-- name: noPassthrough
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          export BUILDLOGGER_BUILDER=MCI_${build_variant}
-          export BUILDLOGGER_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export BUILDLOGGER_PHASE="${task_name}_${execution}"
-
-          cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} noPassthrough
-
-- name: noPassthrough_WT
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          export BUILDLOGGER_BUILDER=MCI_${build_variant}
-          export BUILDLOGGER_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export BUILDLOGGER_PHASE="${task_name}_${execution}"
-
-          cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --storageEngine=wiredTiger noPassthrough
-
-- name: noPassthroughWithMongod
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          export BUILDLOGGER_BUILDER=MCI_${build_variant}
-          export BUILDLOGGER_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export BUILDLOGGER_PHASE="${task_name}_${execution}"
-
-          cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} noPassthroughWithMongod
-
-- name: noPassthroughWithMongod_WT
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          export BUILDLOGGER_BUILDER=MCI_${build_variant}
-          export BUILDLOGGER_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export BUILDLOGGER_PHASE="${task_name}_${execution}"
-
-          cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --storageEngine=wiredTiger noPassthroughWithMongod
-
-- name: slow1
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          export BUILDLOGGER_BUILDER=MCI_${build_variant}
-          export BUILDLOGGER_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export BUILDLOGGER_PHASE="${task_name}_${execution}"
-
-          cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} slow1
-
-- name: slow1_WT
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          export BUILDLOGGER_BUILDER=MCI_${build_variant}
-          export BUILDLOGGER_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export BUILDLOGGER_PHASE="${task_name}_${execution}"
-
-          cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --storageEngine=wiredTiger slow1
-
-- name: slow2
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      timeout_secs: 10800
-      params:
-        working_dir: src
-        script: |
-          export BUILDLOGGER_BUILDER=MCI_${build_variant}
-          export BUILDLOGGER_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export BUILDLOGGER_PHASE="${task_name}_${execution}"
-
-          cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --clean-every=1 --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} slow2
-
-- name: slow2_WT
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      timeout_secs: 10800
-      params:
-        working_dir: src
-        script: |
-          export BUILDLOGGER_BUILDER=MCI_${build_variant}
-          export BUILDLOGGER_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export BUILDLOGGER_PHASE="${task_name}_${execution}"
-
-          cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --clean-every=1 --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --storageEngine=wiredTiger slow2
-
-- name: parallel
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          export BUILDLOGGER_BUILDER=MCI_${build_variant}
-          export BUILDLOGGER_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export BUILDLOGGER_PHASE="${task_name}_${execution}"
-
-          cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} parallel
-
-- name: parallel_WT
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          export BUILDLOGGER_BUILDER=MCI_${build_variant}
-          export BUILDLOGGER_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export BUILDLOGGER_PHASE="${task_name}_${execution}"
-
-          cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --storageEngine=wiredTiger --wiredTigerEngineConfig=cache_size=1G parallel
-
-- name: parallel_compatibility
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          export BUILDLOGGER_BUILDER=MCI_${build_variant}
-          export BUILDLOGGER_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export BUILDLOGGER_PHASE="${task_name}_${execution}"
-
-          cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --shell-write-mode compatibility  parallel
-
-- name: parallel_compatibility_WT
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          export BUILDLOGGER_BUILDER=MCI_${build_variant}
-          export BUILDLOGGER_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export BUILDLOGGER_PHASE="${task_name}_${execution}"
-
-          cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --shell-write-mode compatibility  --storageEngine=wiredTiger --wiredTigerEngineConfig=cache_size=1G parallel
-
-- name: concurrency
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          export BUILDLOGGER_BUILDER=MCI_${build_variant}
-          export BUILDLOGGER_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export BUILDLOGGER_PHASE="${task_name}_${execution}"
-
-          cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} concurrency
-
-- name: concurrency_WT
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          export BUILDLOGGER_BUILDER=MCI_${build_variant}
-          export BUILDLOGGER_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export BUILDLOGGER_PHASE="${task_name}_${execution}"
-
-          cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --storageEngine=wiredTiger --wiredTigerEngineConfig=cache_size=1G concurrency
-
-- name: concurrency_compatibility
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          export BUILDLOGGER_BUILDER=MCI_${build_variant}
-          export BUILDLOGGER_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export BUILDLOGGER_PHASE="${task_name}_${execution}"
-
-          cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --shell-write-mode compatibility  concurrency
-
-- name: concurrency_compatibility_WT
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          export BUILDLOGGER_BUILDER=MCI_${build_variant}
-          export BUILDLOGGER_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export BUILDLOGGER_PHASE="${task_name}_${execution}"
-
-          cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --shell-write-mode compatibility  --storageEngine=wiredTiger --wiredTigerEngineConfig=cache_size=1G concurrency
-
-- name: replicasets
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          export BUILDLOGGER_BUILDER=MCI_${build_variant}
-          export BUILDLOGGER_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export BUILDLOGGER_PHASE="${task_name}_${execution}"
-
-          cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} replSets
-
-- name: replicasets_WT
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          export BUILDLOGGER_BUILDER=MCI_${build_variant}
-          export BUILDLOGGER_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export BUILDLOGGER_PHASE="${task_name}_${execution}"
-
-          cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --storageEngine=wiredTiger replSets
-
-- name: replicasets_auth
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          export BUILDLOGGER_BUILDER=MCI_${build_variant}
-          export BUILDLOGGER_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export BUILDLOGGER_PHASE="${task_name}_${execution}"
-
-          cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --auth replSets
-
-- name: replication
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          export BUILDLOGGER_BUILDER=MCI_${build_variant}
-          export BUILDLOGGER_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export BUILDLOGGER_PHASE="${task_name}_${execution}"
-
-          cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} repl
-
-- name: replication_WT
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          export BUILDLOGGER_BUILDER=MCI_${build_variant}
-          export BUILDLOGGER_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export BUILDLOGGER_PHASE="${task_name}_${execution}"
-
-          cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --storageEngine=wiredTiger repl
-
-- name: replication_auth
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          export BUILDLOGGER_BUILDER=MCI_${build_variant}
-          export BUILDLOGGER_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export BUILDLOGGER_PHASE="${task_name}_${execution}"
-
-          cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --auth repl
-
-- name: rlp
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --buildlogger-url ${logger_url|http://buildlogs.mongodb.org/} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} --basisTechRootDirectory /opt/basis --set-parameters rlpEnableExperimentalLanguagesForTesting=true rlp
-
-- name: sasl
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          export BUILDLOGGER_BUILDER=MCI_${build_variant}
-          export BUILDLOGGER_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export BUILDLOGGER_PHASE="${task_name}_${execution}"
-
-          cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} sasl
-
-- name: sharding
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          export BUILDLOGGER_BUILDER=MCI_${build_variant}
-          export BUILDLOGGER_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export BUILDLOGGER_PHASE="${task_name}_${execution}"
-
-          cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} sharding
-
-- name: sharding_WT
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          export BUILDLOGGER_BUILDER=MCI_${build_variant}
-          export BUILDLOGGER_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export BUILDLOGGER_PHASE="${task_name}_${execution}"
-
-          cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --storageEngine=wiredTiger sharding
-
-- name: sharding_auth
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          export BUILDLOGGER_BUILDER=MCI_${build_variant}
-          export BUILDLOGGER_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export BUILDLOGGER_PHASE="${task_name}_${execution}"
-
-          cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --auth sharding
-
-- name: snmp
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          export BUILDLOGGER_BUILDER=MCI_${build_variant}
-          export BUILDLOGGER_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export BUILDLOGGER_PHASE="${task_name}_${execution}"
-
-          cp mongodb*/bin/* .
-          mkdir -p snmpconf
-          cp -f src/mongo/db/modules/enterprise/docs/mongod.conf.master snmpconf/mongod.conf
-          SNMPCONFPATH=snmpconf ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} snmp
-
-- name: snmp_WT
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          export BUILDLOGGER_BUILDER=MCI_${build_variant}
-          export BUILDLOGGER_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export BUILDLOGGER_PHASE="${task_name}_${execution}"
-
-          cp mongodb*/bin/* .
-          mkdir -p snmpconf
-          cp -f src/mongo/db/modules/enterprise/docs/mongod.conf.master snmpconf/mongod.conf
-          SNMPCONFPATH=snmpconf ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --storageEngine=wiredTiger snmp
-
-- name: ssl
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          export BUILDLOGGER_BUILDER=MCI_${build_variant}
-          export BUILDLOGGER_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export BUILDLOGGER_PHASE="${task_name}_${execution}"
-
-          cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} ssl --use-ssl
-
-- name: sslSpecial
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          export BUILDLOGGER_BUILDER=MCI_${build_variant}
-          export BUILDLOGGER_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export BUILDLOGGER_PHASE="${task_name}_${execution}"
-
-          cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} sslSpecial
-
-- name: tool
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          export BUILDLOGGER_BUILDER=MCI_${build_variant}
-          export BUILDLOGGER_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export BUILDLOGGER_PHASE="${task_name}_${execution}"
-
-          cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} tool
-
-- name: tool_WT
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          export BUILDLOGGER_BUILDER=MCI_${build_variant}
-          export BUILDLOGGER_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|http://buildlogs.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export BUILDLOGGER_PHASE="${task_name}_${execution}"
-
-          cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --storageEngine=wiredTiger tool
+- <<: *task_template
+  name: aggregation
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=aggregation --storageEngine=mmapv1
+
+- <<: *task_template
+  name: aggregation_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=aggregation --storageEngine=wiredTiger
+
+- <<: *task_template
+  name: aggregation_auth
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=aggregation_auth
+
+- <<: *task_template
+  name: audit
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=audit --storageEngine=mmapv1
+
+- <<: *task_template
+  name: audit_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=audit --storageEngine=wiredTiger
+
+- <<: *task_template
+  name: auth
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=auth --storageEngine=mmapv1
+
+- <<: *task_template
+  name: auth_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=auth --storageEngine=wiredTiger
+
+- <<: *task_template
+  name: dbtest
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=dbtest --storageEngine=mmapv1
+
+- <<: *task_template
+  name: dbtest_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=dbtest --storageEngine=wiredTiger
+
+- <<: *task_template
+  name: disk
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=disk
+
+- <<: *task_template
+  name: durability
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=durability
+
+- <<: *task_template
+  name: dur_jscore_passthrough
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=dur_jscore_passthrough
+
+- <<: *task_template
+  name: failpoints
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=failpoints
+
+- <<: *task_template
+  name: failpoints_auth
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=failpoints_auth
+
+- <<: *task_template
+  name: gle_auth
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=gle_auth --shellWriteMode=legacy --storageEngine=mmapv1
+
+- <<: *task_template
+  name: gle_auth_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=gle_auth --shellWriteMode=legacy --storageEngine=wiredTiger
+
+- <<: *task_template
+  name: gle_auth_write_cmd
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args:  --suites=gle_auth --shellWriteMode=commands --storageEngine=mmapv1
+
+- <<: *task_template
+  name: gle_auth_write_cmd_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=gle_auth --shellWriteMode=commands --storageEngine=wiredTiger
+
+- <<: *task_template
+  name: gle_auth_basics_passthrough
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=gle_auth_basics_passthrough --shellWriteMode=legacy --storageEngine=mmapv1
+
+- <<: *task_template
+  name: gle_auth_basics_passthrough_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=gle_auth_basics_passthrough --shellWriteMode=legacy --storageEngine=wiredTiger
+
+- <<: *task_template
+  name: gle_auth_basics_passthrough_write_cmd
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=gle_auth_basics_passthrough --shellWriteMode=commands --storageEngine=mmapv1
+
+- <<: *task_template
+  name: gle_auth_basics_passthrough_write_cmd_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=gle_auth_basics_passthrough --shellWriteMode=commands --storageEngine=wiredTiger
+
+- <<: *task_template
+  name: sharding_gle_auth_basics_passthrough
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharding_gle_auth_basics_passthrough --shellWriteMode=legacy --storageEngine=mmapv1
+
+- <<: *task_template
+  name: sharding_gle_auth_basics_passthrough_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharding_gle_auth_basics_passthrough --shellWriteMode=legacy --storageEngine=wiredTiger
+
+- <<: *task_template
+  name: sharding_gle_auth_basics_passthrough_write_cmd
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharding_gle_auth_basics_passthrough --shellWriteMode=commands --storageEngine=mmapv1
+
+- <<: *task_template
+  name: sharding_gle_auth_basics_passthrough_write_cmd_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharding_gle_auth_basics_passthrough --shellWriteMode=commands --storageEngine=wiredTiger
+
+- <<: *task_template
+  name: jsCore
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: -j8 --suites=core --storageEngine=mmapv1
+
+- <<: *task_template
+  name: jsCore_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: -j8 --suites=core --storageEngine=wiredTiger
+
+- <<: *task_template
+  name: jsCore_compatibility
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: -j8 --suites=core --shellWriteMode=compatibility --storageEngine=mmapv1
+
+- <<: *task_template
+  name: jsCore_compatibility_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: -j8 --suites=core --shellWriteMode=compatibility --storageEngine=wiredTiger
+
+- <<: *task_template
+  name: jsCore_auth
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: -j8 --suites=core_auth --storageEngine=mmapv1
+
+- <<: *task_template
+  name: jsCore_auth_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: -j8 --suites=core_auth --storageEngine=wiredTiger
+
+- <<: *task_template
+  name: inMemoryExperiment
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: -j8 --suites=core --storageEngine=inMemoryExperiment
+
+- <<: *task_template
+  name: jsCore_small_oplog
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=core_small_oplog --storageEngine=mmapv1
+
+- <<: *task_template
+  name: jsCore_small_oplog_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=core_small_oplog --storageEngine=wiredTiger
+
+- <<: *task_template
+  name: jsCore_small_oplog_rs
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=core_small_oplog_rs --storageEngine=mmapv1
+
+- <<: *task_template
+  name: jsCore_small_oplog_rs_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=core_small_oplog_rs --storageEngine=wiredTiger
+
+- <<: *task_template
+  name: mongosTest
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=mongos_test
+
+- <<: *task_template
+  name: mmap
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=mmap
+
+- <<: *task_template
+  name: multiversion
+  commands:
+  - func: "do setup"
+  - command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        set -o errexit
+        set -o verbose
+
+        cp mongodb*/bin/* .
+        rm -rf /data/install /data/multiversion
+        ${python|python} buildscripts/setup_multiversion_mongodb.py /data/install /data/multiversion "Linux/x86_64" "1.8" "2.0" "2.2" "2.4" "2.6" "3.0"
+        PATH=$PATH:/data/multiversion ${asan_symbolizer} ${enable_lsan} ${python|python} buildscripts/resmoke.py --suites=multiversion ${test_flags} --log=buildlogger --reportFile=report.json
+
+- <<: *task_template
+  name: noPassthrough
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=no_passthrough --storageEngine=mmapv1
+
+- <<: *task_template
+  name: noPassthrough_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=no_passthrough --storageEngine=wiredTiger
+
+- <<: *task_template
+  name: noPassthroughWithMongod
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=no_passthrough_with_mongod --storageEngine=mmapv1
+
+- <<: *task_template
+  name: noPassthroughWithMongod_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=no_passthrough_with_mongod --storageEngine=wiredTiger
+
+- <<: *task_template
+  name: bulk_gle_passthrough
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=bulk_gle_passthrough --storageEngine=mmapv1
+
+- <<: *task_template
+  name: bulk_gle_passthrough_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=bulk_gle_passthrough --storageEngine=wiredTiger
+
+- <<: *task_template
+  name: slow1
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=slow1 --storageEngine=mmapv1
+
+- <<: *task_template
+  name: slow1_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=slow1 --storageEngine=wiredTiger
+
+- <<: *task_template
+  name: slow2
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=slow2 --storageEngine=mmapv1
+
+- <<: *task_template
+  name: slow2_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=slow2 --storageEngine=wiredTiger
+
+- <<: *task_template
+  name: sharding_jscore_passthrough
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharding_jscore_passthrough --storageEngine=mmapv1
+
+- <<: *task_template
+  name: sharding_jscore_passthrough_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharding_jscore_passthrough --storageEngine=wiredTiger
+
+- <<: *task_template
+  name: parallel
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=parallel --storageEngine=mmapv1
+
+- <<: *task_template
+  name: parallel_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=parallel --storageEngine=wiredTiger
+
+- <<: *task_template
+  name: parallel_compatibility
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=parallel --shellWriteMode=compatibility --storageEngine=mmapv1
+
+- <<: *task_template
+  name: parallel_compatibility_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=parallel --shellWriteMode=compatibility --storageEngine=wiredTiger
+
+- <<: *task_template
+  name: concurrency
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=concurrency --storageEngine=mmapv1
+
+- <<: *task_template
+  name: concurrency_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=concurrency --storageEngine=wiredTiger
+
+- <<: *task_template
+  name: concurrency_compatibility
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=concurrency --shellWriteMode=compatibility --storageEngine=mmapv1
+
+- <<: *task_template
+  name: concurrency_compatibility_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=concurrency --shellWriteMode=compatibility --storageEngine=wiredTiger
+
+- <<: *task_template
+  name: rlp
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=rlp --storageEngine=mmapv1
+
+- <<: *task_template
+  name: rlp_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=rlp --storageEngine=wiredTiger
+
+- <<: *task_template
+  name: replicasets
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=replica_sets --storageEngine=mmapv1
+
+- <<: *task_template
+  name: replicasets_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=replica_sets --storageEngine=wiredTiger
+
+- <<: *task_template
+  name: replicasets_auth
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=replica_sets_auth
+
+- <<: *task_template
+  name: replication
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=replication --storageEngine=mmapv1
+
+- <<: *task_template
+  name: replication_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=replication --storageEngine=wiredTiger
+
+- <<: *task_template
+  name: replication_auth
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=replication_auth
+
+- <<: *task_template
+  name: sasl
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sasl
+
+- <<: *task_template
+  name: sharding
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharding --storageEngine=mmapv1
+
+- <<: *task_template
+  name: sharding_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharding --storageEngine=wiredTiger
+
+- <<: *task_template
+  name: sharding_auth
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharding_auth
+
+- <<: *task_template
+  name: snmp
+  commands:
+  - func: "do setup"
+  - command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        set -o errexit
+        set -o verbose
+
+        cp mongodb*/bin/* .
+        mkdir -p snmpconf
+        cp -f src/mongo/db/modules/enterprise/docs/mongod.conf.master snmpconf/mongod.conf
+        SNMPCONFPATH=snmpconf ${asan_symbolizer} ${enable_lsan} ${python|python} buildscripts/resmoke.py --suites=snmp --storageEngine=mmapv1 ${test_flags} --log=buildlogger --reportFile=report.json
+
+- <<: *task_template
+  name: snmp_WT
+  commands:
+  - func: "do setup"
+  - command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        set -o errexit
+        set -o verbose
+
+        cp mongodb*/bin/* .
+        mkdir -p snmpconf
+        cp -f src/mongo/db/modules/enterprise/docs/mongod.conf.master snmpconf/mongod.conf
+        SNMPCONFPATH=snmpconf ${asan_symbolizer} ${enable_lsan} ${python|python} buildscripts/resmoke.py --suites=snmp --storageEngine=wiredTiger ${test_flags} --log=buildlogger --reportFile=report.json
+
+- <<: *task_template
+  name: ssl
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=ssl
+
+- <<: *task_template
+  name: sslSpecial
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=ssl_special
+
+- <<: *task_template
+  name: tool
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=tool --storageEngine=mmapv1
+
+- <<: *task_template
+  name: tool_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=tool --storageEngine=wiredTiger
 
 - name: push
   depends_on:
@@ -2082,7 +1374,9 @@ tasks:
         script: |
           ssh distro-deb2.build.10gen.cc sudo -H -u ubuntu /home/ubuntu/git/kernel-tools/releases/publish_packages/publish_packages.sh master ${version} ${revision} || true
 
-### modules ###
+#######################################
+#               Modules               #
+#######################################
 
 modules:
 - name: enterprise
@@ -2096,7 +1390,7 @@ modules:
   branch: master
 
 #######################################
-# Buildvariants
+#            Buildvariants            #
 #######################################
 
 buildvariants:
@@ -2119,7 +1413,8 @@ buildvariants:
     push_name: linux
     push_arch: x86_64
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release --variant-dir="linux2/release"
-    test_flags: --continue-on-failure
+    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
+    test_flags: --continueOnFailure
     has_debugsymbols: true
   tasks:
   - name: compile
@@ -2135,12 +1430,21 @@ buildvariants:
   - name: dbtest_WT
   - name: disk
   - name: durability
+  - name: dur_jscore_passthrough
   - name: failpoints
   - name: failpoints_auth
   - name: gle_auth
   - name: gle_auth_WT
   - name: gle_auth_write_cmd
   - name: gle_auth_write_cmd_WT
+  - name: gle_auth_basics_passthrough
+  - name: gle_auth_basics_passthrough_WT
+  - name: gle_auth_basics_passthrough_write_cmd
+  - name: gle_auth_basics_passthrough_write_cmd_WT
+  - name: sharding_gle_auth_basics_passthrough
+  - name: sharding_gle_auth_basics_passthrough_WT
+  - name: sharding_gle_auth_basics_passthrough_write_cmd
+  - name: sharding_gle_auth_basics_passthrough_write_cmd_WT
   - name: inMemoryExperiment
   - name: jsCore
   - name: jsCore_WT
@@ -2158,6 +1462,8 @@ buildvariants:
   - name: noPassthrough_WT
   - name: noPassthroughWithMongod
   - name: noPassthroughWithMongod_WT
+  - name: bulk_gle_passthrough
+  - name: bulk_gle_passthrough_WT
   - name: parallel
   - name: parallel_WT
   - name: parallel_compatibility
@@ -2179,6 +1485,8 @@ buildvariants:
   - name: slow1_WT
   - name: slow2
   - name: slow2_WT
+  - name: sharding_jscore_passthrough
+  - name: sharding_jscore_passthrough_WT
   - name: tool
   - name: tool_WT
   - name: push
@@ -2198,7 +1506,8 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux-debug
     push_arch: x86_64
-    test_flags: --continue-on-failure
+    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
+    test_flags: --continueOnFailure
     compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/dbg_on/opt_on"
     has_debugsymbols: true
   tasks:
@@ -2221,16 +1530,18 @@ buildvariants:
   - name: jsCore_auth
   - name: jsCore_compatibility
   - name: jsCore_compatibility_WT
-  - name: mmap
   - name: jsCore_small_oplog
   - name: jsCore_small_oplog_WT
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
+  - name: mmap
   - name: mongosTest
   - name: noPassthrough
   - name: noPassthrough_WT
   - name: noPassthroughWithMongod
   - name: noPassthroughWithMongod_WT
+  - name: bulk_gle_passthrough
+  - name: bulk_gle_passthrough_WT
   - name: parallel
   - name: parallel_WT
   - name: parallel_compatibility
@@ -2252,6 +1563,8 @@ buildvariants:
   - name: slow1_WT
   - name: slow2
   - name: slow2_WT
+  - name: sharding_jscore_passthrough
+  - name: sharding_jscore_passthrough_WT
   - name: tool
   - name: tool_WT
 
@@ -2270,7 +1583,8 @@ buildvariants:
     push_arch: x86_64
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/durableDefaultOff"
     has_debugsymbols: true
-    test_flags: --continue-on-failure --nojournal
+    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
+    test_flags: --continueOnFailure --nojournal
   tasks:
   - name: compile
     distros:
@@ -2281,6 +1595,7 @@ buildvariants:
   - name: dbtest
   - name: disk
   - name: durability
+  - name: dur_jscore_passthrough
   - name: failpoints
   - name: failpoints_auth
   - name: jsCore
@@ -2288,10 +1603,11 @@ buildvariants:
   - name: jsCore_compatibility
   - name: jsCore_small_oplog
   - name: jsCore_small_oplog_rs
-  - name: mongosTest
   - name: mmap
+  - name: mongosTest
   - name: noPassthrough
   - name: noPassthroughWithMongod
+  - name: bulk_gle_passthrough
   - name: parallel
   - name: parallel_compatibility
   - name: concurrency
@@ -2304,6 +1620,7 @@ buildvariants:
   - name: sharding_auth
   - name: slow1
   - name: slow2
+  - name: sharding_jscore_passthrough
   - name: tool
 
 - name: linux-64-lsm
@@ -2316,7 +1633,8 @@ buildvariants:
     gitvars: LD_LIBRARY_PATH=/opt/openssl/lib64 #needed to workaround the old openSSL on rhel55 builders.
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release --variant-dir="linux2/release"
-    test_flags: --continue-on-failure --wiredTigerCollectionConfig=type=lsm --wiredTigerIndexConfig=type=lsm
+    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
+    test_flags: --continueOnFailure --wiredTigerCollectionConfig=type=lsm --wiredTigerIndexConfig=type=lsm
   tasks:
   - name: compile
     distros:
@@ -2326,12 +1644,17 @@ buildvariants:
   - name: dbtest_WT
   - name: gle_auth_WT
   - name: gle_auth_write_cmd_WT
+  - name: gle_auth_basics_passthrough_WT
+  - name: gle_auth_basics_passthrough_write_cmd_WT
+  - name: sharding_gle_auth_basics_passthrough_WT
+  - name: sharding_gle_auth_basics_passthrough_write_cmd_WT
   - name: jsCore_WT
   - name: jsCore_compatibility_WT
   - name: jsCore_small_oplog_WT
   - name: jsCore_small_oplog_rs_WT
   - name: noPassthrough_WT
   - name: noPassthroughWithMongod_WT
+  - name: bulk_gle_passthrough_WT
   - name: parallel_WT
   - name: parallel_compatibility_WT
   - name: concurrency_WT
@@ -2341,8 +1664,8 @@ buildvariants:
   - name: sharding_WT
   - name: slow1_WT
   - name: slow2_WT
+  - name: sharding_jscore_passthrough_WT
   - name: tool_WT
-
 
 - name: ubuntu1204
   display_name: SSL Ubuntu 1204 64-bit
@@ -2356,7 +1679,8 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-ubuntu1204
     compile_flags: --ssl --distmod=ubuntu1204 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/release"
-    test_flags: --continue-on-failure
+    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
+    test_flags: --continueOnFailure
     has_debugsymbols: true
   tasks:
   - name: compile
@@ -2371,12 +1695,21 @@ buildvariants:
   - name: dbtest_WT
   - name: disk
   - name: durability
+  - name: dur_jscore_passthrough
   - name: failpoints
   - name: failpoints_auth
   - name: gle_auth
   - name: gle_auth_WT
   - name: gle_auth_write_cmd
   - name: gle_auth_write_cmd_WT
+  - name: gle_auth_basics_passthrough
+  - name: gle_auth_basics_passthrough_WT
+  - name: gle_auth_basics_passthrough_write_cmd
+  - name: gle_auth_basics_passthrough_write_cmd_WT
+  - name: sharding_gle_auth_basics_passthrough
+  - name: sharding_gle_auth_basics_passthrough_WT
+  - name: sharding_gle_auth_basics_passthrough_write_cmd
+  - name: sharding_gle_auth_basics_passthrough_write_cmd_WT
   - name: jsCore
   - name: jsCore_WT
   - name: jsCore_auth
@@ -2393,6 +1726,8 @@ buildvariants:
   - name: noPassthrough_WT
   - name: noPassthroughWithMongod
   - name: noPassthroughWithMongod_WT
+  - name: bulk_gle_passthrough
+  - name: bulk_gle_passthrough_WT
   - name: parallel
   - name: parallel_WT
   - name: parallel_compatibility
@@ -2414,6 +1749,8 @@ buildvariants:
   - name: slow1_WT
   - name: slow2
   - name: slow2_WT
+  - name: sharding_jscore_passthrough
+  - name: sharding_jscore_passthrough_WT
   - name: ssl
   - name: sslSpecial
   - name: tool
@@ -2434,7 +1771,8 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-ubuntu1404
     compile_flags: --ssl --distmod=ubuntu1404 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/release"
-    test_flags: --continue-on-failure
+    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
+    test_flags: --continueOnFailure
     has_debugsymbols: true
   tasks:
   - name: compile
@@ -2449,12 +1787,21 @@ buildvariants:
   - name: dbtest_WT
   - name: disk
   - name: durability
+  - name: dur_jscore_passthrough
   - name: failpoints
   - name: failpoints_auth
   - name: gle_auth
   - name: gle_auth_WT
   - name: gle_auth_write_cmd
   - name: gle_auth_write_cmd_WT
+  - name: gle_auth_basics_passthrough
+  - name: gle_auth_basics_passthrough_WT
+  - name: gle_auth_basics_passthrough_write_cmd
+  - name: gle_auth_basics_passthrough_write_cmd_WT
+  - name: sharding_gle_auth_basics_passthrough
+  - name: sharding_gle_auth_basics_passthrough_WT
+  - name: sharding_gle_auth_basics_passthrough_write_cmd
+  - name: sharding_gle_auth_basics_passthrough_write_cmd_WT
   - name: jsCore
   - name: jsCore_WT
   - name: jsCore_auth
@@ -2471,6 +1818,8 @@ buildvariants:
   - name: noPassthrough_WT
   - name: noPassthroughWithMongod
   - name: noPassthroughWithMongod_WT
+  - name: bulk_gle_passthrough
+  - name: bulk_gle_passthrough_WT
   - name: parallel
   - name: parallel_WT
   - name: parallel_compatibility
@@ -2492,6 +1841,8 @@ buildvariants:
   - name: slow1_WT
   - name: slow2
   - name: slow2_WT
+  - name: sharding_jscore_passthrough
+  - name: sharding_jscore_passthrough_WT
   - name: ssl
   - name: sslSpecial
   - name: tool
@@ -2513,7 +1864,8 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-enterprise-amzn64
     compile_flags: --ssl --ssl-fips-capability --distmod=amzn64 --release -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/release"
-    test_flags: --authMechanism=SCRAM-SHA-1 --continue-on-failure
+    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
+    test_flags: --continueOnFailure
     has_debugsymbols: true
   tasks:
   - name: compile
@@ -2533,6 +1885,8 @@ buildvariants:
   - name: noPassthrough_WT
   - name: noPassthroughWithMongod
   - name: noPassthroughWithMongod_WT
+  - name: bulk_gle_passthrough
+  - name: bulk_gle_passthrough_WT
   - name: replicasets_auth
   - name: replication_auth
   - name: sasl
@@ -2541,6 +1895,8 @@ buildvariants:
   - name: slow1_WT
   - name: slow2
   - name: slow2_WT
+  - name: sharding_jscore_passthrough
+  - name: sharding_jscore_passthrough_WT
   - name: snmp
   - name: snmp_WT
   - name: ssl
@@ -2561,7 +1917,8 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-amazon
     compile_flags: --ssl --distmod=amazon -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/release"
-    test_flags: --continue-on-failure
+    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
+    test_flags: --continueOnFailure
     has_debugsymbols: true
   tasks:
   - name: compile
@@ -2576,12 +1933,21 @@ buildvariants:
   - name: dbtest_WT
   - name: disk
   - name: durability
+  - name: dur_jscore_passthrough
   - name: failpoints
   - name: failpoints_auth
   - name: gle_auth
   - name: gle_auth_WT
   - name: gle_auth_write_cmd
   - name: gle_auth_write_cmd_WT
+  - name: gle_auth_basics_passthrough
+  - name: gle_auth_basics_passthrough_WT
+  - name: gle_auth_basics_passthrough_write_cmd
+  - name: gle_auth_basics_passthrough_write_cmd_WT
+  - name: sharding_gle_auth_basics_passthrough
+  - name: sharding_gle_auth_basics_passthrough_WT
+  - name: sharding_gle_auth_basics_passthrough_write_cmd
+  - name: sharding_gle_auth_basics_passthrough_write_cmd_WT
   - name: jsCore
   - name: jsCore_WT
   - name: jsCore_auth
@@ -2598,6 +1964,8 @@ buildvariants:
   - name: noPassthrough_WT
   - name: noPassthroughWithMongod
   - name: noPassthroughWithMongod_WT
+  - name: bulk_gle_passthrough
+  - name: bulk_gle_passthrough_WT
   - name: parallel
   - name: parallel_WT
   - name: parallel_compatibility
@@ -2619,6 +1987,8 @@ buildvariants:
   - name: slow1_WT
   - name: slow2
   - name: slow2_WT
+  - name: sharding_jscore_passthrough
+  - name: sharding_jscore_passthrough_WT
   - name: ssl
   - name: sslSpecial
   - name: tool
@@ -2640,7 +2010,8 @@ buildvariants:
     push_name: linux
     push_arch: i686
     compile_flags: --release --distarch=i686 -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/release" --wiredtiger=off CCFLAGS="-m32" LINKFLAGS="-m32"
-    test_flags: --continue-on-failure
+    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
+    test_flags: --continueOnFailure -j1  # Avoid starting too many mongod's on 32-bit systems.
     has_debugsymbols: true
   tasks:
   - name: compile
@@ -2676,7 +2047,8 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux-debug
     push_arch: i686
-    test_flags: --continue-on-failure
+    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
+    test_flags: --continueOnFailure -j1  # Avoid starting too many mongod's on 32-bit systems.
     has_debugsymbols: true
     compile_flags: --dbg=on --distarch=i686 --opt=on -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/debug" --wiredtiger=off CCFLAGS="-m32" LINKFLAGS="-m32"
   tasks:
@@ -2716,8 +2088,11 @@ buildvariants:
     msi_target: msi
     content_type: application/zip
     compile_flags: --release -j$(grep -c ^processor /proc/cpuinfo)
-    test_flags: --continue-on-failure
+    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
+    test_flags: --continueOnFailure
     ext: zip
+    # TODO: Remove the "is_windows" expansion after PyYAML is installed on all build variants.
+    is_windows: true
   tasks:
   - name: compile
     distros:
@@ -2735,6 +2110,14 @@ buildvariants:
   - name: gle_auth_WT
   - name: gle_auth_write_cmd
   - name: gle_auth_write_cmd_WT
+  - name: gle_auth_basics_passthrough
+  - name: gle_auth_basics_passthrough_WT
+  - name: gle_auth_basics_passthrough_write_cmd
+  - name: gle_auth_basics_passthrough_write_cmd_WT
+  - name: sharding_gle_auth_basics_passthrough
+  - name: sharding_gle_auth_basics_passthrough_WT
+  - name: sharding_gle_auth_basics_passthrough_write_cmd
+  - name: sharding_gle_auth_basics_passthrough_write_cmd_WT
   - name: jsCore
   - name: jsCore_WT
   - name: jsCore_compatibility
@@ -2749,6 +2132,8 @@ buildvariants:
   - name: noPassthrough_WT
   - name: noPassthroughWithMongod
   - name: noPassthroughWithMongod_WT
+  - name: bulk_gle_passthrough
+  - name: bulk_gle_passthrough_WT
   - name: parallel
   - name: parallel_WT
   - name: parallel_compatibility
@@ -2767,6 +2152,8 @@ buildvariants:
   - name: slow1_WT
   - name: slow2
   - name: slow2_WT
+  - name: sharding_jscore_passthrough
+  - name: sharding_jscore_passthrough_WT
   - name: tool
   - name: tool_WT
   - name: push
@@ -2787,8 +2174,11 @@ buildvariants:
     msi_target: msi
     content_type: application/zip
     compile_flags: --release --win-version-min=ws08r2 -j$(grep -c ^processor /proc/cpuinfo) --distmod=2008plus
-    test_flags: --continue-on-failure
+    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
+    test_flags: --continueOnFailure
     ext: zip
+    # TODO: Remove the "is_windows" expansion after PyYAML is installed on all build variants.
+    is_windows: true
   tasks:
   - name: compile
     distros:
@@ -2816,6 +2206,8 @@ buildvariants:
   - name: noPassthrough_WT
   - name: noPassthroughWithMongod
   - name: noPassthroughWithMongod_WT
+  - name: bulk_gle_passthrough
+  - name: bulk_gle_passthrough_WT
   - name: parallel
   - name: parallel_WT
   - name: parallel_compatibility
@@ -2834,6 +2226,8 @@ buildvariants:
   - name: slow1_WT
   - name: slow2
   - name: slow2_WT
+  - name: sharding_jscore_passthrough
+  - name: sharding_jscore_passthrough_WT
   - name: tool
   - name: tool_WT
   - name: push
@@ -2852,9 +2246,12 @@ buildvariants:
     push_name: win32-debug
     push_arch: x86_64-2008plus
     content_type: application/zip
-    test_flags: --continue-on-failure
+    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
+    test_flags: --continueOnFailure
     compile_flags: --dbg=on --opt=on --win-version-min=ws08r2 -j$(grep -c ^processor /proc/cpuinfo) --distmod=2008plus
     ext: zip
+    # TODO: Remove the "is_windows" expansion after PyYAML is installed on all build variants.
+    is_windows: true
   tasks:
   - name: compile
     distros:
@@ -2882,6 +2279,8 @@ buildvariants:
   - name: noPassthrough_WT
   - name: noPassthroughWithMongod
   - name: noPassthroughWithMongod_WT
+  - name: bulk_gle_passthrough
+  - name: bulk_gle_passthrough_WT
   - name: parallel
   - name: parallel_WT
   - name: parallel_compatibility
@@ -2916,8 +2315,11 @@ buildvariants:
     msi_target: msi
     content_type: application/zip
     compile_flags: --release --ssl --ssl-fips-capability --distmod=windows-64 CPPPATH="c:/openssl/include c:/sasl/include c:/snmp/include" LIBPATH="c:/openssl/lib c:/sasl/lib c:/snmp/lib" -j$(grep -c ^processor /proc/cpuinfo) --dynamic-windows --win-version-min=ws08r2 --variant-dir=win32
-    test_flags: --continue-on-failure
+    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
+    test_flags: --continueOnFailure
     ext: zip
+    # TODO: Remove the "is_windows" expansion after PyYAML is installed on all build variants.
+    is_windows: true
   tasks:
   - name: compile
     distros:
@@ -2955,8 +2357,11 @@ buildvariants:
     msi_target: msi
     content_type: application/zip
     compile_flags: --release --ssl --distmod=2008plus-ssl CPPPATH="c:/openssl/include" LIBPATH="c:/openssl/lib" -j$(grep -c ^processor /proc/cpuinfo) --dynamic-windows --win-version-min=ws08r2
-    test_flags: --continue-on-failure
+    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
+    test_flags: --continueOnFailure
     ext: zip
+    # TODO: Remove the "is_windows" expansion after PyYAML is installed on all build variants.
+    is_windows: true
   tasks:
   - name: compile
     distros:
@@ -2984,6 +2389,8 @@ buildvariants:
   - name: noPassthrough_WT
   - name: noPassthroughWithMongod
   - name: noPassthroughWithMongod_WT
+  - name: bulk_gle_passthrough
+  - name: bulk_gle_passthrough_WT
   - name: parallel
   - name: parallel_WT
   - name: parallel_compatibility
@@ -3002,6 +2409,8 @@ buildvariants:
   - name: slow1_WT
   - name: slow2
   - name: slow2_WT
+  - name: sharding_jscore_passthrough
+  - name: sharding_jscore_passthrough_WT
   - name: tool
   - name: tool_WT
   - name: ssl
@@ -3025,8 +2434,11 @@ buildvariants:
     msi_target: msi
     content_type: application/zip
     compile_flags: --release -j$(grep -c ^processor /proc/cpuinfo) --wiredtiger=off TARGET_ARCH=i386
-    test_flags: --continue-on-failure
+    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
+    test_flags: --continueOnFailure -j1  # Avoid starting too many mongod's on 32-bit systems.
     ext: zip
+    # TODO: Remove the "is_windows" expansion after PyYAML is installed on all build variants.
+    is_windows: true
   tasks:
   - name: compile
     distros:
@@ -3064,7 +2476,8 @@ buildvariants:
     push_name: osx
     push_arch: x86_64
     compile_flags: --allocator=system -j$(sysctl -n hw.logicalcpu) --release --osx-version-min=10.7 --libc++
-    test_flags: --continue-on-failure
+    num_jobs_unittests: $(sysctl -n hw.logicalcpu)
+    test_flags: --continueOnFailure
   tasks:
   - name: compile
   - name: aggregation
@@ -3080,6 +2493,14 @@ buildvariants:
   - name: gle_auth_WT
   - name: gle_auth_write_cmd
   - name: gle_auth_write_cmd_WT
+  - name: gle_auth_basics_passthrough
+  - name: gle_auth_basics_passthrough_WT
+  - name: gle_auth_basics_passthrough_write_cmd
+  - name: gle_auth_basics_passthrough_write_cmd_WT
+  - name: sharding_gle_auth_basics_passthrough
+  - name: sharding_gle_auth_basics_passthrough_WT
+  - name: sharding_gle_auth_basics_passthrough_write_cmd
+  - name: sharding_gle_auth_basics_passthrough_write_cmd_WT
   - name: jsCore
   - name: jsCore_WT
   - name: jsCore_compatibility
@@ -3094,6 +2515,8 @@ buildvariants:
   - name: noPassthrough_WT
   - name: noPassthroughWithMongod
   - name: noPassthroughWithMongod_WT
+  - name: bulk_gle_passthrough
+  - name: bulk_gle_passthrough_WT
   - name: parallel
   - name: parallel_WT
   - name: parallel_compatibility
@@ -3112,6 +2535,8 @@ buildvariants:
   - name: slow1_WT
   - name: slow2
   - name: slow2_WT
+  - name: sharding_jscore_passthrough
+  - name: sharding_jscore_passthrough_WT
   - name: tool
   - name: tool_WT
   - name: push
@@ -3128,7 +2553,8 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: osx-debug
     push_arch: x86_64
-    test_flags: --continue-on-failure
+    num_jobs_unittests: $(sysctl -n hw.logicalcpu)
+    test_flags: --continueOnFailure
     compile_flags: --dbg=on --opt=on --allocator=system -j$(sysctl -n hw.logicalcpu) --osx-version-min=10.7 --libc++
   tasks:
   - name: compile
@@ -3159,6 +2585,7 @@ buildvariants:
 ###########################################
 #          Redhat buildvariants           #
 ###########################################
+
 - name: enterprise-rhel-57-64-bit
   display_name: Enterprise RHEL 5.7 64-bit
   modules:
@@ -3174,7 +2601,8 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-enterprise-rhel57
     compile_flags: --ssl --ssl-fips-capability --distmod=rhel57 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/release"
-    test_flags: --continue-on-failure
+    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
+    test_flags: --continueOnFailure
     has_debugsymbols: true
   tasks:
   - name: compile
@@ -3212,7 +2640,8 @@ buildvariants:
     push_arch: x86_64-enterprise-rhel62
     rlp_environment: MONGOD_UNITTEST_RLP_LANGUAGE_TEST_BTROOT=/opt/basis
     compile_flags: --ssl --ssl-fips-capability --distmod=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/release" CPPPATH="/opt/basis/rlp/rlp/include /opt/basis/rlp/utilities/include" --use-basis-tech-rosette-linguistics-platform=on
-    test_flags: --continue-on-failure
+    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
+    test_flags: --continueOnFailure
     has_debugsymbols: true
   tasks:
   - name: compile
@@ -3250,7 +2679,8 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-enterprise-rhel70
     compile_flags: --ssl --ssl-fips-capability --distmod=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/release"
-    test_flags: --continue-on-failure
+    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
+    test_flags: --continueOnFailure
     has_debugsymbols: true
   tasks:
   - name: compile
@@ -3286,7 +2716,8 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-rhel55
     compile_flags: --ssl --distmod=rhel55 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/release"
-    test_flags: --continue-on-failure
+    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
+    test_flags: --continueOnFailure
     has_debugsymbols: true
   tasks:
   - name: compile
@@ -3301,12 +2732,21 @@ buildvariants:
   - name: dbtest_WT
   - name: disk
   - name: durability
+  - name: dur_jscore_passthrough
   - name: failpoints
   - name: failpoints_auth
   - name: gle_auth
   - name: gle_auth_WT
   - name: gle_auth_write_cmd
   - name: gle_auth_write_cmd_WT
+  - name: gle_auth_basics_passthrough
+  - name: gle_auth_basics_passthrough_WT
+  - name: gle_auth_basics_passthrough_write_cmd
+  - name: gle_auth_basics_passthrough_write_cmd_WT
+  - name: sharding_gle_auth_basics_passthrough
+  - name: sharding_gle_auth_basics_passthrough_WT
+  - name: sharding_gle_auth_basics_passthrough_write_cmd
+  - name: sharding_gle_auth_basics_passthrough_write_cmd_WT
   - name: jsCore
   - name: jsCore_WT
   - name: jsCore_auth
@@ -3323,6 +2763,8 @@ buildvariants:
   - name: noPassthrough_WT
   - name: noPassthroughWithMongod
   - name: noPassthroughWithMongod_WT
+  - name: bulk_gle_passthrough
+  - name: bulk_gle_passthrough_WT
   - name: parallel
   - name: parallel_WT
   - name: parallel_compatibility
@@ -3344,6 +2786,8 @@ buildvariants:
   - name: slow1_WT
   - name: slow2
   - name: slow2_WT
+  - name: sharding_jscore_passthrough
+  - name: sharding_jscore_passthrough_WT
   - name: ssl
   - name: sslSpecial
   - name: tool
@@ -3365,7 +2809,8 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-rhel62
     compile_flags: --ssl --distmod=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/release"
-    test_flags: --continue-on-failure
+    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
+    test_flags: --continueOnFailure
     has_debugsymbols: true
   tasks:
   - name: compile
@@ -3380,12 +2825,21 @@ buildvariants:
   - name: dbtest_WT
   - name: disk
   - name: durability
+  - name: dur_jscore_passthrough
   - name: failpoints
   - name: failpoints_auth
   - name: gle_auth
   - name: gle_auth_WT
   - name: gle_auth_write_cmd
   - name: gle_auth_write_cmd_WT
+  - name: gle_auth_basics_passthrough
+  - name: gle_auth_basics_passthrough_WT
+  - name: gle_auth_basics_passthrough_write_cmd
+  - name: gle_auth_basics_passthrough_write_cmd_WT
+  - name: sharding_gle_auth_basics_passthrough
+  - name: sharding_gle_auth_basics_passthrough_WT
+  - name: sharding_gle_auth_basics_passthrough_write_cmd
+  - name: sharding_gle_auth_basics_passthrough_write_cmd_WT
   - name: jsCore
   - name: jsCore_WT
   - name: jsCore_auth
@@ -3402,6 +2856,8 @@ buildvariants:
   - name: noPassthrough_WT
   - name: noPassthroughWithMongod
   - name: noPassthroughWithMongod_WT
+  - name: bulk_gle_passthrough
+  - name: bulk_gle_passthrough_WT
   - name: parallel
   - name: parallel_WT
   - name: parallel_compatibility
@@ -3423,6 +2879,8 @@ buildvariants:
   - name: slow1_WT
   - name: slow2
   - name: slow2_WT
+  - name: sharding_jscore_passthrough
+  - name: sharding_jscore_passthrough_WT
   - name: ssl
   - name: sslSpecial
   - name: tool
@@ -3444,7 +2902,8 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-rhel70
     compile_flags: --ssl --distmod=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/release"
-    test_flags: --continue-on-failure
+    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
+    test_flags: --continueOnFailure
     has_debugsymbols: true
   tasks:
   - name: compile
@@ -3459,12 +2918,21 @@ buildvariants:
   - name: dbtest_WT
   - name: disk
   - name: durability
+  - name: dur_jscore_passthrough
   - name: failpoints
   - name: failpoints_auth
   - name: gle_auth
   - name: gle_auth_WT
   - name: gle_auth_write_cmd
   - name: gle_auth_write_cmd_WT
+  - name: gle_auth_basics_passthrough
+  - name: gle_auth_basics_passthrough_WT
+  - name: gle_auth_basics_passthrough_write_cmd
+  - name: gle_auth_basics_passthrough_write_cmd_WT
+  - name: sharding_gle_auth_basics_passthrough
+  - name: sharding_gle_auth_basics_passthrough_WT
+  - name: sharding_gle_auth_basics_passthrough_write_cmd
+  - name: sharding_gle_auth_basics_passthrough_write_cmd_WT
   - name: jsCore
   - name: jsCore_WT
   - name: jsCore_auth
@@ -3481,6 +2949,8 @@ buildvariants:
   - name: noPassthrough_WT
   - name: noPassthroughWithMongod
   - name: noPassthroughWithMongod_WT
+  - name: bulk_gle_passthrough
+  - name: bulk_gle_passthrough_WT
   - name: parallel
   - name: parallel_WT
   - name: parallel_compatibility
@@ -3502,6 +2972,8 @@ buildvariants:
   - name: slow1_WT
   - name: slow2
   - name: slow2_WT
+  - name: sharding_jscore_passthrough
+  - name: sharding_jscore_passthrough_WT
   - name: ssl
   - name: sslSpecial
   - name: tool
@@ -3528,7 +3000,8 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-enterprise-ubuntu1204
     compile_flags: --ssl --ssl-fips-capability --distmod=ubuntu1204 --release -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/release"
-    test_flags: --authMechanism=SCRAM-SHA-1 --continue-on-failure
+    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
+    test_flags: --continueOnFailure
     has_debugsymbols: true
   tasks:
   - name: compile
@@ -3565,7 +3038,8 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-enterprise-ubuntu1404
     compile_flags: --ssl --ssl-fips-capability --distmod=ubuntu1404 --release -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/release"
-    test_flags: --authMechanism=SCRAM-SHA-1 --continue-on-failure
+    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
+    test_flags: --continueOnFailure
     has_debugsymbols: true
   tasks:
   - name: compile
@@ -3606,8 +3080,11 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-enterprise-suse11
     compile_flags: --ssl --ssl-fips-capability --distmod=suse11 --release -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/release"
-    test_flags: --authMechanism=SCRAM-SHA-1 --continue-on-failure
+    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
+    test_flags: --continueOnFailure
     has_debugsymbols: true
+    # TODO: Remove the "has_pyyaml_installed" expansion after PyYAML is installed on all build variants.
+    has_pyyaml_installed: true
   tasks:
   - name: compile
     distros:
@@ -3642,8 +3119,11 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-suse11
     compile_flags: --ssl --distmod=suse11 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/release"
-    test_flags: --continue-on-failure
+    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
+    test_flags: --continueOnFailure
     has_debugsymbols: true
+    # TODO: Remove the "has_pyyaml_installed" expansion after PyYAML is installed on all build variants.
+    has_pyyaml_installed: true
   tasks:
   - name: compile
     distros:
@@ -3657,12 +3137,21 @@ buildvariants:
   - name: dbtest_WT
   - name: disk
   - name: durability
+  - name: dur_jscore_passthrough
   - name: failpoints
   - name: failpoints_auth
   - name: gle_auth
   - name: gle_auth_WT
   - name: gle_auth_write_cmd
   - name: gle_auth_write_cmd_WT
+  - name: gle_auth_basics_passthrough
+  - name: gle_auth_basics_passthrough_WT
+  - name: gle_auth_basics_passthrough_write_cmd
+  - name: gle_auth_basics_passthrough_write_cmd_WT
+  - name: sharding_gle_auth_basics_passthrough
+  - name: sharding_gle_auth_basics_passthrough_WT
+  - name: sharding_gle_auth_basics_passthrough_write_cmd
+  - name: sharding_gle_auth_basics_passthrough_write_cmd_WT
   - name: jsCore
   - name: jsCore_WT
   - name: jsCore_auth
@@ -3679,6 +3168,8 @@ buildvariants:
   - name: noPassthrough_WT
   - name: noPassthroughWithMongod
   - name: noPassthroughWithMongod_WT
+  - name: bulk_gle_passthrough
+  - name: bulk_gle_passthrough_WT
   - name: parallel
   - name: parallel_WT
   - name: parallel_compatibility
@@ -3700,6 +3191,8 @@ buildvariants:
   - name: slow1_WT
   - name: slow2
   - name: slow2_WT
+  - name: sharding_jscore_passthrough
+  - name: sharding_jscore_passthrough_WT
   - name: ssl
   - name: sslSpecial
   - name: tool
@@ -3707,7 +3200,6 @@ buildvariants:
   - name: push
     distros:
     - rhel55-test
-
 
 ###########################################
 #          Solaris buildvariants          #
@@ -3724,7 +3216,8 @@ buildvariants:
     push_name: sunos5
     push_arch: x86_64
     compile_flags: CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ -j$(kstat cpu | sort -u | grep -c "^module") --release CCFLAGS="-m64" LINKFLAGS="-m64 -static-libstdc++ -static-libgcc"
-    test_flags: --continue-on-failure
+    num_jobs_unittests: $(kstat cpu | sort -u | grep -c "^module")
+    test_flags: --continueOnFailure
     has_debugsymbols: true
   tasks:
   - name: compile
@@ -3742,6 +3235,7 @@ buildvariants:
   - name: mongosTest
   - name: noPassthrough
   - name: noPassthroughWithMongod
+  - name: bulk_gle_passthrough
   - name: parallel
   - name: parallel_compatibility
   - name: concurrency
@@ -3751,6 +3245,7 @@ buildvariants:
   - name: sharding
   - name: slow1
   - name: slow2
+  - name: sharding_jscore_passthrough
   - name: tool
   - name: push
     distros:
@@ -3774,7 +3269,8 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-enterprise-debian71
     compile_flags: --ssl --ssl-fips-capability --distmod=debian71 --release -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/release"
-    test_flags: --authMechanism=SCRAM-SHA-1 --continue-on-failure
+    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
+    test_flags: --continueOnFailure
     has_debugsymbols: true
   tasks:
   - name: compile
@@ -3810,7 +3306,8 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-debian71
     compile_flags: --ssl --distmod=debian71 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/release"
-    test_flags: --continue-on-failure
+    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
+    test_flags: --continueOnFailure
     has_debugsymbols: true
   tasks:
   - name: compile
@@ -3825,12 +3322,21 @@ buildvariants:
   - name: dbtest_WT
   - name: disk
   - name: durability
+  - name: dur_jscore_passthrough
   - name: failpoints
   - name: failpoints_auth
   - name: gle_auth
   - name: gle_auth_WT
   - name: gle_auth_write_cmd
   - name: gle_auth_write_cmd_WT
+  - name: gle_auth_basics_passthrough
+  - name: gle_auth_basics_passthrough_WT
+  - name: gle_auth_basics_passthrough_write_cmd
+  - name: gle_auth_basics_passthrough_write_cmd_WT
+  - name: sharding_gle_auth_basics_passthrough
+  - name: sharding_gle_auth_basics_passthrough_WT
+  - name: sharding_gle_auth_basics_passthrough_write_cmd
+  - name: sharding_gle_auth_basics_passthrough_write_cmd_WT
   - name: jsCore
   - name: jsCore_WT
   - name: jsCore_auth
@@ -3847,6 +3353,8 @@ buildvariants:
   - name: noPassthrough_WT
   - name: noPassthroughWithMongod
   - name: noPassthroughWithMongod_WT
+  - name: bulk_gle_passthrough
+  - name: bulk_gle_passthrough_WT
   - name: parallel
   - name: parallel_WT
   - name: parallel_compatibility
@@ -3868,6 +3376,8 @@ buildvariants:
   - name: slow1_WT
   - name: slow2
   - name: slow2_WT
+  - name: sharding_jscore_passthrough
+  - name: sharding_jscore_passthrough_WT
   - name: ssl
   - name: sslSpecial
   - name: tool
@@ -3889,7 +3399,8 @@ buildvariants:
   expansions:
     build_rocksdb: true
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --dbg=off --opt=on CPPPATH=$(readlink -f ../rocksdb/include/) LIBPATH=$(readlink -f ../rocksdb/) LIBS=rocksdb CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --variant-dir=release
-    test_flags: --continue-on-failure --storageEngine=rocksdb
+    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
+    test_flags: --continueOnFailure --storageEngine=rocksdb
   tasks:
   - name: compile
     distros:
@@ -3901,16 +3412,23 @@ buildvariants:
   - name: dbtest
   # - name: disk
   # - name: durability
+  # - name: dur_jscore_passthrough
   - name: failpoints
   - name: failpoints_auth
   - name: gle_auth
   - name: gle_auth_write_cmd
+  - name: gle_auth_basics_passthrough
+  - name: gle_auth_basics_passthrough_write_cmd
+  - name: sharding_gle_auth_basics_passthrough
+  - name: sharding_gle_auth_basics_passthrough_write_cmd
   - name: jsCore
   - name: jsCore_auth
   - name: jsCore_compatibility
   - name: jsCore_small_oplog
+  - name: jsCore_small_oplog_rs
   - name: noPassthrough
   - name: noPassthroughWithMongod
+  - name: bulk_gle_passthrough
   - name: parallel
   - name: parallel_compatibility
   - name: concurrency
@@ -3923,6 +3441,7 @@ buildvariants:
   - name: sharding_auth
   - name: slow1
   - name: slow2
+  - name: sharding_jscore_passthrough
 
 ###########################################
 #     Experimental buildvariants          #
@@ -3939,7 +3458,8 @@ buildvariants:
     asan_symbolizer: ASAN_SYMBOLIZER_PATH=/usr/bin/llvm-symbolizer-3.4
     enable_lsan: LSAN_OPTIONS="suppressions=etc/lsan.suppressions" ASAN_OPTIONS=detect_leaks=1
     compile_flags: CC=/usr/bin/clang CXX=/usr/bin/clang++ --dbg=on --opt=on --allocator=system --sanitize=address --ssl -j$(grep -c ^processor /proc/cpuinfo) --nostrip --variant-dir=build
-    test_flags: --continue-on-failure
+    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
+    test_flags: -j1 --continueOnFailure  # Avoid starting too many mongod's under ASAN build.
   tasks:
   - name: compile
   - name: aggregation
@@ -3957,6 +3477,14 @@ buildvariants:
   - name: gle_auth_WT
   - name: gle_auth_write_cmd
   - name: gle_auth_write_cmd_WT
+  - name: gle_auth_basics_passthrough
+  - name: gle_auth_basics_passthrough_WT
+  - name: gle_auth_basics_passthrough_write_cmd
+  - name: gle_auth_basics_passthrough_write_cmd_WT
+  - name: sharding_gle_auth_basics_passthrough
+  - name: sharding_gle_auth_basics_passthrough_WT
+  - name: sharding_gle_auth_basics_passthrough_write_cmd
+  - name: sharding_gle_auth_basics_passthrough_write_cmd_WT
   - name: jsCore
   - name: jsCore_WT
   - name: jsCore_auth
@@ -3973,6 +3501,8 @@ buildvariants:
   - name: noPassthrough_WT
   - name: noPassthroughWithMongod
   - name: noPassthroughWithMongod_WT
+  - name: bulk_gle_passthrough
+  - name: bulk_gle_passthrough_WT
   - name: parallel
   - name: parallel_WT
   - name: parallel_compatibility
@@ -3994,6 +3524,8 @@ buildvariants:
   - name: slow1_WT
   - name: slow2
   - name: slow2_WT
+  - name: sharding_jscore_passthrough
+  - name: sharding_jscore_passthrough_WT
   - name: ssl
   - name: sslSpecial
   - name: tool
@@ -4007,7 +3539,8 @@ buildvariants:
   expansions:
     tooltags: "-tags 'ssl'"
     compile_flags: CC=/usr/bin/clang CXX=/usr/bin/clang++ --libc++ --ssl -j$(grep -c ^processor /proc/cpuinfo) --variant-dir=build --distmod=ubuntu1410-clang
-    test_flags: --continue-on-failure
+    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
+    test_flags: --continueOnFailure
     push_path: linux
     push_bucket: downloads.mongodb.org
     push_name: linux
@@ -4025,12 +3558,21 @@ buildvariants:
   - name: dbtest_WT
   - name: disk
   - name: durability
+  - name: dur_jscore_passthrough
   - name: failpoints
   - name: failpoints_auth
   - name: gle_auth
   - name: gle_auth_WT
   - name: gle_auth_write_cmd
   - name: gle_auth_write_cmd_WT
+  - name: gle_auth_basics_passthrough
+  - name: gle_auth_basics_passthrough_WT
+  - name: gle_auth_basics_passthrough_write_cmd
+  - name: gle_auth_basics_passthrough_write_cmd_WT
+  - name: sharding_gle_auth_basics_passthrough
+  - name: sharding_gle_auth_basics_passthrough_WT
+  - name: sharding_gle_auth_basics_passthrough_write_cmd
+  - name: sharding_gle_auth_basics_passthrough_write_cmd_WT
   - name: jsCore
   - name: jsCore_WT
   - name: jsCore_auth
@@ -4047,6 +3589,8 @@ buildvariants:
   - name: noPassthrough_WT
   - name: noPassthroughWithMongod
   - name: noPassthroughWithMongod_WT
+  - name: bulk_gle_passthrough
+  - name: bulk_gle_passthrough_WT
   - name: parallel
   - name: parallel_WT
   - name: parallel_compatibility
@@ -4068,6 +3612,8 @@ buildvariants:
   - name: slow1_WT
   - name: slow2
   - name: slow2_WT
+  - name: sharding_jscore_passthrough
+  - name: sharding_jscore_passthrough_WT
   - name: ssl
   - name: sslSpecial
   - name: tool
