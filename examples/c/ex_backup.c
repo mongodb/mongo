@@ -323,7 +323,7 @@ main(void)
 	 * comparison between the incremental and original.
 	 */
 	ret = wt_conn->close(wt_conn, NULL);
-	printf("Final comparison: dumping and comparing data\n", i);
+	printf("Final comparison: dumping and comparing data\n");
 	ret = compare_backups(0);
 	return (ret);
 }
