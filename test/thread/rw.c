@@ -78,7 +78,9 @@ rw_start(u_int readers, u_int writers)
 	int ret;
 	void *thread_ret;
 
+	tids = NULL;	/* Keep GCC 4.1 happy. */
 	total_nops = 0;
+
 	/* Create per-thread structures. */
 	if ((run_info = calloc(
 	    (size_t)(readers + writers), sizeof(*run_info))) == NULL ||
