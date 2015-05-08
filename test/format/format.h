@@ -50,11 +50,7 @@
 #endif
 #include <time.h>
 
-#ifdef _WIN32
-#include "windows_shim.h"
-#endif
-
-#include <wiredtiger.h>
+#include "test_util.i"
 #include <wiredtiger_ext.h>
 
 #ifdef BDB

@@ -46,7 +46,7 @@ main(int argc, char *argv[])
 
 	config = NULL;
 
-	if ((g.progname = strrchr(argv[0], '/')) == NULL)
+	if ((g.progname = strrchr(argv[0], DIR_DELIM)) == NULL)
 		g.progname = argv[0];
 	else
 		++g.progname;

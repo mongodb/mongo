@@ -57,15 +57,16 @@ struct __wt_cursor_lsm {
 
 	u_int update_count;		/* Updates performed. */
 
-#define	WT_CLSM_ACTIVE		0x01    /* Incremented the session count */
-#define	WT_CLSM_ITERATE_NEXT    0x02    /* Forward iteration */
-#define	WT_CLSM_ITERATE_PREV    0x04    /* Backward iteration */
-#define	WT_CLSM_MERGE           0x08    /* Merge cursor, don't update */
-#define	WT_CLSM_MINOR_MERGE	0x10    /* Minor merge, include tombstones */
-#define	WT_CLSM_MULTIPLE        0x20    /* Multiple cursors have values for the
+#define	WT_CLSM_ACTIVE		0x001   /* Incremented the session count */
+#define	WT_CLSM_BULK		0x002   /* Open for snapshot isolation */
+#define	WT_CLSM_ITERATE_NEXT    0x004   /* Forward iteration */
+#define	WT_CLSM_ITERATE_PREV    0x008   /* Backward iteration */
+#define	WT_CLSM_MERGE           0x010   /* Merge cursor, don't update */
+#define	WT_CLSM_MINOR_MERGE	0x020   /* Minor merge, include tombstones */
+#define	WT_CLSM_MULTIPLE        0x040   /* Multiple cursors have values for the
 					   current key */
-#define	WT_CLSM_OPEN_READ	0x40    /* Open for reads */
-#define	WT_CLSM_OPEN_SNAPSHOT	0x80    /* Open for snapshot isolation */
+#define	WT_CLSM_OPEN_READ	0x080   /* Open for reads */
+#define	WT_CLSM_OPEN_SNAPSHOT	0x100   /* Open for snapshot isolation */
 	uint32_t flags;
 };
 

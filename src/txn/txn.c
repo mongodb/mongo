@@ -178,7 +178,7 @@ __wt_txn_get_snapshot(WT_SESSION_IMPL *session)
  * past the last committed transaction.
 */
 void
-__wt_txn_update_oldest(WT_SESSION_IMPL *session)
+__wt_txn_update_oldest(WT_SESSION_IMPL *session, int force)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_SESSION_IMPL *oldest_session;
@@ -196,13 +196,13 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session)
 	oldest_session = NULL;
 	prev_oldest_id = txn_global->oldest_id;
 
-	/* For pure read-only workloads, avoid scanning. */
-	if (prev_oldest_id == current_id) {
-		/* Check that the oldest ID has not moved in the meantime. */
-		if (prev_oldest_id == txn_global->oldest_id &&
-		    txn_global->scan_count == 0)
-			return;
-	}
+	/*
+	 * For pure read-only workloads, or if the update isn't forced and the
+	 * oldest ID isn't too far behind, avoid scanning.
+	 */
+	if (prev_oldest_id == current_id ||
+	    (!force && TXNID_LT(current_id, prev_oldest_id + 100)))
+		return;
 
 	/*
 	 * We're going to scan.  Increment the count of scanners to prevent the

@@ -38,7 +38,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#include <wiredtiger.h>
+#include "test_util.i"
 #include "wt_internal.h"			/* For __wt_random */
 
 #define	URI_BASE	"table:__wt"		/* File name */
