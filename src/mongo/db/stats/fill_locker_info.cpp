@@ -41,7 +41,7 @@ namespace mongo {
         const size_t locksSize = lockerInfo.locks.size();
 
         // Only add the last lock of each type, and use the largest mode encountered
-        LockMode modeForType[LockModesCount] = { }; // default initialize to zero (min value)
+        LockMode modeForType[ResourceTypesCount] = { }; // default initialize to zero (min value)
         for (size_t i = 0; i < locksSize; i++) {
             const Locker::OneLock& lock = lockerInfo.locks[i];
             const ResourceType lockType = lock.resourceId.getType();
