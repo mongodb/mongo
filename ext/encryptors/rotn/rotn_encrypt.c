@@ -414,12 +414,7 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 	 * as the first field, allowing us to treat references to either type of
 	 * structure as a reference to the other type.
 	 *
-	 * This could be simplified if only a single database is opened in the
-	 * application, we could use a static WT_ENCRYPTOR structure, and a
-	 * static reference to the WT_EXTENSION_API methods, then we don't need
-	 * to allocate memory when the encryptor is initialized or free it when
-	 * the encryptor is terminated.  However, this approach is more general
-	 * purpose and supports multiple databases per application.
+	 * Heap memory (not static), because it can support multiple databases.
 	 */
 	rotn_encryptor->encryptor.encrypt = rotn_encrypt;
 	rotn_encryptor->encryptor.decrypt = rotn_decrypt;
