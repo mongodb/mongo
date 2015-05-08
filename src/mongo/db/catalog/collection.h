@@ -45,6 +45,8 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/platform/cstdint.h"
+#include "mongo/util/concurrency/synchronization.h"
+#include "mongo/platform/atomic_word.h"
 
 namespace mongo {
 
@@ -275,6 +277,18 @@ namespace mongo {
                 return 5;
             return static_cast<int>( dataSize( txn ) / n );
         }
+        
+        /* For now triggerChangeSubscribersNotification() used only to awake waiters on capped collection
+           cursor while waiting */
+        void triggerChangeSubscribersNotification();
+
+        /* subscribers to event of new document inserted into capped collection should call this method 
+           and wait to be awakened */
+        NotifyAll::When waitForDocumentInsertedEvent( NotifyAll::When when, int timeout );
+        /* subscribeToInsertedEvent() should be called within a readlock. Collection will keep track of 
+           count of capped collection readers in this way preventing destruction of the object in case a reader
+           is actively waiting for data while outside of the readlock */
+        void subscribeToInsertedEvent();
 
         uint64_t getIndexSize(OperationContext* opCtx,
                               BSONObjBuilder* details = NULL,
@@ -313,6 +327,8 @@ namespace mongo {
         DatabaseCatalogEntry* _dbce;
         CollectionInfoCache _infoCache;
         IndexCatalog _indexCatalog;
+        NotifyAll _changeSubscribers;
+        AtomicWord<uint32_t> _eventSubscriberCount;
 
         // this is mutable because read only users of the Collection class
         // use it keep state.  This seems valid as const correctness of Collection

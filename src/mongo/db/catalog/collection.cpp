@@ -98,6 +98,8 @@ namespace mongo {
           _dbce( dbce ),
           _infoCache( this ),
           _indexCatalog( this ),
+          _changeSubscribers(),
+          _eventSubscriberCount(),
           _cursorManager( fullNS ) {
         _magic = 1357924;
         _indexCatalog.init(txn);
@@ -109,6 +111,28 @@ namespace mongo {
     Collection::~Collection() {
         verify( ok() );
         _magic = 0;
+        triggerChangeSubscribersNotification();
+        /* In the following code we will spin waiting for no readers waiting for data to be inserted
+           into the capped collection. A small 2ms wait time will be introduced to let the reader threads
+           catch up and get out of the waiting state after the call to triggerChangeSubscribersNotification() */
+        while(_eventSubscriberCount.load() > 0) {
+            sleepmillis(2);
+        }
+    }
+
+    void Collection::triggerChangeSubscribersNotification(){
+        _changeSubscribers.notifyAll( _changeSubscribers.now() );
+    }
+
+    NotifyAll::When Collection::waitForDocumentInsertedEvent(  NotifyAll::When when, int timeout ) {
+        _changeSubscribers.timedWaitFor( when, timeout );
+        NotifyAll::When result = _changeSubscribers.now();
+        _eventSubscriberCount.subtractAndFetch(1);
+        return result;
+    }    
+    
+    void Collection::subscribeToInsertedEvent() {
+        _eventSubscriberCount.addAndFetch(1);
     }
 
     bool Collection::requiresIdIndex() const {
@@ -270,6 +294,11 @@ namespace mongo {
         Status s = _indexCatalog.indexRecord(txn, docToInsert, loc.getValue());
         if (!s.isOK())
             return StatusWith<RecordId>(s);
+
+        /* Let's trigger event notifier only for capped collections */
+        if( isCapped() ) {
+            triggerChangeSubscribersNotification();
+        }
 
         return loc;
     }

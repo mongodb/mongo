@@ -864,6 +864,7 @@ namespace {
         bool exhaust = false;
         QueryResult::View msgdata = 0;
         Timestamp last;
+        NotifyAll::When lastWaitTime = 0;
         while( 1 ) {
             bool isCursorAuthorized = false;
             try {
@@ -928,10 +929,26 @@ namespace {
                 pass++;
                 if (kDebugBuild)
                     sleepmillis(20);
-                else
-                    sleepmillis(2);
-                
-                // note: the 1100 is beacuse of the waitForDifferent above
+                else {        
+                    Collection* collection = 0;                
+                    {
+                        // Let's use a read lock to acquire a pointer to the collection object
+                        const NamespaceString nss(ns);
+                        scoped_ptr<AutoGetCollectionForRead> ctx(new AutoGetCollectionForRead(txn, nss));
+                        collection = ctx->getCollection();
+                        /* TODO: Replace this number when changes (if ever) changes are merged into upstream */
+                        uassert(77383, "collection dropped between newGetMore calls", collection);
+                        /* This will ensure our collection was not destroyed until we call waitForDocumentInsertedEvent()
+                           because we are going to be outside of the lock to call waitForDocumentInsertedEvent().
+                           We can't do that inside this block, because otherwise we will be blocking the collection too 
+                           long if no new documents are inserted on the capped collection.
+                         */ 
+                        collection->subscribeToInsertedEvent(); 
+                    }                    
+                    lastWaitTime = collection->waitForDocumentInsertedEvent(lastWaitTime, 50);
+                }
+
+                // note: the 1100 is because of the waitForDifferent above
                 // should eventually clean this up a bit
                 curop.setExpectedLatencyMs( 1100 + timer->millis() );
                 
