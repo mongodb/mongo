@@ -283,7 +283,7 @@ onint(int signo)
 {
 	WT_UNUSED(signo);
 
-	cleanup();
+	(void)cleanup();
 
 	fprintf(stderr, "\n");
 	exit(EXIT_FAILURE);
