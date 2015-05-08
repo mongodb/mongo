@@ -600,6 +600,12 @@ config_sanity(CONFIG *cfg)
 		    "invalid database count, less than 1 or greater than 99\n");
 		return (EINVAL);
 	}
+
+	if (cfg->pareto > 100) {
+		fprintf(stderr,
+		    "Invalid pareto distribution - should be a percentage\n");
+		return (EINVAL);
+	}
 	return (0);
 }
 

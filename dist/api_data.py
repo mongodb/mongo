@@ -142,8 +142,8 @@ file_config = format_meta + [
         are also available.  See @ref compression for more information''',
         func='__wt_compressor_confchk'),
     Config('cache_resident', 'false', r'''
-        do not ever evict the object's pages; see @ref
-        tuning_cache_resident for more information''',
+        do not ever evict the object's pages from cache. Not compatible with
+        LSM tables; see @ref tuning_cache_resident for more information''',
         type='boolean'),
     Config('checksum', 'uncompressed', r'''
         configure block checksums; permitted values are <code>on</code>

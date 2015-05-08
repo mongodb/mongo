@@ -408,7 +408,7 @@ __log_wrlsn_server(void *arg)
 			 * as soon as one is not in order.
 			 */
 			for (i = 0; i < written_i; i++) {
-				if (LOG_CMP(&log->write_lsn,
+				if (WT_LOG_CMP(&log->write_lsn,
 				    &written[i].lsn) != 0)
 					break;
 				/*
@@ -416,7 +416,7 @@ __log_wrlsn_server(void *arg)
 				 * Advance the LSN and process the slot.
 				 */
 				slot = &log->slot_pool[written[i].slot_index];
-				WT_ASSERT(session, LOG_CMP(&written[i].lsn,
+				WT_ASSERT(session, WT_LOG_CMP(&written[i].lsn,
 				    &slot->slot_release_lsn) == 0);
 				log->write_start_lsn = slot->slot_start_lsn;
 				log->write_lsn = slot->slot_end_lsn;

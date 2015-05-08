@@ -546,12 +546,12 @@ __session_salvage(WT_SESSION *wt_session, const char *uri, const char *config)
 	session = (WT_SESSION_IMPL *)wt_session;
 
 	SESSION_API_CALL(session, salvage, config, cfg);
+
 	/* Block out checkpoints to avoid spurious EBUSY errors. */
-	__wt_spin_lock(session, &S2C(session)->checkpoint_lock);
-	WT_WITH_SCHEMA_LOCK(session,
-	    ret = __wt_schema_worker(session, uri, __wt_salvage,
-	    NULL, cfg, WT_DHANDLE_EXCLUSIVE | WT_BTREE_SALVAGE));
-	__wt_spin_unlock(session, &S2C(session)->checkpoint_lock);
+	WT_WITH_CHECKPOINT_LOCK(session,
+	    WT_WITH_SCHEMA_LOCK(session, ret =
+		__wt_schema_worker(session, uri, __wt_salvage,
+		NULL, cfg, WT_DHANDLE_EXCLUSIVE | WT_BTREE_SALVAGE)));
 
 err:	API_END_RET_NOTFOUND_MAP(session, ret);
 }
@@ -605,15 +605,11 @@ __session_truncate(WT_SESSION *wt_session,
 				    "the truncate method should not specify any"
 				    "target after the log: URI prefix.");
 			ret = __wt_log_truncate_files(session, start, cfg);
-		} else {
+		} else
 			/* Wait for checkpoints to avoid EBUSY errors. */
-			__wt_spin_lock(session,
-			    &S2C(session)->checkpoint_lock);
-			WT_WITH_SCHEMA_LOCK(session,
-			    ret = __wt_schema_truncate(session, uri, cfg));
-			__wt_spin_unlock(session,
-			    &S2C(session)->checkpoint_lock);
-		}
+			WT_WITH_CHECKPOINT_LOCK(session,
+			    WT_WITH_SCHEMA_LOCK(session,
+				ret = __wt_schema_truncate(session, uri, cfg)));
 		goto done;
 	}
 
@@ -717,11 +713,10 @@ __session_upgrade(WT_SESSION *wt_session, const char *uri, const char *config)
 
 	SESSION_API_CALL(session, upgrade, config, cfg);
 	/* Block out checkpoints to avoid spurious EBUSY errors. */
-	__wt_spin_lock(session, &S2C(session)->checkpoint_lock);
-	WT_WITH_SCHEMA_LOCK(session,
-	    ret = __wt_schema_worker(session, uri, __wt_upgrade,
-	    NULL, cfg, WT_DHANDLE_EXCLUSIVE | WT_BTREE_UPGRADE));
-	__wt_spin_unlock(session, &S2C(session)->checkpoint_lock);
+	WT_WITH_CHECKPOINT_LOCK(session,
+	    WT_WITH_SCHEMA_LOCK(session,
+		ret = __wt_schema_worker(session, uri, __wt_upgrade,
+		NULL, cfg, WT_DHANDLE_EXCLUSIVE | WT_BTREE_UPGRADE)));
 
 err:	API_END_RET_NOTFOUND_MAP(session, ret);
 }
@@ -740,11 +735,10 @@ __session_verify(WT_SESSION *wt_session, const char *uri, const char *config)
 
 	SESSION_API_CALL(session, verify, config, cfg);
 	/* Block out checkpoints to avoid spurious EBUSY errors. */
-	__wt_spin_lock(session, &S2C(session)->checkpoint_lock);
-	WT_WITH_SCHEMA_LOCK(session,
-	    ret = __wt_schema_worker(session, uri, __wt_verify,
-	    NULL, cfg, WT_DHANDLE_EXCLUSIVE | WT_BTREE_VERIFY));
-	__wt_spin_unlock(session, &S2C(session)->checkpoint_lock);
+	WT_WITH_CHECKPOINT_LOCK(session,
+	    WT_WITH_SCHEMA_LOCK(session,
+		ret = __wt_schema_worker(session, uri, __wt_verify,
+		NULL, cfg, WT_DHANDLE_EXCLUSIVE | WT_BTREE_VERIFY)));
 
 err:	API_END_RET_NOTFOUND_MAP(session, ret);
 }
@@ -914,13 +908,11 @@ __session_checkpoint(WT_SESSION *wt_session, const char *config)
 	 * here to ensure we don't get into trouble.
 	 */
 	WT_STAT_FAST_CONN_SET(session, txn_checkpoint_running, 1);
-	__wt_spin_lock(session, &S2C(session)->checkpoint_lock);
 
-	ret = __wt_txn_checkpoint(session, cfg);
+	WT_WITH_CHECKPOINT_LOCK(session,
+	    ret = __wt_txn_checkpoint(session, cfg));
 
 	WT_STAT_FAST_CONN_SET(session, txn_checkpoint_running, 0);
-
-	__wt_spin_unlock(session, &S2C(session)->checkpoint_lock);
 
 err:	F_CLR(session, WT_SESSION_CAN_WAIT | WT_SESSION_NO_CACHE_CHECK);
 
@@ -953,7 +945,7 @@ __wt_open_internal_session(WT_CONNECTION_IMPL *conn, const char *name,
 
 	*sessionp = NULL;
 
-	WT_RET(__wt_open_session(conn, NULL, NULL, &session));
+	WT_RET(__wt_open_session(conn, NULL, NULL, open_metadata, &session));
 	session->name = name;
 
 	/*
@@ -971,19 +963,6 @@ __wt_open_internal_session(WT_CONNECTION_IMPL *conn, const char *name,
 	if (!uses_dhandles)
 		F_SET(session, WT_SESSION_NO_DATA_HANDLES);
 
-	/*
-	 * Acquiring the metadata handle requires the schema lock; we've seen
-	 * problems in the past where a worker thread has acquired the schema
-	 * lock unexpectedly, relatively late in the run, and deadlocked. Be
-	 * defensive, get it now.  The metadata file may not exist when the
-	 * connection first creates its default session or the shared cache
-	 * pool creates its sessions, let our caller decline this work.
-	 */
-	if (open_metadata) {
-		WT_ASSERT(session, !F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
-		WT_RET(__wt_metadata_open(session));
-	}
-
 	*sessionp = session;
 	return (0);
 }
@@ -995,7 +974,7 @@ __wt_open_internal_session(WT_CONNECTION_IMPL *conn, const char *name,
  */
 int
 __wt_open_session(WT_CONNECTION_IMPL *conn,
-    WT_EVENT_HANDLER *event_handler, const char *config,
+    WT_EVENT_HANDLER *event_handler, const char *config, int open_metadata,
     WT_SESSION_IMPL **sessionp)
 {
 	static const WT_SESSION stds = {
@@ -1131,5 +1110,20 @@ __wt_open_session(WT_CONNECTION_IMPL *conn,
 	WT_STAT_FAST_CONN_INCR(session, session_open);
 
 err:	__wt_spin_unlock(session, &conn->api_lock);
-	return (ret);
+	WT_RET(ret);
+
+	/*
+	 * Acquiring the metadata handle requires the schema lock; we've seen
+	 * problems in the past where a session has acquired the schema lock
+	 * unexpectedly, relatively late in the run, and deadlocked. Be
+	 * defensive, get it now.  The metadata file may not exist when the
+	 * connection first creates its default session or the shared cache
+	 * pool creates its sessions, let our caller decline this work.
+	 */
+	if (open_metadata) {
+		WT_ASSERT(session, !F_ISSET(session, WT_SESSION_LOCKED_SCHEMA));
+		WT_RET(__wt_metadata_open(session_ret));
+	}
+
+	return (0);
 }

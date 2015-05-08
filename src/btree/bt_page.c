@@ -49,8 +49,12 @@ __evict_force_check(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	/* Trigger eviction on the next page release. */
 	__wt_page_evict_soon(page);
 
+	/* Bump the oldest ID, we're about to do some visibility checks. */
+	__wt_txn_update_oldest(session, 0);
+
 	/* If eviction cannot succeed, don't try. */
-	return (__wt_page_can_evict(session, page, 1));
+	return (
+	    __wt_page_can_evict(session, page, WT_EVICT_CHECK_SPLITS, NULL));
 }
 
 /*
@@ -181,8 +185,11 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 skip_evict:
 			/*
 			 * Check if we need an autocommit transaction.
+			 * Starting a transaction can trigger eviction, so skip
+			 * it if eviction isn't permitted.
 			 */
-			return (__wt_txn_autocommit_check(session));
+			return (LF_ISSET(WT_READ_NO_EVICT) ? 0 :
+			    __wt_txn_autocommit_check(session));
 		WT_ILLEGAL_VALUE(session);
 		}
 

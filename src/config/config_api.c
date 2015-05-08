@@ -322,8 +322,7 @@ __wt_configure_method(WT_SESSION_IMPL *session,
 	newcheck = &checks[cnt];
 	newcheck->name = newcheck_name;
 	WT_ERR(__wt_strdup(session, type, &newcheck->type));
-	if (check != NULL)
-		WT_ERR(__wt_strdup(session, check, &newcheck->checks));
+	WT_ERR(__wt_strdup(session, check, &newcheck->checks));
 	entry->checks = checks;
 	entry->checks_entries = 0;
 

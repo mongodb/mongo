@@ -65,7 +65,7 @@ __recovery_cursor(WT_SESSION_IMPL *session, WT_RECOVERY *r,
 			    "No file found with ID %u (max %u)",
 			    id, r->nfiles));
 		r->missing = 1;
-	} else if (LOG_CMP(lsnp, &r->files[id].ckpt_lsn) >= 0) {
+	} else if (WT_LOG_CMP(lsnp, &r->files[id].ckpt_lsn) >= 0) {
 		/*
 		 * We're going to apply the operation.  Get the cursor, opening
 		 * one if none is cached.
@@ -423,7 +423,7 @@ __wt_txn_recover(WT_SESSION_IMPL *session)
 	was_backup = F_ISSET(conn, WT_CONN_WAS_BACKUP) ? 1 : 0;
 
 	/* We need a real session for recovery. */
-	WT_RET(__wt_open_session(conn, NULL, NULL, &session));
+	WT_RET(__wt_open_session(conn, NULL, NULL, 1, &session));
 	F_SET(session, WT_SESSION_NO_LOGGING);
 	r.session = session;
 

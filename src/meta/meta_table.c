@@ -61,6 +61,7 @@ __wt_metadata_cursor(
 	WT_DECL_RET;
 	const char *cfg[] =
 	    { WT_CONFIG_BASE(session, WT_SESSION_open_cursor), config, NULL };
+	int is_dead;
 
 	saved_dhandle = session->dhandle;
 	WT_ERR(__wt_metadata_open(session));
@@ -71,7 +72,11 @@ __wt_metadata_cursor(
 	 * We use the metadata a lot, so we have a handle cached; lock it and
 	 * increment the in-use counter once the cursor is open.
 	 */
-	WT_ERR(__wt_session_lock_dhandle(session, 0, NULL));
+	WT_ERR(__wt_session_lock_dhandle(session, 0, &is_dead));
+
+	/* The metadata should never be closed. */
+	WT_ASSERT(session, !is_dead);
+
 	WT_ERR(__wt_curfile_create(session, NULL, cfg, 0, 0, cursorp));
 	__wt_cursor_dhandle_incr_use(session);
 

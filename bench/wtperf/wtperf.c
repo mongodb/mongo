@@ -90,6 +90,7 @@ static uint64_t	 wtperf_value_range(CONFIG *);
 #define	HELIUM_PATH							\
 	"../../ext/test/helium/.libs/libwiredtiger_helium.so"
 #define	HELIUM_CONFIG	",type=helium"
+#define	INDEX_COL_NAMES	",columns=(key,val)"
 
 /* Retrieve an ID for the next insert operation. */
 static inline uint64_t
@@ -798,7 +799,8 @@ populate_thread(void *arg)
 	}
 
 	/* Do bulk loads if populate is single-threaded. */
-	cursor_config = cfg->populate_threads == 1 ? "bulk" : NULL;
+	cursor_config =
+	    (cfg->populate_threads == 1 && !cfg->index) ? "bulk" : NULL;
 	/* Create the cursors. */
 	cursors = calloc(cfg->table_count, sizeof(WT_CURSOR *));
 	if (cursors == NULL) {
@@ -1672,13 +1674,24 @@ create_tables(CONFIG *cfg)
 		}
 	}
 
-	for (i = 0; i < cfg->table_count; i++)
+	for (i = 0; i < cfg->table_count; i++) {
 		if ((ret = session->create(
 		    session, cfg->uris[i], cfg->table_config)) != 0) {
 			lprintf(cfg, ret, 0,
 			    "Error creating table %s", cfg->uris[i]);
 			return (ret);
 		}
+		if (cfg->index) {
+			snprintf(buf, 512, "index:%s:val_idx",
+			    cfg->uris[i] + strlen("table:"));
+			if ((ret = session->create(
+			    session, buf, "columns=(val)")) != 0) {
+				lprintf(cfg, ret, 0,
+				    "Error creating index %s", buf);
+				return (ret);
+			}
+		}
+	}
 
 	if ((ret = session->close(session, NULL)) != 0) {
 		lprintf(cfg, ret, 0, "Error closing session");
@@ -2115,7 +2128,7 @@ main(int argc, char *argv[])
 		if ((ret = config_opt_str(cfg, "conn_config", cc_buf)) != 0)
 			goto err;
 	}
-	if (cfg->verbose > 1 || cfg->helium_mount != NULL ||
+	if (cfg->verbose > 1 || cfg->index || cfg->helium_mount != NULL ||
 	    user_tconfig != NULL || cfg->compress_table != NULL) {
 		req_len = strlen(cfg->table_config) + strlen(HELIUM_CONFIG) +
 		    strlen(debug_tconfig) + 3;
@@ -2123,6 +2136,8 @@ main(int argc, char *argv[])
 			req_len += strlen(user_tconfig);
 		if (cfg->compress_table != NULL)
 			req_len += strlen(cfg->compress_table);
+		if (cfg->index)
+			req_len += strlen(INDEX_COL_NAMES);
 		if ((tc_buf = calloc(req_len, 1)) == NULL) {
 			ret = enomem(cfg);
 			goto err;
@@ -2130,8 +2145,9 @@ main(int argc, char *argv[])
 		/*
 		 * This is getting hard to parse.
 		 */
-		snprintf(tc_buf, req_len, "%s%s%s%s%s%s%s",
+		snprintf(tc_buf, req_len, "%s%s%s%s%s%s%s%s",
 		    cfg->table_config,
+		    cfg->index ? INDEX_COL_NAMES : "",
 		    cfg->compress_table ? cfg->compress_table : "",
 		    cfg->verbose > 1 ? ",": "",
 		    cfg->verbose > 1 ? debug_tconfig : "",
@@ -2351,15 +2367,16 @@ wtperf_rand(CONFIG_THREAD *thread)
 	rval = (uint64_t)__wt_random(thread->rnd);
 
 	/* Use Pareto distribution to give 80/20 hot/cold values. */
-	if (cfg->pareto) {
+	if (cfg->pareto != 0) {
 #define	PARETO_SHAPE	1.5
 		S1 = (-1 / PARETO_SHAPE);
-		S2 = wtperf_value_range(cfg) * 0.2 * (PARETO_SHAPE - 1);
+		S2 = wtperf_value_range(cfg) *
+		    (cfg->pareto / 100.0) * (PARETO_SHAPE - 1);
 		U = 1 - (double)rval / (double)UINT32_MAX;
 		rval = (pow(U, S1) - 1) * S2;
 		/*
 		 * This Pareto calculation chooses out of range values about
-		 * about 2% of the time, from my testing. That will lead to the
+		 * 2% of the time, from my testing. That will lead to the
 		 * first item in the table being "hot".
 		 */
 		if (rval > wtperf_value_range(cfg))

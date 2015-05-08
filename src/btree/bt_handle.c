@@ -133,16 +133,13 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 {
 	WT_BM *bm;
 	WT_BTREE *btree;
-	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 
-	dhandle = session->dhandle;
 	btree = S2BT(session);
 
 	if ((bm = btree->bm) != NULL) {
 		/* Unload the checkpoint, unless it's a special command. */
-		if (F_ISSET(dhandle, WT_DHANDLE_OPEN) &&
-		    !F_ISSET(btree,
+		if (!F_ISSET(btree,
 		    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY))
 			WT_TRET(bm->checkpoint_unload(bm, session));
 
@@ -172,6 +169,8 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 	btree->collator = NULL;
 
 	btree->bulk_load_ok = 0;
+
+	F_CLR(btree, WT_BTREE_SPECIAL_FLAGS);
 
 	return (ret);
 }

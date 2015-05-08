@@ -1,0 +1,10 @@
+# wtperf options file: medium btree configuration
+conn_config="cache_size=10G,checkpoint=(wait=60),statistics=[all],statistics_log=(wait=5)"
+table_config="type=file,leaf_page_max=32k"
+icount=50000000
+report_interval=5
+run_time=1200
+pareto=1
+index=true
+populate_threads=1
+threads=((count=40,reads=1),(count=40,updates=1))

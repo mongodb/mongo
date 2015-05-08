@@ -29,7 +29,7 @@ __lsm_tree_discard(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, int final)
 	/* We may be destroying an lsm_tree before it was added. */
 	if (F_ISSET(lsm_tree, WT_LSM_TREE_OPEN)) {
 		WT_ASSERT(session, final ||
-		    F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED));
+		    F_ISSET(session, WT_SESSION_LOCKED_HANDLE_LIST));
 		TAILQ_REMOVE(&S2C(session)->lsmqh, lsm_tree, q);
 	}
 
@@ -248,7 +248,7 @@ int
 __wt_lsm_tree_setup_chunk(
     WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, WT_LSM_CHUNK *chunk)
 {
-	WT_ASSERT(session, F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
+	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_SCHEMA));
 	WT_RET(__wt_epoch(session, &chunk->create_ts));
 
 	WT_RET(__wt_lsm_tree_chunk_name(
@@ -307,7 +307,7 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	char *tmpconfig;
 
 	/* If the tree is open, it already exists. */
-	WT_WITH_DHANDLE_LOCK(session,
+	WT_WITH_HANDLE_LIST_LOCK(session,
 	    ret = __wt_lsm_tree_get(session, uri, 0, &lsm_tree));
 	if (ret == 0) {
 		__wt_lsm_tree_release(session, lsm_tree);
@@ -347,6 +347,11 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_config_gets_none(session, cfg, "collator", &cval));
 	WT_ERR(__wt_strndup(
 	    session, cval.str, cval.len, &lsm_tree->collator_name));
+
+	WT_ERR(__wt_config_gets(session, cfg, "cache_resident", &cval));
+	if (cval.val != 0)
+		WT_ERR_MSG(session, EINVAL,
+		    "The cache_resident flag is not compatible with LSM");
 
 	WT_ERR(__wt_config_gets(session, cfg, "lsm.auto_throttle", &cval));
 	if (cval.val)
@@ -429,7 +434,7 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	 * tracking macros handle cleaning up on failure.
 	 */
 	if (ret == 0)
-		WT_WITH_DHANDLE_LOCK(session,
+		WT_WITH_HANDLE_LIST_LOCK(session,
 		    ret = __lsm_tree_open(session, uri, &lsm_tree));
 	if (ret == 0)
 		__wt_lsm_tree_release(session, lsm_tree);
@@ -454,7 +459,7 @@ __lsm_tree_find(WT_SESSION_IMPL *session,
 {
 	WT_LSM_TREE *lsm_tree;
 
-	WT_ASSERT(session, F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED));
+	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_HANDLE_LIST));
 
 	/* See if the tree is already open. */
 	TAILQ_FOREACH(lsm_tree, &S2C(session)->lsmqh, q)
@@ -548,7 +553,7 @@ __lsm_tree_open(WT_SESSION_IMPL *session, const char *uri, WT_LSM_TREE **treep)
 	conn = S2C(session);
 	lsm_tree = NULL;
 
-	WT_ASSERT(session, F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED));
+	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_HANDLE_LIST));
 
 	/* Start the LSM manager thread if it isn't running. */
 	if (WT_ATOMIC_CAS4(conn->lsm_manager.lsm_workers, 0, 1))
@@ -608,7 +613,7 @@ __wt_lsm_tree_get(WT_SESSION_IMPL *session,
 {
 	WT_DECL_RET;
 
-	WT_ASSERT(session, F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED));
+	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_HANDLE_LIST));
 
 	ret = __lsm_tree_find(session, uri, exclusive, treep);
 	if (ret == WT_NOTFOUND)
@@ -934,7 +939,7 @@ __wt_lsm_tree_drop(
 	locked = 0;
 
 	/* Get the LSM tree. */
-	WT_WITH_DHANDLE_LOCK(session,
+	WT_WITH_HANDLE_LIST_LOCK(session,
 	    ret = __wt_lsm_tree_get(session, name, 1, &lsm_tree));
 	WT_RET(ret);
 
@@ -970,7 +975,7 @@ __wt_lsm_tree_drop(
 
 err:	if (locked)
 		WT_TRET(__wt_lsm_tree_writeunlock(session, lsm_tree));
-	WT_WITH_DHANDLE_LOCK(session,
+	WT_WITH_HANDLE_LIST_LOCK(session,
 	    WT_TRET(__lsm_tree_discard(session, lsm_tree, 0)));
 	return (ret);
 }
@@ -994,7 +999,7 @@ __wt_lsm_tree_rename(WT_SESSION_IMPL *session,
 	locked = 0;
 
 	/* Get the LSM tree. */
-	WT_WITH_DHANDLE_LOCK(session,
+	WT_WITH_HANDLE_LIST_LOCK(session,
 	    ret = __wt_lsm_tree_get(session, olduri, 1, &lsm_tree));
 	WT_RET(ret);
 
@@ -1044,7 +1049,7 @@ err:	if (locked)
 	 * Discard this LSM tree structure. The first operation on the renamed
 	 * tree will create a new one.
 	 */
-	WT_WITH_DHANDLE_LOCK(session,
+	WT_WITH_HANDLE_LIST_LOCK(session,
 	    WT_TRET(__lsm_tree_discard(session, lsm_tree, 0)));
 	return (ret);
 }
@@ -1067,7 +1072,7 @@ __wt_lsm_tree_truncate(
 	locked = 0;
 
 	/* Get the LSM tree. */
-	WT_WITH_DHANDLE_LOCK(session,
+	WT_WITH_HANDLE_LIST_LOCK(session,
 	    ret = __wt_lsm_tree_get(session, name, 1, &lsm_tree));
 	WT_RET(ret);
 
@@ -1106,7 +1111,7 @@ err:	if (locked)
 		 * the last good version of the metadata will be used, resulting
 		 * in a valid (not truncated) tree.
 		 */
-		WT_WITH_DHANDLE_LOCK(session,
+		WT_WITH_HANDLE_LIST_LOCK(session,
 		    WT_TRET(__lsm_tree_discard(session, lsm_tree, 0)));
 	}
 	return (ret);
@@ -1204,7 +1209,7 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 	/* Tell __wt_schema_worker not to look inside the LSM tree. */
 	*skip = 1;
 
-	WT_WITH_DHANDLE_LOCK(session,
+	WT_WITH_HANDLE_LIST_LOCK(session,
 	    ret = __wt_lsm_tree_get(session, name, 0, &lsm_tree));
 	WT_RET(ret);
 
@@ -1390,7 +1395,7 @@ __wt_lsm_tree_worker(WT_SESSION_IMPL *session,
 
 	locked = 0;
 	exclusive = FLD_ISSET(open_flags, WT_DHANDLE_EXCLUSIVE) ? 1 : 0;
-	WT_WITH_DHANDLE_LOCK(session,
+	WT_WITH_HANDLE_LIST_LOCK(session,
 	    ret = __wt_lsm_tree_get(session, uri, exclusive, &lsm_tree));
 	WT_RET(ret);
 
