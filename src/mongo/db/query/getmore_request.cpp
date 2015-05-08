@@ -32,6 +32,10 @@
 
 #include "mongo/db/query/getmore_request.h"
 
+#include <boost/optional.hpp>
+
+#include "mongo/util/stringutils.h"
+
 namespace mongo {
 
     const int GetMoreRequest::kDefaultBatchSize = 101;
@@ -76,42 +80,64 @@ namespace mongo {
     // static
     StatusWith<GetMoreRequest> GetMoreRequest::parseFromBSON(const std::string& dbname,
                                                              const BSONObj& cmdObj) {
-        if (!str::equals(cmdObj.firstElementFieldName(), "getMore")) {
-            return StatusWith<GetMoreRequest>(ErrorCodes::FailedToParse, str::stream()
-                << "First field name must be 'getMore' in: " << cmdObj);
-        }
+        // Required fields.
+        boost::optional<CursorId> cursorid;
+        boost::optional<std::string> fullns;
 
-        BSONElement cursorIdElt = cmdObj.firstElement();
-        if (cursorIdElt.type() != BSONType::NumberLong) {
-            return StatusWith<GetMoreRequest>(ErrorCodes::TypeMismatch, str::stream()
-                << "Field 'getMore' must be of type long in: " << cmdObj);
-        }
-        const CursorId cursorid = cursorIdElt.Long();
-
-        BSONElement collElt = cmdObj["collection"];
-        if (collElt.type() != BSONType::String) {
-            return StatusWith<GetMoreRequest>(ErrorCodes::TypeMismatch, str::stream()
-                << "Field 'collection' must be of type string in: " << cmdObj);
-        }
-        const std::string fullns = parseNs(dbname, cmdObj);
-
+        // Optional field, set to its default.
         int batchSize = kDefaultBatchSize;
-        BSONElement batchSizeElt = cmdObj["batchSize"];
-        if (batchSizeElt.type() != BSONType::NumberInt && !batchSizeElt.eoo()) {
-            return StatusWith<GetMoreRequest>(ErrorCodes::TypeMismatch, str::stream()
-                << "Field 'batchSize' must be of type int in: " << cmdObj);
-        }
-        else if (!batchSizeElt.eoo()) {
-            batchSize = batchSizeElt.Int();
+
+        for (BSONElement el : cmdObj) {
+            const char* fieldName = el.fieldName();
+            if (str::equals(fieldName, "getMore")) {
+                if (el.type() != BSONType::NumberLong) {
+                    return {ErrorCodes::TypeMismatch,
+                            str::stream() << "Field 'getMore' must be of type long in: " << cmdObj};
+                }
+
+                cursorid = el.Long();
+            }
+            else if (str::equals(fieldName, "collection")) {
+                if (el.type() != BSONType::String) {
+                    return {ErrorCodes::TypeMismatch,
+                            str::stream() << "Field 'collection' must be of type string in: "
+                                          << cmdObj};
+                }
+
+                fullns = parseNs(dbname, cmdObj);
+            }
+            else if (str::equals(fieldName, "batchSize")) {
+                if (!el.isNumber()) {
+                    return {ErrorCodes::TypeMismatch,
+                            str::stream() << "Field 'batchSize' must be a number in: " << cmdObj};
+                }
+
+                batchSize = el.numberInt();
+            }
+            else if (!str::startsWith(fieldName, "$")) {
+                return {ErrorCodes::FailedToParse,
+                        str::stream() << "Failed to parse: " << cmdObj << ". "
+                                      << "Unrecognized field '" << fieldName << "'."};
+            }
         }
 
-        GetMoreRequest request(fullns, cursorid, batchSize);
+        if (!cursorid) {
+            return {ErrorCodes::FailedToParse,
+                    str::stream() << "Field 'getMore' missing in: " << cmdObj};
+        }
+
+        if (!fullns) {
+            return {ErrorCodes::FailedToParse,
+                    str::stream() << "Field 'collection' missing in: " << cmdObj};
+        }
+
+        GetMoreRequest request(*fullns, *cursorid, batchSize);
         Status validStatus = request.isValid();
         if (!validStatus.isOK()) {
-            return StatusWith<GetMoreRequest>(validStatus);
+            return validStatus;
         }
 
-        return StatusWith<GetMoreRequest>(request);
+        return request;
     }
 
 } // namespace mongo
