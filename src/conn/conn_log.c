@@ -30,9 +30,7 @@ __logmgr_sync_cfg(WT_SESSION_IMPL *session, const char **cfg)
 	WT_RET(
 	    __wt_config_gets(session, cfg, "transaction_sync.method", &cval));
 	FLD_CLR(conn->txn_logsync, WT_LOG_DSYNC | WT_LOG_FSYNC);
-	if (WT_STRING_MATCH("background", cval.str, cval.len))
-		FLD_SET(conn->txn_logsync, WT_LOG_BACKGROUND);
-	else if (WT_STRING_MATCH("dsync", cval.str, cval.len))
+	if (WT_STRING_MATCH("dsync", cval.str, cval.len))
 		FLD_SET(conn->txn_logsync, WT_LOG_DSYNC);
 	else if (WT_STRING_MATCH("fsync", cval.str, cval.len))
 		FLD_SET(conn->txn_logsync, WT_LOG_FSYNC);

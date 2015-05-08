@@ -1392,7 +1392,12 @@ struct __wt_session {
 	 * @snippet ex_all.c transaction commit/rollback
 	 *
 	 * @param session the session handle
-	 * @configempty{WT_SESSION.commit_transaction, see dist/api_data.py}
+	 * @configstart{WT_SESSION.commit_transaction, see dist/api_data.py}
+	 * @config{sync, override whether to sync log records when the
+	 * transaction commits\, inherited from ::wiredtiger_open \c
+	 * transaction_sync., a string\, chosen from the following options: \c
+	 * "background"\, \c "off"\, \c "on"; default \c off.}
+	 * @configend
 	 * @errors
 	 */
 	int __F(commit_transaction)(WT_SESSION *session, const char *config);
@@ -2128,8 +2133,8 @@ struct __wt_connection {
  * WT_SESSION::begin_transaction., a boolean flag; default \c false.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;method, the method used to ensure log records
  * are stable on disk\, see @ref tune_durability for more information., a
- * string\, chosen from the following options: \c "background"\, \c "dsync"\, \c
- * "fsync"\, \c "none"; default \c fsync.}
+ * string\, chosen from the following options: \c "dsync"\, \c "fsync"\, \c
+ * "none"; default \c fsync.}
  * @config{ ),,}
  * @config{use_environment_priv, use the \c WIREDTIGER_CONFIG and \c
  * WIREDTIGER_HOME environment variables regardless of whether or not the

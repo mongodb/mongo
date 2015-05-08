@@ -390,6 +390,7 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 int
 __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 {
+	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
 	WT_TXN *txn;
 	WT_TXN_OP *op;
@@ -400,6 +401,24 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 
 	if (!F_ISSET(txn, TXN_RUNNING))
 		WT_RET_MSG(session, EINVAL, "No transaction is active");
+
+	/*
+	 * The default sync setting is inherited from the connection, but can
+	 * be overridden by an explicit "sync" setting for this transaction.
+	 *
+	 * !!! This is an unusual use of the config code: the "default" value
+	 * we pass in is inherited from the connection.  If flush is not set in
+	 * the connection-wide flag and not overridden here, we end up clearing
+	 * all flags.
+	 */
+	WT_RET(__wt_config_gets_def(session, cfg, "sync",
+	    FLD_ISSET(txn->txn_logsync, WT_LOG_FLUSH) ? 1 : 0, &cval));
+	if (WT_STRING_MATCH("background", cval.str, cval.len))
+		txn->txn_logsync = WT_LOG_BACKGROUND;
+	else if (WT_STRING_MATCH("on", cval.str, cval.len))
+		txn->txn_logsync = S2C(session)->txn_logsync;
+	else
+		txn->txn_logsync = 0;
 
 	/* Commit notification. */
 	if (txn->notify != NULL)
