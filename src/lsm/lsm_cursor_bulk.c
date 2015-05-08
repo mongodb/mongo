@@ -63,7 +63,6 @@ int
 __wt_clsm_open_bulk(WT_CURSOR_LSM *clsm, const char *cfg[])
 {
 	WT_CURSOR *cursor, *bulk_cursor;
-	WT_DECL_RET;
 	WT_LSM_TREE *lsm_tree;
 	WT_SESSION_IMPL *session;
 
@@ -80,9 +79,9 @@ __wt_clsm_open_bulk(WT_CURSOR_LSM *clsm, const char *cfg[])
 	cursor->close = __clsm_close_bulk;
 
 	/* Setup the first chunk in the tree. */
-	F_SET(lsm_tree, WT_LSM_TREE_NEED_SWITCH);
 	WT_RET(__wt_clsm_request_switch(clsm));
 	WT_RET(__wt_clsm_await_switch(clsm));
+
 	/*
 	 * Grab and release the LSM tree lock to ensure that the first chunk
 	 * has been fully created before proceeding. We have the LSM tree
@@ -110,12 +109,12 @@ __wt_clsm_open_bulk(WT_CURSOR_LSM *clsm, const char *cfg[])
 	 * Pass through the application config to ensure the tree is open
 	 * for bulk access.
 	 */
-	ret = __wt_open_cursor(session,
-	    lsm_tree->chunk[0]->uri, &clsm->iface, cfg, &bulk_cursor);
+	WT_RET(__wt_open_cursor(session,
+	    lsm_tree->chunk[0]->uri, &clsm->iface, cfg, &bulk_cursor));
 	clsm->cursors[0] = bulk_cursor;
 	/* LSM cursors are always raw */
 	F_SET(bulk_cursor, WT_CURSTD_RAW);
 
-	return (ret);
+	return (0);
 }
 

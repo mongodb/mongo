@@ -23,7 +23,7 @@ static int __clsm_reset_cursors(WT_CURSOR_LSM *, WT_CURSOR *);
  * __wt_clsm_request_switch --
  *	Request an LSM tree switch for a cursor operation.
  */
-inline int
+int
 __wt_clsm_request_switch(WT_CURSOR_LSM *clsm)
 {
 	WT_DECL_RET;
@@ -44,9 +44,9 @@ __wt_clsm_request_switch(WT_CURSOR_LSM *clsm)
 		if (lsm_tree->nchunks == 0 ||
 		    (clsm->dsk_gen == lsm_tree->dsk_gen &&
 		    !F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH))) {
+			F_SET(lsm_tree, WT_LSM_TREE_NEED_SWITCH);
 			ret = __wt_lsm_manager_push_entry(
 			    session, WT_LSM_WORK_SWITCH, 0, lsm_tree);
-			F_SET(lsm_tree, WT_LSM_TREE_NEED_SWITCH);
 		}
 		WT_TRET(__wt_lsm_tree_readunlock(session, lsm_tree));
 	}
@@ -58,7 +58,7 @@ __wt_clsm_request_switch(WT_CURSOR_LSM *clsm)
  * __wt_clsm_await_switch --
  *	Wait for a switch to have completed in the LSM tree
  */
-inline int
+int
 __wt_clsm_await_switch(WT_CURSOR_LSM *clsm)
 {
 	WT_LSM_TREE *lsm_tree;
@@ -1531,9 +1531,9 @@ __wt_clsm_open(WT_SESSION_IMPL *session,
 	 * Check whether the exclusive open for a bulk load succeeded, and
 	 * if it did ensure that it's safe to bulk load into the tree.
 	 */
-	if (bulk && (ret == EBUSY || (ret == 0 &&  lsm_tree->nchunks != 0)))
+	if (bulk && (ret == EBUSY || (ret == 0 &&  lsm_tree->nchunks > 1)))
 		WT_ERR_MSG(session, EINVAL,
-		    "Attempting to open a bulk cursor on a non-empty LSM tree");
+		    "bulk-load is only supported on newly created LSM trees");
 	/* Flag any errors from the tree get. */
 	WT_RET(ret);
 
@@ -1565,6 +1565,12 @@ err:		if (clsm != NULL)
 			WT_TRET(__wt_clsm_close(cursor));
 		else if (lsm_tree != NULL)
 			__wt_lsm_tree_release(session, lsm_tree);
+
+		/*
+		 * We open bulk cursors after setting the returned cursor.
+		 * Fix that here.
+		 */
+		*cursorp = NULL;
 	}
 
 	return (ret);
