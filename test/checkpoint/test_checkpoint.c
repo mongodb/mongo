@@ -246,8 +246,7 @@ cleanup(void)
 	g.running = 0;
 	g.ntables_created = 0;
 
-	testutil_clean_work_dir(g.home);
-	return (0);
+	return (testutil_clean_work_dir(g.home));
 }
 
 static int
