@@ -97,16 +97,11 @@ compare_backups(int i)
 		(void)strncpy(msg, "MAIN", sizeof(msg));
 	else
 		snprintf(msg, sizeof(msg), "%d", i);
-	if (ret == 0)
-		fprintf(stdout,
-		    "Iteration %s: Tables %s.%d and %s.%d identical\n",
-		    msg, full_out, i, incr_out, i);
-	else {
-		fprintf(stdout,
-		    "Iteration %s: Tables %s.%d and %s.%d differ\n",
-		    msg, full_out, i, incr_out, i);
-		exit(1);
-	}
+	printf(
+	    "Iteration %s: Tables %s.%d and %s.%d %s\n",
+	    msg, full_out, i, incr_out, i, ret == 0 ? "identical" : "differ");
+	if (ret != 0)
+		exit (1);
 
 	/*
 	 * If they compare successfully, clean up.
