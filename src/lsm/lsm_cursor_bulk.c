@@ -20,13 +20,9 @@ __clsm_close_bulk(WT_CURSOR *cursor)
 
 	clsm = (WT_CURSOR_LSM *)cursor;
 	lsm_tree = clsm->lsm_tree;
+	F_SET(lsm_tree->chunk[0], WT_LSM_CHUNK_ONDISK);
 
 	WT_RET(__wt_clsm_close(cursor));
-
-	F_SET(lsm_tree, WT_LSM_TREE_NEED_SWITCH);
-	WT_RET(__wt_clsm_request_switch(clsm));
-	WT_RET(__wt_clsm_await_switch(clsm));
-
 	return (0);
 }
 /*
