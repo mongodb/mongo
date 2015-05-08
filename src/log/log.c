@@ -538,8 +538,8 @@ __log_openfile(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_open(
 	    session, buf->data, ok_create, 0, WT_FILE_TYPE_LOG, fh));
 	/*
-	 * XXX - if we are not creating the file, we should verify the
-	 * log file header record for the magic number and versions here.
+	 * If we are not creating the log file but opening it for reading,
+	 * check that the magic number and versions are correct.
 	 */
 	if (!ok_create) {
 		__wt_scr_free(session, &buf);
