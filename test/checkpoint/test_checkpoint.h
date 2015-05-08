@@ -64,7 +64,6 @@ typedef struct {
 
 typedef struct {
 	char *home;				/* Home directory */
-	char *home_init;			/* Home directory init shell */
 	const char *checkpoint_name;		/* Checkpoint name */
 	WT_CONNECTION *conn;			/* WiredTiger connection */
 	u_int nkeys;				/* Keys to load */
