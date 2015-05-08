@@ -468,7 +468,7 @@ env = Environment( BUILD_DIR=variantDir,
                    UNITTEST_LIST='#build/unittests.txt',
                    PYSYSPLATFORM=os.sys.platform,
 
-                   PCRE_VERSION='8.36',
+                   PCRE_VERSION='8.37',
                    CONFIGUREDIR = '#' + scons_data_dir + '/sconf_temp',
                    CONFIGURELOG = '#' + scons_data_dir + '/config.log'
                    )
