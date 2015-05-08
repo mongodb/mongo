@@ -288,8 +288,7 @@ ops(void *arg)
 			    ckpt_available && MMRAND(1, 10) == 1) {
 				if ((ret = session->open_cursor(session,
 				    g.uri, NULL, ckpt_name, &cursor)) != 0)
-					die(ret,
-					    "session.open_cursor");
+					die(ret, "session.open_cursor");
 
 				/* Pick the next session/cursor close/open. */
 				session_op += 250;
@@ -312,13 +311,11 @@ ops(void *arg)
 				 */
 				if ((ret = session->open_cursor(session, g.uri,
 				    NULL, "overwrite", &cursor)) != 0)
-					die(ret,
-					    "session.open_cursor");
+					die(ret, "session.open_cursor");
 				if ((g.type == FIX || g.type == VAR) &&
 				    (ret = session->open_cursor(session, g.uri,
 				    NULL, "append", &cursor_insert)) != 0)
-					die(ret,
-					    "session.open_cursor");
+					die(ret, "session.open_cursor");
 
 				/* Pick the next session/cursor close/open. */
 				session_op += 100 * MMRAND(1, 50);
@@ -501,8 +498,7 @@ skip_insert:			if (col_update(cursor, &key, &value, keyno))
 			case 1: case 2: case 3: case 4:		/* 40% */
 				if ((ret = session->commit_transaction(
 				    session, NULL)) != 0)
-					die(ret,
-					    "session.commit_transaction");
+					die(ret, "session.commit_transaction");
 				++tinfo->commit;
 				intxn = 0;
 				break;
@@ -818,8 +814,7 @@ row_update(
 	if (ret == WT_ROLLBACK)
 		return (WT_ROLLBACK);
 	if (ret != 0 && ret != WT_NOTFOUND)
-		die(ret,
-		    "row_update: update row %" PRIu64 " by key", keyno);
+		die(ret, "row_update: update row %" PRIu64 " by key", keyno);
 
 #ifdef HAVE_BERKELEY_DB
 	if (!SINGLETHREADED)
@@ -1025,8 +1020,7 @@ row_insert(
 	if (ret == WT_ROLLBACK)
 		return (WT_ROLLBACK);
 	if (ret != 0 && ret != WT_NOTFOUND)
-		die(ret,
-		    "row_insert: insert row %" PRIu64 " by key", keyno);
+		die(ret, "row_insert: insert row %" PRIu64 " by key", keyno);
 
 #ifdef HAVE_BERKELEY_DB
 	if (!SINGLETHREADED)
@@ -1127,8 +1121,7 @@ row_remove(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int *notfoundp)
 	if (ret == WT_ROLLBACK)
 		return (WT_ROLLBACK);
 	if (ret != 0 && ret != WT_NOTFOUND)
-		die(ret,
-		    "row_remove: remove %" PRIu64 " by key", keyno);
+		die(ret, "row_remove: remove %" PRIu64 " by key", keyno);
 	*notfoundp = (ret == WT_NOTFOUND);
 
 #ifdef HAVE_BERKELEY_DB
@@ -1171,8 +1164,7 @@ col_remove(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int *notfoundp)
 	if (ret == WT_ROLLBACK)
 		return (WT_ROLLBACK);
 	if (ret != 0 && ret != WT_NOTFOUND)
-		die(ret,
-		    "col_remove: remove %" PRIu64 " by key", keyno);
+		die(ret, "col_remove: remove %" PRIu64 " by key", keyno);
 	*notfoundp = (ret == WT_NOTFOUND);
 
 #ifdef HAVE_BERKELEY_DB

@@ -125,8 +125,7 @@ config_setup(void)
 
 	/* Required shared libraries. */
 	if (DATASOURCE("helium") && access(HELIUM_PATH, R_OK) != 0)
-		die(errno,
-		    "Levyx/helium shared library: %s", HELIUM_PATH);
+		die(errno, "Levyx/helium shared library: %s", HELIUM_PATH);
 	if (DATASOURCE("kvsbdb") && access(KVS_BDB_PATH, R_OK) != 0)
 		die(errno, "kvsbdb shared library: %s", KVS_BDB_PATH);
 
@@ -186,8 +185,7 @@ config_setup(void)
 	if (!config_is_perm("value_max") && g.c_value_max < g.c_value_min)
 		g.c_value_max = g.c_value_min;
 	if (g.c_value_min > g.c_value_max)
-		die(EINVAL,
-		    "value_min may not be larger than value_max");
+		die(EINVAL, "value_min may not be larger than value_max");
 
 	/* Reset the key count. */
 	g.key_cnt = 0;
@@ -535,8 +533,7 @@ config_map_compression(const char *s, u_int *vp)
 	else if (strcmp(s, "zlib-noraw") == 0)
 		*vp = COMPRESS_ZLIB_NO_RAW;
 	else
-		die(EINVAL,
-		    "illegal compression configuration: %s", s);
+		die(EINVAL, "illegal compression configuration: %s", s);
 }
 
 /*

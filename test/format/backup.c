@@ -47,8 +47,7 @@ check_copy(void)
 
 	ret = session->verify(session, g.uri, NULL);
 	if (ret != 0)
-		die(ret,
-		    "session.verify: %s: %s", g.home_backup, g.uri);
+		die(ret, "session.verify: %s: %s", g.home_backup, g.uri);
 
 	if ((ret = conn->close(conn, NULL)) != 0)
 		die(ret, "connection.close: %s", g.home_backup);

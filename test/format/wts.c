@@ -167,8 +167,7 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 		p += snprintf(p, REMAIN(p, end), ",%s", g.config_open);
 
 	if (REMAIN(p, end) == 0)
-		die(ENOMEM,
-		    "wiredtiger_open configuration buffer too small");
+		die(ENOMEM, "wiredtiger_open configuration buffer too small");
 
 	/*
 	 * Direct I/O may not work with backups, doing copies through the buffer
@@ -392,8 +391,7 @@ wts_create(void)
 	}
 
 	if (REMAIN(p, end) == 0)
-		die(ENOMEM,
-		    "WT_SESSION.create configuration buffer too small");
+		die(ENOMEM, "WT_SESSION.create configuration buffer too small");
 
 	/*
 	 * Create the underlying store.
