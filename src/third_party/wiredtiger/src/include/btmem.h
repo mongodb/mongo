@@ -179,17 +179,20 @@ struct __wt_page_modify {
 	 */
 	uint64_t disk_snap_min;
 
-	/* The largest transaction ID seen on the page by reconciliation. */
-	uint64_t rec_max_txn;
-
 	/* The first unwritten transaction ID (approximate). */
 	uint64_t first_dirty_txn;
 
-	/* The largest update transaction ID (approximate). */
-	uint64_t update_txn;
-
 	/* In-memory split transaction ID. */
 	uint64_t inmem_split_txn;
+
+	/* Avoid checking for obsolete updates during checkpoints. */
+	uint64_t obsolete_check_txn;
+
+	/* The largest transaction ID seen on the page by reconciliation. */
+	uint64_t rec_max_txn;
+
+	/* The largest update transaction ID (approximate). */
+	uint64_t update_txn;
 
 	/* Dirty bytes added to the cache. */
 	size_t bytes_dirty;
@@ -353,8 +356,10 @@ struct __wt_page_modify {
 #define	WT_PM_REC_EMPTY		0x01	/* Reconciliation: no replacement */
 #define	WT_PM_REC_MULTIBLOCK	0x02	/* Reconciliation: multiple blocks */
 #define	WT_PM_REC_REPLACE	0x04	/* Reconciliation: single block */
+#define	WT_PM_REC_REWRITE	0x08	/* Reconciliation: rewrite in place */
 #define	WT_PM_REC_MASK							\
-	(WT_PM_REC_EMPTY | WT_PM_REC_MULTIBLOCK | WT_PM_REC_REPLACE)
+	(WT_PM_REC_EMPTY | WT_PM_REC_MULTIBLOCK |			\
+	 WT_PM_REC_REPLACE | WT_PM_REC_REWRITE)
 	uint8_t flags;			/* Page flags */
 };
 
@@ -535,7 +540,7 @@ struct __wt_page {
 #define	WT_PAGE_REFUSE_DEEPEN	0x10	/* Don't deepen the tree at this page */
 #define	WT_PAGE_SCANNING	0x20	/* Obsolete updates are being scanned */
 #define	WT_PAGE_SPLIT_INSERT	0x40	/* A leaf page was split for append */
-#define	WT_PAGE_SPLITTING	0x80	/* An internal page is growing */
+#define	WT_PAGE_SPLIT_LOCKED	0x80	/* An internal page is growing */
 	uint8_t flags_atomic;		/* Atomic flags, use F_*_ATOMIC */
 
 	/*

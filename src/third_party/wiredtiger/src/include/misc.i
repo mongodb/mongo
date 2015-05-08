@@ -7,6 +7,17 @@
  */
 
 /*
+ * __wt_strdup --
+ *	ANSI strdup function.
+ */
+static inline int
+__wt_strdup(WT_SESSION_IMPL *session, const char *str, void *retp)
+{
+	return (__wt_strndup(
+	    session, str, (str == NULL) ? 0 : strlen(str), retp));
+}
+
+/*
  * __wt_verbose --
  * 	Verbose message.
  */

@@ -166,10 +166,12 @@ EOF
 	(cd ../docs && mkdir -p man/man1 &&
 	    mv man/man3/command_line.3 man/man1/wt.1 &&
 	    sed -i~ -e 's/command_line/wt/g' man/man1/wt.1 &&
+	    sed -i~ -e 's/Version Version/Version/g' man/man1/wt.1 &&
 	    rm -f man/man1/wt.1~ &&
 	    mv man/man3/basic_api.3 man/ && rm -f man/man3/* &&
 	    mv man/basic_api.3 man/man3/wiredtiger.3 &&
 	    sed -i~ -e 's/basic_api/WiredTiger/g' man/man3/wiredtiger.3 &&
+	    sed -i~ -e 's/Version Version/Version/g' man/man3/wiredtiger.3 &&
 	    rm -f man/man3/wiredtiger.3~)
 }
 

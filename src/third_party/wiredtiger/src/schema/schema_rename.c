@@ -30,7 +30,7 @@ __rename_file(
 		return (EINVAL);
 
 	/* Close any btree handles in the file. */
-	WT_WITH_DHANDLE_LOCK(session,
+	WT_WITH_HANDLE_LIST_LOCK(session,
 	    ret = __wt_conn_dhandle_close_all(session, uri, 0));
 	WT_ERR(ret);
 

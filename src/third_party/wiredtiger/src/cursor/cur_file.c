@@ -513,12 +513,12 @@ __wt_curfile_open(WT_SESSION_IMPL *session, const char *uri,
 		 * open failing with EBUSY due to a database-wide checkpoint.
 		 */
 		if (bulk)
-			__wt_spin_lock(
-			    session, &S2C(session)->checkpoint_lock);
-		ret = __wt_session_get_btree_ckpt(session, uri, cfg, flags);
-		if (bulk)
-			__wt_spin_unlock(
-			    session, &S2C(session)->checkpoint_lock);
+			WT_WITH_CHECKPOINT_LOCK(session, ret =
+			    __wt_session_get_btree_ckpt(
+			    session, uri, cfg, flags));
+		else
+			ret = __wt_session_get_btree_ckpt(
+			    session, uri, cfg, flags);
 		WT_RET(ret);
 	} else
 		WT_RET(__wt_bad_object_type(session, uri));

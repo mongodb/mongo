@@ -681,7 +681,7 @@ __wt_evict_page(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * before evicting, using a special "eviction" isolation level, where
 	 * only globally visible updates can be evicted.
 	 */
-	__wt_txn_update_oldest(session);
+	__wt_txn_update_oldest(session, 1);
 	txn = &session->txn;
 	saved_iso = txn->isolation;
 	txn->isolation = TXN_ISO_EVICTION;
@@ -941,7 +941,7 @@ __evict_walk(WT_SESSION_IMPL *session, uint32_t flags)
 	 * after a long-running transaction (such as a checkpoint) completes,
 	 * we may never start evicting again.
 	 */
-	__wt_txn_update_oldest(session);
+	__wt_txn_update_oldest(session, 1);
 
 	if (cache->evict_current == NULL)
 		WT_STAT_FAST_CONN_INCR(session, cache_eviction_queue_empty);
@@ -1232,7 +1232,8 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 		}
 
 fast:		/* If the page can't be evicted, give up. */
-		if (!__wt_page_can_evict(session, page, 1))
+		if (!__wt_page_can_evict(
+		    session, page, WT_EVICT_CHECK_SPLITS, NULL))
 			continue;
 
 		/*
@@ -1522,7 +1523,7 @@ __wt_cache_wait(WT_SESSION_IMPL *session, int full)
 		 * are not busy.
 		 */
 		if (busy) {
-			__wt_txn_update_oldest(session);
+			__wt_txn_update_oldest(session, 0);
 			if (txn_state->id == txn_global->oldest_id ||
 			    txn_state->snap_min == txn_global->oldest_id)
 				return (0);
