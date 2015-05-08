@@ -102,6 +102,9 @@ namespace mongo {
          */
         double seconds;
 
+        /// Base random seed for threads
+        int64_t randomSeed;
+
         bool hideResults;
         bool handleErrors;
         bool hideErrors;
@@ -325,7 +328,8 @@ namespace mongo {
          *
          * "id" is a positive integer which should uniquely identify the worker.
          */
-        BenchRunWorker(size_t id, const BenchRunConfig *config, BenchRunState *brState);
+        BenchRunWorker(size_t id, const BenchRunConfig *config,
+                       BenchRunState *brState, int64_t randomSeed);
         ~BenchRunWorker();
 
         /**
@@ -355,6 +359,7 @@ namespace mongo {
         const BenchRunConfig *_config;
         BenchRunState *_brState;
         BenchRunStats _stats;
+        int64_t _randomSeed;
     };
 
     /**
