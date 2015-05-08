@@ -289,13 +289,16 @@ main(void)
 	ret = setup_directories();
 	ret = wt_conn->open_session(wt_conn, NULL, NULL, &session);
 	ret = session->create(session, uri, "key_format=S,value_format=S");
+	fprintf(stdout, "Adding initial data\n");
 	ret = add_work(session, 0);
 
+	fprintf(stdout, "Taking initial backup\n");
 	ret = take_full_backup(session, 0);
 
 	ret = session->checkpoint(session, NULL);
 
 	for (i = 1; i < MAX_ITERATIONS; i++) {
+		fprintf(stdout, "Iteration %d: adding data\n", i);
 		ret = add_work(session, i);
 		ret = session->checkpoint(session, NULL);
 		/*
@@ -303,14 +306,17 @@ main(void)
 		 * comparison purposes.  A normal incremental backup
 		 * procedure would not include this.
 		 */
+		fprintf(stdout, "Iteration %d: taking full backup\n", i);
 		ret = take_full_backup(session, i);
 		/*
 		 * Taking the incremental backup also calls truncate
 		 * to archive the log files, if the copies were successful.
 		 * See that function for details on that call.
 		 */
+		fprintf(stdout, "Iteration %d: taking incremental backup\n", i); 
 		ret = take_incr_backup(session, i);
 
+		fprintf(stdout, "Iteration %d: dumping and comparing data\n", i);
 		ret = compare_backups(i);
 	}
 
@@ -319,6 +325,7 @@ main(void)
 	 * comparison between the incremental and original.
 	 */
 	ret = wt_conn->close(wt_conn, NULL);
+	fprintf(stdout, "Final comparison: dumping and comparing data\n", i);
 	ret = compare_backups(0);
 	return (ret);
 }
