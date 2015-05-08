@@ -155,6 +155,7 @@ namespace mongo {
 
         throwGLE = false;
         breakOnTrap = true;
+        randomSeed = 1314159265358979323;
     }
 
     BenchRunConfig *BenchRunConfig::createFromBson( const BSONObj &args ) {
@@ -177,6 +178,8 @@ namespace mongo {
 
         if ( args["parallel"].isNumber() )
             this->parallel = args["parallel"].numberInt();
+        if ( args["randomSeed"].isNumber() )
+            this->randomSeed = args["randomSeed"].numberInt();
         if ( args["seconds"].isNumber() )
             this->seconds = args["seconds"].number();
         if ( ! args["hideResults"].eoo() )
@@ -320,8 +323,9 @@ namespace mongo {
         return b.obj();
     }
 
-    BenchRunWorker::BenchRunWorker(size_t id, const BenchRunConfig *config, BenchRunState *brState)
-        : _id(id), _config(config), _brState(brState) {
+    BenchRunWorker::BenchRunWorker(size_t id, const BenchRunConfig *config, BenchRunState *brState,
+                                   int64_t randomSeed)
+        : _id(id), _config(config), _brState(brState), _randomSeed(randomSeed) {
     }
 
     BenchRunWorker::~BenchRunWorker() {}
@@ -341,7 +345,7 @@ namespace mongo {
         long long count = 0;
         mongo::Timer timer;
 
-        BsonTemplateEvaluator bsonTemplateEvaluator;
+        BsonTemplateEvaluator bsonTemplateEvaluator(_randomSeed);
         invariant(bsonTemplateEvaluator.setId(_id) == BsonTemplateEvaluator::StatusSuccess);
 
         if (_config->username != "") {
@@ -785,8 +789,11 @@ namespace mongo {
              }
 
              // Start threads
-             for ( unsigned i = 0; i < _config->parallel; i++ ) {
-                 BenchRunWorker *worker = new BenchRunWorker(i, _config.get(), &_brState);
+             for ( int64_t i = 0; i < _config->parallel; i++ ) {
+                 // Make a unique random seed for the worker. 
+                 int64_t seed = _config->randomSeed +  i;
+                 BenchRunWorker *worker = new BenchRunWorker(i, _config.get(),
+                                                             &_brState, seed);
                  worker->start();
                  _workers.push_back(worker);
              }

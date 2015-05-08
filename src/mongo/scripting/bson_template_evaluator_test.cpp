@@ -68,7 +68,7 @@ namespace mongo {
 
         TEST(BSONTemplateEvaluatorTest, RAND_INT) {
 
-            BsonTemplateEvaluator t;
+            BsonTemplateEvaluator t(1234567);
             int randValue1, randValue2;
 
             common_rand_tests("#RAND_INT", &t);
@@ -158,7 +158,7 @@ namespace mongo {
 
         TEST(BSONTemplateEvaluatorTest, RAND_INT_PLUS_THREAD) {
 
-            BsonTemplateEvaluator t;
+            BsonTemplateEvaluator t(2345678);
             t.setId(1);
             int randValue1, randValue2;
 
@@ -248,7 +248,7 @@ namespace mongo {
             ASSERT_LESS_THAN_OR_EQUALS(randValue1, 10);
 
             // Test success with a single element for a zero _id
-            BsonTemplateEvaluator t2;
+            BsonTemplateEvaluator t2(3456789);
             t2.setId(0);
 
             BSONObjBuilder builder13;
@@ -264,7 +264,7 @@ namespace mongo {
 
         TEST(BSONTemplateEvaluatorTest, SEQ_INT) {
 
-            boost::scoped_ptr<BsonTemplateEvaluator> t(new BsonTemplateEvaluator());
+            boost::scoped_ptr<BsonTemplateEvaluator> t(new BsonTemplateEvaluator(131415));
             BSONObj seqObj;
             BSONObj expectedObj;
 
@@ -401,7 +401,7 @@ namespace mongo {
 
         TEST(BSONTemplateEvaluatorTest, RAND_STRING) {
 
-            BsonTemplateEvaluator t;
+            BsonTemplateEvaluator t(4567890);
 
             // Test failure when the arguments to RAND_STRING is not an integer
             BSONObjBuilder builder1;
@@ -506,7 +506,7 @@ namespace mongo {
 
         TEST(BSONTemplateEvaluatorTest, CONCAT) {
 
-            BsonTemplateEvaluator t;
+            BsonTemplateEvaluator t(5678901);
 
             // Test failure when the arguments to #CONCAT has only one argument
             BSONObjBuilder builder1;
@@ -561,7 +561,7 @@ namespace mongo {
 
         TEST(BSONTemplateEvaluatorTest, OID) {
 
-            BsonTemplateEvaluator t;
+            BsonTemplateEvaluator t(6789012);
             BSONObj oidObj = BSON( "#OID" << 1 );
 
             // Error: field must be "_id"
@@ -578,7 +578,7 @@ namespace mongo {
 
         TEST(BSONTemplateEvaluatorTest, COMBINED_OPERATORS) {
 
-            BsonTemplateEvaluator t;
+            BsonTemplateEvaluator t(7890123);
             BSONObj randIntObj = BSON( "#RAND_INT" << BSON_ARRAY( 0 << 5 ) );
             BSONObj randStrObj = BSON( "#RAND_STRING" << BSON_ARRAY(5) );
 
@@ -612,7 +612,7 @@ namespace mongo {
 
         // Test #VARIABLE
         TEST(BSONTemplateEvaluatorTest, VARIABLE) {
-            BsonTemplateEvaluator t;
+            BsonTemplateEvaluator t(8901234);
             int value1;
 
             // Test failure when the variable has not been set
@@ -638,7 +638,7 @@ namespace mongo {
         // Test template recursion and other general features
         TEST(BSONTemplateEvaluatorTest, NESTING) {
 
-            BsonTemplateEvaluator t;
+            BsonTemplateEvaluator t(8901234);
             int randValue1, randValue2;
 
             // Test failure when operators are arbitrarily nested

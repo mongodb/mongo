@@ -48,7 +48,7 @@ namespace mongo {
         addOperator("VARIABLE", &BsonTemplateEvaluator::evalVariable);
     }
 
-    BsonTemplateEvaluator::BsonTemplateEvaluator() : _id(0) {
+    BsonTemplateEvaluator::BsonTemplateEvaluator(int64_t seed) : _id(0), rng(seed) {
         initializeEvaluator();
     }
 
@@ -169,7 +169,8 @@ namespace mongo {
         const int max  = range["1"].numberInt();
         if (max <= min)
             return StatusOpEvaluationError;
-        int randomNum = min + (rand() % (max - min));
+        // range of max-min
+        int randomNum = min + (btl->rng.nextInt32() % (max - min));
         if (range.nFields() == 3) {
             if (!range[2].isNumber())
                 return StatusOpEvaluationError;
@@ -192,7 +193,7 @@ namespace mongo {
         const int max  = range["1"].numberInt();
         if (max <= min)
             return StatusOpEvaluationError;
-        int randomNum = min + (rand() % (max - min));
+        int randomNum = min + (btl->rng.nextInt32() % (max - min));
         randomNum += ((max - min) * btl->_id);
         out.append(fieldName, randomNum);
         return StatusSuccess;
@@ -269,11 +270,11 @@ namespace mongo {
                                        "0123456789+/";
         static const size_t alphaNumLength = sizeof(alphanum) - 1;
         BOOST_STATIC_ASSERT(alphaNumLength == 64);
-        unsigned currentRand = 0;
+        int32_t currentRand = 0;
         std::string str;
         for (int i = 0; i < length; ++i, currentRand >>= 6) {
             if (i % 5 == 0)
-                currentRand = rand();
+                currentRand = btl->rng.nextInt32();
             str.push_back(alphanum[currentRand % alphaNumLength]);
         }
         out.append(fieldName, str);
