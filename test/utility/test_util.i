@@ -101,7 +101,7 @@ testutil_clean_work_dir(char *dir)
 	/* Additional bytes for the Windows rd command. */
 	inputSize = strlen(dir) + sizeof(RM_COMMAND);
 	if ((buffer = malloc(inputSize)) == NULL)
-		testutil_die(1, "Failed to allocate memory");
+		testutil_die(ENOMEM, "Failed to allocate memory");
 
 	snprintf(buffer, inputSize, "%s%s", RM_COMMAND, dir);
 	ret = system(buffer);
@@ -125,7 +125,7 @@ testutil_make_work_dir(char *dir)
 	/* Additional bytes for the mkdir command */
 	inputSize = strlen(dir) + sizeof(MKDIR_COMMAND);
 	if ((buffer = malloc(inputSize)) == NULL)
-		testutil_die(1, "Failed to allocate memory");
+		testutil_die(ENOMEM, "Failed to allocate memory");
 
 	/* mkdir shares syntax between Windows and Linux */
 	snprintf(buffer, inputSize, "%s%s", MKDIR_COMMAND, dir);
