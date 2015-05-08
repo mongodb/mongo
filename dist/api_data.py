@@ -20,10 +20,8 @@ common_meta = [
     Config('app_metadata', '', r'''
         application-owned metadata for this object'''),
     Config('collator', 'none', r'''
-        configure custom collation for keys.  Permitted values are
-        \c "none" or a custom collator name created with
-        WT_CONNECTION::add_collator''',
-        func='__wt_collator_confchk'),
+        configure custom collation for keys.  Permitted values are \c "none"
+        or a custom collator name created with WT_CONNECTION::add_collator'''),
     Config('columns', '', r'''
         list of the column names.  Comma-separated list of the form
         <code>(column[,...])</code>.  For tables, the number of entries
@@ -139,8 +137,7 @@ file_config = format_meta + [
         or custom compression engine name created with
         WT_CONNECTION::add_compressor.  If WiredTiger has builtin support for
         \c "bzip2", \c "snappy", \c "lz4" or \c "zlib" compression, these names
-        are also available.  See @ref compression for more information''',
-        func='__wt_compressor_confchk'),
+        are also available.  See @ref compression for more information'''),
     Config('cache_resident', 'false', r'''
         do not ever evict the object's pages from cache. Not compatible with
         LSM tables; see @ref tuning_cache_resident for more information''',
@@ -181,13 +178,11 @@ file_config = format_meta + [
     Config('huffman_key', 'none', r'''
         configure Huffman encoding for keys.  Permitted values are
         \c "none", \c "english", \c "utf8<file>" or \c "utf16<file>".
-        See @ref huffman for more information''',
-        func='__wt_huffman_confchk'),
+        See @ref huffman for more information'''),
     Config('huffman_value', 'none', r'''
         configure Huffman encoding for values.  Permitted values are
         \c "none", \c "english", \c "utf8<file>" or \c "utf16<file>".
-        See @ref huffman for more information''',
-        func='__wt_huffman_confchk'),
+        See @ref huffman for more information'''),
     Config('internal_key_truncate', 'true', r'''
         configure internal key truncation, discarding unnecessary
         trailing bytes on internal keys (ignored for custom
@@ -308,8 +303,7 @@ index_only_config = [
     Config('extractor', 'none', r'''
         configure custom extractor for indices.  Permitted values are
         \c "none" or an extractor name created with
-        WT_CONNECTION::add_extractor''',
-        func='__wt_extractor_confchk'),
+        WT_CONNECTION::add_extractor'''),
     Config('immutable', 'false', r'''
         configure the index to be immutable - that is an index is not changed
         by any update to a record in the table''', type='boolean'),

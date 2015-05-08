@@ -75,8 +75,7 @@ __collator_confchk(
 	WT_CONNECTION_IMPL *conn;
 	WT_NAMED_COLLATOR *ncoll;
 
-	if (collatorp != NULL)
-		*collatorp = NULL;
+	*collatorp = NULL;
 
 	if (cname->len == 0 || WT_STRING_MATCH("none", cname->str, cname->len))
 		return (0);
@@ -84,22 +83,11 @@ __collator_confchk(
 	conn = S2C(session);
 	TAILQ_FOREACH(ncoll, &conn->collqh, q)
 		if (WT_STRING_MATCH(ncoll->name, cname->str, cname->len)) {
-			if (collatorp != NULL)
-				*collatorp = ncoll->collator;
+			*collatorp = ncoll->collator;
 			return (0);
 		}
 	WT_RET_MSG(session, EINVAL,
 	    "unknown collator '%.*s'", (int)cname->len, cname->str);
-}
-
-/*
- * __wt_collator_confchk --
- *	Check for a valid custom collator (public).
- */
-int
-__wt_collator_confchk(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cname)
-{
-	return (__collator_confchk(session, cname, NULL));
 }
 
 /*
@@ -212,8 +200,7 @@ __compressor_confchk(
 	WT_CONNECTION_IMPL *conn;
 	WT_NAMED_COMPRESSOR *ncomp;
 
-	if (compressorp != NULL)
-		*compressorp = NULL;
+	*compressorp = NULL;
 
 	if (cval->len == 0 || WT_STRING_MATCH("none", cval->str, cval->len))
 		return (0);
@@ -221,22 +208,11 @@ __compressor_confchk(
 	conn = S2C(session);
 	TAILQ_FOREACH(ncomp, &conn->compqh, q)
 		if (WT_STRING_MATCH(ncomp->name, cval->str, cval->len)) {
-			if (compressorp != NULL)
-				*compressorp = ncomp->compressor;
+			*compressorp = ncomp->compressor;
 			return (0);
 		}
 	WT_RET_MSG(session, EINVAL,
 	    "unknown compressor '%.*s'", (int)cval->len, cval->str);
-}
-
-/*
- * __wt_compressor_confchk --
- *	Validate the compressor (public).
- */
-int
-__wt_compressor_confchk(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval)
-{
-	return (__compressor_confchk(session, cval, NULL));
 }
 
 /*
@@ -640,8 +616,7 @@ __extractor_confchk(
 	WT_CONNECTION_IMPL *conn;
 	WT_NAMED_EXTRACTOR *nextractor;
 
-	if (extractorp != NULL)
-		*extractorp = NULL;
+	*extractorp = NULL;
 
 	if (cname->len == 0 || WT_STRING_MATCH("none", cname->str, cname->len))
 		return (0);
@@ -649,22 +624,11 @@ __extractor_confchk(
 	conn = S2C(session);
 	TAILQ_FOREACH(nextractor, &conn->extractorqh, q)
 		if (WT_STRING_MATCH(nextractor->name, cname->str, cname->len)) {
-			if (extractorp != NULL)
-				*extractorp = nextractor->extractor;
+			*extractorp = nextractor->extractor;
 			return (0);
 		}
 	WT_RET_MSG(session, EINVAL,
 	    "unknown extractor '%.*s'", (int)cname->len, cname->str);
-}
-
-/*
- * __wt_extractor_confchk --
- *	Check for a valid custom extractor (public).
- */
-int
-__wt_extractor_confchk(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cname)
-{
-	return (__extractor_confchk(session, cname, NULL));
 }
 
 /*
