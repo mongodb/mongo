@@ -221,7 +221,7 @@ main(int argc, char *argv[])
 	}
 	free(big);
 
-	testutil_clean_work_dir(home);
+	(void)testutil_clean_work_dir(home);
 
 	return (EXIT_SUCCESS);
 }

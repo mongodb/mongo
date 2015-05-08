@@ -113,4 +113,3 @@ __wt_clsm_open_bulk(WT_CURSOR_LSM *clsm, const char *cfg[])
 
 	return (0);
 }
-

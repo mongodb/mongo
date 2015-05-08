@@ -191,7 +191,7 @@ wt_connect(char *config_open)
 	char config[512];
 	size_t print_count;
 
-	testutil_clean_work_dir(home);
+	(void)testutil_clean_work_dir(home);
 	testutil_make_work_dir(home);
 
 	print_count = (size_t)snprintf(config, sizeof(config),
@@ -203,8 +203,7 @@ wt_connect(char *config_open)
 	if (print_count >= sizeof(config))
 		testutil_die(EINVAL, "Config string too long");
 
-	if ((ret = wiredtiger_open(
-	    home, &event_handler, config, &conn)) != 0)
+	if ((ret = wiredtiger_open(home, &event_handler, config, &conn)) != 0)
 		testutil_die(ret, "wiredtiger_open");
 }
 
@@ -235,7 +234,7 @@ wt_shutdown(void)
 static void
 shutdown(void)
 {
-	testutil_clean_work_dir(home);
+	(void)testutil_clean_work_dir(home);
 }
 
 static int
