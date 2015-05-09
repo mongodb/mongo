@@ -50,8 +50,8 @@
 #endif
 #include <time.h>
 
+#include "wt_internal.h"			/* __wt_XXX */
 #include "test_util.i"
-#include <wiredtiger_ext.h>
 
 #ifdef BDB
 #include <db.h>
@@ -94,13 +94,6 @@ extern WT_EXTENSION_API *wt_api;
 #define	MEGABYTE(v)	((v) * 1048576)
 #undef	GIGABYTE
 #define	GIGABYTE(v)	((v) * 1073741824ULL)
-
-#define	F_CLR(p, mask)		((p)->flags &= ~((uint32_t)(mask)))
-#define	F_ISSET(p, mask)	((p)->flags & ((uint32_t)(mask)))
-#define	F_SET(p, mask)		((p)->flags |= ((uint32_t)(mask)))
-
-/* Get a random value between a min/max pair. */
-#define	MMRAND(min, max)	(rng() % (((max) + 1) - (min)) + (min))
 
 #define	WT_NAME	"wt"				/* Object name */
 
@@ -155,6 +148,8 @@ typedef struct {
 	int workers_finished;			/* Operations completed */
 
 	pthread_rwlock_t backup_lock;		/* Hot backup running */
+
+	uint32_t rnd[2];			/* Global RNG state */
 
 	/*
 	 * We have a list of records that are appended, but not yet "resolved",
@@ -259,6 +254,8 @@ typedef struct {
 extern GLOBAL g;
 
 typedef struct {
+	uint32_t rnd[2];			/* thread RNG state */
+
 	uint64_t search;			/* operations */
 	uint64_t insert;
 	uint64_t update;
@@ -278,7 +275,7 @@ typedef struct {
 #define	TINFO_COMPLETE	2			/* Finished */
 #define	TINFO_JOINED	3			/* Resolved */
 	volatile int state;			/* state */
-} TINFO WT_GCC_ATTRIBUTE((aligned(64)));
+} TINFO WT_GCC_ATTRIBUTE((aligned(WT_CACHE_LINE_ALIGNMENT)));
 
 #ifdef HAVE_BERKELEY_DB
 void	 bdb_close(void);
@@ -298,15 +295,15 @@ void	 config_file(const char *);
 void	 config_print(int);
 void	 config_setup(void);
 void	 config_single(const char *, int);
-void	 key_len_setup(void);
+void	 key_gen(uint8_t *, size_t *, uint64_t);
+void	 key_gen_insert(uint32_t *, uint8_t *, size_t *, uint64_t);
 void	 key_gen_setup(uint8_t **);
-void	 key_gen(uint8_t *, size_t *, uint64_t, int);
+void	 key_len_setup(void);
 void	 path_setup(const char *);
-uint32_t rng(void);
-void	 rng_init(void);
+uint32_t rng(uint32_t *);
 void	 track(const char *, uint64_t, TINFO *);
-void	 val_gen_setup(uint8_t **);
-void	 value_gen(uint8_t *, size_t *, uint64_t);
+void	 val_gen(uint32_t *, uint8_t *, size_t *, uint64_t);
+void	 val_gen_setup(uint32_t *, uint8_t **);
 void	 wts_close(void);
 void	 wts_create(void);
 void	 wts_dump(const char *, int);
@@ -323,3 +320,13 @@ void	 die(int, const char *, ...)
 __attribute__((__noreturn__))
 #endif
 ;
+
+/*
+ * mmrand --
+ *	Return a random value between a min/max pair.
+ */
+static inline uint32_t
+mmrand(uint32_t *rnd, u_int min, u_int max)
+{
+	return (rng(rnd) % (((max) + 1) - (min)) + (min));
+}

@@ -34,7 +34,6 @@ static void startup(void);
 static void usage(void);
 
 extern int __wt_optind;
-extern int __wt_getopt(const char *, int, char * const *, const char *);
 extern char *__wt_optarg;
 
 int
@@ -106,6 +105,9 @@ main(int argc, char *argv[])
 	argc -= __wt_optind;
 	argv += __wt_optind;
 
+	/* Initialize the global random number generator. */
+	__wt_random_init(g.rnd);
+
 	/* Set up paths. */
 	path_setup(home);
 
@@ -160,9 +162,6 @@ main(int argc, char *argv[])
 		die(ret, "pthread_rwlock_init: append lock");
 	if ((ret = pthread_rwlock_init(&g.backup_lock, NULL)) != 0)
 		die(ret, "pthread_rwlock_init: backup lock");
-
-	/* Seed the random number generator. */
-	srand((u_int)(0xdeadbeef ^ (u_int)time(NULL)));
 
 	printf("%s: process %" PRIdMAX "\n", g.progname, (intmax_t)getpid());
 	while (++g.run_cnt <= g.c_runs || g.c_runs == 0 ) {

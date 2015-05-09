@@ -132,7 +132,7 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 	 * Sometimes specify a set of sources just to exercise that code.
 	 */
 	if (g.c_statistics_server) {
-		if (MMRAND(0, 5) == 1 &&
+		if (mmrand(NULL, 0, 5) == 1 &&
 		    memcmp(g.uri, "file:", strlen("file:")) == 0)
 			p += snprintf(p, REMAIN(p, end),
 			    ",statistics=(fast)"
@@ -256,15 +256,15 @@ wts_create(void)
 	 * Configure the maximum key/value sizes, but leave it as the default
 	 * if we come up with something crazy.
 	 */
-	maxintlkey = MMRAND(maxintlpage / 50, maxintlpage / 40);
+	maxintlkey = mmrand(NULL, maxintlpage / 50, maxintlpage / 40);
 	if (maxintlkey > 20)
 		p += snprintf(p, REMAIN(p, end),
 		    ",internal_key_max=%d", maxintlkey);
-	maxleafkey = MMRAND(maxleafpage / 50, maxleafpage / 40);
+	maxleafkey = mmrand(NULL, maxleafpage / 50, maxleafpage / 40);
 	if (maxleafkey > 20)
 		p += snprintf(p, REMAIN(p, end),
 		    ",leaf_key_max=%d", maxleafkey);
-	maxleafvalue = MMRAND(maxleafpage * 10, maxleafpage / 40);
+	maxleafvalue = mmrand(NULL, maxleafpage * 10, maxleafpage / 40);
 	if (maxleafvalue > 40 && maxleafvalue < 100 * 1024)
 		p += snprintf(p, REMAIN(p, end),
 		    ",leaf_value_max=%d", maxleafvalue);
@@ -295,7 +295,7 @@ wts_create(void)
 			    ",huffman_value=english");
 		if (g.c_dictionary)
 			p += snprintf(p, REMAIN(p, end),
-			    ",dictionary=%d", MMRAND(123, 517));
+			    ",dictionary=%d", mmrand(NULL, 123, 517));
 		break;
 	}
 

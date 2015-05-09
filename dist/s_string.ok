@@ -641,6 +641,7 @@ mfence
 minorp
 mkdir
 mmap
+mmrand
 mnt
 msecs
 msg

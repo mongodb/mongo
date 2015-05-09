@@ -55,7 +55,7 @@ compact(void *arg)
 	 * Perform compaction at somewhere under 15 seconds (so we get at
 	 * least one done), and then at 23 second intervals.
 	 */
-	for (period = MMRAND(1, 15);; period = 23) {
+	for (period = mmrand(NULL, 1, 15);; period = 23) {
 		/* Sleep for short periods so we don't make the run wait. */
 		while (period > 0 && !g.workers_finished) {
 			--period;

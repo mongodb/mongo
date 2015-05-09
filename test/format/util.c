@@ -33,7 +33,7 @@
 #endif
 
 static inline uint32_t
-kv_len(uint64_t keyno, uint32_t min, uint32_t max)
+kv_len(uint32_t *rnd, uint64_t keyno, uint32_t min, uint32_t max)
 {
 	/*
 	 * Focus on relatively small key/value items, admitting the possibility
@@ -47,7 +47,7 @@ kv_len(uint64_t keyno, uint32_t min, uint32_t max)
 		max = KILOBYTE(100);
 	} else if (keyno % 20 != 0 && max > min + 20)
 		max = min + 20;
-	return (MMRAND(min, max));
+	return (mmrand(rnd, min, max));
 }
 
 void
@@ -66,7 +66,7 @@ key_len_setup(void)
 	 */
 	for (i = 0; i < sizeof(g.key_rand_len) / sizeof(g.key_rand_len[0]); ++i)
 		g.key_rand_len[i] =
-		    kv_len((uint64_t)i, g.c_key_min, g.c_key_max);
+		    kv_len(NULL, (uint64_t)i, g.c_key_min, g.c_key_max);
 }
 
 void
@@ -85,17 +85,16 @@ key_gen_setup(uint8_t **keyp)
 	*keyp = key;
 }
 
-void
-key_gen(uint8_t *key, size_t *sizep, uint64_t keyno, int insert)
+static void
+key_gen_common(uint8_t *key, size_t *sizep, uint64_t keyno, int suffix)
 {
-	int len, suffix;
+	int len;
 
 	/*
 	 * The key always starts with a 10-digit string (the specified cnt)
 	 * followed by two digits, a random number between 1 and 15 if it's
 	 * an insert, otherwise 00.
 	 */
-	suffix = insert ? (int)MMRAND(1, 15) : 0;
 	len = sprintf((char *)key, "%010" PRIu64 ".%02d", keyno, suffix);
 
 	/*
@@ -110,10 +109,22 @@ key_gen(uint8_t *key, size_t *sizep, uint64_t keyno, int insert)
 	*sizep = (size_t)len;
 }
 
+void
+key_gen(uint8_t *key, size_t *sizep, uint64_t keyno)
+{
+	key_gen_common(key, sizep, keyno, 0);
+}
+
+void
+key_gen_insert(uint32_t *rnd, uint8_t *key, size_t *sizep, uint64_t keyno)
+{
+	key_gen_common(key, sizep, keyno, (int)mmrand(rnd, 1, 15));
+}
+
 static uint32_t val_dup_data_len;	/* Length of duplicate data items */
 
 void
-val_gen_setup(uint8_t **valp)
+val_gen_setup(uint32_t *rnd, uint8_t **valp)
 {
 	uint8_t *val;
 	size_t i, len;
@@ -135,12 +146,12 @@ val_gen_setup(uint8_t **valp)
 
 	*valp = val;
 
-	val_dup_data_len =
-	    kv_len((uint64_t)MMRAND(1, 20), g.c_value_min, g.c_value_max);
+	val_dup_data_len = kv_len(rnd,
+	    (uint64_t)mmrand(rnd, 1, 20), g.c_value_min, g.c_value_max);
 }
 
 void
-value_gen(uint8_t *val, size_t *sizep, uint64_t keyno)
+val_gen(uint32_t *rnd, uint8_t *val, size_t *sizep, uint64_t keyno)
 {
 	/*
 	 * Fixed-length records: take the low N bits from the last digit of
@@ -148,13 +159,13 @@ value_gen(uint8_t *val, size_t *sizep, uint64_t keyno)
 	 */
 	if (g.type == FIX) {
 		switch (g.c_bitcnt) {
-		case 8: val[0] = MMRAND(1, 0xff); break;
-		case 7: val[0] = MMRAND(1, 0x7f); break;
-		case 6: val[0] = MMRAND(1, 0x3f); break;
-		case 5: val[0] = MMRAND(1, 0x1f); break;
-		case 4: val[0] = MMRAND(1, 0x0f); break;
-		case 3: val[0] = MMRAND(1, 0x07); break;
-		case 2: val[0] = MMRAND(1, 0x03); break;
+		case 8: val[0] = (uint8_t)mmrand(rnd, 1, 0xff); break;
+		case 7: val[0] = (uint8_t)mmrand(rnd, 1, 0x7f); break;
+		case 6: val[0] = (uint8_t)mmrand(rnd, 1, 0x3f); break;
+		case 5: val[0] = (uint8_t)mmrand(rnd, 1, 0x1f); break;
+		case 4: val[0] = (uint8_t)mmrand(rnd, 1, 0x0f); break;
+		case 3: val[0] = (uint8_t)mmrand(rnd, 1, 0x07); break;
+		case 2: val[0] = (uint8_t)mmrand(rnd, 1, 0x03); break;
 		case 1: val[0] = 1; break;
 		}
 		*sizep = 1;
@@ -180,14 +191,15 @@ value_gen(uint8_t *val, size_t *sizep, uint64_t keyno)
 	 * use the same data value all the time.
 	 */
 	if ((g.type == ROW || g.type == VAR) &&
-	    g.c_repeat_data_pct != 0 && MMRAND(1, 100) < g.c_repeat_data_pct) {
+	    g.c_repeat_data_pct != 0 &&
+	    mmrand(rnd, 1, 100) < g.c_repeat_data_pct) {
 		(void)strcpy((char *)val, "DUPLICATEV");
 		val[10] = '/';
 		*sizep = val_dup_data_len;
 	} else {
 		(void)sprintf((char *)val, "%010" PRIu64, keyno);
 		val[10] = '/';
-		*sizep = kv_len(keyno, g.c_value_min, g.c_value_max);
+		*sizep = kv_len(rnd, keyno, g.c_value_min, g.c_value_max);
 	}
 }
 
@@ -349,32 +361,34 @@ path_setup(const char *home)
  *	Return a random number.
  */
 uint32_t
-rng(void)
+rng(uint32_t *rnd)
 {
 	char buf[64];
 	uint32_t r;
 
 	/*
-	 * We can entirely reproduce a run based on the random numbers used
-	 * in the initial run, plus the configuration files.  It would be
-	 * nice to just log the initial RNG seed, rather than logging every
-	 * random number generated, but we'd have to include our own RNG,
-	 * Berkeley DB calls rand() internally, and that messes up the pattern
-	 * of random numbers.
+	 * Threaded operations have their own RNG information, otherwise we
+	 * use the default.
+	 */
+	if (rnd == NULL)
+		rnd = g.rnd;
+
+	/*
+	 * We can reproduce a single-threaded run based on the random numbers
+	 * used in the initial run, plus the configuration files.
 	 *
 	 * Check g.replay and g.rand_log_stop: multithreaded runs log/replay
 	 * until they get to the operations phase, then turn off log/replay,
 	 * threaded operation order can't be replayed.
 	 */
 	if (g.rand_log_stop)
-		return ((uint32_t)rand());
+		return (__wt_random(rnd));
 
 	if (g.replay) {
 		if (fgets(buf, sizeof(buf), g.rand_log) == NULL) {
 			if (feof(g.rand_log)) {
 				fprintf(stderr,
-				    "end of random number log reached, "
-				    "exiting\n");
+				    "\n" "end of random number log reached\n");
 				exit(EXIT_SUCCESS);
 			}
 			die(errno, "random number log");
@@ -383,7 +397,7 @@ rng(void)
 		return ((uint32_t)strtoul(buf, NULL, 10));
 	}
 
-	r = (uint32_t)rand();
+	r = __wt_random(rnd);
 
 	/* Save and flush the random number so we're up-to-date on error. */
 	(void)fprintf(g.rand_log, "%" PRIu32 "\n", r);
