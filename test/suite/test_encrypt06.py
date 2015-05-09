@@ -68,28 +68,23 @@ class test_encrypt06(wttest.WiredTigerTestCase):
         ('none', dict(
             sys_encrypt='none', sys_encrypt_args='', encryptmeta=False,
             file0_encrypt='none', file0_encrypt_args='', encrypt0=False,
-            file1_encrypt='none', file1_encrypt_args='', encrypt1=False,
-            file2_encrypt='none', file2_encrypt_args='', encrypt2=False)),
+            file1_encrypt='none', file1_encrypt_args='', encrypt1=False)),
         ('rotn-implied', dict(
             sys_encrypt='rotn', sys_encrypt_args=key11, encryptmeta=True,
             file0_encrypt=None, file0_encrypt_args='', encrypt0=True,
-            file1_encrypt=None, file1_encrypt_args='', encrypt1=True,
-            file2_encrypt=None, file2_encrypt_args='', encrypt2=True)),
+            file1_encrypt=None, file1_encrypt_args='', encrypt1=True)),
         ('rotn-all', dict(
             sys_encrypt='rotn', sys_encrypt_args=key11, encryptmeta=True,
             file0_encrypt='rotn', file0_encrypt_args=key13, encrypt0=True,
-            file1_encrypt='rotn', file1_encrypt_args=key13, encrypt1=True,
-            file2_encrypt='rotn', file2_encrypt_args=key13, encrypt2=True)),
+            file1_encrypt='rotn', file1_encrypt_args=key13, encrypt1=True)),
         ('rotn-sys', dict(
             sys_encrypt='rotn', sys_encrypt_args=key11, encryptmeta=True,
             file0_encrypt='none', file0_encrypt_args='', encrypt0=False,
-            file1_encrypt='none', file1_encrypt_args='', encrypt1=False,
-            file2_encrypt='none', file2_encrypt_args='', encrypt2=False)),
+            file1_encrypt='none', file1_encrypt_args='', encrypt1=False)),
         ('rotn-file0', dict(
             sys_encrypt='rotn', sys_encrypt_args=key11, encryptmeta=True,
             file0_encrypt='rotn', file0_encrypt_args=key13, encrypt0=True,
-            file1_encrypt='none', file1_encrypt_args='', encrypt1=False,
-            file2_encrypt='none', file2_encrypt_args='', encrypt2=False)),
+            file1_encrypt='none', file1_encrypt_args='', encrypt1=False)),
     ]
     scenarios = number_scenarios(multiply_scenarios('.', encrypt, storagetype))
     nrecords = 1000
@@ -158,14 +153,11 @@ class test_encrypt06(wttest.WiredTigerTestCase):
     def test_encrypt(self):
         name0 = 'test_encrypt06-0'
         name1 = 'test_encrypt06-1'
-        name2 = 'test_encrypt06-2'
 
         enc0 = self.encrypt_file_params(self.file0_encrypt,
                                         self.file0_encrypt_args)
         enc1 = self.encrypt_file_params(self.file1_encrypt,
                                         self.file1_encrypt_args)
-        enc2 = self.encrypt_file_params(self.file2_encrypt,
-                                        self.file2_encrypt_args)
 
         # This is the clear text that we'll be looking for
         txt0 = 'AbCdEfG'
