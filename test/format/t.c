@@ -155,13 +155,15 @@ main(int argc, char *argv[])
 		g.c_runs = 1;
 
 	/*
-	 * Initialize locks to single-thread named checkpoints and backups, and
-	 * to single-thread last-record updates.
+	 * Initialize locks to single-thread named checkpoints and backups, last
+	 * last-record updates, and failures.
 	 */
 	if ((ret = pthread_rwlock_init(&g.append_lock, NULL)) != 0)
 		die(ret, "pthread_rwlock_init: append lock");
 	if ((ret = pthread_rwlock_init(&g.backup_lock, NULL)) != 0)
 		die(ret, "pthread_rwlock_init: backup lock");
+	if ((ret = pthread_rwlock_init(&g.death_lock, NULL)) != 0)
+		die(ret, "pthread_rwlock_init: death lock");
 
 	printf("%s: process %" PRIdMAX "\n", g.progname, (intmax_t)getpid());
 	while (++g.run_cnt <= g.c_runs || g.c_runs == 0 ) {
@@ -292,6 +294,9 @@ void
 die(int e, const char *fmt, ...)
 {
 	va_list ap;
+
+	/* Single-thread error handling. */
+	pthread_rwlock_wrlock(&g.death_lock);
 
 	if (fmt != NULL) {				/* Death message. */
 		fprintf(stderr, "%s: ", g.progname);

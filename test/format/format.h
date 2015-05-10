@@ -161,6 +161,8 @@ typedef struct {
 	size_t	  append_cnt;			/* Current unresolved records */
 	pthread_rwlock_t append_lock;		/* Single-thread resolution */
 
+	pthread_rwlock_t death_lock;		/* Single-thread failure */
+
 	char *uri;				/* Object name */
 
 	char *config_open;			/* Command-line configuration */
