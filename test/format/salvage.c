@@ -111,7 +111,7 @@ found:	if (fstat(fd, &sb) == -1)
 	(void)fprintf(fp,
 	    "salvage-corrupt: offset %" PRIuMAX ", length " SIZET_FMT "\n",
 	    (uintmax_t)offset, len);
-	(void)fclose(fp);
+	fclose_and_clear(&fp);
 
 	if (lseek(fd, offset, SEEK_SET) == -1)
 		die(errno, "salvage-corrupt: lseek");

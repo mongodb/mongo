@@ -345,7 +345,7 @@ config_print(int error_display)
 	(void)fflush(fp);
 
 	if (fp != stdout)
-		(void)fclose(fp);
+		fclose_and_clear(&fp);
 }
 
 /*
@@ -368,7 +368,7 @@ config_file(const char *name)
 			continue;
 		config_single(buf, 1);
 	}
-	(void)fclose(fp);
+	fclose_and_clear(&fp);
 }
 
 /*

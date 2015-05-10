@@ -385,8 +385,8 @@ rng(uint32_t *rnd)
 		return (__wt_random(rnd));
 
 	if (g.replay) {
-		if (fgets(buf, sizeof(buf), g.rand_log) == NULL) {
-			if (feof(g.rand_log)) {
+		if (fgets(buf, sizeof(buf), g.randfp) == NULL) {
+			if (feof(g.randfp)) {
 				fprintf(stderr,
 				    "\n" "end of random number log reached\n");
 				exit(EXIT_SUCCESS);
@@ -400,8 +400,25 @@ rng(uint32_t *rnd)
 	r = __wt_random(rnd);
 
 	/* Save and flush the random number so we're up-to-date on error. */
-	(void)fprintf(g.rand_log, "%" PRIu32 "\n", r);
-	(void)fflush(g.rand_log);
+	(void)fprintf(g.randfp, "%" PRIu32 "\n", r);
+	(void)fflush(g.randfp);
 
 	return (r);
+}
+
+/*
+ * fclose_and_clear --
+ *	Close a file and clear the handle so we don't close twice.
+ */
+void
+fclose_and_clear(FILE **fpp)
+{
+	FILE *fp;
+
+	if ((fp = *fpp) == NULL)
+		return;
+	*fpp = NULL;
+	if (fclose(fp) != 0)
+		die(errno, "fclose");
+	return;
 }

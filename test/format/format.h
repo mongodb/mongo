@@ -133,7 +133,7 @@ typedef struct {
 	WT_EXTENSION_API *wt_api;
 
 	int   rand_log_stop;			/* Logging turned off */
-	FILE *rand_log;				/* Random number log */
+	FILE *randfp;				/* Random number log */
 
 	uint32_t run_cnt;			/* Run counter */
 
@@ -295,6 +295,7 @@ void	 config_file(const char *);
 void	 config_print(int);
 void	 config_setup(void);
 void	 config_single(const char *, int);
+void	 fclose_and_clear(FILE **);
 void	 key_gen(uint8_t *, size_t *, uint64_t);
 void	 key_gen_insert(uint32_t *, uint8_t *, size_t *, uint64_t);
 void	 key_gen_setup(uint8_t **);

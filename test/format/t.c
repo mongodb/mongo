@@ -243,10 +243,8 @@ main(int argc, char *argv[])
 	}
 
 	/* Flush/close any logging information. */
-	if (g.logfp != NULL)
-		(void)fclose(g.logfp);
-	if (g.rand_log != NULL)
-		(void)fclose(g.rand_log);
+	fclose_and_clear(&g.logfp);
+	fclose_and_clear(&g.randfp);
 
 	config_print(0);
 
@@ -269,17 +267,9 @@ startup(void)
 {
 	int ret;
 
-	/* Close the logging file. */
-	if (g.logfp != NULL) {
-		(void)fclose(g.logfp);
-		g.logfp = NULL;
-	}
-
-	/* Close the random number logging file. */
-	if (g.rand_log != NULL) {
-		(void)fclose(g.rand_log);
-		g.rand_log = NULL;
-	}
+	/* Flush/close any logging information. */
+	fclose_and_clear(&g.logfp);
+	fclose_and_clear(&g.randfp);
 
 	/* Create or initialize the home and data-source directories. */
 	if ((ret = system(g.home_init)) != 0)
@@ -290,7 +280,7 @@ startup(void)
 		die(errno, "fopen: %s", g.home_log);
 
 	/* Open/truncate the random number logging file. */
-	if ((g.rand_log = fopen(g.home_rand, g.replay ? "r" : "w")) == NULL)
+	if ((g.randfp = fopen(g.home_rand, g.replay ? "r" : "w")) == NULL)
 		die(errno, "%s", g.home_rand);
 }
 
@@ -314,10 +304,8 @@ die(int e, const char *fmt, ...)
 	}
 
 	/* Flush/close any logging information. */
-	if (g.logfp != NULL)
-		(void)fclose(g.logfp);
-	if (g.rand_log != NULL)
-		(void)fclose(g.rand_log);
+	fclose_and_clear(&g.logfp);
+	fclose_and_clear(&g.randfp);
 
 	/* Display the configuration that failed. */
 	if (g.run_cnt)

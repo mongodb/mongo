@@ -552,8 +552,7 @@ wts_stats(void)
 	if ((ret = cursor->close(cursor)) != 0)
 		die(ret, "cursor.close");
 
-	if ((ret = fclose(fp)) != 0)
-		die(ret, "fclose");
+	fclose_and_clear(&fp);
 
 	if ((ret = session->close(session, NULL)) != 0)
 		die(ret, "session.close");
