@@ -328,9 +328,19 @@ add_option('cache-dir',
            "Specify the directory to use for caching objects if --cache is in use",
            1, False, default="$BUILD_ROOT/scons/cache")
 
+def find_mongo_custom_variables():
+    files = []
+    for path in sys.path:
+        probe = os.path.join(path, 'mongo_custom_variables.py')
+        if os.path.isfile(probe):
+            if not has_option('mute'):
+                print "Using mongo variable customization file {0}".format(probe)
+            files.append(probe)
+    return files
+
 add_option('variables-files',
            "Specify variables files to load",
-           1, False, default="")
+           1, False, default=find_mongo_custom_variables())
 
 variable_parse_mode_choices=['auto', 'posix', 'other']
 add_option('variable-parse-mode',
@@ -345,6 +355,10 @@ add_option('modules',
 
 # Setup the command-line variables
 def variable_shlex_converter(val):
+    # If the argument is something other than a string, propogate
+    # it literally.
+    if not isinstance(val, basestring):
+        return val
     parse_mode = get_option('variable-parse-mode')
     if parse_mode == 'auto':
         parse_mode = 'other' if is_running_os('windows') else 'posix'
