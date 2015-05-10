@@ -296,7 +296,7 @@ die(int e, const char *fmt, ...)
 	va_list ap;
 
 	/* Single-thread error handling. */
-	pthread_rwlock_wrlock(&g.death_lock);
+	(void)pthread_rwlock_wrlock(&g.death_lock);
 
 	if (fmt != NULL) {				/* Death message. */
 		fprintf(stderr, "%s: ", g.progname);
