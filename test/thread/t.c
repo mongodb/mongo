@@ -55,7 +55,7 @@ int
 main(int argc, char *argv[])
 {
 	u_int readers, writers;
-	int ch, cnt, ret, runs;
+	int ch, cnt, runs;
 	char *config_open, *working_dir;
 
 	if ((progname = strrchr(argv[0], DIR_DELIM)) == NULL)
@@ -143,8 +143,7 @@ main(int argc, char *argv[])
 	if (argc != 0)
 		return (usage());
 
-	if ((ret = testutil_work_dir_from_path(home, 512, working_dir)) != 0)
-		testutil_die(ret, "provided directory name is too long");
+	testutil_work_dir_from_path(home, 512, working_dir);
 
 	if (vary_nops && !multiple_files) {
 		fprintf(stderr,
@@ -191,7 +190,7 @@ wt_connect(char *config_open)
 	char config[512];
 	size_t print_count;
 
-	(void)testutil_clean_work_dir(home);
+	testutil_clean_work_dir(home);
 	testutil_make_work_dir(home);
 
 	print_count = (size_t)snprintf(config, sizeof(config),
@@ -234,7 +233,7 @@ wt_shutdown(void)
 static void
 shutdown(void)
 {
-	(void)testutil_clean_work_dir(home);
+	testutil_clean_work_dir(home);
 }
 
 static int

@@ -119,8 +119,7 @@ main(int argc, char *argv[])
 	if (argc != 0)
 		return (usage());
 
-	if ((ret = testutil_work_dir_from_path(home, 512, working_dir)) != 0)
-		testutil_die(ret, "provided directory name is too long");
+	testutil_work_dir_from_path(home, 512, working_dir);
 
 	/* Clean up on signal. */
 	(void)signal(SIGINT, onint);
@@ -195,7 +194,7 @@ wt_shutdown(void)
 static void
 shutdown(void)
 {
-	(void)testutil_clean_work_dir(home);
+	testutil_clean_work_dir(home);
 }
 
 static int
