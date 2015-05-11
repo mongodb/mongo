@@ -158,6 +158,11 @@ namespace {
                               net->now(),
                               ResponseStatus(ErrorCodes::OperationFailed, "timeout"));
         net->runReadyNetworkOperations();
+        const NetworkInterfaceMock::NetworkOperationIterator noi2 = net->getNextReadyRequest();
+        net->scheduleResponse(noi2,
+                              net->now(),
+                              ResponseStatus(ErrorCodes::OperationFailed, "timeout"));
+        net->runReadyNetworkOperations();
         net->exitNetwork();
 
         ASSERT(getReplCoord()->getMemberState().primary()) <<
