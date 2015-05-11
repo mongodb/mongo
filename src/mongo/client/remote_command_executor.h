@@ -40,14 +40,17 @@ namespace mongo {
     template<typename T> class StatusWith;
 
 
-    const Milliseconds kNoTimeout(-1);
-    const Date_t kNoExpirationDate(-1);
-
-
     /**
      * Type of object describing a command to execute against a remote MongoDB node.
      */
     struct RemoteCommandRequest {
+
+        // Indicates that there is no timeout for the request to complete
+        static const Milliseconds kNoTimeout;
+
+        // Indicates that there is no expiration time by when the request needs to complete
+        static const Date_t kNoExpirationDate;
+
         RemoteCommandRequest() : timeout(kNoTimeout),
                                  expirationDate(kNoExpirationDate) {
 

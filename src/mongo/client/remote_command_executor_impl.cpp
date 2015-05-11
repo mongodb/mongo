@@ -53,7 +53,7 @@ namespace {
      * status.
      */
     StatusWith<int64_t> getTimeoutMillis(const Date_t expDate, const Date_t nowDate) {
-        if (expDate == kNoExpirationDate) {
+        if (expDate == RemoteCommandRequest::kNoExpirationDate) {
             return StatusWith<int64_t>(0);
         }
 

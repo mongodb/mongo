@@ -50,10 +50,21 @@ env.Library(
     target='remote_command_executor',
     source=[
         'remote_command_executor.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/util/foundation',
+        '$BUILD_DIR/mongo/bson/bson',
+    ]
+)
+
+env.Library(
+    target='remote_command_executor_impl',
+    source=[
         'remote_command_executor_impl.cpp',
     ],
     LIBDEPS=[
         'connection_pool',
+        'remote_command_executor',
         '$BUILD_DIR/mongo/db/query/getmore_request',
         '$BUILD_DIR/mongo/db/query/lite_parsed_query',
     ]

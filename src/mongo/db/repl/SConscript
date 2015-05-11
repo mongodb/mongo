@@ -23,7 +23,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base/base',
         '$BUILD_DIR/mongo/bson/bson',
-        '$BUILD_DIR/mongo/client/remote_command_executor',
+        '$BUILD_DIR/mongo/client/remote_command_executor_impl',
         '$BUILD_DIR/mongo/db/coredb',
         '$BUILD_DIR/mongo/db/common',
         ])
@@ -38,6 +38,7 @@ env.Library(
     LIBDEPS=[
         'database_task',
         'task_runner',
+        '$BUILD_DIR/mongo/client/remote_command_executor',
         '$BUILD_DIR/mongo/util/foundation',
         '$BUILD_DIR/mongo/util/net/hostandport',
     ],

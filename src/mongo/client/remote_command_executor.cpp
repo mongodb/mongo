@@ -34,6 +34,10 @@
 
 namespace mongo {
 
+    const Milliseconds RemoteCommandRequest::kNoTimeout(-1);
+    const Date_t RemoteCommandRequest::kNoExpirationDate(-1);
+
+
     std::string RemoteCommandRequest::toString() const {
         str::stream out;
         out << "RemoteCommand -- target:" << target.toString() << " db:" << dbname;

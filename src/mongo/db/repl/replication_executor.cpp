@@ -289,8 +289,8 @@ namespace {
             const RemoteCommandRequest& request,
             const RemoteCommandCallbackFn& cb) {
         RemoteCommandRequest scheduledRequest = request;
-        if (request.timeout == kNoTimeout) {
-            scheduledRequest.expirationDate = kNoExpirationDate;
+        if (request.timeout == RemoteCommandRequest::kNoTimeout) {
+            scheduledRequest.expirationDate = RemoteCommandRequest::kNoExpirationDate;
         }
         else {
             scheduledRequest.expirationDate =
