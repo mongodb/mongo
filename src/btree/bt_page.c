@@ -49,6 +49,9 @@ __evict_force_check(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	/* Trigger eviction on the next page release. */
 	__wt_page_evict_soon(page);
 
+	/* Bump the oldest ID, we're about to do some visibility checks. */
+	__wt_txn_update_oldest(session, 0);
+
 	/* If eviction cannot succeed, don't try. */
 	return (
 	    __wt_page_can_evict(session, page, WT_EVICT_CHECK_SPLITS, NULL));
