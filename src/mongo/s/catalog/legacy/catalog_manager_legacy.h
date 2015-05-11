@@ -108,6 +108,18 @@ namespace mongo {
 
         virtual bool doShardsExist();
 
+        /**
+         * Grabs a distributed lock and runs the command on all config servers.
+         */
+        virtual bool runUserManagementWriteCommand(const std::string& commandName,
+                                                   const std::string& dbname,
+                                                   const BSONObj& cmdObj,
+                                                   BSONObjBuilder* result);
+
+        virtual bool runUserManagementReadCommand(const std::string& dbname,
+                                                  const BSONObj& cmdObj,
+                                                  BSONObjBuilder* result);
+
         virtual Status applyChunkOpsDeprecated(const BSONArray& updateOps,
                                                const BSONArray& preCondition);
 

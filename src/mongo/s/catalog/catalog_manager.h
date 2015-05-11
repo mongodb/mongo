@@ -41,6 +41,7 @@ namespace mongo {
     class BatchedCommandResponse;
     struct BSONArray;
     class BSONObj;
+    class BSONObjBuilder;
     class ChunkType;
     class CollectionType;
     class ConnectionString;
@@ -249,6 +250,26 @@ namespace mongo {
          * Otherwise, returns false.
          */
         virtual bool doShardsExist() = 0;
+
+        /**
+         * Runs a user management command on the config servers.
+         * @param commandName: name of command
+         * @param dbname: database for which the user management command is invoked
+         * @param cmdObj: command obj
+         * @param result: contains data returned from config servers
+         * Returns true on success.
+         */
+        virtual bool runUserManagementWriteCommand(const std::string& commandName,
+                                                   const std::string& dbname,
+                                                   const BSONObj& cmdObj,
+                                                   BSONObjBuilder* result) = 0;
+
+        /**
+         * Runs a read-only user management command on a single config server.
+         */
+        virtual bool runUserManagementReadCommand(const std::string& dbname,
+                                                  const BSONObj& cmdObj,
+                                                  BSONObjBuilder* result) = 0;
 
         /**
          * Applies oplog entries to the config servers.

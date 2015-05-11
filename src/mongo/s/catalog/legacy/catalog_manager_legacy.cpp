@@ -43,9 +43,11 @@
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/client.h"
+#include "mongo/db/commands.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/s/bson_serializable.h"
 #include "mongo/s/catalog/legacy/cluster_client_internal.h"
 #include "mongo/s/catalog/legacy/config_coordinator.h"
 #include "mongo/s/catalog/type_actionlog.h"
@@ -1211,6 +1213,107 @@ namespace {
 
     bool CatalogManagerLegacy::doShardsExist() {
         return _getShardCount() > 0;
+    }
+
+    bool CatalogManagerLegacy::runUserManagementWriteCommand(const string& commandName,
+                                                             const string& dbname,
+                                                             const BSONObj& cmdObj,
+                                                             BSONObjBuilder* result) {
+        DBClientMultiCommand dispatcher;
+        RawBSONSerializable requestCmdSerial(cmdObj);
+        for (const ConnectionString& configServer : _configServers) {
+            dispatcher.addCommand(configServer, dbname, requestCmdSerial);
+        }
+
+        auto scopedDistLock = getDistLockManager()->lock("authorizationData",
+                                                         commandName,
+                                                         stdx::chrono::milliseconds(5000));
+        if (!scopedDistLock.isOK()) {
+            return Command::appendCommandStatus(*result, scopedDistLock.getStatus());
+        }
+
+        dispatcher.sendAll();
+
+        BSONObj responseObj;
+
+        Status prevStatus{Status::OK()};
+        Status currStatus{Status::OK()};
+
+        BSONObjBuilder responses;
+        unsigned failedCount = 0;
+        bool sameError = true;
+        while (dispatcher.numPending() > 0) {
+            ConnectionString configServer;
+            RawBSONSerializable responseCmdSerial;
+
+            Status dispatchStatus = dispatcher.recvAny(&configServer,
+                                                       &responseCmdSerial);
+
+            if (!dispatchStatus.isOK()) {
+                return Command::appendCommandStatus(*result, dispatchStatus);
+            }
+
+            responseObj = responseCmdSerial.toBSON();
+            responses.append(configServer.toString(), responseObj);
+
+            currStatus = Command::getStatusFromCommandResult(responseObj);
+            if (!currStatus.isOK()) {
+                // same error <=> adjacent error statuses are the same
+                if (failedCount > 0 && prevStatus != currStatus) {
+                    sameError = false;
+                }
+                failedCount++;
+                prevStatus = currStatus;
+            }
+        }
+
+        if (failedCount == 0) {
+            result->appendElements(responseObj);
+            return true;
+        }
+
+        // if the command succeeds on at least one config server and fails on at least one,
+        // manual intervention is required
+        if (failedCount < _configServers.size()) {
+            Status status(ErrorCodes::ManualInterventionRequired,
+                          str::stream() << "Config write was not consistent - "
+                                        << "user management command failed on at least one "
+                                        << "config server but passed on at least one other. "
+                                        << "Manual intervention may be required. "
+                                        << "Config responses: " << responses.obj().toString());
+            return Command::appendCommandStatus(*result, status);
+        }
+
+        if (sameError) {
+            result->appendElements(responseObj);
+            return false;
+        }
+
+        Status status(ErrorCodes::ManualInterventionRequired,
+                      str::stream() << "Config write was not consistent - "
+                                    << "user management command produced inconsistent results. "
+                                    << "Manual intervention may be required. "
+                                    << "Config responses: " << responses.obj().toString());
+        return Command::appendCommandStatus(*result, status);
+    }
+
+    bool CatalogManagerLegacy::runUserManagementReadCommand(const string& dbname,
+                                                            const BSONObj& cmdObj,
+                                                            BSONObjBuilder* result) {
+        try {
+            // let SyncClusterConnection handle connecting to the first config server
+            // that is reachable and returns data
+            ScopedDbConnection conn(_configServerConnectionString, 30);
+
+            BSONObj cmdResult;
+            const bool ok = conn->runCommand(dbname, cmdObj, cmdResult);
+            result->appendElements(cmdResult);
+            conn.done();
+            return ok;
+        }
+        catch (const DBException& ex) {
+            return Command::appendCommandStatus(*result, ex.toStatus());
+        }
     }
 
     Status CatalogManagerLegacy::applyChunkOpsDeprecated(const BSONArray& updateOps,
