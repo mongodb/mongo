@@ -155,14 +155,17 @@ __rename_tree(WT_SESSION_IMPL *session,
 	    cval.str + cval.len));
 
 	/*
+	 * Do the rename before updating the metadata to avoid leaving the
+	 * metadata inconsistent if the rename fails.
+	 */
+	WT_ERR(__wt_schema_rename(session, os->data, ns->data, cfg));
+
+	/*
 	 * Remove the old metadata entry.
 	 * Insert the new metadata entry.
 	 */
 	WT_ERR(__wt_metadata_remove(session, name));
 	WT_ERR(__wt_metadata_insert(session, nn->data, nv->data));
-
-	/* Rename the file. */
-	WT_ERR(__wt_schema_rename(session, os->data, ns->data, cfg));
 
 err:	__wt_scr_free(session, &nn);
 	__wt_scr_free(session, &ns);

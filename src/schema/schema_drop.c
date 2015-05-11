@@ -120,8 +120,13 @@ __drop_table(
 	for (i = 0; i < WT_COLGROUPS(table); i++) {
 		if ((colgroup = table->cgroups[i]) == NULL)
 			continue;
-		WT_ERR(__wt_metadata_remove(session, colgroup->name));
+		/*
+		 * Drop the column group before updating the metadata to avoid
+		 * the metadata for the table becoming inconsistent if we can't
+		 * get exclusive access.
+		 */
 		WT_ERR(__wt_schema_drop(session, colgroup->source, cfg));
+		WT_ERR(__wt_metadata_remove(session, colgroup->name));
 	}
 
 	/* Drop the indices. */
@@ -129,8 +134,13 @@ __drop_table(
 	for (i = 0; i < table->nindices; i++) {
 		if ((idx = table->indices[i]) == NULL)
 			continue;
-		WT_ERR(__wt_metadata_remove(session, idx->name));
+		/*
+		 * Drop the column group before updating the metadata to avoid
+		 * the metadata for the table becoming inconsistent if we can't
+		 * get exclusive access.
+		 */
 		WT_ERR(__wt_schema_drop(session, idx->source, cfg));
+		WT_ERR(__wt_metadata_remove(session, idx->name));
 	}
 
 	WT_ERR(__wt_schema_remove_table(session, table));
