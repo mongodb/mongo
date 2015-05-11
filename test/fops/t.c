@@ -119,7 +119,7 @@ main(int argc, char *argv[])
 	if (argc != 0)
 		return (usage());
 
-	(void)testutil_work_dir_from_path(home, 512, working_dir);
+	testutil_work_dir_from_path(home, 512, working_dir);
 
 	/* Clean up on signal. */
 	(void)signal(SIGINT, onint);
@@ -162,7 +162,7 @@ wt_startup(char *config_open)
 	int ret;
 	char config_buf[128];
 
-	(void)testutil_make_work_dir(home);
+	testutil_make_work_dir(home);
 
 	snprintf(config_buf, sizeof(config_buf),
 	    "create,error_prefix=\"%s\",cache_size=5MB%s%s",
@@ -194,7 +194,7 @@ wt_shutdown(void)
 static void
 shutdown(void)
 {
-	(void)testutil_clean_work_dir(home);
+	testutil_clean_work_dir(home);
 }
 
 static int

@@ -143,7 +143,7 @@ main(int argc, char *argv[])
 	if (argc != 0)
 		return (usage());
 
-	(void)testutil_work_dir_from_path(home, 512, working_dir);
+	testutil_work_dir_from_path(home, 512, working_dir);
 
 	if (vary_nops && !multiple_files) {
 		fprintf(stderr,
@@ -233,7 +233,7 @@ wt_shutdown(void)
 static void
 shutdown(void)
 {
-	(void)testutil_clean_work_dir(home);
+	testutil_clean_work_dir(home);
 }
 
 static int
