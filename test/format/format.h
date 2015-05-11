@@ -236,10 +236,11 @@ typedef struct {
 #define	COMPRESS_BZIP			2
 #define	COMPRESS_BZIP_RAW		3
 #define	COMPRESS_LZ4			4
-#define	COMPRESS_LZO			5
-#define	COMPRESS_SNAPPY			6
-#define	COMPRESS_ZLIB			7
-#define	COMPRESS_ZLIB_NO_RAW		8
+#define	COMPRESS_LZ4_NO_RAW		5
+#define	COMPRESS_LZO			6
+#define	COMPRESS_SNAPPY			7
+#define	COMPRESS_ZLIB			8
+#define	COMPRESS_ZLIB_NO_RAW		9
 	u_int c_compression_flag;		/* Compression flag value */
 
 #define	ISOLATION_RANDOM		1

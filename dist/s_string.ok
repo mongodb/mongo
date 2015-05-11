@@ -441,6 +441,7 @@ der
 dereference
 desc
 dest
+destSize
 dev
 dhandle
 dhandles

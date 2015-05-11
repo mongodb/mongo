@@ -328,6 +328,10 @@ wts_create(void)
 		p += snprintf(p, REMAIN(p, end),
 		    ",block_compressor=\"lz4\"");
 		break;
+	case COMPRESS_LZ4_NO_RAW:
+		p += snprintf(p, REMAIN(p, end),
+		    ",block_compressor=\"lz4-noraw\"");
+		break;
 	case COMPRESS_LZO:
 		p += snprintf(p, REMAIN(p, end),
 		    ",block_compressor=\"LZO1B-6\"");

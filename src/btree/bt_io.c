@@ -52,7 +52,7 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 			    "configured");
 
 		/*
-		 * We're allocating the exact number of bytes we're expecting
+		 * Size the buffer based on the in-memory bytes we're expecting
 		 * from decompression.
 		 */
 		WT_ERR(__wt_buf_initsize(session, buf, dsk->mem_size));
