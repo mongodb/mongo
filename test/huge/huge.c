@@ -111,7 +111,7 @@ run(CONFIG *cp, int bigkey, size_t bytes)
 	    bytes < MEGABYTE ? "B" : (bytes < GIGABYTE ? "MB" : "GB"),
 	    cp->uri, cp->config, bigkey ? "key" : "value");
 
-	testutil_make_work_dir(home);
+	(void)testutil_make_work_dir(home);
 
 	/*
 	 * Open/create the database, connection, session and cursor; set the
@@ -173,7 +173,7 @@ main(int argc, char *argv[])
 {
 	CONFIG *cp;
 	size_t len, *lp;
-	int ch, ret, small;
+	int ch, small;
 	char *working_dir;
 
 	if ((progname = strrchr(argv[0], DIR_DELIM)) == NULL)
@@ -200,7 +200,7 @@ main(int argc, char *argv[])
 	if (argc != 0)
 		usage();
 
-	testutil_work_dir_from_path(home, 512, working_dir);
+	(void)testutil_work_dir_from_path(home, 512, working_dir);
 
 	/* Allocate a buffer to use. */
 	len = small ? ((size_t)SMALL_MAX) : ((size_t)4 * GIGABYTE);
