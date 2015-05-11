@@ -684,14 +684,14 @@ __wt_evict_page(WT_SESSION_IMPL *session, WT_REF *ref)
 	__wt_txn_update_oldest(session, 1);
 	txn = &session->txn;
 	saved_iso = txn->isolation;
-	txn->isolation = TXN_ISO_EVICTION;
+	txn->isolation = WT_ISO_EVICTION;
 
 	/*
 	 * Sanity check: if a transaction has updates, its updates should not
 	 * be visible to eviction.
 	 */
-	WT_ASSERT(session,
-	    !F_ISSET(txn, TXN_HAS_ID) || !__wt_txn_visible(session, txn->id));
+	WT_ASSERT(session, !F_ISSET(txn, WT_TXN_HAS_ID) ||
+	    !__wt_txn_visible(session, txn->id));
 
 	ret = __wt_evict(session, ref, 0);
 	txn->isolation = saved_iso;

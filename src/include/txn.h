@@ -17,11 +17,11 @@
  * transaction), WT_TXN_NONE is smaller than any possible ID (visible to all
  * running transactions).
  */
-#define	TXNID_LE(t1, t2)						\
+#define	WT_TXNID_LE(t1, t2)						\
 	((t1) <= (t2))
 
-#define	TXNID_LT(t1, t2)						\
-	((t1) != (t2) && TXNID_LE(t1, t2))
+#define	WT_TXNID_LT(t1, t2)						\
+	((t1) != (t2) && WT_TXNID_LE(t1, t2))
 
 #define	WT_SESSION_TXN_STATE(s) (&S2C(s)->txn_global.states[(s)->id])
 
@@ -60,10 +60,10 @@ struct __wt_txn_global {
 };
 
 typedef enum __wt_txn_isolation {
-	TXN_ISO_EVICTION,		/* Internal: eviction context */
-	TXN_ISO_READ_UNCOMMITTED,
-	TXN_ISO_READ_COMMITTED,
-	TXN_ISO_SNAPSHOT
+	WT_ISO_EVICTION,		/* Internal: eviction context */
+	WT_ISO_READ_UNCOMMITTED,
+	WT_ISO_READ_COMMITTED,
+	WT_ISO_SNAPSHOT
 } WT_TXN_ISOLATION;
 
 /*
@@ -75,29 +75,29 @@ typedef enum __wt_txn_isolation {
 struct __wt_txn_op {
 	uint32_t fileid;
 	enum {
-		TXN_OP_BASIC,
-		TXN_OP_INMEM,
-		TXN_OP_REF,
-		TXN_OP_TRUNCATE_COL,
-		TXN_OP_TRUNCATE_ROW
+		WT_TXN_OP_BASIC,
+		WT_TXN_OP_INMEM,
+		WT_TXN_OP_REF,
+		WT_TXN_OP_TRUNCATE_COL,
+		WT_TXN_OP_TRUNCATE_ROW
 	} type;
 	union {
-		/* TXN_OP_BASIC, TXN_OP_INMEM */
+		/* WT_TXN_OP_BASIC, WT_TXN_OP_INMEM */
 		WT_UPDATE *upd;
-		/* TXN_OP_REF */
+		/* WT_TXN_OP_REF */
 		WT_REF *ref;
-		/* TXN_OP_TRUNCATE_COL */
+		/* WT_TXN_OP_TRUNCATE_COL */
 		struct {
 			uint64_t start, stop;
 		} truncate_col;
-		/* TXN_OP_TRUNCATE_ROW */
+		/* WT_TXN_OP_TRUNCATE_ROW */
 		struct {
 			WT_ITEM start, stop;
 			enum {
-				TXN_TRUNC_ALL,
-				TXN_TRUNC_BOTH,
-				TXN_TRUNC_START,
-				TXN_TRUNC_STOP
+				WT_TXN_TRUNC_ALL,
+				WT_TXN_TRUNC_BOTH,
+				WT_TXN_TRUNC_START,
+				WT_TXN_TRUNC_STOP
 			} mode;
 		} truncate_row;
 	} u;
@@ -140,10 +140,10 @@ struct __wt_txn {
 	uint32_t	ckpt_nsnapshot;
 	WT_ITEM		*ckpt_snapshot;
 
-#define	TXN_AUTOCOMMIT		0x01
-#define	TXN_ERROR		0x02
-#define	TXN_HAS_ID	        0x04
-#define	TXN_HAS_SNAPSHOT	0x08
-#define	TXN_RUNNING		0x10
+#define	WT_TXN_AUTOCOMMIT	0x01
+#define	WT_TXN_ERROR		0x02
+#define	WT_TXN_HAS_ID	        0x04
+#define	WT_TXN_HAS_SNAPSHOT	0x08
+#define	WT_TXN_RUNNING		0x10
 	uint32_t flags;
 };
