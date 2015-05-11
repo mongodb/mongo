@@ -7,7 +7,7 @@ load("jstests/replsets/rslib.js")
 
 // utility to check if an error was due to connection failure.
 var errorWasDueToConnectionFailure = function(error) {
-    return tojson(error).indexOf("transport error") > 0;
+    return error.message === "error doing query: failed";
 };
 
 var replTest = new ReplSetTest({ name: 'testSet', nodes: 2, nodeOptions: {verbose: 1} });

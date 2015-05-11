@@ -109,7 +109,23 @@ DB.prototype.commandHelp = function( name ){
      // if options were passed (i.e. because they were overridden on a collection), use them.
      // Otherwise use getQueryOptions.
      var options = (typeof(queryOptions) !== "undefined") ? queryOptions : this.getQueryOptions();
-     return this.getMongo().runCommand(this._name, mergedObj, options);
+     var res;
+     try {
+         res = this.getMongo().runCommand(this._name, mergedObj, options);
+     }
+     catch (ex) {
+         // When runCommand flowed through query, a connection error resulted in the message
+         // "error doing query: failed". Even though this message is arguably incorrect
+         // for a command failing due to a connection failure, we preserve it for backwards
+         // compatibility. See SERVER-18334 for details.
+         if (ex.message.indexOf("transport error") >= 0) {
+             throw new Error("error doing query: failed");
+         }
+         else {
+             throw ex;
+         }
+     }
+     return res;
  };
 
 
@@ -267,7 +283,7 @@ DB.prototype.shutdownServer = function(opts) {
     }
     catch (e) {
         // we expect the command to not return a response, as the server will shut down immediately.
-        if (tojson(e).indexOf("transport error") >= 0) {
+        if (e.message === "error doing query: failed") {
             print('server should be down...');
             return;
         }
