@@ -1,4 +1,4 @@
-/*-
+	/*-
  * Public Domain 2014-2015 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
@@ -200,8 +200,7 @@ main(int argc, char *argv[])
 	if (argc != 0)
 		usage();
 
-	if ((ret = testutil_work_dir_from_path(home, 512, working_dir)) != 0)
-		testutil_die(ret, "provided directory name is too long");
+	testutil_work_dir_from_path(home, 512, working_dir);
 
 	/* Allocate a buffer to use. */
 	len = small ? ((size_t)SMALL_MAX) : ((size_t)4 * GIGABYTE);
