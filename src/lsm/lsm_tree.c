@@ -589,7 +589,7 @@ __lsm_tree_open(WT_SESSION_IMPL *session,
 	 * with getting handles exclusive.
 	 */
 	lsm_tree->refcnt = 1;
-	lsm_tree->exclusive = exclusive;
+	lsm_tree->exclusive = (int8_t)exclusive;
 	lsm_tree->queue_ref = 0;
 
 	/* Set a flush timestamp as a baseline. */
