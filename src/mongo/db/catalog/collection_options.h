@@ -53,9 +53,7 @@ namespace mongo {
         Status validate() const;
 
         /**
-         * Updates fields based on BSON document from client.
-         * If document contains a 'storageEngine' field, ensures that 'storageEngine'
-         * contains a single field of Object type.
+         * Parses the "options" subfield of the collection info object.
          */
         Status parse( const BSONObj& obj );
 

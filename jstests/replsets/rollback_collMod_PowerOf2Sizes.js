@@ -25,8 +25,15 @@ var b_conn = slaves[0];
 var AID = replTest.getNodeId(a_conn);
 var BID = replTest.getNodeId(b_conn);
 
+// Create collection with custom options.
+var originalCollectionOptions = {flags: 0, validator: {x : {$exists: 1}}};
+assert.commandWorked(a_conn.getDB(name).createCollection('foo', originalCollectionOptions));
+
 var options = {writeConcern: {w: 2, wtimeout: 60000}, upsert: true};
 assert.writeOK(a_conn.getDB(name).foo.insert({x: 1}, options));
+
+assert.eq(getOptions(a_conn), originalCollectionOptions);
+assert.eq(getOptions(b_conn), originalCollectionOptions);
 
 // Stop the slave so it never sees the collMod.
 replTest.stop(BID);
@@ -58,5 +65,5 @@ catch (e) {
     // Ignore network disconnect.
 }
 replTest.waitForState(a_conn, replTest.PRIMARY);
-assert.eq(getOptions(a_conn), {flags: 1}); // 1 is the default for flags.
+assert.eq(getOptions(a_conn), originalCollectionOptions);
 }());

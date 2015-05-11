@@ -530,11 +530,22 @@ namespace {
                 invariant(info.size() == 1);
 
                 CollectionOptions options;
-                auto status = options.parse(info.front());
-                if (!status.isOK()) {
-                    throw RSFatalException(str::stream() << "Failed to parse options "
-                                                         << info.front() << ": "
-                                                         << status.toString());
+                if (auto optionsField = info.front()["options"]) {
+                    if (optionsField.type() != Object) {
+                        throw RSFatalException(str::stream() << "Failed to parse options "
+                                               << info.front() << ": expected 'options' to be an "
+                                               << "Object, got " << typeName(optionsField.type()));
+                    }
+
+                    auto status = options.parse(optionsField.Obj());
+                    if (!status.isOK()) {
+                        throw RSFatalException(str::stream() << "Failed to parse options "
+                                                             << info.front() << ": "
+                                                             << status.toString());
+                    }
+                }
+                else {
+                    // Use default options.
                 }
 
                 WriteUnitOfWork wuow(txn);
@@ -542,7 +553,7 @@ namespace {
                     cce->updateFlags(txn, options.flags);
                 }
 
-                status = collection->setValidator(txn, options.validator);
+                auto status = collection->setValidator(txn, options.validator);
                 if (!status.isOK()) {
                     throw RSFatalException(str::stream() << "Failed to set validator: "
                                                          << status.toString());
