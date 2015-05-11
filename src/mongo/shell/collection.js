@@ -1272,13 +1272,15 @@ DBCollection.prototype.aggregate = function(pipeline, extraOpts) {
         cmd.cursor = {};
     }
 
+    // in a well formed pipeline, $out must be the last stage. If it isn't then the server
+    // will reject the pipeline anyway.
     var hasOutStage = pipeline.length >= 1 && pipeline[pipeline.length - 1].hasOwnProperty("$out");
 
     var doAgg = function(cmd) {
         // if we don't have an out stage, we could run on a secondary
         // so we need to attach readPreference
         return hasOutStage ?
-            this.runReadCommand("aggregate", cmd) : this.runCommand("aggregate", cmd);
+            this.runCommand("aggregate", cmd) : this.runReadCommand("aggregate", cmd);
     }.bind(this);
 
     var res = doAgg(cmd);
