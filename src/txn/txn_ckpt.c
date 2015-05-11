@@ -387,7 +387,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 * This is particularly important for compact, so that all dirty pages
 	 * can be fully written.
 	 */
-	__wt_txn_update_oldest(session);
+	__wt_txn_update_oldest(session, 1);
 
 	/* Flush data-sources before we start the checkpoint. */
 	WT_ERR(__checkpoint_data_source(session, cfg));
@@ -397,7 +397,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	    "starting write leaves", &verb_timer));
 
 	/* Flush dirty leaf pages before we start the checkpoint. */
-	session->isolation = txn->isolation = TXN_ISO_READ_COMMITTED;
+	session->isolation = txn->isolation = WT_ISO_READ_COMMITTED;
 	WT_ERR(__checkpoint_apply(session, cfg, __checkpoint_write_leaves));
 
 	/*
@@ -497,7 +497,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 * to open one.  We are holding other handle locks, it is not safe to
 	 * lock conn->spinlock.
 	 */
-	session->isolation = txn->isolation = TXN_ISO_READ_UNCOMMITTED;
+	session->isolation = txn->isolation = WT_ISO_READ_UNCOMMITTED;
 	saved_meta_next = session->meta_track_next;
 	session->meta_track_next = NULL;
 	WT_WITH_DHANDLE(session,
@@ -531,11 +531,11 @@ err:	/*
 	 * overwritten the checkpoint, so what ends up on disk is not
 	 * consistent.
 	 */
-	session->isolation = txn->isolation = TXN_ISO_READ_UNCOMMITTED;
+	session->isolation = txn->isolation = WT_ISO_READ_UNCOMMITTED;
 	if (tracking)
 		WT_TRET(__wt_meta_track_off(session, 0, ret != 0));
 
-	if (F_ISSET(txn, TXN_RUNNING)) {
+	if (F_ISSET(txn, WT_TXN_RUNNING)) {
 		/*
 		 * Clear the dhandle so the visibility check doesn't get
 		 * confused about the snap min. Don't bother restoring the
@@ -1107,7 +1107,7 @@ __wt_checkpoint_close(WT_SESSION_IMPL *session, int final)
 	 * for active readers.
 	 */
 	if (!btree->modified && !bulk) {
-		__wt_txn_update_oldest(session);
+		__wt_txn_update_oldest(session, 1);
 		return (__wt_txn_visible_all(session, btree->rec_max_txn) ?
 		    __wt_cache_op(session, NULL, WT_SYNC_DISCARD) : EBUSY);
 	}

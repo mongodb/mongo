@@ -44,43 +44,43 @@ stats(void)
 	const char *pval, *desc;
 
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		die(ret, "conn.session");
+		testutil_die(ret, "conn.session");
 
 	if ((fp = fopen(FNAME_STAT, "w")) == NULL)
-		die(errno, "fopen " FNAME_STAT);
+		testutil_die(errno, "fopen " FNAME_STAT);
 
 	/* Connection statistics. */
 	if ((ret = session->open_cursor(session,
 	    "statistics:", NULL, NULL, &cursor)) != 0)
-		die(ret, "session.open_cursor");
+		testutil_die(ret, "session.open_cursor");
 
 	while ((ret = cursor->next(cursor)) == 0 &&
 	    (ret = cursor->get_value(cursor, &desc, &pval, &v)) == 0)
 		(void)fprintf(fp, "%s=%s\n", desc, pval);
 
 	if (ret != WT_NOTFOUND)
-		die(ret, "cursor.next");
+		testutil_die(ret, "cursor.next");
 	if ((ret = cursor->close(cursor)) != 0)
-		die(ret, "cursor.close");
+		testutil_die(ret, "cursor.close");
 
 	/* File statistics. */
 	if (!multiple_files) {
 		(void)snprintf(name, sizeof(name), "statistics:" FNAME, 0);
 		if ((ret = session->open_cursor(
 		    session, name, NULL, NULL, &cursor)) != 0)
-			die(ret, "session.open_cursor");
+			testutil_die(ret, "session.open_cursor");
 
 		while ((ret = cursor->next(cursor)) == 0 &&
 		    (ret = cursor->get_value(cursor, &desc, &pval, &v)) == 0)
 			(void)fprintf(fp, "%s=%s\n", desc, pval);
 
 		if (ret != WT_NOTFOUND)
-			die(ret, "cursor.next");
+			testutil_die(ret, "cursor.next");
 		if ((ret = cursor->close(cursor)) != 0)
-			die(ret, "cursor.close");
+			testutil_die(ret, "cursor.close");
 
 		if ((ret = session->close(session, NULL)) != 0)
-			die(ret, "session.close");
+			testutil_die(ret, "session.close");
 	}
 	(void)fclose(fp);
 }
