@@ -152,7 +152,14 @@ namespace {
         NetworkInterfaceMock* net = getNet();
         net->enterNetwork();
         const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
+        // blackhole heartbeat
         net->scheduleResponse(noi,
+                              net->now(),
+                              ResponseStatus(ErrorCodes::OperationFailed, "timeout"));
+        net->runReadyNetworkOperations();
+        // blackhole freshness
+        const NetworkInterfaceMock::NetworkOperationIterator noi2 = net->getNextReadyRequest();
+        net->scheduleResponse(noi2,
                               net->now(),
                               ResponseStatus(ErrorCodes::OperationFailed, "timeout"));
         net->runReadyNetworkOperations();

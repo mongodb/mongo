@@ -133,7 +133,7 @@ namespace {
                                            electionTime,
                                            lastOpTimeSender,
                                            lastOpTimeReceiver,
-                                           Milliseconds(0));
+                                           Milliseconds(1));
         }
 
         HeartbeatResponseAction receiveDownHeartbeat(
@@ -141,6 +141,10 @@ namespace {
                 const std::string& setName,
                 Timestamp lastOpTimeReceiver,
                 ErrorCodes::Error errcode = ErrorCodes::HostUnreachable) {
+            // timed out heartbeat to mark a node as down
+
+            Milliseconds roundTripTime{
+                ReplicaSetConfig::kDefaultHeartbeatTimeoutPeriod.total_milliseconds()};
             return _receiveHeartbeatHelper(Status(errcode, ""),
                                            member,
                                            setName,
@@ -148,14 +152,14 @@ namespace {
                                            Timestamp(),
                                            Timestamp(),
                                            lastOpTimeReceiver,
-                                           Milliseconds(0));
+                                           roundTripTime);
         }
 
         HeartbeatResponseAction heartbeatFromMember(const HostAndPort& member,
                                                     const std::string& setName,
                                                     MemberState memberState,
                                                     Timestamp lastOpTimeSender,
-                                                    Milliseconds roundTripTime = Milliseconds(0)) {
+                                                    Milliseconds roundTripTime = Milliseconds(1)) {
             return _receiveHeartbeatHelper(Status::OK(),
                                            member,
                                            setName,
@@ -187,10 +191,11 @@ namespace {
                 hb.setElectionTime(electionTime);
                 hbResponse = StatusWith<ReplSetHeartbeatResponse>(hb);
             }
-            getTopoCoord().prepareHeartbeatRequest(now()++,
+            getTopoCoord().prepareHeartbeatRequest(now(),
                                                    setName,
                                                    member);
-            return getTopoCoord().processHeartbeatResponse(now()++,
+            now() += roundTripTime.total_milliseconds();
+            return getTopoCoord().processHeartbeatResponse(now(),
                                                            roundTripTime,
                                                            member,
                                                            hbResponse,
@@ -494,7 +499,7 @@ namespace {
         getTopoCoord().chooseNewSyncSource(now()++, Timestamp(0,0));
         ASSERT_EQUALS(HostAndPort("h3"), getTopoCoord().getSyncSourceAddress());
         
-        Date_t expireTime = 100;
+        Date_t expireTime = 1000;
         getTopoCoord().blacklistSyncSource(HostAndPort("h3"), expireTime);
         getTopoCoord().chooseNewSyncSource(now()++, Timestamp(0,0));
         // Should choose second best choice now that h3 is blacklisted.
@@ -531,7 +536,7 @@ namespace {
         getTopoCoord().chooseNewSyncSource(now()++, Timestamp(0,0));
         ASSERT_EQUALS(HostAndPort("h2"), getTopoCoord().getSyncSourceAddress());
 
-        Date_t expireTime = 100;
+        Date_t expireTime = 1000;
         getTopoCoord().blacklistSyncSource(HostAndPort("h2"), expireTime);
         getTopoCoord().chooseNewSyncSource(now()++, Timestamp(0,0));
         // Can't choose any sync source now.
@@ -790,9 +795,12 @@ namespace {
         HostAndPort member = HostAndPort("test0:1234");
         StatusWith<ReplSetHeartbeatResponse> hbResponse =
                 StatusWith<ReplSetHeartbeatResponse>(Status(ErrorCodes::HostUnreachable, ""));
+
         getTopoCoord().prepareHeartbeatRequest(startupTime + 2, setName, member);
-        getTopoCoord().processHeartbeatResponse(heartbeatTime,
-                                                Milliseconds(0),
+        Date_t timeoutTime = startupTime + 2 +
+            ReplicaSetConfig::kDefaultHeartbeatTimeoutPeriod.total_milliseconds();
+        getTopoCoord().processHeartbeatResponse(timeoutTime,
+                                                Milliseconds(5000),
                                                 member,
                                                 hbResponse,
                                                 Timestamp(0,0));
@@ -847,7 +855,7 @@ namespace {
         ASSERT_TRUE(member0Status.hasField("optimeDate"));
         ASSERT_EQUALS(Date_t(Timestamp().getSecs() * 1000ULL),
                       member0Status["optimeDate"].Date().millis);
-        ASSERT_EQUALS(heartbeatTime, member0Status["lastHeartbeat"].date());
+        ASSERT_EQUALS(timeoutTime, member0Status["lastHeartbeat"].date());
         ASSERT_EQUALS(Date_t(), member0Status["lastHeartbeatRecv"].date());
 
         // Test member 1, the node that's SECONDARY
@@ -1202,10 +1210,28 @@ namespace {
         virtual void setUp() {
             HeartbeatResponseTest::setUp();
 
+            // Bring up the node we are heartbeating.
             _target = HostAndPort("host2", 27017);
+            Date_t _upRequestDate = unittest::assertGet(dateFromISOString("2014-08-29T12:55Z"));
+            std::pair<ReplSetHeartbeatArgs, Milliseconds> uppingRequest =
+                getTopoCoord().prepareHeartbeatRequest(_upRequestDate,
+                                                       "rs0",
+                                                       _target);
+            HeartbeatResponseAction upAction =
+                getTopoCoord().processHeartbeatResponse(
+                        _upRequestDate,
+                        Milliseconds(0),
+                        _target,
+                        StatusWith<ReplSetHeartbeatResponse>(Status::OK()),
+                        Timestamp(0, 0));  // We've never applied anything.
+            ASSERT_EQUALS(HeartbeatResponseAction::NoAction, upAction.getAction());
+            ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
+
+
+            // Time of first request for this heartbeat period
             _firstRequestDate = unittest::assertGet(dateFromISOString("2014-08-29T13:00Z"));
 
-            // Initial heartbeat request prepared, at t + 0.
+            // Initial heartbeat attempt prepared, at t + 0.
             std::pair<ReplSetHeartbeatArgs, Milliseconds> request =
                 getTopoCoord().prepareHeartbeatRequest(_firstRequestDate,
                                                        "rs0",
@@ -1236,6 +1262,25 @@ namespace {
                         _target);
             // One second left to complete the heartbeat.
             ASSERT_EQUALS(1000, request.second.total_milliseconds());
+
+            // Ensure a single failed heartbeat did not cause the node to be marked down
+            BSONObjBuilder statusBuilder;
+            Status resultStatus(ErrorCodes::InternalError,
+                                "prepareStatusResponse didn't set result");
+            getTopoCoord().prepareStatusResponse(cbData(),
+                                                 _firstRequestDate + 4000,
+                                                 10,
+                                                 Timestamp(100,0),
+                                                 &statusBuilder,
+                                                 &resultStatus);
+            ASSERT_OK(resultStatus);
+            BSONObj rsStatus = statusBuilder.obj();
+            std::vector<BSONElement> memberArray = rsStatus["members"].Array();
+            BSONObj member1Status = memberArray[1].Obj();
+
+            ASSERT_EQUALS(1, member1Status["_id"].Int());
+            ASSERT_EQUALS(1, member1Status["health"].Double());
+
         }
         
         Date_t firstRequestDate() {
@@ -1277,6 +1322,24 @@ namespace {
                         target());
             // 500ms left to complete the heartbeat.
             ASSERT_EQUALS(500, request.second.total_milliseconds());
+
+            // Ensure a second failed heartbeat did not cause the node to be marked down   
+            BSONObjBuilder statusBuilder; 
+            Status resultStatus(ErrorCodes::InternalError,    
+                                "prepareStatusResponse didn't set result");   
+            getTopoCoord().prepareStatusResponse(cbData(),    
+                                                 firstRequestDate() + 4000,   
+                                                 10,  
+                                                 Timestamp(100,0),    
+                                                 &statusBuilder,  
+                                                 &resultStatus);  
+            ASSERT_OK(resultStatus);  
+            BSONObj rsStatus = statusBuilder.obj();   
+            std::vector<BSONElement> memberArray = rsStatus["members"].Array();   
+            BSONObj member1Status = memberArray[1].Obj(); 
+
+            ASSERT_EQUALS(1, member1Status["_id"].Int()); 
+            ASSERT_EQUALS(1, member1Status["health"].Double());
         }
     };
 
@@ -1572,6 +1635,24 @@ namespace {
         // Because this is the second retry, rather than retry again, we expect to wait for the
         // heartbeat interval of 2 seconds to elapse.
         ASSERT_EQUALS(Date_t(firstRequestDate() + 6800), action.getNextHeartbeatStartDate());
+
+        // Ensure a third failed heartbeat caused the node to be marked down   
+        BSONObjBuilder statusBuilder; 
+        Status resultStatus(ErrorCodes::InternalError,    
+                            "prepareStatusResponse didn't set result");   
+        getTopoCoord().prepareStatusResponse(cbData(),    
+                                             firstRequestDate() + 4900,   
+                                             10,  
+                                             Timestamp(100,0),    
+                                             &statusBuilder,  
+                                             &resultStatus);  
+        ASSERT_OK(resultStatus);  
+        BSONObj rsStatus = statusBuilder.obj();   
+        std::vector<BSONElement> memberArray = rsStatus["members"].Array();   
+        BSONObj member1Status = memberArray[1].Obj(); 
+
+        ASSERT_EQUALS(1, member1Status["_id"].Int()); 
+        ASSERT_EQUALS(0, member1Status["health"].Double());
     }
 
     TEST_F(HeartbeatResponseTestTwoRetries, DecideToStepDownRemotePrimary) {
@@ -1724,6 +1805,63 @@ namespace {
         ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
         // Because the heartbeat timed out, we'll retry in 2 seconds.
         ASSERT_EQUALS(Date_t(firstRequestDate() + 7010), action.getNextHeartbeatStartDate());
+    }
+
+    TEST_F(HeartbeatResponseTestTwoRetries, HeartbeatThreeNonconsecutiveFailures) {
+        // Confirm that the topology coordinator does not mark a node down on three
+        // nonconsecutive heartbeat failures.
+        ReplSetHeartbeatResponse response;
+        response.noteReplSet();
+        response.setSetName("rs0");
+        response.setState(MemberState::RS_SECONDARY);
+        response.setElectable(true);
+        response.setVersion(5);
+
+        // successful response (third response due to the two failures in setUp())
+        HeartbeatResponseAction action =
+            getTopoCoord().processHeartbeatResponse(
+                    firstRequestDate() + 4500,
+                    Milliseconds(400),
+                    target(),
+                    StatusWith<ReplSetHeartbeatResponse>(response),
+                    Timestamp(0, 0));  // We've never applied anything.
+
+        ASSERT_EQUALS(HeartbeatResponseAction::NoAction, action.getAction());
+        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
+        // Because the heartbeat succeeded, we'll retry in 2 seconds.
+        ASSERT_EQUALS(Date_t(firstRequestDate() + 6500), action.getNextHeartbeatStartDate());
+
+        // request next heartbeat
+        getTopoCoord().prepareHeartbeatRequest(firstRequestDate() + 6500, "rs0", target());
+        // third failed response
+        action = getTopoCoord().processHeartbeatResponse(
+                firstRequestDate() + 7100,
+                Milliseconds(400),
+                target(),
+                StatusWith<ReplSetHeartbeatResponse>(Status{ErrorCodes::HostUnreachable, ""}),
+                Timestamp(0, 0));  // We've never applied anything.
+
+        ASSERT_EQUALS(HeartbeatResponseAction::NoAction, action.getAction());
+        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
+
+        // Ensure a third nonconsecutive heartbeat failure did not cause the node to be marked down
+        BSONObjBuilder statusBuilder;
+        Status resultStatus(ErrorCodes::InternalError,
+                            "prepareStatusResponse didn't set result");
+        getTopoCoord().prepareStatusResponse(cbData(),
+                                             firstRequestDate() + 7000,
+                                             600,
+                                             Timestamp(100,0),
+                                             &statusBuilder,
+                                             &resultStatus);
+        ASSERT_OK(resultStatus);
+        BSONObj rsStatus = statusBuilder.obj();
+        std::vector<BSONElement> memberArray = rsStatus["members"].Array();
+        BSONObj member1Status = memberArray[1].Obj();
+
+        ASSERT_EQUALS(1, member1Status["_id"].Int());
+        ASSERT_EQUALS(1, member1Status["health"].Double());
+
     }
 
     TEST_F(HeartbeatResponseTest, UpdateHeartbeatDataNewPrimary) {

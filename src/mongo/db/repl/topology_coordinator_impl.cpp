@@ -828,16 +828,11 @@ namespace {
 
         Milliseconds alreadyElapsed(now.asInt64() - hbStats.getLastHeartbeatStartDate().asInt64());
         Date_t nextHeartbeatStartDate;
+        // determine next start time
         if (_rsConfig.isInitialized() &&
             (hbStats.getNumFailuresSinceLastStart() <= kMaxHeartbeatRetries) &&
             (alreadyElapsed < _rsConfig.getHeartbeatTimeoutPeriodMillis())) {
 
-            if (!hbResponse.isOK() && !isUnauthorized) {
-                LOG(1) << "Bad heartbeat response from " << target <<
-                    "; trying again; Retries left: " <<
-                    (kMaxHeartbeatRetries - hbStats.getNumFailuresSinceLastStart()) <<
-                    "; " << alreadyElapsed.total_milliseconds() << "ms have already elapsed";
-            }
             if (isUnauthorized) {
                 nextHeartbeatStartDate = now + kHeartbeatInterval.total_milliseconds();
             } else {
@@ -899,15 +894,24 @@ namespace {
         const MemberConfig member = _rsConfig.getMemberAt(memberIndex);
         if (!hbResponse.isOK()) {
             if (isUnauthorized) {
-                LOG(3) << "setAuthIssue: heartbeat response failed due to authentication"
+                LOG(1) << "setAuthIssue: heartbeat response failed due to authentication"
                     " issue for member _id:" << member.getId();
                 hbData.setAuthIssue(now);
-            } else {
-                LOG(3) << "setDownValues: heartbeat response failed for member _id:"
+            }
+            else if (hbStats.getNumFailuresSinceLastStart() > kMaxHeartbeatRetries ||
+                    alreadyElapsed >= _rsConfig.getHeartbeatTimeoutPeriodMillis()) {
+
+                LOG(1) << "setDownValues: heartbeat response failed for member _id:"
                        << member.getId() << ", msg:  "
                        << hbResponse.getStatus().reason();
 
                 hbData.setDownValues(now, hbResponse.getStatus().reason());
+            }
+            else {
+                LOG(3) << "Bad heartbeat response from " << target <<
+                    "; trying again; Retries left: " <<
+                    (kMaxHeartbeatRetries - hbStats.getNumFailuresSinceLastStart()) <<
+                    "; " << alreadyElapsed.total_milliseconds() << "ms have already elapsed";
             }
         }
         else {
