@@ -57,7 +57,7 @@ namespace mongo {
                 interruptCounter = interruptCheckPeriod;
             }
         }
-        
+
         bool inShard;
         bool inRouter;
         bool extSortAllowed;

@@ -536,19 +536,6 @@ namespace mongo {
         sources.push_front(source);
     }
 
-    bool Pipeline::canRunInMongos() const {
-        if (pCtx->extSortAllowed)
-            return false;
-
-        if (explain)
-            return false;
-
-        if (!sources.empty() && dynamic_cast<DocumentSourceNeedsMongod*>(sources.back().get()))
-            return false;
-
-        return true;
-    }
-
     DepsTracker Pipeline::getDependencies(const BSONObj& initialQuery) const {
         DepsTracker deps;
         bool knowAllFields = false;

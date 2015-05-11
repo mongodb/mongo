@@ -120,9 +120,6 @@ namespace mongo {
         /// The source that represents the output. Returns a non-owning pointer.
         DocumentSource* output() { invariant( !sources.empty() ); return sources.back().get(); }
 
-        /// Returns true if this pipeline only uses features that work in mongos.
-        bool canRunInMongos() const;
-
         /**
          * Write the pipeline's operators to a std::vector<Value>, with the
          * explain flag true (for DocumentSource::serializeToArray()).
