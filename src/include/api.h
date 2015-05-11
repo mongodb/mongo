@@ -33,11 +33,11 @@
 	if ((s) != NULL) {						\
 		(s)->dhandle = __olddh;					\
 		(s)->name = __oldname;					\
-		if (F_ISSET(&(s)->txn, TXN_RUNNING) &&			\
+		if (F_ISSET(&(s)->txn, WT_TXN_RUNNING) &&		\
 		    (ret) != 0 &&					\
 		    (ret) != WT_NOTFOUND &&				\
 		    (ret) != WT_DUPLICATE_KEY)				\
-			F_SET(&(s)->txn, TXN_ERROR);			\
+			F_SET(&(s)->txn, WT_TXN_ERROR);			\
 	}								\
 } while (0)
 
@@ -45,25 +45,25 @@
 #define	TXN_API_CALL(s, h, n, cur, bt, config, cfg) do {		\
 	int __autotxn = 0;						\
 	API_CALL(s, h, n, bt, cur, config, cfg);			\
-	__autotxn = !F_ISSET(&(s)->txn, TXN_AUTOCOMMIT | TXN_RUNNING);	\
+	__autotxn = !F_ISSET(&(s)->txn, WT_TXN_AUTOCOMMIT | WT_TXN_RUNNING);\
 	if (__autotxn)							\
-		F_SET(&(s)->txn, TXN_AUTOCOMMIT)
+		F_SET(&(s)->txn, WT_TXN_AUTOCOMMIT)
 
 /* An API call wrapped in a transaction if necessary. */
 #define	TXN_API_CALL_NOCONF(s, h, n, cur, bt) do {			\
 	int __autotxn = 0;						\
 	API_CALL_NOCONF(s, h, n, cur, bt);				\
-	__autotxn = !F_ISSET(&(s)->txn, TXN_AUTOCOMMIT | TXN_RUNNING);	\
+	__autotxn = !F_ISSET(&(s)->txn, WT_TXN_AUTOCOMMIT | WT_TXN_RUNNING);\
 	if (__autotxn)							\
-		F_SET(&(s)->txn, TXN_AUTOCOMMIT)
+		F_SET(&(s)->txn, WT_TXN_AUTOCOMMIT)
 
 /* End a transactional API call, optional retry on deadlock. */
 #define	TXN_API_END_RETRY(s, ret, retry)				\
 	API_END(s, ret);						\
 	if (__autotxn) {						\
-		if (F_ISSET(&(s)->txn, TXN_AUTOCOMMIT))			\
-			F_CLR(&(s)->txn, TXN_AUTOCOMMIT);		\
-		else if (ret == 0 && !F_ISSET(&(s)->txn, TXN_ERROR))	\
+		if (F_ISSET(&(s)->txn, WT_TXN_AUTOCOMMIT))		\
+			F_CLR(&(s)->txn, WT_TXN_AUTOCOMMIT);		\
+		else if (ret == 0 && !F_ISSET(&(s)->txn, WT_TXN_ERROR))	\
 			ret = __wt_txn_commit((s), NULL);		\
 		else {							\
 			WT_TRET(__wt_txn_rollback((s), NULL));		\

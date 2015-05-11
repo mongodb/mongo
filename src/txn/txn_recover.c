@@ -194,18 +194,18 @@ __txn_op_apply(
 		/* Set up the cursors. */
 		start = stop = NULL;
 		switch (mode) {
-		case TXN_TRUNC_ALL:
+		case WT_TXN_TRUNC_ALL:
 			/* Both cursors stay NULL. */
 			break;
-		case TXN_TRUNC_BOTH:
+		case WT_TXN_TRUNC_BOTH:
 			start = cursor;
 			WT_ERR(__recovery_cursor(
 			    session, r, lsnp, fileid, 1, &stop));
 			break;
-		case TXN_TRUNC_START:
+		case WT_TXN_TRUNC_START:
 			start = cursor;
 			break;
-		case TXN_TRUNC_STOP:
+		case WT_TXN_TRUNC_STOP:
 			stop = cursor;
 			break;
 
