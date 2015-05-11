@@ -1534,6 +1534,7 @@ __wt_clsm_open(WT_SESSION_IMPL *session,
 	if (bulk && (ret == EBUSY || (ret == 0 &&  lsm_tree->nchunks > 1)))
 		WT_ERR_MSG(session, EINVAL,
 		    "bulk-load is only supported on newly created LSM trees");
+	WT_ASSERT(session, !bulk || lsm_tree->exclusive);
 	/* Flag any errors from the tree get. */
 	WT_ERR(ret);
 
