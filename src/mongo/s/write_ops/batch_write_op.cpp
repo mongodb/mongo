@@ -431,6 +431,7 @@ namespace mongo {
                                           BatchedCommandRequest* request ) const {
 
         request->setNS( _clientRequest->getNS() );
+        request->setShouldBypassValidation(_clientRequest->shouldBypassValidation());
 
         const vector<TargetedWrite*>& targetedWrites = targetedBatch.getWrites();
 

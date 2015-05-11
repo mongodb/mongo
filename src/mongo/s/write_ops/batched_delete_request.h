@@ -124,6 +124,13 @@ namespace mongo {
         bool isMetadataSet() const;
         BatchedRequestMetadata* getMetadata() const;
 
+        /**
+         * These are no-ops since delete never validates documents. They only exist to fulfill the
+         * unified API.
+         */
+        void setShouldBypassValidation(bool newVal) {}
+        bool shouldBypassValidation() const { return false; }
+
     private:
         // Convention: (M)andatory, (O)ptional
 

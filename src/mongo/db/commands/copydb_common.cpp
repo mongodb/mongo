@@ -35,6 +35,7 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/client_basic.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
@@ -64,6 +65,10 @@ namespace copydb {
         ActionSet actions;
         actions.addAction(ActionType::insert);
         actions.addAction(ActionType::createIndex);
+        if (shouldBypassDocumentValidationforCommand(cmdObj)) {
+            actions.addAction(ActionType::bypassDocumentValidation);
+        }
+
         if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
                 ResourcePattern::forDatabaseName(todb), actions)) {
             return Status(ErrorCodes::Unauthorized, "Unauthorized");

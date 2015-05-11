@@ -34,6 +34,7 @@
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/util/mongoutils/str.h"
@@ -124,6 +125,10 @@ namespace mongo {
                 }
                 else {
                     outputActions.addAction(ActionType::update);
+                }
+
+                if (shouldBypassDocumentValidationforCommand(cmdObj)) {
+                    outputActions.addAction(ActionType::bypassDocumentValidation);
                 }
 
                 ResourcePattern outputResource(

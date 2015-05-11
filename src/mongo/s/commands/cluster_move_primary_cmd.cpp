@@ -38,6 +38,7 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/client_basic.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/operation_context.h"
@@ -182,7 +183,8 @@ namespace {
             BSONObj cloneRes;
             bool worked = toconn->runCommand(dbname.c_str(),
                                              BSON("clone" << config->getPrimary().getConnString()
-                                                          << "collsToIgnore" << barr.arr()),
+                                               << "collsToIgnore" << barr.arr()
+                                               << bypassDocumentValidationCommandOption() << true),
                                              cloneRes);
             toconn.done();
 

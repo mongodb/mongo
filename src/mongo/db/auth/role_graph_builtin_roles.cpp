@@ -149,6 +149,7 @@ namespace {
 
         // DB admin role
         dbAdminRoleActions
+            << ActionType::bypassDocumentValidation
             << ActionType::collMod
             << ActionType::collStats // clusterMonitor gets this also
             << ActionType::compact
@@ -555,11 +556,15 @@ namespace {
 
     void addRestorePrivileges(PrivilegeVector* privileges) {
         ActionSet actions;
-        actions << ActionType::insert
-                << ActionType::dropCollection
-                << ActionType::createIndex
-                << ActionType::createCollection
-                << ActionType::collMod;
+        actions
+            << ActionType::bypassDocumentValidation
+            << ActionType::collMod
+            << ActionType::createCollection
+            << ActionType::createIndex
+            << ActionType::dropCollection
+            << ActionType::insert
+            ;
+
         Privilege::addPrivilegeToPrivilegeVector(
                 privileges,
                 Privilege(ResourcePattern::forAnyNormalResource(), actions));

@@ -38,6 +38,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -425,6 +426,10 @@ namespace {
             }
             txn->setWriteConcern(wcResult.getValue());
             setupSynchronousCommit(txn);
+
+            boost::optional<DisableDocumentValidation> maybeDisableValidation;
+            if (shouldBypassDocumentValidationforCommand(cmdObj))
+                maybeDisableValidation.emplace(txn);
 
             // We may encounter a WriteConflictException when creating a collection during an
             // upsert, even when holding the exclusive lock on the database (due to other load on

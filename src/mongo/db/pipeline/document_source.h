@@ -233,6 +233,11 @@ namespace mongo {
 
             virtual bool isCapped(const NamespaceString& ns) = 0;
 
+            /**
+             * Inserts 'objs' into 'ns' and returns the "detailed" last error object.
+             */
+            virtual BSONObj insert(const NamespaceString& ns, const std::vector<BSONObj>& objs) = 0;
+
             // Add new methods as needed.
         };
 
@@ -711,7 +716,7 @@ namespace mongo {
         // Sets _tempsNs and prepares it to receive data.
         void prepTempCollection();
 
-        void spill(DBClientBase* conn, const std::vector<BSONObj>& toInsert);
+        void spill(const std::vector<BSONObj>& toInsert);
 
         bool _done;
 

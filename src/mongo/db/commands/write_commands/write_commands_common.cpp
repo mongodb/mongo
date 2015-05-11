@@ -36,6 +36,7 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
+#include "mongo/db/catalog/document_validation.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -50,12 +51,16 @@ namespace auth {
                                      const BSONObj& cmdObj ) {
 
         vector<Privilege> privileges;
+        ActionSet actionsOnCommandNSSS;
+
+        if (shouldBypassDocumentValidationforCommand(cmdObj)) {
+            actionsOnCommandNSSS.addAction(ActionType::bypassDocumentValidation);
+        }
 
         if ( cmdType == BatchedCommandRequest::BatchType_Insert ) {
 
             if ( !cmdNSS.isSystemDotIndexes() ) {
-                privileges.push_back( Privilege( ResourcePattern::forExactNamespace( cmdNSS ),
-                                                 ActionType::insert ) );
+                actionsOnCommandNSSS.addAction(ActionType::insert);
             }
             else {
                 // Special-case indexes until we have a command
@@ -70,23 +75,22 @@ namespace auth {
             }
         }
         else if ( cmdType == BatchedCommandRequest::BatchType_Update ) {
-
-            ActionSet actions;
-            actions.addAction( ActionType::update );
+            actionsOnCommandNSSS.addAction(ActionType::update);
 
             // Upsert also requires insert privs
             if ( BatchedCommandRequest::containsUpserts( cmdObj ) ) {
-                actions.addAction( ActionType::insert );
+                actionsOnCommandNSSS.addAction(ActionType::insert);
             }
-
-            privileges.push_back( Privilege( ResourcePattern::forExactNamespace( cmdNSS ),
-                                             actions ) );
-
         }
         else {
             fassert( 17251, cmdType == BatchedCommandRequest::BatchType_Delete );
-            privileges.push_back( Privilege( ResourcePattern::forExactNamespace( cmdNSS ),
-                                             ActionType::remove ) );
+            actionsOnCommandNSSS.addAction(ActionType::remove);
+        }
+
+
+        if (!actionsOnCommandNSSS.empty()) {
+            privileges.emplace_back(ResourcePattern::forExactNamespace(cmdNSS),
+                                    actionsOnCommandNSSS);
         }
 
         if ( authzSession->isAuthorizedForPrivileges( privileges ) )

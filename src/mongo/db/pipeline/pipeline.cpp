@@ -34,6 +34,7 @@
 
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/accumulator.h"
@@ -159,6 +160,11 @@ namespace mongo {
                                       << typeName(cmdElement.type()),
                         cmdElement.type() == Bool);
                 pCtx->extSortAllowed = cmdElement.Bool();
+                continue;
+            }
+
+            if (pFieldName == bypassDocumentValidationCommandOption()) {
+                pCtx->bypassDocumentValidation = cmdElement.trueValue();
                 continue;
             }
 
@@ -353,6 +359,10 @@ namespace mongo {
                 ActionSet actions;
                 actions.addAction(ActionType::remove);
                 actions.addAction(ActionType::insert);
+                if (shouldBypassDocumentValidationforCommand(cmdObj)) {
+                    actions.addAction(ActionType::bypassDocumentValidation);
+                }
+
                 out->push_back(Privilege(ResourcePattern::forExactNamespace(outputNs), actions));
             }
         }
@@ -479,6 +489,10 @@ namespace mongo {
 
         if (pCtx->extSortAllowed) {
             serialized.setField("allowDiskUse", Value(true));
+        }
+
+        if (pCtx->bypassDocumentValidation) {
+            serialized.setField(bypassDocumentValidationCommandOption(), Value(true));
         }
 
         return serialized.freeze();

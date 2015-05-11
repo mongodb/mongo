@@ -144,6 +144,9 @@ namespace mongo {
         bool isMetadataSet() const;
         BatchedRequestMetadata* getMetadata() const;
 
+        void setShouldBypassValidation(bool newVal);
+        bool shouldBypassValidation() const;
+
         //
         // Helpers for batch pre-processing
         //

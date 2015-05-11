@@ -37,6 +37,7 @@
 #include <vector>
 
 #include "mongo/client/connpool.h"
+#include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/mr.h"
 #include "mongo/s/catalog/catalog_cache.h"
@@ -88,7 +89,8 @@ namespace {
             BSONElement e = i.next();
             const string fn = e.fieldName();
 
-            if (fn == "map" ||
+            if (fn == bypassDocumentValidationCommandOption() ||
+                fn == "map" ||
                 fn == "mapreduce" ||
                 fn == "mapReduce" ||
                 fn == "mapparams" ||
@@ -401,9 +403,8 @@ namespace {
             BSONObj aggCounts = aggCountsB.done();
             finalCmd.append("counts", aggCounts);
 
-            if (cmdObj.hasField(LiteParsedQuery::cmdOptionMaxTimeMS)) {
-                finalCmd.append(cmdObj[LiteParsedQuery::cmdOptionMaxTimeMS]);
-            }
+            if (auto elem = cmdObj[LiteParsedQuery::cmdOptionMaxTimeMS]) finalCmd.append(elem);
+            if (auto elem = cmdObj[bypassDocumentValidationCommandOption()]) finalCmd.append(elem);
 
             Timer t2;
 

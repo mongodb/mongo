@@ -37,6 +37,7 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
 
@@ -50,6 +51,7 @@ namespace find_and_modify {
             bool update = cmdObj["update"].trueValue();
             bool upsert = cmdObj["upsert"].trueValue();
             bool remove = cmdObj["remove"].trueValue();
+            bool bypassDocumentValidation = shouldBypassDocumentValidationforCommand(cmdObj);
 
             ActionSet actions;
             actions.addAction(ActionType::find);
@@ -61,6 +63,9 @@ namespace find_and_modify {
             }
             if (remove) {
                 actions.addAction(ActionType::remove);
+            }
+            if (bypassDocumentValidation) {
+                actions.addAction(ActionType::bypassDocumentValidation);
             }
             ResourcePattern resource(commandTemplate->parseResourcePattern(dbname, cmdObj));
             uassert(17137, "Invalid target namespace " + resource.toString(),

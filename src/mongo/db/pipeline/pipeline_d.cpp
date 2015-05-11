@@ -36,6 +36,7 @@
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/pipeline/document_source.h"
@@ -51,29 +52,38 @@ namespace mongo {
     using std::string;
 
 namespace {
-    class MongodImplementation : public DocumentSourceNeedsMongod::MongodInterface {
+    class MongodImplementation final : public DocumentSourceNeedsMongod::MongodInterface {
     public:
         MongodImplementation(const intrusive_ptr<ExpressionContext>& ctx)
             : _ctx(ctx)
             , _client(ctx->opCtx)
         {}
 
-        DBClientBase* directClient() {
+        DBClientBase* directClient() final {
             // opCtx may have changed since our last call
             invariant(_ctx->opCtx);
             _client.setOpCtx(_ctx->opCtx);
             return &_client;
         }
 
-        bool isSharded(const NamespaceString& ns) {
+        bool isSharded(const NamespaceString& ns) final {
             const ChunkVersion unsharded(0, 0, OID());
             return !(shardingState.getVersion(ns.ns()).isWriteCompatibleWith(unsharded));
         }
 
-        bool isCapped(const NamespaceString& ns) {
+        bool isCapped(const NamespaceString& ns) final {
             AutoGetCollectionForRead ctx(_ctx->opCtx, ns.ns());
             Collection* collection = ctx.getCollection();
             return collection && collection->isCapped();
+        }
+
+        BSONObj insert(const NamespaceString& ns, const std::vector<BSONObj>& objs) final {
+            boost::optional<DisableDocumentValidation> maybeDisableValidation;
+            if (_ctx->bypassDocumentValidation)
+                maybeDisableValidation.emplace(_ctx->opCtx);
+
+            _client.insert(ns.ns(), objs);
+            return _client.getLastErrorDetailed();
         }
 
     private:

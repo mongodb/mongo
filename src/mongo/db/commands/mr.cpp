@@ -40,6 +40,7 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/db.h"
@@ -1287,6 +1288,10 @@ namespace mongo {
                      BSONObjBuilder& result) {
                 Timer t;
 
+                boost::optional<DisableDocumentValidation> maybeDisableValidation;
+                if (shouldBypassDocumentValidationforCommand(cmd))
+                    maybeDisableValidation.emplace(txn);
+
                 if (txn->getClient()->isInDirectClient()) {
                     return appendCommandStatus(result,
                                                Status(ErrorCodes::IllegalOperation,
@@ -1569,6 +1574,10 @@ namespace mongo {
                      int,
                      string& errmsg,
                      BSONObjBuilder& result) {
+                boost::optional<DisableDocumentValidation> maybeDisableValidation;
+                if (shouldBypassDocumentValidationforCommand(cmdObj))
+                    maybeDisableValidation.emplace(txn);
+
                 ShardedConnectionInfo::addHook();
                 // legacy name
                 string shardedOutputCollection = cmdObj["shardedOutputCollection"].valuestrsafe();

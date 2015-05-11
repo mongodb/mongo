@@ -28,6 +28,7 @@
 
 #include "mongo/s/write_ops/batched_insert_request.h"
 
+#include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/field_parser.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -92,6 +93,8 @@ namespace mongo {
 
         if (_metadata) builder.append(metadata(), _metadata->toBSON());
 
+        if (_shouldBypassValidation) builder.append(bypassDocumentValidationCommandOption(), true);
+
         return builder.obj();
     }
 
@@ -152,6 +155,9 @@ namespace mongo {
                     }
                 }
             }
+            else if (bypassDocumentValidationCommandOption() == sourceEl.fieldNameStringData()) {
+                _shouldBypassValidation = sourceEl.trueValue();
+            }
         }
 
         return true;
@@ -170,6 +176,8 @@ namespace mongo {
 
         _ordered = false;
         _isOrderedSet = false;
+
+        _shouldBypassValidation = false;
 
         _metadata.reset();
     }

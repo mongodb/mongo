@@ -38,6 +38,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
@@ -734,6 +735,10 @@ namespace mongo {
     void WriteBatchExecutor::bulkExecute( const BatchedCommandRequest& request,
                                           std::vector<BatchedUpsertDetail*>* upsertedIds,
                                           std::vector<WriteErrorDetail*>* errors ) {
+        boost::optional<DisableDocumentValidation> maybeDisableValidation;
+        if (request.shouldBypassValidation()) {
+            maybeDisableValidation.emplace(_txn);
+        }
 
         if ( request.getBatchType() == BatchedCommandRequest::BatchType_Insert ) {
             execInserts( request, errors );

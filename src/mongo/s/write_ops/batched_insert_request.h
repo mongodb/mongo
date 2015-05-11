@@ -110,6 +110,9 @@ namespace mongo {
         bool isOrderedSet() const;
         bool getOrdered() const;
 
+        void setShouldBypassValidation(bool newVal) { _shouldBypassValidation = newVal; }
+        bool shouldBypassValidation() const { return _shouldBypassValidation; }
+
         /*
          * metadata ownership will be transferred to this.
          */
@@ -142,6 +145,9 @@ namespace mongo {
 
         // (O)  cached copied of target ns
         NamespaceString _targetNSS;
+
+        // (O)  should document validation be bypassed (default false)
+        bool _shouldBypassValidation;
     };
 
 } // namespace mongo

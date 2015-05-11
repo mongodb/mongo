@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/base/string_data.h"
 #include "mongo/db/operation_context.h"
 
 namespace mongo {
@@ -38,6 +39,14 @@ namespace mongo {
      * Note that Decorations are value-constructed so this defaults to false.
      */
     extern const OperationContext::Decoration<bool> documentValidationDisabled;
+
+    inline StringData bypassDocumentValidationCommandOption() {
+        return "bypassDocumentValidation";
+    }
+
+    inline bool shouldBypassDocumentValidationforCommand(const BSONObj& cmdObj) {
+        return cmdObj[bypassDocumentValidationCommandOption()].trueValue();
+    }
 
     /**
      * Disables document validation on a single OperationContext while in scope.

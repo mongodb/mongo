@@ -36,6 +36,7 @@
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/cloner.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/copydb.h"
@@ -80,6 +81,10 @@ namespace mongo {
             ActionSet actions;
             actions.addAction(ActionType::insert);
             actions.addAction(ActionType::createIndex);
+            if (shouldBypassDocumentValidationforCommand(cmdObj)) {
+                actions.addAction(ActionType::bypassDocumentValidation);
+            }
+
             if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
                     ResourcePattern::forDatabaseName(dbname), actions)) {
                 return Status(ErrorCodes::Unauthorized, "Unauthorized");
@@ -93,6 +98,10 @@ namespace mongo {
                          int,
                          string& errmsg,
                          BSONObjBuilder& result) {
+
+            boost::optional<DisableDocumentValidation> maybeDisableValidation;
+            if (shouldBypassDocumentValidationforCommand(cmdObj))
+                maybeDisableValidation.emplace(txn);
 
             string from = cmdObj.getStringField("clone");
             if ( from.empty() )

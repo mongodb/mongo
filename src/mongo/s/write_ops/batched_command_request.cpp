@@ -277,6 +277,14 @@ namespace mongo {
         INVOKE( getMetadata );
     }
 
+    void BatchedCommandRequest::setShouldBypassValidation(bool newVal) {
+        INVOKE(setShouldBypassValidation, newVal);
+    }
+
+    bool BatchedCommandRequest::shouldBypassValidation() const {
+        INVOKE(shouldBypassValidation);
+    }
+
     /**
      * Generates a new request with insert _ids if required.  Otherwise returns NULL.
      */
