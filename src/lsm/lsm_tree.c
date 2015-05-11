@@ -10,7 +10,8 @@
 
 static int __lsm_tree_cleanup_old(WT_SESSION_IMPL *, const char *);
 static int __lsm_tree_open_check(WT_SESSION_IMPL *, WT_LSM_TREE *);
-static int __lsm_tree_open(WT_SESSION_IMPL *, const char *, WT_LSM_TREE **);
+static int __lsm_tree_open(
+    WT_SESSION_IMPL *, const char *, int, WT_LSM_TREE **);
 static int __lsm_tree_set_name(WT_SESSION_IMPL *, WT_LSM_TREE *, const char *);
 
 /*
@@ -430,7 +431,7 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	 */
 	if (ret == 0)
 		WT_WITH_DHANDLE_LOCK(session,
-		    ret = __lsm_tree_open(session, uri, &lsm_tree));
+		    ret = __lsm_tree_open(session, uri, 1, &lsm_tree));
 	if (ret == 0)
 		__wt_lsm_tree_release(session, lsm_tree);
 
@@ -539,8 +540,8 @@ __lsm_tree_open_check(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
  *	Open an LSM tree structure.
  */
 static int
-__lsm_tree_open(
-    WT_SESSION_IMPL *session, const char *uri, WT_LSM_TREE **treep)
+__lsm_tree_open(WT_SESSION_IMPL *session,
+    const char *uri, int exclusive, WT_LSM_TREE **treep)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
@@ -556,7 +557,8 @@ __lsm_tree_open(
 		WT_RET(__wt_lsm_manager_start(session));
 
 	/* Make sure no one beat us to it. */
-	if ((ret = __lsm_tree_find(session, uri, 0, treep)) != WT_NOTFOUND)
+	if ((ret = __lsm_tree_find(
+	    session, uri, exclusive, treep)) != WT_NOTFOUND)
 		return (ret);
 
 	/* Try to open the tree. */
@@ -582,6 +584,7 @@ __lsm_tree_open(
 	 * with getting handles exclusive.
 	 */
 	lsm_tree->refcnt = 1;
+	lsm_tree->exclusive = exclusive;
 	lsm_tree->queue_ref = 0;
 
 	/* Set a flush timestamp as a baseline. */
@@ -613,8 +616,9 @@ __wt_lsm_tree_get(WT_SESSION_IMPL *session,
 
 	ret = __lsm_tree_find(session, uri, exclusive, treep);
 	if (ret == WT_NOTFOUND)
-		ret = __lsm_tree_open(session, uri, treep);
+		ret = __lsm_tree_open(session, uri, exclusive, treep);
 
+	WT_ASSERT(session, ret != 0 || exclusive == (*treep)->exclusive);
 	return (ret);
 }
 
