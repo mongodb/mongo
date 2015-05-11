@@ -73,11 +73,20 @@ namespace mongo {
                                              << aggOutCounter.addAndFetch(1)
                                              ));
 
+        // Create output collection, copying options from existing collection if any.
         {
+            const auto infos = conn->getCollectionInfos(_outputNs.db().toString(),
+                                                        BSON("name" << _outputNs.coll()));
+            const auto options = infos.empty() ? BSONObj()
+                                               : infos.front().getObjectField("options");
+
+            BSONObjBuilder cmd;
+            cmd << "create" << _tempNs.coll();
+            cmd << "temp" << true;
+            cmd.appendElementsUnique(options);
+
             BSONObj info;
-            bool ok =conn->runCommand(_outputNs.db().toString(),
-                                      BSON("create" << _tempNs.coll() << "temp" << true),
-                                      info);
+            bool ok = conn->runCommand(_outputNs.db().toString(), cmd.done(), info);
             uassert(16994, str::stream() << "failed to create temporary $out collection '"
                                          << _tempNs.ns() << "': " << info.toString(),
                     ok);

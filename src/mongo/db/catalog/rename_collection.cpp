@@ -189,24 +189,15 @@ namespace {
         // TODO use a temp collection and unset the temp flag on success.
         Collection* targetColl = nullptr;
         {
-            CollectionOptions options;
-            options.setNoIdIndex();
-
-            if (sourceColl->isCapped()) {
-                const CollectionOptions sourceOpts =
-                    sourceColl->getCatalogEntry()->getCollectionOptions(txn);
-
-                options.capped = true;
-                options.cappedSize = sourceOpts.cappedSize;
-                options.cappedMaxDocs = sourceOpts.cappedMaxDocs;
-            }
+            CollectionOptions options = sourceColl->getCatalogEntry()->getCollectionOptions(txn);
 
             WriteUnitOfWork wunit(txn);
 
             // No logOp necessary because the entire renameCollection command is one logOp.
             bool shouldReplicateWrites = txn->writesAreReplicated();
             txn->setReplicatedWrites(false);
-            targetColl = targetDB->createCollection(txn, target.ns(), options);
+            targetColl = targetDB->createCollection(txn, target.ns(), options,
+                                                    false); // _id index build with others later.
             txn->setReplicatedWrites(shouldReplicateWrites);
             if (!targetColl) {
                 return Status(ErrorCodes::OutOfDiskSpace, "Failed to create target collection.");

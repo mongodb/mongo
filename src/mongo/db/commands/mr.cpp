@@ -38,6 +38,7 @@
 #include "mongo/client/parallel.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
@@ -403,13 +404,16 @@ namespace mongo {
                 wuow.commit();
             }
 
+            CollectionOptions finalOptions;
             vector<BSONObj> indexesToInsert;
 
             {
-                // copy indexes into temporary storage
+                // copy indexes and collection options into temporary storage
                 OldClientWriteContext finalCtx(_txn, _config.outputOptions.finalNamespace);
                 Collection* const finalColl = finalCtx.getCollection();
                 if ( finalColl ) {
+                    finalOptions = finalColl->getCatalogEntry()->getCollectionOptions(_txn);
+
                     IndexCatalog::IndexIterator ii =
                         finalColl->getIndexCatalog()->getIndexIterator( _txn, true );
                     // Iterate over finalColl's indexes.
@@ -442,7 +446,7 @@ namespace mongo {
                 Collection* tempColl = tempCtx.getCollection();
                 invariant(!tempColl);
 
-                CollectionOptions options;
+                CollectionOptions options = finalOptions;
                 options.temp = true;
                 tempColl = tempCtx.db()->createCollection(_txn, _config.tempNamespace, options);
 

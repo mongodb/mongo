@@ -32,6 +32,7 @@
 
 #include "mongo/db/background.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/index_catalog.h"
@@ -127,12 +128,17 @@ namespace {
 
         // create new collection
         {
+            const auto fromOptions = fromCollection->getCatalogEntry()
+                                                   ->getCollectionOptions(txn)
+                                                   .toBSON();
+
             OldClientContext ctx(txn,  toNs);
             BSONObjBuilder spec;
             spec.appendBool("capped", true);
             spec.append("size", size);
             if (temp)
                 spec.appendBool("temp", true);
+            spec.appendElementsUnique(fromOptions);
 
             WriteUnitOfWork wunit(txn);
             Status status = userCreateNS(txn, ctx.db(), toNs, spec.done());
