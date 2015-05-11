@@ -103,7 +103,7 @@ corrupt(void)
 found:	if (fstat(fd, &sb) == -1)
 		die(errno, "salvage-corrupt: fstat");
 
-	offset = MMRAND(0, sb.st_size);
+	offset = mmrand(NULL, 0, (u_int)sb.st_size);
 	len = (size_t)(20 + (sb.st_size / 100) * 2);
 	(void)snprintf(buf, sizeof(buf), "%s/slvg.corrupt", g.home);
 	if ((fp = fopen(buf, "w")) == NULL)
@@ -111,7 +111,7 @@ found:	if (fstat(fd, &sb) == -1)
 	(void)fprintf(fp,
 	    "salvage-corrupt: offset %" PRIuMAX ", length " SIZET_FMT "\n",
 	    (uintmax_t)offset, len);
-	(void)fclose(fp);
+	fclose_and_clear(&fp);
 
 	if (lseek(fd, offset, SEEK_SET) == -1)
 		die(errno, "salvage-corrupt: lseek");

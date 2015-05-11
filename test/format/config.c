@@ -58,7 +58,7 @@ config_setup(void)
 	 * them.
 	 */
 	if (!config_is_perm("data_source"))
-		switch (MMRAND(1, 3)) {
+		switch (mmrand(NULL, 1, 3)) {
 		case 1:
 			config_single("data_source=file", 0);
 			break;
@@ -71,7 +71,7 @@ config_setup(void)
 		}
 
 	if (!config_is_perm("file_type"))
-		switch (DATASOURCE("lsm") ? 5 : MMRAND(1, 10)) {
+		switch (DATASOURCE("lsm") ? 5 : mmrand(NULL, 1, 10)) {
 		case 1:
 			config_single("file_type=fix", 0);
 			break;
@@ -118,9 +118,9 @@ config_setup(void)
 		 * the min, 0 otherwise.
 		 */
 		if (F_ISSET(cp, C_BOOL))
-			*cp->v = MMRAND(1, 100) <= cp->min ? 1 : 0;
+			*cp->v = mmrand(NULL, 1, 100) <= cp->min ? 1 : 0;
 		else
-			*cp->v = CONF_RAND(cp);
+			*cp->v = mmrand(NULL, cp->min, cp->maxrand);
 	}
 
 	/* Required shared libraries. */
@@ -162,7 +162,7 @@ config_setup(void)
 			g.c_cache = 30 * g.c_chunk_size;
 
 		if (!config_is_perm("insert_pct"))
-			g.c_insert_pct = MMRAND(50, 85);
+			g.c_insert_pct = mmrand(NULL, 50, 85);
 	}
 
 	/* Make the default maximum-run length 20 minutes. */
@@ -200,7 +200,7 @@ config_checksum(void)
 {
 	/* Choose a checksum mode if nothing was specified. */
 	if (!config_is_perm("checksum"))
-		switch (MMRAND(1, 10)) {
+		switch (mmrand(NULL, 1, 10)) {
 		case 1:					/* 10% */
 			config_single("checksum=on", 0);
 			break;
@@ -231,7 +231,7 @@ config_compression(void)
 	 */
 	if (!config_is_perm("compression")) {
 		cstr = "compression=none";
-		switch (MMRAND(1, 20)) {
+		switch (mmrand(NULL, 1, 20)) {
 		case 1: case 2: case 3: case 4:		/* 20% no compression */
 			break;
 		case 5: case 6:				/* 10% bzip */
@@ -272,7 +272,7 @@ config_isolation(void)
 	 */
 	if (!config_is_perm("isolation")) {
 		/* Avoid "maybe uninitialized" warnings. */
-		switch (MMRAND(1, 4)) {
+		switch (mmrand(NULL, 1, 4)) {
 		case 1:
 			cstr = "isolation=random";
 			break;
@@ -345,7 +345,7 @@ config_print(int error_display)
 	(void)fflush(fp);
 
 	if (fp != stdout)
-		(void)fclose(fp);
+		fclose_and_clear(&fp);
 }
 
 /*
@@ -368,7 +368,7 @@ config_file(const char *name)
 			continue;
 		config_single(buf, 1);
 	}
-	(void)fclose(fp);
+	fclose_and_clear(&fp);
 }
 
 /*
