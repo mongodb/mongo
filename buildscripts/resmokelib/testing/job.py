@@ -108,20 +108,20 @@ class Job(object):
         try:
             for hook in self.hooks:
                 hook.before_test(self.report)
+
         except errors.StopExecution:
             raise
 
         except errors.ServerFailure:
-            self.logger.error("%s marked as failure by a hook's before_test.",
+            self.logger.error("%s marked as a failure by a hook's before_test.",
                               test.shortDescription())
             self._fail_test(test, sys.exc_info(), return_code=2)
-            if config.FAIL_FAST:
-                raise errors.StopExecution("A hook's before_test failed")
+            raise errors.StopExecution("A hook's before_test failed")
 
         except errors.TestFailure:
-            self.logger.error("%s marked as failure by a hook's after_test.",
+            self.logger.error("%s marked as a failure by a hook's before_test.",
                               test.shortDescription())
-            self._fail_test(test, sys.exc_info(), return_code=2)
+            self._fail_test(test, sys.exc_info(), return_code=1)
             if config.FAIL_FAST:
                 raise errors.StopExecution("A hook's before_test failed")
 
@@ -142,20 +142,20 @@ class Job(object):
         try:
             for hook in self.hooks:
                 hook.after_test(self.report)
+
         except errors.StopExecution:
             raise
 
         except errors.ServerFailure:
-            self.logger.error("%s marked as failure by a hook's after_test.",
+            self.logger.error("%s marked as a failure by a hook's after_test.",
                               test.shortDescription())
             self.report.setFailure(test, return_code=2)
-            if config.FAIL_FAST:
-                raise errors.StopExecution("A hook's after_test failed")
+            raise errors.StopExecution("A hook's after_test failed")
 
         except errors.TestFailure:
-            self.logger.error("%s marked as failure by a hook's after_test.",
+            self.logger.error("%s marked as a failure by a hook's after_test.",
                               test.shortDescription())
-            self.report.setFailure(test)
+            self.report.setFailure(test, return_code=1)
             if config.FAIL_FAST:
                 raise errors.StopExecution("A hook's after_test failed")
 

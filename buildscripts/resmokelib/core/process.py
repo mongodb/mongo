@@ -172,7 +172,7 @@ class Process(object):
             if env_var in env_diff and env_diff[env_var] == default_env[env_var]:
                 del env_diff[env_var]
 
-        sb = []
+        sb = []  # String builder.
         for env_var in env_diff:
             sb.append("%s=%s" % (env_var, env_diff[env_var]))
         sb.extend(self.args)

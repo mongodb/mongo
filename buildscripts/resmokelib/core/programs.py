@@ -95,7 +95,7 @@ def mongo_shell_program(logger, executable=None, filename=None, process_kwargs=N
     executable = utils.default_if_none(executable, config.DEFAULT_MONGO_EXECUTABLE)
     args = [executable]
 
-    eval_sb = []
+    eval_sb = []  # String builder.
     global_vars = kwargs.pop("global_vars", {})
 
     shortcut_opts = {

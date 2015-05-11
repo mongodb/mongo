@@ -4,6 +4,11 @@ Interface of the different fixtures for executing JSTests against.
 
 from __future__ import absolute_import
 
+import time
+
+import pymongo
+
+from ... import errors
 from ... import logging
 
 
@@ -67,6 +72,8 @@ class ReplFixture(Fixture):
     Base class for all fixtures that support replication.
     """
 
+    AWAIT_REPL_TIMEOUT_MINS = 5
+
     def get_primary(self):
         """
         Returns the primary of a replica set, or the master of a
@@ -87,3 +94,27 @@ class ReplFixture(Fixture):
         replicated to all other nodes.
         """
         raise NotImplementedError("await_repl must be implemented by ReplFixture subclasses")
+
+    def retry_until_wtimeout(self, insert_fn):
+        """
+        Given a callback function representing an insert operation on
+        the primary, handle any connection failures, and keep retrying
+        the operation for up to 'AWAIT_REPL_TIMEOUT_MINS' minutes.
+
+        The insert operation callback should take an argument for the
+        number of remaining seconds to provide as the timeout for the
+        operation.
+        """
+
+        deadline = time.time() + ReplFixture.AWAIT_REPL_TIMEOUT_MINS * 60
+
+        while True:
+            try:
+                remaining = deadline - time.time()
+                insert_fn(remaining)
+                break
+            except pymongo.errors.ConnectionFailure:
+                remaining = deadline - time.time()
+                if remaining <= 0.0:
+                    raise errors.ServerFailure("Failed to connect to the primary on port %d" %
+                                               self.port)

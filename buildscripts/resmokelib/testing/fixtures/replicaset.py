@@ -21,8 +21,6 @@ class ReplicaSetFixture(interface.ReplFixture):
     Fixture which provides JSTests with a replica set to run against.
     """
 
-    AWAIT_REPL_TIMEOUT_MINS = 5
-
     def __init__(self,
                  logger,
                  job_num,
@@ -144,11 +142,22 @@ class ReplicaSetFixture(interface.ReplFixture):
 
     def await_repl(self):
         self.logger.info("Awaiting replication of insert (w=%d, wtimeout=%d min) to primary on port"
-                         " %d", self.num_nodes, ReplicaSetFixture.AWAIT_REPL_TIMEOUT_MINS,
+                         " %d", self.num_nodes, interface.ReplFixture.AWAIT_REPL_TIMEOUT_MINS,
                          self.port)
-        repl_timeout = ReplicaSetFixture.AWAIT_REPL_TIMEOUT_MINS * 60 * 1000
-        client = utils.new_mongo_client(port=self.port)
-        client.resmoke.await_repl.insert({}, w=self.num_nodes, wtimeout=repl_timeout)
+
+        # Keep retrying this until it times out waiting for replication.
+        def insert_fn(remaining_secs):
+            remaining_millis = int(round(remaining_secs * 1000))
+            client = utils.new_mongo_client(port=self.port)
+            client.resmoke.await_repl.insert({"awaiting": "repl"},
+                                             w=self.num_nodes,
+                                             wtimeout=remaining_millis)
+        try:
+            self.retry_until_wtimeout(insert_fn)
+        except pymongo.errors.WTimeoutError:
+            self.logger.info("Replication of write operation timed out.")
+            raise
+
         self.logger.info("Replication of write operation completed.")
 
     def _new_mongod(self, index, replset_name):

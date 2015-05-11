@@ -126,10 +126,14 @@ class MongoDFixture(interface.Fixture):
                                  self.mongod.pid)
                 self.mongod.stop()
 
-            success = self.mongod.wait() == 0
+            exit_code = self.mongod.wait()
+            success = exit_code == 0
 
             if running_at_start:
-                self.logger.info("Successfully terminated the mongod on port %d.", self.port)
+                self.logger.info("Successfully terminated the mongod on port %d, exited with code"
+                                 " %d.",
+                                 self.port,
+                                 exit_code)
 
         return success
 

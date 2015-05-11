@@ -319,10 +319,14 @@ class _MongoSFixture(interface.Fixture):
                                  self.mongos.pid)
                 self.mongos.stop()
 
-            success = self.mongos.wait() == 0
+            exit_code = self.mongos.wait()
+            success = exit_code == 0
 
             if running_at_start:
-                self.logger.info("Successfully terminated the mongos on port %d.", self.port)
+                self.logger.info("Successfully terminated the mongos on port %d, exited with code"
+                                 " %d",
+                                 self.port,
+                                 exit_code)
 
         return success
 

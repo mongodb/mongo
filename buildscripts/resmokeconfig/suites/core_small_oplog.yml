@@ -4,13 +4,8 @@ selector:
     - jstests/core/*.js
     exclude_files:
     # These tests are not expected to pass with master-slave:
-    - jstests/core/capped_convertToCapped1.js
-    - jstests/core/capped_max1.js
     - jstests/core/dbadmin.js
-    - jstests/core/dropdb.js
-    - jstests/core/dropdb_race.js
     - jstests/core/opcounters_write_cmd.js
-    - jstests/core/rename.js
 
 executor:
   js_test:

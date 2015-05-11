@@ -6,6 +6,8 @@ from __future__ import absolute_import
 
 import os.path
 
+import pymongo
+
 from . import interface
 from . import standalone
 from ... import config
@@ -18,8 +20,6 @@ class MasterSlaveFixture(interface.ReplFixture):
     Fixture which provides JSTests with a master/slave deployment to
     run against.
     """
-
-    AWAIT_REPL_TIMEOUT_MINS = 5
 
     def __init__(self,
                  logger,
@@ -103,15 +103,49 @@ class MasterSlaveFixture(interface.ReplFixture):
         return [self.slave]
 
     def await_repl(self):
-        self.logger.info("Awaiting replication of insert (w=2, wtimeout=%d min) to master on port"
-                         " %d", MasterSlaveFixture.AWAIT_REPL_TIMEOUT_MINS, self.port)
-        repl_timeout = MasterSlaveFixture.AWAIT_REPL_TIMEOUT_MINS * 60 * 1000
+        """
+        Inserts a document into each database on the master and waits
+        for all write operations to be acknowledged by the master-slave
+        deployment.
+        """
+
         client = utils.new_mongo_client(self.port)
 
-        # Use the same database as the jstests to ensure that the slave doesn't acknowledge the
-        # write as having completed before it has synced the test database.
-        client.test.resmoke_await_repl.insert({}, w=2, wtimeout=repl_timeout)
-        self.logger.info("Replication of write operation completed.")
+        # We verify that each database has replicated to the slave because in the case of an initial
+        # sync, the slave may acknowledge writes to one database before it has finished syncing
+        # others.
+        db_names = client.database_names()
+        self.logger.info("Awaiting replication of inserts to each of the following databases on"
+                         " master on port %d: %s",
+                         self.port,
+                         db_names)
+
+        for db_name in db_names:
+            if db_name == "local":
+                continue  # The local database is expected to differ, ignore.
+
+            self.logger.info("Awaiting replication of insert to database %s (w=2, wtimeout=%d min)"
+                             " to master on port %d",
+                             db_name,
+                             interface.ReplFixture.AWAIT_REPL_TIMEOUT_MINS,
+                             self.port)
+
+            # Keep retrying this until it times out waiting for replication.
+            def insert_fn(remaining_secs):
+                remaining_millis = int(round(remaining_secs * 1000))
+                client[db_name].resmoke_await_repl.insert({"awaiting": "repl"},
+                                                          w=2,
+                                                          wtimeout=remaining_millis)
+
+            try:
+                self.retry_until_wtimeout(insert_fn)
+            except pymongo.errors.WTimeoutError:
+                self.logger.info("Replication of write operation timed out.")
+                raise
+
+            self.logger.info("Replication of write operation completed for database %s.", db_name)
+
+        self.logger.info("Finished awaiting replication.")
 
     def _new_mongod(self, mongod_logger, mongod_options):
         """
