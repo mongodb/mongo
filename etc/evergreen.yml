@@ -2543,6 +2543,87 @@ buildvariants:
     distros:
     - rhel55-test
 
+- name: osx-108-ssl
+  display_name: SSL OS X 10.8
+  modules: ~
+  run_on:
+  - osx-108
+  expansions:
+    push_path: osx
+    push_bucket: downloads.mongodb.org
+    push_name: osx
+    push_arch: x86_64
+    tooltags: "-tags ssl"
+    compile_flags: --ssl --allocator=system -j$(sysctl -n hw.logicalcpu) --release --osx-version-min=10.7 --libc++
+    num_jobs_unittests: $(sysctl -n hw.logicalcpu)
+    test_flags: --continueOnFailure
+  tasks:
+  - name: compile
+  - name: aggregation
+  - name: aggregation_WT
+  - name: auth
+  - name: auth_WT
+  - name: dbtest
+  - name: dbtest_WT
+  - name: disk
+  - name: durability
+  - name: failpoints
+  - name: gle_auth
+  - name: gle_auth_WT
+  - name: gle_auth_write_cmd
+  - name: gle_auth_write_cmd_WT
+  - name: gle_auth_basics_passthrough
+  - name: gle_auth_basics_passthrough_WT
+  - name: gle_auth_basics_passthrough_write_cmd
+  - name: gle_auth_basics_passthrough_write_cmd_WT
+  - name: sharding_gle_auth_basics_passthrough
+  - name: sharding_gle_auth_basics_passthrough_WT
+  - name: sharding_gle_auth_basics_passthrough_write_cmd
+  - name: sharding_gle_auth_basics_passthrough_write_cmd_WT
+  - name: jsCore
+  - name: jsCore_WT
+  - name: jsCore_compatibility
+  - name: jsCore_compatibility_WT
+  - name: jsCore_small_oplog
+  - name: jsCore_small_oplog_WT
+  - name: jsCore_small_oplog_rs
+  - name: jsCore_small_oplog_rs_WT
+  - name: mmap
+  - name: mongosTest
+  - name: noPassthrough
+  - name: noPassthrough_WT
+  - name: noPassthroughWithMongod
+  - name: noPassthroughWithMongod_WT
+  - name: bulk_gle_passthrough
+  - name: bulk_gle_passthrough_WT
+  - name: parallel
+  - name: parallel_WT
+  - name: parallel_compatibility
+  - name: parallel_compatibility_WT
+  - name: concurrency
+  - name: concurrency_WT
+  - name: concurrency_compatibility
+  - name: concurrency_compatibility_WT
+  - name: replicasets
+  - name: replicasets_WT
+  - name: replication
+  - name: replication_WT
+  - name: sharding
+  - name: sharding_WT
+  - name: slow1
+  - name: slow1_WT
+  - name: slow2
+  - name: slow2_WT
+  - name: sharding_jscore_passthrough
+  - name: sharding_jscore_passthrough_WT
+  - name: ssl
+  - name: sslSpecial
+  - name: tool
+  - name: tool_WT
+  - name: push
+    distros:
+    - rhel55-test
+
 - name: osx-108-debug
   display_name: OS X 10.8 DEBUG
   modules: ~
