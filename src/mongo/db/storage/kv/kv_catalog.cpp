@@ -122,7 +122,7 @@ namespace {
         // If this changes to not put _rand at the end, _hasEntryCollidingWithRand will need fixing.
         StringBuilder buf;
         if ( _directoryPerDb ) {
-            buf << nsToDatabaseSubstring( ns ) << '/';
+            buf << NamespaceString::escapeDbName( nsToDatabaseSubstring( ns ) ) << '/';
         }
         buf << kind;
         buf << ( _directoryForIndexes ? '/' : '-' );
