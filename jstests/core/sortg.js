@@ -18,7 +18,7 @@ function memoryException( sortSpec, querySpec ) {
     var ex = assert.throws( function() {
         t.find( querySpec ).sort( sortSpec ).batchSize( 1000 ).itcount()
     } );
-    assert( ex.toString().match( /sort/ ) );
+    assert( ex.toString().match( /Sort/ ) );
 }
 
 function noMemoryException( sortSpec, querySpec ) {
