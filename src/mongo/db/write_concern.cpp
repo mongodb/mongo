@@ -262,10 +262,8 @@ namespace mongo {
                 repl::getGlobalReplicationCoordinator()->awaitReplication(txn,
                                                                           replOpTime,
                                                                           writeConcern);
-        if (replStatus.status == ErrorCodes::ExceededTimeLimit) {
+        if (replStatus.status == ErrorCodes::WriteConcernFailed) {
             gleWtimeouts.increment();
-            replStatus.status = Status(ErrorCodes::WriteConcernFailed,
-                                       "waiting for replication timed out");
             result->err = "timeout";
             result->wTimedOut = true;
         }

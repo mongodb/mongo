@@ -1097,11 +1097,11 @@ namespace {
         WaiterInfo waitInfo(
                 &_replicationWaiterList, txn->getOpID(), &opTime, &writeConcern, &condVar);
         while (!_doneWaitingForReplication_inlock(opTime, writeConcern)) {
-            const int elapsed = timer->millis();
+            const Milliseconds elapsed{timer->millis()};
 
             Status interruptedStatus = txn->checkForInterruptNoAssert();
             if (!interruptedStatus.isOK()) {
-                return StatusAndDuration(interruptedStatus, Milliseconds(elapsed));
+                return StatusAndDuration(interruptedStatus, elapsed);
             }
 
             if (!waitInfo.master) {
@@ -1109,28 +1109,38 @@ namespace {
                                                 "Not master anymore while waiting for replication"
                                                         " - this most likely means that a step down"
                                                         " occurred while waiting for replication"),
-                                         Milliseconds(elapsed));
+                                         elapsed);
             }
 
             if (writeConcern.wTimeout != WriteConcernOptions::kNoTimeout &&
-                    elapsed > writeConcern.wTimeout) {
-                return StatusAndDuration(Status(ErrorCodes::ExceededTimeLimit,
+                    elapsed > Milliseconds{writeConcern.wTimeout}) {
+                return StatusAndDuration(Status(ErrorCodes::WriteConcernFailed,
                                                 "waiting for replication timed out"),
-                                         Milliseconds(elapsed));
+                                         elapsed);
             }
 
             if (_inShutdown) {
                 return StatusAndDuration(Status(ErrorCodes::ShutdownInProgress,
                                                 "Replication is being shut down"),
-                                         Milliseconds(elapsed));
+                                         elapsed);
+            }
+
+            const Microseconds maxTimeMicrosRemaining{txn->getRemainingMaxTimeMicros()};
+            Microseconds waitTime = Microseconds::max();
+            if (maxTimeMicrosRemaining != Microseconds::zero()) {
+                waitTime = maxTimeMicrosRemaining;
+            }
+            if (writeConcern.wTimeout != WriteConcernOptions::kNoTimeout) {
+                waitTime = std::min<Microseconds>(Milliseconds{writeConcern.wTimeout} - elapsed,
+                                                  waitTime);
             }
 
             try {
-                if (writeConcern.wTimeout == WriteConcernOptions::kNoTimeout) {
+                if (waitTime == Microseconds::max()) {
                     condVar.wait(*lock);
                 }
                 else {
-                    condVar.wait_for(*lock, Milliseconds(writeConcern.wTimeout - elapsed));
+                    condVar.wait_for(*lock, waitTime);
                 }
             } catch (const boost::thread_interrupted&) {}
         }

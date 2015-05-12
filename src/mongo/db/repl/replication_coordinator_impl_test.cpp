@@ -507,7 +507,7 @@ namespace {
         // 1 node waiting for time 1
         ReplicationCoordinator::StatusAndDuration statusAndDur =
                                         getReplCoord()->awaitReplication(&txn, time1, writeConcern);
-        ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, statusAndDur.status);
+        ASSERT_EQUALS(ErrorCodes::WriteConcernFailed, statusAndDur.status);
         getReplCoord()->setMyLastOptime(time1);
         statusAndDur = getReplCoord()->awaitReplication(&txn, time1, writeConcern);
         ASSERT_OK(statusAndDur.status);
@@ -515,17 +515,17 @@ namespace {
         // 2 nodes waiting for time1
         writeConcern.wNumNodes = 2;
         statusAndDur = getReplCoord()->awaitReplication(&txn, time1, writeConcern);
-        ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, statusAndDur.status);
+        ASSERT_EQUALS(ErrorCodes::WriteConcernFailed, statusAndDur.status);
         ASSERT_OK(getReplCoord()->setLastOptime_forTest(2, 1, time1));
         statusAndDur = getReplCoord()->awaitReplication(&txn, time1, writeConcern);
         ASSERT_OK(statusAndDur.status);
 
         // 2 nodes waiting for time2
         statusAndDur = getReplCoord()->awaitReplication(&txn, time2, writeConcern);
-        ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, statusAndDur.status);
+        ASSERT_EQUALS(ErrorCodes::WriteConcernFailed, statusAndDur.status);
         getReplCoord()->setMyLastOptime(time2);
         statusAndDur = getReplCoord()->awaitReplication(&txn, time2, writeConcern);
-        ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, statusAndDur.status);
+        ASSERT_EQUALS(ErrorCodes::WriteConcernFailed, statusAndDur.status);
         ASSERT_OK(getReplCoord()->setLastOptime_forTest(2, 3, time2));
         statusAndDur = getReplCoord()->awaitReplication(&txn, time2, writeConcern);
         ASSERT_OK(statusAndDur.status);
@@ -533,7 +533,7 @@ namespace {
         // 3 nodes waiting for time2
         writeConcern.wNumNodes = 3;
         statusAndDur = getReplCoord()->awaitReplication(&txn, time2, writeConcern);
-        ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, statusAndDur.status);
+        ASSERT_EQUALS(ErrorCodes::WriteConcernFailed, statusAndDur.status);
         ASSERT_OK(getReplCoord()->setLastOptime_forTest(2, 2, time2));
         statusAndDur = getReplCoord()->awaitReplication(&txn, time2, writeConcern);
         ASSERT_OK(statusAndDur.status);
@@ -602,11 +602,11 @@ namespace {
         // Nothing satisfied
         getReplCoord()->setMyLastOptime(time1);
         statusAndDur = getReplCoord()->awaitReplication(&txn, time1, majorityWriteConcern);
-        ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, statusAndDur.status);
+        ASSERT_EQUALS(ErrorCodes::WriteConcernFailed, statusAndDur.status);
         statusAndDur = getReplCoord()->awaitReplication(&txn, time1, multiDCWriteConcern);
-        ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, statusAndDur.status);
+        ASSERT_EQUALS(ErrorCodes::WriteConcernFailed, statusAndDur.status);
         statusAndDur = getReplCoord()->awaitReplication(&txn, time1, multiRackWriteConcern);
-        ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, statusAndDur.status);
+        ASSERT_EQUALS(ErrorCodes::WriteConcernFailed, statusAndDur.status);
 
         // Majority satisfied but not either custom mode
         getReplCoord()->setLastOptime_forTest(2, 1, time1);
@@ -615,9 +615,9 @@ namespace {
         statusAndDur = getReplCoord()->awaitReplication(&txn, time1, majorityWriteConcern);
         ASSERT_OK(statusAndDur.status);
         statusAndDur = getReplCoord()->awaitReplication(&txn, time1, multiDCWriteConcern);
-        ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, statusAndDur.status);
+        ASSERT_EQUALS(ErrorCodes::WriteConcernFailed, statusAndDur.status);
         statusAndDur = getReplCoord()->awaitReplication(&txn, time1, multiRackWriteConcern);
-        ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, statusAndDur.status);
+        ASSERT_EQUALS(ErrorCodes::WriteConcernFailed, statusAndDur.status);
 
         // All modes satisfied
         getReplCoord()->setLastOptime_forTest(2, 3, time1);
@@ -634,11 +634,11 @@ namespace {
         getReplCoord()->setLastOptime_forTest(2, 3, time2);
 
         statusAndDur = getReplCoord()->awaitReplication(&txn, time2, majorityWriteConcern);
-        ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, statusAndDur.status);
+        ASSERT_EQUALS(ErrorCodes::WriteConcernFailed, statusAndDur.status);
         statusAndDur = getReplCoord()->awaitReplication(&txn, time2, multiDCWriteConcern);
         ASSERT_OK(statusAndDur.status);
         statusAndDur = getReplCoord()->awaitReplication(&txn, time2, multiRackWriteConcern);
-        ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, statusAndDur.status);
+        ASSERT_EQUALS(ErrorCodes::WriteConcernFailed, statusAndDur.status);
     }
 
     /**
@@ -781,7 +781,7 @@ namespace {
         getReplCoord()->setMyLastOptime(time2);
         ASSERT_OK(getReplCoord()->setLastOptime_forTest(2, 1, time1));
         ReplicationCoordinator::StatusAndDuration statusAndDur = awaiter.getResult();
-        ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, statusAndDur.status);
+        ASSERT_EQUALS(ErrorCodes::WriteConcernFailed, statusAndDur.status);
         awaiter.reset();
     }
 
@@ -1565,7 +1565,7 @@ namespace {
         writeConcern.wTimeout = WriteConcernOptions::kNoWaiting;
         writeConcern.wNumNodes = 1;
 
-        ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit,
+        ASSERT_EQUALS(ErrorCodes::WriteConcernFailed,
                       getReplCoord()->awaitReplication(&txn, time2, writeConcern).status);
 
         // receive updatePosition containing ourself, should not process the update for self
@@ -1577,7 +1577,7 @@ namespace {
                                                 "optime" << time2.timestamp)))));
 
         ASSERT_OK(getReplCoord()->processReplSetUpdatePosition(args, 0));
-        ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit,
+        ASSERT_EQUALS(ErrorCodes::WriteConcernFailed,
                       getReplCoord()->awaitReplication(&txn, time2, writeConcern).status);
 
         // receive updatePosition with incorrect config version
@@ -1591,7 +1591,7 @@ namespace {
         long long cfgver;
         ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig,
                       getReplCoord()->processReplSetUpdatePosition(args2, &cfgver));
-        ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit,
+        ASSERT_EQUALS(ErrorCodes::WriteConcernFailed,
                       getReplCoord()->awaitReplication(&txn, time2, writeConcern).status);
 
         // receive updatePosition with nonexistent member id
@@ -1604,7 +1604,7 @@ namespace {
 
         ASSERT_EQUALS(ErrorCodes::NodeNotFound,
                       getReplCoord()->processReplSetUpdatePosition(args3, 0));
-        ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit,
+        ASSERT_EQUALS(ErrorCodes::WriteConcernFailed,
                       getReplCoord()->awaitReplication(&txn, time2, writeConcern).status);
 
         // receive a good update position
@@ -1802,7 +1802,7 @@ namespace {
         WriteConcernOptions writeConcern2;
         writeConcern2.wTimeout = WriteConcernOptions::kNoWaiting;
         writeConcern2.wMode = WriteConcernOptions::kMajority;
-        ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit,
+        ASSERT_EQUALS(ErrorCodes::WriteConcernFailed,
                       getReplCoord()->awaitReplication(&txn, time, writeConcern2).status);
 
         // reconfig to three nodes
@@ -1860,16 +1860,16 @@ namespace {
         majorityWriteConcern.wTimeout = WriteConcernOptions::kNoWaiting;
         majorityWriteConcern.wMode = WriteConcernOptions::kMajority;
 
-        ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit,
+        ASSERT_EQUALS(ErrorCodes::WriteConcernFailed,
                       getReplCoord()->awaitReplication(&txn, time, majorityWriteConcern).status);
 
         ASSERT_OK(getReplCoord()->setLastOptime_forTest(2, 1, time));
-        ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit,
+        ASSERT_EQUALS(ErrorCodes::WriteConcernFailed,
                       getReplCoord()->awaitReplication(&txn, time, majorityWriteConcern).status);
 
         // this member does not vote and as a result should not count towards write concern
         ASSERT_OK(getReplCoord()->setLastOptime_forTest(2, 3, time));
-        ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit,
+        ASSERT_EQUALS(ErrorCodes::WriteConcernFailed,
                       getReplCoord()->awaitReplication(&txn, time, majorityWriteConcern).status);
 
         ASSERT_OK(getReplCoord()->setLastOptime_forTest(2, 2, time));

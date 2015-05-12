@@ -2205,7 +2205,7 @@ namespace mongo {
                                             repl::ReplClientInfo::forClient(
                                                     txn->getClient()).getLastOp(),
                                             writeConcern);
-                            if (replStatus.status.code() == ErrorCodes::ExceededTimeLimit) {
+                            if (replStatus.status.code() == ErrorCodes::WriteConcernFailed) {
                                 warning() << "secondaryThrottle on, but doc insert timed out; "
                                              "continuing";
                             }

@@ -172,7 +172,9 @@ namespace repl {
          * been replicated to at least a set of nodes that satisfies the writeConcern, whichever
          * comes first. A writeConcern.wTimeout of 0 indicates no timeout (block forever) and a
          * writeConcern.wTimeout of -1 indicates return immediately after checking. Return codes:
-         * ErrorCodes::ExceededTimeLimit if the writeConcern.wTimeout is reached before
+         * ErrorCodes::WriteConcernFailed if the writeConcern.wTimeout is reached before
+         *     the data has been sufficiently replicated
+         * ErrorCodes::ExceededTimeLimit if the txn->getMaxTimeMicrosRemaining is reached before
          *     the data has been sufficiently replicated
          * ErrorCodes::NotMaster if the node is not Primary/Master
          * ErrorCodes::UnknownReplWriteConcern if the writeConcern.wMode contains a write concern
