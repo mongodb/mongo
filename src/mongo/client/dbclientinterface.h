@@ -38,6 +38,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/client/connection_string.h"
+#include "mongo/client/read_preference.h"
 #include "mongo/config.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/logger/log_severity.h"
@@ -137,10 +138,6 @@ namespace mongo {
         RemoveOption_Broadcast = 1 << 1
     };
 
-
-    /**
-     * need to put in DbMesssage::ReservedOptions as well
-     */
     enum InsertOptions {
         /** With muli-insert keep processing inserts if one fails */
         InsertOption_ContinueOnError = 1 << 0
@@ -165,53 +162,6 @@ namespace mongo {
         Reserved_FromWriteback = 1 << 1
     };
 
-    enum ReadPreference {
-        /**
-         * Read from primary only. All operations produce an error (throw an
-         * exception where applicable) if primary is unavailable. Cannot be
-         * combined with tags.
-         */
-        ReadPreference_PrimaryOnly = 0,
-
-        /**
-         * Read from primary if available, otherwise a secondary. Tags will
-         * only be applied in the event that the primary is unavailable and
-         * a secondary is read from. In this event only secondaries matching
-         * the tags provided would be read from.
-         */
-        ReadPreference_PrimaryPreferred,
-
-        /**
-         * Read from secondary if available, otherwise error.
-         */
-        ReadPreference_SecondaryOnly,
-
-        /**
-         * Read from a secondary if available, otherwise read from the primary.
-         */
-        ReadPreference_SecondaryPreferred,
-
-        /**
-         * Read from any member.
-         */
-        ReadPreference_Nearest,
-    };
-
-    class DBClientBase;
-    class DBClientConnection;
-
-    /**
-     * controls how much a clients cares about writes
-     * default is NORMAL
-     */
-    enum WriteConcern {
-        W_NONE = 0 , // TODO: not every connection type fully supports this
-        W_NORMAL = 1
-        // TODO SAFE = 2
-    };
-
-    class BSONObj;
-    class ScopedDbConnection;
     class DBClientCursor;
     class DBClientCursorBatchIterator;
 
@@ -958,22 +908,17 @@ namespace mongo {
     protected:
         static AtomicInt64 ConnectionIdSequence;
         long long _connectionId; // unique connection id for this connection
-        WriteConcern _writeConcern;
         int _minWireVersion;
         int _maxWireVersion;
     public:
         static const uint64_t INVALID_SOCK_CREATION_TIME;
 
         DBClientBase() {
-            _writeConcern = W_NORMAL;
             _connectionId = ConnectionIdSequence.fetchAndAdd(1);
             _minWireVersion = _maxWireVersion = 0;
         }
 
         long long getConnectionId() const { return _connectionId; }
-
-        WriteConcern getWriteConcern() const { return _writeConcern; }
-        void setWriteConcern( WriteConcern w ) { _writeConcern = w; }
 
         void setWireVersions( int minWireVersion, int maxWireVersion ){
             _minWireVersion = minWireVersion;

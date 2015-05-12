@@ -434,48 +434,44 @@ namespace mongo {
         _checkLast();
     }
 
-    void SyncClusterConnection::update( const string &ns , Query query , BSONObj obj , int flags ) {
-
+    void SyncClusterConnection::update(const string &ns, Query query, BSONObj obj, int flags) {
         if ( flags & UpdateOption_Upsert ) {
-            uassert( 13120 , "SyncClusterConnection::update upsert query needs _id" , query.obj["_id"].type() );
+            uassert(13120,
+                    "SyncClusterConnection::update upsert query needs _id",
+                    query.obj["_id"].type());
         }
 
-        if ( _writeConcern ) {
-            string errmsg;
-            if ( ! prepare( errmsg ) )
-                throw UserException( 8005 , (string)"SyncClusterConnection::update prepare failed: " + errmsg );
+        string errmsg;
+        if (!prepare(errmsg)) {
+            throw UserException(8005,
+                                str::stream() << "SyncClusterConnection::update prepare failed: "
+                                              << errmsg);
         }
 
-        for ( size_t i = 0; i < _conns.size(); i++ ) {
-            try {
-                _conns[i]->update( ns , query , obj , flags );
-            }
-            catch ( std::exception& e ) {
-                if ( _writeConcern )
-                    throw e;
-            }
+        for (size_t i = 0; i < _conns.size(); i++) {
+            _conns[i]->update(ns, query, obj, flags);
         }
 
-        if ( _writeConcern ) {
-            _checkLast();
-            verify( _lastErrors.size() > 1 );
+        _checkLast();
+        invariant(_lastErrors.size() > 1);
 
-            int a = _lastErrors[0]["n"].numberInt();
-            for ( unsigned i=1; i<_lastErrors.size(); i++ ) {
-                int b = _lastErrors[i]["n"].numberInt();
-                if ( a == b )
-                    continue;
+        const int a = _lastErrors[0]["n"].numberInt();
 
-                throw UpdateNotTheSame( 8017 , 
-                                        str::stream() 
-                                        << "update not consistent " 
-                                        << " ns: " << ns
-                                        << " query: " << query.toString()
-                                        << " update: " << obj
-                                        << " gle1: " << _lastErrors[0]
-                                        << " gle2: " << _lastErrors[i] ,
-                                        _connAddresses , _lastErrors );
-            }
+        for (unsigned i = 1; i < _lastErrors.size(); i++) {
+            int b = _lastErrors[i]["n"].numberInt();
+
+            if (a == b)
+                continue;
+
+            throw UpdateNotTheSame(8017,
+                                   str::stream() << "update not consistent "
+                                                 << " ns: " << ns
+                                                 << " query: " << query.toString()
+                                                 << " update: " << obj
+                                                 << " gle1: " << _lastErrors[0]
+                                                 << " gle2: " << _lastErrors[i],
+                                   _connAddresses,
+                                   _lastErrors);
         }
     }
 

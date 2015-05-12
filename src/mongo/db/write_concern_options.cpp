@@ -35,15 +35,31 @@ namespace mongo {
 
     using std::string;
 
+namespace {
+
+    /**
+     * Controls how much a client cares about writes and serves as initializer for the pre-defined
+     * write concern options.
+     *
+     * Default is NORMAL.
+     */
+    enum WriteConcern {
+        W_NONE = 0 ,
+        W_NORMAL = 1
+    };
+
+    const BSONField<bool> mongosSecondaryThrottleField("_secondaryThrottle", true);
+    const BSONField<bool> secondaryThrottleField("secondaryThrottle", true);
+    const BSONField<BSONObj> writeConcernField("writeConcern");
+
+} // namespace
+
     const BSONObj WriteConcernOptions::Default = BSONObj();
     const BSONObj WriteConcernOptions::Acknowledged(BSON("w" << W_NORMAL));
     const BSONObj WriteConcernOptions::Unacknowledged(BSON("w" << W_NONE));
 
     const char WriteConcernOptions::kMajority[] = "majority";
 
-    static const BSONField<bool> mongosSecondaryThrottleField("_secondaryThrottle", true);
-    static const BSONField<bool> secondaryThrottleField("secondaryThrottle", true);
-    static const BSONField<BSONObj> writeConcernField("writeConcern");
 
     WriteConcernOptions::WriteConcernOptions(int numNodes,
                                              SyncMode sync,

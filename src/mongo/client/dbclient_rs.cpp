@@ -1071,31 +1071,4 @@ namespace {
         _lastSlaveOkHost = HostAndPort();
     }
 
-    // trying to optimize for the common dont-care-about-tags case.
-    static const BSONArray tagsMatchesAll = BSON_ARRAY(BSONObj());
-    TagSet::TagSet() : _tags(tagsMatchesAll) {}
-
-    string readPrefToString( ReadPreference pref ) {
-        switch ( pref ) {
-        case ReadPreference_PrimaryOnly:
-            return "primary only";
-        case ReadPreference_PrimaryPreferred:
-            return "primary pref";
-        case ReadPreference_SecondaryOnly:
-            return "secondary only";
-        case ReadPreference_SecondaryPreferred:
-            return "secondary pref";
-        case ReadPreference_Nearest:
-            return "nearest";
-        default:
-            return "Unknown";
-        }
-    }
-
-    BSONObj ReadPreferenceSetting::toBSON() const {
-        BSONObjBuilder bob;
-        bob.append( "pref", readPrefToString( pref ) );
-        bob.append( "tags", tags.getTagBSON() );
-        return bob.obj();
-    }
 }
