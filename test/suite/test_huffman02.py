@@ -32,40 +32,31 @@ from wtscenario import multiply_scenarios, number_scenarios
 import wiredtiger, wttest
 
 # test_huffman02.py
-#    Huffman key and value configurations with bad settings
+#    Huffman key and value configurations test.
 class test_huffman02(wttest.WiredTigerTestCase, suite_subprocess):
-    """
-    Test basic operations
-    """
-    table_name = 'table:test_huff'
-
     huffkey = [
-        ('none', dict(huffkey=',huffman_key=none')),
-        ('english', dict(huffkey=',huffman_key=english')),
-        ('bad', dict(huffkey=',huffman_key=bad')),
+        ('bad', dict(keybad=1,huffkey=',huffman_key=bad')),
+        ('english', dict(keybad=0,huffkey=',huffman_key=english')),
+        ('none', dict(keybad=0,huffkey=',huffman_key=none')),
     ]
     huffval = [
-        ('bad', dict(huffval=',huffman_value=bad')),
+        ('bad', dict(valbad=1,huffval=',huffman_value=bad')),
+        ('english', dict(valbad=0,huffval=',huffman_value=english')),
+        ('none', dict(valbad=0,huffval=',huffman_value=english')),
     ]
     type = [
-        ('file', dict(type='type=file')),
-        ('lsm', dict(type='type=lsm')),
+        ('file', dict(uri='file:huff')),
+        ('table', dict(uri='table:huff')),
     ]
     scenarios = number_scenarios(multiply_scenarios('.',type,huffkey, huffval))
 
     def test_huffman(self):
-        gotException = False
-        expectMessage = 'nvalid argument'
-        config=self.type + self.huffkey + self.huffval
-        with self.expectedStderrPattern(expectMessage):
-            try:
-                self.pr('expect an error message...')
-                self.session.create(self.table_name, config)
-            except wiredtiger.WiredTigerError as e:
-                gotException = True
-                self.pr('got expected exception: ' + str(e))
-                self.assertTrue(str(e).find('nvalid argument') >= 0)
-        self.assertTrue(gotException, 'expected exception')
+        if self.keybad or self.valbad:
+            msg = '/Invalid argument/'
+            self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda:
+                self.session.create(self.uri, self.huffkey + self.huffval), msg)
+        else:
+            self.session.create(self.uri, self.huffkey + self.huffval)
 
 if __name__ == '__main__':
     wttest.run()

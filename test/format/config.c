@@ -444,8 +444,7 @@ config_single(const char *s, int perm)
 			config_map_file_type(ep, &g.type);
 			*cp->vstr = strdup(config_file_type(g.type));
 		} else {
-			if (*cp->vstr != NULL)
-				free(*cp->vstr);
+			free(*cp->vstr);
 			*cp->vstr = strdup(ep);
 		}
 		if (*cp->vstr == NULL)

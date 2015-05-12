@@ -35,8 +35,7 @@ util_drop(WT_SESSION *session, int argc, char *argv[])
 
 	ret = session->drop(session, name, "force");
 
-	if (name != NULL)
-		free(name);
+	free(name);
 	return (ret);
 }
 

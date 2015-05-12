@@ -1,5 +1,16 @@
 /*! @page upgrading Upgrading WiredTiger applications
 
+@section version_260 Upgrading to Version 2.6.0
+
+<dl>
+<dt>Statistic change</dt>
+<dd>
+The statistic "log read operations" was removed.  The function that
+used that statistic was never called inside WiredTiger and was also
+removed.
+</dd>
+
+</dl><hr>
 @section version_254 Upgrading to Version 2.5.4
 <dl>
 

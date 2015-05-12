@@ -112,6 +112,7 @@ struct __wt_btree {
 	u_int split_deepen_per_child;	/* Entries per child when deepened */
 	int   split_pct;		/* Split page percent */
 	WT_COMPRESSOR *compressor;	/* Page compressor */
+	WT_KEYED_ENCRYPTOR *kencryptor;	/* Page encryptor */
 	WT_RWLOCK *ovfl_lock;		/* Overflow lock */
 
 	uint64_t last_recno;		/* Column-store last record number */

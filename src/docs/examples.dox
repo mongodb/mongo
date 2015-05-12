@@ -15,6 +15,15 @@ Shows how to configure some properties of the database and tables.
 @example ex_cursor.c
 Shows some common cursor types and operations.
 
+@example ex_encrypt.c
+Shows how to extend WiredTiger with a simple encryption algorithm.
+
+@example nop_encrypt.c
+Shows the basic framework for building an encryptor as a plug in library.
+
+@example rotn_encrypt.c
+Shows a simple encryptor as a plug in library.
+
 @example ex_extending.c
 Shows how to extend WiredTiger with application-specific collations,
 extractors and cursor types.

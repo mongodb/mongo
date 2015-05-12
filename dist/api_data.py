@@ -20,10 +20,8 @@ common_meta = [
     Config('app_metadata', '', r'''
         application-owned metadata for this object'''),
     Config('collator', 'none', r'''
-        configure custom collation for keys.  Permitted values are
-        \c "none" or a custom collator name created with
-        WT_CONNECTION::add_collator''',
-        func='__wt_collator_confchk'),
+        configure custom collation for keys.  Permitted values are \c "none"
+        or a custom collator name created with WT_CONNECTION::add_collator'''),
     Config('columns', '', r'''
         list of the column names.  Comma-separated list of the form
         <code>(column[,...])</code>.  For tables, the number of entries
@@ -139,8 +137,7 @@ file_config = format_meta + [
         or custom compression engine name created with
         WT_CONNECTION::add_compressor.  If WiredTiger has builtin support for
         \c "bzip2", \c "snappy", \c "lz4" or \c "zlib" compression, these names
-        are also available.  See @ref compression for more information''',
-        func='__wt_compressor_confchk'),
+        are also available.  See @ref compression for more information'''),
     Config('cache_resident', 'false', r'''
         do not ever evict the object's pages from cache. Not compatible with
         LSM tables; see @ref tuning_cache_resident for more information''',
@@ -158,19 +155,34 @@ file_config = format_meta + [
         row-store leaf page value dictionary; see
         @ref file_formats_compression for more information''',
         min='0'),
+    Config('encryption', '', r'''
+        configure an encryptor for file blocks. When a table is created,
+        its encryptor is not implicitly used for any related indices
+        or column groups''',
+        type='category', subconfig=[
+        Config('name', 'none', r'''
+            Permitted values are \c "none"
+            or custom encryption engine name created with
+            WT_CONNECTION::add_encryptor.
+            See @ref encryption for more information'''),
+        Config('keyid', '', r'''
+            An identifier that identifies a unique instance of the encryptor.
+            It is stored in clear text, and thus is available when
+            the wiredtiger database is reopened.  On the first use
+            of a (name, keyid) combination, the WT_ENCRYPTOR::customize
+            function is called with the keyid as an argument.'''),
+        ]),
     Config('format', 'btree', r'''
         the file format''',
         choices=['btree']),
     Config('huffman_key', 'none', r'''
         configure Huffman encoding for keys.  Permitted values are
         \c "none", \c "english", \c "utf8<file>" or \c "utf16<file>".
-        See @ref huffman for more information''',
-        func='__wt_huffman_confchk'),
+        See @ref huffman for more information'''),
     Config('huffman_value', 'none', r'''
         configure Huffman encoding for values.  Permitted values are
         \c "none", \c "english", \c "utf8<file>" or \c "utf16<file>".
-        See @ref huffman for more information''',
-        func='__wt_huffman_confchk'),
+        See @ref huffman for more information'''),
     Config('internal_key_truncate', 'true', r'''
         configure internal key truncation, discarding unnecessary
         trailing bytes on internal keys (ignored for custom
@@ -291,8 +303,7 @@ index_only_config = [
     Config('extractor', 'none', r'''
         configure custom extractor for indices.  Permitted values are
         \c "none" or an extractor name created with
-        WT_CONNECTION::add_extractor''',
-        func='__wt_extractor_confchk'),
+        WT_CONNECTION::add_extractor'''),
     Config('immutable', 'false', r'''
         configure the index to be immutable - that is an index is not changed
         by any update to a record in the table''', type='boolean'),
@@ -536,6 +547,31 @@ common_wiredtiger_open = [
         WiredTiger data files opened at a checkpoint (i.e: read only) to
         use \c O_DIRECT''',
         type='list', choices=['checkpoint', 'data', 'log']),
+    Config('encryption', '', r'''
+        configure an encryptor for system wide metadata and logs.
+        If a system wide encryptor is set, it is also used for
+        encrypting data files and tables, unless encryption configuration
+        is explicitly set for them when they are created with
+        WT_SESSION::create''',
+        type='category', subconfig=[
+        Config('name', 'none', r'''
+            Permitted values are \c "none"
+            or custom encryption engine name created with
+            WT_CONNECTION::add_encryptor.
+            See @ref encryption for more information'''),
+        Config('keyid', '', r'''
+            An identifier that identifies a unique instance of the encryptor.
+            It is stored in clear text, and thus is available when
+            the wiredtiger database is reopened.  On the first use
+            of a (name, keyid) combination, the WT_ENCRYPTOR::customize
+            function is called with the keyid as an argument.'''),
+        Config('secretkey', '', r'''
+            A string that is passed to the WT_ENCRYPTOR::customize function.
+            It is never stored in clear text, so must be given to any
+            subsequent wiredtiger_open calls to reopen the database.
+            It must also be provided to any "wt" commands used with
+            this database.'''),
+        ]),
     Config('extensions', '', r'''
         list of shared library extensions to load (using dlopen).
         Any values specified to an library extension are passed to
@@ -824,6 +860,7 @@ methods = {
 'WT_CONNECTION.add_collator' : Method([]),
 'WT_CONNECTION.add_compressor' : Method([]),
 'WT_CONNECTION.add_data_source' : Method([]),
+'WT_CONNECTION.add_encryptor' : Method([]),
 'WT_CONNECTION.add_extractor' : Method([]),
 'WT_CONNECTION.async_new_op' : Method([
     Config('append', 'false', r'''

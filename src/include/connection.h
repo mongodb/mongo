@@ -6,6 +6,12 @@
  * See the file LICENSE for redistribution information.
  */
 
+/*
+ * Default hash table size; use a prime number of buckets rather than assuming
+ * a good hash (Reference Sedgewick, Algorithms in C, "Hash Functions").
+ */
+#define	WT_HASH_ARRAY_SIZE	509
+
 /*******************************************
  * Global per-process structure.
  *******************************************/
@@ -21,6 +27,20 @@ struct __wt_process {
 	WT_CACHE_POOL *cache_pool;
 };
 extern WT_PROCESS __wt_process;
+
+/*
+ * WT_KEYED_ENCRYPTOR --
+ *	An list entry for an encryptor with a unique (name, keyid).
+ */
+struct __wt_keyed_encryptor {
+	const char *keyid;		/* Key id of encryptor */
+	int owned;			/* Encryptor needs to be terminated */
+	size_t size_const;		/* The result of the sizing callback */
+	WT_ENCRYPTOR *encryptor;	/* User supplied callbacks */
+					/* Linked list of encryptors */
+	SLIST_ENTRY(__wt_keyed_encryptor) hashl;
+	SLIST_ENTRY(__wt_keyed_encryptor) l;
+};
 
 /*
  * WT_NAMED_COLLATOR --
@@ -52,6 +72,21 @@ struct __wt_named_data_source {
 	WT_DATA_SOURCE *dsrc;		/* User supplied callbacks */
 					/* Linked list of data sources */
 	TAILQ_ENTRY(__wt_named_data_source) q;
+};
+
+/*
+ * WT_NAMED_ENCRYPTOR --
+ *	An encryptor list entry
+ */
+struct __wt_named_encryptor {
+	const char *name;		/* Name of encryptor */
+	WT_ENCRYPTOR *encryptor;	/* User supplied callbacks */
+					/* Locked: list of encryptors by key */
+	SLIST_HEAD(__wt_keyedhash, __wt_keyed_encryptor)
+				keyedhashlh[WT_HASH_ARRAY_SIZE];
+	SLIST_HEAD(__wt_keyed_lh, __wt_keyed_encryptor) keyedlh;
+					/* Linked list of encryptors */
+	TAILQ_ENTRY(__wt_named_encryptor) q;
 };
 
 /*
@@ -122,12 +157,6 @@ struct __wt_named_extractor {
 	SLIST_REMOVE(&(conn)->fhlh, fh, __wt_fh, l);			\
 	SLIST_REMOVE(&(conn)->fhhash[bucket], fh, __wt_fh, hashl);	\
 } while (0)
-
-/*
- * Default hash table size; use a prime number of buckets rather than assuming
- * a good hash (Reference Sedgewick, Algorithms in C, "Hash Functions").
- */
-#define	WT_HASH_ARRAY_SIZE	509
 
 /*
  * WT_CONNECTION_IMPL --
@@ -268,6 +297,8 @@ struct __wt_connection_impl {
 
 	WT_LSM_MANAGER	lsm_manager;	/* LSM worker thread information */
 
+	WT_KEYED_ENCRYPTOR *kencryptor;	/* Encryptor for metadata and log */
+
 	WT_SESSION_IMPL *evict_session; /* Eviction server sessions */
 	wt_thread_t	 evict_tid;	/* Eviction server thread ID */
 	int		 evict_tid_set;	/* Eviction server thread ID set */
@@ -330,6 +361,10 @@ struct __wt_connection_impl {
 
 					/* Locked: data source list */
 	TAILQ_HEAD(__wt_dsrc_qh, __wt_named_data_source) dsrcqh;
+
+					/* Locked: encryptor list */
+	WT_SPINLOCK encryptor_lock;	/* Encryptor list lock */
+	TAILQ_HEAD(__wt_encrypt_qh, __wt_named_encryptor) encryptqh;
 
 					/* Locked: extractor list */
 	TAILQ_HEAD(__wt_extractor_qh, __wt_named_extractor) extractorqh;
