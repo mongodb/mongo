@@ -997,12 +997,13 @@ fake:	/*
 	 * Update the object's metadata.
 	 *
 	 * If the object is the metadata, the call to __wt_meta_ckptlist_set
-	 * will update the turtle file.  We need to make sure the metadata is
-	 * on disk before the turtle file is changed.
+	 * will update the turtle file and swap the new one into place.  We
+	 * need to make sure the metadata is on disk before the turtle file is
+	 * updated.
 	 */
-	if (F_ISSET(conn, WT_CONN_CKPT_SYNC) &&
-	    strcmp(dhandle->name, WT_METAFILE_URI) == 0)
+	if (F_ISSET(conn, WT_CONN_CKPT_SYNC) && WT_IS_METADATA(dhandle))
 		WT_ERR(__wt_checkpoint_sync(session, NULL));
+
 	WT_ERR(__wt_meta_ckptlist_set(
 	    session, dhandle->name, ckptbase, &ckptlsn));
 
