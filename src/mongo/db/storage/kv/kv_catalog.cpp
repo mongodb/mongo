@@ -36,6 +36,7 @@
 #include <stdlib.h>
 
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -122,7 +123,7 @@ namespace {
         // If this changes to not put _rand at the end, _hasEntryCollidingWithRand will need fixing.
         StringBuilder buf;
         if ( _directoryPerDb ) {
-            buf << nsToDatabaseSubstring( ns ) << '/';
+            buf << NamespaceString::escapeDbName( nsToDatabaseSubstring( ns ) ) << '/';
         }
         buf << kind;
         buf << ( _directoryForIndexes ? '/' : '-' );

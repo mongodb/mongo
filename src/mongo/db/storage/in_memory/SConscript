@@ -22,6 +22,7 @@ env.Library(
     LIBDEPS= [
         'in_memory_record_store',
         '$BUILD_DIR/mongo/bson/bson',
+        '$BUILD_DIR/mongo/db/namespace_string',
         '$BUILD_DIR/mongo/db/catalog/collection_options',
         '$BUILD_DIR/mongo/db/index/index_descriptor',
         '$BUILD_DIR/mongo/db/storage/index_entry_comparison',
