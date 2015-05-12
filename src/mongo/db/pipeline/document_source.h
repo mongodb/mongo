@@ -567,6 +567,7 @@ namespace mongo {
         virtual const char *getSourceName() const;
         virtual bool coalesce(const boost::intrusive_ptr<DocumentSource>& nextSource);
         virtual Value serialize(bool explain = false) const;
+        virtual boost::intrusive_ptr<DocumentSource> optimize();
         virtual void setSource(DocumentSource* Source);
 
         /**

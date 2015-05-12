@@ -53,6 +53,10 @@ namespace mongo {
         return Value(DOC(getSourceName() << Document(getQuery())));
     }
 
+    intrusive_ptr<DocumentSource> DocumentSourceMatch::optimize() {
+        return getQuery().isEmpty() ? nullptr : this;
+    }
+
     boost::optional<Document> DocumentSourceMatch::getNext() {
         pExpCtx->checkForInterrupt();
 

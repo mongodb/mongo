@@ -97,13 +97,34 @@ namespace PipelineTests {
                 }
             };
 
-            class RemoveSkipZeroKeepProject : public Base {
+            class RemoveEmptyMatch : public Base {
                 string inputPipeJson() override {
-                    return "[{$skip: 0}, {$project: {i: true}}]";
+                    return "[{$match: {}}]";
                 }
 
                 string outputPipeJson() override {
-                    return "[{$project: {i: true}}]";
+                    return "[]";
+                }
+            };
+
+            class RemoveMultipleEmptyMatches : public Base {
+                string inputPipeJson() override {
+                    return "[{$match: {}}, {$match: {}}]";
+                }
+
+                string outputPipeJson() override {
+                    // TODO: The desired behavior here is to end up with an empty array.
+                    return "[{$match: {$and: [{}, {}]}}]";
+                }
+            };
+
+            class DoNotRemoveNonEmptyMatch : public Base {
+                string inputPipeJson() override {
+                    return "[{$match: {_id: 1}}]";
+                }
+
+                string outputPipeJson() override {
+                    return "[{$match: {_id: 1}}]";
                 }
             };
 
@@ -278,7 +299,9 @@ namespace PipelineTests {
         void setupTests() {
             add<Optimizations::Local::RemoveSkipZero>();
             add<Optimizations::Local::DoNotRemoveSkipOne>();
-            add<Optimizations::Local::RemoveSkipZeroKeepProject>();
+            add<Optimizations::Local::RemoveEmptyMatch>();
+            add<Optimizations::Local::RemoveMultipleEmptyMatches>();
+            add<Optimizations::Local::DoNotRemoveNonEmptyMatch>();
             add<Optimizations::Sharded::Empty>();
             add<Optimizations::Sharded::moveFinalUnwindFromShardsToMerger::OneUnwind>();
             add<Optimizations::Sharded::moveFinalUnwindFromShardsToMerger::TwoUnwind>();
