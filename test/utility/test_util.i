@@ -112,7 +112,7 @@ testutil_clean_work_dir(char *dir)
 
 	snprintf(buffer, inputSize, "%s%s", RM_COMMAND, dir);
 
-	if( stat( dir, &info ) == 0 )
+	if ( stat( dir, &info ) == 0 )
 		if ((ret = system(buffer)) != 0)
 			testutil_die(ret,
 			    "System call to remove directory failed");
