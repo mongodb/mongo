@@ -31,6 +31,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <wiredtiger.h>
+#include "wt_internal.h"			/* For __wt_XXX */
 
 #ifdef _WIN32
 #include "windows_shim.h"
@@ -101,9 +102,8 @@ static inline void
 testutil_clean_work_dir(char *dir)
 {
 	size_t inputSize;
-	int ret;
+	int ret, existp;
 	char *buffer;
-	struct stat info;
 
 	/* Additional bytes for the Windows rd command. */
 	inputSize = strlen(dir) + sizeof(RM_COMMAND);
@@ -112,7 +112,11 @@ testutil_clean_work_dir(char *dir)
 
 	snprintf(buffer, inputSize, "%s%s", RM_COMMAND, dir);
 
-	if ( stat( dir, &info ) == 0 )
+	existp = 0;
+	if ( __wt_exist(NULL, dir, &existp) != 0 )
+		testutil_die(existp,
+			    "Unable to check if directory exists");
+	if (existp == 1)
 		if ((ret = system(buffer)) != 0)
 			testutil_die(ret,
 			    "System call to remove directory failed");

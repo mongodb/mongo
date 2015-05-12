@@ -38,8 +38,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "wt_internal.h"			/* For __wt_XXX */
-#include "test_util.i"
+	#include "test_util.i"
 
 #define	FNAME		"file:wt.%03d"		/* File name */
 #define	FNAME_STAT	"__stats"		/* File name for statistics */
