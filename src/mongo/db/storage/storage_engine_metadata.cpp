@@ -268,9 +268,10 @@ namespace {
             return Status::OK();
         }
         return Status(ErrorCodes::InvalidOptions, str::stream()
-            << "Metadata contains unexpected value storage engine option for " << fieldName
-            << "Expected " << (expectedValue ? "true" : "false") << " but got "
-            << (element.boolean() ? "true" : "false") << "instead");
+                      << "Requested option conflicts with current storage engine option for "
+                      << fieldName << "; you requested " << (expectedValue ? "true" : "false")
+                      << " but the current server storage is already set to "
+                      << (element.boolean() ? "true" : "false") << " and cannot be changed");
     }
 
 }  // namespace mongo
