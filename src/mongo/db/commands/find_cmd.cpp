@@ -295,14 +295,19 @@ namespace mongo {
             PlanExecutor* exec = cursor->getExecutor();
 
             // 5) Stream query results, adding them to a BSONArray as we go.
-            //
-            // TODO: Handle result sets larger than 16MB.
             BSONArrayBuilder firstBatch;
             BSONObj obj;
             PlanExecutor::ExecState state;
             int numResults = 0;
             while (!enoughForFirstBatch(pq, numResults, firstBatch.len())
                     && PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL))) {
+                // If adding this object will cause us to exceed the BSON size limit, then we stash
+                // it for later.
+                if (firstBatch.len() + obj.objsize() > BSONObjMaxUserSize && numResults > 0) {
+                    exec->enqueue(obj);
+                    break;
+                }
+
                 // Add result to output buffer.
                 firstBatch.append(obj);
                 numResults++;

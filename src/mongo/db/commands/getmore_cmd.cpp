@@ -54,8 +54,8 @@
 namespace mongo {
 
     /**
-     * A command for running getMore() against an existing cursor registered with a
-     * CursorManager.
+     * A command for running getMore() against an existing cursor registered with a CursorManager.
+     * Used to generate the next batch of results for a ClientCursor.
      *
      * Can be used in combination with any cursor-generating command (e.g. find, aggregate,
      * listIndexes).
@@ -101,11 +101,6 @@ namespace mongo {
                                                                           request.cursorid);
         }
 
-        /**
-         * Generates the next batch of results for a ClientCursor.
-         *
-         * TODO: Do we need to support some equivalent of OP_REPLY responseFlags?
-         */
         bool run(OperationContext* txn,
                  const std::string& dbname,
                  BSONObj& cmdObj,
@@ -339,11 +334,16 @@ namespace mongo {
             // If an awaitData getMore is killed during this process due to our max time expiring at
             // an interrupt point, we just continue as normal and return rather than reporting a
             // timeout to the user.
-            //
-            // TODO: Handle result sets larger than 16MB.
             BSONObj obj;
             try {
                 while (PlanExecutor::ADVANCED == (*state = exec->getNext(&obj, NULL))) {
+                    // If adding this object will cause us to exceed the BSON size limit, then we
+                    // stash it for later.
+                    if (nextBatch->len() + obj.objsize() > BSONObjMaxUserSize && *numResults > 0) {
+                        exec->enqueue(obj);
+                        break;
+                    }
+
                     // Add result to output buffer.
                     nextBatch->append(obj);
                     (*numResults)++;

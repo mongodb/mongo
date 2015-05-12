@@ -312,14 +312,21 @@ namespace mongo {
 
     PlanExecutor::ExecState PlanExecutor::getNextSnapshotted(Snapshotted<BSONObj>* objOut,
                                                              RecordId* dlOut) {
-        if (killed()) { 
+        if (killed()) {
             if (NULL != objOut) {
                 Status status(ErrorCodes::OperationFailed,
                               str::stream() << "Operation aborted because: " << *_killReason);
                 *objOut = Snapshotted<BSONObj>(SnapshotId(),
                                                WorkingSetCommon::buildMemberStatusObject(status));
             }
-            return PlanExecutor::DEAD; 
+            return PlanExecutor::DEAD;
+        }
+
+        if (!_stash.empty()) {
+            invariant(objOut && !dlOut);
+            *objOut = {SnapshotId(), _stash.front()};
+            _stash.pop();
+            return PlanExecutor::ADVANCED;
         }
 
         // When a stage requests a yield for document fetch, it gives us back a RecordFetcher*
@@ -342,8 +349,8 @@ namespace mongo {
 
                 if (killed()) {
                     if (NULL != objOut) {
-                        Status status(ErrorCodes::OperationFailed, 
-                                      str::stream() << "Operation aborted because: " 
+                        Status status(ErrorCodes::OperationFailed,
+                                      str::stream() << "Operation aborted because: "
                                                     << *_killReason);
                         *objOut = Snapshotted<BSONObj>(
                             SnapshotId(),
@@ -460,7 +467,7 @@ namespace mongo {
     }
 
     bool PlanExecutor::isEOF() {
-        return killed() || _root->isEOF();
+        return killed() || (_stash.empty() && _root->isEOF());
     }
 
     void PlanExecutor::registerExec() {
@@ -535,6 +542,10 @@ namespace mongo {
                 this->registerExec();
             }
         }
+    }
+
+    void PlanExecutor::enqueue(const BSONObj& obj) {
+        _stash.push(obj.getOwned());
     }
 
     //
