@@ -42,7 +42,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/storage_engine.h"
-#include "mongo/util/file_allocator.h"
 #include "mongo/util/log.h"
 
 namespace mongo {

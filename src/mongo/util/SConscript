@@ -299,18 +299,6 @@ env.Library(
 )
 
 env.Library(
-    target='mmap',
-    source=[
-        'mmap.cpp',
-        'mmap_${TARGET_OS_FAMILY}.cpp',
-    ],
-    LIBDEPS=[
-        'foundation',
-        'file_allocator',
-    ],
-)
-
-env.Library(
     target='elapsed_tracker',
     source=[
         'elapsed_tracker.cpp',
@@ -412,48 +400,6 @@ env.CppUnitTest(
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson/bson',
         'foundation',
-    ],
-)
-
-compressEnv = env.Clone()
-compressEnv.InjectThirdPartyIncludePaths(libraries=['snappy'])
-compressEnv
-compressEnv.Library(
-    target='compress',
-    source=[
-        'compress.cpp',
-    ],
-    LIBDEPS=[
-        'paths',
-    ],
-)
-
-env.Library(
-    target='logfile',
-    source=[
-        'logfile.cpp',
-    ],
-    LIBDEPS=[
-        'paths',
-    ],
-)
-
-env.Library(
-    target='file_allocator',
-    source=[
-        'file_allocator.cpp',
-    ],
-    LIBDEPS=[
-        'paths',
-    ],
-)
-
-env.Library(
-    target='paths',
-    source=[
-        'paths.cpp',
-    ],
-    LIBDEPS=[
     ],
 )
 

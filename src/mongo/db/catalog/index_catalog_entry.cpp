@@ -43,7 +43,6 @@
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/util/file_allocator.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 

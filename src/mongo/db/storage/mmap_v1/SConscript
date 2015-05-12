@@ -33,12 +33,25 @@ env.Library(
         'record_store_v1',
         'record_access_tracker',
         'btree',
-        '$BUILD_DIR/mongo/util/logfile',
-        '$BUILD_DIR/mongo/util/compress',
-        '$BUILD_DIR/mongo/util/file_allocator',
-        '$BUILD_DIR/mongo/util/paths',
+        'file_allocator',
+        'logfile',
+        'compress',
+        '$BUILD_DIR/mongo/db/storage/paths',
     ]
     )
+
+compressEnv = env.Clone()
+compressEnv.InjectThirdPartyIncludePaths(libraries=['snappy'])
+compressEnv
+compressEnv.Library(
+    target='compress',
+    source=[
+        'compress.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/storage/paths',
+    ],
+)
 
 env.Library(
     target= 'extent',
@@ -51,6 +64,38 @@ env.Library(
         '$BUILD_DIR/mongo/util/foundation',
         ]
     )
+
+env.Library(
+    target='file_allocator',
+    source=[
+        'file_allocator.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/storage/paths',
+    ],
+)
+
+env.Library(
+    target='logfile',
+    source=[
+        'logfile.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/storage/paths',
+    ],
+)
+
+env.Library(
+    target='mmap',
+    source=[
+        'mmap.cpp',
+        'mmap_${TARGET_OS_FAMILY}.cpp',
+    ],
+    LIBDEPS=[
+        'file_allocator',
+        '$BUILD_DIR/mongo/util/foundation',
+    ],
+)
 
 env.Library(
     target= 'record_store_v1',
@@ -162,7 +207,7 @@ env.Library(
         ],
     LIBDEPS= [
         'btree',
-        '$BUILD_DIR/mongo/db/storage/mmap_v1/record_store_v1_test_help',
+        'record_store_v1_test_help',
         ]
     )
 

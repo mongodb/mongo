@@ -49,6 +49,15 @@ env.Library(
     )
 
 env.Library(
+    target='paths',
+    source=[
+        'paths.cpp',
+    ],
+    LIBDEPS=[
+    ],
+)
+
+env.Library(
     target='sorted_data_interface_test_harness',
     source=[
         'sorted_data_interface_test_bulkbuilder.cpp',
@@ -104,7 +113,7 @@ env.Library(
         'storage_engine_lock_file_${TARGET_OS_FAMILY}.cpp',
         ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/util/paths',
+        'paths',
         ]
     )
 

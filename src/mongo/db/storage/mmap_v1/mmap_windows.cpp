@@ -31,10 +31,10 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/util/mmap.h"
+#include "mongo/db/storage/mmap_v1/mmap.h"
 
 #include "mongo/db/storage/mmap_v1/durable_mapped_file.h"
-#include "mongo/util/file_allocator.h"
+#include "mongo/db/storage/mmap_v1/file_allocator.h"
 #include "mongo/util/log.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/text.h"

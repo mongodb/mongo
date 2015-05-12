@@ -29,7 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/util/paths.h"
+#include "mongo/db/storage/paths.h"
 
 #include "mongo/util/log.h"
 

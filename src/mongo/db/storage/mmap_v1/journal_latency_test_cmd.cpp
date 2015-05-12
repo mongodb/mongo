@@ -46,10 +46,10 @@
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/db/storage/mmap_v1/aligned_builder.h"
+#include "mongo/db/storage/mmap_v1/logfile.h"
+#include "mongo/db/storage/paths.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/background.h"
-#include "mongo/util/logfile.h"
-#include "mongo/util/paths.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {

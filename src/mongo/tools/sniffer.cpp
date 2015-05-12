@@ -67,7 +67,7 @@
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/util/net/message.h"
-#include "mongo/util/mmap.h"
+#include "mongo/db/storage/mmap_v1/mmap.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/text.h"
 

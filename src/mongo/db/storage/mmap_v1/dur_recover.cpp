@@ -40,6 +40,7 @@
 #include <sys/stat.h>
 
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/db/storage/mmap_v1/compress.h"
 #include "mongo/db/storage/mmap_v1/dur_commitjob.h"
 #include "mongo/db/storage/mmap_v1/dur_journal.h"
 #include "mongo/db/storage/mmap_v1/dur_journalformat.h"
@@ -49,7 +50,6 @@
 #include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
 #include "mongo/util/bufreader.h"
 #include "mongo/util/checksum.h"
-#include "mongo/util/compress.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/log.h"

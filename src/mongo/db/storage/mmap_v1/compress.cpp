@@ -30,7 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/util/compress.h"
+#include "mongo/db/storage/mmap_v1/compress.h"
 
 #include <snappy.h>
 

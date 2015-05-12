@@ -31,7 +31,7 @@
 #pragma once
 
 #include "mongo/db/storage/mmap_v1/dur_journalformat.h"
-#include "mongo/util/logfile.h"
+#include "mongo/db/storage/mmap_v1/logfile.h"
 
 namespace mongo {
     namespace dur {

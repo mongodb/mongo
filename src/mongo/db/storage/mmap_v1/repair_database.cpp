@@ -46,12 +46,12 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
+#include "mongo/db/storage/mmap_v1/mmap.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_database_catalog_entry.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
 #include "mongo/util/file.h"
-#include "mongo/util/file_allocator.h"
+#include "mongo/db/storage/mmap_v1/file_allocator.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mmap.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {

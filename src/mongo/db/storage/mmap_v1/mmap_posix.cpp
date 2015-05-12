@@ -39,9 +39,9 @@
 
 #include "mongo/platform/atomic_word.h"
 #include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/util/file_allocator.h"
+#include "mongo/db/storage/mmap_v1/file_allocator.h"
+#include "mongo/db/storage/mmap_v1/mmap.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mmap.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/startup_test.h"

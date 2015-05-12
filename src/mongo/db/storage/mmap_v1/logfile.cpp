@@ -32,12 +32,13 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/util/logfile.h"
+#include "mongo/db/storage/mmap_v1/logfile.h"
 
+#include "mongo/db/storage/mmap_v1/mmap.h"
+#include "mongo/db/storage/paths.h"
 #include "mongo/platform/posix_fadvise.h"
 #include "mongo/util/allocator.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mmap.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/startup_test.h"
 #include "mongo/util/text.h"
@@ -138,7 +139,6 @@ namespace mongo {
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include "paths.h"
 #include <sys/ioctl.h>
 
 #ifdef __linux__

@@ -43,6 +43,7 @@
 #include "mongo/db/storage/mmap_v1/record.h"
 #include "mongo/db/storage/mmap_v1/extent.h"
 #include "mongo/db/storage/mmap_v1/extent_manager.h"
+#include "mongo/db/storage/mmap_v1/mmap.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_engine.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
 #include "mongo/db/storage/record_fetcher.h"
@@ -50,7 +51,6 @@
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/file.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mmap.h"
 
 namespace mongo {
 

@@ -46,10 +46,10 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
+#include "mongo/db/storage/mmap_v1/mmap.h"
+#include "mongo/db/storage/mmap_v1/logfile.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/allocator.h"
-#include "mongo/util/logfile.h"
-#include "mongo/util/mmap.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"

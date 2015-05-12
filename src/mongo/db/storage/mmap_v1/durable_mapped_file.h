@@ -31,8 +31,8 @@
 
 #pragma once
 
-#include "mongo/util/mmap.h"
-#include "mongo/util/paths.h"
+#include "mongo/db/storage/mmap_v1/mmap.h"
+#include "mongo/db/storage/paths.h"
 
 namespace mongo {
 

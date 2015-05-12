@@ -31,7 +31,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/util/file_allocator.h"
+#include "mongo/db/storage/mmap_v1/file_allocator.h"
 
 #include <boost/thread.hpp>
 #include <boost/filesystem/operations.hpp>
@@ -51,6 +51,7 @@
 #   include <io.h>
 #endif
 
+#include "mongo/db/storage/paths.h"
 #include "mongo/platform/posix_fadvise.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/concurrency/thread_name.h"
@@ -58,7 +59,6 @@
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
-#include "mongo/util/paths.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"

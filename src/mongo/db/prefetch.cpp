@@ -43,8 +43,8 @@
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/stats/timer_stats.h"
+#include "mongo/db/storage/mmap_v1/mmap.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mmap.h"
 
 namespace mongo {
 

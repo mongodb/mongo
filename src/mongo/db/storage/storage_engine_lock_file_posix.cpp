@@ -41,9 +41,9 @@
 #include <unistd.h>
 #include <sstream>
 
+#include "mongo/db/storage/paths.h"
 #include "mongo/platform/process_id.h"
 #include "mongo/util/log.h"
-#include "mongo/util/paths.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {

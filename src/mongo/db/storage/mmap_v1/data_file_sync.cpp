@@ -35,11 +35,11 @@
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/instance.h"
+#include "mongo/db/storage/mmap_v1/mmap.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mmap.h"
 
 namespace mongo {
 

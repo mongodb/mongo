@@ -31,7 +31,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/util/mmap.h"
+#include "mongo/db/storage/mmap_v1/mmap.h"
 
 #include <boost/filesystem/operations.hpp>
 
