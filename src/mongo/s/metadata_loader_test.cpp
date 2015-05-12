@@ -83,7 +83,7 @@ namespace {
         MockConnRegistry::get()->addServer( &dummyConfig );
 
         CollectionType collInfo;
-        collInfo.setNs( "test.foo" );
+        collInfo.setNs(NamespaceString{"test.foo"});
         collInfo.setKeyPattern(BSON("a" << 1));
         collInfo.setUpdatedAt( 0 );
         collInfo.setEpoch( OID() );
@@ -158,7 +158,7 @@ namespace {
         MockConnRegistry::get()->addServer( &dummyConfig );
 
         CollectionType collInfo;
-        collInfo.setNs( "test.foo" );
+        collInfo.setNs(NamespaceString{"test.foo"});
         collInfo.setUpdatedAt(1ULL);
         collInfo.setKeyPattern( BSON("a" << 1) );
         collInfo.setEpoch( OID::gen() );
@@ -167,7 +167,7 @@ namespace {
         dummyConfig.insert( CollectionType::ConfigNS, collInfo.toBSON() );
 
         ChunkType chunkInfo;
-        chunkInfo.setNS( "test.foo" );
+        chunkInfo.setNS(NamespaceString{"test.foo"});
         chunkInfo.setVersion( ChunkVersion( 1, 0, collInfo.getEpoch() ) );
         ASSERT(!chunkInfo.validate().isOK());
 
@@ -201,7 +201,7 @@ namespace {
             OID epoch = OID::gen();
 
             CollectionType collType;
-            collType.setNs("test.foo");
+            collType.setNs(NamespaceString{"test.foo"});
             collType.setKeyPattern(BSON("a" << 1));
             collType.setUnique(false);
             collType.setUpdatedAt(1ULL);
@@ -244,7 +244,7 @@ namespace {
             OID epoch = OID::gen();
 
             CollectionType collType;
-            collType.setNs( "test.foo" );
+            collType.setNs(NamespaceString{"test.foo"});
             collType.setKeyPattern( BSON("a" << 1) );
             collType.setUnique( false );
             collType.setUpdatedAt( 1ULL );
@@ -311,7 +311,7 @@ namespace {
             _maxCollVersion = ChunkVersion( 1, 0, epoch );
 
             CollectionType collType;
-            collType.setNs("test.foo");
+            collType.setNs(NamespaceString{"test.foo"});
             collType.setKeyPattern(BSON("a" << 1));
             collType.setUnique(false);
             collType.setUpdatedAt(1ULL);
@@ -461,7 +461,7 @@ namespace {
             _dummyConfig->remove( ChunkType::ConfigNS, BSONObj() );
 
             CollectionType coll;
-            coll.setNs( ns );
+            coll.setNs(NamespaceString{ns});
             coll.setKeyPattern( BSON( "a" << 1 ) );
             coll.setUpdatedAt( 1ULL );
             coll.setEpoch( epoch );

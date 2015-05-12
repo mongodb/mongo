@@ -130,7 +130,7 @@ namespace mongo {
 
     void CollectionInfo::save(const string& ns) {
         CollectionType coll;
-        coll.setNs(ns);
+        coll.setNs(NamespaceString{ns});
 
         if (_cm) {
             invariant(!_dropped);

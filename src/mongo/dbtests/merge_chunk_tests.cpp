@@ -64,7 +64,7 @@ namespace mongo {
             ASSERT_GREATER_THAN( ranges.size(), 0u );
 
             CollectionType coll;
-            coll.setNs( nss.ns() );
+            coll.setNs(nss);
             coll.setKeyPattern( ranges.begin()->keyPattern );
             coll.setEpoch( startVersion.epoch() );
             coll.setUpdatedAt( 1ULL );

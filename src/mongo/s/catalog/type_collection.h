@@ -32,6 +32,7 @@
 #include <string>
 
 #include "mongo/db/jsobj.h"
+#include "mongo/db/namespace_string.h"
 
 namespace mongo {
 
@@ -87,8 +88,8 @@ namespace mongo {
          */
         std::string toString() const;
 
-        const std::string& getNs() const { return _fullNs.get(); }
-        void setNs(const std::string& fullNs);
+        const NamespaceString& getNs() const { return _fullNs.get(); }
+        void setNs(const NamespaceString& fullNs);
 
         OID getEpoch() const { return _epoch.get(); }
         void setEpoch(OID epoch);
@@ -109,7 +110,7 @@ namespace mongo {
 
     private:
         // Required full namespace (with the database prefix).
-        boost::optional<std::string> _fullNs;
+        boost::optional<NamespaceString> _fullNs;
 
         // Required to disambiguate collection namespace incarnations.
         boost::optional<OID> _epoch;

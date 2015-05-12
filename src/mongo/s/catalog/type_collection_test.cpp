@@ -56,13 +56,26 @@ namespace {
 
         CollectionType coll = status.getValue();
         ASSERT_TRUE(coll.validate().isOK());
-        ASSERT_EQUALS(coll.getNs(), "db.coll");
+        ASSERT(coll.getNs() == NamespaceString{"db.coll"});
         ASSERT_EQUALS(coll.getEpoch(), oid);
         ASSERT_EQUALS(coll.getUpdatedAt(), 1ULL);
         ASSERT_EQUALS(coll.getKeyPattern(), BSON("a" << 1));
         ASSERT_EQUALS(coll.getUnique(), true);
         ASSERT_EQUALS(coll.getAllowBalance(), true);
         ASSERT_EQUALS(coll.getDropped(), false);
+    }
+
+    TEST(CollectionType, InvalidCollectionNamespace) {
+        const OID oid = OID::gen();
+        StatusWith<CollectionType> result = CollectionType::fromBSON(
+                                                BSON(CollectionType::fullNs("foo\\bar.coll") <<
+                                                     CollectionType::epoch(oid) <<
+                                                     CollectionType::updatedAt(1ULL) <<
+                                                     CollectionType::keyPattern(BSON("a" << 1)) <<
+                                                     CollectionType::unique(true)));
+        ASSERT_TRUE(result.isOK());
+        CollectionType collType = result.getValue();
+        ASSERT_FALSE(collType.validate().isOK());
     }
 
     TEST(CollectionType, BadType) {

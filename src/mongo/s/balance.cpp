@@ -330,7 +330,7 @@ namespace mongo {
         // For each collection, check if the balancing policy recommends moving anything around.
         for (const auto& coll : collections) {
             // Skip collections for which balancing is disabled
-            const string& ns = coll.getNs();
+            const NamespaceString& ns = coll.getNs();
 
             if (!coll.getAllowBalance()) {
                 LOG(1) << "Not balancing collection " << ns << "; explicitly disabled.";
@@ -397,14 +397,13 @@ namespace mongo {
                             tag[TagsType::tag()].String());
                 ranges.push_back(tr);
                 uassert(16356,
-                        str::stream() << "tag ranges not valid for: " << ns,
+                        str::stream() << "tag ranges not valid for: " << ns.toString(),
                         status.addTagRange(tr) );
 
             }
             cursor.reset();
 
-            const NamespaceString nss(ns);
-            auto statusGetDb = grid.catalogCache()->getDatabase(nss.db().toString());
+            auto statusGetDb = grid.catalogCache()->getDatabase(ns.db().toString());
             if (!statusGetDb.isOK()) {
                 warning() << "could not load db config to balance " << ns
                           << ", collection: " << statusGetDb.getStatus();

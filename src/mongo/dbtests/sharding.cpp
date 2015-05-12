@@ -270,7 +270,7 @@ namespace ShardingTests {
 
             // Make manager load existing chunks
             CollectionType collType;
-            collType.setNs(collName());
+            collType.setNs(NamespaceString{collName()});
             collType.setEpoch(version.epoch());
             collType.setUpdatedAt(jsTime());
             collType.setKeyPattern(BSON("_id" << 1));

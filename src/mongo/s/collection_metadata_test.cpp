@@ -66,7 +66,7 @@ namespace {
             OID epoch = OID::gen();
 
             CollectionType collType;
-            collType.setNs( "test.foo" );
+            collType.setNs(NamespaceString{"test.foo"});
             collType.setKeyPattern( BSON("a" << 1) );
             collType.setUnique( false );
             collType.setUpdatedAt( 1ULL );
@@ -78,7 +78,7 @@ namespace {
             // Need a chunk on another shard, otherwise the chunks are invalid in general and we
             // can't load metadata
             ChunkType chunkType;
-            chunkType.setNS( "test.foo");
+            chunkType.setNS(NamespaceString{"test.foo"});
             chunkType.setShard( "shard0001" );
             chunkType.setMin( BSON( "a" << MINKEY ) );
             chunkType.setMax( BSON( "a" << MAXKEY ) );
@@ -474,7 +474,7 @@ namespace {
             ChunkVersion chunkVersion = ChunkVersion( 1, 0, epoch );
 
             CollectionType collType;
-            collType.setNs("test.foo");
+            collType.setNs(NamespaceString{"test.foo"});
             collType.setKeyPattern(BSON("a" << 1));
             collType.setUnique(false);
             collType.setUpdatedAt(1ULL);
@@ -821,7 +821,7 @@ namespace {
             ChunkVersion chunkVersion = ChunkVersion( 1, 0, epoch );
 
             CollectionType collType;
-            collType.setNs("test.foo");
+            collType.setNs(NamespaceString{"test.foo"});
             collType.setKeyPattern(BSON("a" << 1));
             collType.setUnique(false);
             collType.setUpdatedAt(1ULL);
@@ -889,7 +889,7 @@ namespace {
             ChunkVersion chunkVersion = ChunkVersion( 1, 0, epoch );
 
             CollectionType collType;
-            collType.setNs("test.foo");
+            collType.setNs(NamespaceString{"test.foo"});
             collType.setKeyPattern(BSON("a" << 1));
             collType.setUnique(false);
             collType.setUpdatedAt(1ULL);
@@ -1161,7 +1161,7 @@ namespace {
 
             {
                 CollectionType collType;
-                collType.setNs("x.y");
+                collType.setNs(NamespaceString{"x.y"});
                 collType.setKeyPattern(BSON("a" << 1));
                 collType.setUnique(false);
                 collType.setUpdatedAt(1ULL);
