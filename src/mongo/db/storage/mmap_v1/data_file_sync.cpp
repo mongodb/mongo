@@ -86,7 +86,7 @@ namespace mongo {
             Date_t start = jsTime();
             StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
             int numFiles = storageEngine->flushAllFiles( true );
-            time_flushing = (jsTime() - start).count();
+            time_flushing = (int) (jsTime() - start);
 
             _flushed(time_flushing);
 

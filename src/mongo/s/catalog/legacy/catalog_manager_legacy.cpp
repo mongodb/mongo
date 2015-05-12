@@ -1479,7 +1479,7 @@ namespace {
             lk.lock();
             _consistentFromLastCheck = isConsistent;
             if (_inShutdown) break;
-            _consistencyCheckerCV.wait_for(lk, Seconds(60));
+            _consistencyCheckerCV.timed_wait(lk, Seconds(60));
         }
         LOG(1) << "Consistency checker thread shutting down";
     }

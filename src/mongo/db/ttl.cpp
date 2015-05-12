@@ -231,7 +231,7 @@ namespace mongo {
 
             // Read the current time outside of the while loop, so that we don't expand our index
             // bounds after every WriteConflictException.
-            const Date_t now = Date_t::now();
+            unsigned long long now = curTimeMillis64();
 
             long long numDeleted = 0;
             int attempt = 1;
@@ -284,11 +284,10 @@ namespace mongo {
                     return true;
                 }
 
-                const Date_t kDawnOfTime =
-                    Date_t::fromMillisSinceEpoch(std::numeric_limits<long long>::min());
+                const Date_t kDawnOfTime(std::numeric_limits<long long>::min());
                 const BSONObj startKey = BSON("" << kDawnOfTime);
                 const BSONObj endKey =
-                    BSON("" << now - Seconds(secondsExpireElt.numberLong()));
+                    BSON("" << Date_t(now - (1000 * secondsExpireElt.numberLong())));
                 const bool endKeyInclusive = true;
                 // The canonical check as to whether a key pattern element is "ascending" or
                 // "descending" is (elt.number() >= 0).  This is defined by the Ordering class.

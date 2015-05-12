@@ -201,7 +201,7 @@ namespace mongo {
                     s << "\"" << dateToISOStringLocal(date()) << "\"";
                 }
                 else {
-                    s << "{ \"$numberLong\" : \"" << d.toMillisSinceEpoch() << "\" }";
+                    s << "{ \"$numberLong\" : \"" << static_cast<long long>(d.millis) << "\" }";
                 }
                 s << " }";
             }
@@ -221,7 +221,7 @@ namespace mongo {
                     else {
                         // FIXME: This is not parseable by the shell, since it may not fit in a
                         // float
-                        s << d.toMillisSinceEpoch();
+                        s << d.millis;
                     }
                 }
                 else {
@@ -266,14 +266,10 @@ namespace mongo {
 
         case bsonTimestamp:
             if ( format == TenGen ) {
-                s << "Timestamp( "
-                  << durationCount<Seconds>(timestampTime().toDurationSinceEpoch())
-                  << ", " << timestampInc() << " )";
+                s << "Timestamp( " << ( timestampTime() / 1000 ) << ", " << timestampInc() << " )";
             }
             else {
-                s << "{ \"$timestamp\" : { \"t\" : "
-                  << durationCount<Seconds>(timestampTime().toDurationSinceEpoch())
-                  << ", \"i\" : " << timestampInc() << " } }";
+                s << "{ \"$timestamp\" : { \"t\" : " << ( timestampTime() / 1000 ) << ", \"i\" : " << timestampInc() << " } }";
             }
             break;
 
@@ -620,7 +616,7 @@ namespace mongo {
             s << "EOO";
             break;
         case mongo::Date:
-            s << "new Date(" << date().toMillisSinceEpoch() << ')';
+            s << "new Date(" << (long long) date() << ')';
             break;
         case RegEx: {
             s << "/" << regex() << '/';
@@ -705,7 +701,7 @@ namespace mongo {
             }
             break;
         case bsonTimestamp:
-            s << "Timestamp " << timestampTime().toMillisSinceEpoch() << "|" << timestampInc();
+            s << "Timestamp " << timestampTime() << "|" << timestampInc();
             break;
         default:
             s << "?type=" << type();
@@ -856,8 +852,8 @@ namespace mongo {
         case Date:
             // Signed comparisons for Dates.
             {
-                const Date_t a = l.Date();
-                const Date_t b = r.Date();
+                long long a = (long long) l.Date().millis;
+                long long b = (long long) r.Date().millis;
                 if( a < b ) 
                     return -1;
                 return a == b ? 0 : 1;

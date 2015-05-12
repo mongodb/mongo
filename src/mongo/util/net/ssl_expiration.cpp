@@ -32,15 +32,14 @@
 #include <string>
 
 #include "mongo/util/log.h"
-#include "mongo/util/time_support.h"
 
 namespace mongo {
 
-    static const auto oneDay = stdx::chrono::hours(24);
+    static const unsigned long long dayInMillis = 24 * 60 * 60 * 1000;
 
     CertificateExpirationMonitor::CertificateExpirationMonitor(Date_t date)
         : _certExpiration(date)
-        , _lastCheckTime(Date_t::now()) {
+        , _lastCheckTime(Date_t(curTimeMillis64())) {
     }
 
     std::string CertificateExpirationMonitor::taskName() const {
@@ -48,28 +47,30 @@ namespace mongo {
     }
 
     void CertificateExpirationMonitor::taskDoWork() {
-        const Milliseconds timeSinceLastCheck = Date_t::now() - _lastCheckTime;
+        const unsigned long long timeSinceLastCheck = 
+            curTimeMillis64() - _lastCheckTime.millis;
 
-        if (timeSinceLastCheck < oneDay)
+        if (timeSinceLastCheck < dayInMillis)
             return;
 
-        const Date_t now = Date_t::now();
+        const Date_t now = Date_t(curTimeMillis64());
         _lastCheckTime = now;
 
-        if (_certExpiration <= now) {
+        if (_certExpiration.millis <= now.millis) {
             // The certificate has expired.
             warning() << "Server certificate is now invalid. It expired on "
-                      << dateToISOStringUTC(_certExpiration);
+                      << dateToCtimeString(_certExpiration);
             return;
         }
 
-        const auto remainingValidDuration = _certExpiration - now;
+        const unsigned long long remainingValidMillis =
+            _certExpiration.millis - now.millis;
 
-        if (remainingValidDuration <= 30 * oneDay) {
+        if (remainingValidMillis / dayInMillis <= 30) {
             // The certificate will expire in the next 30 days.
             warning() << "Server certificate will expire on "
-                      << dateToISOStringUTC(_certExpiration) << " in "
-                      << durationCount<stdx::chrono::hours>(remainingValidDuration) / 24
+                      << dateToCtimeString(_certExpiration) << " in "
+                      << (remainingValidMillis / dayInMillis)
                       << " days.";
         }
     }

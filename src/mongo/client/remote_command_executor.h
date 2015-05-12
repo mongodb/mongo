@@ -40,8 +40,8 @@ namespace mongo {
     template<typename T> class StatusWith;
 
 
-    extern const Milliseconds kNoTimeout;
-    extern const Date_t kNoExpirationDate;
+    const Milliseconds kNoTimeout(-1);
+    const Date_t kNoExpirationDate(-1);
 
 
     /**

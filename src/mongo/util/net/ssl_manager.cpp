@@ -699,7 +699,7 @@ namespace mongo {
                        "The provided SSL certificate is expired or not yet valid.");
             }
 
-            *serverCertificateExpirationDate = Date_t::fromMillisSinceEpoch(notAfterMillis);
+            *serverCertificateExpirationDate = Date_t(notAfterMillis);
         }
 
         return true;

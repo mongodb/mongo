@@ -63,7 +63,11 @@ namespace repl {
         return result;
     }
 
-    HeartbeatResponseAction::HeartbeatResponseAction() : _action(NoAction), _primaryIndex(-1) {}
+    HeartbeatResponseAction::HeartbeatResponseAction() :
+        _action(NoAction),
+        _primaryIndex(-1),
+        _nextHeartbeatStartDate(0) {
+    }
 
     void HeartbeatResponseAction::setNextHeartbeatStartDate(Date_t when) {
         _nextHeartbeatStartDate = when;

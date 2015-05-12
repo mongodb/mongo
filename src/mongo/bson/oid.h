@@ -140,7 +140,7 @@ namespace mongo {
         void init( Date_t date, bool max=false );
 
         time_t asTimeT() const;
-        Date_t asDateT() const { return Date_t::fromMillisSinceEpoch(asTimeT() * 1000LL); }
+        Date_t asDateT() const { return asTimeT() * 1000LL; }
 
         // True iff the OID is not empty
         bool isSet() const {

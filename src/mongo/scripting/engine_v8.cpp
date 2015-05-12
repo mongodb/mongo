@@ -1435,7 +1435,7 @@ namespace mongo {
         case mongo::Object:
             return mongoToLZV8(elem.embeddedObject(), readOnly);
         case mongo::Date:
-            return v8::Date::New(static_cast<double>(elem.date().toMillisSinceEpoch()));
+            return v8::Date::New((double) ((long long)elem.date().millis));
         case mongo::Bool:
             return v8::Boolean::New(elem.boolean());
         case mongo::EOO:
@@ -1472,7 +1472,7 @@ namespace mongo {
         case mongo::bsonTimestamp: {
             v8::TryCatch tryCatch;
 
-            argv[0] = v8::Number::New(elem.timestampTime().toMillisSinceEpoch() / 1000);
+            argv[0] = v8::Number::New(elem.timestampTime() / 1000);
             argv[1] = v8::Number::New(elem.timestampInc());
 
             v8::Handle<v8::Value> ret = TimestampFT()->GetFunction()->NewInstance(2,argv);
@@ -1658,7 +1658,7 @@ namespace mongo {
         }
         if (value->IsDate()) {
             long long dateval = (long long)(v8::Date::Cast(*value)->NumberValue());
-            b.appendDate(sname, Date_t::fromMillisSinceEpoch(dateval));
+            b.appendDate(sname, Date_t((unsigned long long) dateval));
             return;
         }
         if (value->IsExternal())

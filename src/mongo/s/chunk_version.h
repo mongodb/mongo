@@ -78,7 +78,7 @@ namespace mongo {
 
         static ChunkVersion IGNORED() {
             ChunkVersion version = ChunkVersion();
-            version._epoch.init(Date_t(), true); // ignored OID is zero time, max machineId/inc
+            version._epoch.init( 0, true ); // ignored OID is zero time, max machineId/inc
             return version;
         }
 

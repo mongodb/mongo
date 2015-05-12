@@ -169,7 +169,7 @@ namespace mongo {
         bool success = false;
         BSONObj result;
         string errMsg;
-        Milliseconds delay{0};
+        long long delay = 0;
 
         scoped_ptr<ScopedDbConnection> connPtr;
         try {
@@ -204,7 +204,7 @@ namespace mongo {
 
         // Make sure that our delay is not more than 2x our maximum network skew, since this is the max our remote
         // time value can be off by if we assume a response in the middle of the delay.
-        if (delay > Milliseconds(maxNetSkew * 2)) {
+        if ( delay > (long long) ( maxNetSkew * 2 ) ) {
             throw TimeNotFoundException( str::stream()
                                              << "server " << server.toString() << " in cluster "
                                              << cluster.toString()
@@ -245,10 +245,9 @@ namespace mongo {
                 // Remote time can be delayed by at most MAX_NET_SKEW
 
                 // Skew is how much time we'd have to add to local to get to remote
-                avgSkews[s] += (remote - local).count();
+                avgSkews[s] += (long long) (remote - local);
 
-                LOG( logLvl + 1 ) << "skew from remote server " << server << " found: "
-                                  << (remote - local).count();
+                LOG( logLvl + 1 ) << "skew from remote server " << server << " found: " << (long long) (remote - local) << endl;
 
             }
         }
@@ -388,7 +387,7 @@ namespace mongo {
                     LOG( logLvl ) << "empty ping found for process in lock '" << lockName << "'" << endl;
                     // TODO:  Using 0 as a "no time found" value Will fail if dates roll over, but then, so will a lot.
                     lastPing = BSON( LockpingsType::process(o[LocksType::process()].String()) <<
-                                     LockpingsType::ping(Date_t()) );
+                                     LockpingsType::ping((Date_t) 0) );
                 }
 
                 unsigned long long elapsed = 0;
@@ -423,7 +422,7 @@ namespace mongo {
                         if(_lastPingCheck.remote >= remote)
                             elapsed = 0;
                         else
-                            elapsed = (remote - _lastPingCheck.remote).count();
+                            elapsed = remote - _lastPingCheck.remote;
                     }
                 }
                 catch( LockException& e ) {

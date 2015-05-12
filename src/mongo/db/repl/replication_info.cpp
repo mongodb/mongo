@@ -126,9 +126,8 @@ namespace repl {
                                                              Query().sort( BSON( "$natural" << -1 ) ) );
                         bb.appendDate( "masterFirst" , first["ts"].timestampTime() );
                         bb.appendDate( "masterLast" , last["ts"].timestampTime() );
-                        const auto lag =
-                            (last["ts"].timestampTime() - s["syncedTo"].timestampTime());
-                        bb.append("lagSeconds", durationCount<Milliseconds>(lag) / 1000.0);
+                        double lag = (double) (last["ts"].timestampTime() - s["syncedTo"].timestampTime());
+                        bb.append( "lagSeconds" , lag / 1000 );
                     }
                     conn.done();
                 }

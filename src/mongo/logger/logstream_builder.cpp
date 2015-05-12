@@ -127,7 +127,7 @@ namespace logger {
         if (_os) {
             if ( !_baseMessage.empty() ) _baseMessage.push_back(' ');
             _baseMessage += _os->str();
-            MessageEventEphemeral message(Date_t::now(), _severity, _component, _contextName,
+            MessageEventEphemeral message(curTimeMillis64(), _severity, _component, _contextName,
                                           _baseMessage);
             _domain->append(message);
             if (_tee) {

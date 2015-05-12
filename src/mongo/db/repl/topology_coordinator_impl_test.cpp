@@ -115,7 +115,7 @@ namespace {
             else {
                 invariant(now > _now);
                 getTopoCoord().updateConfig(config, selfIndex, now, lastOp);
-                _now = now + Milliseconds(1);
+                _now = now + 1;
             }
         }
 
@@ -772,7 +772,7 @@ namespace {
         Date_t startupTime(100);
         Date_t heartbeatTime = 5000;
         Seconds uptimeSecs(10);
-        Date_t curTime = heartbeatTime + uptimeSecs;
+        Date_t curTime = heartbeatTime + uptimeSecs.total_milliseconds();
         Timestamp electionTime(1, 2);
         Timestamp oplogProgress(3, 4);
         std::string setName = "mySet";
@@ -784,13 +784,13 @@ namespace {
                                                   BSON("_id" << 2 << "host" << "test2:1234") <<
                                                   BSON("_id" << 3 << "host" << "test3:1234"))),
                      3,
-                     startupTime + Milliseconds(1));
+                     startupTime + 1);
 
         // Now that the replica set is setup, put the members into the states we want them in.
         HostAndPort member = HostAndPort("test0:1234");
         StatusWith<ReplSetHeartbeatResponse> hbResponse =
                 StatusWith<ReplSetHeartbeatResponse>(Status(ErrorCodes::HostUnreachable, ""));
-        getTopoCoord().prepareHeartbeatRequest(startupTime + Milliseconds(2), setName, member);
+        getTopoCoord().prepareHeartbeatRequest(startupTime + 2, setName, member);
         getTopoCoord().processHeartbeatResponse(heartbeatTime,
                                                 Milliseconds(0),
                                                 member,
@@ -805,7 +805,7 @@ namespace {
         hb.setHbMsg("READY");
         hb.setOpTime(oplogProgress);
         hbResponse = StatusWith<ReplSetHeartbeatResponse>(hb);
-        getTopoCoord().prepareHeartbeatRequest(startupTime + Milliseconds(2),
+        getTopoCoord().prepareHeartbeatRequest(startupTime + 2,
                                                setName,
                                                member);
         getTopoCoord().processHeartbeatResponse(heartbeatTime,
@@ -820,7 +820,7 @@ namespace {
         Status resultStatus(ErrorCodes::InternalError, "prepareStatusResponse didn't set result");
         getTopoCoord().prepareStatusResponse(cbData(),
                                              curTime,
-                                             uptimeSecs.count(),
+                                             uptimeSecs.total_seconds(),
                                              oplogProgress,
                                              &statusBuilder,
                                              &resultStatus);
@@ -845,8 +845,8 @@ namespace {
         ASSERT_EQUALS(0, member0Status["uptime"].numberInt());
         ASSERT_EQUALS(Timestamp(), Timestamp(member0Status["optime"].timestampValue()));
         ASSERT_TRUE(member0Status.hasField("optimeDate"));
-        ASSERT_EQUALS(Date_t::fromMillisSinceEpoch(Timestamp().getSecs() * 1000ULL),
-                      member0Status["optimeDate"].Date());
+        ASSERT_EQUALS(Date_t(Timestamp().getSecs() * 1000ULL),
+                      member0Status["optimeDate"].Date().millis);
         ASSERT_EQUALS(heartbeatTime, member0Status["lastHeartbeat"].date());
         ASSERT_EQUALS(Date_t(), member0Status["lastHeartbeatRecv"].date());
 
@@ -857,11 +857,11 @@ namespace {
         ASSERT_EQUALS(MemberState::RS_SECONDARY, member1Status["state"].numberInt());
         ASSERT_EQUALS(MemberState(MemberState::RS_SECONDARY).toString(),
                       member1Status["stateStr"].String());
-        ASSERT_EQUALS(uptimeSecs.count(), member1Status["uptime"].numberInt());
+        ASSERT_EQUALS(uptimeSecs.total_seconds(), member1Status["uptime"].numberInt());
         ASSERT_EQUALS(oplogProgress, Timestamp(member1Status["optime"].timestampValue()));
         ASSERT_TRUE(member1Status.hasField("optimeDate"));
-        ASSERT_EQUALS(Date_t::fromMillisSinceEpoch(oplogProgress.getSecs() * 1000ULL),
-                      member1Status["optimeDate"].Date());
+        ASSERT_EQUALS(Date_t(oplogProgress.getSecs() * 1000ULL),
+                      member1Status["optimeDate"].Date().millis);
         ASSERT_EQUALS(heartbeatTime, member1Status["lastHeartbeat"].date());
         ASSERT_EQUALS(Date_t(), member1Status["lastHeartbeatRecv"].date());
         ASSERT_EQUALS("READY", member1Status["lastHeartbeatMessage"].str());
@@ -889,11 +889,11 @@ namespace {
         ASSERT_EQUALS(MemberState::RS_PRIMARY, selfStatus["state"].numberInt());
         ASSERT_EQUALS(MemberState(MemberState::RS_PRIMARY).toString(),
                       selfStatus["stateStr"].str());
-        ASSERT_EQUALS(uptimeSecs.count(), selfStatus["uptime"].numberInt());
+        ASSERT_EQUALS(uptimeSecs.total_seconds(), selfStatus["uptime"].numberInt());
         ASSERT_EQUALS(oplogProgress, Timestamp(selfStatus["optime"].timestampValue()));
         ASSERT_TRUE(selfStatus.hasField("optimeDate"));
-        ASSERT_EQUALS(Date_t::fromMillisSinceEpoch(oplogProgress.getSecs() * 1000ULL),
-                      selfStatus["optimeDate"].Date());
+        ASSERT_EQUALS(Date_t(oplogProgress.getSecs() * 1000ULL),
+                      selfStatus["optimeDate"].Date().millis);
 
         // TODO(spencer): Test electionTime and pingMs are set properly
     }
@@ -904,7 +904,7 @@ namespace {
         Date_t startupTime(100);
         Date_t heartbeatTime = 5000;
         Seconds uptimeSecs(10);
-        Date_t curTime = heartbeatTime + uptimeSecs;
+        Date_t curTime = heartbeatTime + uptimeSecs.total_milliseconds();
         Timestamp oplogProgress(3, 4);
         std::string setName = "mySet";
 
@@ -914,13 +914,13 @@ namespace {
                                                   BSON("_id" << 1 << "host" << "test1:1234") <<
                                                   BSON("_id" << 2 << "host" << "test2:1234"))),
                      -1,  // This one is not part of the replica set.
-                     startupTime + Milliseconds(1));
+                     startupTime + 1);
 
         BSONObjBuilder statusBuilder;
         Status resultStatus(ErrorCodes::InternalError, "prepareStatusResponse didn't set result");
         getTopoCoord().prepareStatusResponse(cbData(),
                                              curTime,
-                                             uptimeSecs.count(),
+                                             uptimeSecs.total_seconds(),
                                              oplogProgress,
                                              &statusBuilder,
                                              &resultStatus);
@@ -1211,12 +1211,12 @@ namespace {
                                                        "rs0",
                                                        _target);
             // 5 seconds to successfully complete the heartbeat before the timeout expires.
-            ASSERT_EQUALS(5000, request.second.count());
+            ASSERT_EQUALS(5000, request.second.total_milliseconds());
 
             // Initial heartbeat request fails at t + 4000ms
             HeartbeatResponseAction action =
                 getTopoCoord().processHeartbeatResponse(
-                        _firstRequestDate + Seconds(4), // 4 seconds elapsed, retry allowed.
+                        _firstRequestDate + 4000, // 4 seconds elapsed, retry allowed.
                         Milliseconds(3990), // Spent 3.99 of the 4 seconds in the network.
                         _target,
                         StatusWith<ReplSetHeartbeatResponse>(ErrorCodes::ExceededTimeLimit,
@@ -1226,17 +1226,16 @@ namespace {
             ASSERT_EQUALS(HeartbeatResponseAction::NoAction, action.getAction());
             ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
             // Because the heartbeat failed without timing out, we expect to retry immediately.
-            ASSERT_EQUALS(Date_t(_firstRequestDate + Seconds(4)),
-                          action.getNextHeartbeatStartDate());
+            ASSERT_EQUALS(Date_t(_firstRequestDate + 4000), action.getNextHeartbeatStartDate());
 
             // First heartbeat retry prepared, at t + 4000ms.
             request =
                 getTopoCoord().prepareHeartbeatRequest(
-                        _firstRequestDate + Milliseconds(4000),
+                        _firstRequestDate + 4000,
                         "rs0",
                         _target);
             // One second left to complete the heartbeat.
-            ASSERT_EQUALS(1000, request.second.count());
+            ASSERT_EQUALS(1000, request.second.total_milliseconds());
         }
         
         Date_t firstRequestDate() {
@@ -1260,8 +1259,7 @@ namespace {
             // First retry fails at t + 4500ms
             HeartbeatResponseAction action =
                 getTopoCoord().processHeartbeatResponse(
-                        firstRequestDate() + Milliseconds(4500), // 4.5 of the 5 seconds elapsed;
-                                                                 // could retry.
+                        firstRequestDate() + 4500, // 4.5 of the 5 seconds elapsed; could retry.
                         Milliseconds(400), // Spent 0.4 of the 0.5 seconds in the network.
                         target(),
                         StatusWith<ReplSetHeartbeatResponse>(ErrorCodes::NodeNotFound, "Bad DNS?"),
@@ -1269,17 +1267,16 @@ namespace {
             ASSERT_EQUALS(HeartbeatResponseAction::NoAction, action.getAction());
             ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
             // Because the first retry failed without timing out, we expect to retry immediately.
-            ASSERT_EQUALS(firstRequestDate() + Milliseconds(4500),
-                          action.getNextHeartbeatStartDate());
+            ASSERT_EQUALS(Date_t(firstRequestDate() + 4500), action.getNextHeartbeatStartDate());
 
             // Second retry prepared at t + 4500ms.
             std::pair<ReplSetHeartbeatArgs, Milliseconds> request =
                 getTopoCoord().prepareHeartbeatRequest(
-                        firstRequestDate() + Milliseconds(4500),
+                        firstRequestDate() + 4500,
                         "rs0",
                         target());
             // 500ms left to complete the heartbeat.
-            ASSERT_EQUALS(500, request.second.count());
+            ASSERT_EQUALS(500, request.second.total_milliseconds());
         }
     };
 
@@ -1439,14 +1436,14 @@ namespace {
         reconfigResponse.setConfig(newConfig);
         HeartbeatResponseAction action =
             getTopoCoord().processHeartbeatResponse(
-                    firstRequestDate() + Milliseconds(4500), // Time is left.
+                    firstRequestDate() + 4500, // Time is left.
                     Milliseconds(400), // Spent 0.4 of the 0.5 second in the network.
                     target(),
                     StatusWith<ReplSetHeartbeatResponse>(reconfigResponse),
                     Timestamp(0, 0));  // We've never applied anything.
         ASSERT_EQUALS(HeartbeatResponseAction::Reconfig, action.getAction());
         ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
-        ASSERT_EQUALS(firstRequestDate() + Milliseconds(6500), action.getNextHeartbeatStartDate());
+        ASSERT_EQUALS(Date_t(firstRequestDate() + 6500), action.getNextHeartbeatStartDate());
     }
 
     TEST_F(HeartbeatResponseTestOneRetry, DecideToStepDownRemotePrimary) {
@@ -1467,14 +1464,14 @@ namespace {
         electedMoreRecentlyResponse.setVersion(5);
         HeartbeatResponseAction action =
             getTopoCoord().processHeartbeatResponse(
-                    firstRequestDate() + Milliseconds(4500), // Time is left.
+                    firstRequestDate() + 4500, // Time is left.
                     Milliseconds(400), // Spent 0.4 of the 0.5 second in the network.
                     target(),
                     StatusWith<ReplSetHeartbeatResponse>(electedMoreRecentlyResponse),
                     Timestamp(0,0));  // We've never applied anything.
         ASSERT_EQUALS(HeartbeatResponseAction::StepDownRemotePrimary, action.getAction());
         ASSERT_EQUALS(1, action.getPrimaryConfigIndex());
-        ASSERT_EQUALS(firstRequestDate() + Milliseconds(6500), action.getNextHeartbeatStartDate());
+        ASSERT_EQUALS(Date_t(firstRequestDate() + 6500), action.getNextHeartbeatStartDate());
     }
 
     TEST_F(HeartbeatResponseTestOneRetry, DecideToStepDownSelf) {
@@ -1499,14 +1496,14 @@ namespace {
         electedMoreRecentlyResponse.setVersion(5);
         action =
             getTopoCoord().processHeartbeatResponse(
-                    firstRequestDate() + Milliseconds(4500), // Time is left.
+                    firstRequestDate() + 4500, // Time is left.
                     Milliseconds(400), // Spent 0.4 of the 0.5 second in the network.
                     target(),
                     StatusWith<ReplSetHeartbeatResponse>(electedMoreRecentlyResponse),
                     Timestamp(0, 0));  // We've never applied anything.
         ASSERT_EQUALS(HeartbeatResponseAction::StepDownSelf, action.getAction());
         ASSERT_EQUALS(0, action.getPrimaryConfigIndex());
-        ASSERT_EQUALS(firstRequestDate() + Milliseconds(6500), action.getNextHeartbeatStartDate());
+        ASSERT_EQUALS(Date_t(firstRequestDate() + 6500), action.getNextHeartbeatStartDate());
         // Doesn't actually do the stepdown until stepDownIfPending is called
         ASSERT_TRUE(TopologyCoordinator::Role::leader == getTopoCoord().getRole());
         ASSERT_EQUALS(0, getCurrentPrimaryIndex());
@@ -1542,14 +1539,14 @@ namespace {
         startElectionResponse.setVersion(5);
         action =
             getTopoCoord().processHeartbeatResponse(
-                    firstRequestDate() + Milliseconds(4500), // Time is left.
+                    firstRequestDate() + 4500, // Time is left.
                     Milliseconds(400), // Spent 0.4 of the 0.5 second in the network.
                     target(),
                     StatusWith<ReplSetHeartbeatResponse>(startElectionResponse),
                     election);
         ASSERT_EQUALS(HeartbeatResponseAction::StartElection, action.getAction());
         ASSERT_TRUE(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
-        ASSERT_EQUALS(firstRequestDate() + Milliseconds(6500), action.getNextHeartbeatStartDate());
+        ASSERT_EQUALS(Date_t(firstRequestDate() + 6500), action.getNextHeartbeatStartDate());
     }
 
     TEST_F(HeartbeatResponseTestTwoRetries, HeartbeatRetriesAtMostTwice) {
@@ -1565,8 +1562,7 @@ namespace {
         // Second retry fails at t + 4800ms
         HeartbeatResponseAction action =
             getTopoCoord().processHeartbeatResponse(
-                    firstRequestDate() + Milliseconds(4800), // 4.8 of the 5 seconds elapsed;
-                                                             // could still retry.
+                    firstRequestDate() + 4800, // 4.8 of the 5 seconds elapsed; could still retry.
                     Milliseconds(100), // Spent 0.1 of the 0.3 seconds in the network.
                     target(),
                     StatusWith<ReplSetHeartbeatResponse>(ErrorCodes::NodeNotFound, "Bad DNS?"),
@@ -1575,7 +1571,7 @@ namespace {
         ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
         // Because this is the second retry, rather than retry again, we expect to wait for the
         // heartbeat interval of 2 seconds to elapse.
-        ASSERT_EQUALS(firstRequestDate() + Milliseconds(6800), action.getNextHeartbeatStartDate());
+        ASSERT_EQUALS(Date_t(firstRequestDate() + 6800), action.getNextHeartbeatStartDate());
     }
 
     TEST_F(HeartbeatResponseTestTwoRetries, DecideToStepDownRemotePrimary) {
@@ -1596,14 +1592,14 @@ namespace {
         electedMoreRecentlyResponse.setVersion(5);
         HeartbeatResponseAction action =
             getTopoCoord().processHeartbeatResponse(
-                    firstRequestDate() + Milliseconds(5000), // Time is left.
+                    firstRequestDate() + 5000, // Time is left.
                     Milliseconds(400), // Spent 0.4 of the 0.5 second in the network.
                     target(),
                     StatusWith<ReplSetHeartbeatResponse>(electedMoreRecentlyResponse),
                     Timestamp(0,0));  // We've never applied anything.
         ASSERT_EQUALS(HeartbeatResponseAction::StepDownRemotePrimary, action.getAction());
         ASSERT_EQUALS(1, action.getPrimaryConfigIndex());
-        ASSERT_EQUALS(firstRequestDate() + Milliseconds(7000), action.getNextHeartbeatStartDate());
+        ASSERT_EQUALS(Date_t(firstRequestDate() + 7000), action.getNextHeartbeatStartDate());
     }
 
     TEST_F(HeartbeatResponseTestTwoRetries, DecideToStepDownSelf) {
@@ -1628,14 +1624,14 @@ namespace {
         electedMoreRecentlyResponse.setVersion(5);
         action =
             getTopoCoord().processHeartbeatResponse(
-                    firstRequestDate() + Milliseconds(5000), // Time is left.
+                    firstRequestDate() + 5000, // Time is left.
                     Milliseconds(400), // Spent 0.4 of the 0.5 second in the network.
                     target(),
                     StatusWith<ReplSetHeartbeatResponse>(electedMoreRecentlyResponse),
                     Timestamp(0, 0));  // We've never applied anything.
         ASSERT_EQUALS(HeartbeatResponseAction::StepDownSelf, action.getAction());
         ASSERT_EQUALS(0, action.getPrimaryConfigIndex());
-        ASSERT_EQUALS(firstRequestDate() + Milliseconds(7000), action.getNextHeartbeatStartDate());
+        ASSERT_EQUALS(Date_t(firstRequestDate() + 7000), action.getNextHeartbeatStartDate());
         // Doesn't actually do the stepdown until stepDownIfPending is called
         ASSERT_TRUE(TopologyCoordinator::Role::leader == getTopoCoord().getRole());
         ASSERT_EQUALS(0, getCurrentPrimaryIndex());
@@ -1671,14 +1667,14 @@ namespace {
         startElectionResponse.setVersion(5);
         action =
             getTopoCoord().processHeartbeatResponse(
-                    firstRequestDate() + Milliseconds(5000), // Time is left.
+                    firstRequestDate() + 5000, // Time is left.
                     Milliseconds(400), // Spent 0.4 of the 0.5 second in the network.
                     target(),
                     StatusWith<ReplSetHeartbeatResponse>(startElectionResponse),
                     election);
         ASSERT_EQUALS(HeartbeatResponseAction::StartElection, action.getAction());
         ASSERT_TRUE(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
-        ASSERT_EQUALS(firstRequestDate() + Milliseconds(7000), action.getNextHeartbeatStartDate());
+        ASSERT_EQUALS(Date_t(firstRequestDate() + 7000), action.getNextHeartbeatStartDate());
     }
 
     TEST_F(HeartbeatResponseTest, HeartbeatTimeoutSuppressesFirstRetry) {
@@ -1694,13 +1690,12 @@ namespace {
                                                    "rs0",
                                                    target);
         // 5 seconds to successfully complete the heartbeat before the timeout expires.
-        ASSERT_EQUALS(5000, request.second.count());
+        ASSERT_EQUALS(5000, request.second.total_milliseconds());
 
         // Initial heartbeat request fails at t + 5000ms
         HeartbeatResponseAction action =
             getTopoCoord().processHeartbeatResponse(
-                    firstRequestDate + Milliseconds(5000), // Entire heartbeat period elapsed;
-                                                           // no retry allowed.
+                    firstRequestDate + 5000, // Entire heartbeat period elapsed; no retry allowed.
                     Milliseconds(4990), // Spent 4.99 of the 4 seconds in the network.
                     target,
                     StatusWith<ReplSetHeartbeatResponse>(ErrorCodes::ExceededTimeLimit,
@@ -1710,7 +1705,7 @@ namespace {
         ASSERT_EQUALS(HeartbeatResponseAction::NoAction, action.getAction());
         ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
         // Because the heartbeat timed out, we'll retry in 2 seconds.
-        ASSERT_EQUALS(firstRequestDate + Milliseconds(7000), action.getNextHeartbeatStartDate());
+        ASSERT_EQUALS(Date_t(firstRequestDate + 7000), action.getNextHeartbeatStartDate());
     }
 
     TEST_F(HeartbeatResponseTestOneRetry, HeartbeatTimeoutSuppressesSecondRetry) {
@@ -1718,8 +1713,7 @@ namespace {
         // the heartbeat timeout period expired before the first retry completed.
         HeartbeatResponseAction action =
             getTopoCoord().processHeartbeatResponse(
-                    firstRequestDate() + Milliseconds(5010), // Entire heartbeat period elapsed;
-                                                             // no retry allowed.
+                    firstRequestDate() + 5010, // Entire heartbeat period elapsed; no retry allowed.
                     Milliseconds(1000), // Spent 1 of the 1.01 seconds in the network.
                     target(),
                     StatusWith<ReplSetHeartbeatResponse>(ErrorCodes::ExceededTimeLimit,
@@ -1729,7 +1723,7 @@ namespace {
         ASSERT_EQUALS(HeartbeatResponseAction::NoAction, action.getAction());
         ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
         // Because the heartbeat timed out, we'll retry in 2 seconds.
-        ASSERT_EQUALS(firstRequestDate() + Milliseconds(7010), action.getNextHeartbeatStartDate());
+        ASSERT_EQUALS(Date_t(firstRequestDate() + 7010), action.getNextHeartbeatStartDate());
     }
 
     TEST_F(HeartbeatResponseTest, UpdateHeartbeatDataNewPrimary) {
@@ -3225,7 +3219,7 @@ namespace {
         ASSERT_TRUE(response.isReplSet());
         ASSERT_EQUALS(MemberState::RS_SECONDARY, response.getState().s);
         ASSERT_EQUALS(Timestamp(0,0), response.getOpTime());
-        ASSERT_EQUALS(0, response.getTime().count());
+        ASSERT_EQUALS(Seconds(0).total_milliseconds(), response.getTime().total_milliseconds());
         ASSERT_EQUALS("", response.getHbMsg());
         ASSERT_EQUALS("rs0", response.getReplicaSetName());
         ASSERT_EQUALS(1, response.getVersion());
@@ -3248,7 +3242,7 @@ namespace {
         ASSERT_TRUE(response.isReplSet());
         ASSERT_EQUALS(MemberState::RS_SECONDARY, response.getState().s);
         ASSERT_EQUALS(Timestamp(0,0), response.getOpTime());
-        ASSERT_EQUALS(0, response.getTime().count());
+        ASSERT_EQUALS(Seconds(0).total_milliseconds(), response.getTime().total_milliseconds());
         ASSERT_EQUALS("", response.getHbMsg());
         ASSERT_EQUALS("rs0", response.getReplicaSetName());
         ASSERT_EQUALS(1, response.getVersion());
@@ -3272,7 +3266,7 @@ namespace {
         ASSERT_TRUE(response.isReplSet());
         ASSERT_EQUALS(MemberState::RS_SECONDARY, response.getState().s);
         ASSERT_EQUALS(Timestamp(0,0), response.getOpTime());
-        ASSERT_EQUALS(0, response.getTime().count());
+        ASSERT_EQUALS(Seconds(0).total_milliseconds(), response.getTime().total_milliseconds());
         ASSERT_EQUALS("", response.getHbMsg());
         ASSERT_EQUALS("rs0", response.getReplicaSetName());
         ASSERT_EQUALS(1, response.getVersion());
@@ -3296,7 +3290,7 @@ namespace {
         ASSERT_TRUE(response.isReplSet());
         ASSERT_EQUALS(MemberState::RS_SECONDARY, response.getState().s);
         ASSERT_EQUALS(Timestamp(0,0), response.getOpTime());
-        ASSERT_EQUALS(0, response.getTime().count());
+        ASSERT_EQUALS(Seconds(0).total_milliseconds(), response.getTime().total_milliseconds());
         ASSERT_EQUALS("", response.getHbMsg());
         ASSERT_EQUALS("rs0", response.getReplicaSetName());
         ASSERT_EQUALS(1, response.getVersion());
@@ -3319,7 +3313,7 @@ namespace {
         ASSERT_TRUE(response.isReplSet());
         ASSERT_EQUALS(MemberState::RS_SECONDARY, response.getState().s);
         ASSERT_EQUALS(Timestamp(0,0), response.getOpTime());
-        ASSERT_EQUALS(0, response.getTime().count());
+        ASSERT_EQUALS(Seconds(0).total_milliseconds(), response.getTime().total_milliseconds());
         ASSERT_EQUALS("", response.getHbMsg());
         ASSERT_EQUALS("rs0", response.getReplicaSetName());
         ASSERT_EQUALS(1, response.getVersion());
@@ -3345,7 +3339,7 @@ namespace {
         ASSERT_TRUE(response.isReplSet());
         ASSERT_EQUALS(MemberState::RS_SECONDARY, response.getState().s);
         ASSERT_EQUALS(Timestamp(100,0), response.getOpTime());
-        ASSERT_EQUALS(0, response.getTime().count());
+        ASSERT_EQUALS(Seconds(0).total_milliseconds(), response.getTime().total_milliseconds());
         ASSERT_EQUALS("", response.getHbMsg());
         ASSERT_EQUALS("rs0", response.getReplicaSetName());
         ASSERT_EQUALS(1, response.getVersion());
@@ -3371,7 +3365,7 @@ namespace {
         ASSERT_TRUE(response.isReplSet());
         ASSERT_EQUALS(MemberState::RS_STARTUP, response.getState().s);
         ASSERT_EQUALS(Timestamp(0,0), response.getOpTime());
-        ASSERT_EQUALS(0, response.getTime().count());
+        ASSERT_EQUALS(Seconds(0).total_milliseconds(), response.getTime().total_milliseconds());
         ASSERT_EQUALS("", response.getHbMsg());
         ASSERT_EQUALS("", response.getReplicaSetName());
         ASSERT_EQUALS(-2, response.getVersion());
@@ -3398,7 +3392,7 @@ namespace {
         ASSERT_EQUALS(MemberState::RS_PRIMARY, response.getState().s);
         ASSERT_EQUALS(Timestamp(11,0), response.getOpTime());
         ASSERT_EQUALS(Timestamp(10,0), response.getElectionTime());
-        ASSERT_EQUALS(0, response.getTime().count());
+        ASSERT_EQUALS(Seconds(0).total_milliseconds(), response.getTime().total_milliseconds());
         ASSERT_EQUALS("", response.getHbMsg());
         ASSERT_EQUALS("rs0", response.getReplicaSetName());
         ASSERT_EQUALS(1, response.getVersion());
@@ -3428,7 +3422,7 @@ namespace {
         ASSERT_TRUE(response.isReplSet());
         ASSERT_EQUALS(MemberState::RS_SECONDARY, response.getState().s);
         ASSERT_EQUALS(Timestamp(100,0), response.getOpTime());
-        ASSERT_EQUALS(0, response.getTime().count());
+        ASSERT_EQUALS(Seconds(0).total_milliseconds(), response.getTime().total_milliseconds());
         // changed to a syncing message because our sync source changed recently
         ASSERT_EQUALS("syncing from: h2:27017", response.getHbMsg());
         ASSERT_EQUALS("rs0", response.getReplicaSetName());
@@ -3854,17 +3848,17 @@ namespace {
                                         fresherLastOpTimeApplied,
                                         lastOpTimeApplied);
         ASSERT_NO_ACTION(nextAction.getAction());
-        getTopoCoord().blacklistSyncSource(HostAndPort("host3"), now() + Milliseconds(100));
+        getTopoCoord().blacklistSyncSource(HostAndPort("host3"), now() + 100);
 
         // set up complete, time for actual check
         ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(HostAndPort("host2"), now()));
 
         // unblacklist with too early a time (node should remained blacklisted)
-        getTopoCoord().unblacklistSyncSource(HostAndPort("host3"), now() + Milliseconds(90));
+        getTopoCoord().unblacklistSyncSource(HostAndPort("host3"), now() + 90);
         ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(HostAndPort("host2"), now()));
 
         // unblacklist and it should succeed
-        getTopoCoord().unblacklistSyncSource(HostAndPort("host3"), now() + Milliseconds(100));
+        getTopoCoord().unblacklistSyncSource(HostAndPort("host3"), now() + 100);
         startCapturingLogMessages();
         ASSERT_TRUE(getTopoCoord().shouldChangeSyncSource(HostAndPort("host2"), now()));
         stopCapturingLogMessages();

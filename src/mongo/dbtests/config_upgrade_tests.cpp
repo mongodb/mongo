@@ -138,7 +138,7 @@ namespace mongo {
                 ping.setConfigVersion(CURRENT_CONFIG_VERSION);
 
                 if (i % 2 == 0) {
-                    ping.setPing(ping.getPing() - Minutes(10));
+                    ping.setPing(ping.getPing() - 10 * 60 * 1000);
                 }
 
                 client.insert(MongosType::ConfigNS, ping.toBSON());

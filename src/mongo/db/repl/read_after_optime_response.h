@@ -28,10 +28,10 @@
 
 #pragma once
 
+#include <boost/date_time/posix_time/posix_time_types.hpp>
 #include <string>
 
 #include "mongo/base/status.h"
-#include "mongo/stdx/chrono.h"
 
 namespace mongo {
 
@@ -56,7 +56,7 @@ namespace repl {
         /**
          * Constructs a response with wait set to true along with the given parameters.
          */
-        ReadAfterOpTimeResponse(Status status, stdx::chrono::milliseconds duration);
+        ReadAfterOpTimeResponse(Status status, boost::posix_time::milliseconds duration);
 
         /**
          * Appends to the builder the timeout and duration info if didWait() is true.
@@ -70,7 +70,7 @@ namespace repl {
          * Returns the amount of duration waiting for opTime to pass.
          * Valid only if didWait is true.
          */
-        stdx::chrono::milliseconds getDuration() const;
+        boost::posix_time::milliseconds getDuration() const;
 
         /**
          * Returns more details about an error if it occurred.
@@ -79,11 +79,11 @@ namespace repl {
 
     private:
         ReadAfterOpTimeResponse(Status status,
-                                stdx::chrono::milliseconds duration,
+                                boost::posix_time::milliseconds duration,
                                 bool waited);
 
         bool _waited;
-        stdx::chrono::milliseconds _duration;
+        boost::posix_time::milliseconds _duration;
         Status _status;
     };
 

@@ -415,7 +415,7 @@ namespace {
         BSONObjBuilder respObj2;
         respObj2 << "ok" << 1;
         hbResp2.addToBSON(&respObj2);
-        net->runUntil(net->now() + Seconds(10)); // run until we've sent a heartbeat request
+        net->runUntil(net->now() + 10*1000); // run until we've sent a heartbeat request
         const NetworkInterfaceMock::NetworkOperationIterator noi2 = net->getNextReadyRequest();
         net->scheduleResponse(noi2, net->now(), makeResponseStatus(respObj2.obj()));
         net->runReadyNetworkOperations();
@@ -457,7 +457,7 @@ namespace {
         net->blackHole(net->getNextReadyRequest());
 
         // schedule hb reconfig
-        net->runUntil(net->now() + Seconds(10)); // run until we've sent a heartbeat request
+        net->runUntil(net->now() + 10*1000); // run until we've sent a heartbeat request
         const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
         ReplSetHeartbeatResponse hbResp;
         ReplicaSetConfig config;

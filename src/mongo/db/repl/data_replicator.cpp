@@ -61,7 +61,7 @@ namespace repl {
     MONGO_FP_DECLARE(failInitialSyncWithBadHost);
 
     namespace {
-        const Milliseconds NoSyncSourceRetryDelayMS{4000};
+        int NoSyncSourceRetryDelayMS = 4000;
 
         std::string toString(DataReplicatiorState s) {
             switch (s) {
@@ -499,7 +499,7 @@ namespace repl {
 
             if (status.code() == ErrorCodes::InvalidSyncSource) {
                 // Error, sync source
-                Date_t until{};
+                Date_t until = 0;
                 _replCoord->blacklistSyncSource(_syncSource, until);
                 _syncSource = HostAndPort();
             }

@@ -161,7 +161,7 @@ namespace repl {
          * Seconds object.
          */
         Milliseconds getHeartbeatTimeoutPeriodMillis() const {
-            return _heartbeatTimeoutPeriod;
+            return Milliseconds(_heartbeatTimeoutPeriod.total_milliseconds());
         }
 
         /**

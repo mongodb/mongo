@@ -234,7 +234,7 @@ namespace {
         while (replCoord->getMemberState().primary()) {
             log() << "Waiting on network in state " << replCoord->getMemberState();
             getNet()->enterNetwork();
-            net->runUntil(net->now() + Seconds(10));
+            net->runUntil(net->now() + 10000);
             const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
             const RemoteCommandRequest& request = noi->getRequest();
             log() << request.target.toString() << " processing " << request.cmdObj;

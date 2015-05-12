@@ -355,7 +355,7 @@ namespace mongo {
 
         long long numDeleted = 0;
         
-        Milliseconds millisWaitingForReplication{0};
+        long long millisWaitingForReplication = 0;
 
         while ( 1 ) {
             // Scoping for write lock.
@@ -468,14 +468,14 @@ namespace mongo {
                 else {
                     massertStatusOK(replStatus.status);
                 }
-                millisWaitingForReplication += replStatus.duration;
+                millisWaitingForReplication += replStatus.duration.total_milliseconds();
             }
         }
         
         if (writeConcern.shouldWaitForOtherNodes())
             log(LogComponent::kSharding)
                   << "Helpers::removeRangeUnlocked time spent waiting for replication: "
-                  << durationCount<Milliseconds>(millisWaitingForReplication) << "ms" << endl;
+                  << millisWaitingForReplication << "ms" << endl;
         
         MONGO_LOG_COMPONENT(1, LogComponent::kSharding)
                << "end removal of " << min << " to " << max << " in " << ns

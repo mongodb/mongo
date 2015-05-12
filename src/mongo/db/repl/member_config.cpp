@@ -259,7 +259,7 @@ namespace {
         }
         if (_slaveDelay < Seconds(0) || _slaveDelay > kMaxSlaveDelay) {
             return Status(ErrorCodes::BadValue, str::stream() << kSlaveDelayFieldName <<
-                          " field value of " << durationCount<Seconds>(_slaveDelay) <<
+                          " field value of " << _slaveDelay.total_seconds() <<
                           " seconds is out of range");
         }
         if (_slaveDelay > Seconds(0) && _priority != 0) {
@@ -310,7 +310,7 @@ namespace {
         }
         tags.done();
 
-        configBuilder.append("slaveDelay", durationCount<Seconds>(_slaveDelay));
+        configBuilder.append("slaveDelay", _slaveDelay.total_seconds());
         configBuilder.append("votes", getNumVotes());
         return configBuilder.obj();
     }

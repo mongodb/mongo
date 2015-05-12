@@ -471,12 +471,12 @@ namespace mongo {
             if (!ret.isOK()) {
                 return ret;
             }
-            date = Date_t::fromMillisSinceEpoch(numberLong);
+            date = numberLong;
         }
         else {
             // SERVER-11920: We should use parseNumberFromString here, but that function requires
             // that we know ahead of time where the number ends, which is not currently the case.
-            date = Date_t::fromMillisSinceEpoch(strtoll(_input, &endptr, 10));
+            date = static_cast<unsigned long long>(strtoll(_input, &endptr, 10));
             if (_input == endptr) {
                 return parseError("Date expecting integer milliseconds");
             }
@@ -487,8 +487,7 @@ namespace mongo {
                 // SERVER-11920: We should use parseNumberFromString here, but that function
                 // requires that we know ahead of time where the number ends, which is not currently
                 // the case.
-                date = Date_t::fromMillisSinceEpoch(
-                        static_cast<long long>(strtoull(_input, &endptr, 10)));
+                date = strtoull(_input, &endptr, 10);
                 if (errno == ERANGE) {
                     return parseError("Date milliseconds overflow");
                 }
@@ -754,7 +753,7 @@ namespace mongo {
         char* endptr;
         // SERVER-11920: We should use parseNumberFromString here, but that function requires that
         // we know ahead of time where the number ends, which is not currently the case.
-        Date_t date = Date_t::fromMillisSinceEpoch(strtoll(_input, &endptr, 10));
+        Date_t date = static_cast<unsigned long long>(strtoll(_input, &endptr, 10));
         if (_input == endptr) {
             return parseError("Date expecting integer milliseconds");
         }
@@ -764,8 +763,7 @@ namespace mongo {
             errno = 0;
             // SERVER-11920: We should use parseNumberFromString here, but that function requires
             // that we know ahead of time where the number ends, which is not currently the case.
-            date = Date_t::fromMillisSinceEpoch(
-                    static_cast<long long>(strtoull(_input, &endptr, 10)));
+            date = strtoull(_input, &endptr, 10);
             if (errno == ERANGE) {
                 return parseError("Date milliseconds overflow");
             }

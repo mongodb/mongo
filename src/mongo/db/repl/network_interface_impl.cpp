@@ -159,7 +159,7 @@ namespace {
             if (waitTime <= Milliseconds(0)) {
                 break;
             }
-            _isExecutorRunnableCondition.wait_for(lk, waitTime);
+            _isExecutorRunnableCondition.timed_wait(lk, waitTime);
         }
         _isExecutorRunnable = false;
     }
@@ -184,13 +184,13 @@ namespace {
                 if (_threads.size() > kMinThreads) {
                     const Date_t nowDate = now();
                     const Date_t nextThreadRetirementDate =
-                        _lastFullUtilizationDate + kMaxIdleThreadAge;
+                        _lastFullUtilizationDate + kMaxIdleThreadAge.total_milliseconds();
                     if (nowDate > nextThreadRetirementDate) {
                         _lastFullUtilizationDate = nowDate;
                         break;
                     }
                 }
-                _hasPending.wait_for(lk, kMaxIdleThreadAge);
+                _hasPending.timed_wait(lk, kMaxIdleThreadAge);
                 continue;
             }
             CommandData todo = _pending.front();
@@ -243,7 +243,7 @@ namespace {
             _startNewNetworkThread_inlock();
         }
         if (_numIdleThreads <= _pending.size()) {
-            _lastFullUtilizationDate = Date_t::now();
+            _lastFullUtilizationDate = curTimeMillis64();
         }
         _hasPending.notify_one();
     }
@@ -270,7 +270,7 @@ namespace {
     }
 
     Date_t NetworkInterfaceImpl::now() {
-        return Date_t::now();
+        return curTimeMillis64();
     }
 
     OperationContext* NetworkInterfaceImpl::createOperationContext() {

@@ -109,9 +109,8 @@ namespace {
             builder.appendNull(fieldName);
             break;
         case Date:
-            builder.appendDate(fieldName,
-                               Date_t::fromMillisSinceEpoch(static_cast<long long>(
-                                                                    getNumber(scopeName))));
+            // TODO: make signed
+            builder.appendDate(fieldName, Date_t((unsigned long long)getNumber(scopeName)));
             break;
         case Code:
             builder.appendCode(fieldName, getString(scopeName));

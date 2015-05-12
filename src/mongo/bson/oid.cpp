@@ -151,7 +151,7 @@ namespace {
     }
 
     void OID::init(Date_t date, bool max) {
-        setTimestamp(uint32_t(date.toMillisSinceEpoch() / 1000));
+        setTimestamp(uint32_t(date / 1000));
         uint64_t rest = max ? std::numeric_limits<uint64_t>::max() : 0u;
         std::memcpy(_view().view(kInstanceUniqueOffset), &rest,
                     kInstanceUniqueSize + kIncrementSize);

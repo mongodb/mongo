@@ -46,7 +46,7 @@ namespace {
 
         ASSERT_EQ(Timestamp(20, 30), readAfterOpTime.getOpTime().getTimestamp());
         ASSERT_EQ(2, readAfterOpTime.getOpTime().getTerm());
-        ASSERT_EQ(Milliseconds(100), readAfterOpTime.getTimeout());
+        ASSERT_EQ(100, readAfterOpTime.getTimeout().total_milliseconds());
     }
 
     TEST(ReadAfterParse, Empty) {
@@ -54,7 +54,7 @@ namespace {
         ASSERT_OK(readAfterOpTime.initialize(BSON("find" << "test")));
 
         ASSERT(readAfterOpTime.getOpTime().getTimestamp().isNull());
-        ASSERT_EQ(Milliseconds::zero(), readAfterOpTime.getTimeout());
+        ASSERT_EQ(0, readAfterOpTime.getTimeout().total_milliseconds());
     }
 
     TEST(ReadAfterParse, BadRootType) {
@@ -133,7 +133,7 @@ namespace {
 
         ASSERT_EQ(Timestamp(1, 0), readAfterOpTime.getOpTime().getTimestamp());
         ASSERT_EQ(2, readAfterOpTime.getOpTime().getTerm());
-        ASSERT_EQ(Milliseconds::zero(), readAfterOpTime.getTimeout());
+        ASSERT_EQ(0, readAfterOpTime.getTimeout().total_milliseconds());
     }
 
     TEST(ReadAfterParse, BadTimeoutType) {
@@ -170,7 +170,7 @@ namespace {
 
         ASSERT_EQ(Timestamp(20, 30), readAfterOpTime.getOpTime().getTimestamp());
         ASSERT_EQ(2, readAfterOpTime.getOpTime().getTerm());
-        ASSERT_EQ(Milliseconds::zero(), readAfterOpTime.getTimeout());
+        ASSERT_EQ(0, readAfterOpTime.getTimeout().total_milliseconds());
     }
 
 } // unnamed namespace

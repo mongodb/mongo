@@ -68,7 +68,7 @@ namespace {
 
     // Interval between the time the last heartbeat from a node was received successfully, or
     // the time when we gave up retrying, and when the next heartbeat should be sent to a target.
-    const auto kHeartbeatInterval = Seconds{2};
+    const Milliseconds kHeartbeatInterval(Seconds(2).total_milliseconds());
 
     // Maximum number of retries for a failed heartbeat.
     const int kMaxHeartbeatRetries = 2;
@@ -103,6 +103,7 @@ namespace {
     PingStats::PingStats() :
         count(0),
         value(std::numeric_limits<unsigned int>::max()),
+        _lastHeartbeatStartDate(0),
         _numFailuresSinceLastStart(std::numeric_limits<int>::max()) {
     }
 
@@ -129,6 +130,8 @@ namespace {
         _maxSyncSourceLagSecs(maxSyncSourceLagSecs),
         _selfIndex(-1),
         _stepDownPending(false),
+        _stepDownUntil(0),
+        _electionSleepUntil(0),
         _maintenanceModeCalls(0),
         _followerMode(MemberState::RS_STARTUP2)
     {
@@ -217,17 +220,17 @@ namespace {
         }
         else {
             // choose a time that will exclude no candidates, since we don't see a primary
-            primaryOpTime = Timestamp(_maxSyncSourceLagSecs, 0);
+            primaryOpTime = Timestamp(_maxSyncSourceLagSecs.total_seconds(), 0);
         }
 
         if (primaryOpTime.getSecs() < 
-            static_cast<unsigned int>(_maxSyncSourceLagSecs.count())) {
+            static_cast<unsigned int>(_maxSyncSourceLagSecs.total_seconds())) {
             // erh - I think this means there was just a new election
             // and we don't yet know the new primary's optime
-            primaryOpTime = Timestamp(_maxSyncSourceLagSecs, 0);
+            primaryOpTime = Timestamp(_maxSyncSourceLagSecs.total_seconds(), 0);
         }
 
-        Timestamp oldestSyncOpTime(primaryOpTime.getSecs() - _maxSyncSourceLagSecs.count(), 0);
+        Timestamp oldestSyncOpTime(primaryOpTime.getSecs() - _maxSyncSourceLagSecs.total_seconds(), 0);
 
         int closestIndex = -1;
 
@@ -478,7 +481,7 @@ namespace {
         else if (args.opTime < _latestKnownOpTime(lastOpApplied)) {
             weAreFresher = true;
         }
-        response->appendDate("opTime", Date_t::fromMillisSinceEpoch(lastOpApplied.asLL()));
+        response->appendDate("opTime", lastOpApplied.asULL());
         response->append("fresher", weAreFresher);
 
         std::string errmsg;
@@ -619,12 +622,12 @@ namespace {
                   << highestPriority->getHostAndPort().toString();
             vote = -10000;
         }
-        else if (_voteLease.when + VoteLease::leaseTime >= now &&
+        else if (_voteLease.when.millis + VoteLease::leaseTime.total_milliseconds() >= now.millis &&
                  _voteLease.whoId != args.whoid) {
             log() << "replSet voting no for "
                   <<  hopeful->getHostAndPort().toString()
                   << "; voted for " << _voteLease.whoHostAndPort.toString() << ' '
-                  << durationCount<Seconds>(now - _voteLease.when) << " secs ago";
+                  << (now.millis - _voteLease.when.millis) / 1000 << " secs ago";
         }
         else {
             _voteLease.when = now;
@@ -701,7 +704,7 @@ namespace {
 
         // Heartbeat status message
         response->setHbMsg(_getHbmsg(now));
-        response->setTime(duration_cast<Seconds>(now - Date_t{}));
+        response->setTime(Seconds(Milliseconds(now.asInt64()).total_seconds()));
         response->setOpTime(lastOpApplied);
 
         if (!_syncSource.empty()) {
@@ -760,7 +763,7 @@ namespace {
                 const HostAndPort& target) {
 
         PingStats& hbStats = _pings[target];
-        Milliseconds alreadyElapsed = now - hbStats.getLastHeartbeatStartDate();
+        Milliseconds alreadyElapsed(now.asInt64() - hbStats.getLastHeartbeatStartDate().asInt64());
         if (!_rsConfig.isInitialized() ||
             (hbStats.getNumFailuresSinceLastStart() > kMaxHeartbeatRetries) ||
             (alreadyElapsed >= _rsConfig.getHeartbeatTimeoutPeriodMillis())) {
@@ -790,8 +793,10 @@ namespace {
         const Milliseconds timeoutPeriod(
                 _rsConfig.isInitialized() ?
                 _rsConfig.getHeartbeatTimeoutPeriodMillis() :
-                ReplicaSetConfig::kDefaultHeartbeatTimeoutPeriod);
-        const Milliseconds timeout = timeoutPeriod - alreadyElapsed;
+                Milliseconds(
+                        ReplicaSetConfig::kDefaultHeartbeatTimeoutPeriod.total_milliseconds()));
+        const Milliseconds timeout(
+                timeoutPeriod.total_milliseconds() - alreadyElapsed.total_milliseconds());
         return std::make_pair(hbArgs, timeout);
     }
 
@@ -804,12 +809,12 @@ namespace {
 
         const MemberState originalState = getMemberState();
         PingStats& hbStats = _pings[target];
-        invariant(hbStats.getLastHeartbeatStartDate() != Date_t());
+        invariant(hbStats.getLastHeartbeatStartDate() != Date_t(0));
         if (!hbResponse.isOK()) {
             hbStats.miss();
         }
         else {
-            hbStats.hit(networkRoundTripTime.count());
+            hbStats.hit(networkRoundTripTime.total_milliseconds());
             // Log diagnostics.
             if (hbResponse.getValue().isStateDisagreement()) {
                 LOG(1) << target <<
@@ -821,7 +826,7 @@ namespace {
                             (hbResponse.getStatus().code() == ErrorCodes::Unauthorized) ||
                             (hbResponse.getStatus().code() == ErrorCodes::AuthenticationFailed);
 
-        const Milliseconds alreadyElapsed = now - hbStats.getLastHeartbeatStartDate();
+        Milliseconds alreadyElapsed(now.asInt64() - hbStats.getLastHeartbeatStartDate().asInt64());
         Date_t nextHeartbeatStartDate;
         if (_rsConfig.isInitialized() &&
             (hbStats.getNumFailuresSinceLastStart() <= kMaxHeartbeatRetries) &&
@@ -831,16 +836,16 @@ namespace {
                 LOG(1) << "Bad heartbeat response from " << target <<
                     "; trying again; Retries left: " <<
                     (kMaxHeartbeatRetries - hbStats.getNumFailuresSinceLastStart()) <<
-                    "; " << alreadyElapsed.count() << "ms have already elapsed";
+                    "; " << alreadyElapsed.total_milliseconds() << "ms have already elapsed";
             }
             if (isUnauthorized) {
-                nextHeartbeatStartDate = now + kHeartbeatInterval;
+                nextHeartbeatStartDate = now + kHeartbeatInterval.total_milliseconds();
             } else {
                 nextHeartbeatStartDate = now;
             }
         }
         else {
-            nextHeartbeatStartDate = now + kHeartbeatInterval;
+            nextHeartbeatStartDate = now + kHeartbeatInterval.total_milliseconds();
         }
 
         if (hbResponse.isOK() && hbResponse.getValue().hasConfig()) {
@@ -987,7 +992,9 @@ namespace {
                               << highestPriorityMember.getPriority() << " and is only "
                               << (latestOpTime.getSecs() - highestPriorityMemberOptime.getSecs())
                               << " seconds behind me";
-                        const Date_t until = now + VoteLease::leaseTime + kHeartbeatInterval;
+                        const Date_t until = now +
+                            VoteLease::leaseTime.total_milliseconds() +
+                            kHeartbeatInterval.total_milliseconds();
                         if (_electionSleepUntil < until) {
                             _electionSleepUntil = until;
                         }
@@ -1325,8 +1332,7 @@ namespace {
             response->append("stateStr", myState.toString());
             response->append("uptime", selfUptime);
             response->append("optime", lastOpApplied);
-            response->appendDate("optimeDate",
-                                 Date_t::fromDurationSinceEpoch(Seconds(lastOpApplied.getSecs())));
+            response->appendDate("optimeDate", Date_t(lastOpApplied.getSecs() * 1000ULL));
             if (_maintenanceModeCalls) {
                 response->append("maintenanceMode", _maintenanceModeCalls);
             }
@@ -1353,8 +1359,7 @@ namespace {
                 bb.append("uptime", selfUptime);
                 if (!_selfConfig().isArbiter()) {
                     bb.append("optime", lastOpApplied);
-                    bb.appendDate("optimeDate",
-                                  Date_t::fromDurationSinceEpoch(Seconds(lastOpApplied.getSecs())));
+                    bb.appendDate("optimeDate", Date_t(lastOpApplied.getSecs() * 1000ULL));
                 }
 
                 if (!_syncSource.empty() && !_iAmPrimary()) {
@@ -1371,8 +1376,7 @@ namespace {
 
                 if (myState.primary()) {
                     bb.append("electionTime", _electionTime);
-                    bb.appendDate("electionDate",
-                                  Date_t::fromDurationSinceEpoch(Seconds(_electionTime.getSecs())));
+                    bb.appendDate("electionDate", Date_t(_electionTime.getSecs() * 1000ULL));
                 }
                 bb.appendIntOrLL("configVersion", _rsConfig.getConfigVersion());
                 bb.append("self", true);
@@ -1397,16 +1401,12 @@ namespace {
                     bb.append("stateStr", it->getState().toString());
                 }
 
-                const unsigned int uptime = static_cast<unsigned int>(
-                        (it->getUpSince() != Date_t()?
-                         durationCount<Seconds>(now - it->getUpSince()) :
-                         0));
+                const unsigned int uptime = static_cast<unsigned int> ((it->getUpSince() ?
+                        (now - it->getUpSince()) / 1000 /* convert millis to secs */ : 0));
                 bb.append("uptime", uptime);
                 if (!itConfig.isArbiter()) {
                     bb.append("optime", it->getOpTime());
-                    bb.appendDate(
-                            "optimeDate",
-                            Date_t::fromDurationSinceEpoch(Seconds(it->getOpTime().getSecs())));
+                    bb.appendDate("optimeDate", Date_t(it->getOpTime().getSecs() * 1000ULL));
                 }
                 bb.appendDate("lastHeartbeat", it->getLastHeartbeat());
                 bb.appendDate("lastHeartbeatRecv", it->getLastHeartbeatRecv());
@@ -1428,8 +1428,7 @@ namespace {
                 if (state == MemberState::RS_PRIMARY) {
                     bb.append("electionTime", it->getElectionTime());
                     bb.appendDate("electionDate",
-                                  Date_t::fromDurationSinceEpoch(
-                                          Seconds(it->getElectionTime().getSecs())));
+                                  Date_t(it->getElectionTime().getSecs() * 1000ULL));
                 }
                 bb.appendIntOrLL("configVersion", it->getConfigVersion());
                 membersOut.push_back(bb.obj());
@@ -1469,7 +1468,7 @@ namespace {
         {
             for (ReplicaSetConfig::MemberIterator it = _rsConfig.membersBegin();
                     it != _rsConfig.membersEnd(); ++it) {
-                if (it->isHidden() || it->getSlaveDelay() > Seconds{0}) {
+                if (it->isHidden() || it->getSlaveDelay().total_seconds() > 0) {
                     continue;
                 }
 
@@ -1497,7 +1496,7 @@ namespace {
         else if (selfConfig.getPriority() == 0) {
             response->setIsPassive(true);
         }
-        if (selfConfig.getSlaveDelay().count()) {
+        if (selfConfig.getSlaveDelay().total_seconds()) {
             response->setSlaveDelay(selfConfig.getSlaveDelay());
         }
         if (selfConfig.isHidden()) {
@@ -1548,7 +1547,7 @@ namespace {
                 response->append("warning", "you really want to freeze for only 1 second?");
 
             if (!_iAmPrimary()) {
-                _stepDownUntil = std::max(_stepDownUntil, now + Seconds(secs));
+                _stepDownUntil = std::max(_stepDownUntil, Date_t(now + (secs * 1000)));
                 log() << "'freezing' for " << secs << " seconds";
             }
             else {
@@ -1675,7 +1674,7 @@ namespace {
     }
     std::string TopologyCoordinatorImpl::_getHbmsg(Date_t now) const {
         // ignore messages over 2 minutes old
-        if ((now - _hbmsgTime) > Seconds{120}) {
+        if ((now - _hbmsgTime) > 120) {
             return "";
         }
         return _hbmsg;
@@ -1743,7 +1742,7 @@ namespace {
         }
         if (_voteLease.whoId != -1 &&
                 _voteLease.whoId !=_rsConfig.getMemberAt(_selfIndex).getId() &&
-                _voteLease.when + VoteLease::leaseTime >= now) {
+                _voteLease.when.millis + VoteLease::leaseTime.total_milliseconds() >= now.millis) {
             result |= VotedTooRecently;
         }
 
@@ -1880,11 +1879,11 @@ namespace {
             return false;
         }
         int selfId = _selfConfig().getId();
-        if ((_voteLease.when + VoteLease::leaseTime >= now) 
+        if ((_voteLease.when + VoteLease::leaseTime.total_milliseconds() >= now) 
             && (_voteLease.whoId != selfId)) {
             log() << "not voting yea for " << selfId <<
                 " voted for " << _voteLease.whoHostAndPort.toString() << ' ' << 
-                durationCount<Seconds>(now - _voteLease.when) << " secs ago";
+                (now - _voteLease.when) / 1000 << " secs ago";
             return false;
         }
         _voteLease.when = now;
@@ -1937,7 +1936,7 @@ namespace {
         // Clear voteLease time, if we voted for ourselves in this election.
         // This will allow us to vote for others.
         if (_voteLease.whoId == _selfConfig().getId()) {
-            _voteLease.when = Date_t();
+            _voteLease.when = 0;
         }
     }
 
@@ -2062,7 +2061,7 @@ namespace {
             return false;
         }
         unsigned int currentSecs = currentOpTime.getSecs();
-        unsigned int goalSecs = currentSecs + _maxSyncSourceLagSecs.count();
+        unsigned int goalSecs = currentSecs + _maxSyncSourceLagSecs.total_seconds();
 
         for (std::vector<MemberHeartbeatData>::const_iterator it = _hbdata.begin();
              it != _hbdata.end();
@@ -2076,7 +2075,7 @@ namespace {
                 goalSecs < it->getOpTime().getSecs()) {
                 log() << "changing sync target because current sync target's most recent OpTime is "
                       << currentOpTime.toStringLong() << " which is more than "
-                      << _maxSyncSourceLagSecs.count() << " seconds behind member " 
+                      << _maxSyncSourceLagSecs.total_seconds() << " seconds behind member " 
                       <<  candidateConfig.getHostAndPort().toString()
                       << " whose most recent OpTime is " << it->getOpTime().toStringLong();
                 invariant(itIndex != _selfIndex);

@@ -211,8 +211,7 @@ namespace mongo {
             @see Bool(), trueValue()
         */
         Date_t date() const {
-            return Date_t::fromMillisSinceEpoch(
-                    ConstDataView(value()).read<LittleEndian<long long>>());
+            return Date_t(ConstDataView(value()).read<LittleEndian<unsigned long long>>());
         }
 
         /** Convert the value to boolean, regardless of its type, in a javascript-like fashion
@@ -465,7 +464,7 @@ namespace mongo {
 
         Date_t timestampTime() const {
             unsigned long long t = ConstDataView(value() + 4).read<LittleEndian<unsigned int>>();
-            return Date_t::fromMillisSinceEpoch(t * 1000);
+            return t * 1000;
         }
         unsigned int timestampInc() const {
             return ConstDataView(value()).read<LittleEndian<unsigned int>>();

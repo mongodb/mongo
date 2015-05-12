@@ -123,7 +123,7 @@ namespace mongo {
         _what.clear();
         _isWhatSet = false;
 
-        _time = Date_t();
+        _time = 0ULL;
         _isTimeSet = false;
 
         _details = BSONObj();

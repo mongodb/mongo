@@ -109,9 +109,7 @@ namespace mongo {
         case String:
             appendMinForType( fieldName, Object ); return;
         case Date:
-            appendDate(fieldName,
-                       Date_t::fromMillisSinceEpoch(std::numeric_limits<long long>::max()));
-            return;
+            appendDate( fieldName , std::numeric_limits<long long>::max() ); return;
         case bsonTimestamp:
             append( fieldName , Timestamp::max() ); return;
         case Undefined: // shared with EOO
@@ -198,9 +196,16 @@ namespace mongo {
     }
 
     BSONObjBuilder& BSONObjBuilder::appendDate(StringData fieldName, Date_t dt) {
+        /* easy to pass a time_t to this and get a bad result.  thus this warning. */
+        if ( kDebugBuild && dt > 0 && dt <= 0xffffffff ) {
+            static int n;
+            if( n++ == 0 )
+                log() << "DEV WARNING appendDate() called with a tiny (but nonzero) date" << std::endl;
+        }
+
         _b.appendNum((char) Date);
         _b.appendStr(fieldName);
-        _b.appendNum(dt.toMillisSinceEpoch());
+        _b.appendNum(dt);
         return *this;
     }
 

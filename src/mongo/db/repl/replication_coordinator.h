@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <boost/date_time/posix_time/posix_time_types.hpp>
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
@@ -36,7 +37,6 @@
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/reporter.h"
 #include "mongo/util/net/hostandport.h"
-#include "mongo/util/time_support.h"
 
 namespace mongo {
 
@@ -88,6 +88,8 @@ namespace repl {
         MONGO_DISALLOW_COPYING(ReplicationCoordinator);
 
     public:
+
+        typedef boost::posix_time::milliseconds Milliseconds;
 
         struct StatusAndDuration {
         public:

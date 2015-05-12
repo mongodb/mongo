@@ -131,7 +131,7 @@ namespace mongo {
         _name.clear();
         _isNameSet = false;
 
-        _ping = Date_t();
+        _ping = 0ULL;
         _isPingSet = false;
 
         _up = 0;

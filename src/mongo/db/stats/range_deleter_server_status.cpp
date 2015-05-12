@@ -74,16 +74,16 @@ namespace mongo {
                 BSONObjBuilder entryBuilder;
                 entryBuilder.append("deletedDocs", (*it)->deletedDocCount);
 
-                if ((*it)->queueEndTS > Date_t()) {
+                if ((*it)->queueEndTS.millis > 0) {
                     entryBuilder.append("queueStart", (*it)->queueStartTS);
                     entryBuilder.append("queueEnd", (*it)->queueEndTS);
                 }
 
-                if ((*it)->deleteEndTS > Date_t()) {
+                if ((*it)->deleteEndTS.millis > 0) {
                     entryBuilder.append("deleteStart", (*it)->deleteStartTS);
                     entryBuilder.append("deleteEnd", (*it)->deleteEndTS);
 
-                    if ((*it)->waitForReplEndTS > Date_t()) {
+                    if ((*it)->waitForReplEndTS.millis > 0) {
                         entryBuilder.append("waitForReplStart", (*it)->waitForReplStartTS);
                         entryBuilder.append("waitForReplEnd", (*it)->waitForReplEndTS);
                     }

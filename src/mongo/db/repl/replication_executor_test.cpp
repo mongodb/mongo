@@ -284,22 +284,22 @@ namespace {
         Status status3(ErrorCodes::InternalError, "Not mutated");
         const Date_t now = net->now();
         const ReplicationExecutor::CallbackHandle cb1 =
-            unittest::assertGet(executor.scheduleWorkAt(now + Milliseconds(100),
+            unittest::assertGet(executor.scheduleWorkAt(Date_t(now.millis + 100),
                                                         stdx::bind(setStatus,
                                                                    stdx::placeholders::_1,
                                                                    &status1)));
-        unittest::assertGet(executor.scheduleWorkAt(now + Milliseconds(5000),
+        unittest::assertGet(executor.scheduleWorkAt(Date_t(now.millis + 5000),
                                                     stdx::bind(setStatus,
                                                                stdx::placeholders::_1,
                                                                &status3)));
         const ReplicationExecutor::CallbackHandle cb2 =
-            unittest::assertGet(executor.scheduleWorkAt(now + Milliseconds(200),
+            unittest::assertGet(executor.scheduleWorkAt(Date_t(now.millis + 200),
                                                         stdx::bind(setStatusAndShutdown,
                                                                    stdx::placeholders::_1,
                                                                    &status2)));
         const Date_t startTime = net->now();
-        net->runUntil(startTime + Milliseconds(200));
-        ASSERT_EQUALS(startTime + Milliseconds(200), net->now());
+        net->runUntil(startTime + 200 /*ms*/);
+        ASSERT_EQUALS(startTime + 200, net->now());
         executor.wait(cb1);
         executor.wait(cb2);
         ASSERT_OK(status1);
@@ -457,7 +457,7 @@ namespace {
                 HostAndPort("lazy", 27017),
                 "admin",
                 BSON("sleep" << 1),
-                Milliseconds(1));
+                ReplicationExecutor::Milliseconds(1));
         ReplicationExecutor::CallbackHandle cbHandle = unittest::assertGet(
                 executor.scheduleRemoteCommand(
                         request,
@@ -469,10 +469,10 @@ namespace {
         const Date_t startTime = net->now();
         NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
         net->scheduleResponse(noi,
-                              startTime + Milliseconds(2),
+                              startTime + 2,
                               ResponseStatus(ErrorCodes::ExceededTimeLimit, "I took too long"));
-        net->runUntil(startTime + Milliseconds(2));
-        ASSERT_EQUALS(startTime + Milliseconds(2), net->now());
+        net->runUntil(startTime + 2);
+        ASSERT_EQUALS(startTime + 2, net->now());
         executor.wait(cbHandle);
         ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, status);
     }

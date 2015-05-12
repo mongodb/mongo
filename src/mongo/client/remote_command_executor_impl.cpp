@@ -42,22 +42,29 @@ namespace mongo {
 namespace {
 
     /**
-     * Calculates the timeout for a network operation expiring at "expDate", given
-     * that it is now "nowDate".
+     * Calculates the timeout for a network operation expiring at "expDate", given that it is now
+     * "nowDate".
      *
-     * Returns 0ms to indicate no expiration date, a number of milliseconds until "expDate", or
+     * Returns 0 to indicate no expiration date, a number of milliseconds until "expDate", or
      * ErrorCodes::ExceededTimeLimit if "expDate" is not later than "nowDate".
+     *
+     * TODO: Change return type to StatusWith<Milliseconds> once Milliseconds supports default
+     * construction or StatusWith<T> supports not constructing T when the result is a non-OK
+     * status.
      */
-    StatusWith<Milliseconds> getTimeoutMillis(const Date_t expDate, const Date_t nowDate) {
+    StatusWith<int64_t> getTimeoutMillis(const Date_t expDate, const Date_t nowDate) {
         if (expDate == kNoExpirationDate) {
-            return Milliseconds(0);
+            return StatusWith<int64_t>(0);
         }
+
         if (expDate <= nowDate) {
-            return {ErrorCodes::ExceededTimeLimit,
-                    str::stream() << "Went to run command, but it was too late. "
-                    "Expiration was set to " << dateToISOStringUTC(expDate)};
+            return StatusWith<int64_t>(
+                        ErrorCodes::ExceededTimeLimit,
+                        str::stream() << "Went to run command, but it was too late. "
+                                         "Expiration was set to " << dateToISOStringUTC(expDate));
         }
-        return expDate - nowDate;
+
+        return StatusWith<int64_t>(expDate.asInt64() - nowDate.asInt64());
     }
 
     /**
@@ -213,8 +220,9 @@ namespace {
         try {
             BSONObj output;
 
-            const Date_t requestStartDate = Date_t::now();
-            const auto timeoutMillis = getTimeoutMillis(request.expirationDate, requestStartDate);
+            const Date_t requestStartDate = curTimeMillis64();
+            StatusWith<int64_t> timeoutMillis = getTimeoutMillis(request.expirationDate,
+                                                                 requestStartDate);
             if (!timeoutMillis.isOK()) {
                 return StatusWith<RemoteCommandResponse>(timeoutMillis.getStatus());
             }
@@ -222,7 +230,7 @@ namespace {
             ConnectionPool::ConnectionPtr conn(&_connPool,
                                                request.target,
                                                requestStartDate,
-                                               timeoutMillis.getValue());
+                                               Milliseconds(timeoutMillis.getValue()));
 
             bool ok = conn.get()->runCommand(request.dbname, request.cmdObj, output);
 
@@ -252,7 +260,7 @@ namespace {
                 }
             }
 
-            const Date_t requestFinishDate = Date_t::now();
+            const Date_t requestFinishDate = curTimeMillis64();
             conn.done(requestFinishDate);
 
             return StatusWith<RemoteCommandResponse>(

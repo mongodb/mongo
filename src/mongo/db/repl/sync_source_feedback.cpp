@@ -127,7 +127,8 @@ namespace repl {
         catch (const DBException& e) {
             log() << "SyncSourceFeedback error sending update: " << e.what() << endl;
             // blacklist sync target for .5 seconds and find a new one
-            replCoord->blacklistSyncSource(_syncTarget, Date_t::now() + Milliseconds(500));
+            replCoord->blacklistSyncSource(_syncTarget,
+                                           Date_t(curTimeMillis64() + 500));
             BackgroundSync::get()->clearSyncTarget();
             _resetConnection();
             return e.toStatus();
@@ -140,7 +141,8 @@ namespace repl {
             // to the syncsource having a newer config
             if (status != ErrorCodes::InvalidReplicaSetConfig || res["cfgver"].eoo() ||
                     res["cfgver"].numberLong() < replCoord->getConfig().getConfigVersion()) {
-                replCoord->blacklistSyncSource(_syncTarget, Date_t::now() + Milliseconds(500));
+                replCoord->blacklistSyncSource(_syncTarget,
+                                               Date_t(curTimeMillis64() + 500));
                 BackgroundSync::get()->clearSyncTarget();
                 _resetConnection();
             }

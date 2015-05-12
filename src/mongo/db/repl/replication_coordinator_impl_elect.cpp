@@ -173,9 +173,9 @@ namespace {
                 break;
             case FreshnessChecker::FreshnessTie:
                 if ((_selfIndex != 0) && !_sleptLastElection) {
-                    const auto ms = Milliseconds(_replExecutor.nextRandomInt64(1000) + 50);
+                    const long long ms = _replExecutor.nextRandomInt64(1000) + 50;
                     const Date_t nextCandidateTime = now + ms;
-                    log() << "possible election tie; sleeping " << ms.count() << "ms until " <<
+                    log() << "possible election tie; sleeping " << ms << "ms until " <<
                         dateToISOStringLocal(nextCandidateTime);
                     _topCoord->setElectionSleepUntil(nextCandidateTime);
                     _replExecutor.scheduleWorkAt(
@@ -241,7 +241,7 @@ namespace {
                 " votes, but needed at least " << _rsConfig.getMajorityVoteCount();
             // Suppress ourselves from standing for election again, giving other nodes a chance 
             // to win their elections.
-            const auto ms = Milliseconds(_replExecutor.nextRandomInt64(1000) + 50);
+            const long long ms = _replExecutor.nextRandomInt64(1000) + 50;
             const Date_t now(_replExecutor.now());
             const Date_t nextCandidateTime = now + ms;
             log() << "waiting until " << nextCandidateTime << " before standing for election again";

@@ -500,7 +500,7 @@ namespace {
                     tryToGoLiveAsASecondary(&txn, replCoord);
                 }
 
-                const int slaveDelaySecs = replCoord->getSlaveDelaySecs().count();
+                const int slaveDelaySecs = replCoord->getSlaveDelaySecs().total_seconds();
                 if (!ops.empty() && slaveDelaySecs > 0) {
                     const BSONObj& lastOp = ops.getDeque().back();
                     const unsigned int opTimestampSecs = lastOp["ts"].timestamp().getSecs();
@@ -620,7 +620,7 @@ namespace {
 
     void SyncTail::handleSlaveDelay(const BSONObj& lastOp) {
         ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
-        int slaveDelaySecs = replCoord->getSlaveDelaySecs().count();
+        int slaveDelaySecs = replCoord->getSlaveDelaySecs().total_seconds();
 
         // ignore slaveDelay if the box is still initializing. once
         // it becomes secondary we can worry about it.
@@ -645,7 +645,7 @@ namespace {
                         sleepsecs(6);
 
                         // Handle reconfigs that changed the slave delay
-                        if (replCoord->getSlaveDelaySecs().count() != slaveDelaySecs)
+                        if (replCoord->getSlaveDelaySecs().total_seconds() != slaveDelaySecs)
                             break;
                     }
                 }

@@ -53,7 +53,7 @@ namespace {
 
     void LegacyDistLockPinger::_distLockPingThread(ConnectionString addr,
                                                    const string& process,
-                                                   Milliseconds sleepTime) {
+                                                   stdx::chrono::milliseconds sleepTime) {
         setThreadName("LockPinger");
 
         string pingId = pingThreadId(addr, process);
@@ -73,11 +73,11 @@ namespace {
                 ScopedDbConnection conn(addr.toString(), 30.0);
 
                 pingTime = jsTime();
-                const auto  elapsed = pingTime - lastPingTime;
-                if (elapsed > 10 * sleepTime) {
+                Date_t elapsed(pingTime.millis - lastPingTime.millis);
+                if (elapsed.millis > static_cast<unsigned long long>(10 * sleepTime.count())) {
                     warning() << "Lock pinger for addr: " << addr
                               << ", proc: " << process
-                              << " was inactive for " << elapsed;
+                              << " was inactive for " << elapsed.millis << " ms";
                 }
 
                 lastPingTime = pingTime;
@@ -133,7 +133,7 @@ namespace {
                 // of another pinger is too skewed). This is still fine as the lock logic only
                 // checks if there is a change in the ping document and the document going away
                 // is a valid change.
-                Date_t fourDays = pingTime - stdx::chrono::hours{4 * 24};
+                Date_t fourDays = pingTime - (4 * 86400 * 1000); // 4 days
                 conn->remove(LockpingsType::ConfigNS,
                              BSON(LockpingsType::process() << NIN << pids
                                   << LockpingsType::ping() << LT << fourDays));

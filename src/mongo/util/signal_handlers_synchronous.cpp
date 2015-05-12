@@ -114,7 +114,7 @@ namespace {
     // must hold streamMutex to call
     void writeMallocFreeStreamToLog() {
         logger::globalLogDomain()->append(
-            logger::MessageEventEphemeral(Date_t::now(),
+            logger::MessageEventEphemeral(curTimeMillis64(),
                                           logger::LogSeverity::Severe(),
                                           getThreadName(),
                                           mallocFreeOStream.str()));

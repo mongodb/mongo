@@ -42,7 +42,7 @@ namespace repl {
     const string ReadAfterOpTimeResponse::kWaitedMSFieldName("waitedMS");
 
     ReadAfterOpTimeResponse::ReadAfterOpTimeResponse(Status status):
-        ReadAfterOpTimeResponse(status, stdx::chrono::milliseconds(0), false) {
+        ReadAfterOpTimeResponse(status, boost::posix_time::milliseconds(0), false) {
     }
 
     ReadAfterOpTimeResponse::ReadAfterOpTimeResponse():
@@ -50,12 +50,12 @@ namespace repl {
     }
 
     ReadAfterOpTimeResponse::ReadAfterOpTimeResponse(Status status,
-                                                     stdx::chrono::milliseconds duration):
+                                                     boost::posix_time::milliseconds duration):
         ReadAfterOpTimeResponse(status, duration, true) {
     }
 
     ReadAfterOpTimeResponse::ReadAfterOpTimeResponse(Status status,
-                                                     stdx::chrono::milliseconds duration,
+                                                     boost::posix_time::milliseconds duration,
                                                      bool waited):
         _waited(waited),
         _duration(duration),
@@ -67,14 +67,15 @@ namespace repl {
             return;
         }
 
-        builder->append(kWaitedMSFieldName, durationCount<Milliseconds>(_duration));
+        builder->append(kWaitedMSFieldName,
+                        static_cast<long long>(_duration.total_milliseconds()));
     }
 
     bool ReadAfterOpTimeResponse::didWait() const {
         return _waited;
     }
 
-    stdx::chrono::milliseconds ReadAfterOpTimeResponse::getDuration() const {
+    boost::posix_time::milliseconds ReadAfterOpTimeResponse::getDuration() const {
         return _duration;
     }
 

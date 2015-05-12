@@ -136,8 +136,8 @@ namespace mongo {
             Status status = repl::getGlobalReplicationCoordinator()->stepDown(
                                     txn,
                                     force,
-                                    Seconds(timeoutSecs),
-                                    Seconds(120));
+                                    repl::ReplicationCoordinator::Milliseconds(timeoutSecs * 1000),
+                                    repl::ReplicationCoordinator::Milliseconds(120 * 1000));
             if (!status.isOK() && status.code() != ErrorCodes::NotMaster) { // ignore not master
                 return appendCommandStatus(result, status);
             }

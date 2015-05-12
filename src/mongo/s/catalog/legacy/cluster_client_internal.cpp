@@ -91,18 +91,19 @@ namespace mongo {
 
                 Date_t lastPing = ping.getPing();
 
-                Minutes quietIntervalMins{0};
+                long long quietIntervalMillis = 0;
                 Date_t currentJsTime = jsTime();
                 if (currentJsTime >= lastPing) {
-                    quietIntervalMins = duration_cast<Minutes>(currentJsTime - lastPing);
+                    quietIntervalMillis = static_cast<long long>(currentJsTime - lastPing);
                 }
+                long long quietIntervalMins = quietIntervalMillis / (60 * 1000);
 
                 // We assume that anything that hasn't pinged in 5 minutes is probably down
-                if (quietIntervalMins >= Minutes{5}) {
-                    log() << "stale mongos detected " << quietIntervalMins.count()
-                          << " minutes ago, network location is " << pingDoc["_id"].String()
-                          << ", not checking version";
-                }
+                if (quietIntervalMins >= 5) {
+                    log() << "stale mongos detected " << quietIntervalMins << " minutes ago,"
+                          << " network location is " << pingDoc["_id"].String()
+                          << ", not checking version" << endl;
+            	}
                 else {
                     if (versionCmp(mongoVersion, minMongoVersion) < 0) {
                         return Status(ErrorCodes::RemoteValidationError,

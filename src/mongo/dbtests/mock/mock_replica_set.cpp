@@ -219,8 +219,8 @@ namespace mongo {
                     builder.append("passive", true);
                 }
 
-                if (member->getSlaveDelay().count()) {
-                    builder.appendIntOrLL("slaveDelay", member->getSlaveDelay().count());
+                if (member->getSlaveDelay().total_seconds()) {
+                    builder.append("slaveDelay", member->getSlaveDelay().total_seconds());
                 }
 
                 if (member->isHidden()) {

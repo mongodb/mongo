@@ -675,7 +675,7 @@ namespace QueryTests {
             
             ClientCursorPin clientCursor( ctx.db()->getCollection( ns )->getCursorManager(),
                                           cursorId );
-            ASSERT_EQUALS( three.asULL(), clientCursor.c()->getSlaveReadTill().asULL() );
+            ASSERT_EQUALS( three.millis, clientCursor.c()->getSlaveReadTill().asULL() );
         }
     };
 

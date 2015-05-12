@@ -269,8 +269,8 @@ namespace mongo {
         }
         // Add stats
         result->writtenTo = repl::getGlobalReplicationCoordinator()->getHostsWrittenTo(replOpTime);
-        gleWtimeStats.recordMillis(replStatus.duration.count());
-        result->wTime = replStatus.duration.count();
+        gleWtimeStats.recordMillis(replStatus.duration.total_milliseconds());
+        result->wTime = replStatus.duration.total_milliseconds();
 
         return replStatus.status;
     }

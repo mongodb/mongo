@@ -52,7 +52,7 @@ namespace mongo {
          * Information about a connection in the pool.
          */
         struct ConnectionInfo {
-            ConnectionInfo() : conn(NULL) {}
+            ConnectionInfo() : conn(NULL), creationDate(0ULL) {}
             ConnectionInfo(DBClientConnection* theConn, Date_t date)
                 : conn(theConn),
                   creationDate(date) {}

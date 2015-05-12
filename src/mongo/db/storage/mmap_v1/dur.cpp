@@ -701,8 +701,7 @@ namespace {
                 boost::unique_lock<boost::mutex> lock(flushMutex);
 
                 for (unsigned i = 0; i <= 2; i++) {
-                    if (boost::cv_status::no_timeout == flushRequested.wait_for(
-                                lock, Milliseconds(oneThird))) {
+                    if (flushRequested.timed_wait(lock, Milliseconds(oneThird))) {
                         // Someone forced a flush
                         break;
                     }

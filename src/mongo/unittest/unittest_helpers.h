@@ -32,7 +32,7 @@
 
 namespace mongo {
     class Timestamp;
-    class Date_t;
+    struct Date_t;
 
     // So that you can ASSERT_EQUALS two Timestamps
     std::ostream& operator<<(std::ostream& s, const Timestamp& ot);

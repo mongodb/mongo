@@ -50,7 +50,7 @@ namespace {
         ASSERT_EQUALS(0, config.membersBegin()->getId());
         ASSERT_EQUALS(1, config.getDefaultWriteConcern().wNumNodes);
         ASSERT_EQUALS("", config.getDefaultWriteConcern().wMode);
-        ASSERT_EQUALS(Seconds(10), config.getHeartbeatTimeoutPeriod());
+        ASSERT_EQUALS(10, config.getHeartbeatTimeoutPeriod().total_seconds());
         ASSERT_TRUE(config.isChainingAllowed());
         ASSERT_EQUALS(0, config.getProtocolVersion());
     }
@@ -78,7 +78,7 @@ namespace {
         ASSERT_EQUALS(0, config.getDefaultWriteConcern().wNumNodes);
         ASSERT_EQUALS("majority", config.getDefaultWriteConcern().wMode);
         ASSERT_FALSE(config.isChainingAllowed());
-        ASSERT_EQUALS(Seconds(120), config.getHeartbeatTimeoutPeriod());
+        ASSERT_EQUALS(120, config.getHeartbeatTimeoutPeriod().total_seconds());
         ASSERT_EQUALS(2, config.getProtocolVersion());
     }
 
@@ -603,7 +603,7 @@ namespace {
                                                             "host" << "localhost:12345")) <<
                                "settings" << BSON("heartbeatTimeoutSecs" << 20))));
         ASSERT_OK(config.validate());
-        ASSERT_EQUALS(Seconds(20), config.getHeartbeatTimeoutPeriod());
+        ASSERT_EQUALS(20, config.getHeartbeatTimeoutPeriod().total_seconds());
 
         ASSERT_OK(config.initialize(
                           BSON("_id" << "rs0" <<

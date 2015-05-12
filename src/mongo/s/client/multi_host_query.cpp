@@ -181,7 +181,7 @@ namespace mongo {
                                                            int timeoutMillis) {
 
         Date_t nowMillis = _systemEnv->currentTimeMillis();
-        Date_t timeoutAtMillis = nowMillis + Milliseconds(timeoutMillis);
+        Date_t timeoutAtMillis = nowMillis + timeoutMillis;
 
         // Send out all queries
         scheduleQuery(hosts, query, timeoutAtMillis);
@@ -228,7 +228,8 @@ namespace mongo {
                 break;
             }
 
-            _nextResultCV.wait_for(lk, timeoutAtMillis - nowMillis);
+            _nextResultCV.timed_wait(lk,
+                                     boost::posix_time::milliseconds(timeoutAtMillis - nowMillis));
         }
 
         dassert( !nextResult.isOK() || nextResult.getValue() );
