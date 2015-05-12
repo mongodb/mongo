@@ -135,7 +135,6 @@ namespace SymbolArgument {
                 log() << result.jsonString();
                 ASSERT(ok);
             }
-            db.resetIndexCache();
         }
     };
 

@@ -647,7 +647,7 @@ namespace mongo {
                         }
                     }
                     else if ( op == "createIndex" ) {
-                        conn->ensureIndex( ns , e["key"].Obj() , false , "" , false );
+                        conn->ensureIndex(ns, e["key"].Obj(), false, "", false);
                     }
                     else if ( op == "dropIndex" ) {
                         conn->dropIndex( ns , e["key"].Obj()  );

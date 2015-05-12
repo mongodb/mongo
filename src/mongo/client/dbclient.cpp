@@ -39,7 +39,6 @@
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/config.h"
 #include "mongo/db/auth/internal_user_auth.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -62,9 +61,28 @@ namespace mongo {
     using std::stringstream;
     using std::vector;
 
-    AtomicInt64 DBClientBase::ConnectionIdSequence;
+namespace {
 
     const char* const saslCommandUserSourceFieldName = "userSource";
+
+#ifdef MONGO_CONFIG_SSL
+    static SimpleMutex s_mtx("SSLManager");
+    static SSLManagerInterface* s_sslMgr(NULL);
+
+    SSLManagerInterface* sslManager() {
+        SimpleMutex::scoped_lock lk(s_mtx);
+        if (s_sslMgr) {
+            return s_sslMgr;
+        }
+
+        s_sslMgr = getSSLManager();
+        return s_sslMgr;
+    }
+#endif
+
+} // namespace
+
+    AtomicInt64 DBClientBase::ConnectionIdSequence;
 
     const BSONField<BSONObj> Query::ReadPrefField("$readPreference");
     const BSONField<string> Query::ReadPrefModeField("mode");
@@ -651,50 +669,6 @@ namespace mongo {
         return runCommand("admin", b.done(), *info);
     }
 
-    bool DBClientWithCommands::setDbProfilingLevel(const string &dbname, ProfilingLevel level, BSONObj *info ) {
-        BSONObj o;
-        if ( info == 0 ) info = &o;
-
-        if ( level ) {
-            // Create system.profile collection.  If it already exists this does nothing.
-            // TODO: move this into the db instead of here so that all
-            //       drivers don't have to do this.
-            string ns = dbname + ".system.profile";
-            createCollection(ns.c_str(), 1024 * 1024, true, 0, info);
-        }
-
-        BSONObjBuilder b;
-        b.append("profile", (int) level);
-        return runCommand(dbname, b.done(), *info);
-    }
-
-    BSONObj getprofilingcmdobj = fromjson("{\"profile\":-1}");
-
-    bool DBClientWithCommands::getDbProfilingLevel(const string &dbname, ProfilingLevel& level, BSONObj *info) {
-        BSONObj o;
-        if ( info == 0 ) info = &o;
-        if ( runCommand(dbname, getprofilingcmdobj, *info) ) {
-            level = (ProfilingLevel) info->getIntField("was");
-            return true;
-        }
-        return false;
-    }
-
-    DBClientWithCommands::MROutput DBClientWithCommands::MRInline (BSON("inline" << 1));
-
-    BSONObj DBClientWithCommands::mapreduce(const string &ns, const string &jsmapf, const string &jsreducef, BSONObj query, MROutput output) {
-        BSONObjBuilder b;
-        b.append("mapreduce", nsGetCollection(ns));
-        b.appendCode("map", jsmapf);
-        b.appendCode("reduce", jsreducef);
-        if( !query.isEmpty() )
-            b.append("query", query);
-        b.append("out", output.out);
-        BSONObj info;
-        runCommand(nsGetDB(ns), b.done(), info);
-        return info;
-    }
-
     bool DBClientWithCommands::eval(const string &dbname, const string &jscode, BSONObj& info, BSONElement& retValue, BSONObj *args) {
         BSONObjBuilder b;
         b.appendCode("$eval", jscode);
@@ -1271,7 +1245,6 @@ namespace mongo {
             LOG(_logLevel) << "dropIndex failed: " << info << endl;
             uassert( 10007 ,  "dropIndex failed" , 0 );
         }
-        resetIndexCache();
     }
 
     void DBClientWithCommands::dropIndexes( const string& ns ) {
@@ -1282,11 +1255,9 @@ namespace mongo {
                              BSON( "deleteIndexes" << nsToCollectionSubstring(ns) << "index" << "*"),
                              info )
                  );
-        resetIndexCache();
     }
 
     void DBClientWithCommands::reIndex( const string& ns ) {
-        resetIndexCache();
         BSONObj info;
         uassert(18908,
                 str::stream() << "reIndex failed: " << info,
@@ -1318,11 +1289,10 @@ namespace mongo {
         return ss.str();
     }
 
-    bool DBClientWithCommands::ensureIndex( const string &ns,
+    void DBClientWithCommands::ensureIndex( const string &ns,
                                             BSONObj keys,
                                             bool unique,
                                             const string & name,
-                                            bool cache,
                                             bool background,
                                             int version,
                                             int ttl ) {
@@ -1352,21 +1322,10 @@ namespace mongo {
         if( background ) 
             toSave.appendBool( "background", true );
 
-        if ( _seenIndexes.count( cacheKey ) )
-            return 0;
-
-        if ( cache )
-            _seenIndexes.insert( cacheKey );
-
         if ( ttl > 0 )
             toSave.append( "expireAfterSeconds", ttl );
 
-        insert( NamespaceString( ns ).getSystemIndexesCollection() , toSave.obj() );
-        return 1;
-    }
-
-    void DBClientWithCommands::resetIndexCache() {
-        _seenIndexes.clear();
+        insert(NamespaceString(ns).getSystemIndexesCollection(), toSave.obj());
     }
 
     /* -- DBClientCursor ---------------------------------------------- */
@@ -1515,33 +1474,8 @@ namespace mongo {
         _failed = true;
     }
 
-#ifdef MONGO_CONFIG_SSL
-    static SimpleMutex s_mtx("SSLManager");
-    static SSLManagerInterface* s_sslMgr(NULL);
-
-    SSLManagerInterface* DBClientConnection::sslManager() {
-        SimpleMutex::scoped_lock lk(s_mtx);
-        if (s_sslMgr) 
-            return s_sslMgr;
-        s_sslMgr = getSSLManager();
-        
-        return s_sslMgr;
-    }
-#endif
-
     AtomicInt32 DBClientConnection::_numConnections;
     bool DBClientConnection::_lazyKillCursor = true;
-
-
-    bool serverAlive( const string &uri ) {
-        DBClientConnection c(false, 20); // potentially the connection to server could fail while we're checking if it's alive - so use timeouts
-        string err;
-        if ( !c.connect( HostAndPort(uri), err ) )
-            return false;
-        if ( !c.simpleCommand( "admin", 0, "ping" ) )
-            return false;
-        return true;
-    }
 
 
     /** @return the database name portion of an ns string */

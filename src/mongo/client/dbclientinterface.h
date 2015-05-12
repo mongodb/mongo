@@ -1,9 +1,5 @@
-/** @file dbclientinterface.h
-
-    Core MongoDB C++ driver interfaces are defined here.
-*/
-
-/*    Copyright 2009 10gen Inc.
+/**
+ *    Copyright (C) 2008-2015 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -32,18 +28,14 @@
 
 #pragma once
 
-#include <boost/thread/lock_guard.hpp>
 #include <boost/noncopyable.hpp>
 #include <boost/scoped_ptr.hpp>
 
 #include "mongo/base/string_data.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/client/read_preference.h"
-#include "mongo/config.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/logger/log_severity.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/cstdint.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/message.h"
@@ -421,7 +413,6 @@ namespace mongo {
        Basically just invocations of connection.$cmd.findOne({...});
     */
     class DBClientWithCommands : public DBClientInterface {
-        std::set<std::string> _seenIndexes;
     public:
         /** controls how chatty the client is about network errors & such.  See log.h */
         logger::LogSeverity _logLevel;
@@ -599,7 +590,6 @@ namespace mongo {
             }
 
             bool res = runCommand( db.c_str() , BSON( "drop" << coll ) , *info );
-            resetIndexCache();
             return res;
         }
 
@@ -630,56 +620,6 @@ namespace mongo {
            returns true if successful
         */
         bool copyDatabase(const std::string &fromdb, const std::string &todb, const std::string &fromhost = "", BSONObj *info = 0);
-
-        /** The Mongo database provides built-in performance profiling capabilities.  Uset setDbProfilingLevel()
-           to enable.  Profiling information is then written to the system.profile collection, which one can
-           then query.
-        */
-        enum ProfilingLevel {
-            ProfileOff = 0,
-            ProfileSlow = 1, // log very slow (>100ms) operations
-            ProfileAll = 2
-
-        };
-        bool setDbProfilingLevel(const std::string &dbname, ProfilingLevel level, BSONObj *info = 0);
-        bool getDbProfilingLevel(const std::string &dbname, ProfilingLevel& level, BSONObj *info = 0);
-
-        /** This implicitly converts from char*, string, and BSONObj to be an argument to mapreduce
-            You shouldn't need to explicitly construct this
-         */
-        struct MROutput {
-            MROutput(const char* collection) : out(BSON("replace" << collection)) {}
-            MROutput(const std::string& collection) : out(BSON("replace" << collection)) {}
-            MROutput(const BSONObj& obj) : out(obj) {}
-
-            BSONObj out;
-        };
-        static MROutput MRInline;
-
-        /** Run a map/reduce job on the server.
-
-            See http://dochub.mongodb.org/core/mapreduce
-
-            ns        namespace (db+collection name) of input data
-            jsmapf    javascript map function code
-            jsreducef javascript reduce function code.
-            query     optional query filter for the input
-            output    either a std::string collection name or an object representing output type
-                      if not specified uses inline output type
-
-            returns a result object which contains:
-             { result : <collection_name>,
-               numObjects : <number_of_objects_scanned>,
-               timeMillis : <job_time>,
-               ok : <1_if_ok>,
-               [, err : <errmsg_if_error>]
-             }
-
-             For example one might call:
-               result.getField("ok").trueValue()
-             on the result to check if ok.
-        */
-        BSONObj mapreduce(const std::string &ns, const std::string &jsmapf, const std::string &jsreducef, BSONObj query = BSONObj(), MROutput output = MRInline);
 
         /** Run javascript code on the database server.
            dbname    database SavedContext in which the code runs. The javascript variable 'db' will be assigned
@@ -759,31 +699,21 @@ namespace mongo {
         bool exists( const std::string& ns );
 
         /** Create an index if it does not already exist.
-            ensureIndex calls are remembered so it is safe/fast to call this function many
-            times in your code.
            @param ns collection to be indexed
            @param keys the "key pattern" for the index.  e.g., { name : 1 }
            @param unique if true, indicates that key uniqueness should be enforced for this index
            @param name if not specified, it will be created from the keys automatically (which is recommended)
-           @param cache if set to false, the index cache for the connection won't remember this call
            @param background build index in the background (see mongodb docs for details)
            @param v index version. leave at default value. (unit tests set this parameter.)
            @param ttl. The value of how many seconds before data should be removed from a collection.
-           @return whether or not sent message to db.
-             should be true on first call, false on subsequent unless resetIndexCache was called
          */
-        virtual bool ensureIndex( const std::string &ns,
+        virtual void ensureIndex( const std::string &ns,
                                   BSONObj keys,
                                   bool unique = false,
                                   const std::string &name = "",
-                                  bool cache = true,
                                   bool background = false,
                                   int v = -1,
                                   int ttl = 0 );
-        /**
-           clears the index cache, so the subsequent call to ensureIndex for any index will go to the server
-         */
-        virtual void resetIndexCache();
 
         virtual std::list<BSONObj> getIndexSpecs( const std::string &ns, int options = 0 );
 
@@ -801,9 +731,7 @@ namespace mongo {
 
         /** Erase / drop an entire database */
         virtual bool dropDatabase(const std::string &dbname, BSONObj *info = 0) {
-            bool ret = simpleCommand(dbname, info, "dropDatabase");
-            resetIndexCache();
-            return ret;
+            return simpleCommand(dbname, info, "dropDatabase");
         }
 
         virtual std::string toString() const = 0;
@@ -1012,7 +940,6 @@ namespace mongo {
         virtual void killCursor( long long cursorID ) = 0;
 
         virtual bool callRead( Message& toSend , Message& response ) = 0;
-        // virtual bool callWrite( Message& toSend , Message& response ) = 0; // TODO: add this if needed
 
         virtual ConnectionString::ConnectionType type() const = 0;
 
@@ -1025,8 +952,6 @@ namespace mongo {
         virtual void reset() {}
 
     }; // DBClientBase
-
-    class DBClientReplicaSet;
 
     class ConnectException : public UserException {
     public:
@@ -1176,10 +1101,6 @@ namespace mongo {
         static AtomicInt32 _numConnections;
         static bool _lazyKillCursor; // lazy means we piggy back kill cursors on next op
 
-#ifdef MONGO_CONFIG_SSL
-        SSLManagerInterface* sslManager();
-#endif
-
     private:
 
         /**
@@ -1193,10 +1114,6 @@ namespace mongo {
         // Should be empty if this connection is not pointing to a replica set member.
         std::string _parentReplSetName;
     };
-
-    /** pings server to check if it's up
-     */
-    bool serverAlive( const std::string &uri );
 
     BSONElement getErrField( const BSONObj& result );
     bool hasErrField( const BSONObj& result );
