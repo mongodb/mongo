@@ -36,37 +36,14 @@ typedef struct {
 	char *name;				/* object name */
 	u_int nops;				/* Thread op count */
 
+	uint32_t rnd[2];			/* RNG */
+
 	int remove;				/* cursor.remove */
 	int update;				/* cursor.update */
 	int reads;				/* cursor.search */
 } INFO;
 
 static INFO *run_info;
-
-/*
- * r --
- *	Return a 32-bit pseudo-random number.
- *
- * This is an implementation of George Marsaglia's multiply-with-carry pseudo-
- * random number generator.  Computationally fast, with reasonable randomness
- * properties.
- */
-static inline uint32_t
-r(void)
-{
-	static uint32_t m_w = 0, m_z = 0;
-
-	if (m_w == 0) {
-		struct timeval t;
-		(void)gettimeofday(&t, NULL);
-		m_w = (uint32_t)t.tv_sec;
-		m_z = (uint32_t)t.tv_usec;
-	}
-
-	m_z = 36969 * (m_z & 65535) + (m_z >> 16);
-	m_w = 18000 * (m_w & 65535) + (m_w >> 16);
-	return (m_z << 16) + (m_w & 65535);
-}
 
 int
 rw_start(u_int readers, u_int writers)
@@ -182,7 +159,7 @@ rw_start(u_int readers, u_int writers)
  *	Read operation.
  */
 static inline void
-reader_op(WT_SESSION *session, WT_CURSOR *cursor)
+reader_op(WT_SESSION *session, WT_CURSOR *cursor, INFO *s)
 {
 	WT_ITEM *key, _key;
 	u_int keyno;
@@ -191,7 +168,7 @@ reader_op(WT_SESSION *session, WT_CURSOR *cursor)
 
 	key = &_key;
 
-	keyno = r() % nkeys + 1;
+	keyno = __wt_random(s->rnd) % nkeys + 1;
 	if (ftype == ROW) {
 		key->data = keybuf;
 		key->size = (uint32_t)
@@ -223,6 +200,7 @@ reader(void *arg)
 	id = (int)(uintptr_t)arg;
 	s = &run_info[id];
 	__wt_thread_id(tid, sizeof(tid));
+	__wt_random_init(s->rnd);
 
 	printf(" read thread %2d starting: tid: %s, file: %s\n",
 	    id, tid, s->name);
@@ -237,7 +215,7 @@ reader(void *arg)
 			if ((ret = session->open_cursor(
 			    session, s->name, NULL, NULL, &cursor)) != 0)
 				testutil_die(ret, "session.open_cursor");
-			reader_op(session, cursor);
+			reader_op(session, cursor, s);
 			if ((ret = session->close(session, NULL)) != 0)
 				testutil_die(ret, "session.close");
 		}
@@ -249,7 +227,7 @@ reader(void *arg)
 		    session, s->name, NULL, NULL, &cursor)) != 0)
 			testutil_die(ret, "session.open_cursor");
 		for (i = 0; i < s->nops; ++i, ++s->reads, sched_yield())
-			reader_op(session, cursor);
+			reader_op(session, cursor, s);
 		if ((ret = session->close(session, NULL)) != 0)
 			testutil_die(ret, "session.close");
 	}
@@ -275,7 +253,7 @@ writer_op(WT_SESSION *session, WT_CURSOR *cursor, INFO *s)
 	key = &_key;
 	value = &_value;
 
-	keyno = r() % nkeys + 1;
+	keyno = __wt_random(s->rnd) % nkeys + 1;
 	if (ftype == ROW) {
 		key->data = keybuf;
 		key->size = (uint32_t)
@@ -323,6 +301,7 @@ writer(void *arg)
 	id = (int)(uintptr_t)arg;
 	s = &run_info[id];
 	__wt_thread_id(tid, sizeof(tid));
+	__wt_random_init(s->rnd);
 
 	printf("write thread %2d starting: tid: %s, file: %s\n",
 	    id, tid, s->name);

@@ -173,7 +173,7 @@ main(int argc, char *argv[])
 {
 	CONFIG *cp;
 	size_t len, *lp;
-	int ch, ret, small;
+	int ch, small;
 	char *working_dir;
 
 	if ((progname = strrchr(argv[0], DIR_DELIM)) == NULL)
@@ -200,8 +200,7 @@ main(int argc, char *argv[])
 	if (argc != 0)
 		usage();
 
-	if ((ret = testutil_work_dir_from_path(home, 512, working_dir)) != 0)
-		testutil_die(ret, "provided directory name is too long");
+	testutil_work_dir_from_path(home, 512, working_dir);
 
 	/* Allocate a buffer to use. */
 	len = small ? ((size_t)SMALL_MAX) : ((size_t)4 * GIGABYTE);
@@ -221,7 +220,7 @@ main(int argc, char *argv[])
 	}
 	free(big);
 
-	(void)testutil_clean_work_dir(home);
+	testutil_clean_work_dir(home);
 
 	return (EXIT_SUCCESS);
 }

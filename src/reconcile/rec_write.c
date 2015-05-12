@@ -862,11 +862,11 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 			continue;
 
 		/* Track the largest/smallest transaction IDs on the list. */
-		if (TXNID_LT(max_txn, txnid))
+		if (WT_TXNID_LT(max_txn, txnid))
 			max_txn = txnid;
-		if (TXNID_LT(txnid, min_txn))
+		if (WT_TXNID_LT(txnid, min_txn))
 			min_txn = txnid;
-		if (TXNID_LT(txnid, r->skipped_txn) &&
+		if (WT_TXNID_LT(txnid, r->skipped_txn) &&
 		    !__wt_txn_visible_all(session, txnid))
 			r->skipped_txn = txnid;
 
@@ -894,7 +894,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	 * used to avoid evicting clean pages from memory with changes required
 	 * to satisfy a snapshot read.
 	 */
-	if (TXNID_LT(r->max_txn, max_txn))
+	if (WT_TXNID_LT(r->max_txn, max_txn))
 		r->max_txn = max_txn;
 
 	/*

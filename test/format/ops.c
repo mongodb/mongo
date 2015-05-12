@@ -28,15 +28,15 @@
 
 #include "format.h"
 
-static int   col_insert(WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t *);
+static int   col_insert(TINFO *, WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t *);
 static int   col_remove(WT_CURSOR *, WT_ITEM *, uint64_t, int *);
-static int   col_update(WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t);
+static int   col_update(TINFO *, WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t);
 static int   nextprev(WT_CURSOR *, int, int *);
 static void *ops(void *);
 static int   read_row(WT_CURSOR *, WT_ITEM *, uint64_t);
-static int   row_insert(WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t);
+static int   row_insert(TINFO *, WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t);
 static int   row_remove(WT_CURSOR *, WT_ITEM *, uint64_t, int *);
-static int   row_update(WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t);
+static int   row_update(TINFO *, WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t);
 static void  table_append_init(void);
 
 #ifdef HAVE_BERKELEY_DB
@@ -66,13 +66,6 @@ wts_ops(int lastrun)
 	memset(&compact_tid, 0, sizeof(compact_tid));
 
 	/*
-	 * We support replay of threaded runs, but don't log random numbers
-	 * after threaded operations start, there's no point.
-	 */
-	if (!SINGLETHREADED)
-		g.rand_log_stop = 1;
-
-	/*
 	 * There are two mechanisms to specify the length of the run, a number
 	 * of operations and a timer, when either expire the run terminates.
 	 * Each thread does an equal share of the total operations (and make
@@ -94,6 +87,13 @@ wts_ops(int lastrun)
 
 	/* Initialize the table extension code. */
 	table_append_init();
+
+	/*
+	 * We support replay of threaded runs, but don't log random numbers
+	 * after threaded operations start, there's no point.
+	 */
+	if (!SINGLETHREADED)
+		g.rand_log_stop = 1;
 
 	/* Open a session. */
 	if (g.logging != 0) {
@@ -194,7 +194,7 @@ wts_ops(int lastrun)
  *	Return the current session configuration.
  */
 static const char *
-ops_session_config(void)
+ops_session_config(uint32_t *rnd)
 {
 	u_int v;
 
@@ -202,7 +202,7 @@ ops_session_config(void)
 	 * The only current session configuration is the isolation level.
 	 */
 	if ((v = g.c_isolation_flag) == ISOLATION_RANDOM)
-		v = MMRAND(2, 4);
+		v = mmrand(rnd, 2, 4);
 	switch (v) {
 	case ISOLATION_READ_UNCOMMITTED:
 		return ("isolation=read-uncommitted");
@@ -231,13 +231,16 @@ ops(void *arg)
 
 	tinfo = arg;
 
+	/* Initialize the per-thread random number generator. */
+	__wt_random_init(tinfo->rnd);
+
 	conn = g.wts_conn;
 	keybuf = valbuf = NULL;
 	readonly = 0;			/* -Wconditional-uninitialized */
 
 	/* Set up the default key and value buffers. */
 	key_gen_setup(&keybuf);
-	val_gen_setup(&valbuf);
+	val_gen_setup(tinfo->rnd, &valbuf);
 
 	/* Set the first operation where we'll create sessions and cursors. */
 	session_op = 0;
@@ -245,7 +248,7 @@ ops(void *arg)
 	cursor = cursor_insert = NULL;
 
 	/* Set the first operation where we'll perform checkpoint operations. */
-	ckpt_op = g.c_checkpoints ? MMRAND(100, 10000) : 0;
+	ckpt_op = g.c_checkpoints ? mmrand(tinfo->rnd, 100, 10000) : 0;
 	ckpt_available = 0;
 
 	for (intxn = 0; !tinfo->quit; ++tinfo->ops) {
@@ -269,8 +272,8 @@ ops(void *arg)
 			    (ret = session->close(session, NULL)) != 0)
 				die(ret, "session.close");
 
-			if ((ret = conn->open_session(
-			    conn, NULL, ops_session_config(), &session)) != 0)
+			if ((ret = conn->open_session(conn, NULL,
+			    ops_session_config(tinfo->rnd), &session)) != 0)
 				die(ret, "connection.open_session");
 
 			/*
@@ -285,7 +288,7 @@ ops(void *arg)
 			 * checkpoints.
 			 */
 			if (!SINGLETHREADED && !DATASOURCE("lsm") &&
-			    ckpt_available && MMRAND(1, 10) == 1) {
+			    ckpt_available && mmrand(tinfo->rnd, 1, 10) == 1) {
 				if ((ret = session->open_cursor(session,
 				    g.uri, NULL, ckpt_name, &cursor)) != 0)
 					die(ret, "session.open_cursor");
@@ -318,7 +321,7 @@ ops(void *arg)
 					die(ret, "session.open_cursor");
 
 				/* Pick the next session/cursor close/open. */
-				session_op += 100 * MMRAND(1, 50);
+				session_op += mmrand(tinfo->rnd, 100, 5000);
 
 				/* Updates supported. */
 				readonly = 0;
@@ -334,7 +337,8 @@ ops(void *arg)
 			 * checkpoint.
 			 */
 			if (DATASOURCE("helium") || DATASOURCE("kvsbdb") ||
-			    DATASOURCE("lsm") || readonly || MMRAND(1, 5) == 1)
+			    DATASOURCE("lsm") ||
+			    readonly || mmrand(tinfo->rnd, 1, 5) == 1)
 				ckpt_config = NULL;
 			else {
 				(void)snprintf(ckpt_name, sizeof(ckpt_name),
@@ -369,14 +373,15 @@ ops(void *arg)
 			ckpt_available = 1;
 
 			/* Pick the next checkpoint operation. */
-			ckpt_op += 1000 * MMRAND(5, 20);
+			ckpt_op += mmrand(tinfo->rnd, 5000, 20000);
 		}
 
 		/*
 		 * If we're not single-threaded and we're not in a transaction,
 		 * start a transaction 20% of the time.
 		 */
-		if (!SINGLETHREADED && !intxn && MMRAND(1, 10) >= 8) {
+		if (!SINGLETHREADED &&
+		    !intxn && mmrand(tinfo->rnd, 1, 10) >= 8) {
 			if ((ret =
 			    session->begin_transaction(session, NULL)) != 0)
 				die(ret, "session.begin_transaction");
@@ -385,7 +390,7 @@ ops(void *arg)
 
 		insert = notfound = 0;
 
-		keyno = MMRAND(1, g.rows);
+		keyno = mmrand(tinfo->rnd, 1, (u_int)g.rows);
 		key.data = keybuf;
 		value.data = valbuf;
 
@@ -396,7 +401,7 @@ ops(void *arg)
 		 * of deletes will mean fewer inserts and writes.  Modifications
 		 * are always followed by a read to confirm it worked.
 		 */
-		op = readonly ? UINT32_MAX : (uint32_t)(rng() % 100);
+		op = readonly ? UINT32_MAX : mmrand(tinfo->rnd, 1, 100);
 		if (op < g.c_delete_pct) {
 			++tinfo->remove;
 			switch (g.type) {
@@ -418,7 +423,8 @@ ops(void *arg)
 			++tinfo->insert;
 			switch (g.type) {
 			case ROW:
-				if (row_insert(cursor, &key, &value, keyno))
+				if (row_insert(
+				    tinfo, cursor, &key, &value, keyno))
 					goto deadlock;
 				insert = 1;
 				break;
@@ -433,7 +439,7 @@ ops(void *arg)
 					goto skip_insert;
 
 				/* Insert, then reset the insert cursor. */
-				if (col_insert(
+				if (col_insert(tinfo,
 				    cursor_insert, &key, &value, &keyno))
 					goto deadlock;
 				if ((ret =
@@ -448,12 +454,14 @@ ops(void *arg)
 			++tinfo->update;
 			switch (g.type) {
 			case ROW:
-				if (row_update(cursor, &key, &value, keyno))
+				if (row_update(
+				    tinfo, cursor, &key, &value, keyno))
 					goto deadlock;
 				break;
 			case FIX:
 			case VAR:
-skip_insert:			if (col_update(cursor, &key, &value, keyno))
+skip_insert:			if (col_update(tinfo,
+				    cursor, &key, &value, keyno))
 					goto deadlock;
 				break;
 			}
@@ -471,8 +479,8 @@ skip_insert:			if (col_update(cursor, &key, &value, keyno))
 		 * a random direction.
 		 */
 		if (!insert) {
-			dir = (int)MMRAND(0, 1);
-			for (np = 0; np < MMRAND(1, 8); ++np) {
+			dir = (int)mmrand(tinfo->rnd, 0, 1);
+			for (np = 0; np < mmrand(tinfo->rnd, 1, 8); ++np) {
 				if (notfound)
 					break;
 				if (nextprev(cursor, dir, &notfound))
@@ -494,7 +502,7 @@ skip_insert:			if (col_update(cursor, &key, &value, keyno))
 		 * rollback 10% of the time.
 		 */
 		if (intxn)
-			switch (MMRAND(1, 10)) {
+			switch (mmrand(tinfo->rnd, 1, 10)) {
 			case 1: case 2: case 3: case 4:		/* 40% */
 				if ((ret = session->commit_transaction(
 				    session, NULL)) != 0)
@@ -550,7 +558,7 @@ wts_read_scan(void)
 
 	/* Open a session and cursor pair. */
 	if ((ret = conn->open_session(
-	    conn, NULL, ops_session_config(), &session)) != 0)
+	    conn, NULL, ops_session_config(NULL), &session)) != 0)
 		die(ret, "connection.open_session");
 	if ((ret = session->open_cursor(
 	    session, g.uri, NULL, NULL, &cursor)) != 0)
@@ -558,7 +566,7 @@ wts_read_scan(void)
 
 	/* Check a random subset of the records using the key. */
 	for (last_cnt = cnt = 0; cnt < g.key_cnt;) {
-		cnt += rng() % 17 + 1;
+		cnt += mmrand(NULL, 1, 17);
 		if (cnt > g.rows)
 			cnt = g.rows;
 		if (cnt - last_cnt > 1000) {
@@ -604,7 +612,7 @@ read_row(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno)
 		cursor->set_key(cursor, keyno);
 		break;
 	case ROW:
-		key_gen((uint8_t *)key->data, &key->size, keyno, 0);
+		key_gen((uint8_t *)key->data, &key->size, keyno);
 		cursor->set_key(cursor, key);
 		break;
 	}
@@ -790,7 +798,7 @@ nextprev(WT_CURSOR *cursor, int next, int *notfoundp)
  *	Update a row in a row-store file.
  */
 static int
-row_update(
+row_update(TINFO *tinfo,
     WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t keyno)
 {
 	WT_SESSION *session;
@@ -798,8 +806,8 @@ row_update(
 
 	session = cursor->session;
 
-	key_gen((uint8_t *)key->data, &key->size, keyno, 0);
-	value_gen((uint8_t *)value->data, &value->size, keyno);
+	key_gen((uint8_t *)key->data, &key->size, keyno);
+	val_gen(tinfo->rnd, (uint8_t *)value->data, &value->size, keyno);
 
 	/* Log the operation */
 	if (g.logging == LOG_OPS)
@@ -835,14 +843,15 @@ row_update(
  *	Update a row in a column-store file.
  */
 static int
-col_update(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t keyno)
+col_update(TINFO *tinfo,
+    WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t keyno)
 {
 	WT_SESSION *session;
 	int ret;
 
 	session = cursor->session;
 
-	value_gen((uint8_t *)value->data, &value->size, keyno);
+	val_gen(tinfo->rnd, (uint8_t *)value->data, &value->size, keyno);
 
 	/* Log the operation */
 	if (g.logging == LOG_OPS) {
@@ -876,7 +885,7 @@ col_update(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t keyno)
 	{
 	int notfound;
 
-	key_gen((uint8_t *)key->data, &key->size, keyno, 0);
+	key_gen((uint8_t *)key->data, &key->size, keyno);
 	bdb_update(key->data, key->size, value->data, value->size, &notfound);
 	(void)notfound_chk("col_update", ret, notfound, keyno);
 	}
@@ -993,7 +1002,7 @@ table_append(uint64_t keyno)
  *	Insert a row in a row-store file.
  */
 static int
-row_insert(
+row_insert(TINFO *tinfo,
     WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t keyno)
 {
 	WT_SESSION *session;
@@ -1001,8 +1010,8 @@ row_insert(
 
 	session = cursor->session;
 
-	key_gen((uint8_t *)key->data, &key->size, keyno, 1);
-	value_gen((uint8_t *)value->data, &value->size, keyno);
+	key_gen_insert(tinfo->rnd, (uint8_t *)key->data, &key->size, keyno);
+	val_gen(tinfo->rnd, (uint8_t *)value->data, &value->size, keyno);
 
 	/* Log the operation */
 	if (g.logging == LOG_OPS)
@@ -1038,7 +1047,8 @@ row_insert(
  *	Insert an element in a column-store file.
  */
 static int
-col_insert(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t *keynop)
+col_insert(TINFO *tinfo,
+    WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t *keynop)
 {
 	WT_SESSION *session;
 	uint64_t keyno;
@@ -1046,7 +1056,7 @@ col_insert(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t *keynop)
 
 	session = cursor->session;
 
-	value_gen((uint8_t *)value->data, &value->size, g.rows + 1);
+	val_gen(tinfo->rnd, (uint8_t *)value->data, &value->size, g.rows + 1);
 
 	if (g.type == FIX)
 		cursor->set_value(cursor, *(uint8_t *)value->data);
@@ -1083,7 +1093,7 @@ col_insert(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t *keynop)
 	{
 	int notfound;
 
-	key_gen((uint8_t *)key->data, &key->size, keyno, 0);
+	key_gen((uint8_t *)key->data, &key->size, keyno);
 	bdb_update(key->data, key->size, value->data, value->size, &notfound);
 	}
 #else
@@ -1104,7 +1114,7 @@ row_remove(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int *notfoundp)
 
 	session = cursor->session;
 
-	key_gen((uint8_t *)key->data, &key->size, keyno, 0);
+	key_gen((uint8_t *)key->data, &key->size, keyno);
 
 	/* Log the operation */
 	if (g.logging == LOG_OPS)
@@ -1176,7 +1186,7 @@ col_remove(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int *notfoundp)
 	 * do the same thing for the BDB store.
 	 */
 	if (g.type == FIX) {
-		key_gen((uint8_t *)key->data, &key->size, keyno, 0);
+		key_gen((uint8_t *)key->data, &key->size, keyno);
 		bdb_update(key->data, key->size, "\0", 1, &notfound);
 	} else
 		bdb_remove(keyno, &notfound);

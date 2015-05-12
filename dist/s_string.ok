@@ -459,6 +459,7 @@ der
 dereference
 desc
 dest
+destSize
 dev
 dhandle
 dhandles
@@ -662,6 +663,7 @@ mfence
 minorp
 mkdir
 mmap
+mmrand
 mnt
 msecs
 msg

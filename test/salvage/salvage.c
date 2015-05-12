@@ -26,7 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "wt_internal.h"
+#include "wt_internal.h"			/* For __wt_XXX */
 #include "test_util.i"
 
 #include <assert.h>

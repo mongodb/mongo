@@ -130,8 +130,7 @@ main(int argc, char *argv[])
 	/* Clean up on signal. */
 	(void)signal(SIGINT, onint);
 
-	if ((ret = testutil_work_dir_from_path(g.home, 512, working_dir)) != 0)
-		testutil_die(ret, "provided directory name is too long");
+	testutil_work_dir_from_path(g.home, 512, working_dir);
 
 	printf("%s: process %" PRIu64 "\n", g.progname, (uint64_t)getpid());
 	for (cnt = 1; (runs == 0 || cnt <= runs) && g.status == 0; ++cnt) {
@@ -245,7 +244,8 @@ cleanup(void)
 	g.running = 0;
 	g.ntables_created = 0;
 
-	return (testutil_clean_work_dir(g.home));
+	testutil_clean_work_dir(g.home);
+	return (0);
 }
 
 static int
