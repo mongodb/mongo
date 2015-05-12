@@ -43,7 +43,7 @@ namespace repl {
     const BSONObj BaseClonerTest::idIndexSpec =
         BSON("v" << 1 << "key" << BSON("_id" << 1) << "name" << "_id_" << "ns" << nss.ns());
 
-    Status BaseClonerTest::getDefaultStatus() {
+    Status BaseClonerTest::getDetectableErrorStatus() {
         return Status(ErrorCodes::InternalError, "Not mutated");
     }
 
@@ -100,7 +100,7 @@ namespace repl {
     BaseClonerTest::BaseClonerTest()
         : _mutex(),
           _setStatusCondition(),
-          _status(getDefaultStatus()) { }
+          _status(getDetectableErrorStatus()) { }
 
     void BaseClonerTest::setUp() {
         ReplicationExecutorTest::setUp();
@@ -113,7 +113,7 @@ namespace repl {
     }
 
     void BaseClonerTest::clear() {
-        _status = getDefaultStatus();
+        _status = getDetectableErrorStatus();
     }
 
     void BaseClonerTest::setStatus(const Status& status) {
@@ -129,7 +129,7 @@ namespace repl {
 
     void BaseClonerTest::waitForStatus() {
         boost::unique_lock<boost::mutex> lk(_mutex);
-        if (_status == getDefaultStatus()) {
+        if (_status == getDetectableErrorStatus()) {
             try {
                 _setStatusCondition.wait_for(lk, Milliseconds(1000));
             }

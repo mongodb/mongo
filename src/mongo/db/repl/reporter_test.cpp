@@ -62,7 +62,7 @@ namespace {
 
     class ReporterTest : public ReplicationExecutorTest {
     public:
-        static Status getDefaultStatus();
+        static Status getDetectableErrorStatus();
         ReporterTest();
         void setUp() override;
         void tearDown() override;
@@ -78,7 +78,7 @@ namespace {
 
     ReporterTest::ReporterTest() {}
 
-    Status ReporterTest::getDefaultStatus() {
+    Status ReporterTest::getDetectableErrorStatus() {
         return Status(ErrorCodes::InternalError, "Not mutated");
     }
 

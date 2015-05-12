@@ -489,3 +489,21 @@ env.Library(target='optime',
             LIBDEPS=[
                 '$BUILD_DIR/mongo/bson/bson',
             ])
+
+env.Library(
+    target='applier',
+    source=[
+        'applier.cpp',
+    ],
+    LIBDEPS=[
+    ],
+)
+
+env.CppUnitTest(
+    target='applier_test',
+    source='applier_test.cpp',
+    LIBDEPS=[
+        'applier',
+        'replication_executor_test_fixture',
+    ],
+)

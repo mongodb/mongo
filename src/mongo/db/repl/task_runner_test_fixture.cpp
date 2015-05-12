@@ -59,7 +59,7 @@ namespace {
 
 } // namespace
 
-    Status TaskRunnerTest::getDefaultStatus() {
+    Status TaskRunnerTest::getDetectableErrorStatus() {
         return Status(ErrorCodes::InternalError, "Not mutated");
     }
 

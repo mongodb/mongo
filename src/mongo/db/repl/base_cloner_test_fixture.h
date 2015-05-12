@@ -58,7 +58,7 @@ namespace repl {
          * Creates an initial error status suitable for checking if
          * cloner has modified the 'status' field in test fixture.
          */
-        static Status getDefaultStatus();
+        static Status getDetectableErrorStatus();
 
         /**
          * Creates a cursor response with given array of documents.

@@ -48,7 +48,7 @@ namespace {
 
     class FetcherTest : public ReplicationExecutorTest {
     public:
-        static Status getDefaultStatus();
+        static Status getDetectableErrorStatus();
         FetcherTest();
         void setUp() override;
         void tearDown() override;
@@ -74,12 +74,12 @@ namespace {
                        Fetcher::NextAction* nextAction);
     };
 
-    Status FetcherTest::getDefaultStatus() {
+    Status FetcherTest::getDetectableErrorStatus() {
         return Status(ErrorCodes::InternalError, "Not mutated");
     }
 
     FetcherTest::FetcherTest()
-        : status(getDefaultStatus()),
+        : status(getDetectableErrorStatus()),
           cursorId(-1),
           nextAction(Fetcher::NextAction::kInvalid) { }
 
@@ -100,7 +100,7 @@ namespace {
     }
 
     void FetcherTest::clear() {
-        status = getDefaultStatus();
+        status = getDetectableErrorStatus();
         cursorId = -1;
         documents.clear();
         nextAction = Fetcher::NextAction::kInvalid;

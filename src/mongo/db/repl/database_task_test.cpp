@@ -75,7 +75,7 @@ namespace {
         bool called = false;
         OperationContext* txn = nullptr;
         bool lockIsW = false;
-        Status status = getDefaultStatus();
+        Status status = getDetectableErrorStatus();
         // Task returning 'void' implies NextAction::NoAction.
         auto task = [&](OperationContext* theTxn, const Status& theStatus) {
             boost::lock_guard<boost::mutex> lk(mutex);
@@ -101,7 +101,7 @@ namespace {
         bool called = false;
         OperationContext* txn = nullptr;
         bool isDatabaseLockedForMode = false;
-        Status status = test.getDefaultStatus();
+        Status status = test.getDetectableErrorStatus();
         // Task returning 'void' implies NextAction::NoAction.
         auto task = [&](OperationContext* theTxn, const Status& theStatus) {
             boost::lock_guard<boost::mutex> lk(mutex);
@@ -144,7 +144,7 @@ namespace {
         bool called = false;
         OperationContext* txn = nullptr;
         bool isCollectionLockedForMode = false;
-        Status status = test.getDefaultStatus();
+        Status status = test.getDetectableErrorStatus();
         // Task returning 'void' implies NextAction::NoAction.
         auto task = [&](OperationContext* theTxn, const Status& theStatus) {
             boost::lock_guard<boost::mutex> lk(mutex);

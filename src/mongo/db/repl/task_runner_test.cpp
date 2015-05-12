@@ -63,7 +63,7 @@ namespace {
         boost::mutex mutex;
         bool called = false;
         OperationContext* txn = nullptr;
-        Status status = getDefaultStatus();
+        Status status = getDetectableErrorStatus();
         auto task = [&](OperationContext* theTxn, const Status& theStatus) {
             boost::lock_guard<boost::mutex> lk(mutex);
             called = true;
@@ -89,7 +89,7 @@ namespace {
         bool called = false;
         OperationContextNoop opCtxNoop;
         OperationContext* txn = &opCtxNoop;
-        Status status = getDefaultStatus();
+        Status status = getDetectableErrorStatus();
         auto task = [&](OperationContext* theTxn, const Status& theStatus) {
             boost::lock_guard<boost::mutex> lk(mutex);
             called = true;
@@ -174,7 +174,7 @@ namespace {
         boost::mutex mutex;
         int i = 0;
         OperationContext* txn[2] = {nullptr, nullptr};
-        Status status[2] = {getDefaultStatus(), getDefaultStatus()};
+        Status status[2] = {getDetectableErrorStatus(), getDetectableErrorStatus()};
         boost::condition condition;
         bool schedulingDone = false;
         auto task = [&](OperationContext* theTxn, const Status& theStatus) {
@@ -216,7 +216,7 @@ namespace {
         boost::mutex mutex;
         int i = 0;
         OperationContext* txn[2] = {nullptr, nullptr};
-        Status status[2] = {getDefaultStatus(), getDefaultStatus()};
+        Status status[2] = {getDetectableErrorStatus(), getDetectableErrorStatus()};
         boost::condition condition;
         bool schedulingDone = false;
         auto task = [&](OperationContext* theTxn, const Status& theStatus) {
@@ -264,7 +264,7 @@ namespace {
     TEST_F(TaskRunnerTest, Cancel) {
         boost::mutex mutex;
         boost::condition condition;
-        Status status = getDefaultStatus();
+        Status status = getDetectableErrorStatus();
         bool taskRunning = false;
 
         // Running this task causes the task runner to wait for another task that
@@ -306,7 +306,7 @@ namespace {
     TEST_F(TaskRunnerTest, DestroyShouldWaitForTasksToComplete) {
         boost::mutex mutex;
         boost::condition condition;
-        Status status = getDefaultStatus();
+        Status status = getDetectableErrorStatus();
         bool taskRunning = false;
 
         // Running this task causes the task runner to wait for another task that

@@ -35,6 +35,7 @@
 #include <boost/make_shared.hpp>
 #include <memory>
 
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/client/connection_pool.h"
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context_impl.h"
@@ -274,7 +275,10 @@ namespace {
     }
 
     OperationContext* NetworkInterfaceImpl::createOperationContext() {
-        Client::initThreadIfNotAlready();
+        if (!ClientBasic::getCurrent()) {
+            Client::initThreadIfNotAlready();
+            AuthorizationSession::get(*ClientBasic::getCurrent())->grantInternalAuthorization();
+        }
         return new OperationContextImpl();
     }
 

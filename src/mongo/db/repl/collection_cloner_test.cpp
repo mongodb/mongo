@@ -163,7 +163,7 @@ namespace {
         // the cloner stops the fetcher from retrieving more results.
         processNetworkResponse(createListIndexesResponse(1, BSONArray()));
 
-        ASSERT_EQUALS(getDefaultStatus(), getStatus());
+        ASSERT_EQUALS(getDetectableErrorStatus(), getStatus());
         ASSERT_TRUE(collectionCloner->isActive());
 
         ASSERT_TRUE(getNet()->hasReadyRequests());
@@ -251,7 +251,7 @@ namespace {
         processNetworkResponse(createListIndexesResponse(1, BSON_ARRAY(specs[0] << specs[1])));
 
         // 'status' should not be modified because cloning is not finished.
-        ASSERT_EQUALS(getDefaultStatus(), getStatus());
+        ASSERT_EQUALS(getDetectableErrorStatus(), getStatus());
         ASSERT_TRUE(collectionCloner->isActive());
 
         processNetworkResponse(createListIndexesResponse(0, BSON_ARRAY(specs[2]), "nextBatch"));
@@ -259,7 +259,7 @@ namespace {
         collectionCloner->waitForDbWorker();
 
         // 'status' will be set if listIndexes fails.
-        ASSERT_EQUALS(getDefaultStatus(), getStatus());
+        ASSERT_EQUALS(getDetectableErrorStatus(), getStatus());
 
         ASSERT_EQUALS(nss.ns(), collNss.ns());
         ASSERT_EQUALS(options.toBSON(), collOptions.toBSON());
@@ -479,7 +479,7 @@ namespace {
         ASSERT_EQUALS(1U, collDocuments.size());
         ASSERT_EQUALS(doc, collDocuments[0]);
 
-        ASSERT_EQUALS(getDefaultStatus(), getStatus());
+        ASSERT_EQUALS(getDetectableErrorStatus(), getStatus());
         ASSERT_TRUE(collectionCloner->isActive());
 
         const BSONObj doc2 = BSON("_id" << 1);

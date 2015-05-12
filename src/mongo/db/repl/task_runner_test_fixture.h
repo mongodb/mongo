@@ -53,7 +53,7 @@ namespace repl {
      */
     class TaskRunnerTest : public unittest::Test {
     public:
-        static Status getDefaultStatus();
+        static Status getDetectableErrorStatus();
 
         /**
          * Returns ID of mock operation context returned from createOperationContext().

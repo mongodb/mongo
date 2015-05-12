@@ -211,7 +211,7 @@ namespace {
         // Keep going even if initial batch is empty.
         processNetworkResponse(createListCollectionsResponse(1, BSONArray()));
 
-        ASSERT_EQUALS(getDefaultStatus(), getStatus());
+        ASSERT_EQUALS(getDetectableErrorStatus(), getStatus());
         ASSERT_TRUE(databaseCloner->isActive());
 
         // Final batch is also empty. Database cloner should stop and return a successful status.
@@ -248,7 +248,7 @@ namespace {
                                                                            sourceInfos[1] <<
                                                                            sourceInfos[2])));
 
-        ASSERT_EQUALS(getDefaultStatus(), getStatus());
+        ASSERT_EQUALS(getDetectableErrorStatus(), getStatus());
         ASSERT_TRUE(databaseCloner->isActive());
 
         const std::vector<BSONObj>& collectionInfos = databaseCloner->getCollectionInfos();
@@ -265,7 +265,7 @@ namespace {
             BSON("name" << "b" << "options" << BSONObj())};
         processNetworkResponse(createListCollectionsResponse(1, BSON_ARRAY(sourceInfos[0])));
 
-        ASSERT_EQUALS(getDefaultStatus(), getStatus());
+        ASSERT_EQUALS(getDetectableErrorStatus(), getStatus());
         ASSERT_TRUE(databaseCloner->isActive());
 
         {
@@ -277,7 +277,7 @@ namespace {
         processNetworkResponse(
             createListCollectionsResponse(0, BSON_ARRAY(sourceInfos[1]), "nextBatch"));
 
-        ASSERT_EQUALS(getDefaultStatus(), getStatus());
+        ASSERT_EQUALS(getDetectableErrorStatus(), getStatus());
         ASSERT_TRUE(databaseCloner->isActive());
 
         {
@@ -435,7 +435,7 @@ namespace {
         processNetworkResponse(createListCollectionsResponse(0, BSON_ARRAY(sourceInfos[0] <<
                                                                            sourceInfos[1])));
 
-        ASSERT_EQUALS(getDefaultStatus(), getStatus());
+        ASSERT_EQUALS(getDetectableErrorStatus(), getStatus());
         ASSERT_TRUE(databaseCloner->isActive());
 
         // Collection cloners are run serially for now.
@@ -476,7 +476,7 @@ namespace {
         processNetworkResponse(createListCollectionsResponse(0, BSON_ARRAY(sourceInfos[0] <<
                                                                            sourceInfos[1])));
 
-        ASSERT_EQUALS(getDefaultStatus(), getStatus());
+        ASSERT_EQUALS(getDetectableErrorStatus(), getStatus());
         ASSERT_TRUE(databaseCloner->isActive());
 
         // Collection cloners are run serially for now.
