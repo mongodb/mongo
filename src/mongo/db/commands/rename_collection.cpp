@@ -29,6 +29,7 @@
 */
 
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/db/background.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/commands.h"
@@ -66,34 +67,6 @@ namespace mongo {
             help << " example: { renameCollection: foo.a, to: bar.b }";
         }
 
-        virtual std::vector<BSONObj> stopIndexBuilds(Database* db,
-                                                     const BSONObj& cmdObj) {
-            string source = cmdObj.getStringField( name.c_str() );
-            string target = cmdObj.getStringField( "to" );
-
-            IndexCatalog::IndexKillCriteria criteria;
-            criteria.ns = source;
-            std::vector<BSONObj> prelim = 
-                IndexBuilder::killMatchingIndexBuilds(db->getCollection(source), criteria);
-
-            std::vector<BSONObj> indexes;
-
-            for (int i = 0; i < static_cast<int>(prelim.size()); i++) {
-                // Change the ns
-                BSONObj stripped = prelim[i].removeField("ns");
-                BSONObjBuilder builder;
-                builder.appendElements(stripped);
-                builder.append("ns", target);
-                indexes.push_back(builder.obj());
-            }
-
-            return indexes;
-        }
-
-        virtual void restoreIndexBuildsOnSource(std::vector<BSONObj> indexesInProg, std::string source) {
-            IndexBuilder::restoreIndexes( indexesInProg );
-        }
-
         virtual bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             string source = cmdObj.getStringField( name.c_str() );
             string target = cmdObj.getStringField( "to" );
@@ -120,6 +93,8 @@ namespace mongo {
                     return false;
                 }
             }
+
+            BackgroundOperation::assertNoBgOpInProgForNs( source );
 
             string sourceDB = nsToDatabase(source);
             string targetDB = nsToDatabase(target);
@@ -163,7 +138,6 @@ namespace mongo {
 
                 {
                     const NamespaceDetails *nsd = nsdetails( source );
-                    indexesInProg = stopIndexBuilds( srcCtx.db(), cmdObj );
                     capped = nsd->isCapped();
                     if ( capped )
                         for( DiskLoc i = nsd->firstExtent(); !i.isNull(); i = i.ext()->xnext )
@@ -185,7 +159,6 @@ namespace mongo {
                     Status s = cc().database()->dropCollection( target );
                     if ( !s.isOK() ) {
                         errmsg = s.toString();
-                        restoreIndexBuildsOnSource( indexesInProg, source );
                         return false;
                     }
                 }
@@ -197,7 +170,6 @@ namespace mongo {
                                                            cmdObj["stayTemp"].trueValue() );
                     if ( !s.isOK() ) {
                         errmsg = s.toString();
-                        restoreIndexBuildsOnSource( indexesInProg, source );
                         return false;
                     }
                     return true;
@@ -224,7 +196,6 @@ namespace mongo {
                 }
                 if ( !targetColl ) {
                     errmsg = "Failed to create target collection.";
-                    restoreIndexBuildsOnSource( indexesInProg, source );
                     return false;
                 }
             }
@@ -268,7 +239,6 @@ namespace mongo {
                 Status s = ctx.db()->dropCollection( target );
                 if ( !s.isOK() )
                     errmsg = s.toString();
-                restoreIndexBuildsOnSource( indexesInProg, source );
                 return false;
             }
 
@@ -322,7 +292,6 @@ namespace mongo {
                     Status s = ctx.db()->dropCollection( target );
                     if ( !s.isOK() )
                         errmsg = s.toString();
-                    restoreIndexBuildsOnSource( indexesInProg, source );
                     return false;
                 }
             }
@@ -333,7 +302,6 @@ namespace mongo {
                 Status s = srcCtx.db()->dropCollection( source );
                 if ( !s.isOK() ) {
                     errmsg = s.toString();
-                    restoreIndexBuildsOnSource( indexesInProg, source );
                     return false;
                 }
             }

@@ -105,7 +105,7 @@ namespace mongo {
         verify(this);
         DEV Lock::assertAtLeastReadLocked( _dbname );
         if ( n < 0 || n >= static_cast<int>(_files.size()) )
-            log() << "uh oh: " << n;
+            severe() << "unable to open file number " << n;
         verify( n >= 0 && n < static_cast<int>(_files.size()) );
         return _files[n];
     }
