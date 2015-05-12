@@ -28,6 +28,8 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #include <wiredtiger.h>
 
 #ifdef _WIN32
@@ -101,6 +103,7 @@ testutil_clean_work_dir(char *dir)
 	size_t inputSize;
 	int ret;
 	char *buffer;
+	struct stat info;
 
 	/* Additional bytes for the Windows rd command. */
 	inputSize = strlen(dir) + sizeof(RM_COMMAND);
@@ -108,8 +111,11 @@ testutil_clean_work_dir(char *dir)
 		testutil_die(ENOMEM, "Failed to allocate memory");
 
 	snprintf(buffer, inputSize, "%s%s", RM_COMMAND, dir);
-	if ((ret = system(buffer)) != 0)
-		testutil_die(ret, "System call to remove directory failed");
+
+	if( stat( dir, &info ) == 0 )
+		if ((ret = system(buffer)) != 0)
+			testutil_die(ret,
+			    "System call to remove directory failed");
 	free(buffer);
 }
 
