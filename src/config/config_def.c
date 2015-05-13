@@ -762,7 +762,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  NULL, 0
 	},
 	{ "WT_SESSION.commit_transaction",
-	  "sync=off",
+	  "sync=",
 	  confchk_WT_SESSION_commit_transaction, 1
 	},
 	{ "WT_SESSION.compact",

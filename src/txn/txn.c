@@ -331,11 +331,19 @@ __wt_txn_config(WT_SESSION_IMPL *session, const char *cfg[])
 	 * !!! This is an unusual use of the config code: the "default" value
 	 * we pass in is inherited from the connection.  If flush is not set in
 	 * the connection-wide flag and not overridden here, we end up clearing
-	 * all flags.
+	 * all flags.  We want to distinguish between inheriting implicitly
+	 * and explicitly.
 	 */
-	WT_RET(__wt_config_gets_def(session, cfg, "sync",
-	    FLD_ISSET(txn->txn_logsync, WT_LOG_FLUSH) ? 1 : 0, &cval));
-	if (!cval.val)
+	WT_RET(__wt_config_gets_def(session, cfg, "sync", UINT_MAX, &cval));
+	if (cval.val != UINT_MAX)
+		/*
+		 * This is an explicit setting of sync.  Set the flag so
+		 * that we know not to overwrite it in commit_transaction.
+		 * Only reset the value if the setting was turned off.
+		 */
+		F_SET(txn, TXN_SYNC_SET);
+	if (cval.val == 0 || (cval.val == UINT_MAX &&
+	    !FLD_ISSET(txn->txn_logsync, WT_LOG_FLUSH)))
 		txn->txn_logsync = 0;
 
 	return (0);
@@ -405,20 +413,34 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	/*
 	 * The default sync setting is inherited from the connection, but can
 	 * be overridden by an explicit "sync" setting for this transaction.
-	 *
-	 * !!! This is an unusual use of the config code: the "default" value
-	 * we pass in is inherited from the connection.  If flush is not set in
-	 * the connection-wide flag and not overridden here, we end up clearing
-	 * all flags.
 	 */
-	WT_RET(__wt_config_gets_def(session, cfg, "sync",
-	    FLD_ISSET(txn->txn_logsync, WT_LOG_FLUSH) ? 1 : 0, &cval));
-	if (WT_STRING_MATCH("background", cval.str, cval.len))
+	WT_RET(__wt_config_gets_def(session, cfg, "sync", 0, &cval));
+	/*
+	 * If the user chose the default setting, check whether
+	 * transaction_sync is enabled in the connection.  If it isn't,
+	 * we want to clear the field.  Otherwise check for specific
+	 * settings.  We don't need to check for "on" because that is
+	 * the default inherited from the connection.  If the user set
+	 * anything in begin_transaction, we only override with an
+	 * explicit setting.
+	 */
+	if (cval.len == 0) {
+		if (!FLD_ISSET(txn->txn_logsync, WT_LOG_FLUSH) &&
+		    !F_ISSET(txn, TXN_SYNC_SET))
+			txn->txn_logsync = 0;
+	} else if (WT_STRING_MATCH("background", cval.str, cval.len))
 		txn->txn_logsync = WT_LOG_BACKGROUND;
+	else if (WT_STRING_MATCH("off", cval.str, cval.len))
+		txn->txn_logsync = 0;
+	/*
+	 * This conditional checking for the "on" setting can go away
+	 * once the begin_transaction setting is deprecated and the field
+	 * is initialized to the connection setting unconditionally.
+	 * Now, the "on" setting overrides anything that may have been
+	 * set in begin_transaction, so we explicitly check it.
+	 */
 	else if (WT_STRING_MATCH("on", cval.str, cval.len))
 		txn->txn_logsync = S2C(session)->txn_logsync;
-	else
-		txn->txn_logsync = 0;
 
 	/* Commit notification. */
 	if (txn->notify != NULL)

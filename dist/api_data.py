@@ -804,7 +804,7 @@ methods = {
 ]),
 
 'WT_SESSION.commit_transaction' : Method([
-    Config('sync', 'off', r'''
+    Config('sync', '', r'''
         override whether to sync log records when the transaction commits,
         inherited from ::wiredtiger_open \c transaction_sync''',
         choices=['background', 'off', 'on']),
