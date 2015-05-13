@@ -32,7 +32,6 @@ struct __wt_hazard {
 
 /* Get the connection implementation for a session */
 #define	S2C(session)	  ((WT_CONNECTION_IMPL *)(session)->iface.connection)
-#define	S2C_SAFE(session) ((session) == NULL ? NULL : S2C(session))
 
 /* Get the btree for a session */
 #define	S2BT(session)	   ((WT_BTREE *)(session)->dhandle->handle)

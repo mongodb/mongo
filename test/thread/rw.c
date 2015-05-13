@@ -34,6 +34,9 @@ static void *writer(void *);
 
 typedef struct {
 	char *name;				/* object name */
+	u_int nops;				/* Thread op count */
+
+	uint32_t rnd[2];			/* RNG */
 
 	int remove;				/* cursor.remove */
 	int update;				/* cursor.update */
@@ -42,56 +45,68 @@ typedef struct {
 
 static INFO *run_info;
 
-/*
- * r --
- *	Return a 32-bit pseudo-random number.
- *
- * This is an implementation of George Marsaglia's multiply-with-carry pseudo-
- * random number generator.  Computationally fast, with reasonable randomness
- * properties.
- */
-static inline uint32_t
-r(void)
-{
-	static uint32_t m_w = 0, m_z = 0;
-
-	if (m_w == 0) {
-		struct timeval t;
-		(void)gettimeofday(&t, NULL);
-		m_w = (uint32_t)t.tv_sec;
-		m_z = (uint32_t)t.tv_usec;
-	}
-
-	m_z = 36969 * (m_z & 65535) + (m_z >> 16);
-	m_w = 18000 * (m_w & 65535) + (m_w >> 16);
-	return (m_z << 16) + (m_w & 65535);
-}
-
 int
 rw_start(u_int readers, u_int writers)
 {
 	struct timeval start, stop;
 	double seconds;
 	pthread_t *tids;
-	u_int i;
+	u_int i, name_index, offset, total_nops;
 	int ret;
 	void *thread_ret;
+
+	tids = NULL;	/* Keep GCC 4.1 happy. */
+	total_nops = 0;
 
 	/* Create per-thread structures. */
 	if ((run_info = calloc(
 	    (size_t)(readers + writers), sizeof(*run_info))) == NULL ||
 	    (tids = calloc((size_t)(readers + writers), sizeof(*tids))) == NULL)
-		die("calloc", errno);
+		testutil_die(errno, "calloc");
 
 	/* Create the files and load the initial records. */
-	for (i = 0; i < readers + writers; ++i)
+	for (i = 0; i < writers; ++i) {
 		if (i == 0 || multiple_files) {
 			if ((run_info[i].name = malloc(64)) == NULL)
-				die("malloc", errno);
+				testutil_die(errno, "malloc");
 			snprintf(run_info[i].name, 64, FNAME, i);
+
+			/* Vary by orders of magnitude */
+			if (vary_nops)
+				run_info[i].nops = WT_MAX(1000, max_nops >> i);
 			load(run_info[i].name);
 		} else
 			run_info[i].name = run_info[0].name;
+
+		/* Setup op count if not varying ops. */
+		if (run_info[i].nops == 0)
+			run_info[i].nops = max_nops;
+		total_nops += run_info[i].nops;
+	}
+
+	/* Setup the reader configurations */
+	for (i = 0; i < readers; ++i) {
+		offset = i + writers;
+		if (multiple_files) {
+			if ((run_info[offset].name = malloc(64)) == NULL)
+				testutil_die(errno, "malloc");
+			/* Have readers read from tables with writes. */
+			name_index = i % writers;
+			snprintf(
+			    run_info[offset].name, 64, FNAME, name_index);
+
+			/* Vary by orders of magnitude */
+			if (vary_nops)
+				run_info[offset].nops =
+				    WT_MAX(1000, max_nops >> name_index);
+		} else
+			run_info[offset].name = run_info[0].name;
+
+		/* Setup op count if not varying ops. */
+		if (run_info[offset].nops == 0)
+			run_info[offset].nops = max_nops;
+		total_nops += run_info[offset].nops;
+	}
 
 	(void)gettimeofday(&start, NULL);
 
@@ -99,11 +114,11 @@ rw_start(u_int readers, u_int writers)
 	for (i = 0; i < readers; ++i)
 		if ((ret = pthread_create(
 		    &tids[i], NULL, reader, (void *)(uintptr_t)i)) != 0)
-			die("pthread_create", ret);
+			testutil_die(ret, "pthread_create");
 	for (; i < readers + writers; ++i) {
 		if ((ret = pthread_create(
 		    &tids[i], NULL, writer, (void *)(uintptr_t)i)) != 0)
-			die("pthread_create", ret);
+			testutil_die(ret, "pthread_create");
 	}
 
 	/* Wait for the threads. */
@@ -114,7 +129,7 @@ rw_start(u_int readers, u_int writers)
 	seconds = (stop.tv_sec - start.tv_sec) +
 	    (stop.tv_usec - start.tv_usec) * 1e-6;
 	fprintf(stderr, "timer: %.2lf seconds (%d ops/second)\n",
-	    seconds, (int)(((readers + writers) * nops) / seconds));
+	    seconds, (int)(((readers + writers) * total_nops) / seconds));
 
 	/* Verify the files. */
 	for (i = 0; i < readers + writers; ++i) {
@@ -144,7 +159,7 @@ rw_start(u_int readers, u_int writers)
  *	Read operation.
  */
 static inline void
-reader_op(WT_SESSION *session, WT_CURSOR *cursor)
+reader_op(WT_SESSION *session, WT_CURSOR *cursor, INFO *s)
 {
 	WT_ITEM *key, _key;
 	u_int keyno;
@@ -153,7 +168,7 @@ reader_op(WT_SESSION *session, WT_CURSOR *cursor)
 
 	key = &_key;
 
-	keyno = r() % nkeys + 1;
+	keyno = __wt_random(s->rnd) % nkeys + 1;
 	if (ftype == ROW) {
 		key->data = keybuf;
 		key->size = (uint32_t)
@@ -162,7 +177,7 @@ reader_op(WT_SESSION *session, WT_CURSOR *cursor)
 	} else
 		cursor->set_key(cursor, (uint32_t)keyno);
 	if ((ret = cursor->search(cursor)) != 0 && ret != WT_NOTFOUND)
-		die("cursor.search", ret);
+		testutil_die(ret, "cursor.search");
 	if (log_print)
 		(void)session->log_printf(session,
 		    "Reader Thread %p key %017u", pthread_self(), keyno);
@@ -183,38 +198,42 @@ reader(void *arg)
 	char tid[128];
 
 	id = (int)(uintptr_t)arg;
-
+	s = &run_info[id];
 	__wt_thread_id(tid, sizeof(tid));
-	printf(" read thread %2d starting: tid: %s\n", id, tid);
+	__wt_random_init(s->rnd);
+
+	printf(" read thread %2d starting: tid: %s, file: %s\n",
+	    id, tid, s->name);
 
 	sched_yield();		/* Get all the threads created. */
 
-	s = &run_info[id];
-
 	if (session_per_op) {
-		for (i = 0; i < nops; ++i, ++s->reads, sched_yield()) {
+		for (i = 0; i < s->nops; ++i, ++s->reads, sched_yield()) {
 			if ((ret = conn->open_session(
 			    conn, NULL, NULL, &session)) != 0)
-				die("conn.open_session", ret);
+				testutil_die(ret, "conn.open_session");
 			if ((ret = session->open_cursor(
 			    session, s->name, NULL, NULL, &cursor)) != 0)
-				die("session.open_cursor", ret);
-			reader_op(session, cursor);
+				testutil_die(ret, "session.open_cursor");
+			reader_op(session, cursor, s);
 			if ((ret = session->close(session, NULL)) != 0)
-				die("session.close", ret);
+				testutil_die(ret, "session.close");
 		}
 	} else {
 		if ((ret = conn->open_session(
 		    conn, NULL, NULL, &session)) != 0)
-			die("conn.open_session", ret);
+			testutil_die(ret, "conn.open_session");
 		if ((ret = session->open_cursor(
 		    session, s->name, NULL, NULL, &cursor)) != 0)
-			die("session.open_cursor", ret);
-		for (i = 0; i < nops; ++i, ++s->reads, sched_yield())
-			reader_op(session, cursor);
+			testutil_die(ret, "session.open_cursor");
+		for (i = 0; i < s->nops; ++i, ++s->reads, sched_yield())
+			reader_op(session, cursor, s);
 		if ((ret = session->close(session, NULL)) != 0)
-			die("session.close", ret);
+			testutil_die(ret, "session.close");
 	}
+
+	printf(" read thread %2d stopping: tid: %s, file: %s\n",
+	    id, tid, s->name);
 
 	return (NULL);
 }
@@ -234,7 +253,7 @@ writer_op(WT_SESSION *session, WT_CURSOR *cursor, INFO *s)
 	key = &_key;
 	value = &_value;
 
-	keyno = r() % nkeys + 1;
+	keyno = __wt_random(s->rnd) % nkeys + 1;
 	if (ftype == ROW) {
 		key->data = keybuf;
 		key->size = (uint32_t)
@@ -246,7 +265,7 @@ writer_op(WT_SESSION *session, WT_CURSOR *cursor, INFO *s)
 		++s->remove;
 		if ((ret =
 		    cursor->remove(cursor)) != 0 && ret != WT_NOTFOUND)
-			die("cursor.remove", ret);
+			testutil_die(ret, "cursor.remove");
 	} else {
 		++s->update;
 		value->data = valuebuf;
@@ -258,7 +277,7 @@ writer_op(WT_SESSION *session, WT_CURSOR *cursor, INFO *s)
 			cursor->set_value(cursor, value);
 		}
 		if ((ret = cursor->update(cursor)) != 0)
-			die("cursor.update", ret);
+			testutil_die(ret, "cursor.update");
 	}
 	if (log_print)
 		(void)session->log_printf(session,
@@ -280,38 +299,42 @@ writer(void *arg)
 	char tid[128];
 
 	id = (int)(uintptr_t)arg;
-
+	s = &run_info[id];
 	__wt_thread_id(tid, sizeof(tid));
-	printf("write thread %2d starting: tid: %s\n", id, tid);
+	__wt_random_init(s->rnd);
+
+	printf("write thread %2d starting: tid: %s, file: %s\n",
+	    id, tid, s->name);
 
 	sched_yield();		/* Get all the threads created. */
 
-	s = &run_info[id];
-
 	if (session_per_op) {
-		for (i = 0; i < nops; ++i, sched_yield()) {
+		for (i = 0; i < s->nops; ++i, sched_yield()) {
 			if ((ret = conn->open_session(
 			    conn, NULL, NULL, &session)) != 0)
-				die("conn.open_session", ret);
+				testutil_die(ret, "conn.open_session");
 			if ((ret = session->open_cursor(
 			    session, s->name, NULL, NULL, &cursor)) != 0)
-				die("session.open_cursor", ret);
+				testutil_die(ret, "session.open_cursor");
 			writer_op(session, cursor, s);
 			if ((ret = session->close(session, NULL)) != 0)
-				die("session.close", ret);
+				testutil_die(ret, "session.close");
 		}
 	} else {
 		if ((ret = conn->open_session(
 		    conn, NULL, NULL, &session)) != 0)
-			die("conn.open_session", ret);
+			testutil_die(ret, "conn.open_session");
 		if ((ret = session->open_cursor(
 		    session, s->name, NULL, NULL, &cursor)) != 0)
-			die("session.open_cursor", ret);
-		for (i = 0; i < nops; ++i, sched_yield())
+			testutil_die(ret, "session.open_cursor");
+		for (i = 0; i < s->nops; ++i, sched_yield())
 			writer_op(session, cursor, s);
 		if ((ret = session->close(session, NULL)) != 0)
-			die("session.close", ret);
+			testutil_die(ret, "session.close");
 	}
+
+	printf("write thread %2d stopping: tid: %s, file: %s\n",
+	    id, tid, s->name);
 
 	return (NULL);
 }

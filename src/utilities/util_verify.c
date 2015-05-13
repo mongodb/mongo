@@ -95,10 +95,8 @@ util_verify(WT_SESSION *session, int argc, char *argv[])
 err:		ret = 1;
 	}
 
-	if (config != NULL)
-		free(config);
-	if (name != NULL)
-		free(name);
+	free(config);
+	free(name);
 
 	return (ret);
 }

@@ -6,6 +6,12 @@
  * See the file LICENSE for redistribution information.
  */
 
+/*
+ * Default hash table size; use a prime number of buckets rather than assuming
+ * a good hash (Reference Sedgewick, Algorithms in C, "Hash Functions").
+ */
+#define	WT_HASH_ARRAY_SIZE	509
+
 /*******************************************
  * Global per-process structure.
  *******************************************/
@@ -21,6 +27,20 @@ struct __wt_process {
 	WT_CACHE_POOL *cache_pool;
 };
 extern WT_PROCESS __wt_process;
+
+/*
+ * WT_KEYED_ENCRYPTOR --
+ *	An list entry for an encryptor with a unique (name, keyid).
+ */
+struct __wt_keyed_encryptor {
+	const char *keyid;		/* Key id of encryptor */
+	int owned;			/* Encryptor needs to be terminated */
+	size_t size_const;		/* The result of the sizing callback */
+	WT_ENCRYPTOR *encryptor;	/* User supplied callbacks */
+					/* Linked list of encryptors */
+	SLIST_ENTRY(__wt_keyed_encryptor) hashl;
+	SLIST_ENTRY(__wt_keyed_encryptor) l;
+};
 
 /*
  * WT_NAMED_COLLATOR --
@@ -52,6 +72,21 @@ struct __wt_named_data_source {
 	WT_DATA_SOURCE *dsrc;		/* User supplied callbacks */
 					/* Linked list of data sources */
 	TAILQ_ENTRY(__wt_named_data_source) q;
+};
+
+/*
+ * WT_NAMED_ENCRYPTOR --
+ *	An encryptor list entry
+ */
+struct __wt_named_encryptor {
+	const char *name;		/* Name of encryptor */
+	WT_ENCRYPTOR *encryptor;	/* User supplied callbacks */
+					/* Locked: list of encryptors by key */
+	SLIST_HEAD(__wt_keyedhash, __wt_keyed_encryptor)
+				keyedhashlh[WT_HASH_ARRAY_SIZE];
+	SLIST_HEAD(__wt_keyed_lh, __wt_keyed_encryptor) keyedlh;
+					/* Linked list of encryptors */
+	TAILQ_ENTRY(__wt_named_encryptor) q;
 };
 
 /*
@@ -184,7 +219,6 @@ struct __wt_connection_impl {
 	 * URI.
 	 */
 					/* Locked: data handle hash array */
-#define	WT_HASH_ARRAY_SIZE	512
 	SLIST_HEAD(__wt_dhhash, __wt_data_handle) dhhash[WT_HASH_ARRAY_SIZE];
 					/* Locked: data handle list */
 	SLIST_HEAD(__wt_dhandle_lh, __wt_data_handle) dhlh;
@@ -202,6 +236,7 @@ struct __wt_connection_impl {
 
 	u_int open_btree_count;		/* Locked: open writable btree count */
 	uint32_t next_file_id;		/* Locked: file ID counter */
+	uint32_t open_file_count;	/* Atomic: open file handle count */
 
 	/*
 	 * WiredTiger allocates space for 50 simultaneous sessions (threads of
@@ -255,35 +290,14 @@ struct __wt_connection_impl {
 
 	WT_CONNECTION_STATS stats;	/* Connection statistics */
 
-#if SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX_LOGGING
-	/*
-	 * Spinlock registration, so we can track which spinlocks are heavily
-	 * used, which are blocking and where.
-	 *
-	 * There's an array of spinlocks, and an array of blocking IDs.
-	 */
-#define	WT_SPINLOCK_MAX			1024
-#define	WT_SPINLOCK_MAX_LOCATION_ID	60
-	WT_SPINLOCK *spinlock_list[WT_SPINLOCK_MAX];
-
-					/* Spinlock blocking matrix */
-	struct __wt_connection_stats_spinlock {
-		const char *name;	/* Mutex name */
-
-		const char *file;	/* Caller's file/line, ID location */
-		int line;
-
-		u_int total;		/* Count of total, blocked calls */
-		u_int blocked[WT_SPINLOCK_MAX_LOCATION_ID];
-	} spinlock_block[WT_SPINLOCK_MAX_LOCATION_ID];
-#endif
-
 	WT_ASYNC	*async;		/* Async structure */
 	int		 async_cfg;	/* Global async configuration */
 	uint32_t	 async_size;	/* Async op array size */
 	uint32_t	 async_workers;	/* Number of async workers */
 
 	WT_LSM_MANAGER	lsm_manager;	/* LSM worker thread information */
+
+	WT_KEYED_ENCRYPTOR *kencryptor;	/* Encryptor for metadata and log */
 
 	WT_SESSION_IMPL *evict_session; /* Eviction server sessions */
 	wt_thread_t	 evict_tid;	/* Eviction server thread ID */
@@ -337,6 +351,7 @@ struct __wt_connection_impl {
 	WT_CONDVAR	*sweep_cond;	/* Handle sweep wait mutex */
 	time_t		 sweep_idle_time;/* Handle sweep idle time */
 	time_t		 sweep_interval;/* Handle sweep interval */
+	u_int		 sweep_handles_min;/* Handle sweep minimum open */
 
 					/* Locked: collator list */
 	TAILQ_HEAD(__wt_coll_qh, __wt_named_collator) collqh;
@@ -346,6 +361,10 @@ struct __wt_connection_impl {
 
 					/* Locked: data source list */
 	TAILQ_HEAD(__wt_dsrc_qh, __wt_named_data_source) dsrcqh;
+
+					/* Locked: encryptor list */
+	WT_SPINLOCK encryptor_lock;	/* Encryptor list lock */
+	TAILQ_HEAD(__wt_encrypt_qh, __wt_named_encryptor) encryptqh;
 
 					/* Locked: extractor list */
 	TAILQ_HEAD(__wt_extractor_qh, __wt_named_extractor) extractorqh;

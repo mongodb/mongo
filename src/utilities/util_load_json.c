@@ -196,8 +196,7 @@ json_strdup(WT_SESSION *session, JSON_INPUT_STATE *ins, char **resultp)
 	if (0) {
 err:		if (ret == 0)
 			ret = EINVAL;
-		if (result != NULL)
-			free(result);
+		free(result);
 		*resultp = NULL;
 	}
 	return (ret);
@@ -433,8 +432,7 @@ err:		if (ret == 0)
 			ret = EINVAL;
 	}
 	config_list_free(&cl);
-	if (tableuri != NULL)
-		free(tableuri);
+	free(tableuri);
 	return (ret);
 }
 
@@ -574,8 +572,7 @@ util_load_json(WT_SESSION *session, const char *filename, uint32_t flags)
 	if ((ret = json_top_level(session, &instate, flags)) != 0)
 		goto err;
 
-err:	if (instate.line.mem != NULL)
-		free(instate.line.mem);
+err:	free(instate.line.mem);
 	free(instate.kvraw);
 	return (ret);
 }

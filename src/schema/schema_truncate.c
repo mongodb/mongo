@@ -33,7 +33,7 @@ __truncate_file(WT_SESSION_IMPL *session, const char *name)
 	WT_RET(__wt_session_release_btree(session));
 
 	/* Close any btree handles in the file. */
-	WT_WITH_DHANDLE_LOCK(session,
+	WT_WITH_HANDLE_LIST_LOCK(session,
 	    ret = __wt_conn_dhandle_close_all(session, name, 0));
 	WT_RET(ret);
 
@@ -84,7 +84,7 @@ __truncate_dsrc(WT_SESSION_IMPL *session, const char *uri)
 	const char *cfg[2];
 
 	/* Open a cursor and traverse the object, removing every entry. */
-	cfg[0] = WT_CONFIG_BASE(session, session_open_cursor);
+	cfg[0] = WT_CONFIG_BASE(session, WT_SESSION_open_cursor);
 	cfg[1] = NULL;
 	WT_RET(__wt_open_cursor(session, uri, NULL, cfg, &cursor));
 	while ((ret = cursor->next(cursor)) == 0)

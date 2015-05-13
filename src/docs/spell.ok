@@ -23,7 +23,9 @@ EB
 EBUSY
 ECMA
 EINVAL
+ENCRYPTOR
 EmpId
+Encryptors
 Facebook
 Facebook's
 FlexeLint
@@ -39,6 +41,7 @@ HyperDex
 HyperLevelDB
 IEC
 JavaScript
+KMS
 LD
 LDFLAGS
 LIBS
@@ -147,6 +150,7 @@ copydoc
 cpp
 crashless
 cursortype
+customerABC
 cv
 dN
 dNLen
@@ -162,6 +166,8 @@ dbformat
 dbm
 dbt
 decl
+decrypt
+decrypted
 del
 desc
 destructor
@@ -180,6 +186,9 @@ dt
 dumpfile
 dup
 dups
+encrypt
+encryptor
+encryptors
 endcode
 endcond
 endian
@@ -245,6 +254,7 @@ json
 kb
 keyexist
 keyfmt
+keyid
 keyname
 keyvalue
 kvs
@@ -378,6 +388,7 @@ rf
 rmw
 ro
 rocksdb
+rotn
 rpc
 runnable
 runtime
@@ -388,6 +399,7 @@ scalable
 scanf
 schemas
 scons
+secretkey
 selectable
 seqname
 seqno
@@ -441,6 +453,7 @@ ul
 umask
 unallocated
 unencoded
+unencrypted
 unescaped
 unicode
 uninstall

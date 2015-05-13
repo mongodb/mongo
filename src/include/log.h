@@ -11,7 +11,7 @@
 #define	WT_LOG_TMPNAME	"WiredTigerTmplog"	/* Log temporary name */
 
 /* Logging subsystem declarations. */
-#define	LOG_ALIGN		128
+#define	WT_LOG_ALIGN			128
 #define	WT_LOG_SLOT_BUF_INIT_SIZE	64 * 1024
 
 #define	WT_INIT_LSN(l)	do {						\
@@ -51,7 +51,7 @@
  * Compare 2 LSNs, return -1 if lsn0 < lsn1, 0 if lsn0 == lsn1
  * and 1 if lsn0 > lsn1.
  */
-#define	LOG_CMP(lsn1, lsn2)						\
+#define	WT_LOG_CMP(lsn1, lsn2)						\
 	((lsn1)->file != (lsn2)->file ?					\
 	((lsn1)->file < (lsn2)->file ? -1 : 1) :			\
 	((lsn1)->offset != (lsn2)->offset ?				\
@@ -128,7 +128,8 @@ typedef struct {
 	WT_LSN		sync_dir_lsn;	/* LSN of the last directory sync */
 	WT_LSN		sync_lsn;	/* LSN of the last sync */
 	WT_LSN		trunc_lsn;	/* End LSN for recovery truncation */
-	WT_LSN		write_lsn;	/* Last LSN written to log file */
+	WT_LSN		write_lsn;	/* End of last LSN written */
+	WT_LSN		write_start_lsn;/* Beginning of last LSN written */
 
 	/*
 	 * Synchronization resources
@@ -166,6 +167,7 @@ typedef struct {
 	uint32_t	checksum;	/* 04-07: Checksum of the record */
 
 #define	WT_LOG_RECORD_COMPRESSED	0x01	/* Compressed except hdr */
+#define	WT_LOG_RECORD_ENCRYPTED		0x02	/* Encrypted except hdr */
 	uint16_t	flags;		/* 08-09: Flags */
 	uint8_t		unused[2];	/* 10-11: Padding */
 	uint32_t	mem_len;	/* 12-15: Uncompressed len if needed */

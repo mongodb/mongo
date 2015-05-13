@@ -12,6 +12,8 @@ ext/compressors/nop
 ext/compressors/snappy SNAPPY
 ext/compressors/zlib ZLIB
 ext/datasources/helium HAVE_HELIUM
+ext/encryptors/nop
+ext/encryptors/rotn
 ext/test/kvs_bdb HAVE_BERKELEY_DB
 .
 api/leveldb LEVELDB
@@ -20,10 +22,12 @@ examples/c
 lang/java JAVA
 examples/java JAVA
 lang/python PYTHON
+
+# Make the tests
 test/bloom
 test/checkpoint
 test/fops
-test/format HAVE_BERKELEY_DB
+test/format
 test/huge
 test/packing
 test/salvage

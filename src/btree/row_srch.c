@@ -153,7 +153,7 @@ __wt_row_search(WT_SESSION_IMPL *session,
 
 	btree = S2BT(session);
 	collator = btree->collator;
-	item = &cbt->search_key;
+	item = cbt->tmp;
 
 	__cursor_pos_clear(cbt);
 
@@ -178,10 +178,7 @@ __wt_row_search(WT_SESSION_IMPL *session,
 	append_check = insert && cbt->append_tree;
 	descend_right = 1;
 
-	/*
-	 * In the service of eviction splits, we're only searching a single leaf
-	 * page, not a full tree.
-	 */
+	/* We may only be searching a single leaf page, not the full tree. */
 	if (leaf != NULL) {
 		current = leaf;
 		goto leaf_only;
@@ -526,7 +523,7 @@ restart:
 		    __wt_random(session->rnd) % page->pg_row_entries : 0;
 
 		return (__wt_row_leaf_key(session,
-		    page, page->pg_row_d + cbt->slot, &cbt->search_key, 0));
+		    page, page->pg_row_d + cbt->slot, cbt->tmp, 0));
 	}
 
 	/*

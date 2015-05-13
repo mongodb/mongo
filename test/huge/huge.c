@@ -34,8 +34,9 @@
 #include <unistd.h>
 #endif
 
-#include <wiredtiger.h>
+#include "test_util.i"
 
+static char home[512];				/* Program working dir */
 static const char *progname;			/* Program name */
 static uint8_t *big;				/* Big key/value buffer */
 
@@ -82,23 +83,6 @@ usage(void)
 	exit(EXIT_FAILURE);
 }
 
-static void
-die(int e, const char *fmt, ...)
-{
-	va_list ap;
-
-	if (fmt != NULL) {				/* Death message. */
-		fprintf(stderr, "%s: ", progname);
-		va_start(ap, fmt);
-		vfprintf(stderr, fmt, ap);
-		va_end(ap);
-		if (e != 0)
-			fprintf(stderr, ": %s", wiredtiger_strerror(e));
-		fprintf(stderr, "\n");
-	}
-	exit(EXIT_FAILURE);
-}
-
 #ifndef _WIN32
 #define	SIZET_FMT	"%zu"			/* size_t format string */
 #else
@@ -127,23 +111,23 @@ run(CONFIG *cp, int bigkey, size_t bytes)
 	    bytes < MEGABYTE ? "B" : (bytes < GIGABYTE ? "MB" : "GB"),
 	    cp->uri, cp->config, bigkey ? "key" : "value");
 
-	if ((ret = system("rm -rf WT_TEST && mkdir WT_TEST")) != 0)
-		die(ret, "system cleanup call failed");
+	testutil_make_work_dir(home);
 
 	/*
 	 * Open/create the database, connection, session and cursor; set the
 	 * cache size large, we don't want to try and evict anything.
 	 */
 	if ((ret = wiredtiger_open(
-	    "WT_TEST", NULL, "create,cache_size=10GB", &conn)) != 0)
-		die(ret, "wiredtiger_open");
+	    home, NULL, "create,cache_size=10GB", &conn)) != 0)
+		testutil_die(ret, "wiredtiger_open");
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		die(ret, "WT_CONNECTION.open_session");
+		testutil_die(ret, "WT_CONNECTION.open_session");
 	if ((ret = session->create(session, cp->uri, cp->config)) != 0)
-		die(ret, "WT_SESSION.create: %s %s", cp->uri, cp->config);
+		testutil_die(ret,
+		    "WT_SESSION.create: %s %s", cp->uri, cp->config);
 	if ((ret =
 	    session->open_cursor(session, cp->uri, NULL, NULL, &cursor)) != 0)
-		die(ret, "WT_SESSION.open_cursor: %s", cp->uri);
+		testutil_die(ret, "WT_SESSION.open_cursor: %s", cp->uri);
 
 	/* Set the key/value. */
 	if (bigkey)
@@ -157,46 +141,54 @@ run(CONFIG *cp, int bigkey, size_t bytes)
 
 	/* Insert the record. */
 	if ((ret = cursor->insert(cursor)) != 0)
-		die(ret, "WT_CURSOR.insert");
+		testutil_die(ret, "WT_CURSOR.insert");
 
 	/* Retrieve the record and check it. */
 	if ((ret = cursor->search(cursor)) != 0)
-		die(ret, "WT_CURSOR.search");
+		testutil_die(ret, "WT_CURSOR.search");
 	if (bigkey && (ret = cursor->get_key(cursor, &p)) != 0)
-		die(ret, "WT_CURSOR.get_key");
+		testutil_die(ret, "WT_CURSOR.get_key");
 	if ((ret = cursor->get_value(cursor, &p)) != 0)
-		die(ret, "WT_CURSOR.get_value");
+		testutil_die(ret, "WT_CURSOR.get_value");
 	if (memcmp(p, big, bytes) != 0)
-		die(0, "retrieved big key/value item did not match original");
+		testutil_die(0,
+		    "retrieved big key/value item did not match original");
 
 	/* Remove the record. */
 	if ((ret = cursor->remove(cursor)) != 0)
-		die(ret, "WT_CURSOR.remove");
+		testutil_die(ret, "WT_CURSOR.remove");
 
 	if ((ret = conn->close(conn, NULL)) != 0)
-		die(ret, "WT_CONNECTION.close");
+		testutil_die(ret, "WT_CONNECTION.close");
 
 	big[bytes - 1] = 'a';
 }
 
 extern int __wt_optind;
 extern int __wt_getopt(const char *, int, char * const *, const char *);
+extern char *__wt_optarg;
 
 int
 main(int argc, char *argv[])
 {
 	CONFIG *cp;
 	size_t len, *lp;
-	int ch, ret, small;
+	int ch, small;
+	char *working_dir;
 
-	if ((progname = strrchr(argv[0], '/')) == NULL)
+	if ((progname = strrchr(argv[0], DIR_DELIM)) == NULL)
 		progname = argv[0];
 	else
 		++progname;
 
 	small = 0;
-	while ((ch = __wt_getopt(progname, argc, argv, "s")) != EOF)
+	working_dir = NULL;
+
+	while ((ch = __wt_getopt(progname, argc, argv, "h:s")) != EOF)
 		switch (ch) {
+		case 'h':
+			working_dir = __wt_optarg;
+			break;
 		case 's':			/* Gigabytes */
 			small = 1;
 			break;
@@ -208,10 +200,12 @@ main(int argc, char *argv[])
 	if (argc != 0)
 		usage();
 
+	testutil_work_dir_from_path(home, 512, working_dir);
+
 	/* Allocate a buffer to use. */
 	len = small ? ((size_t)SMALL_MAX) : ((size_t)4 * GIGABYTE);
 	if ((big = malloc(len)) == NULL)
-		die(errno, "");
+		testutil_die(errno, "");
 	memset(big, 'a', len);
 
 	/* Make sure the configurations all work. */
@@ -226,8 +220,7 @@ main(int argc, char *argv[])
 	}
 	free(big);
 
-	if ((ret = system("rm -rf WT_TEST")) != 0)
-		die(ret, "system cleanup call failed");
+	testutil_clean_work_dir(home);
 
 	return (EXIT_SUCCESS);
 }

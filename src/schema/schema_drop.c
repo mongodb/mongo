@@ -29,7 +29,7 @@ __drop_file(
 		return (EINVAL);
 
 	/* Close all btree handles associated with this file. */
-	WT_WITH_DHANDLE_LOCK(session,
+	WT_WITH_HANDLE_LIST_LOCK(session,
 	    ret = __wt_conn_dhandle_close_all(session, uri, force));
 	WT_RET(ret);
 
@@ -59,7 +59,7 @@ __drop_colgroup(
 	WT_DECL_RET;
 	WT_TABLE *table;
 
-	WT_ASSERT(session, F_ISSET(session, WT_SESSION_TABLE_LOCKED));
+	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_TABLE));
 
 	/* If we can get the colgroup, detach it from the table. */
 	if ((ret = __wt_schema_get_colgroup(
@@ -120,8 +120,13 @@ __drop_table(
 	for (i = 0; i < WT_COLGROUPS(table); i++) {
 		if ((colgroup = table->cgroups[i]) == NULL)
 			continue;
-		WT_ERR(__wt_metadata_remove(session, colgroup->name));
+		/*
+		 * Drop the column group before updating the metadata to avoid
+		 * the metadata for the table becoming inconsistent if we can't
+		 * get exclusive access.
+		 */
 		WT_ERR(__wt_schema_drop(session, colgroup->source, cfg));
+		WT_ERR(__wt_metadata_remove(session, colgroup->name));
 	}
 
 	/* Drop the indices. */
@@ -129,8 +134,13 @@ __drop_table(
 	for (i = 0; i < table->nindices; i++) {
 		if ((idx = table->indices[i]) == NULL)
 			continue;
-		WT_ERR(__wt_metadata_remove(session, idx->name));
+		/*
+		 * Drop the column group before updating the metadata to avoid
+		 * the metadata for the table becoming inconsistent if we can't
+		 * get exclusive access.
+		 */
 		WT_ERR(__wt_schema_drop(session, idx->source, cfg));
+		WT_ERR(__wt_metadata_remove(session, idx->name));
 	}
 
 	WT_ERR(__wt_schema_remove_table(session, table));

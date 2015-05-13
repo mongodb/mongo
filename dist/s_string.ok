@@ -37,12 +37,15 @@ Bitfield
 Bitwise
 Bsearch
 Btree
+Buf
 Bzip
 CAS
+CCCCCCCCCCCCCCCCCC
 CELL's
 CELLs
 CHECKKEY
 CKPT
+CMP
 CONCAT
 CONFIG
 CPUs
@@ -69,12 +72,14 @@ DUPLICATEV
 DbCursor
 DbEnv
 Decrement
+Decrypt
 EAGAIN
 EBUSY
 EINTR
 EINVAL
 EMSG
 EMail
+ENCRYPTOR
 ENOENT
 ENOMEM
 ENOTSUP
@@ -84,12 +89,14 @@ ESET
 ETIME
 ETIMEDOUT
 EXTLIST
+Encryptor
+Encryptors
 Enqueue
 Eron
 FALLTHROUGH
 FH
 FLD
-FLS
+FLSv
 FNV
 FORALL
 FOREACH
@@ -162,8 +169,10 @@ LockFile
 Lookup
 MALLOC
 MEM
+MEMALIGN
 MERCHANTABILITY
 MSVC
+MULTIBLOCK
 MUTEX
 Manos
 MapViewOfFile
@@ -176,6 +185,7 @@ MongoDB
 MoveFile
 Multithreaded
 Mutex
+MySecret
 NEEDKEY
 NEEDVALUE
 NOLL
@@ -191,6 +201,7 @@ Nul
 OPTYPE
 OUTBUFF
 OVFL
+ObWgfvgw
 Obama
 PARAM
 POSIX
@@ -230,6 +241,7 @@ STAILQ
 STRUCT
 Scalability
 Scalable
+Sedgewick
 Seigh
 SetEndOfFile
 SetFilePointerEx
@@ -243,6 +255,7 @@ Spinlocks
 Split's
 Stoica
 TAILQ
+TCMalloc
 TODO
 TORTIOUS
 TXN
@@ -263,16 +276,18 @@ UnixLib
 Unmap
 UnmapViewOfFile
 Unmarshall
+Uryyb
 VARCHAR
 VLDB
 VMSG
 Vc
 Vfprintf
+Vigenere
 Vixie
 Vo
-Vv
 VxWorks
 WIREDTIGER
+WRLSN
 WakeAllConditionVariable
 Wconditional
 WeakHashLen
@@ -289,6 +304,7 @@ WiredTigerTmplog
 WiredTigerTxn
 WithSeeds
 Wuninitialized
+Wunused
 XP
 abcdef
 abcdefghijklmnopqrstuvwxyz
@@ -342,6 +358,7 @@ builtin
 builtins
 bytelock
 bytestring
+byvalue
 bzCompressEnd
 bzCompressInit
 bzDecompress
@@ -388,12 +405,15 @@ config
 conn
 connectionp
 const
+constantp
 copydoc
 copyin
 copyout
 cp
 cpuid
 crc
+crypto
+cryptobad
 ctime
 curbackup
 curbulk
@@ -409,6 +429,7 @@ cursorp
 curstat
 curtable
 cust
+customp
 cv
 cxa
 data's
@@ -424,6 +445,10 @@ decl
 decr
 decrement
 decrementing
+decrypt
+decrypted
+decrypting
+decrypts
 deflateCopy
 deflateEnd
 deflateInit
@@ -434,6 +459,7 @@ der
 dereference
 desc
 dest
+destSize
 dev
 dhandle
 dhandles
@@ -458,6 +484,8 @@ dup
 eg
 emp
 encodings
+encryptor
+encryptors
 endian
 english
 enqueue
@@ -574,6 +602,7 @@ jrx
 json
 kb
 keycmp
+keyid
 keyv
 kv
 kvraw
@@ -634,6 +663,7 @@ mfence
 minorp
 mkdir
 mmap
+mmrand
 mnt
 msecs
 msg
@@ -664,6 +694,7 @@ nfilename
 nhex
 nlpo
 nocase
+nocrypto
 nonliteral
 noop
 nop
@@ -701,6 +732,7 @@ popthreads
 pos
 posint
 posix
+postsize
 pragmas
 pre
 prealloc
@@ -741,6 +773,7 @@ recnos
 reconfig
 reconfiguring
 recsize
+rectype
 recurse
 refp
 reinitialization
@@ -752,6 +785,8 @@ rf
 rle
 rmw
 rng
+rotN
+rotn
 rpc
 run's
 runtime
@@ -761,6 +796,7 @@ sHQ
 sched
 scr
 sd
+secretkey
 sed
 sessionp
 setstr
@@ -803,6 +839,7 @@ strtouq
 struct
 structs
 su
+subdirectory
 subgetraw
 subgets
 subinit
@@ -815,6 +852,7 @@ sys
 t's
 tV
 tablename
+testutil
 th
 tid
 timestamp
@@ -847,6 +885,7 @@ unbare
 uncompressing
 uncompresssed
 undef
+unencrypted
 unesc
 unescaped
 uninstantiated
@@ -857,6 +896,7 @@ unmarshalled
 unmerged
 unmodify
 unpackv
+unpadded
 unreferenced
 unregister
 unsized
@@ -870,11 +910,13 @@ uri's
 uris
 usecs
 usedp
+userbad
 usercfg
 usr
 utf
 util
 uu
+vW
 va
 valuep
 valuev

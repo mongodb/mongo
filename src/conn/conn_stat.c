@@ -45,6 +45,8 @@ __wt_conn_stat_init(WT_SESSION_IMPL *session)
 	__wt_async_stats_update(session);
 	__wt_cache_stats_update(session);
 	__wt_txn_stats_update(session);
+
+	WT_CONN_STAT(session, file_open) = S2C(session)->open_file_count;
 }
 
 /*
@@ -140,7 +142,7 @@ __statlog_dump(WT_SESSION_IMPL *session, const char *name, int conn_stats)
 	uint64_t max;
 	const char *uri;
 	const char *cfg[] = {
-	    WT_CONFIG_BASE(session, session_open_cursor), NULL };
+	    WT_CONFIG_BASE(session, WT_SESSION_open_cursor), NULL };
 
 	conn = S2C(session);
 
@@ -316,17 +318,12 @@ __statlog_log_one(WT_SESSION_IMPL *session, WT_ITEM *path, WT_ITEM *tmp)
 	/* Dump the connection statistics. */
 	WT_RET(__statlog_dump(session, conn->home, 1));
 
-#if SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX_LOGGING
-	/* Dump the spinlock statistics. */
-	WT_RET(__wt_statlog_dump_spinlock(conn, conn->home));
-#endif
-
 	/*
 	 * Lock the schema and walk the list of open handles, dumping
 	 * any that match the list of object sources.
 	 */
 	if (conn->stat_sources != NULL) {
-		WT_WITH_DHANDLE_LOCK(session, ret =
+		WT_WITH_HANDLE_LIST_LOCK(session, ret =
 		    __wt_conn_btree_apply(
 		    session, 0, NULL, __statlog_apply, NULL));
 		WT_RET(ret);

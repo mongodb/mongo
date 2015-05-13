@@ -112,6 +112,7 @@ struct __wt_btree {
 	u_int split_deepen_per_child;	/* Entries per child when deepened */
 	int   split_pct;		/* Split page percent */
 	WT_COMPRESSOR *compressor;	/* Page compressor */
+	WT_KEYED_ENCRYPTOR *kencryptor;	/* Page encryptor */
 	WT_RWLOCK *ovfl_lock;		/* Overflow lock */
 
 	uint64_t last_recno;		/* Column-store last record number */
@@ -144,8 +145,8 @@ struct __wt_btree {
 
 	/* Flags values up to 0xff are reserved for WT_DHANDLE_* */
 #define	WT_BTREE_BULK		0x00100	/* Bulk-load handle */
-#define	WT_BTREE_NO_EVICTION	0x00200	/* Disable eviction */
-#define	WT_BTREE_NO_HAZARD	0x00400	/* Disable hazard pointers */
+#define	WT_BTREE_IN_MEMORY	0x00200	/* Cache-resident object */
+#define	WT_BTREE_NO_EVICTION	0x00400	/* Disable eviction */
 #define	WT_BTREE_SALVAGE	0x00800	/* Handle is for salvage */
 #define	WT_BTREE_UPGRADE	0x01000	/* Handle is for upgrade */
 #define	WT_BTREE_VERIFY		0x02000	/* Handle is for verify */

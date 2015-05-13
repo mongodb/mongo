@@ -323,13 +323,22 @@ __wt_debug_disk(
 		/* FALLTHROUGH */
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
-		__dmsg(ds, ", entries %" PRIu32 "\n", dsk->u.entries);
+		__dmsg(ds, ", entries %" PRIu32, dsk->u.entries);
 		break;
 	case WT_PAGE_OVFL:
-		__dmsg(ds, ", datalen %" PRIu32 "\n", dsk->u.datalen);
+		__dmsg(ds, ", datalen %" PRIu32, dsk->u.datalen);
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}
+
+	if (F_ISSET(dsk, WT_PAGE_COMPRESSED))
+		__dmsg(ds, ", compressed");
+	if (F_ISSET(dsk, WT_PAGE_EMPTY_V_ALL))
+		__dmsg(ds, ", empty-all");
+	if (F_ISSET(dsk, WT_PAGE_EMPTY_V_NONE))
+		__dmsg(ds, ", empty-none");
+
+	__dmsg(ds, ", generation %" PRIu64 "\n", dsk->write_gen);
 
 	switch (dsk->type) {
 	case WT_PAGE_BLOCK_MANAGER:
@@ -631,10 +640,14 @@ __debug_page_metadata(WT_DBG *ds, WT_PAGE *page)
 		__dmsg(ds, ", disk-mapped");
 	if (F_ISSET_ATOMIC(page, WT_PAGE_EVICT_LRU))
 		__dmsg(ds, ", evict-lru");
+	if (F_ISSET_ATOMIC(page, WT_PAGE_REFUSE_DEEPEN))
+		__dmsg(ds, ", refuse-deepen");
 	if (F_ISSET_ATOMIC(page, WT_PAGE_SCANNING))
 		__dmsg(ds, ", scanning");
-	if (F_ISSET_ATOMIC(page, WT_PAGE_SPLITTING))
-		__dmsg(ds, ", splitting");
+	if (F_ISSET_ATOMIC(page, WT_PAGE_SPLIT_INSERT))
+		__dmsg(ds, ", split-insert");
+	if (F_ISSET_ATOMIC(page, WT_PAGE_SPLIT_LOCKED))
+		__dmsg(ds, ", split-locked");
 
 	if (mod != NULL)
 		switch (F_ISSET(mod, WT_PM_REC_MASK)) {
@@ -646,6 +659,9 @@ __debug_page_metadata(WT_DBG *ds, WT_PAGE *page)
 			break;
 		case WT_PM_REC_REPLACE:
 			__dmsg(ds, ", replaced");
+			break;
+		case WT_PM_REC_REWRITE:
+			__dmsg(ds, ", rewrite");
 			break;
 		case 0:
 			break;
@@ -788,7 +804,7 @@ __debug_page_row_int(WT_DBG *ds, WT_PAGE *page, uint32_t flags)
 	WT_REF *ref;
 	WT_SESSION_IMPL *session;
 	size_t len;
-	uint8_t *p;
+	void *p;
 
 	session = ds->session;
 

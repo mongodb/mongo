@@ -483,6 +483,7 @@ __rec_root_write(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	switch (F_ISSET(mod, WT_PM_REC_MASK)) {
 	case WT_PM_REC_EMPTY:				/* Page is empty */
 	case WT_PM_REC_REPLACE:				/* 1-for-1 page swap */
+	case WT_PM_REC_REWRITE:				/* Rewrite */
 		return (0);
 	case WT_PM_REC_MULTIBLOCK:			/* Multiple blocks */
 		break;
@@ -861,11 +862,11 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 			continue;
 
 		/* Track the largest/smallest transaction IDs on the list. */
-		if (TXNID_LT(max_txn, txnid))
+		if (WT_TXNID_LT(max_txn, txnid))
 			max_txn = txnid;
-		if (TXNID_LT(txnid, min_txn))
+		if (WT_TXNID_LT(txnid, min_txn))
 			min_txn = txnid;
-		if (TXNID_LT(txnid, r->skipped_txn) &&
+		if (WT_TXNID_LT(txnid, r->skipped_txn) &&
 		    !__wt_txn_visible_all(session, txnid))
 			r->skipped_txn = txnid;
 
@@ -893,7 +894,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	 * used to avoid evicting clean pages from memory with changes required
 	 * to satisfy a snapshot read.
 	 */
-	if (TXNID_LT(r->max_txn, max_txn))
+	if (WT_TXNID_LT(r->max_txn, max_txn))
 		r->max_txn = max_txn;
 
 	/*
@@ -2121,7 +2122,7 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session,
 	WT_ITEM *dst, *write_ref;
 	WT_PAGE_HEADER *dsk, *dsk_dst;
 	WT_SESSION *wt_session;
-	size_t corrected_page_size, len, result_len;
+	size_t corrected_page_size, extra_skip, len, result_len;
 	uint64_t recno;
 	uint32_t entry, i, result_slots, slots;
 	int last_block;
@@ -2276,6 +2277,11 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session,
 		WT_RET(compressor->pre_size(compressor, wt_session,
 		    (uint8_t *)dsk + WT_BLOCK_COMPRESS_SKIP,
 		    (size_t)r->raw_offsets[slots], &result_len));
+	extra_skip = 0;
+	if (btree->kencryptor != NULL)
+		extra_skip = btree->kencryptor->size_const +
+		    WT_ENCRYPT_LEN_SIZE;
+
 	corrected_page_size = result_len + WT_BLOCK_COMPRESS_SKIP;
 	WT_RET(bm->write_size(bm, session, &corrected_page_size));
 	WT_RET(__wt_buf_init(session, dst, corrected_page_size));
@@ -2287,7 +2293,8 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session,
 	memcpy(dst->mem, dsk, WT_BLOCK_COMPRESS_SKIP);
 	ret = compressor->compress_raw(compressor, wt_session,
 	    r->page_size_orig, btree->split_pct,
-	    WT_BLOCK_COMPRESS_SKIP, (uint8_t *)dsk + WT_BLOCK_COMPRESS_SKIP,
+	    WT_BLOCK_COMPRESS_SKIP + extra_skip,
+	    (uint8_t *)dsk + WT_BLOCK_COMPRESS_SKIP,
 	    r->raw_offsets, slots,
 	    (uint8_t *)dst->mem + WT_BLOCK_COMPRESS_SKIP,
 	    result_len, no_more_rows, &result_len, &result_slots);
@@ -2679,8 +2686,8 @@ __rec_split_fixup(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 		/* Finalize the header information and write the page. */
 		dsk->recno = bnd->recno;
 		dsk->u.entries = bnd->entries;
-		dsk->mem_size =
-		    tmp->size = WT_PAGE_HEADER_BYTE_SIZE(btree) + len;
+		tmp->size = WT_PAGE_HEADER_BYTE_SIZE(btree) + len;
+		dsk->mem_size = WT_STORE_SIZE(tmp->size);
 		WT_ERR(__rec_split_write(session, r, bnd, tmp, 0));
 	}
 
@@ -3229,6 +3236,18 @@ __rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	WT_RET(__rec_split_init(
 	    session, r, page, page->pg_intl_recno, btree->maxintlpage));
 
+	/*
+	 * We need to mark this page as splitting, as this may be an in-memory
+	 * split during a checkpoint.
+	 */
+	for (;;) {
+		F_CAS_ATOMIC(page, WT_PAGE_SPLIT_LOCKED, ret);
+		if (ret == 0) {
+			break;
+		}
+		__wt_yield();
+	}
+
 	/* For each entry in the in-memory page... */
 	WT_INTL_FOREACH_BEGIN(session, page, ref) {
 		/* Update the starting record number in case we split. */
@@ -3271,6 +3290,8 @@ __rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			case WT_PM_REC_REPLACE:
 				addr = &child->modify->mod_replace;
 				break;
+			case WT_PM_REC_REWRITE:
+				break;
 			WT_ILLEGAL_VALUE_ERR(session);
 			}
 		} else
@@ -3308,6 +3329,8 @@ __rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		/* Copy the value onto the page. */
 		__rec_copy_incr(session, r, val);
 	} WT_INTL_FOREACH_END;
+
+	F_CLR_ATOMIC(page, WT_PAGE_SPLIT_LOCKED);
 
 	/* Write the remnant page. */
 	return (__rec_split_finish(session, r));
@@ -4041,6 +4064,18 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	 */
 	r->cell_zero = 1;
 
+	/*
+	 * We need to mark this page as splitting in order to ensure we don't
+	 * deadlock when performing an in-memory split during a checkpoint.
+	 */
+	for (;;) {
+		F_CAS_ATOMIC(page, WT_PAGE_SPLIT_LOCKED, ret);
+		if (ret == 0) {
+			break;
+		}
+		__wt_yield();
+	}
+
 	/* For each entry in the in-memory page... */
 	WT_INTL_FOREACH_BEGIN(session, page, ref) {
 		/*
@@ -4198,6 +4233,8 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		/* Update compression state. */
 		__rec_key_state_update(r, ovfl_key);
 	} WT_INTL_FOREACH_END;
+
+	F_CLR_ATOMIC(page, WT_PAGE_SPLIT_LOCKED);
 
 	/* Write the remnant page. */
 	return (__rec_split_finish(session, r));
@@ -4836,6 +4873,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	case WT_PM_REC_EMPTY:				/* Page deleted */
 		break;
 	case WT_PM_REC_MULTIBLOCK:			/* Multiple blocks */
+	case WT_PM_REC_REWRITE:				/* Rewrite */
 		/*
 		 * Discard the multiple replacement blocks.
 		 */
@@ -4914,7 +4952,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			bnd->dsk = NULL;
 			mod->mod_multi_entries = 1;
 
-			F_SET(mod, WT_PM_REC_MULTIBLOCK);
+			F_SET(mod, WT_PM_REC_REWRITE);
 			break;
 		}
 
@@ -5064,10 +5102,14 @@ __rec_write_wrapup_err(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	 * information (otherwise we might think the backing block is being
 	 * reused on a subsequent reconciliation where we want to free it).
 	 */
-	if (F_ISSET(mod, WT_PM_REC_MASK) == WT_PM_REC_MULTIBLOCK)
+	switch (F_ISSET(mod, WT_PM_REC_MASK)) {
+	case WT_PM_REC_MULTIBLOCK:
+	case WT_PM_REC_REWRITE:
 		for (multi = mod->mod_multi,
 		    i = 0; i < mod->mod_multi_entries; ++multi, ++i)
 			multi->addr.reuse = 0;
+		break;
+	}
 
 	/*
 	 * On error, discard blocks we've written, they're unreferenced by the

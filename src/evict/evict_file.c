@@ -27,7 +27,7 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 	WT_RET(__wt_evict_file_exclusive_on(session, &evict_reset));
 
 	/* Make sure the oldest transaction ID is up-to-date. */
-	__wt_txn_update_oldest(session);
+	__wt_txn_update_oldest(session, 1);
 
 	/* Walk the tree, discarding pages. */
 	next_ref = NULL;
@@ -76,11 +76,11 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 			/*
 			 * Evict the page.
 			 */
-			WT_ERR(__wt_evict(session, ref, 1));
+			WT_ERR(__wt_evict(session, ref, WT_EVICT_EXCLUSIVE));
 			break;
 		case WT_SYNC_DISCARD:
 			WT_ASSERT(session,
-			    __wt_page_can_evict(session, page, 0));
+			    __wt_page_can_evict(session, page, 0, NULL));
 			__wt_evict_page_clean_update(session, ref);
 			break;
 		case WT_SYNC_DISCARD_FORCE:

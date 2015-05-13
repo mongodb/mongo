@@ -31,10 +31,7 @@ __wt_col_search(WT_SESSION_IMPL *session,
 
 	__cursor_pos_clear(cbt);
 
-	/*
-	 * In the service of eviction splits, we're only searching a single leaf
-	 * page, not a full tree.
-	 */
+	/* We may only be searching a single leaf page, not the full tree. */
 	if (leaf != NULL) {
 		current = leaf;
 		goto leaf_only;
@@ -122,17 +119,33 @@ leaf_only:
 	cbt->slot = UINT32_MAX;
 
 	/*
-	 * Search the leaf page.  We do not check in the search path for a
-	 * record greater than the maximum record in the tree; in that case,
-	 * we arrive here with a record that's impossibly large for the page.
+	 * Search the leaf page.
+	 *
+	 * Search after a page is pinned does a search of the pinned page before
+	 * doing a full tree search, in which case we might be searching for a
+	 * record logically before the page. Return failure, and there's nothing
+	 * else to do, the record isn't going to be on this page.
+	 *
+	 * We don't check inside the search path for a record greater than the
+	 * maximum record in the tree; in that case, we get here with a record
+	 * that's impossibly large for the page. We do have additional setup to
+	 * do in that case, the record may be appended to the page.
 	 */
 	if (page->type == WT_PAGE_COL_FIX) {
+		if (recno < page->pg_fix_recno) {
+			cbt->compare = 1;
+			return (0);
+		}
 		if (recno >= page->pg_fix_recno + page->pg_fix_entries) {
 			cbt->recno = page->pg_fix_recno + page->pg_fix_entries;
 			goto past_end;
 		} else
 			ins_head = WT_COL_UPDATE_SINGLE(page);
-	} else
+	} else {
+		if (recno < page->pg_var_recno) {
+			cbt->compare = 1;
+			return (0);
+		}
 		if ((cip = __col_var_search(page, recno, NULL)) == NULL) {
 			cbt->recno = __col_var_last_recno(page);
 			goto past_end;
@@ -140,6 +153,7 @@ leaf_only:
 			cbt->slot = WT_COL_SLOT(page, cip);
 			ins_head = WT_COL_UPDATE_SLOT(page, cbt->slot);
 		}
+	}
 
 	/*
 	 * We have a match on the page, check for an update.  Check the page's

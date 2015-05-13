@@ -56,8 +56,8 @@ __logmgr_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 	*runp = cval.val != 0;
 
 	/*
-	 * Setup a log path and compression even if logging is disabled in
-	 * case we are going to print a log.
+	 * Setup a log path, compression and encryption even if logging is
+	 * disabled in case we are going to print a log.
 	 */
 	conn->log_compressor = NULL;
 	WT_RET(__wt_config_gets_none(session, cfg, "log.compressor", &cval));
@@ -344,18 +344,13 @@ typedef struct {
 } WT_LOG_WRLSN_ENTRY;
 
 /*
- * __log_wrlsn_cmp --
- *	The log wrlsn comparison function for qsort.
+ * WT_WRLSN_ENTRY_CMP_LT --
+ *	Return comparison of a written slot pair by LSN.
  */
-static int WT_CDECL
-__log_wrlsn_cmp(const void *a, const void *b)
-{
-	WT_LOG_WRLSN_ENTRY *ae, *be;
-
-	ae = (WT_LOG_WRLSN_ENTRY *)a;
-	be = (WT_LOG_WRLSN_ENTRY *)b;
-	return (LOG_CMP(&ae->lsn, &be->lsn));
-}
+#define	WT_WRLSN_ENTRY_CMP_LT(entry1, entry2)				\
+	((entry1).lsn.file < (entry2).lsn.file ||			\
+	((entry1).lsn.file == (entry2).lsn.file &&			\
+	(entry1).lsn.offset < (entry2).lsn.offset))
 
 /*
  * __log_wrlsn_server --
@@ -404,15 +399,16 @@ __log_wrlsn_server(void *arg)
 		 */
 		if (written_i > 0) {
 			yield = 0;
-			qsort(written, written_i, sizeof(WT_LOG_WRLSN_ENTRY),
-			    __log_wrlsn_cmp);
+			WT_INSERTION_SORT(written, written_i,
+			    WT_LOG_WRLSN_ENTRY, WT_WRLSN_ENTRY_CMP_LT);
+
 			/*
 			 * We know the written array is sorted by LSN.  Go
 			 * through them either advancing write_lsn or stop
 			 * as soon as one is not in order.
 			 */
 			for (i = 0; i < written_i; i++) {
-				if (LOG_CMP(&log->write_lsn,
+				if (WT_LOG_CMP(&log->write_lsn,
 				    &written[i].lsn) != 0)
 					break;
 				/*
@@ -420,8 +416,9 @@ __log_wrlsn_server(void *arg)
 				 * Advance the LSN and process the slot.
 				 */
 				slot = &log->slot_pool[written[i].slot_index];
-				WT_ASSERT(session, LOG_CMP(&written[i].lsn,
+				WT_ASSERT(session, WT_LOG_CMP(&written[i].lsn,
 				    &slot->slot_release_lsn) == 0);
+				log->write_start_lsn = slot->slot_start_lsn;
 				log->write_lsn = slot->slot_end_lsn;
 				WT_ERR(__wt_cond_signal(session,
 				    log->log_write_cond));
@@ -538,9 +535,9 @@ __wt_logmgr_create(WT_SESSION_IMPL *session, const char *cfg[])
 	    &log->log_archive_lock, "log archive lock"));
 	if (FLD_ISSET(conn->direct_io, WT_FILE_TYPE_LOG))
 		log->allocsize =
-		    WT_MAX((uint32_t)conn->buffer_alignment, LOG_ALIGN);
+		    WT_MAX((uint32_t)conn->buffer_alignment, WT_LOG_ALIGN);
 	else
-		log->allocsize = LOG_ALIGN;
+		log->allocsize = WT_LOG_ALIGN;
 	WT_INIT_LSN(&log->alloc_lsn);
 	WT_INIT_LSN(&log->ckpt_lsn);
 	WT_INIT_LSN(&log->first_lsn);
@@ -552,6 +549,7 @@ __wt_logmgr_create(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_ZERO_LSN(&log->sync_dir_lsn);
 	WT_INIT_LSN(&log->trunc_lsn);
 	WT_INIT_LSN(&log->write_lsn);
+	WT_INIT_LSN(&log->write_start_lsn);
 	log->fileid = 0;
 	WT_RET(__wt_cond_alloc(session, "log sync", 0, &log->log_sync_cond));
 	WT_RET(__wt_cond_alloc(session, "log write", 0, &log->log_write_cond));
@@ -706,6 +704,5 @@ __wt_logmgr_destroy(WT_SESSION_IMPL *session)
 	__wt_spin_destroy(session, &conn->log->log_sync_lock);
 	__wt_free(session, conn->log_path);
 	__wt_free(session, conn->log);
-
 	return (ret);
 }

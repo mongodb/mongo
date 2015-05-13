@@ -188,10 +188,10 @@ __wt_eventv(WT_SESSION_IMPL *session, int msg_event, int error,
 	end = s + sizeof(s);
 
 	/*
-	 * We have several prefixes for the error message:
-	 * a timestamp and the process and thread ids, the database error
-	 * prefix, the data-source's name, and the session's name.  Write them
-	 * as a comma-separate list, followed by a colon.
+	 * We have several prefixes for the error message: a timestamp and the
+	 * process and thread ids, the database error prefix, the data-source's
+	 * name, and the session's name.  Write them as a comma-separate list,
+	 * followed by a colon.
 	 */
 	prefix_cnt = 0;
 	if (__wt_epoch(session, &ts) == 0) {

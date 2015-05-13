@@ -11,7 +11,7 @@
 const char *home = ".";				/* Home directory */
 const char *progname;				/* Program name */
 						/* Global arguments */
-const char *usage_prefix = "[-Vv] [-R] [-C config] [-h home]";
+const char *usage_prefix = "[-LRVv] [-C config] [-E secretkey] [-h home]";
 int verbose;					/* Verbose flag */
 
 static const char *command;			/* Command name */
@@ -31,11 +31,12 @@ main(int argc, char *argv[])
 	size_t len;
 	int ch, major_v, minor_v, tret, (*func)(WT_SESSION *, int, char *[]);
 	int logoff, recover;
-	char *p;
-	const char *cmd_config, *config, *rec_config;
+	char *p, *secretkey;
+	const char *cmd_config, *config, *p1, *p2, *p3, *rec_config;
 
 	conn = NULL;
 	p = NULL;
+	secretkey = NULL;
 
 	/* Get the program name. */
 	if ((progname = strrchr(argv[0], '/')) == NULL)
@@ -57,7 +58,7 @@ main(int argc, char *argv[])
 		return (EXIT_FAILURE);
 	}
 
-	cmd_config = config = NULL;
+	cmd_config = config = secretkey = NULL;
 	/*
 	 * We default to returning an error if recovery needs to be run.
 	 * Generally we expect this to be run after a clean shutdown.
@@ -67,10 +68,17 @@ main(int argc, char *argv[])
 	rec_config = REC_ERROR;
 	logoff = recover = 0;
 	/* Check for standard options. */
-	while ((ch = __wt_getopt(progname, argc, argv, "C:h:LRVv")) != EOF)
+	while ((ch = __wt_getopt(progname, argc, argv, "C:E:h:LRVv")) != EOF)
 		switch (ch) {
 		case 'C':			/* wiredtiger_open config */
 			cmd_config = __wt_optarg;
+			break;
+		case 'E':			/* secret key */
+			if ((secretkey = strdup(__wt_optarg)) == NULL) {
+				ret = util_err(NULL, errno, NULL);
+				goto err;
+			}
+			memset(__wt_optarg, 0, strlen(__wt_optarg));
 			break;
 		case 'h':			/* home directory */
 			home = __wt_optarg;
@@ -182,18 +190,25 @@ main(int argc, char *argv[])
 
 	/* Build the configuration string. */
 	len = 10;					/* some slop */
+	p1 = p2 = p3 = "";
 	if (config != NULL)
 		len += strlen(config);
 	if (cmd_config != NULL)
 		len += strlen(cmd_config);
+	if (secretkey != NULL) {
+		len += strlen(secretkey) + 30;
+		p1 = ",encryption=(secretkey=";
+		p2 = secretkey;
+		p3 = ")";
+	}
 	len += strlen(rec_config);
 	if ((p = malloc(len)) == NULL) {
 		ret = util_err(NULL, errno, NULL);
 		goto err;
 	}
-	(void)snprintf(p, len, "%s,%s,%s",
+	(void)snprintf(p, len, "%s,%s,%s%s%s%s",
 	    config == NULL ? "" : config,
-	    cmd_config == NULL ? "" : cmd_config, rec_config);
+	    cmd_config == NULL ? "" : cmd_config, rec_config, p1, p2, p3);
 	config = p;
 
 	/* Open the database and a session. */
@@ -215,8 +230,8 @@ main(int argc, char *argv[])
 err:	if (conn != NULL && (tret = conn->close(conn, NULL)) != 0 && ret == 0)
 		ret = tret;
 
-	if (p != NULL)
-		free(p);
+	free(p);
+	free(secretkey);
 
 	return (ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
 }

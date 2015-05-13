@@ -36,7 +36,7 @@ file_create(const char *name)
 	char *p, *end, config[128];
 
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		die("conn.session", ret);
+		testutil_die(ret, "conn.session");
 
 	p = config;
 	end = config + sizeof(config);
@@ -50,10 +50,10 @@ file_create(const char *name)
 
 	if ((ret = session->create(session, name, config)) != 0)
 		if (ret != EEXIST)
-			die("session.create", ret);
+			testutil_die(ret, "session.create");
 
 	if ((ret = session->close(session, NULL)) != 0)
-		die("session.close", ret);
+		testutil_die(ret, "session.close");
 }
 
 void
@@ -69,11 +69,11 @@ load(const char *name)
 	file_create(name);
 
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		die("conn.session", ret);
+		testutil_die(ret, "conn.session");
 
 	if ((ret =
 	    session->open_cursor(session, name, NULL, "bulk", &cursor)) != 0)
-		die("cursor.open", ret);
+		testutil_die(ret, "cursor.open");
 
 	key = &_key;
 	value = &_value;
@@ -94,11 +94,11 @@ load(const char *name)
 			cursor->set_value(cursor, value);
 		}
 		if ((ret = cursor->insert(cursor)) != 0)
-			die("cursor.insert", ret);
+			testutil_die(ret, "cursor.insert");
 	}
 
 	if ((ret = session->close(session, NULL)) != 0)
-		die("session.close", ret);
+		testutil_die(ret, "session.close");
 }
 
 void
@@ -108,11 +108,11 @@ verify(const char *name)
 	int ret;
 
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		die("conn.session", ret);
+		testutil_die(ret, "conn.session");
 
 	if ((ret = session->verify(session, name, NULL)) != 0)
-		die("session.create", ret);
+		testutil_die(ret, "session.create");
 
 	if ((ret = session->close(session, NULL)) != 0)
-		die("session.close", ret);
+		testutil_die(ret, "session.close");
 }

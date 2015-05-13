@@ -68,6 +68,7 @@ static const char * const debug_tconfig = "";
 static void	*checkpoint_worker(void *);
 static int	 create_tables(CONFIG *);
 static int	 create_uris(CONFIG *);
+static int	drop_all_tables(CONFIG *);
 static int	 execute_populate(CONFIG *);
 static int	 execute_workload(CONFIG *);
 static int	 find_table_count(CONFIG *);
@@ -89,6 +90,7 @@ static uint64_t	 wtperf_value_range(CONFIG *);
 #define	HELIUM_PATH							\
 	"../../ext/test/helium/.libs/libwiredtiger_helium.so"
 #define	HELIUM_CONFIG	",type=helium"
+#define	INDEX_COL_NAMES	",columns=(key,val)"
 
 /* Retrieve an ID for the next insert operation. */
 static inline uint64_t
@@ -380,7 +382,7 @@ worker(void *arg)
 	CONFIG_THREAD *thread;
 	TRACK *trk;
 	WT_CONNECTION *conn;
-	WT_CURSOR **cursors, *cursor;
+	WT_CURSOR **cursors, *cursor, *tmp_cursor;
 	WT_SESSION *session;
 	int64_t ops, ops_per_txn, throttle_ops;
 	size_t i;
@@ -388,6 +390,7 @@ worker(void *arg)
 	uint8_t *op, *op_end;
 	int measure_latency, ret;
 	char *value_buf, *key_buf, *value;
+	char buf[512];
 
 	thread = (CONFIG_THREAD *)arg;
 	cfg = thread->cfg;
@@ -409,6 +412,20 @@ worker(void *arg)
 		lprintf(cfg, ENOMEM, 0,
 		    "worker: couldn't allocate cursor array");
 		goto err;
+	}
+	for (i = 0; i < cfg->table_count_idle; i++) {
+		snprintf(buf, 512, "%s_idle%05d", cfg->uris[0], (int)i);
+		if ((ret = session->open_cursor(
+		    session, buf, NULL, NULL, &tmp_cursor)) != 0) {
+			lprintf(cfg, ret, 0,
+			    "Error opening idle table %s", buf);
+			goto err;
+		}
+		if ((ret = tmp_cursor->close(tmp_cursor)) != 0) {
+			lprintf(cfg, ret, 0,
+			    "Error closing idle table %s", buf);
+			goto err;
+		}
 	}
 	for (i = 0; i < cfg->table_count; i++) {
 		if ((ret = session->open_cursor(session,
@@ -638,8 +655,7 @@ op_err:			lprintf(cfg, ret, 0,
 	if (0) {
 err:		cfg->error = cfg->stop = 1;
 	}
-	if (cursors != NULL)
-		free(cursors);
+	free(cursors);
 
 	return (NULL);
 }
@@ -782,7 +798,8 @@ populate_thread(void *arg)
 	}
 
 	/* Do bulk loads if populate is single-threaded. */
-	cursor_config = cfg->populate_threads == 1 ? "bulk" : NULL;
+	cursor_config =
+	    (cfg->populate_threads == 1 && !cfg->index) ? "bulk" : NULL;
 	/* Create the cursors. */
 	cursors = calloc(cfg->table_count, sizeof(WT_CURSOR *));
 	if (cursors == NULL) {
@@ -902,8 +919,7 @@ populate_thread(void *arg)
 	if (0) {
 err:		cfg->error = cfg->stop = 1;
 	}
-	if (cursors != NULL)
-		free(cursors);
+	free(cursors);
 
 	return (NULL);
 }
@@ -1513,6 +1529,10 @@ err:	cfg->stop = 1;
 	    cfg, (u_int)cfg->workers_cnt, cfg->workers)) != 0 && ret == 0)
 		ret = t_ret;
 
+	/* Drop tables if configured to and this isn't an error path */
+	if (ret == 0 && cfg->drop_tables && (ret = drop_all_tables(cfg)) != 0)
+		lprintf(cfg, ret, 0, "Drop tables failed.");
+
 	/* Report if any worker threads didn't finish. */
 	if (cfg->error != 0) {
 		lprintf(cfg, WT_ERROR, 0,
@@ -1602,20 +1622,18 @@ create_uris(CONFIG *cfg)
 		goto err;
 	}
 	for (i = 0; i < cfg->table_count; i++) {
-		uri = cfg->uris[i] = calloc(base_uri_len + 3, 1);
+		uri = cfg->uris[i] = calloc(base_uri_len + 5, 1);
 		if (uri == NULL) {
 			ret = ENOMEM;
 			goto err;
 		}
-		memcpy(uri, cfg->base_uri, base_uri_len);
 		/*
 		 * If there is only one table, just use base name.
 		 */
-		if (cfg->table_count > 1) {
-			uri[base_uri_len] = uri[base_uri_len + 1] = '0';
-			uri[base_uri_len] = '0' + (i / 10);
-			uri[base_uri_len + 1] = '0' + (i % 10);
-		}
+		if (cfg->table_count == 1)
+			memcpy(uri, cfg->base_uri, base_uri_len);
+		else
+			sprintf(uri, "%s%05d", cfg->base_uri, i);
 	}
 err:	if (ret != 0 && cfg->uris != NULL) {
 		for (i = 0; i < cfg->table_count; i++)
@@ -1632,6 +1650,7 @@ create_tables(CONFIG *cfg)
 	WT_SESSION *session;
 	size_t i;
 	int ret;
+	char buf[512];
 
 	if (cfg->create == 0)
 		return (0);
@@ -1643,13 +1662,34 @@ create_tables(CONFIG *cfg)
 		return (ret);
 	}
 
-	for (i = 0; i < cfg->table_count; i++)
+	for (i = 0; i < cfg->table_count_idle; i++) {
+		snprintf(buf, 512, "%s_idle%05d", cfg->uris[0], (int)i);
+		if ((ret = session->create(
+		    session, buf, cfg->table_config)) != 0) {
+			lprintf(cfg, ret, 0,
+			    "Error creating idle table %s", buf);
+			return (ret);
+		}
+	}
+
+	for (i = 0; i < cfg->table_count; i++) {
 		if ((ret = session->create(
 		    session, cfg->uris[i], cfg->table_config)) != 0) {
 			lprintf(cfg, ret, 0,
 			    "Error creating table %s", cfg->uris[i]);
 			return (ret);
 		}
+		if (cfg->index) {
+			snprintf(buf, 512, "index:%s:val_idx",
+			    cfg->uris[i] + strlen("table:"));
+			if ((ret = session->create(
+			    session, buf, "columns=(val)")) != 0) {
+				lprintf(cfg, ret, 0,
+				    "Error creating index %s", buf);
+				return (ret);
+			}
+		}
+	}
 
 	if ((ret = session->close(session, NULL)) != 0) {
 		lprintf(cfg, ret, 0, "Error closing session");
@@ -2086,7 +2126,7 @@ main(int argc, char *argv[])
 		if ((ret = config_opt_str(cfg, "conn_config", cc_buf)) != 0)
 			goto err;
 	}
-	if (cfg->verbose > 1 || cfg->helium_mount != NULL ||
+	if (cfg->verbose > 1 || cfg->index || cfg->helium_mount != NULL ||
 	    user_tconfig != NULL || cfg->compress_table != NULL) {
 		req_len = strlen(cfg->table_config) + strlen(HELIUM_CONFIG) +
 		    strlen(debug_tconfig) + 3;
@@ -2094,6 +2134,8 @@ main(int argc, char *argv[])
 			req_len += strlen(user_tconfig);
 		if (cfg->compress_table != NULL)
 			req_len += strlen(cfg->compress_table);
+		if (cfg->index)
+			req_len += strlen(INDEX_COL_NAMES);
 		if ((tc_buf = calloc(req_len, 1)) == NULL) {
 			ret = enomem(cfg);
 			goto err;
@@ -2101,8 +2143,9 @@ main(int argc, char *argv[])
 		/*
 		 * This is getting hard to parse.
 		 */
-		snprintf(tc_buf, req_len, "%s%s%s%s%s%s%s",
+		snprintf(tc_buf, req_len, "%s%s%s%s%s%s%s%s",
 		    cfg->table_config,
+		    cfg->index ? INDEX_COL_NAMES : "",
 		    cfg->compress_table ? cfg->compress_table : "",
 		    cfg->verbose > 1 ? ",": "",
 		    cfg->verbose > 1 ? debug_tconfig : "",
@@ -2261,6 +2304,42 @@ worker_throttle(int64_t throttle, int64_t *ops, struct timespec *interval)
 	*interval = now;
 }
 
+static int
+drop_all_tables(CONFIG *cfg)
+{
+	struct timespec start, stop;
+	WT_SESSION *session;
+	size_t i;
+	uint64_t msecs;
+	int ret, t_ret;
+
+	/* Drop any tables. */
+	if ((ret = cfg->conn->open_session(
+	    cfg->conn, NULL, cfg->sess_config, &session)) != 0) {
+		lprintf(cfg, ret, 0,
+		    "Error opening a session on %s", cfg->home);
+		return (ret);
+	}
+	(void)__wt_epoch(NULL, &start);
+	for (i = 0; i < cfg->table_count; i++) {
+		if ((ret = session->drop(
+		    session, cfg->uris[i], NULL)) != 0) {
+			lprintf(cfg, ret, 0,
+			    "Error dropping table %s", cfg->uris[i]);
+			goto err;
+		}
+	}
+	(void)__wt_epoch(NULL, &stop);
+	msecs = ns_to_ms(WT_TIMEDIFF(stop, start));
+	lprintf(cfg, 0, 1,
+	    "Executed %" PRIu32 " drop operations average time %" PRIu64 "ms",
+	    cfg->table_count, msecs / cfg->table_count);
+
+err:	if ((t_ret = session->close(session, NULL)) != 0 && ret == 0)
+		ret = t_ret;
+	return (ret);
+}
+
 static uint64_t
 wtperf_value_range(CONFIG *cfg)
 {
@@ -2286,15 +2365,16 @@ wtperf_rand(CONFIG_THREAD *thread)
 	rval = (uint64_t)__wt_random(thread->rnd);
 
 	/* Use Pareto distribution to give 80/20 hot/cold values. */
-	if (cfg->pareto) {
+	if (cfg->pareto != 0) {
 #define	PARETO_SHAPE	1.5
 		S1 = (-1 / PARETO_SHAPE);
-		S2 = wtperf_value_range(cfg) * 0.2 * (PARETO_SHAPE - 1);
+		S2 = wtperf_value_range(cfg) *
+		    (cfg->pareto / 100.0) * (PARETO_SHAPE - 1);
 		U = 1 - (double)rval / (double)UINT32_MAX;
 		rval = (pow(U, S1) - 1) * S2;
 		/*
 		 * This Pareto calculation chooses out of range values about
-		 * about 2% of the time, from my testing. That will lead to the
+		 * 2% of the time, from my testing. That will lead to the
 		 * first item in the table being "hot".
 		 */
 		if (rval > wtperf_value_range(cfg))

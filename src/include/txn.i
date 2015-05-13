@@ -26,7 +26,7 @@ __txn_next_op(WT_SESSION_IMPL *session, WT_TXN_OP **opp)
 	 * Make sure we have allocated a transaction ID.
 	 */
 	WT_RET(__wt_txn_id_check(session));
-	WT_ASSERT(session, F_ISSET(txn, TXN_HAS_ID));
+	WT_ASSERT(session, F_ISSET(txn, WT_TXN_HAS_ID));
 
 	WT_RET(__wt_realloc_def(session, &txn->mod_alloc,
 	    txn->mod_count + 1, &txn->mod));
@@ -49,7 +49,7 @@ __wt_txn_unmodify(WT_SESSION_IMPL *session)
 	WT_TXN *txn;
 
 	txn = &session->txn;
-	if (F_ISSET(txn, TXN_HAS_ID)) {
+	if (F_ISSET(txn, WT_TXN_HAS_ID)) {
 		WT_ASSERT(session, txn->mod_count > 0);
 		txn->mod_count--;
 	}
@@ -67,7 +67,7 @@ __wt_txn_modify(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 
 	WT_RET(__txn_next_op(session, &op));
 	op->type = F_ISSET(session, WT_SESSION_LOGGING_INMEM) ?
-	    TXN_OP_INMEM : TXN_OP_BASIC;
+	    WT_TXN_OP_INMEM : WT_TXN_OP_BASIC;
 	op->u.upd = upd;
 	upd->txnid = session->txn.id;
 	return (ret);
@@ -83,7 +83,7 @@ __wt_txn_modify_ref(WT_SESSION_IMPL *session, WT_REF *ref)
 	WT_TXN_OP *op;
 
 	WT_RET(__txn_next_op(session, &op));
-	op->type = TXN_OP_REF;
+	op->type = WT_TXN_OP_REF;
 	op->u.ref = ref;
 	return (__wt_txn_log_op(session, NULL));
 }
@@ -118,14 +118,14 @@ __wt_txn_visible_all(WT_SESSION_IMPL *session, uint64_t id)
 	 */
 	if (checkpoint_snap_min != WT_TXN_NONE && (btree == NULL ||
 	    btree->checkpoint_gen != txn_global->checkpoint_gen) &&
-	    TXNID_LT(checkpoint_snap_min, oldest_id))
+	    WT_TXNID_LT(checkpoint_snap_min, oldest_id))
 		/*
 		 * Use the checkpoint ID for the visibility check if it is the
 		 * oldest ID in the system.
 		 */
 		oldest_id = checkpoint_snap_min;
 
-	return (TXNID_LT(id, oldest_id));
+	return (WT_TXNID_LT(id, oldest_id));
 }
 
 /*
@@ -139,20 +139,20 @@ __wt_txn_visible(WT_SESSION_IMPL *session, uint64_t id)
 
 	txn = &session->txn;
 
-	/*
-	 * Eviction only sees globally visible updates, or if there is a
-	 * checkpoint transaction running, use its transaction.
-	*/
-	if (txn->isolation == TXN_ISO_EVICTION)
-		return (__wt_txn_visible_all(session, id));
+	/* Changes with no associated transaction are always visible. */
+	if (id == WT_TXN_NONE)
+		return (1);
 
 	/* Nobody sees the results of aborted transactions. */
 	if (id == WT_TXN_ABORTED)
 		return (0);
 
-	/* Changes with no associated transaction are always visible. */
-	if (id == WT_TXN_NONE)
-		return (1);
+	/*
+	 * Eviction only sees globally visible updates, or if there is a
+	 * checkpoint transaction running, use its transaction.
+	 */
+	if (txn->isolation == WT_ISO_EVICTION)
+		return (__wt_txn_visible_all(session, id));
 
 	/*
 	 * Read-uncommitted transactions see all other changes.
@@ -164,7 +164,7 @@ __wt_txn_visible(WT_SESSION_IMPL *session, uint64_t id)
 	 * Metadata updates use non-transactional techniques (such as the
 	 * schema and metadata locks) to protect access to in-flight updates.
 	 */
-	if (txn->isolation == TXN_ISO_READ_UNCOMMITTED ||
+	if (txn->isolation == WT_ISO_READ_UNCOMMITTED ||
 	    session->dhandle == session->meta_dhandle)
 		return (1);
 
@@ -173,7 +173,7 @@ __wt_txn_visible(WT_SESSION_IMPL *session, uint64_t id)
 		return (1);
 
 	/*
-	 * TXN_ISO_SNAPSHOT, TXN_ISO_READ_COMMITTED: the ID is visible if it is
+	 * WT_ISO_SNAPSHOT, WT_ISO_READ_COMMITTED: the ID is visible if it is
 	 * not the result of a concurrent transaction, that is, if was
 	 * committed before the snapshot was taken.
 	 *
@@ -181,9 +181,9 @@ __wt_txn_visible(WT_SESSION_IMPL *session, uint64_t id)
 	 * saw when taking the snapshot should be invisible, even if the
 	 * snapshot is empty.
 	 */
-	if (TXNID_LE(txn->snap_max, id))
+	if (WT_TXNID_LE(txn->snap_max, id))
 		return (0);
-	if (txn->snapshot_count == 0 || TXNID_LT(id, txn->snap_min))
+	if (txn->snapshot_count == 0 || WT_TXNID_LT(id, txn->snap_min))
 		return (1);
 
 	return (bsearch(&id, txn->snapshot, txn->snapshot_count,
@@ -204,17 +204,50 @@ __wt_txn_read(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 }
 
 /*
+ * __wt_txn_begin --
+ *	Begin a transaction.
+ */
+static inline int
+__wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
+{
+	WT_TXN *txn;
+
+	txn = &session->txn;
+	txn->isolation = session->isolation;
+	txn->txn_logsync = S2C(session)->txn_logsync;
+
+	if (cfg != NULL)
+		WT_RET(__wt_txn_config(session, cfg));
+
+	if (txn->isolation == WT_ISO_SNAPSHOT) {
+		if (session->ncursors > 0)
+			WT_RET(__wt_session_copy_values(session));
+
+		/*
+		 * We're about to allocate a snapshot: if we need to block for
+		 * eviction, it's better to do it beforehand.
+		 */
+		WT_RET(__wt_cache_full_check(session));
+
+		__wt_txn_get_snapshot(session);
+	}
+
+	F_SET(txn, WT_TXN_RUNNING);
+	return (0);
+}
+
+/*
  * __wt_txn_autocommit_check --
  *	If an auto-commit transaction is required, start one.
-*/
+ */
 static inline int
 __wt_txn_autocommit_check(WT_SESSION_IMPL *session)
 {
 	WT_TXN *txn;
 
 	txn = &session->txn;
-	if (F_ISSET(txn, TXN_AUTOCOMMIT)) {
-		F_CLR(txn, TXN_AUTOCOMMIT);
+	if (F_ISSET(txn, WT_TXN_AUTOCOMMIT)) {
+		F_CLR(txn, WT_TXN_AUTOCOMMIT);
 		return (__wt_txn_begin(session, NULL));
 	}
 	return (0);
@@ -254,10 +287,10 @@ __wt_txn_idle_cache_check(WT_SESSION_IMPL *session)
 
 	/*
 	 * Check the published snap_min because read-uncommitted never sets
-	 * TXN_HAS_SNAPSHOT.
+	 * WT_TXN_HAS_SNAPSHOT.
 	 */
-	if (F_ISSET(txn, TXN_RUNNING) &&
-	    !F_ISSET(txn, TXN_HAS_ID) && txn_state->snap_min == WT_TXN_NONE)
+	if (F_ISSET(txn, WT_TXN_RUNNING) &&
+	    !F_ISSET(txn, WT_TXN_HAS_ID) && txn_state->snap_min == WT_TXN_NONE)
 		WT_RET(__wt_cache_full_check(session));
 
 	return (0);
@@ -278,12 +311,12 @@ __wt_txn_id_check(WT_SESSION_IMPL *session)
 
 	txn = &session->txn;
 
-	WT_ASSERT(session, F_ISSET(txn, TXN_RUNNING));
+	WT_ASSERT(session, F_ISSET(txn, WT_TXN_RUNNING));
 
 	/* If the transaction is idle, check that the cache isn't full. */
 	WT_RET(__wt_txn_idle_cache_check(session));
 
-	if (!F_ISSET(txn, TXN_HAS_ID)) {
+	if (!F_ISSET(txn, WT_TXN_HAS_ID)) {
 		conn = S2C(session);
 		txn_global = &conn->txn_global;
 		txn_state = &txn_global->states[session->id];
@@ -319,7 +352,7 @@ __wt_txn_id_check(WT_SESSION_IMPL *session)
 		 */
 		if (txn->id == WT_TXN_ABORTED)
 			WT_RET_MSG(session, ENOMEM, "Out of transaction IDs");
-		F_SET(txn, TXN_HAS_ID);
+		F_SET(txn, WT_TXN_HAS_ID);
 	}
 
 	return (0);
@@ -335,7 +368,7 @@ __wt_txn_update_check(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 	WT_TXN *txn;
 
 	txn = &session->txn;
-	if (txn->isolation == TXN_ISO_SNAPSHOT)
+	if (txn->isolation == WT_ISO_SNAPSHOT)
 		while (upd != NULL && !__wt_txn_visible(session, upd->txnid)) {
 			if (upd->txnid != WT_TXN_ABORTED) {
 				WT_STAT_FAST_DATA_INCR(
@@ -360,8 +393,8 @@ __wt_txn_read_last(WT_SESSION_IMPL *session)
 	txn = &session->txn;
 
 	/* Release the snap_min ID we put in the global table. */
-	if (!F_ISSET(txn, TXN_RUNNING) ||
-	    txn->isolation != TXN_ISO_SNAPSHOT)
+	if (!F_ISSET(txn, WT_TXN_RUNNING) ||
+	    txn->isolation != WT_ISO_SNAPSHOT)
 		__wt_txn_release_snapshot(session);
 }
 
@@ -396,14 +429,14 @@ __wt_txn_cursor_op(WT_SESSION_IMPL *session)
 	 * further forward, so that once a read-uncommitted cursor is
 	 * positioned on a value, it can't be freed.
 	 */
-	if (txn->isolation == TXN_ISO_READ_UNCOMMITTED &&
-	    !F_ISSET(txn, TXN_HAS_ID) &&
-	    TXNID_LT(txn_state->snap_min, txn_global->last_running))
+	if (txn->isolation == WT_ISO_READ_UNCOMMITTED &&
+	    !F_ISSET(txn, WT_TXN_HAS_ID) &&
+	    WT_TXNID_LT(txn_state->snap_min, txn_global->last_running))
 		txn_state->snap_min = txn_global->last_running;
 
-	if (txn->isolation != TXN_ISO_READ_UNCOMMITTED &&
-	    !F_ISSET(txn, TXN_HAS_SNAPSHOT))
-		__wt_txn_refresh(session, 1);
+	if (txn->isolation != WT_ISO_READ_UNCOMMITTED &&
+	    !F_ISSET(txn, WT_TXN_HAS_SNAPSHOT))
+		__wt_txn_get_snapshot(session);
 }
 
 /*
@@ -429,7 +462,7 @@ __wt_txn_am_oldest(WT_SESSION_IMPL *session)
 
 	WT_ORDERED_READ(session_cnt, conn->session_cnt);
 	for (i = 0, s = txn_global->states; i < session_cnt; i++, s++)
-		if ((id = s->id) != WT_TXN_NONE && TXNID_LT(id, txn->id))
+		if ((id = s->id) != WT_TXN_NONE && WT_TXNID_LT(id, txn->id))
 			return (0);
 
 	return (1);

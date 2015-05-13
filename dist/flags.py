@@ -44,6 +44,11 @@ flags = {
         'READ_TRUNCATE',
         'READ_WONT_NEED',
     ],
+    'page_eviction' : [
+        'EVICT_CHECK_SPLITS',
+        'EVICT_EXCLUSIVE',
+        'EVICT_INMEM_SPLIT',
+    ],
     'rec_write' : [
         'EVICTING',
         'SKIP_UPDATE_ERR',
@@ -106,7 +111,10 @@ flags = {
         'SESSION_CAN_WAIT',
         'SESSION_CLEAR_EVICT_WALK',
         'SESSION_DISCARD_FORCE',
-        'SESSION_HANDLE_LIST_LOCKED',
+        'SESSION_LOCKED_CHECKPOINT',
+        'SESSION_LOCKED_HANDLE_LIST',
+        'SESSION_LOCKED_SCHEMA',
+        'SESSION_LOCKED_TABLE',
         'SESSION_INTERNAL',
         'SESSION_LOGGING_INMEM',
         'SESSION_NO_CACHE',
@@ -115,9 +123,7 @@ flags = {
         'SESSION_NO_LOGGING',
         'SESSION_NO_SCHEMA_LOCK',
         'SESSION_SALVAGE_CORRUPT_OK',
-        'SESSION_SCHEMA_LOCKED',
         'SESSION_SERVER_ASYNC',
-        'SESSION_TABLE_LOCKED',
     ],
 }
 

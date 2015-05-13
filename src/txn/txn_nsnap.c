@@ -34,7 +34,7 @@ __wt_txn_named_snapshot(WT_SESSION_IMPL *session,
 	WT_TXN *txn;
 	WT_TXN_GLOBAL *txn_global;
 	const char *txn_cfg[] =
-	    { WT_CONFIG_BASE(session, session_begin_transaction),
+	    { WT_CONFIG_BASE(session, WT_SESSION_begin_transaction),
 	      "isolation=snapshot", NULL };
 	int locked;
 
@@ -108,7 +108,7 @@ __wt_txn_named_snapshot(WT_SESSION_IMPL *session,
 
 err:	if (locked)
 		WT_TRET(__wt_writeunlock(session, txn_global->nsnap_rwlock));
-	if (F_ISSET(txn, TXN_RUNNING))
+	if (F_ISSET(txn, WT_TXN_RUNNING))
 		WT_TRET(__wt_txn_rollback(session, NULL));
 	if (nsnap_new != NULL)
 		__nsnap_destroy(session, nsnap_new);
@@ -132,7 +132,7 @@ __wt_txn_nsnap_get(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *nameval)
 	txn_global = &S2C(session)->txn_global;
 	txn_state = &S2C(session)->txn_global.states[session->id];
 
-	txn->isolation = TXN_ISO_SNAPSHOT;
+	txn->isolation = WT_ISO_SNAPSHOT;
 	if (session->ncursors > 0)
 		WT_RET(__wt_session_copy_values(session));
 
@@ -146,7 +146,7 @@ __wt_txn_nsnap_get(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *nameval)
 				memcpy(txn->snapshot, nsnap->snapshot,
 				    nsnap->snapshot_count *
 				    sizeof(*nsnap->snapshot));
-			F_SET(txn, TXN_HAS_SNAPSHOT);
+			F_SET(txn, WT_TXN_HAS_SNAPSHOT);
 			break;
 		}
 	WT_RET(__wt_readunlock(session, txn_global->nsnap_rwlock));

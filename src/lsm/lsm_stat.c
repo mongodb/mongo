@@ -26,13 +26,13 @@ __curstat_lsm_init(
 	int locked;
 	char config[64];
 	const char *cfg[] = {
-	    WT_CONFIG_BASE(session, session_open_cursor), NULL, NULL };
+	    WT_CONFIG_BASE(session, WT_SESSION_open_cursor), NULL, NULL };
 	const char *disk_cfg[] = {
-	   WT_CONFIG_BASE(session, session_open_cursor),
+	   WT_CONFIG_BASE(session, WT_SESSION_open_cursor),
 	   "checkpoint=" WT_CHECKPOINT, NULL, NULL };
 
 	locked = 0;
-	WT_WITH_DHANDLE_LOCK(session,
+	WT_WITH_HANDLE_LIST_LOCK(session,
 	    ret = __wt_lsm_tree_get(session, uri, 0, &lsm_tree));
 	WT_RET(ret);
 	WT_ERR(__wt_scr_alloc(session, 0, &uribuf));

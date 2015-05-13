@@ -26,7 +26,8 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "wt_internal.h"
+#include "wt_internal.h"			/* For __wt_XXX */
+#include "test_util.i"
 
 #include <assert.h>
 
@@ -70,7 +71,7 @@ main(int argc, char *argv[])
 	u_int ptype;
 	int ch, r;
 
-	if ((progname = strrchr(argv[0], '/')) == NULL)
+	if ((progname = strrchr(argv[0], DIR_DELIM)) == NULL)
 		progname = argv[0];
 	else
 		++progname;

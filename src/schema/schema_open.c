@@ -44,7 +44,7 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 	char *cgconfig;
 	u_int i;
 
-	WT_ASSERT(session, F_ISSET(session, WT_SESSION_TABLE_LOCKED));
+	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_TABLE));
 
 	if (table->cg_complete)
 		return (0);
@@ -187,13 +187,12 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table, WT_INDEX *idx)
 
 	/* Start with the declared index columns. */
 	WT_ERR(__wt_config_subinit(session, &colconf, &idx->colconf));
-	npublic_cols = 0;
-	while ((ret = __wt_config_next(&colconf, &ckey, &cval)) == 0) {
+	for (npublic_cols = 0;
+	    (ret = __wt_config_next(&colconf, &ckey, &cval)) == 0;
+	    ++npublic_cols)
 		WT_ERR(__wt_buf_catfmt(
 		    session, buf, "%.*s,", (int)ckey.len, ckey.str));
-		++npublic_cols;
-	}
-	if (ret != 0 && ret != WT_NOTFOUND)
+	if (ret != WT_NOTFOUND)
 		goto err;
 
 	/*
@@ -408,7 +407,7 @@ __wt_schema_open_table(WT_SESSION_IMPL *session,
 	table = NULL;
 	tablename = NULL;
 
-	WT_ASSERT(session, F_ISSET(session, WT_SESSION_TABLE_LOCKED));
+	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_TABLE));
 
 	WT_ERR(__wt_scr_alloc(session, 0, &buf));
 	WT_ERR(__wt_buf_fmt(session, buf, "table:%.*s", (int)namelen, name));

@@ -45,31 +45,6 @@ typedef struct {
 
 static STATS *run_stats;
 
-/*
- * r --
- *	Return a 32-bit pseudo-random number.
- *
- * This is an implementation of George Marsaglia's multiply-with-carry pseudo-
- * random number generator.  Computationally fast, with reasonable randomness
- * properties.
- */
-static inline uint32_t
-r(void)
-{
-	static uint32_t m_w = 0, m_z = 0;
-
-	if (m_w == 0) {
-		struct timeval t;
-		(void)gettimeofday(&t, NULL);
-		m_w = (uint32_t)t.tv_sec;
-		m_z = (uint32_t)t.tv_usec;
-	}
-
-	m_z = 36969 * (m_z & 65535) + (m_z >> 16);
-	m_w = 18000 * (m_w & 65535) + (m_w >> 16);
-	return (m_z << 16) + (m_w & 65535);
-}
-
 int
 fop_start(u_int nthreads)
 {
@@ -80,11 +55,13 @@ fop_start(u_int nthreads)
 	int ret;
 	void *thread_ret;
 
+	tids = NULL; /* Silence GCC 4.1 warning. */
+
 	/* Create statistics and thread structures. */
 	if ((run_stats = calloc(
 	    (size_t)(nthreads), sizeof(*run_stats))) == NULL ||
 	    (tids = calloc((size_t)(nthreads), sizeof(*tids))) == NULL)
-		die(errno, "calloc");
+		testutil_die(errno, "calloc");
 
 	(void)gettimeofday(&start, NULL);
 
@@ -92,7 +69,7 @@ fop_start(u_int nthreads)
 	for (i = 0; i < nthreads; ++i)
 		if ((ret = pthread_create(
 		    &tids[i], NULL, fop, (void *)(uintptr_t)i)) != 0)
-			die(ret, "pthread_create");
+			testutil_die(ret, "pthread_create");
 
 	/* Wait for the threads. */
 	for (i = 0; i < nthreads; ++i)
@@ -121,15 +98,17 @@ fop(void *arg)
 {
 	STATS *s;
 	uintptr_t id;
+	uint32_t rnd[2];
 	u_int i;
 
 	id = (uintptr_t)arg;
 	sched_yield();		/* Get all the threads created. */
 
 	s = &run_stats[id];
+	__wt_random_init(rnd);
 
 	for (i = 0; i < nops; ++i, sched_yield())
-		switch (r() % 9) {
+		switch (__wt_random(rnd) % 9) {
 		case 0:
 			++s->bulk;
 			obj_bulk();

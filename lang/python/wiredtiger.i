@@ -31,10 +31,16 @@
  *	The SWIG interface file defining the wiredtiger python API.
  */
 %define DOCSTRING
-"@defgroup wt_python WiredTiger Python API
-Python wrappers aroung the WiredTiger C API.
-@{
-@cond IGNORE"
+"Python wrappers around the WiredTiger C API
+
+This provides an API similar to the C API, with the following modifications:
+  - Many C functions are exposed as OO methods. See the Python examples and test suite
+  - Errors are handled in a Pythonic way; wrap calls in try/except blocks
+  - Cursors have extra accessor methods and iterators that are higher-level than the C API
+  - Statistics cursors behave a little differently and are best handled using the C-like functions
+  - C Constants starting with WT_STAT_DSRC are instead exposed under wiredtiger.stat.dsrc
+  - C Constants starting with WT_STAT_CONN are instead exposed under wiredtiger.stat.conn
+"
 %enddef
 
 %module(docstring=DOCSTRING) wiredtiger
@@ -917,6 +923,7 @@ int verbose_build();
 %ignore __wt_compressor;
 %ignore __wt_config_item;
 %ignore __wt_data_source;
+%ignore __wt_encryptor;
 %ignore __wt_event_handler;
 %ignore __wt_extractor;
 %ignore __wt_item;
@@ -925,6 +932,7 @@ int verbose_build();
 %ignore __wt_connection::add_collator;
 %ignore __wt_connection::add_compressor;
 %ignore __wt_connection::add_data_source;
+%ignore __wt_connection::add_encryptor;
 %ignore __wt_connection::add_extractor;
 %ignore __wt_connection::get_extension_api;
 %ignore __wt_session::log_printf;

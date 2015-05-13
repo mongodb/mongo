@@ -41,8 +41,8 @@ __recovery_cursor(WT_SESSION_IMPL *session, WT_RECOVERY *r,
     WT_LSN *lsnp, u_int id, int duplicate, WT_CURSOR **cp)
 {
 	WT_CURSOR *c;
-	const char *cfg[] = { WT_CONFIG_BASE(session, session_open_cursor),
-	    "overwrite", NULL };
+	const char *cfg[] = { WT_CONFIG_BASE(
+	    session, WT_SESSION_open_cursor), "overwrite", NULL };
 	int metadata_op;
 
 	c = NULL;
@@ -65,7 +65,7 @@ __recovery_cursor(WT_SESSION_IMPL *session, WT_RECOVERY *r,
 			    "No file found with ID %u (max %u)",
 			    id, r->nfiles));
 		r->missing = 1;
-	} else if (LOG_CMP(lsnp, &r->files[id].ckpt_lsn) >= 0) {
+	} else if (WT_LOG_CMP(lsnp, &r->files[id].ckpt_lsn) >= 0) {
 		/*
 		 * We're going to apply the operation.  Get the cursor, opening
 		 * one if none is cached.
@@ -194,18 +194,18 @@ __txn_op_apply(
 		/* Set up the cursors. */
 		start = stop = NULL;
 		switch (mode) {
-		case TXN_TRUNC_ALL:
+		case WT_TXN_TRUNC_ALL:
 			/* Both cursors stay NULL. */
 			break;
-		case TXN_TRUNC_BOTH:
+		case WT_TXN_TRUNC_BOTH:
 			start = cursor;
 			WT_ERR(__recovery_cursor(
 			    session, r, lsnp, fileid, 1, &stop));
 			break;
-		case TXN_TRUNC_START:
+		case WT_TXN_TRUNC_START:
 			start = cursor;
 			break;
-		case TXN_TRUNC_STOP:
+		case WT_TXN_TRUNC_STOP:
 			stop = cursor;
 			break;
 
@@ -376,32 +376,30 @@ __recovery_free(WT_RECOVERY *r)
 static int
 __recovery_file_scan(WT_RECOVERY *r)
 {
-	WT_DECL_RET;
 	WT_CURSOR *c;
-	const char *uri, *config;
+	WT_DECL_RET;
 	int cmp;
+	const char *uri, *config;
 
 	/* Scan through all files in the metadata. */
 	c = r->files[0].c;
 	c->set_key(c, "file:");
 	if ((ret = c->search_near(c, &cmp)) != 0) {
 		/* Is the metadata empty? */
-		if (ret == WT_NOTFOUND)
-			ret = 0;
-		goto err;
+		WT_RET_NOTFOUND_OK(ret);
+		return (0);
 	}
 	if (cmp < 0)
-		WT_ERR_NOTFOUND_OK(c->next(c));
+		WT_RET_NOTFOUND_OK(c->next(c));
 	for (; ret == 0; ret = c->next(c)) {
-		WT_ERR(c->get_key(c, &uri));
+		WT_RET(c->get_key(c, &uri));
 		if (!WT_PREFIX_MATCH(uri, "file:"))
 			break;
-		WT_ERR(c->get_value(c, &config));
-		WT_ERR(__recovery_setup_file(r, uri, config));
+		WT_RET(c->get_value(c, &config));
+		WT_RET(__recovery_setup_file(r, uri, config));
 	}
-	WT_ERR_NOTFOUND_OK(ret);
-
-err:	return (ret);
+	WT_RET_NOTFOUND_OK(ret);
+	return (0);
 }
 
 /*
@@ -425,7 +423,7 @@ __wt_txn_recover(WT_SESSION_IMPL *session)
 	was_backup = F_ISSET(conn, WT_CONN_WAS_BACKUP) ? 1 : 0;
 
 	/* We need a real session for recovery. */
-	WT_RET(__wt_open_session(conn, NULL, NULL, &session));
+	WT_RET(__wt_open_session(conn, NULL, NULL, 1, &session));
 	F_SET(session, WT_SESSION_NO_LOGGING);
 	r.session = session;
 

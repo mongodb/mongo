@@ -34,7 +34,6 @@ static void startup(void);
 static void usage(void);
 
 extern int __wt_optind;
-extern int __wt_getopt(const char *, int, char * const *, const char *);
 extern char *__wt_optarg;
 
 int
@@ -46,7 +45,7 @@ main(int argc, char *argv[])
 
 	config = NULL;
 
-	if ((g.progname = strrchr(argv[0], '/')) == NULL)
+	if ((g.progname = strrchr(argv[0], DIR_DELIM)) == NULL)
 		g.progname = argv[0];
 	else
 		++g.progname;
@@ -106,6 +105,9 @@ main(int argc, char *argv[])
 	argc -= __wt_optind;
 	argv += __wt_optind;
 
+	/* Initialize the global random number generator. */
+	__wt_random_init(g.rnd);
+
 	/* Set up paths. */
 	path_setup(home);
 
@@ -153,16 +155,15 @@ main(int argc, char *argv[])
 		g.c_runs = 1;
 
 	/*
-	 * Initialize locks to single-thread named checkpoints and backups, and
-	 * to single-thread last-record updates.
+	 * Initialize locks to single-thread named checkpoints and backups, last
+	 * last-record updates, and failures.
 	 */
 	if ((ret = pthread_rwlock_init(&g.append_lock, NULL)) != 0)
 		die(ret, "pthread_rwlock_init: append lock");
 	if ((ret = pthread_rwlock_init(&g.backup_lock, NULL)) != 0)
 		die(ret, "pthread_rwlock_init: backup lock");
-
-	/* Seed the random number generator. */
-	srand((u_int)(0xdeadbeef ^ (u_int)time(NULL)));
+	if ((ret = pthread_rwlock_init(&g.death_lock, NULL)) != 0)
+		die(ret, "pthread_rwlock_init: death lock");
 
 	printf("%s: process %" PRIdMAX "\n", g.progname, (intmax_t)getpid());
 	while (++g.run_cnt <= g.c_runs || g.c_runs == 0 ) {
@@ -175,8 +176,10 @@ main(int argc, char *argv[])
 		start = time(NULL);
 		track("starting up", 0ULL, NULL);
 
+#ifdef HAVE_BERKELEY_DB
 		if (SINGLETHREADED)
 			bdb_open();		/* Initial file config */
+#endif
 		wts_open(g.home, 1, &g.wts_conn);
 		wts_create();
 
@@ -214,8 +217,10 @@ main(int argc, char *argv[])
 			}
 
 		track("shutting down", 0ULL, NULL);
+#ifdef HAVE_BERKELEY_DB
 		if (SINGLETHREADED)
 			bdb_close();
+#endif
 		wts_close();
 
 		/*
@@ -236,13 +241,12 @@ main(int argc, char *argv[])
 		printf("%4d: %s, %s (%.0f seconds)\n",
 		    g.run_cnt, g.c_data_source,
 		    g.c_file_type, difftime(time(NULL), start));
+		fflush(stdout);
 	}
 
 	/* Flush/close any logging information. */
-	if (g.logfp != NULL)
-		(void)fclose(g.logfp);
-	if (g.rand_log != NULL)
-		(void)fclose(g.rand_log);
+	fclose_and_clear(&g.logfp);
+	fclose_and_clear(&g.randfp);
 
 	config_print(0);
 
@@ -265,36 +269,20 @@ startup(void)
 {
 	int ret;
 
-	/* Close the logging file. */
-	if (g.logfp != NULL) {
-		(void)fclose(g.logfp);
-		g.logfp = NULL;
-	}
+	/* Flush/close any logging information. */
+	fclose_and_clear(&g.logfp);
+	fclose_and_clear(&g.randfp);
 
-	/* Close the random number logging file. */
-	if (g.rand_log != NULL) {
-		(void)fclose(g.rand_log);
-		g.rand_log = NULL;
-	}
-
-	/* Create home if it doesn't yet exist. */
-	if (access(g.home, X_OK) != 0 && mkdir(g.home, 0777) != 0)
-		die(errno, "mkdir: %s", g.home);
-
-	/* Remove the run's files except for rand. */
+	/* Create or initialize the home and data-source directories. */
 	if ((ret = system(g.home_init)) != 0)
 		die(ret, "home directory initialization failed");
-
-	/* Create the data-source directory. */
-	if (mkdir(g.home_kvs, 0777) != 0)
-		die(errno, "mkdir: %s", g.home_kvs);
 
 	/* Open/truncate the logging file. */
 	if (g.logging != 0 && (g.logfp = fopen(g.home_log, "w")) == NULL)
 		die(errno, "fopen: %s", g.home_log);
 
 	/* Open/truncate the random number logging file. */
-	if ((g.rand_log = fopen(g.home_rand, g.replay ? "r" : "w")) == NULL)
+	if ((g.randfp = fopen(g.home_rand, g.replay ? "r" : "w")) == NULL)
 		die(errno, "%s", g.home_rand);
 }
 
@@ -307,6 +295,9 @@ die(int e, const char *fmt, ...)
 {
 	va_list ap;
 
+	/* Single-thread error handling. */
+	(void)pthread_rwlock_wrlock(&g.death_lock);
+
 	if (fmt != NULL) {				/* Death message. */
 		fprintf(stderr, "%s: ", g.progname);
 		va_start(ap, fmt);
@@ -318,10 +309,8 @@ die(int e, const char *fmt, ...)
 	}
 
 	/* Flush/close any logging information. */
-	if (g.logfp != NULL)
-		(void)fclose(g.logfp);
-	if (g.rand_log != NULL)
-		(void)fclose(g.rand_log);
+	fclose_and_clear(&g.logfp);
+	fclose_and_clear(&g.randfp);
 
 	/* Display the configuration that failed. */
 	if (g.run_cnt)

@@ -26,7 +26,8 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "wt_internal.h"
+#include "wt_internal.h"			/* For __wt_XXX */
+#include "test_util.i"
 
 static struct {
 	char *progname;				/* Program name */
@@ -47,7 +48,6 @@ static struct {
 } g;
 
 void cleanup(void);
-void die(int e, const char *fmt, ...);
 void populate_entries(void);
 void run(void);
 void setup(void);
@@ -61,7 +61,7 @@ main(int argc, char *argv[])
 {
 	int ch;
 
-	if ((g.progname = strrchr(argv[0], '/')) == NULL)
+	if ((g.progname = strrchr(argv[0], DIR_DELIM)) == NULL)
 		g.progname = argv[0];
 	else
 		++g.progname;
@@ -115,7 +115,7 @@ setup(void)
 	char config[512];
 
 	if ((ret = system("rm -f WiredTiger* *.bf")) != 0)
-		die(ret, "system cleanup call failed");
+		testutil_die(ret, "system cleanup call failed");
 
 	/*
 	 * This test doesn't test public Wired Tiger functionality, it still
@@ -131,10 +131,10 @@ setup(void)
 	    g.progname, g.c_cache, g.config_open == NULL ? "" : g.config_open);
 
 	if ((ret = wiredtiger_open(NULL, NULL, config, &conn)) != 0)
-		die(ret, "wiredtiger_open");
+		testutil_die(ret, "wiredtiger_open");
 
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		die(ret, "connection.open_session");
+		testutil_die(ret, "connection.open_session");
 
 	g.wt_conn = conn;
 	g.wt_session = session;
@@ -156,37 +156,37 @@ run(void)
 
 	if ((ret = __wt_bloom_create(
 	    sess, uri, NULL, g.c_ops, g.c_factor, g.c_k, &bloomp)) != 0)
-		die(ret, "__wt_bloom_create");
+		testutil_die(ret, "__wt_bloom_create");
 
 	item.size = g.c_key_max;
 	for (i = 0; i < g.c_ops; i++) {
 		item.data = g.entries[i];
 		if ((ret = __wt_bloom_insert(bloomp, &item)) != 0)
-			die(ret, "__wt_bloom_insert: %d", i);
+			testutil_die(ret, "__wt_bloom_insert: %d", i);
 	}
 
 	if ((ret = __wt_bloom_finalize(bloomp)) != 0)
-		die(ret, "__wt_bloom_finalize");
+		testutil_die(ret, "__wt_bloom_finalize");
 
 	for (i = 0; i < g.c_ops; i++) {
 		item.data = g.entries[i];
 		if ((ret = __wt_bloom_get(bloomp, &item)) != 0) {
 			fprintf(stderr, "get failed at record: %d\n", i);
-			die(ret, "__wt_bloom_get");
+			testutil_die(ret, "__wt_bloom_get");
 		}
 	}
 	if ((ret = __wt_bloom_close(bloomp)) != 0)
-		die(ret, "__wt_bloom_close");
+		testutil_die(ret, "__wt_bloom_close");
 
 	if ((ret = g.wt_session->checkpoint(g.wt_session, NULL)) != 0)
-		die(ret, "WT_SESSION.checkpoint");
+		testutil_die(ret, "WT_SESSION.checkpoint");
 	if ((ret = __wt_bloom_open(
 	    sess, uri, g.c_factor, g.c_k, NULL, &bloomp)) != 0)
-		die(ret, "__wt_bloom_open");
+		testutil_die(ret, "__wt_bloom_open");
 	for (i = 0; i < g.c_ops; i++) {
 		item.data = g.entries[i];
 		if ((ret = __wt_bloom_get(bloomp, &item)) != 0)
-			die(ret, "__wt_bloom_get");
+			testutil_die(ret, "__wt_bloom_get");
 	}
 
 	/*
@@ -206,7 +206,7 @@ run(void)
 	printf("Out of %d ops, got %d false positives, %.4f%%\n",
 	    g.c_ops, fp, 100.0 * fp/g.c_ops);
 	if ((ret = __wt_bloom_drop(bloomp, NULL)) != 0)
-		die(ret, "__wt_bloom_drop");
+		testutil_die(ret, "__wt_bloom_drop");
 }
 
 void
@@ -219,9 +219,9 @@ cleanup(void)
 		free(g.entries[i]);
 	free(g.entries);
 	if ((ret = g.wt_session->close(g.wt_session, NULL)) != 0)
-		die(ret, "WT_SESSION.close");
+		testutil_die(ret, "WT_SESSION.close");
 	if ((g.wt_conn->close(g.wt_conn, NULL)) != 0)
-		die(ret, "WT_CONNECTION.close");
+		testutil_die(ret, "WT_CONNECTION.close");
 }
 
 /*
@@ -238,39 +238,17 @@ populate_entries(void)
 
 	entries = calloc(g.c_ops, sizeof(uint8_t *));
 	if (entries == NULL)
-		die(ENOMEM, "key buffer malloc");
+		testutil_die(ENOMEM, "key buffer malloc");
 
 	for (i = 0; i < g.c_ops; i++) {
 		entries[i] = calloc(g.c_key_max, sizeof(uint8_t));
 		if (entries[i] == NULL)
-			die(ENOMEM, "key buffer malloc 2");
+			testutil_die(ENOMEM, "key buffer malloc 2");
 		for (j = 0; j < g.c_key_max; j++)
 			entries[i][j] = 'a' + ((uint8_t)rand() % 26);
 	}
 
 	g.entries = entries;
-}
-
-/*
- * die --
- *	Report an error and quit.
- */
-void
-die(int e, const char *fmt, ...)
-{
-	va_list ap;
-
-	if (fmt != NULL) {				/* Death message. */
-		fprintf(stderr, "%s: ", g.progname);
-		va_start(ap, fmt);
-		vfprintf(stderr, fmt, ap);
-		va_end(ap);
-		if (e != 0)
-			fprintf(stderr, ": %s", wiredtiger_strerror(e));
-		fprintf(stderr, "\n");
-	}
-
-	exit(EXIT_FAILURE);
 }
 
 /*

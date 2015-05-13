@@ -227,7 +227,7 @@ __wt_lsm_manager_start(WT_SESSION_IMPL *session)
 	for (i = 0; i < WT_LSM_MAX_WORKERS; i++) {
 		WT_ERR(__wt_open_internal_session(
 		    S2C(session), "lsm-worker", 1, 0, &worker_session));
-		worker_session->isolation = TXN_ISO_READ_UNCOMMITTED;
+		worker_session->isolation = WT_ISO_READ_UNCOMMITTED;
 		manager->lsm_worker_cookies[i].session = worker_session;
 	}
 
@@ -327,8 +327,7 @@ __wt_lsm_manager_destroy(WT_SESSION_IMPL *session)
 			WT_TRET(wt_session->close(wt_session, NULL));
 		}
 	}
-	WT_STAT_FAST_CONN_INCRV(session,
-	    lsm_work_units_discarded, removed);
+	WT_STAT_FAST_CONN_INCRV(session, lsm_work_units_discarded, removed);
 
 	/* Free resources that are allocated in connection initialize */
 	__wt_spin_destroy(session, &manager->switch_lock);
@@ -424,7 +423,7 @@ __lsm_manager_run_server(WT_SESSION_IMPL *session)
 		if (TAILQ_EMPTY(&conn->lsmqh))
 			continue;
 		__wt_spin_lock(session, &conn->dhandle_lock);
-		F_SET(session, WT_SESSION_HANDLE_LIST_LOCKED);
+		F_SET(session, WT_SESSION_LOCKED_HANDLE_LIST);
 		dhandle_locked = 1;
 		TAILQ_FOREACH(lsm_tree, &S2C(session)->lsmqh, q) {
 			if (!F_ISSET(lsm_tree, WT_LSM_TREE_ACTIVE))
@@ -484,13 +483,13 @@ __lsm_manager_run_server(WT_SESSION_IMPL *session)
 			}
 		}
 		__wt_spin_unlock(session, &conn->dhandle_lock);
-		F_CLR(session, WT_SESSION_HANDLE_LIST_LOCKED);
+		F_CLR(session, WT_SESSION_LOCKED_HANDLE_LIST);
 		dhandle_locked = 0;
 	}
 
 err:	if (dhandle_locked) {
 		__wt_spin_unlock(session, &conn->dhandle_lock);
-		F_CLR(session, WT_SESSION_HANDLE_LIST_LOCKED);
+		F_CLR(session, WT_SESSION_LOCKED_HANDLE_LIST);
 	}
 	return (ret);
 }
