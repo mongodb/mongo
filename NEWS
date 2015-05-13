@@ -1,11 +1,39 @@
 WiredTiger release 2.6.0, 2015-05-13
 ------------------------------------
 
-The WiredTiger 2.6.0 release contains major new features and important bug fixes.
+The WiredTiger 2.6.0 release contains new features, minor API changes and many
+bug fixes.
+
+New features:
+
+* Add support for encrypting WiredTiger tables via a new encryption API.
+  refs WT-1822
+
+* Add support for bulk load in LSM trees. Previously the bulk configuration for
+  cursor create was ignored by LSM trees.
+  refs WT-1922 SERVER-18321
+
+* Add support for raw compression in LZ4. Change is not compatible with tables
+  created with LZ4 compression using earlier versions of WiredTiger. See
+  upgrading documentation for more information.
 
 API and behavior changes:
 
-TODO: Move contet into this section.
+* Enhance performance of WT_SESSION::drop with force enabled. Don't flush
+  content from cache before returning from the API call, instead mark the tree
+  as dead and discard it in the background without writing any content to disk.
+  WT-1894
+
+* Add an API to validate configuration strings.
+  refs #1739
+
+* Disallow the cache_resident flag on LSM trees.
+  refs WT-1905
+
+* Enhance the controls for how aggressively idle handles are closed. Update the
+  wiredtiger_open file_manager configuration options to expose that control.
+  refs WT-1856 SERVER-17907
+
 
 Significant bug fixes and performance enhancements:
 
@@ -14,43 +42,36 @@ Significant bug fixes and performance enhancements:
   - Sync the metadata file before updating turtle file.
   refs SERVER-18316
 
-* Add support for encrypting WiredTiger tables via a new encryption API.
-  refs WT-1822
-
-* Add support for raw compression in LZ4. Change is not compatible with tables created with LZ4 compression using earlier versions of WiredTiger. See upgrading documentation for more information.
-
-* Don't attempt to validate configuration settings for extensions (collators, compressors, encryptors, extractors). The extension may be valid, but not yet loaded.
-
-* Add support for bulk load in LSM trees. Previously the bulk configuration for cursor create was ignored by LSM trees.
-  refs WT-1922 SERVER-18321
+* Don't attempt to validate configuration settings for extensions (collators,
+  compressors, encryptors, extractors). The extension may be valid but not yet
+  loaded so it is not possible to validate.
 
 * Check the magic and version numbers in log files when first opening them.
 
 * Fix a bug with cache leaf size accounting for statistics.
-  refs WT-1885
+  refs WT-1885 WT-1919
 
-* Fix checkpoint visiting a page that was rewritten in memory
+* Fix a bug where checkpoint could skip a page that was rewritten in memory.
   refs #1946
 
-* If a random lookup lands on a deleted item, move to the next valid record
+* Fix a bug in WT_CURSOR::search_near with a random cursor. If a lookup lands
+  on a deleted item move to the next valid record.
   refs WT-1921 #1944
 
-* Disallow the cache_resident flag on LSM trees.
-  refs WT-1905
-
-* Don't skip reconciliation of pages during checkpoint if they were rewritten in memory.
-  refs WT-1919
-
-* Fix a bug in handle close, where we could fail to clear WT_DHANDLE_OPEN.
+* Fix a bug in handle close where we could fail to clear WT_DHANDLE_OPEN.
   refs WT-1915
 
-* Fix the logic around in-memory splits: if we're trying one, don't allow any other kind of eviction.
+* Fix the logic around in-memory splits: don't allow any other eviction of a
+  page if we are attempting to split it.
   refs WT-1916, WT-1917
 
-* If we get part way through a btree open then fail, make sure the checkpoint is unloaded.  Hopefully this will fix a hard-to-reproduce leak found recently by valgrind.
+* Fix a bug in btree open where if there was a failure while opening at a
+  checkpoint, the checkpoint may not be unloaded.
   refs WT-1598
 
-* Avoid obsolete update checks during long-running transactions.  There can potentially be long chains of updates that cannot be freed: there is no point repeatedly scanning them.
+* Fix a performance problem where long running transactions could continually
+  scan long update chains looking for obsolete entries, when there is no chance
+  of finding any.
   refs WT-1913
 
 * Move eviction outside transactions and don't start a transaction when reading a page if eviction is prohibited.
@@ -58,12 +79,6 @@ Significant bug fixes and performance enhancements:
 
 * Restructure handle locking so it all happens at the session level, avoid entanglements between handle locks, the schema lock and the handle list lock.
   refs WT-1598
-
-* Enhance performance of forced drop of trees. Don't flush content from cache before returning from the API call, instead mark the tree as dead and discard it in the background without writing any content to disk.
-  WT-1894
-
-* Add an API to validate configuration strings.
-  refs #1739
 
 * Ensure that a file marked as cache resident is never evicted, add some optimizations for cache resident files.
   refs SERVER-18192
@@ -100,9 +115,6 @@ Significant bug fixes and performance enhancements:
 
 * Fix a bug in file truncate, where we could truncate to the wrong place if there was a race extending the file at the same time.
   refs WT-1871
-
-* Improve the control over how aggressively WiredTiger closes idle handles. Update the wiredtiger_open file_manager configuration option. close_idle_time max increased, close_scan_interval increased, new close_handle_minimum
-  refs WT-1856 SERVER-17907
 
 * Fix a bug in reconciliation where the page boundary structures could point into freed memory.
   refs WT-1852
