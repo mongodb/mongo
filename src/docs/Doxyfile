@@ -779,7 +779,9 @@ EXCLUDE_SYMBOLS        = __F \
 
 EXAMPLE_PATH           = ../../examples/c \
 			 ../../examples/java/com/wiredtiger/examples/ \
-			 ../../ext/compressors/nop
+			 ../../ext/compressors/nop \
+			 ../../ext/encryptors/nop \
+			 ../../ext/encryptors/rotn
 
 # If the value of the EXAMPLE_PATH tag contains directories, you can use the 
 # EXAMPLE_PATTERNS tag to specify one or more wildcard pattern (like *.cpp 
@@ -1564,6 +1566,7 @@ PREDEFINED             = DOXYGEN \
                          __wt_connection:=WT_CONNECTION \
                          __wt_cursor:=WT_CURSOR \
                          __wt_data_source:=WT_DATA_SOURCE \
+                         __wt_encryptor:=WT_ENCRYPTOR \
                          __wt_event_handler:=WT_EVENT_HANDLER \
                          __wt_extension_api:=WT_EXTENSION_API \
                          __wt_extractor:=WT_EXTRACTOR \

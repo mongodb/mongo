@@ -1,4 +1,5 @@
-AM_CPPFLAGS = -I$(top_builddir) -I$(top_srcdir)/src/include
+AM_CPPFLAGS = -I$(top_builddir) \
+    -I$(top_srcdir)/src/include -I$(top_srcdir)/test/utility
 if HAVE_BERKELEY_DB
 AM_CPPFLAGS += -DHAVE_BERKELEY_DB \
 	-DBERKELEY_DB_PATH=\"$(BERKELEY_DB_PATH)\" -I$(BERKELEY_DB_PATH)/include

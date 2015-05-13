@@ -1,0 +1,124 @@
+/*! @m_page{{c,java},encryption,Encryptors}
+
+@section encryption_overview Overview of Encryption in WiredTiger
+@ref encryption_custom "Custom encryption engines" may be used to
+extend WiredTiger.  WiredTiger does not currently offer builtin
+support for any particular encryption algorithm.
+@ref encryption_examples "Example encryption code" is provided
+to demonstrate how encryption extensions are created.
+
+\warning The encryption infrastructure included in WiredTiger, when used with a
+strong encryption algorithm, is intended to protect data stored in files
+(that is, <em>encryption at rest</em>). The table content (keys, values),
+the metadata pertaining to data (table, index, column names, and other
+configuration information) as well as the database log files are encrypted
+on disk.  Decryption occurs when the data is read into memory; thus an
+attacker having the ability to directly read system memory will have access
+to unencrypted data. Many systems may also page memory to a backing disk
+under load. Access to any such \em paging or \em swap devices must be
+considered when planning the security of a system.
+
+The encryption extension must be loaded in the ::wiredtiger_open call.
+See @subpage_single extensions for details on how extensions are loaded.
+Also, encryption is specified using \c encryption= in the configuration
+for the ::wiredtiger_open call. This configuration establishes
+the encryption algorithm and keys to be used for database log files and a subset
+of the WiredTiger metadata files. By default, this same encryption
+is also used for all data files. We call this the <em>system</em> encryption.
+
+It is also possible to use different encryption options when individual
+data files are first created, using the \c encryption= configuration in
+the WT_SESSION::create call.  Such options override the default
+(<em>system</em>) encryption that was indicated in the ::wiredtiger_open
+call for the individual data file. It is possible to turn encryption off
+for individual files, to use a different encryptor, or to specify a
+different \c keyid.
+
+Overriding the system encryption for a table does not override
+the system encryption for indices on that table, nor does it override
+the system encryption for column groups specified on that table.
+Encryption for column groups and indices must specified when they
+are created, if they are to be different than the system encryption.
+
+It is an error to specify encryption in a WT_SESSION::create call when it
+was not specified in the ::wiredtiger_open call. This prevents accidental
+exposure of the file's data in log files, which would be written in the
+clear in such a scenario.
+
+\warning When using separate keys for individual data files or tables, the
+key used for the \em system encryption continues to have fundamental
+importance.  The database log, protected by the \em system encryption,
+contains a shared stream of changes to all data files. Thus, if the \em
+system key is exposed, even when per-file keys are not exposed, an attacker
+can read database log files, and hence has access to data in individual
+files.
+
+@section encryption_parameters Encryption keyid and secretkey
+
+Two parameters, \c keyid and \c secretkey, may be specified
+when configuring encryption for ::wiredtiger_open to allow the possibility
+of varying the algorithm according to different keys.
+
+The configuration parameter <code>encryption=(keyid=<em>identifier</em>)</code>
+may be used in ::wiredtiger_open or WT_SESSION::create calls. This is intended
+to reference a key stored using a Key Management Solution (KMS).
+The \c keyid given to ::wiredtiger_open is stored in the clear in
+WiredTiger configuration files; it should never contain sensitive
+information.  As an example, with a \c keyid of \c "customerABC",
+the encryptor would consult the KMS to return a key previously stored
+for \c "customerABC". The encryptor will use the returned key when
+applying the encryption.  To effectively use the \c keyid, a custom
+encryptor must implement the WT_ENCRYPTOR::customize callback.
+It is during \c customize that the encryptor has an opportunity to use
+the \c keyid to fetch the actual key. The \c customize function is
+called on the first use of a \c keyid, and the same \em customized encryptor
+will be used with each use of the same \c keyid.
+
+The configuration parameter <code>encryption=(secretkey)</code> is used
+only in the ::wiredtiger_open call. The value of the secretkey
+is never stored on disk in any form, so it must always be provided
+when WiredTiger is reopened (again, with the ::wiredtiger_open call).
+The secretkey is available to the encryptor during the
+WT_ENCRYPTOR::customize callback, during which the encryptor may
+be \em customized to keep the secretkey or a transformation of it
+for use during the WT_ENCRYPTOR::encrypt and WT_ENCRYPTOR::decrypt callbacks.
+
+If a \c secretkey is used, it must be provided using the \c -E option
+when using the \c wt utility. Specifying \c keyid is not needed with the \c wt
+utility, as the \c keyid is stored in the clear on disk by WiredTiger.
+Any additional \c keyid values needed to decrypt data files
+are stored in WiredTiger metadata using the system encryptor.
+
+@section encryption_custom Custom encryption engines
+
+WiredTiger may be extended by adding custom encryption engines
+that we call \em encryptors. Custom encryptors must be coded in the C language.
+Once packaged, they can be used in any language.
+
+See @subpage_single extensions for general details on extending WiredTiger,
+and see WT_ENCRYPTOR for the encryptor interface.
+
+Custom encryptors are registered by calling WT_CONNECTION::add_encryptor,
+this creates an encryptor name that may be referenced using the
+<code>encryption=(name=...</code> configuration string in the ::wiredtiger_open
+or WT_SESSION::create call.
+
+@section encryption_examples Encryption examples
+
+There are two kinds of example code with overlapping functionality.
+A simple, self contained encryption example is in @ex_ref{ex_encrypt.c}.
+This example includes a small encryptor that rotates letters in the
+alphabet by a fixed amount, based on the value of \c keyid.  This example
+also shows how encryption is configured within an application.
+The second set of examples are in \c ext/encryptors.  These are
+encryptors only (no application level code), showing how encryptors
+might be packaged in a loadable shared library.
+@ex_ref{nop_encrypt.c} merely copies its input to its output.
+@ex_ref{rotn_encrypt.c} is an extended version of the example that
+rotates the alphabet.  It adds a twist in that a \c secretkey can
+be specified, changing the rotation per letter.  The Python test suite
+uses the rotn encryptor to help test the encryption framework.
+
+Please note that these samples are for demonstration use only.
+They do not provide any security.
+ */

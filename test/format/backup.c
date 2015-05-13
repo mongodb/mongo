@@ -104,7 +104,7 @@ backup(void *arg)
 	 * Perform a backup at somewhere under 10 seconds (so we get at
 	 * least one done), and then at 45 second intervals.
 	 */
-	for (period = MMRAND(1, 10);; period = 45) {
+	for (period = mmrand(NULL, 1, 10);; period = 45) {
 		/* Sleep for short periods so we don't make the run wait. */
 		while (period > 0 && !g.workers_finished) {
 			--period;

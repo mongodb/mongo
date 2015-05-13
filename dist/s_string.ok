@@ -37,8 +37,10 @@ Bitfield
 Bitwise
 Bsearch
 Btree
+Buf
 Bzip
 CAS
+CCCCCCCCCCCCCCCCCC
 CELL's
 CELLs
 CHECKKEY
@@ -70,12 +72,14 @@ DUPLICATEV
 DbCursor
 DbEnv
 Decrement
+Decrypt
 EAGAIN
 EBUSY
 EINTR
 EINVAL
 EMSG
 EMail
+ENCRYPTOR
 ENOENT
 ENOMEM
 ENOTSUP
@@ -85,6 +89,8 @@ ESET
 ETIME
 ETIMEDOUT
 EXTLIST
+Encryptor
+Encryptors
 Enqueue
 Eron
 FALLTHROUGH
@@ -179,6 +185,7 @@ MongoDB
 MoveFile
 Multithreaded
 Mutex
+MySecret
 NEEDKEY
 NEEDVALUE
 NOLL
@@ -194,6 +201,7 @@ Nul
 OPTYPE
 OUTBUFF
 OVFL
+ObWgfvgw
 Obama
 PARAM
 POSIX
@@ -268,14 +276,15 @@ UnixLib
 Unmap
 UnmapViewOfFile
 Unmarshall
+Uryyb
 VARCHAR
 VLDB
 VMSG
 Vc
 Vfprintf
+Vigenere
 Vixie
 Vo
-Vv
 VxWorks
 WIREDTIGER
 WRLSN
@@ -349,6 +358,7 @@ builtin
 builtins
 bytelock
 bytestring
+byvalue
 bzCompressEnd
 bzCompressInit
 bzDecompress
@@ -395,12 +405,15 @@ config
 conn
 connectionp
 const
+constantp
 copydoc
 copyin
 copyout
 cp
 cpuid
 crc
+crypto
+cryptobad
 ctime
 curbackup
 curbulk
@@ -416,6 +429,7 @@ cursorp
 curstat
 curtable
 cust
+customp
 cv
 cxa
 data's
@@ -431,6 +445,10 @@ decl
 decr
 decrement
 decrementing
+decrypt
+decrypted
+decrypting
+decrypts
 deflateCopy
 deflateEnd
 deflateInit
@@ -441,6 +459,7 @@ der
 dereference
 desc
 dest
+destSize
 dev
 dhandle
 dhandles
@@ -465,6 +484,8 @@ dup
 eg
 emp
 encodings
+encryptor
+encryptors
 endian
 english
 enqueue
@@ -581,6 +602,7 @@ jrx
 json
 kb
 keycmp
+keyid
 keyv
 kv
 kvraw
@@ -641,6 +663,7 @@ mfence
 minorp
 mkdir
 mmap
+mmrand
 mnt
 msecs
 msg
@@ -671,6 +694,7 @@ nfilename
 nhex
 nlpo
 nocase
+nocrypto
 nonliteral
 noop
 nop
@@ -707,6 +731,7 @@ popthreads
 pos
 posint
 posix
+postsize
 pragmas
 pre
 prealloc
@@ -759,6 +784,8 @@ rf
 rle
 rmw
 rng
+rotN
+rotn
 rpc
 run's
 runtime
@@ -768,6 +795,7 @@ sHQ
 sched
 scr
 sd
+secretkey
 sed
 sessionp
 setstr
@@ -856,6 +884,7 @@ unbare
 uncompressing
 uncompresssed
 undef
+unencrypted
 unesc
 unescaped
 uninstantiated
@@ -866,6 +895,7 @@ unmarshalled
 unmerged
 unmodify
 unpackv
+unpadded
 unreferenced
 unregister
 unsized
@@ -879,6 +909,7 @@ uri's
 uris
 usecs
 usedp
+userbad
 usercfg
 usr
 utf

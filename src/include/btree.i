@@ -226,6 +226,11 @@ __wt_cache_page_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
 	/* Update the bytes in-memory to reflect the eviction. */
 	WT_CACHE_DECR(session, cache->bytes_inmem, page->memory_footprint);
 
+	/* Update the bytes_internal value to reflect the eviction */
+	if (WT_PAGE_IS_INTERNAL(page))
+		WT_CACHE_DECR(session,
+		    cache->bytes_internal, page->memory_footprint);
+
 	/* Update the cache's dirty-byte count. */
 	if (modify != NULL && modify->bytes_dirty != 0) {
 		if (cache->bytes_dirty < modify->bytes_dirty) {
@@ -362,7 +367,7 @@ __wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * The page can never end up with changes older than the oldest
 		 * running transaction.
 		 */
-		if (F_ISSET(&session->txn, TXN_HAS_SNAPSHOT))
+		if (F_ISSET(&session->txn, WT_TXN_HAS_SNAPSHOT))
 			page->modify->disk_snap_min = session->txn.snap_min;
 
 		/*
@@ -379,7 +384,7 @@ __wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 	}
 
 	/* Check if this is the largest transaction ID to update the page. */
-	if (TXNID_LT(page->modify->update_txn, session->txn.id))
+	if (WT_TXNID_LT(page->modify->update_txn, session->txn.id))
 		page->modify->update_txn = session->txn.id;
 }
 
@@ -1104,7 +1109,7 @@ __wt_page_can_evict(
 	 * transaction.
 	 */
 	if (LF_ISSET(WT_EVICT_CHECK_SPLITS) &&
-	    TXNID_LE(txn_global->oldest_id, mod->inmem_split_txn))
+	    WT_TXNID_LE(txn_global->oldest_id, mod->inmem_split_txn))
 		return (0);
 
 	return (1);

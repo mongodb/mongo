@@ -233,7 +233,6 @@ connection_stats = [
     LogStat('log_prealloc_max',
         'number of pre-allocated log files to create', 'no_clear,no_scale'),
     LogStat('log_prealloc_used', 'pre-allocated log files used'),
-    LogStat('log_reads', 'log read operations'),
     LogStat('log_release_write_lsn', 'log release advances write LSN'),
     LogStat('log_scan_records', 'records processed by log scan'),
     LogStat('log_scan_rereads', 'log scan records requiring two reads'),

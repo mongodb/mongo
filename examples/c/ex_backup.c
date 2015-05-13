@@ -97,16 +97,11 @@ compare_backups(int i)
 		(void)strncpy(msg, "MAIN", sizeof(msg));
 	else
 		snprintf(msg, sizeof(msg), "%d", i);
-	if (ret == 0)
-		fprintf(stdout,
-		    "Iteration %s: Tables %s.%d and %s.%d identical\n",
-		    msg, full_out, i, incr_out, i);
-	else {
-		fprintf(stdout,
-		    "Iteration %s: Tables %s.%d and %s.%d differ\n",
-		    msg, full_out, i, incr_out, i);
-		exit(1);
-	}
+	printf(
+	    "Iteration %s: Tables %s.%d and %s.%d %s\n",
+	    msg, full_out, i, incr_out, i, ret == 0 ? "identical" : "differ");
+	if (ret != 0)
+		exit (1);
 
 	/*
 	 * If they compare successfully, clean up.
@@ -289,13 +284,16 @@ main(void)
 	ret = setup_directories();
 	ret = wt_conn->open_session(wt_conn, NULL, NULL, &session);
 	ret = session->create(session, uri, "key_format=S,value_format=S");
+	printf("Adding initial data\n");
 	ret = add_work(session, 0);
 
+	printf("Taking initial backup\n");
 	ret = take_full_backup(session, 0);
 
 	ret = session->checkpoint(session, NULL);
 
 	for (i = 1; i < MAX_ITERATIONS; i++) {
+		printf("Iteration %d: adding data\n", i);
 		ret = add_work(session, i);
 		ret = session->checkpoint(session, NULL);
 		/*
@@ -303,14 +301,17 @@ main(void)
 		 * comparison purposes.  A normal incremental backup
 		 * procedure would not include this.
 		 */
+		printf("Iteration %d: taking full backup\n", i);
 		ret = take_full_backup(session, i);
 		/*
 		 * Taking the incremental backup also calls truncate
 		 * to archive the log files, if the copies were successful.
 		 * See that function for details on that call.
 		 */
+		printf("Iteration %d: taking incremental backup\n", i);
 		ret = take_incr_backup(session, i);
 
+		printf("Iteration %d: dumping and comparing data\n", i);
 		ret = compare_backups(i);
 	}
 
@@ -319,6 +320,7 @@ main(void)
 	 * comparison between the incremental and original.
 	 */
 	ret = wt_conn->close(wt_conn, NULL);
+	printf("Final comparison: dumping and comparing data\n");
 	ret = compare_backups(0);
 	return (ret);
 }

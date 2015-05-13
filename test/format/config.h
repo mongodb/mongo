@@ -57,12 +57,6 @@ typedef struct {
 	char		**vstr;		/* Value for string options */
 } CONFIG;
 
-/*
- * Get a random value between a config min/max pair (inclusive for both min
- * and max).
- */
-#define	CONF_RAND(cp)	MMRAND((cp)->min, (cp)->maxrand)
-
 static CONFIG c[] = {
 	{ "abort",
 	  "if timed run should drop core",			/* 0% */
@@ -117,8 +111,8 @@ static CONFIG c[] = {
 	  C_BOOL, 10, 0, 0, &g.c_compact, NULL },
 
 	{ "compression",
-	  "type of compression "
-	  "(none | bzip | bzip-raw | lz4 | lzo | snappy | zlib | zlib-noraw)",
+	  "type of compression (none | bzip | "
+	  "bzip-raw | lz4 | lz4-noraw | lzo | snappy | zlib | zlib-noraw)",
 	  C_IGNORE|C_STRING, 0, 0, 0, NULL, &g.c_compression },
 
 	{ "data_extend",

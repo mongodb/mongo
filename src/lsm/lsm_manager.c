@@ -227,7 +227,7 @@ __wt_lsm_manager_start(WT_SESSION_IMPL *session)
 	for (i = 0; i < WT_LSM_MAX_WORKERS; i++) {
 		WT_ERR(__wt_open_internal_session(
 		    S2C(session), "lsm-worker", 1, 0, &worker_session));
-		worker_session->isolation = TXN_ISO_READ_UNCOMMITTED;
+		worker_session->isolation = WT_ISO_READ_UNCOMMITTED;
 		manager->lsm_worker_cookies[i].session = worker_session;
 	}
 

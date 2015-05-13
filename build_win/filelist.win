@@ -84,6 +84,7 @@ src/log/log.c
 src/log/log_auto.c
 src/log/log_slot.c
 src/lsm/lsm_cursor.c
+src/lsm/lsm_cursor_bulk.c
 src/lsm/lsm_manager.c
 src/lsm/lsm_merge.c
 src/lsm/lsm_meta.c
@@ -150,6 +151,7 @@ src/session/session_compact.c
 src/session/session_dhandle.c
 src/session/session_salvage.c
 src/support/cksum.c
+src/support/crypto.c
 src/support/err.c
 src/support/filename.c
 src/support/global.c

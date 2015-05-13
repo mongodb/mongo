@@ -166,12 +166,7 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 	 * as the first field, allowing us to treat references to either type of
 	 * structure as a reference to the other type.
 	 *
-	 * This could be simplified if only a single database is opened in the
-	 * application, we could use a static WT_COMPRESSOR structure, and a
-	 * static reference to the WT_EXTENSION_API methods, then we don't need
-	 * to allocate memory when the compressor is initialized or free it when
-	 * the compressor is terminated.  However, this approach is more general
-	 * purpose and supports multiple databases per application.
+	 * Heap memory (not static), because it can support multiple databases.
 	 */
 	nop_compressor->compressor.compress = nop_compress;
 	nop_compressor->compressor.compress_raw = NULL;

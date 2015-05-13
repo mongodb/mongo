@@ -97,13 +97,13 @@ void
 __wt_txn_op_free(WT_SESSION_IMPL *session, WT_TXN_OP *op)
 {
 	switch (op->type) {
-	case TXN_OP_BASIC:
-	case TXN_OP_INMEM:
-	case TXN_OP_REF:
-	case TXN_OP_TRUNCATE_COL:
+	case WT_TXN_OP_BASIC:
+	case WT_TXN_OP_INMEM:
+	case WT_TXN_OP_REF:
+	case WT_TXN_OP_TRUNCATE_COL:
 		break;
 
-	case TXN_OP_TRUNCATE_ROW:
+	case WT_TXN_OP_TRUNCATE_ROW:
 		__wt_buf_free(session, &op->u.truncate_row.start);
 		__wt_buf_free(session, &op->u.truncate_row.stop);
 		break;
@@ -163,7 +163,7 @@ __wt_txn_log_op(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 
 	/* We'd better have a transaction. */
 	WT_ASSERT(session,
-	    F_ISSET(txn, TXN_RUNNING) && F_ISSET(txn, TXN_HAS_ID));
+	    F_ISSET(txn, WT_TXN_RUNNING) && F_ISSET(txn, WT_TXN_HAS_ID));
 
 	WT_ASSERT(session, txn->mod_count > 0);
 	op = txn->mod + txn->mod_count - 1;
@@ -172,17 +172,17 @@ __wt_txn_log_op(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 	logrec = txn->logrec;
 
 	switch (op->type) {
-	case TXN_OP_BASIC:
+	case WT_TXN_OP_BASIC:
 		return (__txn_op_log(session, logrec, op, cbt));
-	case TXN_OP_INMEM:
-	case TXN_OP_REF:
+	case WT_TXN_OP_INMEM:
+	case WT_TXN_OP_REF:
 		/* Nothing to log, we're done. */
 		return (0);
-	case TXN_OP_TRUNCATE_COL:
+	case WT_TXN_OP_TRUNCATE_COL:
 		return (__wt_logop_col_truncate_pack(session, logrec,
 		    op->fileid,
 		    op->u.truncate_col.start, op->u.truncate_col.stop));
-	case TXN_OP_TRUNCATE_ROW:
+	case WT_TXN_OP_TRUNCATE_ROW:
 		return (__wt_logop_row_truncate_pack(session, txn->logrec,
 		    op->fileid,
 		    &op->u.truncate_row.start, &op->u.truncate_row.stop,
@@ -387,12 +387,12 @@ __wt_txn_truncate_log(
 	WT_RET(__txn_next_op(session, &op));
 
 	if (btree->type == BTREE_ROW) {
-		op->type = TXN_OP_TRUNCATE_ROW;
-		op->u.truncate_row.mode = TXN_TRUNC_ALL;
+		op->type = WT_TXN_OP_TRUNCATE_ROW;
+		op->u.truncate_row.mode = WT_TXN_TRUNC_ALL;
 		WT_CLEAR(op->u.truncate_row.start);
 		WT_CLEAR(op->u.truncate_row.stop);
 		if (start != NULL) {
-			op->u.truncate_row.mode = TXN_TRUNC_START;
+			op->u.truncate_row.mode = WT_TXN_TRUNC_START;
 			item = &op->u.truncate_row.start;
 			WT_RET(__wt_cursor_get_raw_key(&start->iface, item));
 			WT_RET(__wt_buf_set(
@@ -400,15 +400,15 @@ __wt_txn_truncate_log(
 		}
 		if (stop != NULL) {
 			op->u.truncate_row.mode =
-			    (op->u.truncate_row.mode == TXN_TRUNC_ALL) ?
-			    TXN_TRUNC_STOP : TXN_TRUNC_BOTH;
+			    (op->u.truncate_row.mode == WT_TXN_TRUNC_ALL) ?
+			    WT_TXN_TRUNC_STOP : WT_TXN_TRUNC_BOTH;
 			item = &op->u.truncate_row.stop;
 			WT_RET(__wt_cursor_get_raw_key(&stop->iface, item));
 			WT_RET(__wt_buf_set(
 			    session, item, item->data, item->size));
 		}
 	} else {
-		op->type = TXN_OP_TRUNCATE_COL;
+		op->type = WT_TXN_OP_TRUNCATE_COL;
 		op->u.truncate_col.start =
 		    (start == NULL) ? 0 : start->recno;
 		op->u.truncate_col.stop =

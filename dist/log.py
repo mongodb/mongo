@@ -114,7 +114,8 @@ __wt_logrec_alloc(WT_SESSION_IMPL *session, size_t size, WT_ITEM **logrecp)
 {
 \tWT_ITEM *logrec;
 
-\tWT_RET(__wt_scr_alloc(session, WT_ALIGN(size + 1, LOG_ALIGN), &logrec));
+\tWT_RET(
+\t    __wt_scr_alloc(session, WT_ALIGN(size + 1, WT_LOG_ALIGN), &logrec));
 \tWT_CLEAR(*(WT_LOG_RECORD *)logrec->data);
 \tlogrec->size = offsetof(WT_LOG_RECORD, record);
 

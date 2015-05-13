@@ -11,6 +11,7 @@ noinst_PROGRAMS = \
 	ex_config_parse \
 	ex_cursor \
 	ex_data_source \
+	ex_encrypt \
 	ex_extending \
 	ex_extractor \
 	ex_hello \
@@ -21,6 +22,8 @@ noinst_PROGRAMS = \
 	ex_scope \
 	ex_stat \
 	ex_thread
+
+ex_encrypt_LDFLAGS = -rdynamic
 
 # The examples can be run with no arguments as simple smoke tests
 TESTS = $(noinst_PROGRAMS)
