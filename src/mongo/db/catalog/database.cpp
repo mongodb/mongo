@@ -221,27 +221,20 @@ namespace mongo {
             duplicates->clear();
         }
 
-        vector<string> others;
-        StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
-        storageEngine->listDatabases(&others);
-
         set<string> allShortNames;
         dbHolder().getAllShortNames(allShortNames);
 
-        others.insert( others.end(), allShortNames.begin(), allShortNames.end() );
-
-        for ( unsigned i=0; i<others.size(); i++ ) {
-
-            if ( strcasecmp( others[i].c_str() , name.c_str() ) )
+        for (const auto& dbname : allShortNames) {
+            if (strcasecmp(dbname.c_str(), name.c_str()))
                 continue;
 
-            if ( strcmp( others[i].c_str() , name.c_str() ) == 0 )
+            if (strcmp(dbname.c_str(), name.c_str()) == 0)
                 continue;
 
             if ( duplicates ) {
-                duplicates->insert( others[i] );
+                duplicates->insert(dbname);
             } else {
-                return others[i];
+                return dbname;
             }
         }
         if ( duplicates ) {
