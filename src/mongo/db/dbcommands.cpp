@@ -475,7 +475,6 @@ namespace mongo {
                 return false;
             }
 
-            result.append("ns", nsToDrop);
             return appendCommandStatus(result,
                                        dropCollection(txn, NamespaceString(nsToDrop), result));
         }

@@ -93,14 +93,16 @@ namespace {
 
             stopIndexBuilds(txn, db, collectionName);
 
-            result.append("ns", collectionName);
-            result.append("nIndexesWas", numIndexes);
             WriteUnitOfWork wunit(txn);
             Status s = db->dropCollection(txn, collectionName.ns());
+
+            result.append("ns", collectionName);
 
             if ( !s.isOK() ) {
                 return s;
             }
+
+            result.append("nIndexesWas", numIndexes);
 
             wunit.commit();
         } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "drop", collectionName.ns());
