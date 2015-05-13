@@ -507,9 +507,9 @@ namespace mongo {
         }
 
         if (keysToAdd.size() > params.maxKeysPerInsert) {
-            warning() << "insert of geo object generated lots of keys (" << keysToAdd.size()
-                << ") consider creating larger buckets. obj="
-                << obj;
+            warning() << "Insert of geo object generated a high number of keys."
+                      << " num keys: " << keysToAdd.size()
+                      << " obj inserted: " << obj;
         }
 
         *keys = keysToAdd;
