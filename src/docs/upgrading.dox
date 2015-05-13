@@ -10,10 +10,6 @@ used that statistic was never called inside WiredTiger and was also
 removed.
 </dd>
 
-</dl><hr>
-@section version_254 Upgrading to Version 2.5.4
-<dl>
-
 <dt>File handle closing</dt>
 <dd>
 In WiredTiger, a separate thread of control periodically reviews open
@@ -32,6 +28,14 @@ values to the ::wiredtiger_open call.
 The LZ4 compression support has been updated in this release in non-backward
 compatible ways; tables and files compressed using LZ4 compression should be
 dumped and re-loaded into a new database.
+</dd>
+
+<dt>wiredtiger_open file manager configuration changes</dt>
+<dd>
+The configuration settings related to file handle management have changed
+significantly in this release. If your application uses the file_manager
+configuration setting, please refer to the API documentation for the latest
+settings.
 </dd>
 
 </dl><hr>
