@@ -44,8 +44,8 @@
 #include "mongo/db/auth/authz_session_external_state_s.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/catalog_manager.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/write_ops/batched_command_response.h"
@@ -63,14 +63,13 @@ namespace mongo {
 
 namespace {
 
-    ScopedDbConnection* getConnectionForAuthzCollection(const NamespaceString& nss) {
+    ScopedDbConnection* getConfigServerConnection() {
         // Note: The connection mechanism here is *not* ideal, and should not be used elsewhere.
         // If the primary for the collection moves, this approach may throw rather than handle
         // version exceptions.
-        auto config = uassertStatusOK(grid.catalogCache()->getDatabase(nss.db().toString()));
-        Shard s = config->getShard(nss.ns());
+        auto shard = grid.shardRegistry()->find("config");
 
-        return new ScopedDbConnection(s.getConnString(), 30.0);
+        return new ScopedDbConnection(shard->getConnString(), 30.0);
     }
 
     Status getRemoteStoredAuthorizationVersion(DBClientBase* conn, int* outVersion) {
@@ -124,8 +123,7 @@ namespace {
     Status AuthzManagerExternalStateMongos::getStoredAuthorizationVersion(
                                                 OperationContext* txn, int* outVersion) {
         try {
-            scoped_ptr<ScopedDbConnection> conn(getConnectionForAuthzCollection(
-                    AuthorizationManager::usersCollectionNamespace));
+            scoped_ptr<ScopedDbConnection> conn(getConfigServerConnection());
             Status status = getRemoteStoredAuthorizationVersion(conn->get(), outVersion);
             conn->done();
             return status;
@@ -138,8 +136,7 @@ namespace {
     Status AuthzManagerExternalStateMongos::getUserDescription(
                     OperationContext* txn, const UserName& userName, BSONObj* result) {
         try {
-            scoped_ptr<ScopedDbConnection> conn(getConnectionForAuthzCollection(
-                    AuthorizationManager::usersCollectionNamespace));
+            scoped_ptr<ScopedDbConnection> conn(getConfigServerConnection());
             BSONObj cmdResult;
             conn->get()->runCommand(
                     "admin",
@@ -180,8 +177,7 @@ namespace {
                                                                bool showPrivileges,
                                                                BSONObj* result) {
         try {
-            scoped_ptr<ScopedDbConnection> conn(getConnectionForAuthzCollection(
-                    AuthorizationManager::rolesCollectionNamespace));
+            scoped_ptr<ScopedDbConnection> conn(getConfigServerConnection());
             BSONObj cmdResult;
             conn->get()->runCommand(
                     "admin",
@@ -222,8 +218,7 @@ namespace {
                                                                      bool showBuiltinRoles,
                                                                      vector<BSONObj>* result) {
         try {
-            scoped_ptr<ScopedDbConnection> conn(getConnectionForAuthzCollection(
-                    AuthorizationManager::rolesCollectionNamespace));
+            scoped_ptr<ScopedDbConnection> conn(getConfigServerConnection());
             BSONObj cmdResult;
             conn->get()->runCommand(
                     dbname,
@@ -252,7 +247,9 @@ namespace {
             const BSONObj& queryDoc,
             BSONObj* result) {
         try {
-            scoped_ptr<ScopedDbConnection> conn(getConnectionForAuthzCollection(collectionName));
+            invariant(collectionName.db() == "admin");
+            scoped_ptr<ScopedDbConnection> conn(getConfigServerConnection());
+
             Query query(queryDoc);
             query.readPref(ReadPreference_PrimaryPreferred, BSONArray());
             *result = conn->get()->findOne(collectionName, query).getOwned();
@@ -274,7 +271,9 @@ namespace {
             const BSONObj& projection,
             const stdx::function<void(const BSONObj&)>& resultProcessor) {
         try {
-            scoped_ptr<ScopedDbConnection> conn(getConnectionForAuthzCollection(collectionName));
+            invariant(collectionName.db() == "admin");
+            scoped_ptr<ScopedDbConnection> conn(getConfigServerConnection());
+
             Query query(queryDoc);
             query.readPref(ReadPreference_PrimaryPreferred, BSONArray());
             conn->get()->query(resultProcessor, collectionName.ns(), query, &projection);
