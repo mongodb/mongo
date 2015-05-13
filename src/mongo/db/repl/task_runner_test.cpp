@@ -45,12 +45,14 @@ namespace {
 
     TEST_F(TaskRunnerTest, InvalidConstruction) {
         // Null thread pool.
-        ASSERT_THROWS(TaskRunner(nullptr, []() -> OperationContext* { return nullptr; }),
-                      UserException);
+        ASSERT_THROWS_CODE(TaskRunner(nullptr, []() -> OperationContext* { return nullptr; }),
+                           UserException,
+                           ErrorCodes::BadValue);
 
         // Null function for creating operation contexts.
-        ASSERT_THROWS(TaskRunner(&getThreadPool(), TaskRunner::CreateOperationContextFn()),
-                      UserException);
+        ASSERT_THROWS_CODE(TaskRunner(&getThreadPool(), TaskRunner::CreateOperationContextFn()),
+                           UserException,
+                           ErrorCodes::BadValue);
     }
 
     TEST_F(TaskRunnerTest, GetDiagnosticString) {

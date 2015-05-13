@@ -135,6 +135,15 @@
                                                                ::mongo::stdx::placeholders::_1)))
 
 /**
+ * Behaves like ASSERT_THROWS, above, but also fails if calling getCode() on the thrown exception
+ * does not return an error code equal to EXPECTED_CODE.
+ */
+#define ASSERT_THROWS_CODE(STATEMENT, EXCEPTION_TYPE, EXPECTED_CODE) \
+    ASSERT_THROWS_PRED(STATEMENT, \
+                       EXCEPTION_TYPE, \
+                       ([](const EXCEPTION_TYPE& ex) { return (EXPECTED_CODE) == ex.getCode(); }))
+
+/**
  * Behaves like ASSERT_THROWS, above, but also fails if PREDICATE(ex) for the throw exception, ex,
  * is false.
  */
