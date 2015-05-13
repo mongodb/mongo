@@ -58,14 +58,6 @@ namespace {
         return Status::OK();
     }
 
-    TEST(TimeFormatting, TimeTAsISO8601Zulu) {
-        ASSERT_EQUALS(std::string("1970-01-01T00:00:00Z"), timeToISOString(0));
-        ASSERT_EQUALS(std::string("1970-06-30T01:06:40Z"), timeToISOString(15556000));
-        if (!isTimeTSmall)
-            ASSERT_EQUALS(std::string("2058-02-20T18:29:11Z"), timeToISOString(2781455351LL));
-        ASSERT_EQUALS(std::string("2013-02-20T18:29:11Z"), timeToISOString(1361384951));
-    }
-
     TEST(TimeFormatting, DateAsISO8601UTCString) {
         ASSERT_EQUALS(std::string("1970-01-01T00:00:00.000Z"),
                       dateToISOStringUTC(Date_t()));

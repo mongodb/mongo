@@ -481,7 +481,7 @@ namespace mongo {
             _myid = buf.str();
             _started = time(0);
 
-            log() << "balancer id: " << _myid << " started at " << time_t_to_String_short(_started) << endl;
+            log() << "balancer id: " << _myid << " started";
 
             return true;
 

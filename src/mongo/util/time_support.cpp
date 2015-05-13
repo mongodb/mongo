@@ -159,17 +159,6 @@ namespace {
 #endif
     }
 
-    std::string time_t_to_String(time_t t) {
-        char buf[64];
-#if defined(_WIN32)
-        ctime_s(buf, sizeof(buf), &t);
-#else
-        ctime_r(&t, buf);
-#endif
-        buf[24] = 0; // don't want the \n
-        return buf;
-    }
-
     std::string time_t_to_String_short(time_t t) {
         char buf[64];
 #if defined(_WIN32)
@@ -197,15 +186,6 @@ namespace {
     }
 
 #define MONGO_ISO_DATE_FMT_NO_TZ "%Y-%m-%dT%H:%M:%S"
-    string timeToISOString(time_t time) {
-        struct tm t;
-        time_t_to_Struct( time, &t );
-
-        const char* fmt = MONGO_ISO_DATE_FMT_NO_TZ "Z";
-        char buf[32];
-        fassert(16227, strftime(buf, sizeof(buf), fmt, &t) == 20);
-        return buf;
-    }
 
 namespace {
     struct DateStringBuffer {
@@ -765,17 +745,13 @@ namespace {
 
 #undef MONGO_ISO_DATE_FMT_NO_TZ
 
-    void Date_t::toTm(tm* buf) {
-        time_t dtime = toTimeT();
-#if defined(_WIN32)
-        gmtime_s(buf, &dtime);
-#else
-        gmtime_r(&dtime, buf);
-#endif
-    }
-
     std::string Date_t::toString() const {
-        return time_t_to_String(toTimeT());
+        if (isFormatable()) {
+            return dateToISOStringLocal(*this);
+        }
+        else {
+            return str::stream() << "Date(" << millis << ")";
+        }
     }
 
     time_t Date_t::toTimeT() const {
