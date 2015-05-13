@@ -195,7 +195,8 @@ namespace mongo {
         opensslInfo.done();
 
         BSONObjBuilder buildvarsInfo(result.subobjStart("buildEnvironment"));
-        buildvarsInfo << "cc" << "@buildinfo_cc_version@"
+        buildvarsInfo << "build_command" << "@buildinfo_cmdline@"
+                      << "cc" << "@buildinfo_cc_version@"
                       << "ccflags" << "@buildinfo_ccflags@"
                       << "cflags" << "@buildinfo_cflags@"
                       << "cxx" << "@buildinfo_cxx_version@"

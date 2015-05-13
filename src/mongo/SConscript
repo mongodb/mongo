@@ -77,6 +77,13 @@ def get_toolchain_ver(tool):
     return env.subst('${%s}: %s' % (tool, verstr))
 
 js_engine_ver = get_option("js-engine") if get_option("server-js") == "on" else "none"
+
+# On windows, we need to escape the backslashes in the command-line
+# so that windows paths look okay.
+cmd_line = " ".join(sys.argv).encode('string-escape')
+if env.TargetOSIs('windows'):
+    cmd_line = cmd_line.replace('\\', r'\\')
+
 module_list = '{ %s }' % ', '.join([ '"{0}"'.format(x) for x in env['MONGO_MODULES'] ])
 
 versionInfo = env.Substfile(
@@ -90,6 +97,7 @@ versionInfo = env.Substfile(
         ('@buildinfo_cflags@', env['CFLAGS']),
         ('@buildinfo_cxxflags@', env['CXXFLAGS']),
         ('@buildinfo_linkflags@', env['LINKFLAGS']),
+        ('@buildinfo_cmdline@', cmd_line),
         ('@buildinfo_modules@', module_list),
         ('@buildinfo_target_arch@', env['TARGET_ARCH']),
         ('@buildinfo_target_os@', env.GetTargetOSName()),
