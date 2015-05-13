@@ -93,11 +93,8 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 		    colgroup->config, "columns", &colgroup->colconf));
 		WT_ERR(__wt_config_getones(
 		    session, colgroup->config, "source", &cval));
-		WT_ERR(__wt_buf_init(session, buf, 0));
-		WT_ERR(__wt_buf_fmt(
-		    session, buf, "%.*s", (int)cval.len, cval.str));
 		WT_ERR(__wt_strndup(
-		    session, buf->data, buf->size, &colgroup->source));
+		    session, cval.str, cval.len, &colgroup->source));
 		table->cgroups[i] = colgroup;
 		colgroup = NULL;
 	}
@@ -140,8 +137,7 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table, WT_INDEX *idx)
 
 	/* Get the data source from the index config. */
 	WT_ERR(__wt_config_getones(session, idx->config, "source", &cval));
-	WT_ERR(__wt_buf_fmt(session, buf, "%.*s", (int)cval.len, cval.str));
-	WT_ERR(__wt_strndup(session, buf->data, buf->size, &idx->source));
+	WT_ERR(__wt_strndup(session, cval.str, cval.len, &idx->source));
 
 	WT_ERR(__wt_config_getones(session, idx->config, "immutable", &cval));
 	if (cval.val)
@@ -166,10 +162,8 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table, WT_INDEX *idx)
 	WT_ERR(__wt_extractor_config(
 	    session, idx->config, &idx->extractor, &idx->extractor_owned));
 
-	WT_ERR(__wt_buf_init(session, buf, 0));
 	WT_ERR(__wt_config_getones(session, idx->config, "key_format", &cval));
-	WT_ERR(__wt_buf_fmt(session, buf, "%.*s", (int)cval.len, cval.str));
-	WT_ERR(__wt_strndup(session, buf->data, buf->size, &idx->key_format));
+	WT_ERR(__wt_strndup(session, cval.str, cval.len, &idx->key_format));
 
 	/*
 	 * The key format for an index is somewhat subtle: the application
@@ -254,8 +248,7 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table, WT_INDEX *idx)
 	 * key columns can be simply appended.
 	 */
 	WT_ERR(__wt_buf_catfmt(session, buf, "x"));
-	WT_ERR(__wt_strndup(
-	    session, buf->data, buf->size, &idx->exkey_format));
+	WT_ERR(__wt_strndup(session, buf->data, buf->size, &idx->exkey_format));
 
 	/* By default, index cursor values are the table value columns. */
 	/* TODO Optimize to use index columns in preference to table lookups. */
