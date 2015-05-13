@@ -67,11 +67,7 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 		 * Always open from scratch: we may have failed part of the way
 		 * through opening a table, or column groups may have changed.
 		 */
-		if (table->cgroups[i] != NULL) {
-			__wt_schema_destroy_colgroup(
-			    session, table->cgroups[i]);
-			table->cgroups[i] = NULL;
-		}
+		__wt_schema_destroy_colgroup(session, &table->cgroups[i]);
 
 		WT_ERR(__wt_buf_init(session, buf, 0));
 		WT_ERR(__wt_schema_colgroup_name(session, table,
@@ -112,8 +108,7 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 	table->cg_complete = 1;
 
 err:	__wt_scr_free(session, &buf);
-	if (colgroup != NULL)
-		__wt_schema_destroy_colgroup(session, colgroup);
+	__wt_schema_destroy_colgroup(session, &colgroup);
 	if (cgconfig != NULL)
 		__wt_free(session, cgconfig);
 	return (ret);
@@ -347,9 +342,8 @@ __wt_schema_open_index(WT_SESSION_IMPL *session,
 			 * will need to be reopened once the table is complete.
 			 */
 			if (!table->cg_complete) {
-				ret = __wt_schema_destroy_index(session, idx);
-				idx = NULL;
-				WT_ERR(ret);
+				WT_ERR(
+				    __wt_schema_destroy_index(session, &idx));
 				if (idxname != NULL)
 					break;
 				continue;
@@ -383,8 +377,7 @@ __wt_schema_open_index(WT_SESSION_IMPL *session,
 	}
 
 err:	__wt_scr_free(session, &tmp);
-	if (idx != NULL)
-		WT_TRET(__wt_schema_destroy_index(session, idx));
+	WT_TRET(__wt_schema_destroy_index(session, &idx));
 	if (cursor != NULL)
 		WT_TRET(cursor->close(cursor));
 	return (ret);
@@ -495,8 +488,7 @@ __wt_schema_open_table(WT_SESSION_IMPL *session,
 	*tablep = table;
 
 	if (0) {
-err:		if (table != NULL)
-			WT_TRET(__wt_schema_destroy_table(session, table));
+err:		WT_TRET(__wt_schema_destroy_table(session, &table));
 	}
 	if (cursor != NULL)
 		WT_TRET(cursor->close(cursor));
