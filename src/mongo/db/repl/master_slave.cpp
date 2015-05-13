@@ -1029,9 +1029,7 @@ namespace repl {
 
                     syncedTo = nextOpTime;
                     save(txn); // note how far we are synced up to now
-                    log() << "applied " << n << " operations" << endl;
                     nApplied = n;
-                    log() << "end sync_pullOpLog syncedTo: " << syncedTo.toStringLong() << endl;
                     break;
                 }
 
