@@ -38,7 +38,6 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "wt_internal.h"			/* For __wt_XXX */
 #include "test_util.i"
 
 #define	URI_BASE	"table:__wt"		/* File name */
