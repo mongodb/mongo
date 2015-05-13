@@ -145,5 +145,6 @@ struct __wt_txn {
 #define	TXN_HAS_ID	        0x04
 #define	TXN_HAS_SNAPSHOT	0x08
 #define	TXN_RUNNING		0x10
+#define	TXN_SYNC_SET		0x20
 	uint32_t flags;
 };

@@ -611,7 +611,7 @@ common_wiredtiger_open = [
         Config('method', 'fsync', r'''
             the method used to ensure log records are stable on disk, see
             @ref tune_durability for more information''',
-            choices=['background', 'dsync', 'fsync', 'none']),
+            choices=['dsync', 'fsync', 'none']),
         ]),
 ]
 
@@ -804,7 +804,12 @@ methods = {
         type='boolean'),
 ]),
 
-'WT_SESSION.commit_transaction' : Method([]),
+'WT_SESSION.commit_transaction' : Method([
+    Config('sync', '', r'''
+        override whether to sync log records when the transaction commits,
+        inherited from ::wiredtiger_open \c transaction_sync''',
+        choices=['background', 'off', 'on']),
+]),
 'WT_SESSION.rollback_transaction' : Method([]),
 
 'WT_SESSION.checkpoint' : Method([

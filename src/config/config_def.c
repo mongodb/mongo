@@ -160,6 +160,13 @@ static const WT_CONFIG_CHECK confchk_WT_SESSION_checkpoint[] = {
 	{ NULL, NULL, NULL, NULL, NULL, 0 }
 };
 
+static const WT_CONFIG_CHECK confchk_WT_SESSION_commit_transaction[] = {
+	{ "sync", "string",
+	    NULL, "choices=[\"background\",\"off\",\"on\"]",
+	    NULL, 0 },
+	{ NULL, NULL, NULL, NULL, NULL, 0 }
+};
+
 static const WT_CONFIG_CHECK confchk_WT_SESSION_compact[] = {
 	{ "timeout", "int", NULL, NULL, NULL, 0 },
 	{ NULL, NULL, NULL, NULL, NULL, 0 }
@@ -415,7 +422,7 @@ static const WT_CONFIG_CHECK
     confchk_wiredtiger_open_transaction_sync_subconfigs[] = {
 	{ "enabled", "boolean", NULL, NULL, NULL, 0 },
 	{ "method", "string",
-	    NULL, "choices=[\"background\",\"dsync\",\"fsync\",\"none\"]",
+	    NULL, "choices=[\"dsync\",\"fsync\",\"none\"]",
 	    NULL, 0 },
 	{ NULL, NULL, NULL, NULL, NULL, 0 }
 };
@@ -755,8 +762,8 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  NULL, 0
 	},
 	{ "WT_SESSION.commit_transaction",
-	  "",
-	  NULL, 0
+	  "sync=",
+	  confchk_WT_SESSION_commit_transaction, 1
 	},
 	{ "WT_SESSION.compact",
 	  "timeout=1200",
