@@ -342,7 +342,7 @@ __wt_txn_config(WT_SESSION_IMPL *session, const char *cfg[])
 		 * that we know not to overwrite it in commit_transaction.
 		 * Only reset the value if the setting was turned off.
 		 */
-		F_SET(txn, TXN_SYNC_SET);
+		F_SET(txn, WT_TXN_SYNC_SET);
 	if (cval.val == 0 || (cval.val == UINT_MAX &&
 	    !FLD_ISSET(txn->txn_logsync, WT_LOG_FLUSH)))
 		txn->txn_logsync = 0;
@@ -427,7 +427,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	 */
 	if (cval.len == 0) {
 		if (!FLD_ISSET(txn->txn_logsync, WT_LOG_FLUSH) &&
-		    !F_ISSET(txn, TXN_SYNC_SET))
+		    !F_ISSET(txn, WT_TXN_SYNC_SET))
 			txn->txn_logsync = 0;
 	} else if (WT_STRING_MATCH("background", cval.str, cval.len))
 		txn->txn_logsync = WT_LOG_BACKGROUND;
