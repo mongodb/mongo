@@ -183,6 +183,101 @@ namespace {
         }
     }
 
+    TEST(BSONObjCompare, StringSymbol) {
+        BSONObj l, r;
+        { BSONObjBuilder b; b.append("x", "eliot"); l = b.obj(); }
+        { BSONObjBuilder b; b.appendSymbol("x", "eliot"); r = b.obj(); }
+
+        ASSERT_EQ(l.woCompare(r), 0);
+        ASSERT_EQ(r.woCompare(l), 0);
+    }
+
+    TEST(BSONObjCompare, StringOrder1) {
+        BSONObjBuilder b;
+        b.appendRegex("x", "foo");
+        BSONObj o = b.done();
+
+        BSONObjBuilder c;
+        c.appendRegex("x", "goo");
+        BSONObj p = c.done();
+
+        ASSERT(!o.binaryEqual(p));
+        ASSERT_LT(o.woCompare(p), 0);
+    }
+
+    TEST(BSONObjCompare, StringOrder2) {
+        BSONObj x, y, z;
+        { BSONObjBuilder b; b.append("x", (long long)2); x = b.obj(); }
+        { BSONObjBuilder b; b.append("x", (int)3); y = b.obj(); }
+        { BSONObjBuilder b; b.append("x", (long long)4); z = b.obj(); }
+
+        ASSERT_LT(x.woCompare(y), 0);
+        ASSERT_LT(x.woCompare(z), 0);
+        ASSERT_GT(y.woCompare(x), 0);
+        ASSERT_GT(z.woCompare(x), 0);
+        ASSERT_LT(y.woCompare(z), 0);
+        ASSERT_GT(z.woCompare(y), 0);
+    }
+
+    TEST(BSONObjCompare, StringOrder3) {
+        BSONObj ll,d,i,n,u;
+        { BSONObjBuilder b; b.append( "x" , (long long)2 ); ll = b.obj(); }
+        { BSONObjBuilder b; b.append( "x" , (double)2 ); d = b.obj(); }
+        { BSONObjBuilder b; b.append( "x" , (int)2 ); i = b.obj(); }
+        { BSONObjBuilder b; b.appendNull( "x" ); n = b.obj(); }
+        { BSONObjBuilder b; u = b.obj(); }
+
+        ASSERT_TRUE( ll.woCompare( u ) == d.woCompare( u ) );
+        ASSERT_TRUE( ll.woCompare( u ) == i.woCompare( u ) );
+
+        BSONObj k = BSON( "x" << 1 );
+        ASSERT_TRUE( ll.woCompare( u , k ) == d.woCompare( u , k ) );
+        ASSERT_TRUE( ll.woCompare( u , k ) == i.woCompare( u , k ) );
+
+        ASSERT_TRUE( u.woCompare( ll ) == u.woCompare( d ) );
+        ASSERT_TRUE( u.woCompare( ll ) == u.woCompare( i ) );
+        ASSERT_TRUE( u.woCompare( ll , k ) == u.woCompare( d , k ) );
+        ASSERT_TRUE( u.woCompare( ll , k ) == u.woCompare( d , k ) );
+
+        ASSERT_TRUE( i.woCompare( n ) == d.woCompare( n ) );
+
+        ASSERT_TRUE( ll.woCompare( n ) == d.woCompare( n ) );
+        ASSERT_TRUE( ll.woCompare( n ) == i.woCompare( n ) );
+        ASSERT_TRUE( ll.woCompare( n , k ) == d.woCompare( n , k ) );
+        ASSERT_TRUE( ll.woCompare( n , k ) == i.woCompare( n , k ) );
+
+        ASSERT_TRUE( n.woCompare( ll ) == n.woCompare( d ) );
+        ASSERT_TRUE( n.woCompare( ll ) == n.woCompare( i ) );
+        ASSERT_TRUE( n.woCompare( ll , k ) == n.woCompare( d , k ) );
+        ASSERT_TRUE( n.woCompare( ll , k ) == n.woCompare( d , k ) );
+    }
+
+    TEST(BSONObjCompare, NumericBounds) {
+        BSONObj l, r;
+        {
+            BSONObjBuilder b;
+            b.append("x", std::numeric_limits<long long>::max());
+            l = b.obj();
+        }
+        {
+            BSONObjBuilder b;
+            b.append("x", std::numeric_limits<double>::max());
+            r = b.obj();
+        }
+
+        ASSERT_LT(l.woCompare(r), 0);
+        ASSERT_GT(r.woCompare(l), 0);
+
+        {
+            BSONObjBuilder b;
+            b.append("x", std::numeric_limits<int>::max());
+            l = b.obj();
+        }
+
+        ASSERT_LT(l.woCompare(r), 0);
+        ASSERT_GT(r.woCompare(l), 0);
+    }
+
     TEST(Looping, Cpp11Basic) {
         int count = 0;
         for (BSONElement e : BSON("a" << 1 << "a" << 2 << "a" << 3)) {
