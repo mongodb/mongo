@@ -41,7 +41,8 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/server_parameters.h"
-#include "mongo/s/config.h"
+#include "mongo/s/catalog/catalog_manager.h"
+#include "mongo/s/grid.h"
 #include "mongo/util/background.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
@@ -90,19 +91,15 @@ namespace {
 
     StatusWith<OID> getCurrentCacheGeneration() {
         try {
-            ConnectionString config = configServer.getConnectionString();
-            ScopedDbConnection conn(config.toString(), 30);
-
-            BSONObj result;
-            conn->runCommand("admin", BSON("_getUserCacheGeneration" << 1), result);
-            conn.done();
-
-            Status status = Command::getStatusFromCommandResult(result);
-            if (!status.isOK()) {
-                return StatusWith<OID>(status);
+            BSONObjBuilder result;
+            const bool ok = grid.catalogManager()->runUserManagementReadCommand(
+                    "admin",
+                    BSON("_getUserCacheGeneration" << 1),
+                    &result);
+            if (!ok) {
+                return Command::getStatusFromCommandResult(result.obj());
             }
-
-            return StatusWith<OID>(result["cacheGeneration"].OID());
+            return result.obj()["cacheGeneration"].OID();
         } catch (const DBException& e) {
             return StatusWith<OID>(e.toStatus());
         } catch (const std::exception& e) {
