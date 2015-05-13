@@ -29,7 +29,6 @@
 import wiredtiger, wttest
 from helper import complex_populate
 
-
 # test_bug012.py
 class test_bug012(wttest.WiredTigerTestCase):
 
