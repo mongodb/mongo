@@ -1,3 +1,131 @@
+WiredTiger release 2.6.0, 2015-05-13
+------------------------------------
+
+The WiredTiger 2.6.0 release contains major new features and important bug fixes.
+
+API and behavior changes:
+
+TODO: Move contet into this section.
+
+Significant bug fixes and performance enhancements:
+
+* Fix bugs in checkpoint:
+  - Committing the checkpoint transaction before it was safe.
+  - Sync the metadata file before updating turtle file.
+  refs SERVER-18316
+
+* Add support for encrypting WiredTiger tables via a new encryption API.
+  refs WT-1822
+
+* Add support for raw compression in LZ4. Change is not compatible with tables created with LZ4 compression using earlier versions of WiredTiger. See upgrading documentation for more information.
+
+* Don't attempt to validate configuration settings for extensions (collators, compressors, encryptors, extractors). The extension may be valid, but not yet loaded.
+
+* Add support for bulk load in LSM trees. Previously the bulk configuration for cursor create was ignored by LSM trees.
+  refs WT-1922 SERVER-18321
+
+* Check the magic and version numbers in log files when first opening them.
+
+* Fix a bug with cache leaf size accounting for statistics.
+  refs WT-1885
+
+* Fix checkpoint visiting a page that was rewritten in memory
+  refs #1946
+
+* If a random lookup lands on a deleted item, move to the next valid record
+  refs WT-1921 #1944
+
+* Disallow the cache_resident flag on LSM trees.
+  refs WT-1905
+
+* Don't skip reconciliation of pages during checkpoint if they were rewritten in memory.
+  refs WT-1919
+
+* Fix a bug in handle close, where we could fail to clear WT_DHANDLE_OPEN.
+  refs WT-1915
+
+* Fix the logic around in-memory splits: if we're trying one, don't allow any other kind of eviction.
+  refs WT-1916, WT-1917
+
+* If we get part way through a btree open then fail, make sure the checkpoint is unloaded.  Hopefully this will fix a hard-to-reproduce leak found recently by valgrind.
+  refs WT-1598
+
+* Avoid obsolete update checks during long-running transactions.  There can potentially be long chains of updates that cannot be freed: there is no point repeatedly scanning them.
+  refs WT-1913
+
+* Move eviction outside transactions and don't start a transaction when reading a page if eviction is prohibited.
+  refs WT-1912
+
+* Restructure handle locking so it all happens at the session level, avoid entanglements between handle locks, the schema lock and the handle list lock.
+  refs WT-1598
+
+* Enhance performance of forced drop of trees. Don't flush content from cache before returning from the API call, instead mark the tree as dead and discard it in the background without writing any content to disk.
+  WT-1894
+
+* Add an API to validate configuration strings.
+  refs #1739
+
+* Ensure that a file marked as cache resident is never evicted, add some optimizations for cache resident files.
+  refs SERVER-18192
+
+* Fix a deadlock related to LSM. There are cases where closing a file with an existing checkpoint could self deadlock.
+  refs WT-716
+
+* Run recovery earlier. TODO: more information
+  WT-1897
+
+* Only split large in-memory pages if there is a need to keep them in cache. Otherwise it is better to reconcile and evict them immediately.
+  refs WT-1890 WT-1896
+
+* Shut down the eviction server before closing file handles to avoid a race.
+  refs WT-1893
+
+* Look for any number of non-data-changing log records to determine if we can skip recovery.
+  WT-1892
+
+* Update API documentation to explain internal session handle usage. This allows users to do specific calculations based on their session_max setting.
+
+* Fix a bug in LSM where updates with overwrite could be skipped incorrectly.
+  refs BF-829
+
+* Fix a bug in cursors where searching and traversing in different combinations could lead to data buffers being freed before they should be.
+  refs WT-1887
+
+* Fix a bug when closing bulk cursors where a file could be left pinned open.
+
+* Generated tables for config subcategories now contains the name of the method they are applicable for.  TODO: This is an API change, find details.
+  refs WT-1879
+
+* Disable fallocate on Windows since SetEndofFile does not ignore truncation requests like POSIX fallocate.
+
+* Fix a bug in file truncate, where we could truncate to the wrong place if there was a race extending the file at the same time.
+  refs WT-1871
+
+* Improve the control over how aggressively WiredTiger closes idle handles. Update the wiredtiger_open file_manager configuration option. close_idle_time max increased, close_scan_interval increased, new close_handle_minimum
+  refs WT-1856 SERVER-17907
+
+* Fix a bug in reconciliation where the page boundary structures could point into freed memory.
+  refs WT-1852
+
+* Change the WT_CURSOR::search and WT_CURSOR::search_near API to first check the currently pinned page before starting a regular descending search.
+
+* Reset eol if we continue.  Return NOTFOUND if checksum mismatch. #1840
+  commit 684fd71475cbc6b15290945af0160fac0313ad6b
+
+* Modify log_scan callback args to send in next LSN. #1837 TODO: API change?
+  commit 9c29e0f13268c03038704372c069353c81357791
+
+* Enhance the Python cursor API to allow setting keys and values using array notation.
+
+* The gaps in column-store tables can be large enough we spend too much time looping through the "deleted" records when writing out the page skip the boring part.
+  refs WT-1807.
+
+* Set checkpoint LSN to existing log record.
+  refs WT-1700
+
+* Update the btree search routine to use vectorized search. Based on CPU and memory profiling.
+
+
 WiredTiger release 2.5.3, 2015-04-22
 ------------------------------------
 
