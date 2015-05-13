@@ -227,7 +227,14 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table, WT_INDEX *idx)
 		WT_ERR(__wt_buf_catfmt(
 		    session, buf, "%.*s,", (int)ckey.len, ckey.str));
 	}
-	if (ret != 0 && ret != WT_NOTFOUND)
+	WT_ERR_NOTFOUND_OK(ret);
+
+	/*
+	 * If the table doesn't yet have its column groups, don't try to
+	 * calculate a plan: we are just checking that the index creation is
+	 * sane.
+	 */
+	if (!table->cg_complete)
 		goto err;
 
 	WT_ERR(__wt_scr_alloc(session, 0, &plan));
@@ -340,6 +347,20 @@ __wt_schema_open_index(WT_SESSION_IMPL *session,
 			WT_ERR(__wt_strdup(session, uri, &idx->name));
 			WT_ERR(__wt_strdup(session, idxconf, &idx->config));
 			WT_ERR(__open_index(session, table, idx));
+
+			/*
+			 * If we're checking the creation of an index before a
+			 * table is fully created, don't save the index: it
+			 * will need to be reopened once the table is complete.
+			 */
+			if (!table->cg_complete) {
+				ret = __wt_schema_destroy_index(session, idx);
+				idx = NULL;
+				WT_ERR(ret);
+				if (idxname != NULL)
+					break;
+				continue;
+			}
 
 			table->indices[i] = idx;
 			idx = NULL;

@@ -29,7 +29,6 @@
 import wiredtiger, wttest
 from helper import complex_populate
 
-
 # test_bug012.py
 class test_bug012(wttest.WiredTigerTestCase):
 
@@ -77,10 +76,9 @@ class test_bug012(wttest.WiredTigerTestCase):
     def test_illegal_extractor(self):
         complex_populate(self, 'table:A', 'key_format=S', 10)
         msg = '/unknown extractor/'
-        self.session.create('index:A:xyzzy',
-            'key_format=S,columns=(column2),extractor="xyzzy"')
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda:
-            self.session.open_cursor('index:A:xyzzy', None, None), msg)
+            self.session.create('index:A:xyzzy',
+            'key_format=S,columns=(column2),extractor="xyzzy"'), msg)
 
 if __name__ == '__main__':
     wttest.run()
