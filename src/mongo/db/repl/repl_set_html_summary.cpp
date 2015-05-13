@@ -190,6 +190,7 @@ namespace {
                     memberTable << td( grey(str::stream() << "(was " << state << ')', true) );
                 }
                 memberTable << td(grey(memberHB.getLastHeartbeatMsg(), !up));
+                // TODO(dannenberg): change timestamp to optime in V1
                 memberTable << td(memberHB.getLastHeartbeat() == Date_t() ?
                         "?" : memberHB.getOpTime().toString());
             }
@@ -205,7 +206,8 @@ namespace {
         const MemberConfig& selfConfig = _config.getMemberAt(_selfIndex);
 
         if (_primaryIndex >= 0 && _primaryIndex != _selfIndex && !selfConfig.isArbiter()) {
-            int lag = _hbData[_primaryIndex].getOpTime().getSecs() - _selfOptime.getSecs();
+            int lag = _hbData[_primaryIndex].getOpTime().getTimestamp().getSecs() -
+                _selfOptime.getTimestamp().getSecs();
             s << tr("Lag: ", str::stream() << lag << " secs");
         }
 

@@ -116,5 +116,9 @@ namespace repl {
         _runner->cancel(executor);
     }
 
+    Status ElectionWinnerDeclarer::getStatus() const {
+        return _algorithm->getStatus();
+    }
+
 } // namespace repl
 } // namespace mongo

@@ -518,7 +518,7 @@ namespace {
             ASSERT(seenHosts.insert(request.target).second) <<
                 "Already saw " << request.target.toString();
             ReplSetHeartbeatResponse hbResp;
-            hbResp.setVersion(0);
+            hbResp.setConfigVersion(0);
             hbResp.noteHasData();
             if (request.target == HostAndPort("h5", 1)) {
                 _net->scheduleResponse(noi,

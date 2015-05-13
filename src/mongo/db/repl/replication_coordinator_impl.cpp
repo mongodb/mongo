@@ -43,14 +43,17 @@
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/repl/check_quorum_for_config_change.h"
 #include "mongo/db/repl/elect_cmd_runner.h"
+#include "mongo/db/repl/election_winner_declarer.h"
 #include "mongo/db/repl/freshness_checker.h"
 #include "mongo/db/repl/handshake_args.h"
 #include "mongo/db/repl/is_master_response.h"
 #include "mongo/db/repl/read_after_optime_args.h"
 #include "mongo/db/repl/read_after_optime_response.h"
+#include "mongo/db/repl/last_vote.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_set_declare_election_winner_args.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
+#include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
 #include "mongo/db/repl/repl_set_html_summary.h"
 #include "mongo/db/repl/repl_set_request_votes_args.h"
@@ -60,7 +63,7 @@
 #include "mongo/db/repl/rslog.h"
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/db/repl/update_position_args.h"
-#include "mongo/db/repl/last_vote.h"
+#include "mongo/db/repl/vote_requester.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/stdx/functional.h"
@@ -1279,7 +1282,7 @@ namespace {
             return;
         }
         bool forceNow = now >= waitUntil ? force : false;
-        if (_topCoord->stepDown(stepDownUntil, forceNow, getMyLastOptime().getTimestamp())) {
+        if (_topCoord->stepDown(stepDownUntil, forceNow, getMyLastOptime())) {
             // Schedule work to (potentially) step back up once the stepdown period has ended.
             _replExecutor.scheduleWorkAt(stepDownUntil,
                                          stdx::bind(&ReplicationCoordinatorImpl::_handleTimePassing,
@@ -1507,7 +1510,7 @@ namespace {
                        stdx::placeholders::_1,
                        _replExecutor.now(),
                        time(0) - serverGlobalParams.started,
-                       getMyLastOptime().getTimestamp(),
+                       getMyLastOptime(),
                        response,
                        &result));
         if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
@@ -1676,7 +1679,7 @@ namespace {
                        _topCoord.get(),
                        stdx::placeholders::_1,
                        target,
-                       _getMyLastOptime_inlock().getTimestamp(),
+                       _getMyLastOptime_inlock(),
                        resultObj,
                        &result));
         if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
@@ -1767,7 +1770,7 @@ namespace {
                 now,
                 args,
                 _settings.ourSetName(),
-                getMyLastOptime().getTimestamp(),
+                getMyLastOptime(),
                 response);
         if ((outStatus->isOK() || *outStatus == ErrorCodes::InvalidReplicaSetConfig) &&
                 _selfIndex < 0) {
@@ -2154,7 +2157,7 @@ namespace {
         }
 
         _topCoord->prepareFreshResponse(
-                args, _replExecutor.now(), getMyLastOptime().getTimestamp(), response, result);
+                args, _replExecutor.now(), getMyLastOptime(), response, result);
     }
 
     Status ReplicationCoordinatorImpl::processReplSetElect(const ReplSetElectArgs& args,
@@ -2186,7 +2189,7 @@ namespace {
         }
 
         _topCoord->prepareElectResponse(
-                args, _replExecutor.now(), getMyLastOptime().getTimestamp(), response, result);
+                args, _replExecutor.now(), getMyLastOptime(), response, result);
     }
 
     ReplicationCoordinatorImpl::PostMemberStateUpdateAction
@@ -2197,7 +2200,7 @@ namespace {
          _cancelHeartbeats();
          _setConfigState_inlock(kConfigSteady);
          // Must get this before changing our config.
-         Timestamp myOptime = _getMyLastOptime_inlock().getTimestamp();
+         OpTime myOptime = _getMyLastOptime_inlock();
          _topCoord->updateConfig(
                  newConfig,
                  myIndex,
@@ -2394,7 +2397,7 @@ namespace {
             return;
         }
         *newSyncSource = _topCoord->chooseNewSyncSource(_replExecutor.now(),
-                                                        getMyLastOptime().getTimestamp());
+                                                        getMyLastOptime());
     }
 
     HostAndPort ReplicationCoordinatorImpl::chooseNewSyncSource() {
@@ -2627,8 +2630,59 @@ namespace {
     }
 
     Status ReplicationCoordinatorImpl::processHeartbeatV1(const ReplSetHeartbeatArgsV1& args,
-                                                          ReplSetHeartbeatResponseV1* response) {
-        return {ErrorCodes::CommandNotFound, "not implemented"};
+                                                          ReplSetHeartbeatResponse* response) {
+        {
+            boost::lock_guard<boost::mutex> lock(_mutex);
+            if (_rsConfigState == kConfigPreStart || _rsConfigState == kConfigStartingUp) {
+                return Status(ErrorCodes::NotYetInitialized,
+                              "Received heartbeat while still initializing replication system");
+            }
+        }
+
+        Status result(ErrorCodes::InternalError, "didn't set status in prepareHeartbeatResponse");
+        CBHStatus cbh = _replExecutor.scheduleWork(
+                stdx::bind(&ReplicationCoordinatorImpl::_processHeartbeatFinishV1,
+                           this,
+                           stdx::placeholders::_1,
+                           args,
+                           response,
+                           &result));
+        if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
+            return {ErrorCodes::ShutdownInProgress, "replication shutdown in progress"};
+        }
+        fassert(28645, cbh.getStatus());
+        _replExecutor.wait(cbh.getValue());
+        return result;
+    }
+
+    void ReplicationCoordinatorImpl::_processHeartbeatFinishV1(
+            const ReplicationExecutor::CallbackData& cbData,
+            const ReplSetHeartbeatArgsV1& args,
+            ReplSetHeartbeatResponse* response,
+            Status* outStatus) {
+
+        if (cbData.status == ErrorCodes::CallbackCanceled) {
+            *outStatus = {ErrorCodes::ShutdownInProgress, "Replication shutdown in progress"};
+            return;
+        }
+        fassert(28655, cbData.status);
+        const Date_t now = _replExecutor.now();
+        *outStatus = _topCoord->prepareHeartbeatResponseV1(
+                now,
+                args,
+                _settings.ourSetName(),
+                getMyLastOptime(),
+                response);
+        if ((outStatus->isOK() || *outStatus == ErrorCodes::InvalidReplicaSetConfig) &&
+                _selfIndex < 0) {
+            // If this node does not belong to the configuration it knows about, send heartbeats
+            // back to any node that sends us a heartbeat, in case one of those remote nodes has
+            // a configuration that contains us.  Chances are excellent that it will, since that
+            // is the only reason for a remote node to send this node a heartbeat request.
+            if (!args.getSenderHost().empty() && _seedList.insert(args.getSenderHost()).second) {
+                _scheduleHeartbeatToTarget(args.getSenderHost(), -1, now);
+            }
+        }
     }
 
     void ReplicationCoordinatorImpl::summarizeAsHtml(ReplSetHtmlSummary* output) {
@@ -2650,7 +2704,7 @@ namespace {
             return;
         }
 
-        output->setSelfOptime(getMyLastOptime().getTimestamp());
+        output->setSelfOptime(getMyLastOptime());
         output->setSelfUptime(time(0) - serverGlobalParams.started);
         output->setNow(_replExecutor.now());
 

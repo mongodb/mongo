@@ -142,6 +142,7 @@ env.Library('repl_coordinator_impl',
                 'replica_set_config_checks.cpp',
                 'replication_coordinator_impl.cpp',
                 'replication_coordinator_impl_elect.cpp',
+                'replication_coordinator_impl_elect_v1.cpp',
                 'replication_coordinator_impl_heartbeat.cpp',
                 'vote_requester.cpp',
             ],
@@ -239,6 +240,14 @@ env.CppUnitTest('repl_coordinator_impl_elect_test',
                 'replication_coordinator_impl_elect_test.cpp',
                 LIBDEPS=['repl_coordinator_test_fixture'])
 
+env.CppUnitTest('repl_coordinator_impl_elect_v1_test',
+                'replication_coordinator_impl_elect_v1_test.cpp',
+                LIBDEPS=['repl_coordinator_test_fixture'])
+
+env.CppUnitTest('repl_coordinator_impl_heartbeat_v1_test',
+                'replication_coordinator_impl_heartbeat_v1_test.cpp',
+                LIBDEPS=['repl_coordinator_test_fixture'])
+
 env.CppUnitTest('repl_coordinator_impl_heartbeat_test',
                 'replication_coordinator_impl_heartbeat_test.cpp',
                 LIBDEPS=['repl_coordinator_test_fixture'])
@@ -294,7 +303,6 @@ env.Library('replica_set_messages',
                 'repl_set_heartbeat_args.cpp',
                 'repl_set_heartbeat_args_v1.cpp',
                 'repl_set_heartbeat_response.cpp',
-                'repl_set_heartbeat_response_v1.cpp',
                 'repl_set_html_summary.cpp',
                 'repl_set_request_votes_args.cpp',
                 'replica_set_config.cpp',

@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2014 MongoDB Inc.
+ *    Copyright (C) 2015 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -34,7 +34,7 @@
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/repl/network_interface_mock.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
-#include "mongo/db/repl/repl_set_heartbeat_response.h"
+#include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
 #include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/replication_coordinator_external_state_mock.h"
 #include "mongo/db/repl/replication_coordinator_impl.h"
@@ -47,7 +47,7 @@ namespace mongo {
 namespace repl {
 namespace {
 
-    class ReplCoordHBTest : public ReplCoordTest {
+    class ReplCoordHBV1Test : public ReplCoordTest {
     protected:
         void assertMemberState(MemberState expected, std::string msg = "");
         ReplSetHeartbeatResponse receiveHeartbeatFrom(
@@ -56,37 +56,38 @@ namespace {
                 const HostAndPort& source);
     };
 
-    void ReplCoordHBTest::assertMemberState(const MemberState expected, std::string msg) {
+    void ReplCoordHBV1Test::assertMemberState(const MemberState expected, std::string msg) {
         const MemberState actual = getReplCoord()->getMemberState();
         ASSERT(expected == actual) << "Expected coordinator to report state " <<
             expected.toString() << " but found " << actual.toString() << " - " << msg;
     }
 
-    ReplSetHeartbeatResponse ReplCoordHBTest::receiveHeartbeatFrom(
+    ReplSetHeartbeatResponse ReplCoordHBV1Test::receiveHeartbeatFrom(
             const ReplicaSetConfig& rsConfig,
             int sourceId,
             const HostAndPort& source) {
-        ReplSetHeartbeatArgs hbArgs;
-        hbArgs.setProtocolVersion(1);
+        ReplSetHeartbeatArgsV1 hbArgs;
         hbArgs.setConfigVersion(rsConfig.getConfigVersion());
         hbArgs.setSetName(rsConfig.getReplSetName());
         hbArgs.setSenderHost(source);
         hbArgs.setSenderId(sourceId);
+        hbArgs.setTerm(1);
         ASSERT(hbArgs.isInitialized());
 
         ReplSetHeartbeatResponse response;
-        ASSERT_OK(getReplCoord()->processHeartbeat(hbArgs, &response));
+        ASSERT_OK(getReplCoord()->processHeartbeatV1(hbArgs, &response));
         return response;
     }
 
-    TEST_F(ReplCoordHBTest, JoinExistingReplSet) {
+    TEST_F(ReplCoordHBV1Test, JoinExistingReplSet) {
         logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Debug(3));
         ReplicaSetConfig rsConfig = assertMakeRSConfig(
                 BSON("_id" << "mySet" <<
                      "version" << 3 <<
                      "members" << BSON_ARRAY(BSON("_id" << 1 << "host" << "h1:1") <<
                                              BSON("_id" << 2 << "host" << "h2:1") <<
-                                             BSON("_id" << 3 << "host" << "h3:1"))));
+                                             BSON("_id" << 3 << "host" << "h3:1")) <<
+                     "protocolVersion" << 1));
         init("mySet");
         addSelf(HostAndPort("h2", 1));
         const Date_t startDate = getNet()->now();
@@ -109,7 +110,6 @@ namespace {
         ReplSetHeartbeatResponse hbResp;
         hbResp.setSetName("mySet");
         hbResp.setState(MemberState::RS_PRIMARY);
-        hbResp.noteReplSet();
         hbResp.setConfigVersion(rsConfig.getConfigVersion());
         hbResp.setConfig(rsConfig);
         BSONObjBuilder responseBuilder;
@@ -138,7 +138,7 @@ namespace {
         exitNetwork();
     }
 
-    TEST_F(ReplCoordHBTest, DoNotJoinReplSetIfNotAMember) {
+    TEST_F(ReplCoordHBV1Test, DoNotJoinReplSetIfNotAMember) {
         // Tests that a node in RS_STARTUP will not transition to RS_REMOVED if it receives a
         // configuration that does not contain it.
         logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Debug(3));
@@ -147,7 +147,8 @@ namespace {
                      "version" << 3 <<
                      "members" << BSON_ARRAY(BSON("_id" << 1 << "host" << "h1:1") <<
                                              BSON("_id" << 2 << "host" << "h2:1") <<
-                                             BSON("_id" << 3 << "host" << "h3:1"))));
+                                             BSON("_id" << 3 << "host" << "h3:1")) <<
+                     "protocolVersion" << 1));
         init("mySet");
         addSelf(HostAndPort("h4", 1));
         const Date_t startDate = getNet()->now();
@@ -170,7 +171,6 @@ namespace {
         ReplSetHeartbeatResponse hbResp;
         hbResp.setSetName("mySet");
         hbResp.setState(MemberState::RS_PRIMARY);
-        hbResp.noteReplSet();
         hbResp.setConfigVersion(rsConfig.getConfigVersion());
         hbResp.setConfig(rsConfig);
         BSONObjBuilder responseBuilder;
@@ -196,23 +196,23 @@ namespace {
         exitNetwork();
     }
 
-    TEST_F(ReplCoordHBTest, NotYetInitializedConfigStateEarlyReturn) {
+    TEST_F(ReplCoordHBV1Test, NotYetInitializedConfigStateEarlyReturn) {
         // ensure that if we've yet to receive an initial config, we return NotYetInitialized
         init("mySet");
-        ReplSetHeartbeatArgs hbArgs;
-        hbArgs.setProtocolVersion(1);
+        ReplSetHeartbeatArgsV1 hbArgs;
         hbArgs.setConfigVersion(3);
         hbArgs.setSetName("mySet");
         hbArgs.setSenderHost(HostAndPort("h1:1"));
         hbArgs.setSenderId(1);
+        hbArgs.setTerm(1);
         ASSERT(hbArgs.isInitialized());
 
         ReplSetHeartbeatResponse response;
-        Status status = getReplCoord()->processHeartbeat(hbArgs, &response);
+        Status status = getReplCoord()->processHeartbeatV1(hbArgs, &response);
         ASSERT_EQUALS(ErrorCodes::NotYetInitialized, status.code());
     }
 
-    TEST_F(ReplCoordHBTest, OnlyUnauthorizedUpCausesRecovering) {
+    TEST_F(ReplCoordHBV1Test, OnlyUnauthorizedUpCausesRecovering) {
         // Tests that a node that only has auth error heartbeats is recovering
         logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Debug(3));
         assertStartSuccess(

@@ -6,7 +6,7 @@
 (function() {
     "use strict";
     var name = "initialize_from_old";
-    var oldVersion = '2.6';
+    var oldVersion = 'last-stable';
     var newVersion = 'latest';
     var nodes = {
         n0: {binVersion: oldVersion},

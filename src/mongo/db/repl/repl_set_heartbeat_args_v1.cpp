@@ -33,6 +33,7 @@
 #include "mongo/bson/util/bson_check.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/util/net/hostandport.h"
 
 namespace mongo {
 namespace repl {
@@ -41,6 +42,7 @@ namespace {
 
     const std::string kCheckEmptyFieldName = "checkEmpty";
     const std::string kConfigVersionFieldName = "configVersion";
+    const std::string kSenderHostFieldName = "from";
     const std::string kSenderIdFieldName = "fromId";
     const std::string kSetNameFieldName = "replSetHeartbeat";
     const std::string kTermFieldName = "term";
@@ -48,6 +50,7 @@ namespace {
     const std::string kLegalHeartbeatFieldNames[] = {
         kCheckEmptyFieldName,
         kConfigVersionFieldName,
+        kSenderHostFieldName,
         kSenderIdFieldName,
         kSetNameFieldName,
         kTermFieldName
@@ -73,9 +76,20 @@ namespace {
         if (!status.isOK())
             return status;
 
-        status = bsonExtractIntegerField(argsObj, kSenderIdFieldName, &_senderId);
+        status = bsonExtractIntegerFieldWithDefault(argsObj, kSenderIdFieldName, -1, &_senderId);
         if (!status.isOK())
             return status;
+
+        std::string hostAndPortString;
+        status = bsonExtractStringField(argsObj, kSenderHostFieldName, &hostAndPortString);
+        if (!status.isOK())
+            return status;
+        if (!hostAndPortString.empty()) {
+            status = _senderHost.initialize(hostAndPortString);
+            if (!status.isOK())
+                return status;
+            _hasSender = true;
+        }
 
         status = bsonExtractIntegerField(argsObj, kTermFieldName, &_term);
         if (!status.isOK())
@@ -89,11 +103,15 @@ namespace {
     }
 
     bool ReplSetHeartbeatArgsV1::isInitialized() const {
-        return _configVersion != -1 && _senderId != -1 && _term != -1 && !_setName.empty();
+        return _configVersion != -1 && _term != -1 && !_setName.empty();
     }
 
     void ReplSetHeartbeatArgsV1::setConfigVersion(long long newVal) {
         _configVersion = newVal;
+    }
+
+    void ReplSetHeartbeatArgsV1::setSenderHost(const HostAndPort& newVal) {
+        _senderHost = newVal;
     }
 
     void ReplSetHeartbeatArgsV1::setSenderId(long long newVal) {
@@ -125,6 +143,7 @@ namespace {
             builder->append(kCheckEmptyFieldName, _checkEmpty);
         }
         builder->appendIntOrLL(kConfigVersionFieldName, _configVersion);
+        builder->append(kSenderHostFieldName, _hasSender ? _senderHost.toString() : "");
         builder->appendIntOrLL(kSenderIdFieldName, _senderId);
         builder->appendIntOrLL(kTermFieldName, _term);
     }

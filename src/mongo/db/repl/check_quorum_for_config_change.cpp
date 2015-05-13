@@ -191,7 +191,7 @@ namespace repl {
 
         BSONObj resBSON = response.getValue().data;
         ReplSetHeartbeatResponse hbResp;
-        Status hbStatus = hbResp.initialize(resBSON);
+        Status hbStatus = hbResp.initialize(resBSON, 0);
 
         if (hbStatus.code() == ErrorCodes::InconsistentReplicaSetNames) {
             std::string message = str::stream() << "Our set name did not match that of " <<
@@ -210,11 +210,11 @@ namespace repl {
         }
 
         if (!hbResp.getReplicaSetName().empty()) {
-            if (hbResp.getVersion() >= _rsConfig->getConfigVersion()) {
+            if (hbResp.getConfigVersion() >= _rsConfig->getConfigVersion()) {
                 std::string message = str::stream() << "Our config version of " <<
                     _rsConfig->getConfigVersion() <<
                     " is no larger than the version on " << request.target.toString() <<
-                    ", which is " << hbResp.getVersion();
+                    ", which is " << hbResp.getConfigVersion();
                 _vetoStatus = Status(ErrorCodes::NewReplicaSetConfigurationIncompatible, message);
                 warning() << message;
                 return;

@@ -281,7 +281,7 @@ namespace {
         ASSERT_EQUALS("admin", noi->getRequest().dbname);
         ASSERT_EQUALS(hbArgs.toBSON(), noi->getRequest().cmdObj);
         ReplSetHeartbeatResponse hbResp;
-        hbResp.setVersion(0);
+        hbResp.setConfigVersion(0);
         getNet()->scheduleResponse(
                 noi,
                 startDate + Milliseconds(10),
@@ -970,8 +970,8 @@ namespace {
             ReplSetHeartbeatResponse hbResp;
             hbResp.setSetName(hbArgs.getSetName());
             hbResp.setState(MemberState::RS_SECONDARY);
-            hbResp.setVersion(hbArgs.getConfigVersion());
-            hbResp.setOpTime(optime1.timestamp);
+            hbResp.setConfigVersion(hbArgs.getConfigVersion());
+            hbResp.setOpTime(optime1);
             BSONObjBuilder respObj;
             respObj << "ok" << 1;
             hbResp.addToBSON(&respObj);
@@ -1158,8 +1158,8 @@ namespace {
             ReplSetHeartbeatResponse hbResp;
             hbResp.setSetName(hbArgs.getSetName());
             hbResp.setState(MemberState::RS_SECONDARY);
-            hbResp.setVersion(hbArgs.getConfigVersion());
-            hbResp.setOpTime(optime2.timestamp);
+            hbResp.setConfigVersion(hbArgs.getConfigVersion());
+            hbResp.setOpTime(optime2);
             BSONObjBuilder respObj;
             respObj << "ok" << 1;
             hbResp.addToBSON(&respObj);
@@ -1680,7 +1680,7 @@ namespace {
         repl::ReplSetHeartbeatResponse hbResp;
         hbResp.setSetName("mySet");
         hbResp.setState(MemberState::RS_SECONDARY);
-        hbResp.setVersion(2);
+        hbResp.setConfigVersion(2);
         BSONObjBuilder respObj;
         respObj << "ok" << 1;
         hbResp.addToBSON(&respObj);
@@ -1750,7 +1750,7 @@ namespace {
         repl::ReplSetHeartbeatResponse hbResp;
         hbResp.setSetName("mySet");
         hbResp.setState(MemberState::RS_SECONDARY);
-        hbResp.setVersion(2);
+        hbResp.setConfigVersion(2);
         BSONObjBuilder respObj;
         respObj << "ok" << 1;
         hbResp.addToBSON(&respObj);
@@ -1818,7 +1818,7 @@ namespace {
         repl::ReplSetHeartbeatResponse hbResp;
         hbResp.setSetName("mySet");
         hbResp.setState(MemberState::RS_SECONDARY);
-        hbResp.setVersion(2);
+        hbResp.setConfigVersion(2);
         BSONObjBuilder respObj;
         respObj << "ok" << 1;
         hbResp.addToBSON(&respObj);

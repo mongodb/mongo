@@ -54,6 +54,8 @@ namespace repl {
 
         Timestamp getTimestamp() const;
 
+        long long getSecs() const;
+
         long long getTerm() const;
 
         std::string toString() const;

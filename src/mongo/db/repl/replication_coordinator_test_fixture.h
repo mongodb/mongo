@@ -153,6 +153,7 @@ namespace repl {
          * Behavior is unspecified if node does not have a clean config, is not in SECONDARY, etc.
          */
         void simulateSuccessfulElection();
+        void simulateSuccessfulV1Election();
 
         /**
          * Brings the repl coord from PRIMARY to SECONDARY by simulating a period of time in which

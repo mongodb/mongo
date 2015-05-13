@@ -35,6 +35,7 @@
 #include <string>
 
 #include "mongo/base/status.h"
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
@@ -44,42 +45,28 @@ namespace mongo {
 namespace repl {
 namespace {
 
-    const std::string kOkFieldName = "ok";
+    const std::string kConfigFieldName = "config";
+    const std::string kConfigVersionFieldName = "v";
+    const std::string kElectionTimeFieldName = "electionTime";
     const std::string kErrMsgFieldName = "errmsg";
     const std::string kErrorCodeFieldName = "code";
-    const std::string kOpTimeFieldName = "opTime";
-    const std::string kTimeFieldName = "time";
-    const std::string kElectionTimeFieldName = "electionTime";
-    const std::string kConfigFieldName = "config";
-    const std::string kIsElectableFieldName = "e";
-    const std::string kMismatchFieldName = "mismatch";
-    const std::string kIsReplSetFieldName = "rs";
+    const std::string kHasDataFieldName = "hasData";
     const std::string kHasStateDisagreementFieldName = "stateDisagreement";
-    const std::string kMemberStateFieldName = "state";
-    const std::string kConfigVersionFieldName = "v";
     const std::string kHbMessageFieldName = "hbmsg";
+    const std::string kIsElectableFieldName = "e";
+    const std::string kIsReplSetFieldName = "rs";
+    const std::string kMemberStateFieldName = "state";
+    const std::string kMismatchFieldName = "mismatch";
+    const std::string kOkFieldName = "ok";
+    const std::string kOpTimeFieldName = "opTime";
+    const std::string kPrimaryIdFieldName = "primaryId";
     const std::string kReplSetFieldName = "set";
     const std::string kSyncSourceFieldName = "syncingTo";
-    const std::string kHasDataFieldName = "hasData";
+    const std::string kTermFieldName = "term";
+    const std::string kTimeFieldName = "time";
+    const std::string kTimestampFieldName = "ts";
 
 }  // namespace
-
-    ReplSetHeartbeatResponse::ReplSetHeartbeatResponse() :
-            _electionTimeSet(false),
-            _timeSet(false),
-            _time(0),
-            _opTimeSet(false),
-            _electableSet(false),
-            _electable(false),
-            _hasDataSet(false),
-            _hasData(false),
-            _mismatch(false),
-            _isReplSet(false),
-            _stateDisagreement(false),
-            _stateSet(false),
-            _version(-1),
-            _configSet(false)
-            {}
 
     void ReplSetHeartbeatResponse::addToBSON(BSONObjBuilder* builder) const {
         if (_mismatch) {
@@ -89,9 +76,6 @@ namespace {
         }
 
         builder->append(kOkFieldName, 1.0);
-        if (_opTimeSet) {
-            builder->appendDate(kOpTimeFieldName, Date_t::fromMillisSinceEpoch(_opTime.asLL()));
-        }
         if (_timeSet) {
             *builder << kTimeFieldName << durationCount<Seconds>(_time);
         }
@@ -114,19 +98,38 @@ namespace {
         if (_stateSet) {
             builder->appendIntOrLL(kMemberStateFieldName, _state.s);
         }
-        if (_version != -1) {
-            *builder << kConfigVersionFieldName << _version;
+        if (_configVersion != -1) {
+            *builder << kConfigVersionFieldName << _configVersion;
         }
         *builder << kHbMessageFieldName << _hbmsg;
         if (!_setName.empty()) {
             *builder << kReplSetFieldName << _setName;
         }
         if (!_syncingTo.empty()) {
-            *builder << kSyncSourceFieldName << _syncingTo;
+            *builder << kSyncSourceFieldName << _syncingTo.toString();
         }
         if (_hasDataSet) {
             builder->append(kHasDataFieldName, _hasData);
         }
+        if (_term != -1) {
+            builder->append(kTermFieldName, _term);
+        }
+        if (_primaryIdSet) {
+            builder->append(kPrimaryIdFieldName, _primaryId);
+        }
+        if (_opTimeSet) {
+            if (_protocolVersion == 0) {
+                builder->appendDate(kOpTimeFieldName,
+                                    Date_t::fromMillisSinceEpoch(_opTime.getTimestamp().asLL()));
+            }
+            else {
+                BSONObjBuilder opTime(builder->subobjStart(kOpTimeFieldName));
+                opTime.append(kTimestampFieldName, _opTime.getTimestamp());
+                opTime.append(kTermFieldName, _opTime.getTerm());
+                opTime.done();
+            }
+        }
+
     }
 
     BSONObj ReplSetHeartbeatResponse::toBSON() const {
@@ -135,7 +138,7 @@ namespace {
         return builder.obj();
     }
 
-    Status ReplSetHeartbeatResponse::initialize(const BSONObj& doc) {
+    Status ReplSetHeartbeatResponse::initialize(const BSONObj& doc, long long term) {
 
         // Old versions set this even though they returned not "ok"
         _mismatch = doc[kMismatchFieldName].trueValue();
@@ -209,17 +212,39 @@ namespace {
                           typeName(timeElement.type()));
         }
 
+        _isReplSet = doc[kIsReplSetFieldName].trueValue();
+
+        // In order to support both the 3.0(V0) and 3.2(V1) heartbeats we must parse the OpTime
+        // field based on its type. If it is a Date, we parse it as the timestamp and use
+        // initialize's term argument to complete the OpTime type. If it is an Object, then it's
+        // V1 and we construct an OpTime out of its nested fields.
         const BSONElement opTimeElement = doc[kOpTimeFieldName];
         if (opTimeElement.eoo()) {
             _opTimeSet = false;
         }
         else if (opTimeElement.type() == bsonTimestamp) {
             _opTimeSet = true;
-            _opTime = opTimeElement.timestamp();
+            _opTime = OpTime(opTimeElement.timestamp(), term);
         }
         else if (opTimeElement.type() == Date) {
             _opTimeSet = true;
-            _opTime = Timestamp(opTimeElement.date());
+            _opTime = OpTime(Timestamp(opTimeElement.date()), term);
+        }
+        else if (opTimeElement.type() == Object) {
+            BSONObj opTime = opTimeElement.Obj();
+            Timestamp ts;
+            Status status = bsonExtractTimestampField(opTime, kTimestampFieldName, &ts);
+            if (!status.isOK())
+                return status;
+            long long term;
+            status = bsonExtractIntegerField(opTime, kTermFieldName, &term);
+            if (!status.isOK())
+                return status;
+
+            _opTimeSet = true;
+            _opTime = OpTime(ts, term);
+            // since a v1 OpTime was in the response, the member must be part of a replset
+            _isReplSet = true;
         }
         else {
             return Status(ErrorCodes::TypeMismatch, str::stream() << "Expected \"" <<
@@ -236,8 +261,6 @@ namespace {
             _electableSet = true;
             _electable = electableElement.trueValue();
         }
-
-        _isReplSet = doc[kIsReplSetFieldName].trueValue();
 
         const BSONElement memberStateElement = doc[kMemberStateFieldName];
         if (memberStateElement.eoo()) {
@@ -266,23 +289,23 @@ namespace {
 
 
         // Not required for the case of uninitialized members -- they have no config
-        const BSONElement versionElement = doc[kConfigVersionFieldName];
+        const BSONElement configVersionElement = doc[kConfigVersionFieldName];
 
-        // If we have an optime then we must have a version
-        if (_opTimeSet && versionElement.eoo()) {
+        // If we have an optime then we must have a configVersion
+        if (_opTimeSet && configVersionElement.eoo()) {
             return Status(ErrorCodes::NoSuchKey, str::stream() <<
                           "Response to replSetHeartbeat missing required \"" <<
                           kConfigVersionFieldName << "\" field even though initialized");
         }
 
         // If there is a "v" (config version) then it must be an int.
-        if (!versionElement.eoo() && versionElement.type() != NumberInt) {
+        if (!configVersionElement.eoo() && configVersionElement.type() != NumberInt) {
             return Status(ErrorCodes::TypeMismatch, str::stream() << "Expected \"" <<
                           kConfigVersionFieldName <<
                           "\" field in response to replSetHeartbeat to have "
-                          "type NumberInt, but found " << typeName(versionElement.type()));
+                          "type NumberInt, but found " << typeName(configVersionElement.type()));
         }
-        _version = versionElement.numberInt();
+        _configVersion = configVersionElement.numberInt();
 
         const BSONElement hbMsgElement = doc[kHbMessageFieldName];
         if (hbMsgElement.eoo()) {
@@ -299,7 +322,7 @@ namespace {
 
         const BSONElement syncingToElement = doc[kSyncSourceFieldName];
         if (syncingToElement.eoo()) {
-            _syncingTo.clear();
+            _syncingTo = HostAndPort();
         }
         else if (syncingToElement.type() != String) {
             return Status(ErrorCodes::TypeMismatch, str::stream() << "Expected \"" <<
@@ -307,7 +330,7 @@ namespace {
                           "have type String, but found " << typeName(syncingToElement.type()));
         }
         else {
-            _syncingTo = syncingToElement.String();
+            _syncingTo = HostAndPort(syncingToElement.String());
         }
 
         const BSONElement rsConfigElement = doc[kConfigFieldName];
@@ -322,6 +345,7 @@ namespace {
                           "Object, but found " << typeName(rsConfigElement.type()));
         }
         _configSet = true;
+
         return _config.initialize(rsConfigElement.Obj());
     }
 
@@ -345,14 +369,19 @@ namespace {
         return _time;
     }
 
-    Timestamp ReplSetHeartbeatResponse::getOpTime() const {
-        invariant(_opTimeSet);
-        return _opTime;
-    }
-
     const ReplicaSetConfig& ReplSetHeartbeatResponse::getConfig() const {
         invariant(_configSet);
         return _config;
+    }
+
+    long long ReplSetHeartbeatResponse::getPrimaryId() const {
+        invariant(_primaryIdSet);
+        return _primaryId;
+    }
+
+    OpTime ReplSetHeartbeatResponse::getOpTime() const {
+        invariant(_opTimeSet);
+        return _opTime;
     }
 
 } // namespace repl

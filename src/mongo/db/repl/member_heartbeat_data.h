@@ -53,9 +53,9 @@ namespace repl {
             _lastHeartbeatRecv = newHeartbeatRecvTime;
         }
         const std::string& getLastHeartbeatMsg() const { return _lastResponse.getHbMsg(); }
-        const std::string& getSyncSource() const { return _lastResponse.getSyncingTo(); }
-        Timestamp getOpTime() const { return _lastResponse.getOpTime(); }
-        int getConfigVersion() const { return _lastResponse.getVersion(); }
+        const HostAndPort& getSyncSource() const { return _lastResponse.getSyncingTo(); }
+        OpTime getOpTime() const { return _lastResponse.getOpTime(); }
+        int getConfigVersion() const { return _lastResponse.getConfigVersion(); }
         bool hasAuthIssue() const { return _authIssue; }
 
         Timestamp getElectionTime() const { return _lastResponse.getElectionTime(); }

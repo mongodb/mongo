@@ -97,8 +97,8 @@ namespace {
             _requester->processResponse(request, response);
         }
 
-        Status getStatus() {
-            return _requester->getStatus();
+        VoteRequester::VoteRequestResult getResult() {
+            return _requester->getResult();
         }
 
         RemoteCommandRequest requestFrom(std::string hostname) {
@@ -179,7 +179,7 @@ namespace {
         ASSERT_FALSE(hasReceivedSufficientResponses());
         processResponse(requestFrom("host1"), votedYes());
         ASSERT_TRUE(hasReceivedSufficientResponses());
-        ASSERT_OK(getStatus());
+        ASSERT_EQUALS(VoteRequester::SuccessfullyElected, getResult());
     }
 
     TEST_F(VoteRequesterTest, BadConfigVersionWinElection) {
@@ -190,7 +190,7 @@ namespace {
         ASSERT_EQUALS(1, countLogLinesContaining("Got no vote from host1"));
         processResponse(requestFrom("host2"), votedYes());
         ASSERT_TRUE(hasReceivedSufficientResponses());
-        ASSERT_OK(getStatus());
+        ASSERT_EQUALS(VoteRequester::SuccessfullyElected, getResult());
         stopCapturingLogMessages();
     }
 
@@ -202,7 +202,7 @@ namespace {
         ASSERT_EQUALS(1, countLogLinesContaining("Got no vote from host1"));
         processResponse(requestFrom("host2"), votedYes());
         ASSERT_TRUE(hasReceivedSufficientResponses());
-        ASSERT_OK(getStatus());
+        ASSERT_EQUALS(VoteRequester::SuccessfullyElected, getResult());
         stopCapturingLogMessages();
     }
 
@@ -214,7 +214,7 @@ namespace {
         ASSERT_EQUALS(1, countLogLinesContaining("Got no vote from host1"));
         processResponse(requestFrom("host2"), votedYes());
         ASSERT_TRUE(hasReceivedSufficientResponses());
-        ASSERT_OK(getStatus());
+        ASSERT_EQUALS(VoteRequester::SuccessfullyElected, getResult());
         stopCapturingLogMessages();
     }
 
@@ -226,7 +226,7 @@ namespace {
         ASSERT_EQUALS(1, countLogLinesContaining("Got failed response from host1"));
         processResponse(requestFrom("host2"), votedYes());
         ASSERT_TRUE(hasReceivedSufficientResponses());
-        ASSERT_OK(getStatus());
+        ASSERT_EQUALS(VoteRequester::SuccessfullyElected, getResult());
         stopCapturingLogMessages();
     }
 
@@ -238,7 +238,7 @@ namespace {
         ASSERT_EQUALS(1, countLogLinesContaining("Got no vote from host1"));
         processResponse(requestFrom("host2"), votedYes());
         ASSERT_TRUE(hasReceivedSufficientResponses());
-        ASSERT_OK(getStatus());
+        ASSERT_EQUALS(VoteRequester::SuccessfullyElected, getResult());
         stopCapturingLogMessages();
     }
 
@@ -248,7 +248,7 @@ namespace {
         processResponse(requestFrom("host1"), votedNoBecauseTermIsGreater());
         ASSERT_EQUALS(1, countLogLinesContaining("Got no vote from host1"));
         ASSERT_TRUE(hasReceivedSufficientResponses());
-        ASSERT_EQUALS(getStatus().reason(), "running for a stale term");
+        ASSERT_EQUALS(VoteRequester::StaleTerm, getResult());
         stopCapturingLogMessages();
     }
 
@@ -261,7 +261,7 @@ namespace {
         processResponse(requestFrom("host2"), badResponseStatus());
         ASSERT_EQUALS(1, countLogLinesContaining("Got failed response from host2"));
         ASSERT_TRUE(hasReceivedSufficientResponses());
-        ASSERT_EQUALS(getStatus().reason(), "received insufficient votes");
+        ASSERT_EQUALS(VoteRequester::InsufficientVotes, getResult());
         stopCapturingLogMessages();
     }
 

@@ -221,7 +221,7 @@ namespace {
         repl::ReplSetHeartbeatResponse hbResp;
         hbResp.setSetName("mySet");
         hbResp.setState(MemberState::RS_SECONDARY);
-        hbResp.setVersion(5);
+        hbResp.setConfigVersion(5);
         BSONObjBuilder respObj;
         respObj << "ok" << 1;
         hbResp.addToBSON(&respObj);
@@ -259,7 +259,7 @@ namespace {
         repl::ReplSetHeartbeatResponse hbResp;
         hbResp.setSetName("mySet");
         hbResp.setState(MemberState::RS_SECONDARY);
-        hbResp.setVersion(2);
+        hbResp.setConfigVersion(2);
         BSONObjBuilder respObj;
         respObj << "ok" << 1;
         hbResp.addToBSON(&respObj);
@@ -368,7 +368,7 @@ namespace {
         repl::ReplSetHeartbeatResponse hbResp;
         hbResp.setSetName("mySet");
         hbResp.setState(MemberState::RS_SECONDARY);
-        hbResp.setVersion(2);
+        hbResp.setConfigVersion(2);
         BSONObjBuilder respObj;
         respObj << "ok" << 1;
         hbResp.addToBSON(&respObj);
@@ -409,7 +409,7 @@ namespace {
                                                        BSON("_id" << 2 <<
                                                             "host" << "node2:12345"))));
         hbResp2.setConfig(config);
-        hbResp2.setVersion(3);
+        hbResp2.setConfigVersion(3);
         hbResp2.setSetName("mySet");
         hbResp2.setState(MemberState::RS_SECONDARY);
         BSONObjBuilder respObj2;
@@ -468,7 +468,7 @@ namespace {
                                                        BSON("_id" << 2 <<
                                                             "host" << "node2:12345"))));
         hbResp.setConfig(config);
-        hbResp.setVersion(4);
+        hbResp.setConfigVersion(4);
         hbResp.setSetName("mySet");
         hbResp.setState(MemberState::RS_SECONDARY);
         BSONObjBuilder respObj2;

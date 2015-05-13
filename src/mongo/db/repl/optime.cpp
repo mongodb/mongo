@@ -42,6 +42,10 @@ namespace repl {
         return _timestamp;
     }
 
+    long long OpTime::getSecs() const {
+        return _timestamp.getSecs();
+    }
+
     long long OpTime::getTerm() const {
         return _term;
     }

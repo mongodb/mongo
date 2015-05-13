@@ -33,6 +33,7 @@
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/condition_variable.hpp>
 #include <vector>
+#include <memory>
 
 #include "mongo/base/status.h"
 #include "mongo/bson/timestamp.h"
@@ -58,16 +59,18 @@ namespace mongo {
 namespace repl {
 
     class ElectCmdRunner;
+    class ElectionWinnerDeclarer;
     class FreshnessChecker;
     class HandshakeArgs;
     class HeartbeatResponseAction;
+    class LastVote;
     class OplogReader;
     class ReplSetDeclareElectionWinnerArgs;
     class ReplSetRequestVotesArgs;
     class ReplicaSetConfig;
     class SyncSourceFeedback;
     class TopologyCoordinator;
-    class LastVote;
+    class VoteRequester;
 
     class ReplicationCoordinatorImpl : public ReplicationCoordinator,
                                        public KillOpListenerInterface {
@@ -255,7 +258,7 @@ namespace repl {
         virtual void prepareCursorResponseInfo(BSONObjBuilder* objBuilder);
 
         virtual Status processHeartbeatV1(const ReplSetHeartbeatArgsV1& args,
-                                          ReplSetHeartbeatResponseV1* response) override;
+                                          ReplSetHeartbeatResponse* response) override;
 
         virtual bool isV1ElectionProtocol() override;
 
@@ -586,6 +589,10 @@ namespace repl {
         void _handleHeartbeatResponse(const ReplicationExecutor::RemoteCommandCallbackData& cbData,
                                       int targetIndex);
 
+        void _handleHeartbeatResponseV1(
+                const ReplicationExecutor::RemoteCommandCallbackData& cbData,
+                int targetIndex);
+
         void _trackHeartbeatHandle(const StatusWith<ReplicationExecutor::CallbackHandle>& handle);
 
         void _untrackHeartbeatHandle(const ReplicationExecutor::CallbackHandle& handle);
@@ -693,22 +700,42 @@ namespace repl {
          * Called after an incoming heartbeat changes this node's view of the set such that it
          * believes it can be elected PRIMARY.
          * For proper concurrency, must be called via a ReplicationExecutor callback.
+         *
+         * For old style elections the election path is:
+         *      _startElectSelf()
+         *      _onFreshnessCheckComplete()
+         *      _onElectCmdRunnerComplete()
+         * For V1 (raft) style elections the election path is:
+         *      _startElectSelfV1()
+         *      _onVoteRequestComplete()
+         *      _onElectionWinnerDeclarerComplete()
          */
         void _startElectSelf();
+        void _startElectSelfV1();
 
         /**
          * Callback called when the FreshnessChecker has completed; checks the results and
          * decides whether to continue election proceedings.
-         * finishEvh is an event that is signaled when election is complete.
          **/
         void _onFreshnessCheckComplete();
 
         /**
          * Callback called when the ElectCmdRunner has completed; checks the results and
          * decides whether to complete the election and change state to primary.
-         * finishEvh is an event that is signaled when election is complete.
          **/
         void _onElectCmdRunnerComplete();
+
+        /**
+         * Callback called when the VoteRequester has completed; checks the results and
+         * decides whether to change state to primary and alert other nodes of our primary-ness.
+         */
+        void _onVoteRequestComplete();
+
+        /**
+         * Callback called when the ElectWinnerDeclarer has completed; checks the results and
+         * if we received any negative responses, relinquish primary.
+         */
+        void _onElectionWinnerDeclarerComplete();
 
         /**
          * Callback called after a random delay, to prevent repeated election ties.
@@ -761,10 +788,10 @@ namespace repl {
         void _heartbeatStepDownStart();
 
         /**
-         * Completes a step-down of the current node triggered by a heartbeat.  Must
-         * be run with a global shared or global exclusive lock.
+         * Completes a step-down of the current node.  Must be run with a global
+         * shared or global exclusive lock.
          */
-        void _heartbeatStepDownFinish(const ReplicationExecutor::CallbackData& cbData);
+        void _stepDownFinish(const ReplicationExecutor::CallbackData& cbData);
 
         /**
          * Schedules a replica set config change.
@@ -794,7 +821,7 @@ namespace repl {
 
         /**
          * Utility method that schedules or performs actions specified by a HeartbeatResponseAction
-         * returned by a TopologyCoordinator::processHeartbeatResponse call with the given
+         * returned by a TopologyCoordinator::processHeartbeatResponse(V1) call with the given
          * value of "responseStatus".
          */
         void _handleHeartbeatResponseAction(
@@ -809,6 +836,13 @@ namespace repl {
                                      ReplSetHeartbeatResponse* response,
                                      Status* outStatus);
 
+        /**
+         * Bottom half of processHeartbeatV1(), which runs in the replication executor.
+         */
+        void _processHeartbeatFinishV1(const ReplicationExecutor::CallbackData& cbData,
+                                       const ReplSetHeartbeatArgsV1& args,
+                                       ReplSetHeartbeatResponse* response,
+                                       Status* outStatus);
         /**
          * Scan the SlaveInfoVector and determine the highest OplogEntry present on a majority of
          * servers; set _lastCommittedOpTime to this new entry, if greater than the current entry.
@@ -927,10 +961,16 @@ namespace repl {
 
         // State for conducting an election of this node.
         // the presence of a non-null _freshnessChecker pointer indicates that an election is
-        // currently in progress.  Only one election is allowed at once.
+        // currently in progress. When using the V1 protocol, a non-null _voteRequester pointer
+        // indicates this instead.
+        // Only one election is allowed at a time.
         boost::scoped_ptr<FreshnessChecker> _freshnessChecker;                            // (X)
 
         boost::scoped_ptr<ElectCmdRunner> _electCmdRunner;                                // (X)
+
+        std::unique_ptr<VoteRequester> _voteRequester;                                    // (X)
+
+        std::unique_ptr<ElectionWinnerDeclarer> _electionWinnerDeclarer;                  // (X)
 
         // Event that the election code will signal when the in-progress election completes.
         // Unspecified value when _freshnessChecker is NULL.

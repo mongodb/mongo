@@ -273,9 +273,7 @@ namespace {
         if (!cbData.status.isOK()) {
             return;
         }
-        if (_topCoord->checkShouldStandForElection(_replExecutor.now(),
-                                                   getMyLastOptime().getTimestamp()))
-        {
+        if (_topCoord->checkShouldStandForElection(_replExecutor.now(), getMyLastOptime())) {
             _startElectSelf();
         }
     }

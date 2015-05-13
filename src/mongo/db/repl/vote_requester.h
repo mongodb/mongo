@@ -52,6 +52,12 @@ namespace repl {
         MONGO_DISALLOW_COPYING(VoteRequester);
     public:
 
+        enum VoteRequestResult {
+            SuccessfullyElected,
+            StaleTerm,
+            InsufficientVotes,
+        };
+
         class Algorithm : public ScatterGatherAlgorithm {
         public:
             Algorithm(const ReplicaSetConfig& rsConfig,
@@ -66,12 +72,11 @@ namespace repl {
             virtual bool hasReceivedSufficientResponses() const;
 
             /**
-             * Returns BadValue if the term for which we are running is statel, IllegalOperation if
-             * insufficient votes are received, and Status::OK if we've won the election.
+             * Returns a VoteRequestResult indicating the result of the election.
              * 
-             * It is invalid to call this before hasReceivedSufficeintResponses returns true.
+             * It is invalid to call this before hasReceivedSufficientResponses returns true.
              */
-            Status getStatus() const { return _status; }
+            VoteRequestResult getResult() const;
 
         private:
             const ReplicaSetConfig _rsConfig;
@@ -79,10 +84,9 @@ namespace repl {
             const long long _term;
             const OpTime _lastOplogEntry;
             std::vector<HostAndPort> _targets;
-            bool _failed = false;
+            bool _staleTerm = false;
             long long _responsesProcessed = 0;
             long long _votes = 1;
-            Status _status = Status::OK();
         };
 
         VoteRequester();
@@ -112,6 +116,8 @@ namespace repl {
          * Like start(), this method must run in the executor context.
          */
         void cancel(ReplicationExecutor* executor);
+
+        VoteRequestResult getResult() const;
 
     private:
         std::unique_ptr<Algorithm> _algorithm;

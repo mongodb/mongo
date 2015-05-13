@@ -197,7 +197,7 @@ namespace repl {
         virtual void prepareCursorResponseInfo(BSONObjBuilder* objBuilder);
 
         virtual Status processHeartbeatV1(const ReplSetHeartbeatArgsV1& args,
-                                          ReplSetHeartbeatResponseV1* response);
+                                          ReplSetHeartbeatResponse* response);
 
         virtual bool isV1ElectionProtocol();
 

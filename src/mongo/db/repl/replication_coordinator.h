@@ -62,7 +62,6 @@ namespace repl {
     class ReplSetHeartbeatArgs;
     class ReplSetHeartbeatArgsV1;
     class ReplSetHeartbeatResponse;
-    class ReplSetHeartbeatResponseV1;
     class ReplSetHtmlSummary;
     class ReplSetRequestVotesArgs;
     class ReplSetRequestVotesResponse;
@@ -428,7 +427,8 @@ namespace repl {
         virtual Status processHeartbeat(const ReplSetHeartbeatArgs& args,
                                         ReplSetHeartbeatResponse* response) = 0;
         virtual Status processHeartbeatV1(const ReplSetHeartbeatArgsV1& args,
-                                          ReplSetHeartbeatResponseV1* response) = 0;
+                                          ReplSetHeartbeatResponse* response) = 0;
+
 
         /**
          * Arguments for the replSetReconfig command.

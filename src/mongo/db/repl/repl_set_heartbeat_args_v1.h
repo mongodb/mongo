@@ -30,6 +30,8 @@
 
 #include <string>
 
+#include "mongo/util/net/hostandport.h"
+
 namespace mongo {
 
     class BSONObj;
@@ -54,11 +56,6 @@ namespace repl {
         bool isInitialized() const;
 
         /**
-         * Gets the version of the Heartbeat protocol being used by the sender.
-         */
-        long long getProtocolVersion() const { return _protocolVersion; }
-
-        /**
          * Gets the ReplSetConfig version number of the sender.
          */ 
         long long getConfigVersion() const { return _configVersion; }
@@ -67,6 +64,11 @@ namespace repl {
          * Gets the _id of the sender in their ReplSetConfig.
          */
         long long getSenderId() const { return _senderId; }
+
+        /**
+         * Gets the HostAndPort of the sender.
+         */
+        HostAndPort getSenderHost() const { return _senderHost; }
 
         /**
          * Gets the replSet name of the sender's replica set.
@@ -87,8 +89,8 @@ namespace repl {
          * The below methods set the value in the method name to 'newVal'.
          */
         void setConfigVersion(long long newVal);
-        void setProtocolVersion(long long newVal);
         void setSenderId(long long newVal);
+        void setSenderHost(const HostAndPort& newVal);
         void setSetName(const std::string& newVal);
         void setTerm(long long newVal);
         void setCheckEmpty();
@@ -105,11 +107,12 @@ namespace repl {
     private:
         // look at the body of the isInitialized() function to see which fields are mandatory
         long long _configVersion = -1;
-        long long _protocolVersion = -1;
         long long _senderId = -1;
         long long _term = -1;
         bool _checkEmpty = false;
+        bool _hasSender = false;
         std::string _setName;
+        HostAndPort _senderHost;
     };
 
 } // namespace repl

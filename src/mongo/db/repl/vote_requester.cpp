@@ -64,7 +64,7 @@ namespace repl {
     std::vector<RemoteCommandRequest>
     VoteRequester::Algorithm::getRequests() const {
         BSONObjBuilder requestVotesCmdBuilder;
-        requestVotesCmdBuilder.append("replSetDeclareElectionWinner", 1);
+        requestVotesCmdBuilder.append("replSetRequestVotes", 1);
         requestVotesCmdBuilder.append("setName", _rsConfig.getReplSetName());
         requestVotesCmdBuilder.append("term", _term);
         requestVotesCmdBuilder.append("candidateId", _candidateId);
@@ -109,22 +109,28 @@ namespace repl {
             }
 
             if (voteResponse.getTerm() > _term) {
-                _failed = true;
-                _status = {ErrorCodes::BadValue,
-                           "running for a stale term"};
+                _staleTerm = true;
             }
         }
 
-        if (_responsesProcessed == static_cast<int>(_targets.size()) && // all responses obtained
-                !hasReceivedSufficientResponses()) {
-            _failed = true;
-            _status = {ErrorCodes::IllegalOperation,
-                       "received insufficient votes"};
-        }
     }
 
     bool VoteRequester::Algorithm::hasReceivedSufficientResponses() const {
-        return _failed || _votes == _rsConfig.getMajorityVoteCount();
+        return _staleTerm ||
+            _votes == _rsConfig.getMajorityVoteCount() ||
+            _responsesProcessed == static_cast<int>(_targets.size());
+    }
+    
+    VoteRequester::VoteRequestResult VoteRequester::Algorithm::getResult() const {
+        if (_staleTerm) {
+            return StaleTerm;
+        }
+        else if (_votes >= _rsConfig.getMajorityVoteCount()) {
+            return SuccessfullyElected;
+        }
+        else {
+            return InsufficientVotes;
+        }
     }
 
     VoteRequester::VoteRequester() : _isCanceled(false) {}
@@ -151,6 +157,9 @@ namespace repl {
         _runner->cancel(executor);
     }
 
+    VoteRequester::VoteRequestResult VoteRequester::getResult() const {
+        return _algorithm->getResult();
+    }
 
 } // namespace repl
 } // namespace mongo

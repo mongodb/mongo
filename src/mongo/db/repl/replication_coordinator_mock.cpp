@@ -324,7 +324,7 @@ namespace repl {
     void ReplicationCoordinatorMock::prepareCursorResponseInfo(BSONObjBuilder* objBuilder) {}
 
     Status ReplicationCoordinatorMock::processHeartbeatV1(const ReplSetHeartbeatArgsV1& args,
-                                                          ReplSetHeartbeatResponseV1* response) {
+                                                          ReplSetHeartbeatResponse* response) {
         return Status::OK();
     }
 

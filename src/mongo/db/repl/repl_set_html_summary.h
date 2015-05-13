@@ -32,6 +32,7 @@
 #include <vector>
 
 #include "mongo/db/repl/member_heartbeat_data.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replica_set_config.h"
 
 namespace mongo {
@@ -64,7 +65,7 @@ namespace repl {
             _primaryIndex = index;
         }
 
-        void setSelfOptime(const Timestamp& ts) {
+        void setSelfOptime(const OpTime& ts) {
             _selfOptime = ts;
         }
 
@@ -91,7 +92,7 @@ namespace repl {
         Date_t _now;
         int _selfIndex;
         int _primaryIndex;
-        Timestamp _selfOptime;
+        OpTime _selfOptime;
         unsigned int _selfUptime;
         MemberState _selfState;
         std::string _selfHeartbeatMessage;

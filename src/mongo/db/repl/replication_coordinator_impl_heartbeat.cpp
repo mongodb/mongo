@@ -38,6 +38,7 @@
 #include "mongo/db/repl/freshness_checker.h"
 #include "mongo/db/repl/heartbeat_response_action.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
+#include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
 #include "mongo/db/repl/replica_set_config_checks.h"
 #include "mongo/db/repl/replication_coordinator_impl.h"
@@ -71,16 +72,28 @@ namespace {
         }
 
         const Date_t now = _replExecutor.now();
-        const std::pair<ReplSetHeartbeatArgs, Milliseconds> hbRequest =
-            _topCoord->prepareHeartbeatRequest(
-                    now,
-                    _settings.ourSetName(),
-                    target);
+        BSONObj heartbeatObj;
+        Milliseconds timeout(0);
+        if (isV1ElectionProtocol()) {
+            const std::pair<ReplSetHeartbeatArgsV1, Milliseconds> hbRequest =
+                _topCoord->prepareHeartbeatRequestV1(
+                        now,
+                        _settings.ourSetName(),
+                        target);
+            heartbeatObj = hbRequest.first.toBSON();
+            timeout = hbRequest.second;
+        }
+        else {
+            const std::pair<ReplSetHeartbeatArgs, Milliseconds> hbRequest =
+                _topCoord->prepareHeartbeatRequest(
+                        now,
+                        _settings.ourSetName(),
+                        target);
+            heartbeatObj = hbRequest.first.toBSON();
+            timeout = hbRequest.second;
+        }
 
-        const RemoteCommandRequest request(target,
-                                           "admin",
-                                           hbRequest.first.toBSON(),
-                                           hbRequest.second);
+        const RemoteCommandRequest request(target, "admin", heartbeatObj, timeout);
         const ReplicationExecutor::RemoteCommandCallbackFn callback = stdx::bind(
                 &ReplicationCoordinatorImpl::_handleHeartbeatResponse,
                 this,
@@ -124,12 +137,12 @@ namespace {
         BSONObj resp;
         if (responseStatus.isOK()) {
             resp = cbData.response.getValue().data;
-            responseStatus = hbResponse.initialize(resp);
+            responseStatus = hbResponse.initialize(resp, _topCoord->getTerm());
         }
         const bool isUnauthorized = (responseStatus.code() == ErrorCodes::Unauthorized) ||
                                     (responseStatus.code() == ErrorCodes::AuthenticationFailed);
         const Date_t now = _replExecutor.now();
-        const Timestamp lastApplied = getMyLastOptime().getTimestamp();  // Locks and unlocks _mutex.
+        const OpTime lastApplied = getMyLastOptime();  // Locks and unlocks _mutex.
         Milliseconds networkTime(0);
         StatusWith<ReplSetHeartbeatResponse> hbStatusResponse(hbResponse);
 
@@ -163,11 +176,9 @@ namespace {
                 hbStatusResponse.getValue().hasState() &&
                 hbStatusResponse.getValue().getState() != MemberState::RS_PRIMARY) {
             boost::unique_lock<boost::mutex> lk(_mutex);
-            if (hbStatusResponse.getValue().getVersion() == _rsConfig.getConfigVersion()) {
-                // Use current term so terms never go back.
+            if (hbStatusResponse.getValue().getConfigVersion() == _rsConfig.getConfigVersion()) {
                 _updateOpTimeFromHeartbeat_inlock(targetIndex,
-                                                  OpTime(hbStatusResponse.getValue().getOpTime(),
-                                                         _topCoord->getTerm()));
+                                                  hbStatusResponse.getValue().getOpTime());
                 // TODO: Enable with Data Replicator
                 //lk.unlock();
                 //_dr.slavesHaveProgressed();
@@ -215,7 +226,12 @@ namespace {
             _scheduleHeartbeatReconfig(responseStatus.getValue().getConfig());
             break;
         case HeartbeatResponseAction::StartElection:
-            _startElectSelf();
+            if (isV1ElectionProtocol()) {
+                _startElectSelfV1();
+            }
+            else {
+                _startElectSelf();
+            }
             break;
         case HeartbeatResponseAction::StepDownSelf:
             invariant(action.getPrimaryConfigIndex() == _selfIndex);
@@ -270,12 +286,12 @@ namespace {
     void ReplicationCoordinatorImpl::_heartbeatStepDownStart() {
         log() << "Stepping down from primary in response to heartbeat";
         _replExecutor.scheduleWorkWithGlobalExclusiveLock(
-                stdx::bind(&ReplicationCoordinatorImpl::_heartbeatStepDownFinish,
+                stdx::bind(&ReplicationCoordinatorImpl::_stepDownFinish,
                            this,
                            stdx::placeholders::_1));
     }
 
-    void ReplicationCoordinatorImpl::_heartbeatStepDownFinish(
+    void ReplicationCoordinatorImpl::_stepDownFinish(
             const ReplicationExecutor::CallbackData& cbData) {
 
         if (cbData.status == ErrorCodes::CallbackCanceled) {

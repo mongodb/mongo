@@ -45,7 +45,7 @@ namespace repl {
 
         _lastResponse.setState(MemberState::RS_UNKNOWN);
         _lastResponse.setElectionTime(Timestamp());
-        _lastResponse.setOpTime(Timestamp());
+        _lastResponse.setOpTime(OpTime());
     }
 
     void MemberHeartbeatData::setUpValues(Date_t now,
@@ -86,9 +86,9 @@ namespace repl {
         _lastResponse = ReplSetHeartbeatResponse();
         _lastResponse.setState(MemberState::RS_DOWN);
         _lastResponse.setElectionTime(Timestamp());
-        _lastResponse.setOpTime(Timestamp());
+        _lastResponse.setOpTime(OpTime());
         _lastResponse.setHbMsg(heartbeatMessage);
-        _lastResponse.setSyncingTo("");
+        _lastResponse.setSyncingTo(HostAndPort());
     }
 
     void MemberHeartbeatData::setAuthIssue(Date_t now) {
@@ -100,9 +100,9 @@ namespace repl {
         _lastResponse = ReplSetHeartbeatResponse();
         _lastResponse.setState(MemberState::RS_UNKNOWN);
         _lastResponse.setElectionTime(Timestamp());
-        _lastResponse.setOpTime(Timestamp());
+        _lastResponse.setOpTime(OpTime());
         _lastResponse.setHbMsg("");
-        _lastResponse.setSyncingTo("");
+        _lastResponse.setSyncingTo(HostAndPort());
     }
 
 } // namespace repl

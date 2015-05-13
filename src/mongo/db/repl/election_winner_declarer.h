@@ -110,6 +110,14 @@ namespace repl {
          */
         void cancel(ReplicationExecutor* executor);
 
+        /**
+         * Returns a Status from the ElectionWinnerDeclarer::algorithm which indicates what 
+         * if anything went wrong while declaring the election winner.
+         *
+         * It is invalid to call this before the ElectionWinnerDeclarer::algorithm finishes running.
+         */
+        Status getStatus() const;
+
     private:
         boost::scoped_ptr<Algorithm> _algorithm;
         boost::scoped_ptr<ScatterGatherRunner> _runner;
