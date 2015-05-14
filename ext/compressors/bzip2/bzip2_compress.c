@@ -314,8 +314,15 @@ bzip2_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	if ((ret = BZ2_bzDecompress(&bz)) == BZ_STREAM_END) {
 		*result_lenp = dst_len - bz.avail_out;
 		ret = 0;
-	} else
+	} else {
+		/*
+		 * If BZ2_bzDecompress returns 0, it expects there to be more
+		 * data available.  There isn't, so treat this as an error.
+		 */
+		if (ret == 0)
+			ret = BZ_DATA_ERROR;
 		(void)bzip2_error(compressor, session, "BZ2_bzDecompress", ret);
+	}
 
 	if ((tret = BZ2_bzDecompressEnd(&bz)) != BZ_OK)
 		return (bzip2_error(

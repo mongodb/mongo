@@ -215,6 +215,10 @@ __wt_lsm_work_bloom(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		    chunk->count == 0)
 			continue;
 
+		/* Never create a bloom filter on the oldest chunk */
+		if (chunk == lsm_tree->chunk[0] &&
+		    !FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_OLDEST))
+			continue;
 		/*
 		 * See if we win the race to switch on the "busy" flag and
 		 * recheck that the chunk still needs a Bloom filter.
