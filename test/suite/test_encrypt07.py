@@ -33,10 +33,10 @@
 import os, run, string, codecs
 import wiredtiger, wttest
 from wtscenario import multiply_scenarios, number_scenarios
-from test_salvage import test_salvage
+import test_salvage
 
 # Run the regular salvage test, but with encryption on
-class test_encrypt07(test_salvage):
+class test_encrypt07(test_salvage.test_salvage):
 
     uri='table:test_encrypt07'
     sys_encrypt='rotn'
