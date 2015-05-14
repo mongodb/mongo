@@ -825,5 +825,14 @@ namespace {
         ASSERT_EQUALS("52ms52\xce\xbcs52s", os.str());
     }
 
+    TEST(SystemTime, ConvertDateToSystemTime) {
+        const std::string isoTimeString = "2015-05-14T17:28:33.123Z";
+        const Date_t aDate = unittest::assertGet(dateFromISOString(isoTimeString));
+        const auto aTimePoint = aDate.toSystemTimePoint();
+        ASSERT_EQUALS(aDate.toDurationSinceEpoch(),
+                      aTimePoint - stdx::chrono::system_clock::from_time_t(0));
+        ASSERT_EQUALS(aDate, Date_t(aTimePoint));
+    }
+
 }  // namespace
 }  // namespace mongo

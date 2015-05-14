@@ -126,6 +126,13 @@ namespace {
         return fromMillisSinceEpoch(curTimeMillis64());
     }
 
+    Date_t::Date_t(stdx::chrono::system_clock::time_point tp) :
+        millis(durationCount<Milliseconds>(tp - stdx::chrono::system_clock::from_time_t(0))) {}
+
+    stdx::chrono::system_clock::time_point Date_t::toSystemTimePoint() const {
+        return stdx::chrono::system_clock::from_time_t(0) + toDurationSinceEpoch();
+    }
+
     bool Date_t::isFormattable() const {
         if (millis < 0) {
             return false;

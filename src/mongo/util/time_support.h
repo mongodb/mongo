@@ -119,7 +119,12 @@ namespace mongo {
         /**
          * Constructs a Date_t representing the epoch.
          */
-        Date_t(): millis(0) {}
+        Date_t() = default;
+
+        /**
+         * Constructs a Date_t from a system clock time point.
+         */
+        explicit Date_t(stdx::chrono::system_clock::time_point tp);
 
         /**
          * Returns a string representation of the date.
@@ -165,6 +170,11 @@ namespace mongo {
          */
         long long toMillisSinceEpoch() const { return static_cast<long long>(millis); }
 
+        /*
+         * Returns a system clock time_point representing the same point in time as this Date_t.
+         */
+        stdx::chrono::system_clock::time_point toSystemTimePoint() const;
+
         /**
          * Returns true if this Date_t is in the range of Date_ts that can be formatted as calendar
          * dates.  This property is guaranteed to be true for all dates from the epoch,
@@ -172,6 +182,12 @@ namespace mongo {
          * 2038-01-19T03:14:07.000Z on 32-bit systems.
          */
         bool isFormattable() const;
+
+        /**
+         * Implicit conversion operator to system clock time point.  Enables use of Date_t with
+         * condition_variable::wait_until.
+         */
+        operator stdx::chrono::system_clock::time_point () const { return toSystemTimePoint(); }
 
         template <typename Duration>
         Date_t& operator+=(Duration d) {
@@ -223,9 +239,9 @@ namespace mongo {
         }
 
     private:
-        Date_t(long long m): millis(m) {}
+        explicit Date_t(long long m): millis(m) {}
 
-        long long millis;
+        long long millis = 0;
     };
 
     // uses ISO 8601 dates without trailing Z
