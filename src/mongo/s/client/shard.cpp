@@ -81,7 +81,13 @@ namespace {
                          std::string& errmsg ,
                          mongo::BSONObjBuilder& result) {
 
-            grid.shardRegistry()->toBSON(&result);
+            // MongoD instances do not know that they are part of a sharded cluster until they
+            // receive a setShardVersion command and that's when the catalog manager and the shard
+            // registry get initialized.
+            if (grid.shardRegistry()) {
+                grid.shardRegistry()->toBSON(&result);
+            }
+
             return true;
         }
 
