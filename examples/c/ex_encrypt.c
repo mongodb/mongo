@@ -43,6 +43,12 @@
 #include <wiredtiger.h>
 #include <wiredtiger_ext.h>
 
+#ifdef _WIN32
+/*
+ * Explicitly export this function so it is visible when loading extensions.
+ */
+__declspec(dllexport)
+#endif
 int add_my_encryptors(WT_CONNECTION *connection);
 
 static const char *home = NULL;

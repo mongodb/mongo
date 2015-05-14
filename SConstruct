@@ -347,6 +347,7 @@ examples = [
     "ex_config_parse",
     "ex_cursor",
     "ex_data_source",
+    "ex_encrypt",
     "ex_extending",
     "ex_hello",
     "ex_log",
@@ -459,7 +460,7 @@ Default(t)
 
 #Build the Examples
 for ex in examples:
-    if(ex in ['ex_all', 'ex_async', 'ex_thread']):
+    if(ex in ['ex_all', 'ex_async', 'ex_thread', 'ex_encrypt']):
         exp = env.Program(ex, "examples/c/" + ex + ".c", LIBS=[wtlib, shim] + wtlibs)
         Default(exp)
         env.Alias("check", env.SmokeTest(exp))
