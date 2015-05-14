@@ -136,7 +136,10 @@ namespace {
                 break;
             case ShardDrainingStatus::ONGOING: {
                 vector<ChunkType> chunks;
-                Status status = grid.catalogManager()->getChunksForShard(s.getName(), &chunks);
+                Status status = grid.catalogManager()->getChunks(
+                                            Query(BSON(ChunkType::shard(s.getName()))),
+                                            0,  // return all
+                                            &chunks);
                 if (!status.isOK()) {
                     return appendCommandStatus(result, status);
                 }

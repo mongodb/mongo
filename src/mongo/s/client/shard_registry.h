@@ -60,11 +60,6 @@ namespace mongo {
          */
         Shard lookupRSName(const std::string& name);
 
-        /**
-         * Useful for ensuring our shard data will not be modified while we use it.
-         */
-        Shard findCopy(const std::string& ident);
-
         void set(const std::string& name, const Shard& s);
 
         void remove(const std::string& name);

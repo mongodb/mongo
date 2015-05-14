@@ -174,9 +174,6 @@ namespace mongo {
         static void installShard(const std::string& name, const Shard& shard);
 
     private:
-
-        void _setAddr( const std::string& addr );
-
         std::string    _name;
         std::string    _addr;
         ConnectionString _cs;

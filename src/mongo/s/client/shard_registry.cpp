@@ -158,15 +158,6 @@ namespace mongo {
         return (i == _rsLookup.end()) ? Shard::EMPTY : *(i->second.get());
     }
 
-    Shard ShardRegistry::findCopy(const string& ident){
-        shared_ptr<Shard> found = _findWithRetry(ident);
-
-        boost::lock_guard<boost::mutex> lk(_mutex);
-        massert(13128, str::stream() << "can't find shard for: " << ident, found.get());
-
-        return *found.get();
-    }
-
     void ShardRegistry::set(const string& name, const Shard& s) {
         shared_ptr<Shard> ss(boost::make_shared<Shard>(s));
 

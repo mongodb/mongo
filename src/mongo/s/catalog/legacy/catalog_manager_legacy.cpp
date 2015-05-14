@@ -1151,17 +1151,12 @@ namespace {
         conn.done();
     }
 
-    Status CatalogManagerLegacy::getChunksForShard(const string& shardName,
-                                                   vector<ChunkType>* chunks) {
-        return getChunks(BSON(ChunkType::shard(shardName)), chunks);
-    }
-
     Status CatalogManagerLegacy::getChunks(const Query& query,
+                                           int nToReturn,
                                            vector<ChunkType>* chunks) {
-        ScopedDbConnection conn(_configServerConnectionString, 30.0);
-        std::unique_ptr<DBClientCursor> cursor(conn->query(ChunkType::ConfigNS,
-                                                           query));
 
+        ScopedDbConnection conn(_configServerConnectionString, 30.0);
+        std::unique_ptr<DBClientCursor> cursor(conn->query(ChunkType::ConfigNS, query, nToReturn));
         if (!cursor.get()) {
             conn.done();
             return Status(ErrorCodes::HostUnreachable, "unable to open chunk cursor");
@@ -1243,10 +1238,10 @@ namespace {
         unsigned failedCount = 0;
         bool sameError = true;
         while (dispatcher.numPending() > 0) {
-            ConnectionString configServer;
+            ConnectionString host;
             RawBSONSerializable responseCmdSerial;
 
-            Status dispatchStatus = dispatcher.recvAny(&configServer,
+            Status dispatchStatus = dispatcher.recvAny(&host,
                                                        &responseCmdSerial);
 
             if (!dispatchStatus.isOK()) {
@@ -1254,7 +1249,7 @@ namespace {
             }
 
             responseObj = responseCmdSerial.toBSON();
-            responses.append(configServer.toString(), responseObj);
+            responses.append(host.toString(), responseObj);
 
             currStatus = Command::getStatusFromCommandResult(responseObj);
             if (!currStatus.isOK()) {

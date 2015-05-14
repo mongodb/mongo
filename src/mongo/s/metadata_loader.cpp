@@ -34,9 +34,6 @@
 
 #include <vector>
 
-#include "mongo/client/connpool.h"
-#include "mongo/client/dbclientcursor.h"
-#include "mongo/client/dbclientmockcursor.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
@@ -184,10 +181,8 @@ namespace mongo {
         differ.attach( ns, metadata->_chunksMap, metadata->_collVersion, versionMap );
 
         try {
-
             std::vector<ChunkType> chunks;
-            Status status = catalogManager->getChunks(differ.configDiffQuery(),
-                                                      &chunks);
+            Status status = catalogManager->getChunks(differ.configDiffQuery(), 0, &chunks);
             if (!status.isOK()) {
                 if (status == ErrorCodes::HostUnreachable) {
                     // Make our metadata invalid

@@ -97,9 +97,8 @@ namespace mongo {
         Query diffQuery = configDiffQuery();
 
         try {
-
             std::vector<ChunkType> chunks;
-            uassertStatusOK(catalogManager->getChunks(diffQuery, &chunks));
+            uassertStatusOK(catalogManager->getChunks(diffQuery, 0, &chunks));
 
             return calculateConfigDiff(chunks);
         }

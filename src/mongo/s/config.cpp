@@ -319,29 +319,31 @@ namespace mongo {
         
         // TODO: We need to keep this first one-chunk check in until we have a more efficient way of
         // creating/reusing a chunk manager, as doing so requires copying the full set of chunks currently
-
-        BSONObj newest;
+        std::vector<ChunkType> newestChunk;
         if ( oldVersion.isSet() && ! forceReload ) {
-            ScopedDbConnection conn(configServer.modelServer(), 30.0);
-            newest = conn->findOne(ChunkType::ConfigNS,
-                                   Query(BSON(ChunkType::ns(ns))).sort(
-                                           ChunkType::DEPRECATED_lastmod(), -1));
-            conn.done();
-            
-            if ( ! newest.isEmpty() ) {
-                ChunkVersion v = ChunkVersion::fromBSON(newest, ChunkType::DEPRECATED_lastmod());
-                if ( v.equals( oldVersion ) ) {
+            uassertStatusOK(grid.catalogManager()->getChunks(
+                                        Query(BSON(ChunkType::ns(ns)))
+                                            .sort(ChunkType::DEPRECATED_lastmod(), -1),
+                                        1,
+                                        &newestChunk));
+
+            if (!newestChunk.empty()) {
+                invariant(newestChunk.size() == 1);
+                ChunkVersion v = newestChunk[0].getVersion();
+                if (v.equals(oldVersion)) {
                     boost::lock_guard<boost::mutex> lk( _lock );
-                    CollectionInfo& ci = _collections[ns];
-                    uassert( 15885 , str::stream() << "not sharded after reloading from chunks : " << ns , ci.isSharded() );
+                    const CollectionInfo& ci = _collections[ns];
+                    uassert(15885,
+                            str::stream() << "not sharded after reloading from chunks : "
+                                          << ns, ci.isSharded());
                     return ci.getCM();
                 }
             }
 
         }
-        else if( ! oldVersion.isSet() ){
-            warning() << "version 0 found when " << ( forceReload ? "reloading" : "checking" ) << " chunk manager"
-                      << ", collection '" << ns << "' initially detected as sharded" << endl;
+        else if (!oldVersion.isSet()) {
+            warning() << "version 0 found when " << (forceReload ? "reloading" : "checking")
+                      << " chunk manager; collection '" << ns << "' initially detected as sharded";
         }
 
         // we are not locked now, and want to load a new ChunkManager
@@ -351,7 +353,7 @@ namespace mongo {
         {
             boost::lock_guard<boost::mutex> lll ( _hitConfigServerLock );
             
-            if ( ! newest.isEmpty() && ! forceReload ) {
+            if (!newestChunk.empty() && !forceReload) {
                 // if we have a target we're going for
                 // see if we've hit already
                 
@@ -359,18 +361,15 @@ namespace mongo {
                 CollectionInfo& ci = _collections[ns];
                 if ( ci.isSharded() && ci.getCM() ) {
 
-                    ChunkVersion currentVersion =
-                        ChunkVersion::fromBSON(newest, ChunkType::DEPRECATED_lastmod());
+                    ChunkVersion currentVersion = newestChunk[0].getVersion();
 
                     // Only reload if the version we found is newer than our own in the same
                     // epoch
-                    if( currentVersion <= ci.getCM()->getVersion() &&
-                        ci.getCM()->getVersion().hasEqualEpoch( currentVersion ) )
-                    {
+                    if (currentVersion <= ci.getCM()->getVersion() &&
+                            ci.getCM()->getVersion().hasEqualEpoch(currentVersion)) {
                         return ci.getCM();
                     }
                 }
-                
             }
             
             temp.reset(new ChunkManager(oldManager->getns(),

@@ -42,6 +42,8 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/s/client/shard.h"
+#include "mongo/s/client/shard_registry.h"
+#include "mongo/s/grid.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -80,28 +82,35 @@ namespace {
             std::string opToKill;
             uassertStatusOK(bsonExtractStringField(cmdObj, "op", &opToKill));
 
-            auto opSepPos = opToKill.find(':');
+            const auto opSepPos = opToKill.find(':');
 
             uassert(28625,
                     str::stream() << "The op argument to killOp must be of the format shardid:opid"
                                   << " but found \"" << opToKill << '"',
-                    (opToKill.size() >= 3) &&// must have at least N:N
-                    (opSepPos != std::string::npos) &&  // must have ':' as separator
+                    (opToKill.size() >= 3) && // must have at least N:N
+                    (opSepPos != std::string::npos) && // must have ':' as separator
                     (opSepPos != 0) && // can't be :NN
                     (opSepPos != (opToKill.size() - 1))); // can't be NN:
 
             auto shardIdent = opToKill.substr(0, opSepPos);
-            auto opId = std::stoi(opToKill.substr(opSepPos + 1));
-
-            // shardid is actually the opid - keeping for backwards compatibility.
-            result.append("shard" , shardIdent);
-            result.append("shardid", opId);
-
             log() << "want to kill op: " << opToKill;
 
             // Will throw if shard id is not found
-            Shard s(shardIdent);
-            ScopedDbConnection conn(s.getConnString());
+            auto shard = grid.shardRegistry()->findIfExists(shardIdent);
+            if (!shard) {
+                return appendCommandStatus(result,
+                                           Status(ErrorCodes::ShardNotFound,
+                                                  str::stream() << "shard " << shardIdent
+                                                                << " does not exist"));
+            }
+
+            auto opId = std::stoi(opToKill.substr(opSepPos + 1));
+
+            // shardid is actually the opid - keeping for backwards compatibility.
+            result.append("shard", shardIdent);
+            result.append("shardid", opId);
+
+            ScopedDbConnection conn(shard->getConnString());
             BSONObj cmdRes;
             BSONObjBuilder argsBob;
             argsBob.append("op", opId);
@@ -109,6 +118,7 @@ namespace {
             // intentionally ignore return value - that is how legacy killOp worked.
             conn->runPseudoCommand("admin", "killOp", "$cmd.sys.killop", args, cmdRes);
             conn.done();
+
             // The original behavior of killOp on mongos is to always return success, regardless of
             // whether the shard reported success or not.
             return true;

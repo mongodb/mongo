@@ -220,17 +220,16 @@ namespace mongo {
                                           std::vector<std::string>* dbs) = 0;
 
         /**
-         * Gets all chunks (of type ChunkType) for a shard.
-         * Returns a !OK status if an error occurs.
-         */
-        virtual Status getChunksForShard(const std::string& shardName,
-                                         std::vector<ChunkType>* chunks) = 0;
-
-        /**
-         * Gets all chunks (of type ChunkType) that satisfy a query.
+         * Gets the requested number of chunks (of type ChunkType) that satisfy a query.
+         *
+         * @param query The query to filter out the results.
+         * @param nToReturn The number of chunk entries to return. 0 means all.
+         * @param chunks Vector entry to receive the results
+         *
          * Returns a !OK status if an error occurs.
          */
         virtual Status getChunks(const Query& query,
+                                 int nToReturn,
                                  std::vector<ChunkType>* chunks) = 0;
 
         /**

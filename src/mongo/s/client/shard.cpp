@@ -32,13 +32,10 @@
 
 #include "mongo/s/client/shard.h"
 
-#include <boost/make_shared.hpp>
-#include <set>
 #include <string>
 #include <vector>
 
 #include "mongo/client/connpool.h"
-#include "mongo/client/dbclientcursor.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
@@ -51,8 +48,6 @@
 
 namespace mongo {
 
-    using std::list;
-    using std::map;
     using std::string;
     using std::stringstream;
     using std::vector;
@@ -113,7 +108,9 @@ namespace {
           _maxSizeMB(maxSizeMB),
           _isDraining(isDraining) {
 
-        _setAddr(addr);
+        if (!_addr.empty()) {
+            _cs = ConnectionString(addr, ConnectionString::SET);
+        }
     }
 
     Shard::Shard(const std::string& name,
@@ -133,15 +130,11 @@ namespace {
         return shard ? *shard : Shard::EMPTY;
     }
 
-    void Shard::_setAddr( const string& addr ) {
-        _addr = addr;
-        if ( !_addr.empty() ) {
-            _cs = ConnectionString( addr , ConnectionString::SET );
-        }
-    }
+    void Shard::reset(const string& ident) {
+        auto shard = grid.shardRegistry()->findIfExists(ident);
+        invariant(shard);
 
-    void Shard::reset( const string& ident ) {
-        *this = grid.shardRegistry()->findCopy( ident );
+        *this = *shard;
     }
 
     bool Shard::containsNode( const string& node ) const {

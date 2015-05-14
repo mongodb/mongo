@@ -1688,31 +1688,34 @@ namespace mongo {
                     warning() << "moveChunk commit outcome ongoing" << migrateLog;
                     sleepsecs( 10 );
 
+                    // look for the chunk in this shard whose version got bumped
+                    // we assume that if that mod made it to the config, the applyOps was successful
                     try {
-                        ScopedDbConnection conn(shardingState.getConfigServer(), 10.0);
-
-                        // look for the chunk in this shard whose version got bumped
-                        // we assume that if that mod made it to the config, the applyOps was successful
-                        BSONObj doc = conn->findOne(ChunkType::ConfigNS,
+                        std::vector<ChunkType> newestChunk;
+                        Status status = grid.catalogManager()->getChunks(
                                                     Query(BSON(ChunkType::ns(ns)))
-                                                        .sort(BSON(ChunkType::DEPRECATED_lastmod() << -1)));
+                                                        .sort(ChunkType::DEPRECATED_lastmod(), -1),
+                                                    1,
+                                                    &newestChunk);
+                        uassertStatusOK(status);
 
+                        ChunkVersion checkVersion;
+                        if (!newestChunk.empty()) {
+                            invariant(newestChunk.size() == 1);
+                            checkVersion = newestChunk[0].getVersion();
+                        }
 
-                        ChunkVersion checkVersion(ChunkVersion::fromBSON(doc));
-                        if ( checkVersion.equals( nextVersion ) ) {
+                        if (checkVersion.equals(nextVersion)) {
                             log() << "moveChunk commit confirmed" << migrateLog;
                             errmsg.clear();
 
                         }
                         else {
                             error() << "moveChunk commit failed: version is at "
-                                            << checkVersion << " instead of " << nextVersion << migrateLog;
+                                    << checkVersion << " instead of " << nextVersion << migrateLog;
                             error() << "TERMINATING" << migrateLog;
                             dbexit( EXIT_SHARDING_ERROR );
                         }
-
-                        conn.done();
-
                     }
                     catch ( ... ) {
                         error() << "moveChunk failed to get confirmation of commit" << migrateLog;
