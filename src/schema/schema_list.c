@@ -122,8 +122,14 @@ __wt_schema_release_table(WT_SESSION_IMPL *session, WT_TABLE *table)
  *	Free a column group handle.
  */
 void
-__wt_schema_destroy_colgroup(WT_SESSION_IMPL *session, WT_COLGROUP *colgroup)
+__wt_schema_destroy_colgroup(WT_SESSION_IMPL *session, WT_COLGROUP **colgroupp)
 {
+	WT_COLGROUP *colgroup;
+
+	if ((colgroup = *colgroupp) == NULL)
+		return;
+	*colgroupp = NULL;
+
 	__wt_free(session, colgroup->name);
 	__wt_free(session, colgroup->source);
 	__wt_free(session, colgroup->config);
@@ -135,9 +141,14 @@ __wt_schema_destroy_colgroup(WT_SESSION_IMPL *session, WT_COLGROUP *colgroup)
  *	Free an index handle.
  */
 int
-__wt_schema_destroy_index(WT_SESSION_IMPL *session, WT_INDEX *idx)
+__wt_schema_destroy_index(WT_SESSION_IMPL *session, WT_INDEX **idxp)
 {
 	WT_DECL_RET;
+	WT_INDEX *idx;
+
+	if ((idx = *idxp) == NULL)
+		return (0);
+	*idxp = NULL;
 
 	/* If there is a custom collator configured, terminate it. */
 	if (idx->collator != NULL &&
@@ -175,12 +186,15 @@ __wt_schema_destroy_index(WT_SESSION_IMPL *session, WT_INDEX *idx)
  *	Free a table handle.
  */
 int
-__wt_schema_destroy_table(WT_SESSION_IMPL *session, WT_TABLE *table)
+__wt_schema_destroy_table(WT_SESSION_IMPL *session, WT_TABLE **tablep)
 {
-	WT_COLGROUP *colgroup;
 	WT_DECL_RET;
-	WT_INDEX *idx;
+	WT_TABLE *table;
 	u_int i;
+
+	if ((table = *tablep) == NULL)
+		return (0);
+	*tablep = NULL;
 
 	__wt_free(session, table->name);
 	__wt_free(session, table->config);
@@ -188,19 +202,15 @@ __wt_schema_destroy_table(WT_SESSION_IMPL *session, WT_TABLE *table)
 	__wt_free(session, table->key_format);
 	__wt_free(session, table->value_format);
 	if (table->cgroups != NULL) {
-		for (i = 0; i < WT_COLGROUPS(table); i++) {
-			if ((colgroup = table->cgroups[i]) == NULL)
-				continue;
-			__wt_schema_destroy_colgroup(session, colgroup);
-		}
+		for (i = 0; i < WT_COLGROUPS(table); i++)
+			__wt_schema_destroy_colgroup(
+			    session, &table->cgroups[i]);
 		__wt_free(session, table->cgroups);
 	}
 	if (table->indices != NULL) {
-		for (i = 0; i < table->nindices; i++) {
-			if ((idx = table->indices[i]) == NULL)
-				continue;
-			WT_TRET(__wt_schema_destroy_index(session, idx));
-		}
+		for (i = 0; i < table->nindices; i++)
+			WT_TRET(__wt_schema_destroy_index(
+			    session, &table->indices[i]));
 		__wt_free(session, table->indices);
 	}
 	__wt_free(session, table);
@@ -220,7 +230,7 @@ __wt_schema_remove_table(WT_SESSION_IMPL *session, WT_TABLE *table)
 	bucket = table->name_hash % WT_HASH_ARRAY_SIZE;
 	SLIST_REMOVE(&session->tables, table, __wt_table, l);
 	SLIST_REMOVE(&session->tablehash[bucket], table, __wt_table, hashl);
-	return (__wt_schema_destroy_table(session, table));
+	return (__wt_schema_destroy_table(session, &table));
 }
 
 /*
