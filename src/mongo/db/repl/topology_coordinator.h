@@ -40,6 +40,9 @@
 
 namespace mongo {
 
+    class OperationContext;
+    class OpTime;
+
 namespace repl {
 
     class HeartbeatResponseAction;
@@ -351,12 +354,6 @@ namespace repl {
          * Set the outgoing heartbeat message from self
          */
         virtual void setMyHeartbeatMessage(const Date_t now, const std::string& s) = 0;
-
-        /**
-         * Writes into 'output' all the information needed to generate a summary of the current
-         * replication state for use by the web interface.
-         */
-        virtual void summarizeAsHtml(ReplSetHtmlSummary* output) = 0;
 
     protected:
         TopologyCoordinator() {}

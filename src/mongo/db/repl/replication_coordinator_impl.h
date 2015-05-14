@@ -225,8 +225,6 @@ namespace repl {
         virtual bool shouldChangeSyncSource(const HostAndPort& currentSource);
 
 
-        virtual void summarizeAsHtml(ReplSetHtmlSummary* s);
-
         // ================== Test support API ===================
 
         /**
@@ -745,9 +743,6 @@ namespace repl {
                                      const ReplSetHeartbeatArgs& args,
                                      ReplSetHeartbeatResponse* response,
                                      Status* outStatus);
-
-        void _summarizeAsHtml_finish(const ReplicationExecutor::CallbackData& cbData,
-                                     ReplSetHtmlSummary* output);
 
         //
         // All member variables are labeled with one of the following codes indicating the

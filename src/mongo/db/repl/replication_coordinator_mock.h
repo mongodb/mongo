@@ -180,8 +180,6 @@ namespace repl {
 
         virtual bool shouldChangeSyncSource(const HostAndPort& currentSource);
 
-        virtual void summarizeAsHtml(ReplSetHtmlSummary* output);
-
     private:
 
         const ReplSettings _settings;
