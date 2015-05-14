@@ -47,7 +47,9 @@ namespace mongo {
                 if ( fieldName == "key" ||
                      fieldName == "ns" ||
                      fieldName == "name" ||
-                     fieldName == "v" ||
+                     fieldName == "v" || // not considered for equivalence
+                     fieldName == "textIndexVersion" || // same as "v"
+                     fieldName == "2dsphereIndexVersion" || // same as "v"
                      fieldName == "background" || // this is a creation time option only
                      fieldName == "dropDups" || // this is now ignored
                      fieldName == "sparse" || // checked specially
