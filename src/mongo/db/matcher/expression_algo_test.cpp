@@ -1,7 +1,7 @@
 // expression_algo_test.cpp
 
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2015 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -30,7 +30,7 @@
 
 #include "mongo/unittest/unittest.h"
 
-#include <boost/scoped_ptr.hpp>
+#include <memory>
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
@@ -38,241 +38,289 @@
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/matcher/expression_parser.h"
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
-#include "mongo/util/log.h"
-
 namespace mongo {
 
-    using boost::scoped_ptr;
-
     /**
-     * A MatchExpression does not hold the memory for BSONElements.
-     * So using this we can tie the life cycle of a MatchExpression to its data.
+     * A MatchExpression does not hold the memory for BSONElements, so use ParsedMatchExpression to
+     * ensure that the BSONObj outlives the MatchExpression.
      */
-    struct Parsed {
-        Parsed(const char* str) {
-            obj = fromjson(str);
-            _parse();
+    class ParsedMatchExpression {
+    public:
+        ParsedMatchExpression(const std::string& str)
+           : _obj(fromjson(str)) {
+            StatusWithMatchExpression result = MatchExpressionParser::parse(_obj);
+            ASSERT_OK(result.getStatus());
+            _expr.reset(result.getValue());
         }
 
-        Parsed(const BSONObj& o)
-            : obj(o) {
-            _parse();
-        }
+        const MatchExpression* get() const { return _expr.get(); }
 
-        void _parse() {
-            StatusWithMatchExpression result = MatchExpressionParser::parse(obj);
-            if (!result.isOK()) {
-                log() << "failed to parse expression: " << obj;
-                invariant(false);
-            }
-            exp.reset(result.getValue());
-        }
-
-        const MatchExpression* get() const { return exp.get(); }
-
-        BSONObj obj;
-        scoped_ptr<MatchExpression> exp;
+    private:
+        const BSONObj _obj;
+        std::unique_ptr<MatchExpression> _expr;
     };
 
-    TEST(ExpressionAlgoRedundant, Equal1) {
-        Parsed foo("{ x : 5 }");
-        Parsed bar1("{ x : 5 }");
-        Parsed bar2("{ x : 6 }");
-        Parsed bar3("{ a : 5 }");
-        ASSERT_TRUE(expression::isClauseRedundant(foo.get(), bar1.get()));
-        ASSERT_FALSE(expression::isClauseRedundant(foo.get(), bar2.get()));
-        ASSERT_FALSE(expression::isClauseRedundant(foo.get(), bar3.get()));
+    TEST(ExpressionAlgoIsSubsetOf, NullAndOmittedField) {
+        // Verify that ComparisonMatchExpression::init() prohibits creating a match expression with
+        // an Undefined type.
+        BSONObj undefined = fromjson("{a: undefined}");
+        ASSERT_EQUALS(ErrorCodes::BadValue, MatchExpressionParser::parse(undefined).getStatus());
+
+        ParsedMatchExpression empty("{}");
+        ParsedMatchExpression null("{a: null}");
+
+        ASSERT_TRUE(expression::isSubsetOf(null.get(), empty.get()));
+        ASSERT_FALSE(expression::isSubsetOf(empty.get(), null.get()));
+
+        ParsedMatchExpression b1("{b: 1}");
+        ParsedMatchExpression aNullB1("{a: null, b: 1}");
+
+        ASSERT_TRUE(expression::isSubsetOf(aNullB1.get(), b1.get()));
+        ASSERT_FALSE(expression::isSubsetOf(b1.get(), aNullB1.get()));
+
+        ParsedMatchExpression a1C3("{a: 1, c: 3}");
+        ParsedMatchExpression a1BNullC3("{a: 1, b: null, c: 3}");
+
+        ASSERT_TRUE(expression::isSubsetOf(a1BNullC3.get(), a1C3.get()));
+        ASSERT_FALSE(expression::isSubsetOf(a1C3.get(), a1BNullC3.get()));
     }
 
-    TEST(ExpressionAlgoRedundant, AndEqual1) {
-        Parsed foo("{ a : 3, x : 5 }");
-        Parsed bar1("{ x : 5 }");
-        Parsed bar2("{ x : 6 }");
-        Parsed bar3("{ a : 5 }");
-        ASSERT_TRUE(expression::isClauseRedundant(foo.get(), bar1.get()));
-        ASSERT_FALSE(expression::isClauseRedundant(foo.get(), bar2.get()));
-        ASSERT_FALSE(expression::isClauseRedundant(foo.get(), bar3.get()));
-        ASSERT_FALSE(expression::isClauseRedundant(bar1.get(), foo.get()));
+    TEST(ExpressionAlgoIsSubsetOf, NullAndExists) {
+        ParsedMatchExpression null("{x: null}");
+        ParsedMatchExpression exists("{x: {$exists: true}}");
+        ASSERT_FALSE(expression::isSubsetOf(null.get(), exists.get()));
+        ASSERT_FALSE(expression::isSubsetOf(exists.get(), null.get()));
     }
 
-    TEST(ExpressionAlgoRedundant, DifferentTypes1) {
-        // Comparison of different canonical types is not redundant.
-        Parsed foo("{x: {$gt: \"a\"}}");
-        Parsed bar("{x: {$gt: 1}}");
-        ASSERT_FALSE(expression::isClauseRedundant(foo.get(), bar.get()));
-        ASSERT_FALSE(expression::isClauseRedundant(bar.get(), foo.get()));
+    TEST(ExpressionAlgoIsSubsetOf, Compare_NaN) {
+        ParsedMatchExpression nan("{x: NaN}");
+        ParsedMatchExpression lt("{x: {$lt: 5}}");
+        ParsedMatchExpression lte("{x: {$lte: 5}}");
+        ParsedMatchExpression gte("{x: {$gte: 5}}");
+        ParsedMatchExpression gt("{x: {$gt: 5}}");
+
+        ASSERT_TRUE(expression::isSubsetOf(nan.get(), nan.get()));
+        ASSERT_FALSE(expression::isSubsetOf(nan.get(), lt.get()));
+        ASSERT_FALSE(expression::isSubsetOf(lt.get(), nan.get()));
+        ASSERT_FALSE(expression::isSubsetOf(nan.get(), lte.get()));
+        ASSERT_FALSE(expression::isSubsetOf(lte.get(), nan.get()));
+        ASSERT_FALSE(expression::isSubsetOf(nan.get(), gte.get()));
+        ASSERT_FALSE(expression::isSubsetOf(gte.get(), nan.get()));
+        ASSERT_FALSE(expression::isSubsetOf(nan.get(), gt.get()));
+        ASSERT_FALSE(expression::isSubsetOf(gt.get(), nan.get()));
     }
 
-    TEST(ExpressionAlgoRedundant, DifferentTypes2) {
-        Parsed foo("{x: null}");
-        Parsed bar("{x: {$exists: true}}");
-        ASSERT_FALSE(expression::isClauseRedundant(foo.get(), bar.get()));
+    TEST(ExpressionAlgoIsSubsetOf, Compare_EQ) {
+        ParsedMatchExpression a5("{a: 5}");
+        ParsedMatchExpression a6("{a: 6}");
+        ParsedMatchExpression b5("{b: 5}");
+
+        ASSERT_TRUE(expression::isSubsetOf(a5.get(), a5.get()));
+        ASSERT_FALSE(expression::isSubsetOf(a5.get(), a6.get()));
+        ASSERT_FALSE(expression::isSubsetOf(a5.get(), b5.get()));
     }
 
-    TEST(ExpressionAlgoRedundant, PointToRange) {
-        Parsed foo1("{ x : 4 }");
-        Parsed foo2("{ x : 5 }");
-        Parsed foo3("{ a : 4 }");
-        Parsed foo4("{ x : 6 }");
-        Parsed foo5("{ a : 6 }");
+    TEST(ExpressionAlgoIsSubsetOf, CompareAnd_EQ) {
+        ParsedMatchExpression a1B2("{a: 1, b: 2}");
+        ParsedMatchExpression a1B7("{a: 1, b: 7}");
+        ParsedMatchExpression a1("{a: 1}");
+        ParsedMatchExpression b2("{b: 2}");
 
-        Parsed bar1("{ x : { $lte : 5 } }");
-        Parsed bar2("{ x : { $lt : 5 } }");
-        Parsed bar3("{ x : { $gte : 5 } }");
-        Parsed bar4("{ x : { $gt : 5 } }");
+        ASSERT_TRUE(expression::isSubsetOf(a1B2.get(), a1B2.get()));
+        ASSERT_FALSE(expression::isSubsetOf(a1B2.get(), a1B7.get()));
 
-        ASSERT_TRUE(expression::isClauseRedundant(foo1.get(), bar1.get()));
-        ASSERT_TRUE(expression::isClauseRedundant(foo2.get(), bar1.get()));
-        ASSERT_FALSE(expression::isClauseRedundant(foo3.get(), bar1.get()));
-        ASSERT_FALSE(expression::isClauseRedundant(foo4.get(), bar1.get()));
-        ASSERT_FALSE(expression::isClauseRedundant(foo5.get(), bar1.get()));
-        ASSERT_FALSE(expression::isClauseRedundant(bar1.get(), foo1.get()));
-
-        ASSERT_TRUE(expression::isClauseRedundant(foo1.get(), bar2.get()));
-        ASSERT_FALSE(expression::isClauseRedundant(foo2.get(), bar2.get()));
-        ASSERT_FALSE(expression::isClauseRedundant(foo3.get(), bar2.get()));
-        ASSERT_FALSE(expression::isClauseRedundant(foo4.get(), bar2.get()));
-        ASSERT_FALSE(expression::isClauseRedundant(foo5.get(), bar2.get()));
-
-        ASSERT_FALSE(expression::isClauseRedundant(foo1.get(), bar3.get()));
-        ASSERT_TRUE(expression::isClauseRedundant(foo2.get(), bar3.get()));
-        ASSERT_FALSE(expression::isClauseRedundant(foo3.get(), bar3.get()));
-        ASSERT_TRUE(expression::isClauseRedundant(foo4.get(), bar3.get()));
-        ASSERT_FALSE(expression::isClauseRedundant(foo5.get(), bar3.get()));
-
-        ASSERT_FALSE(expression::isClauseRedundant(foo1.get(), bar4.get()));
-        ASSERT_FALSE(expression::isClauseRedundant(foo2.get(), bar4.get()));
-        ASSERT_FALSE(expression::isClauseRedundant(foo3.get(), bar4.get()));
-        ASSERT_TRUE(expression::isClauseRedundant(foo4.get(), bar4.get()));
-        ASSERT_FALSE(expression::isClauseRedundant(foo5.get(), bar4.get()));
+        ASSERT_TRUE(expression::isSubsetOf(a1B2.get(), a1.get()));
+        ASSERT_TRUE(expression::isSubsetOf(a1B2.get(), b2.get()));
+        ASSERT_FALSE(expression::isSubsetOf(a1B7.get(), b2.get()));
     }
 
-    TEST(ExpressionAlgoRedundant, LessThanToLessThan) {
-        Parsed foo1("{ x : { $lte : 4 } }");
-        Parsed foo2("{ x : { $lt : 5 } }");
-        Parsed foo3("{ x : { $lte : 5 } }");
-        Parsed foo4("{ x : { $lte : 6 } }");
-        Parsed foo5("{ a : { $lte : 4 } }");
+    TEST(ExpressionAlgoIsSubsetOf, CompareAnd_GT) {
+        ParsedMatchExpression filter("{a: {$gt: 5}, b: {$gt: 6}}");
+        ParsedMatchExpression query("{a: {$gt: 5}, b: {$gt: 6}, c: {$gt: 7}}");
 
-        Parsed bar1("{ x : { $lte : 5 } }");
-        Parsed bar2("{ x : { $lt : 5 } }");
-
-        ASSERT_TRUE(expression::isClauseRedundant(foo1.get(), bar1.get()));
-        ASSERT_TRUE(expression::isClauseRedundant(foo2.get(), bar1.get()));
-        ASSERT_TRUE(expression::isClauseRedundant(foo3.get(), bar1.get()));
-        ASSERT_FALSE(expression::isClauseRedundant(foo4.get(), bar1.get()));
-        ASSERT_FALSE(expression::isClauseRedundant(foo5.get(), bar1.get()));
-
-        ASSERT_TRUE(expression::isClauseRedundant(foo1.get(), bar2.get()));
-        ASSERT_TRUE(expression::isClauseRedundant(foo2.get(), bar2.get()));
-        ASSERT_FALSE(expression::isClauseRedundant(foo3.get(), bar2.get()));
-        ASSERT_FALSE(expression::isClauseRedundant(foo4.get(), bar2.get()));
-        ASSERT_FALSE(expression::isClauseRedundant(foo5.get(), bar2.get()));
-
+        ASSERT_TRUE(expression::isSubsetOf(query.get(), filter.get()));
+        ASSERT_FALSE(expression::isSubsetOf(filter.get(), query.get()));
     }
 
-    TEST(ExpressionAlgoRedundant, GreaterThanToGreaterThan) {
-        Parsed foo1("{ x : { $gte : 6 } }");
-        Parsed foo2("{ x : { $gt : 5 } }");
-        Parsed foo3("{ x : { $gte : 5 } }");
-        Parsed foo4("{ x : { $gte : 4 } }");
-        Parsed foo5("{ a : { $gte : 6 } }");
-
-        Parsed bar1("{ x : { $gte : 5 } }");
-        Parsed bar2("{ x : { $gt : 5 } }");
-
-        ASSERT_TRUE(expression::isClauseRedundant(foo1.get(), bar1.get()));
-        ASSERT_TRUE(expression::isClauseRedundant(foo2.get(), bar1.get()));
-        ASSERT_TRUE(expression::isClauseRedundant(foo3.get(), bar1.get()));
-        ASSERT_FALSE(expression::isClauseRedundant(foo4.get(), bar1.get()));
-        ASSERT_FALSE(expression::isClauseRedundant(foo5.get(), bar1.get()));
-
-        ASSERT_TRUE(expression::isClauseRedundant(foo1.get(), bar2.get()));
-        ASSERT_TRUE(expression::isClauseRedundant(foo2.get(), bar2.get()));
-        ASSERT_FALSE(expression::isClauseRedundant(foo3.get(), bar2.get()));
-        ASSERT_FALSE(expression::isClauseRedundant(foo4.get(), bar2.get()));
-        ASSERT_FALSE(expression::isClauseRedundant(foo5.get(), bar2.get()));
-
+    TEST(ExpressionAlgoIsSubsetOf, DifferentCanonicalTypes) {
+        ParsedMatchExpression number("{x: {$gt: 1}}");
+        ParsedMatchExpression string("{x: {$gt: 'a'}}");
+        ASSERT_FALSE(expression::isSubsetOf(number.get(), string.get()));
+        ASSERT_FALSE(expression::isSubsetOf(string.get(), number.get()));
     }
 
-    TEST(ExpressionAlgoRedundant, Exists1) {
-        Parsed a("{a : { $exists : 1 } }");
-        Parsed b("{b : { $exists : 1 } }");
-        Parsed ab("{a : { $exists : 1 }, b : { $exists: 1 } }");
-        Parsed abc("{a : { $exists : 1 }, b : { $exists: 1 }, c : 5 }");
+    TEST(ExpressionAlgoIsSubsetOf, DifferentNumberTypes) {
+        ParsedMatchExpression numberDouble("{x: 5.0}");
+        ParsedMatchExpression numberInt("{x: NumberInt(5)}");
+        ParsedMatchExpression numberLong("{x: NumberLong(5)}");
 
-        ASSERT_TRUE(expression::isClauseRedundant(a.get(), a.get()));
-        ASSERT_FALSE(expression::isClauseRedundant(a.get(), b.get()));
-        ASSERT_FALSE(expression::isClauseRedundant(b.get(), a.get()));
-
-        ASSERT_TRUE(expression::isClauseRedundant(ab.get(), a.get()));
-        ASSERT_TRUE(expression::isClauseRedundant(ab.get(), b.get()));
-
-        ASSERT_TRUE(expression::isClauseRedundant(abc.get(), a.get()));
-        ASSERT_TRUE(expression::isClauseRedundant(abc.get(), b.get()));
-
-        ASSERT_TRUE(expression::isClauseRedundant(abc.get(), ab.get()));
-        ASSERT_FALSE(expression::isClauseRedundant(ab.get(), abc.get()));
+        ASSERT_TRUE(expression::isSubsetOf(numberDouble.get(), numberInt.get()));
+        ASSERT_TRUE(expression::isSubsetOf(numberDouble.get(), numberLong.get()));
+        ASSERT_TRUE(expression::isSubsetOf(numberInt.get(), numberDouble.get()));
+        ASSERT_TRUE(expression::isSubsetOf(numberInt.get(), numberLong.get()));
+        ASSERT_TRUE(expression::isSubsetOf(numberLong.get(), numberDouble.get()));
+        ASSERT_TRUE(expression::isSubsetOf(numberLong.get(), numberInt.get()));
     }
 
-    TEST(ExpressionAlgoRedundant, Exists2) {
-        Parsed filter("{a : { $exists : 1 } }");
-        Parsed query1("{a : 1}");
-        Parsed query2("{a : { $gt : 4 } }");
-        Parsed query3("{a : { $lt : 4 } }");
+    TEST(ExpressionAlgoIsSubsetOf, PointInUnboundedRange) {
+        ParsedMatchExpression a4("{a: 4}");
+        ParsedMatchExpression a5("{a: 5}");
+        ParsedMatchExpression a6("{a: 6}");
+        ParsedMatchExpression b5("{b: 5}");
 
-        ASSERT_TRUE(expression::isClauseRedundant(query1.get(), filter.get()));
-        ASSERT_TRUE(expression::isClauseRedundant(query2.get(), filter.get()));
-        ASSERT_TRUE(expression::isClauseRedundant(query3.get(), filter.get()));
-        ASSERT_FALSE(expression::isClauseRedundant(filter.get(), query1.get()));
+        ParsedMatchExpression lt5("{a: {$lt: 5}}");
+        ParsedMatchExpression lte5("{a: {$lte: 5}}");
+        ParsedMatchExpression gte5("{a: {$gte: 5}}");
+        ParsedMatchExpression gt5("{a: {$gt: 5}}");
+
+        ASSERT_TRUE(expression::isSubsetOf(a4.get(), lte5.get()));
+        ASSERT_TRUE(expression::isSubsetOf(a5.get(), lte5.get()));
+        ASSERT_FALSE(expression::isSubsetOf(a6.get(), lte5.get()));
+
+        ASSERT_TRUE(expression::isSubsetOf(a4.get(), lt5.get()));
+        ASSERT_FALSE(expression::isSubsetOf(a5.get(), lt5.get()));
+        ASSERT_FALSE(expression::isSubsetOf(a6.get(), lt5.get()));
+
+        ASSERT_FALSE(expression::isSubsetOf(a4.get(), gte5.get()));
+        ASSERT_TRUE(expression::isSubsetOf(a5.get(), gte5.get()));
+        ASSERT_TRUE(expression::isSubsetOf(a6.get(), gte5.get()));
+
+        ASSERT_FALSE(expression::isSubsetOf(a4.get(), gt5.get()));
+        ASSERT_FALSE(expression::isSubsetOf(a5.get(), gt5.get()));
+        ASSERT_TRUE(expression::isSubsetOf(a6.get(), gt5.get()));
+
+        // An unbounded range query does not match a subset of documents of a point query.
+        ASSERT_FALSE(expression::isSubsetOf(lt5.get(), a5.get()));
+        ASSERT_FALSE(expression::isSubsetOf(lte5.get(), a5.get()));
+        ASSERT_FALSE(expression::isSubsetOf(gte5.get(), a5.get()));
+        ASSERT_FALSE(expression::isSubsetOf(gt5.get(), a5.get()));
+
+        // Cannot be a subset if comparing different field names.
+        ASSERT_FALSE(expression::isSubsetOf(b5.get(), lt5.get()));
+        ASSERT_FALSE(expression::isSubsetOf(b5.get(), lte5.get()));
+        ASSERT_FALSE(expression::isSubsetOf(b5.get(), gte5.get()));
+        ASSERT_FALSE(expression::isSubsetOf(b5.get(), gt5.get()));
     }
 
-    TEST(ExpressionAlgoRedundant, Exists3) {
-        Parsed filter("{a : { $exists : 1 } }");
-        Parsed query1("{a : { $type : 5 } }");
+    TEST(ExpressionAlgoIsSubsetOf, PointInBoundedRange) {
+        ParsedMatchExpression filter("{a: {$gt: 5, $lt: 10}}");
+        ParsedMatchExpression query("{a: 6}");
 
-        ASSERT_TRUE(expression::isClauseRedundant(query1.get(), filter.get()));
-        ASSERT_FALSE(expression::isClauseRedundant(filter.get(), query1.get()));
+        ASSERT_TRUE(expression::isSubsetOf(query.get(), filter.get()));
+        ASSERT_FALSE(expression::isSubsetOf(filter.get(), query.get()));
     }
 
-    TEST(ExpressionAlgoRedundant, Exists4) {
-        Parsed filter("{a : { $exists : 1 } }");
-        Parsed query1("{b : { $type : 5 } }");
+    TEST(ExpressionAlgoIsSubsetOf, PointInBoundedRange_FakeAnd) {
+        ParsedMatchExpression filter("{a: {$gt: 5, $lt: 10}}");
+        ParsedMatchExpression query("{$and: [{a: 6}, {a: 6}]}");
 
-        ASSERT_FALSE(expression::isClauseRedundant(query1.get(), filter.get()));
-        ASSERT_FALSE(expression::isClauseRedundant(filter.get(), query1.get()));
+        ASSERT_TRUE(expression::isSubsetOf(query.get(), filter.get()));
+        ASSERT_FALSE(expression::isSubsetOf(filter.get(), query.get()));
     }
 
-    TEST(ExpressionAlgoRedundant, Type1) {
-        Parsed a("{a : { $type : 4 } }");
-        Parsed a2("{a : { $type : 4 } }");
-        Parsed b("{a : { $type : 7 } }");
+    TEST(ExpressionAlgoIsSubsetOf, PointInCompoundRange) {
+        ParsedMatchExpression filter("{a: {$gt: 5}, b: {$gt: 6}, c: {$gt: 7}}");
+        ParsedMatchExpression query("{a: 10, b: 10, c: 10}");
 
-        ASSERT_TRUE(expression::isClauseRedundant(a.get(), a2.get()));
-        ASSERT_FALSE(expression::isClauseRedundant(a.get(), b.get()));
+        ASSERT_TRUE(expression::isSubsetOf(query.get(), filter.get()));
+        ASSERT_FALSE(expression::isSubsetOf(filter.get(), query.get()));
     }
 
-    TEST(ExpressionAlgoRedundant, Subset1) {
-        Parsed filter("{ a : 5, b : 6 }");
-        Parsed query("{ a : 5, b : 6, c : 7 }");
+    TEST(ExpressionAlgoIsSubsetOf, Compare_LT_LTE) {
+        ParsedMatchExpression lte4("{x: {$lte: 4}}");
+        ParsedMatchExpression lt5("{x: {$lt: 5}}");
+        ParsedMatchExpression lte5("{x: {$lte: 5}}");
+        ParsedMatchExpression lt6("{x: {$lt: 6}}");
 
-        ASSERT_TRUE(expression::isClauseRedundant(query.get(), filter.get()));
-        ASSERT_FALSE(expression::isClauseRedundant(filter.get(), query.get()));
+        ASSERT_TRUE(expression::isSubsetOf(lte4.get(), lte5.get()));
+        ASSERT_TRUE(expression::isSubsetOf(lt5.get(), lte5.get()));
+        ASSERT_TRUE(expression::isSubsetOf(lte5.get(), lte5.get()));
+        ASSERT_FALSE(expression::isSubsetOf(lt6.get(), lte5.get()));
+
+        ASSERT_TRUE(expression::isSubsetOf(lte4.get(), lt5.get()));
+        ASSERT_TRUE(expression::isSubsetOf(lt5.get(), lt5.get()));
+        ASSERT_FALSE(expression::isSubsetOf(lte5.get(), lt5.get()));
+        ASSERT_FALSE(expression::isSubsetOf(lt6.get(), lt5.get()));
     }
 
-    TEST(ExpressionAlgoRedundant, Subset2) {
-        Parsed filter("{ a : { $gt : 5 }, b : { $gt : 6 } }");
-        Parsed query1("{ a : { $gt : 5 }, b : { $gt : 6 }, c : { $gt : 7 } }");
-        Parsed query2("{ a : 10, b : 10, c : 10 }");
+    TEST(ExpressionAlgoIsSubsetOf, Compare_GT_GTE) {
+        ParsedMatchExpression gte6("{x: {$gte: 6}}");
+        ParsedMatchExpression gt5("{x: {$gt: 5}}");
+        ParsedMatchExpression gte5("{x: {$gte: 5}}");
+        ParsedMatchExpression gt4("{x: {$gt: 4}}");
 
-        ASSERT_FALSE(expression::isClauseRedundant(filter.get(), query1.get()));
-        ASSERT_FALSE(expression::isClauseRedundant(filter.get(), query2.get()));
+        ASSERT_TRUE(expression::isSubsetOf(gte6.get(), gte5.get()));
+        ASSERT_TRUE(expression::isSubsetOf(gt5.get(), gte5.get()));
+        ASSERT_TRUE(expression::isSubsetOf(gte5.get(), gte5.get()));
+        ASSERT_FALSE(expression::isSubsetOf(gt4.get(), gte5.get()));
 
-        ASSERT_TRUE(expression::isClauseRedundant(query1.get(), filter.get()));
-        ASSERT_TRUE(expression::isClauseRedundant(query2.get(), filter.get()));
-
+        ASSERT_TRUE(expression::isSubsetOf(gte6.get(), gt5.get()));
+        ASSERT_TRUE(expression::isSubsetOf(gt5.get(), gt5.get()));
+        ASSERT_FALSE(expression::isSubsetOf(gte5.get(), gt5.get()));
+        ASSERT_FALSE(expression::isSubsetOf(gt4.get(), gt5.get()));
     }
 
-}
+    TEST(ExpressionAlgoIsSubsetOf, BoundedRangeInUnboundedRange) {
+        ParsedMatchExpression filter("{a: {$gt: 1}}");
+        ParsedMatchExpression query("{a: {$gt: 5, $lt: 10}}");
 
+        ASSERT_TRUE(expression::isSubsetOf(query.get(), filter.get()));
+        ASSERT_FALSE(expression::isSubsetOf(filter.get(), query.get()));
+    }
+
+    TEST(ExpressionAlgoIsSubsetOf, Exists) {
+        ParsedMatchExpression aExists("{a: {$exists: true}}");
+        ParsedMatchExpression bExists("{b: {$exists: true}}");
+        ParsedMatchExpression aExistsBExists("{a: {$exists: true}, b: {$exists: true}}");
+        ParsedMatchExpression aExistsBExistsC5("{a: {$exists: true}, b: {$exists: true}, c: 5}");
+
+        ASSERT_TRUE(expression::isSubsetOf(aExists.get(), aExists.get()));
+        ASSERT_FALSE(expression::isSubsetOf(aExists.get(), bExists.get()));
+
+        ASSERT_TRUE(expression::isSubsetOf(aExistsBExists.get(), aExists.get()));
+        ASSERT_TRUE(expression::isSubsetOf(aExistsBExists.get(), bExists.get()));
+        ASSERT_FALSE(expression::isSubsetOf(aExistsBExists.get(), aExistsBExistsC5.get()));
+
+        ASSERT_TRUE(expression::isSubsetOf(aExistsBExistsC5.get(), aExists.get()));
+        ASSERT_TRUE(expression::isSubsetOf(aExistsBExistsC5.get(), bExists.get()));
+        ASSERT_TRUE(expression::isSubsetOf(aExistsBExistsC5.get(), aExistsBExists.get()));
+    }
+
+    TEST(ExpressionAlgoIsSubsetOf, Compare_Exists) {
+        ParsedMatchExpression exists("{a: {$exists: true}}");
+        ParsedMatchExpression eq("{a: 1}");
+        ParsedMatchExpression gt("{a: {$gt: 4}}");
+        ParsedMatchExpression lte("{a: {$lte: 7}}");
+
+        ASSERT_TRUE(expression::isSubsetOf(eq.get(), exists.get()));
+        ASSERT_TRUE(expression::isSubsetOf(gt.get(), exists.get()));
+        ASSERT_TRUE(expression::isSubsetOf(lte.get(), exists.get()));
+
+        ASSERT_FALSE(expression::isSubsetOf(exists.get(), eq.get()));
+        ASSERT_FALSE(expression::isSubsetOf(exists.get(), gt.get()));
+        ASSERT_FALSE(expression::isSubsetOf(exists.get(), lte.get()));
+    }
+
+    TEST(ExpressionAlgoIsSubsetOf, Type) {
+        ParsedMatchExpression aType1("{a: {$type: 1}}");
+        ParsedMatchExpression aType2("{a: {$type: 2}}");
+        ParsedMatchExpression bType2("{b: {$type: 2}}");
+
+        ASSERT_FALSE(expression::isSubsetOf(aType1.get(), aType2.get()));
+        ASSERT_FALSE(expression::isSubsetOf(aType2.get(), aType1.get()));
+
+        ASSERT_TRUE(expression::isSubsetOf(aType2.get(), aType2.get()));
+        ASSERT_FALSE(expression::isSubsetOf(aType2.get(), bType2.get()));
+    }
+
+    TEST(ExpressionAlgoIsSubsetOf, TypeAndExists) {
+        ParsedMatchExpression aExists("{a: {$exists: true}}");
+        ParsedMatchExpression aType2("{a: {$type: 2}}");
+        ParsedMatchExpression bType2("{b: {$type: 2}}");
+
+        ASSERT_TRUE(expression::isSubsetOf(aType2.get(), aExists.get()));
+        ASSERT_FALSE(expression::isSubsetOf(aExists.get(), aType2.get()));
+        ASSERT_FALSE(expression::isSubsetOf(bType2.get(), aExists.get()));
+    }
+
+}  // namespace mongo

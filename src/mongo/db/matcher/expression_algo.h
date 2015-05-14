@@ -30,21 +30,34 @@
 
 namespace mongo {
 
-    class MatchExpression;
+     class MatchExpression;
 
-    namespace expression {
-        /**
-         * In filtered index case, a is the query, b is the filter.
-         * @return If 'b' cannot reduce the set of returned documents that would
-         *         be returned with 'a' as the only filter.
-         *         Everything that matches a also must match b.
-         *         The document set returned by applying a is a subset of the document
-         *         set returned by applying b.
-         * Examples:
-         *    a: { x : 5 } b: { x : { $lte : 5 } } = true
-         *    a: { x : { $lte : 5 } b: { x : 5 } = false
-         */
-        bool isClauseRedundant(const MatchExpression* a,
-                               const MatchExpression* b);
-    }
-}
+namespace expression {
+
+    /**
+     * Returns true if the documents matched by 'lhs' are a subset of the documents matched by
+     * 'rhs', i.e. a document matched by 'lhs' must also be matched by 'rhs', and false otherwise.
+     *
+     * With respect to partial indexes, 'lhs' corresponds to the query specification and 'rhs'
+     * corresponds to the filter specification.
+     *
+     * e.g.
+     *
+     *  Suppose that
+     *
+     *      lhs = { x : 4 }
+     *      rhs = { x : { $lte : 5 } }
+     *
+     *      ==> true
+     *
+     *  Suppose that
+     *
+     *      lhs = { x : { $gte: 6 } }
+     *      rhs = { x : 7 }
+     *
+     *      ==> false
+     */
+    bool isSubsetOf(const MatchExpression* lhs, const MatchExpression* rhs);
+
+}  // namespace expression
+}  // namespace mongo

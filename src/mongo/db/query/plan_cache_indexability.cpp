@@ -64,7 +64,7 @@ namespace mongo {
         if (!filterExpr->isLogical()) {
             _pathDiscriminatorsMap[filterExpr->path()].push_back(
                 [filterExpr] (const MatchExpression* queryExpr) {
-                    return expression::isClauseRedundant(queryExpr, filterExpr);
+                    return expression::isSubsetOf(queryExpr, filterExpr);
                 }
             );
         }

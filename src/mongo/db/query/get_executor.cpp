@@ -127,7 +127,7 @@ namespace mongo {
                 return true;
             }
 
-            return !expression::isClauseRedundant(queryPredicates, filter);
+            return !expression::isSubsetOf(queryPredicates, filter);
         }
     }  // namespace
 
