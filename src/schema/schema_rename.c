@@ -151,8 +151,7 @@ __rename_tree(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_scr_alloc(session, 0, &nv));
 	WT_ERR(__wt_buf_fmt(session, nv, "%.*s%s%s",
 	    (int)WT_PTRDIFF(cval.str, value), value,
-	    (const char *)ns->data,
-	    cval.str + cval.len));
+	    (const char *)ns->data, cval.str + cval.len));
 
 	/*
 	 * Do the rename before updating the metadata to avoid leaving the

@@ -29,6 +29,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <wiredtiger.h>
+#include "wt_internal.h"			/* For __wt_XXX */
 
 #ifdef _WIN32
 #include "windows_shim.h"
@@ -99,7 +100,7 @@ static inline void
 testutil_clean_work_dir(char *dir)
 {
 	size_t inputSize;
-	int ret;
+	int exist, ret;
 	char *buffer;
 
 	/* Additional bytes for the Windows rd command. */
@@ -108,8 +109,14 @@ testutil_clean_work_dir(char *dir)
 		testutil_die(ENOMEM, "Failed to allocate memory");
 
 	snprintf(buffer, inputSize, "%s%s", RM_COMMAND, dir);
-	if ((ret = system(buffer)) != 0)
-		testutil_die(ret, "System call to remove directory failed");
+
+	exist = 0;
+	if ((ret = __wt_exist(NULL, dir, &exist)) != 0)
+		testutil_die(ret,
+		    "Unable to check if directory exists");
+	if (exist == 1 && (ret = system(buffer)) != 0)
+		testutil_die(ret,
+		    "System call to remove directory failed");
 	free(buffer);
 }
 

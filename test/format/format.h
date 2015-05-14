@@ -50,7 +50,6 @@
 #endif
 #include <time.h>
 
-#include "wt_internal.h"			/* __wt_XXX */
 #include "test_util.i"
 
 #ifdef BDB

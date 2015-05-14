@@ -44,7 +44,6 @@
 #include <unistd.h>
 #endif
 
-#include "wt_internal.h"			/* For __wt_XXX */
 #include "test_util.i"
 
 extern WT_CONNECTION *conn;			/* WiredTiger connection */

@@ -23,7 +23,7 @@ __wt_dlopen(WT_SESSION_IMPL *session, const char *path, WT_DLH **dlhp)
 
 	/* NULL means load from the current binary */
 	if (path == NULL) {
-		ret = GetModuleHandleExA(0, NULL, &dlh->handle);
+		ret = GetModuleHandleExA(0, NULL, (HMODULE *)&dlh->handle);
 		if (ret == FALSE)
 			WT_ERR_MSG(session,
 			    __wt_errno(), "GetModuleHandleEx(%s): %s", path, 0);
@@ -58,7 +58,7 @@ __wt_dlsym(WT_SESSION_IMPL *session,
 	sym = GetProcAddress(dlh->handle, name);
 	if (sym == NULL && fail) {
 		WT_RET_MSG(session, __wt_errno(),
-		    "GetProcAddress(%s in %s): %s", name, dlh->name, 0);
+		    "GetProcAddress(%s in %s)", name, dlh->name);
 	}
 
 	*(void **)sym_ret = sym;

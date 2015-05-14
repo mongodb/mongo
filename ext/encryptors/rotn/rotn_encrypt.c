@@ -26,7 +26,6 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <ctype.h>
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
@@ -129,11 +128,14 @@ do_rotate(char *buf, size_t len, int rotn)
 	uint32_t i;
 	/*
 	 * Now rotate.
+	 *
+	 * Avoid ctype functions because they behave in unexpected ways,
+	 * particularly when the locale is not "C".
 	 */
 	for (i = 0; i < len; i++) {
-		if (islower(buf[i]))
+		if ('a' <= buf[i] && buf[i] <= 'z')
 			buf[i] = ((buf[i] - 'a') + rotn) % 26 + 'a';
-		else if (isalpha(buf[i]))
+		else if ('A' <= buf[i] && buf[i] <= 'Z')
 			buf[i] = ((buf[i] - 'A') + rotn) % 26 + 'A';
 	}
 }
@@ -335,9 +337,9 @@ rotn_customize(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 			goto err;
 		}
 		for (i = 0; i < len; i++) {
-			if (islower(secret.str[i]))
+			if ('a' <= secret.str[i] && secret.str[i] <= 'z')
 				base = 'a';
-			else if (isupper(secret.str[i]))
+			else if ('A' <= secret.str[i] && secret.str[i] <= 'Z')
 				base = 'A';
 			else {
 				ret = EINVAL;
