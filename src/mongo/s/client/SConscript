@@ -8,6 +8,7 @@ env.Library(
         'dbclient_multi_command.cpp',
         'shard.cpp',
         'shard_connection.cpp',
+        'shard_registry.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/clientdriver',

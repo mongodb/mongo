@@ -115,7 +115,6 @@ namespace mongo {
     }
 
     Status ShardType::validate() const {
-
         if (!_name.is_initialized() || _name->empty()) {
             return Status(ErrorCodes::NoSuchKey,
                           str::stream() << "missing " << name.name() << " field");
@@ -127,8 +126,7 @@ namespace mongo {
         }
 
         if (_maxSize.is_initialized() && getMaxSize() < 0) {
-            return Status(ErrorCodes::BadValue,
-                          str::stream() << "maxSize can't be negative");
+            return Status(ErrorCodes::BadValue, str::stream() << "maxSize can't be negative");
         }
 
         return Status::OK();
