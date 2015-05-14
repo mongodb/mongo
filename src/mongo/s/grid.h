@@ -41,6 +41,7 @@ namespace mongo {
     class CatalogManager;
     class DBConfig;
     class SettingsType;
+    class ShardRegistry;
     template<typename T> class StatusWith;
 
 
@@ -86,10 +87,12 @@ namespace mongo {
 
         CatalogManager* catalogManager() const { return _catalogManager.get(); }
         CatalogCache* catalogCache() const { return _catalogCache.get(); }
+        ShardRegistry* shardRegistry() const { return _shardRegistry.get(); }
 
     private:
         std::unique_ptr<CatalogManager> _catalogManager;
         std::unique_ptr<CatalogCache> _catalogCache;
+        std::unique_ptr<ShardRegistry> _shardRegistry;
 
         // can 'localhost' be used in shard addresses?
         bool _allowLocalShard;

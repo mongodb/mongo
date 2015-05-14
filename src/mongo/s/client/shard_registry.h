@@ -36,6 +36,7 @@
 namespace mongo {
 
     class BSONObjBuilder;
+    class CatalogManager;
     class Shard;
 
 
@@ -44,7 +45,7 @@ namespace mongo {
      */
     class ShardRegistry {
     public:
-        ShardRegistry();
+        ShardRegistry(CatalogManager* catalogManager);
         ~ShardRegistry();
 
         void reload();
@@ -83,6 +84,10 @@ namespace mongo {
 
         boost::shared_ptr<Shard> _findUsingLookUp(const std::string& shardName);
 
+
+        // Catalog manager from which to load the shard information. Not owned and must outlive
+        // the shard registry object.
+        CatalogManager* const _catalogManager;
 
         // Map of both shardName -> Shard and hostName -> Shard
         mutable boost::mutex _mutex;

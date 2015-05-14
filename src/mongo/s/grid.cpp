@@ -38,6 +38,7 @@
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/type_settings.h"
 #include "mongo/s/catalog/type_shard.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/config.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
@@ -58,9 +59,11 @@ namespace mongo {
     void Grid::setCatalogManager(std::unique_ptr<CatalogManager> catalogManager) {
         invariant(!_catalogManager);
         invariant(!_catalogCache);
+        invariant(!_shardRegistry);
 
         _catalogManager = std::move(catalogManager);
         _catalogCache = stdx::make_unique<CatalogCache>(_catalogManager.get());
+        _shardRegistry = stdx::make_unique<ShardRegistry>(_catalogManager.get());
     }
 
     StatusWith<shared_ptr<DBConfig>> Grid::implicitCreateDb(const std::string& dbName) {

@@ -46,6 +46,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/grid.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -57,9 +58,6 @@ namespace mongo {
     using std::vector;
 
 namespace {
-
-    ShardRegistry staticShardInfo;
-
 
     class CmdGetShardMap : public Command {
     public:
@@ -83,8 +81,7 @@ namespace {
                          std::string& errmsg ,
                          mongo::BSONObjBuilder& result) {
 
-            staticShardInfo.toBSON(&result);
-
+            grid.shardRegistry()->toBSON(&result);
             return true;
         }
 
@@ -126,7 +123,7 @@ namespace {
     }
 
     Shard Shard::findIfExists( const string& shardName ) {
-        ShardPtr shard = staticShardInfo.findIfExists( shardName );
+        ShardPtr shard = grid.shardRegistry()->findIfExists( shardName );
         return shard ? *shard : Shard::EMPTY;
     }
 
@@ -138,7 +135,7 @@ namespace {
     }
 
     void Shard::reset( const string& ident ) {
-        *this = staticShardInfo.findCopy( ident );
+        *this = grid.shardRegistry()->findCopy( ident );
     }
 
     bool Shard::containsNode( const string& node ) const {
@@ -161,15 +158,15 @@ namespace {
     }
 
     void Shard::getAllShards( vector<Shard>& all ) {
-        staticShardInfo.getAllShards( all );
+        grid.shardRegistry()->getAllShards( all );
     }
 
     bool Shard::isAShardNode( const string& ident ) {
-        return staticShardInfo.isAShardNode( ident );
+        return grid.shardRegistry()->isAShardNode( ident );
     }
 
     Shard Shard::lookupRSName( const string& name) {
-        return staticShardInfo.lookupRSName(name);
+        return grid.shardRegistry()->lookupRSName(name);
     }
 
     BSONObj Shard::runCommand(const std::string& db, const std::string& simple) const {
@@ -242,20 +239,20 @@ namespace {
     }
 
     void Shard::reloadShardInfo() {
-        staticShardInfo.reload();
+        grid.shardRegistry()->reload();
     }
 
 
     void Shard::removeShard( const string& name ) {
-        staticShardInfo.remove( name );
+        grid.shardRegistry()->remove( name );
     }
 
     Shard Shard::pick( const Shard& current ) {
         vector<Shard> all;
-        staticShardInfo.getAllShards( all );
+        grid.shardRegistry()->getAllShards( all );
         if ( all.size() == 0 ) {
-            staticShardInfo.reload();
-            staticShardInfo.getAllShards( all );
+            grid.shardRegistry()->reload();
+            grid.shardRegistry()->getAllShards( all );
             if ( all.size() == 0 )
                 return EMPTY;
         }
@@ -277,7 +274,7 @@ namespace {
     }
 
     void Shard::installShard(const std::string& name, const Shard& shard) {
-        staticShardInfo.set(name, shard);
+        grid.shardRegistry()->set(name, shard);
     }
 
     ShardStatus::ShardStatus(const Shard& shard, long long dataSizeBytes, const string& version):
