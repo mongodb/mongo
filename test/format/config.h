@@ -192,6 +192,11 @@ static CONFIG c[] = {
 	  "if logging configured",				/* 30% */
 	  C_BOOL, 30, 0, 0, &g.c_logging, NULL },
 
+	{ "logging_compression",
+	  "type of logging compression "
+	  "(none | bzip | bzip-raw | lzo | snappy | zlib | zlib-noraw)",
+	  C_IGNORE|C_STRING, 1, 7, 7, NULL, &g.c_logging_compression },
+
 	{ "logging_archive",
 	  "if log file archival configured",			/* 50% */
 	  C_BOOL, 50, 0, 0, &g.c_logging_archive, NULL },

@@ -202,6 +202,7 @@ typedef struct {
 	uint32_t c_leak_memory;
 	uint32_t c_logging;
 	uint32_t c_logging_archive;
+	char	*c_logging_compression;
 	uint32_t c_logging_prealloc;
 	uint32_t c_lsm_worker_threads;
 	uint32_t c_merge_max;
@@ -242,6 +243,7 @@ typedef struct {
 #define	COMPRESS_ZLIB			8
 #define	COMPRESS_ZLIB_NO_RAW		9
 	u_int c_compression_flag;		/* Compression flag value */
+	u_int c_logging_compression_flag;	/* Log compression flag value */
 
 #define	ISOLATION_RANDOM		1
 #define	ISOLATION_READ_UNCOMMITTED	2
