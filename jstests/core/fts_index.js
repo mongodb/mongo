@@ -62,10 +62,12 @@ coll.drop();
 //
 // 3. Collections may have at most one text index.
 //
-assert.commandWorked(coll.ensureIndex({a: 1, b: "text", c: 1}));
-assert.eq(2, coll.getIndexes().length);
 
 // ensureIndex() becomes a no-op on an equivalent index spec.
+assert.commandWorked(coll.getDB().createCollection(coll.getName()));
+assert.eq(1, coll.getIndexes().length);
+assert.commandWorked(coll.ensureIndex({a: 1, b: "text", c: 1}));
+assert.eq(2, coll.getIndexes().length);
 assert.commandWorked(coll.ensureIndex({a: 1, b: "text", c: 1}));
 assert.eq(2, coll.getIndexes().length);
 assert.commandWorked(coll.ensureIndex({a: 1, b: "text", c: 1}, {background: true}));
@@ -78,11 +80,37 @@ assert.commandWorked(coll.ensureIndex({a: 1, b: "text", c: 1}, {textIndexVersion
 assert.eq(2, coll.getIndexes().length);
 assert.commandWorked(coll.ensureIndex({a: 1, b: "text", c: 1}, {language_override: "language"}));
 assert.eq(2, coll.getIndexes().length);
+coll.drop();
+
+// Two index specs are also considered equivalent if they differ only in 'textIndexVersion', and
+// ensureIndex() becomes a no-op on repeated requests that only differ in this way.
+assert.commandWorked(coll.getDB().createCollection(coll.getName()));
+assert.eq(1, coll.getIndexes().length);
+assert.commandWorked(coll.ensureIndex({a: "text"}, {textIndexVersion: 1}));
+assert.eq(2, coll.getIndexes().length);
+assert.commandWorked(coll.ensureIndex({a: "text"}, {textIndexVersion: 2}));
+assert.eq(2, coll.getIndexes().length);
+assert.commandWorked(coll.ensureIndex({a: "text"}));
+assert.eq(2, coll.getIndexes().length);
+coll.drop();
+
+assert.commandWorked(coll.getDB().createCollection(coll.getName()));
+assert.eq(1, coll.getIndexes().length);
+assert.commandWorked(coll.ensureIndex({a: "text"}, {textIndexVersion: 2}));
+assert.eq(2, coll.getIndexes().length);
+assert.commandWorked(coll.ensureIndex({a: "text"}, {textIndexVersion: 1}));
+assert.eq(2, coll.getIndexes().length);
+assert.commandWorked(coll.ensureIndex({a: "text"}));
+assert.eq(2, coll.getIndexes().length);
+coll.drop();
 
 // ensureIndex() fails if a second text index would be built.
+assert.commandWorked(coll.getDB().createCollection(coll.getName()));
+assert.eq(1, coll.getIndexes().length);
+assert.commandWorked(coll.ensureIndex({a: 1, b: "text", c: 1}));
+assert.eq(2, coll.getIndexes().length);
 assert.commandFailed(coll.ensureIndex({a: 1, _fts: "text", _ftsx: 1, c: 1}, {weights: {d: 1}}));
 assert.commandFailed(coll.ensureIndex({a: 1, b: "text", c: 1}, {default_language: "none"}));
-assert.commandFailed(coll.ensureIndex({a: 1, b: "text", c: 1}, {textIndexVersion: 1}));
 assert.commandFailed(coll.ensureIndex({a: 1, b: "text", c: 1}, {language_override: "idioma"}));
 assert.commandFailed(coll.ensureIndex({a: 1, b: "text", c: 1}, {weights: {d: 1}}));
 assert.commandFailed(coll.ensureIndex({a: 1, b: "text", d: 1}));
