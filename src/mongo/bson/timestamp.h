@@ -59,7 +59,7 @@ namespace mongo {
         Timestamp(Seconds s, unsigned increment) : Timestamp(s.count(), increment) {}
 
         Timestamp(unsigned a, unsigned b) : i(b), secs(a) {
-            dassert(secs <= std::numeric_limits<int>::max());
+            dassert(secs <= static_cast<unsigned>(std::numeric_limits<int>::max()));
         }
 
         Timestamp() = default;
