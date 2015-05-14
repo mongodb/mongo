@@ -165,14 +165,13 @@ namespace mongo {
 
             // TODO: possibly use mutable BSON to remove preCondition field
             // once it is available
-            BSONObjIterator iter(applyOpCmd);
             BSONObjBuilder cmdBuilder;
 
-            while (iter.more()) {
-                BSONElement elem(iter.next());
-                if (strcmp(elem.fieldName(), "preCondition") != 0) {
-                    cmdBuilder.append(elem);
-                }
+            for (auto elem : applyOpCmd) {
+                auto name = elem.fieldNameStringData();
+                if (name == "preCondition") continue;
+                if (name == "bypassDocumentValidation") continue;
+                cmdBuilder.append(elem);
             }
 
             const BSONObj cmdRewritten = cmdBuilder.done();

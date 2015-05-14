@@ -40,6 +40,7 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/catalog/apply_ops.h"
+#include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/dbhash.h"
@@ -81,6 +82,10 @@ namespace mongo {
                          int,
                          string& errmsg,
                          BSONObjBuilder& result) {
+            boost::optional<DisableDocumentValidation> maybeDisableValidation;
+            if (shouldBypassDocumentValidationforCommand(cmdObj))
+                maybeDisableValidation.emplace(txn);
+
             if ( cmdObj.firstElement().type() != Array ) {
                 errmsg = "ops has to be an array";
                 return false;
