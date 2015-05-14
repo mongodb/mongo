@@ -690,6 +690,8 @@ ShardingTest.prototype.printCollectionInfo = function( ns , msg ){
 }
 
 printShardingStatus = function( configDB , verbose ){
+    // configDB is a DB object that contains the sharding metadata of interest.
+    // Defaults to the db named "config" on the current connection.
     if (configDB === undefined)
         configDB = db.getSisterDB('config')
     
@@ -713,80 +715,77 @@ printShardingStatus = function( configDB , verbose ){
         }
     );
 
-    // All of the balancer information functions below depend on a connection to a liveDB
-    // This isn't normally a problem, but can cause issues in testing and running with --nodb
-    if ( typeof db !== 'undefined' ) {
-        output( "  balancer:" );
+    output( "  balancer:" );
 
-        //Is the balancer currently enabled
-        output( "\tCurrently enabled:  " + ( sh.getBalancerState() ? "yes" : "no" ) );
+    //Is the balancer currently enabled
+    output( "\tCurrently enabled:  " + ( sh.getBalancerState(configDB) ? "yes" : "no" ) );
 
-        //Is the balancer currently active
-        output( "\tCurrently running:  " + ( sh.isBalancerRunning() ? "yes" : "no" ) );
+    //Is the balancer currently active
+    output( "\tCurrently running:  " + ( sh.isBalancerRunning(configDB) ? "yes" : "no" ) );
 
-        //Output details of the current balancer round
-        var balLock = sh.getBalancerLockDetails()
-        if ( balLock ) {
-            output( "\t\tBalancer lock taken at " + balLock.when + " by " + balLock.who );
-        }
+    //Output details of the current balancer round
+    var balLock = sh.getBalancerLockDetails(configDB)
+    if ( balLock ) {
+        output( "\t\tBalancer lock taken at " + balLock.when + " by " + balLock.who );
+    }
 
-        //Output the balancer window
-        var balSettings = sh.getBalancerWindow()
-        if ( balSettings ) {
-            output( "\t\tBalancer active window is set between " +
-                balSettings.start + " and " + balSettings.stop + " server local time");
-        }
+    //Output the balancer window
+    var balSettings = sh.getBalancerWindow(configDB)
+    if ( balSettings ) {
+        output( "\t\tBalancer active window is set between " +
+            balSettings.start + " and " + balSettings.stop + " server local time");
+    }
 
-        //Output the list of active migrations
-        var activeMigrations = sh.getActiveMigrations()
-        if (activeMigrations.length > 0 ){
-            output("\tCollections with active migrations: ");
-            activeMigrations.forEach( function(migration){
-                output("\t\t"+migration._id+ " started at " + migration.when );
-            });
-        }
+    //Output the list of active migrations
+    var activeMigrations = sh.getActiveMigrations(configDB)
+    if (activeMigrations.length > 0 ){
+        output("\tCollections with active migrations: ");
+        activeMigrations.forEach( function(migration){
+            output("\t\t"+migration._id+ " started at " + migration.when );
+        });
+    }
 
-        // Actionlog and version checking only works on 2.7 and greater
-        var versionHasActionlog = false;
-        var metaDataVersion = configDB.getCollection("version").findOne().currentVersion
-        if ( metaDataVersion > 5 ) {
+    // Actionlog and version checking only works on 2.7 and greater
+    var versionHasActionlog = false;
+    var metaDataVersion = configDB.getCollection("version").findOne().currentVersion
+    if ( metaDataVersion > 5 ) {
+        versionHasActionlog = true;
+    }
+    if ( metaDataVersion == 5 ) {
+        var verArray = db.serverBuildInfo().versionArray
+        if (verArray[0] == 2 && verArray[1] > 6){
             versionHasActionlog = true;
         }
-        if ( metaDataVersion == 5 ) {
-            var verArray = db.serverBuildInfo().versionArray
-            if (verArray[0] == 2 && verArray[1] > 6){
-                versionHasActionlog = true;
-            }
+    }
+
+    if ( versionHasActionlog ) {
+        //Review config.actionlog for errors
+        var actionReport = sh.getRecentFailedRounds(configDB);
+        //Always print the number of failed rounds
+        output( "\tFailed balancer rounds in last 5 attempts:  " + actionReport.count )
+
+        //Only print the errors if there are any
+        if ( actionReport.count > 0 ){
+            output( "\tLast reported error:  " + actionReport.lastErr )
+            output( "\tTime of Reported error:  " + actionReport.lastTime )
         }
 
-        if ( versionHasActionlog ) {
-            //Review config.actionlog for errors
-            var actionReport = sh.getRecentFailedRounds();
-            //Always print the number of failed rounds
-            output( "\tFailed balancer rounds in last 5 attempts:  " + actionReport.count )
-
-            //Only print the errors if there are any
-            if ( actionReport.count > 0 ){
-                output( "\tLast reported error:  " + actionReport.lastErr )
-                output( "\tTime of Reported error:  " + actionReport.lastTime )
-            }
-
-            output("\tMigration Results for the last 24 hours: ");
-            var migrations = sh.getRecentMigrations()
-            if(migrations.length > 0) {
-                migrations.forEach( function(x) {
-                    if (x._id === "Success"){
-                        output( "\t\t" + x.count + " : " + x._id)
-                    } else {
-                        output( "\t\t" + x.count + " : Failed with error '" +  x._id
-                        + "', from " + x.from + " to " + x.to )
-                    }
-                });
-            } else {
-                    output( "\t\tNo recent migrations");
-            }
+        output("\tMigration Results for the last 24 hours: ");
+        var migrations = sh.getRecentMigrations(configDB)
+        if(migrations.length > 0) {
+            migrations.forEach( function(x) {
+                if (x._id === "Success"){
+                    output( "\t\t" + x.count + " : " + x._id)
+                } else {
+                    output( "\t\t" + x.count + " : Failed with error '" +  x._id
+                    + "', from " + x.from + " to " + x.to )
+                }
+            });
+        } else {
+                output( "\t\tNo recent migrations");
         }
     }
+
     output( "  databases:" );
     configDB.databases.find().sort( { name : 1 } ).forEach( 
         function(db){
