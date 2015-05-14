@@ -1227,8 +1227,8 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 	 * already created a bloom filter for it or we are configured not to.
 	 */
 	if (lsm_tree->nchunks == 1 &&
-	    (FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_OLDEST) &&
-	    F_ISSET(lsm_tree->chunk[0], WT_LSM_CHUNK_BLOOM) ||
+	    ((FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_OLDEST) &&
+	    F_ISSET(lsm_tree->chunk[0], WT_LSM_CHUNK_BLOOM)) ||
 	    !FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_OLDEST))) {
 		__wt_lsm_tree_release(session, lsm_tree);
 		return (0);
