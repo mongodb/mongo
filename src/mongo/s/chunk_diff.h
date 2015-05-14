@@ -38,7 +38,6 @@ namespace mongo {
 
     class ChunkType;
     class CatalogManager;
-    class Query;
 
     /**
      * This class manages and applies diffs from partial config server data reloads.  Because the

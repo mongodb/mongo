@@ -30,7 +30,7 @@
 
 #include <boost/shared_ptr.hpp>
 
-#include "mongo/client/connection_string.h"
+#include "mongo/client/dbclientinterface.h"
 
 namespace mongo {
 
@@ -126,11 +126,25 @@ namespace mongo {
 
         bool ok() const { return _addr.size() > 0; }
 
-        BSONObj runCommand(const std::string& db, const std::string& simple) const;
-        BSONObj runCommand(const std::string& db, const BSONObj& cmd) const;
+        // Set internal to true to run the command with internal authentication privileges.
+        BSONObj runCommand( const std::string& db , const std::string& simple ) const {
+            return runCommand( db , BSON( simple << 1 ) );
+        }
+        BSONObj runCommand( const std::string& db , const BSONObj& cmd ) const ;
 
-        bool runCommand(const std::string& db, const std::string& simple, BSONObj& res) const;
-        bool runCommand(const std::string& db, const BSONObj& cmd, BSONObj& res) const;
+        /**
+         * Runs a command on this shard. This method signature matches that of
+         * the connection on which this method relies upon.
+         */
+        bool runCommand(const std::string& db,
+                        const BSONObj& cmd,
+                        BSONObj& res) const;
+
+        bool runCommand(const std::string& db,
+                        const std::string& simple,
+                        BSONObj& res) const {
+            return runCommand(db, BSON(simple << 1), res);
+        }
 
         /**
          * Returns the version string from the shard based from the serverStatus command result.
@@ -149,12 +163,13 @@ namespace mongo {
 
         /**
          * mostly for replica set
-         * retursn true if node is the shard
+         * retursn true if node is the shard 
          * of if the replica set contains node
          */
         bool containsNode( const std::string& node ) const;
 
         static void getAllShards( std::vector<Shard>& all );
+        static void printShardInfo( std::ostream& out );
         static Shard lookupRSName( const std::string& name);
         
         /**
@@ -188,11 +203,17 @@ namespace mongo {
 
     class ShardStatus {
     public:
+
         ShardStatus(const Shard& shard, long long dataSizeBytes, const std::string& version);
+
+        friend std::ostream& operator << (std::ostream& out, const ShardStatus& s) {
+            out << s.toString();
+            return out;
+        }
 
         std::string toString() const {
             std::stringstream ss;
-            ss << "shard: " << _shard.toString()
+            ss << "shard: " << _shard
                << " dataSizeBytes: " << _dataSizeBytes
                << " version: " << _mongoVersion;
             return ss.str();

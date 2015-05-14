@@ -125,14 +125,17 @@ namespace mongo {
 
         // Atomically returns *either* the chunk manager *or* the primary shard for the collection,
         // neither if the collection doesn't exist.
-        void getChunkManagerOrPrimary(const std::string& ns,
-                                      boost::shared_ptr<ChunkManager>& manager,
-                                      boost::shared_ptr<Shard>& primary);
+        void getChunkManagerOrPrimary(const std::string& ns, boost::shared_ptr<ChunkManager>& manager, ShardPtr& primary);
 
         boost::shared_ptr<ChunkManager> getChunkManager(const std::string& ns, bool reload = false, bool forceReload = false);
         boost::shared_ptr<ChunkManager> getChunkManagerIfExists(const std::string& ns, bool reload = false, bool forceReload = false);
 
         const Shard& getShard( const std::string& ns );
+        /**
+         * @return the correct for shard for the ns
+         * if the namespace is sharded, will return NULL
+         */
+        ShardPtr getShardIfExists( const std::string& ns );
 
         void setPrimary( const std::string& s );
 
