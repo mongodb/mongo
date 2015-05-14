@@ -244,14 +244,19 @@ assert(db.getCollection( "test_db" ).getIndexes().length == 0,24);
 
     t.save({a: 1});
     var stats = assert.commandWorked(t.stats());
-    assert.eq(stats.storageSize, t.storageSize());
     assert.neq(undefined, t.storageSize(),
                'db.collection.storageSize() cannot be undefined on a non-empty collection');
-    assert.eq(stats.totalIndexSize, t.totalIndexSize());
     assert.neq(undefined, t.totalIndexSize(),
                'db.collection.totalIndexSize() cannot be undefined on a non-empty collection');
-    assert.eq(t.storageSize() + t.totalIndexSize(), t.totalSize(),
-              'incorrect db.collection.totalSize() on a non-empty collection');
+
+    if (db.serverStatus()storageEngine.name === 'mmapv1') {
+        // Only in MMAPv1 do we guarantee that storageSize only changes when you write to a
+        // collection.
+        assert.eq(stats.storageSize, t.storageSize());
+        assert.eq(stats.totalIndexSize, t.totalIndexSize());
+        assert.eq(t.storageSize() + t.totalIndexSize(), t.totalSize(),
+                  'incorrect db.collection.totalSize() on a non-empty collection');
+    }
 
     t.drop();
 }());
