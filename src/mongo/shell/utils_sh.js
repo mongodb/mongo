@@ -100,15 +100,19 @@ sh.setBalancerState = function( onOrNot ) {
     db.getSisterDB( "config" ).settings.update({ _id: "balancer" }, { $set : { stopped: onOrNot ? false : true } }, true );
 }
 
-sh.getBalancerState = function() {
-    var x = db.getSisterDB( "config" ).settings.findOne({ _id: "balancer" } )
+sh.getBalancerState = function(configDB) {
+    if (configDB === undefined)
+        configDB = db.getSiblingDB('config');
+    var x = configDB.settings.findOne({ _id: "balancer" } )
     if ( x == null )
         return true;
     return ! x.stopped;
 }
 
-sh.isBalancerRunning = function () {
-    var x = db.getSisterDB("config").locks.findOne({ _id: "balancer" });
+sh.isBalancerRunning = function (configDB) {
+    if (configDB === undefined)
+        configDB = db.getSiblingDB('config');
+    var x = configDB.locks.findOne({ _id: "balancer" });
     if (x == null) {
         print("config.locks collection empty or missing. be sure you are connected to a mongos");
         return false;
@@ -116,8 +120,10 @@ sh.isBalancerRunning = function () {
     return x.state > 0;
 }
 
-sh.getBalancerHost = function() {   
-    var x = db.getSisterDB("config").locks.findOne({ _id: "balancer" });
+sh.getBalancerHost = function(configDB) {
+    if (configDB === undefined)
+        configDB = db.getSiblingDB('config');
+    var x = configDB.locks.findOne({ _id: "balancer" });
     if( x == null ){
         print("config.locks collection does not contain balancer lock. be sure you are connected to a mongos");
         return ""
@@ -378,8 +384,9 @@ sh.removeTagRange = function( ns, min, max, tag ) {
     sh._checkLastError( config );
 }
 
-sh.getBalancerLockDetails = function() {
-    var configDB = db.getSiblingDB('config');
+sh.getBalancerLockDetails = function(configDB) {
+    if (configDB === undefined)
+        configDB = db.getSiblingDB('config');
     var lock = configDB.locks.findOne({ _id : 'balancer' });
     if (lock == null) {
         return null;
@@ -390,8 +397,9 @@ sh.getBalancerLockDetails = function() {
     return lock;
 }
 
-sh.getBalancerWindow = function() {
-    var configDB = db.getSiblingDB('config');
+sh.getBalancerWindow = function(configDB) {
+    if (configDB === undefined)
+        configDB = db.getSiblingDB('config');
     var settings = configDB.settings.findOne({ _id : 'balancer' });
     if ( settings == null ) {
         return null;
@@ -402,8 +410,9 @@ sh.getBalancerWindow = function() {
     return null
 }
 
-sh.getActiveMigrations = function() {
-    var configDB = db.getSiblingDB('config');
+sh.getActiveMigrations = function(configDB) {
+    if (configDB === undefined)
+        configDB = db.getSiblingDB('config');
     var activeLocks = configDB.locks.find( { _id : { $ne : "balancer" }, state: {$eq:2} });
     var result = []
     if( activeLocks != null ){
@@ -414,8 +423,9 @@ sh.getActiveMigrations = function() {
     return result;
 }
 
-sh.getRecentFailedRounds = function() {
-    var configDB = db.getSiblingDB('config');
+sh.getRecentFailedRounds = function(configDB) {
+    if (configDB === undefined)
+        configDB = db.getSiblingDB('config');
     var balErrs = configDB.actionlog.find({what:"balancer.round"}).sort({time:-1}).limit(5)
     var result = { count : 0, lastErr : "", lastTime : " "};
     if(balErrs != null) {
@@ -435,8 +445,9 @@ sh.getRecentFailedRounds = function() {
  * since yesterday. The format is an array of 2 arrays, where the first array contains
  * the successful cases, and the second array contains the failure cases.
  */
-sh.getRecentMigrations = function() {
-    var configDB = db.getSiblingDB('config');
+sh.getRecentMigrations = function(configDB) {
+    if (configDB === undefined)
+        configDB = db.getSiblingDB('config');
     var yesterday = new Date( new Date() - 24 * 60 * 60 * 1000 );
 
     // Successful migrations.
