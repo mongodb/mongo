@@ -76,6 +76,31 @@ assert.eq(2, specObj["2dsphereIndexVersion"]);
 coll.drop();
 
 //
+// Two index specs are considered equivalent if they differ only in '2dsphereIndexVersion', and
+// ensureIndex() should become a no-op on repeated requests that only differ in this way.
+//
+
+assert.commandWorked(coll.getDB().createCollection(coll.getName()));
+assert.eq(1, coll.getIndexes().length);
+assert.commandWorked(coll.ensureIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": 1}));
+assert.eq(2, coll.getIndexes().length);
+assert.commandWorked(coll.ensureIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": 2}));
+assert.eq(2, coll.getIndexes().length);
+assert.commandWorked(coll.ensureIndex({geo: "2dsphere"}));
+assert.eq(2, coll.getIndexes().length);
+coll.drop();
+
+assert.commandWorked(coll.getDB().createCollection(coll.getName()));
+assert.eq(1, coll.getIndexes().length);
+assert.commandWorked(coll.ensureIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": 2}));
+assert.eq(2, coll.getIndexes().length);
+assert.commandWorked(coll.ensureIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": 1}));
+assert.eq(2, coll.getIndexes().length);
+assert.commandWorked(coll.ensureIndex({geo: "2dsphere"}));
+assert.eq(2, coll.getIndexes().length);
+coll.drop();
+
+//
 // Test compatibility of various GeoJSON objects with both 2dsphere index versions.
 //
 
