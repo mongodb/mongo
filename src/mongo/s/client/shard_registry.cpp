@@ -39,6 +39,7 @@
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard.h"
+#include "mongo/s/grid.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -49,16 +50,13 @@ namespace mongo {
     using std::vector;
 
 
-    ShardRegistry::ShardRegistry(CatalogManager* catalogManager)
-        : _catalogManager(catalogManager) {
-
-    }
+    ShardRegistry::ShardRegistry() = default;
 
     ShardRegistry::~ShardRegistry() = default;
 
     void ShardRegistry::reload() {
         vector<ShardType> shards;
-        Status status = _catalogManager->getAllShards(&shards);
+        Status status = grid.catalogManager()->getAllShards(&shards);
         massert(13632, "couldn't get updated shard list from config server", status.isOK());
 
         int numShards = shards.size();

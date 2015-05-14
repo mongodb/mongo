@@ -485,11 +485,11 @@ namespace mongo {
                 str::stream() << "Invalid config server connection string: " << errmsg,
                 configServerCS.isValid());
 
+        configServer.init(configServerCS);
+
         auto catalogManager = stdx::make_unique<CatalogManagerLegacy>();
         uassertStatusOK(catalogManager->init(configServerCS));
         grid.setCatalogManager(std::move(catalogManager));
-
-        configServer.init(configServerCS);
 
         _enabled = true;
     }
