@@ -11,7 +11,7 @@ New features:
 
 * Add support for bulk load in LSM trees. Previously the bulk configuration for
   cursor create was ignored by LSM trees.
-  refs WT-1922 SERVER-18321
+  refs SERVER-18321, WT-1922
 
 * Add support for raw compression in LZ4. Change is not compatible with tables
   created with LZ4 compression using earlier versions of WiredTiger. See
@@ -22,17 +22,17 @@ API and behavior changes:
 * Enhance performance of WT_SESSION::drop with force enabled. Don't flush
   content from cache before returning from the API call, instead mark the tree
   as dead and discard it in the background without writing any content to disk.
-  WT-1894
+  refs WT-1894
 
 * Add an API to validate configuration strings.
-  refs #1739
+  refs WT-1739
 
 * Disallow the cache_resident flag on LSM trees.
   refs WT-1905
 
 * Enhance the controls for how aggressively idle handles are closed. Update the
   wiredtiger_open file_manager configuration options to expose that control.
-  refs WT-1856 SERVER-17907
+  refs SERVER-17907, WT-1856
 
 
 Significant bug fixes and performance enhancements:
@@ -49,14 +49,14 @@ Significant bug fixes and performance enhancements:
 * Check the magic and version numbers in log files when first opening them.
 
 * Fix a bug with cache leaf size accounting for statistics.
-  refs WT-1885 WT-1919
+  refs WT-1885, WT-1919
 
 * Fix a bug where checkpoint could skip a page that was rewritten in memory.
-  refs #1946
+  refs WT-1946
 
 * Fix a bug in WT_CURSOR::search_near with a random cursor. If a lookup lands
   on a deleted item move to the next valid record.
-  refs WT-1921 #1944
+  refs WT-1921, WT-1944
 
 * Fix a bug in handle close where we could fail to clear WT_DHANDLE_OPEN.
   refs WT-1915
@@ -92,7 +92,7 @@ Significant bug fixes and performance enhancements:
 
 * Only split large in-memory pages if there is a need to keep them in cache.
   Otherwise it is better to reconcile and evict them immediately.
-  refs WT-1890 WT-1896
+  refs WT-1890, WT-1896
 
 * Fix a race on shutdown where the eviction server could still have been
   accessing files while they were being closed.
@@ -100,7 +100,7 @@ Significant bug fixes and performance enhancements:
 
 * Fix a case where we could run recovery unnecessarily if there were only non
   data changing log records since the last checkpoint.
-  WT-1892
+  refs WT-1892
 
 * Update API documentation to explain internal session handle usage. This
   allows users to do specific calculations based on their session_max setting.
