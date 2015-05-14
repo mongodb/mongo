@@ -126,7 +126,7 @@ namespace {
         return fromMillisSinceEpoch(curTimeMillis64());
     }
 
-    bool Date_t::isFormatable() const {
+    bool Date_t::isFormattable() const {
         if (millis < 0) {
             return false;
         }
@@ -195,7 +195,7 @@ namespace {
     };
 
     void _dateToISOString(Date_t date, bool local, DateStringBuffer* result) {
-        invariant(date.isFormatable());
+        invariant(date.isFormattable());
         static const int bufSize = DateStringBuffer::dataCapacity;
         char* const buf = result->data;
         struct tm t;
@@ -746,7 +746,7 @@ namespace {
 #undef MONGO_ISO_DATE_FMT_NO_TZ
 
     std::string Date_t::toString() const {
-        if (isFormatable()) {
+        if (isFormattable()) {
             return dateToISOStringLocal(*this);
         }
         else {

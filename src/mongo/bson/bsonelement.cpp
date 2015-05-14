@@ -197,7 +197,7 @@ namespace mongo {
                 // long long, despite the fact that it is logically signed (SERVER-8573), this check
                 // handles both the case where Date_t::millis is too large, and the case where
                 // Date_t::millis is negative (before the epoch).
-                if (d.isFormatable()) {
+                if (d.isFormattable()) {
                     s << "\"" << dateToISOStringLocal(date()) << "\"";
                 }
                 else {
@@ -215,7 +215,7 @@ namespace mongo {
                     // unsigned long long, despite the fact that it is logically signed
                     // (SERVER-8573), this check handles both the case where Date_t::millis is too
                     // large, and the case where Date_t::millis is negative (before the epoch).
-                    if (d.isFormatable()) {
+                    if (d.isFormattable()) {
                         s << "\"" << dateToISOStringLocal(date()) << "\"";
                     }
                     else {

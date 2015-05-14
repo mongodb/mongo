@@ -81,31 +81,97 @@ namespace mongo {
         return duration_cast<DOut>(d).count();
     }
 
+    /**
+     * Representation of a point in time, with millisecond resolution and capable
+     * of representing all times representable by the BSON Date type.
+     *
+     * The epoch used for this type is the Posix Epoch (1970-01-01T00:00:00Z).
+     */
     class Date_t {
     public:
+        /**
+         * The largest representable Date_t.
+         *
+         * TODO(schwerin): Make constexpr when supported by all compilers.
+         */
         static Date_t max();
+
+        /**
+         * Reads the system clock and returns a Date_t representing the present time.
+         */
         static Date_t now();
 
+        /**
+         * Returns a Date_t from an integer number of milliseconds since the epoch.
+         */
         static Date_t fromMillisSinceEpoch(long long m) {
             return Date_t(m);
         }
 
+        /**
+         * Returns a Date_t from a duration since the epoch.
+         */
         template <typename Duration>
         static Date_t fromDurationSinceEpoch(Duration d) {
             return fromMillisSinceEpoch(durationCount<Milliseconds>(d));
         }
 
+        /**
+         * Constructs a Date_t representing the epoch.
+         */
         Date_t(): millis(0) {}
 
+        /**
+         * Returns a string representation of the date.
+         *
+         * If isFormattable() returns true for this date, the string will be equivalent to the one
+         * returned by dateToISOStringLocal(*this).  Otherwise, returns the string Date(...) where
+         * ... is the string representation in base 10 of the number of milliseconds since the epoch
+         * that this date represents (negative for pre-epoch).
+         */
         std::string toString() const;
+
+        /**
+         * Returns a representation of this date as a C time_t.
+         *
+         * Raises an exception if this date is not representable as a time_t on the system.
+         */
         time_t toTimeT() const;
+
+        /**
+         * DEPRECATED. This is a deprecated form of toMillisSinceEpoch().
+         */
         int64_t asInt64() const {
             return toMillisSinceEpoch();
         }
-        unsigned long long toULL() const { return static_cast<unsigned long long>(asInt64()); }
+
+        /**
+         * DEPRECATED. This is a deprecated form of toMillisSinceEpoch() that casts the result to
+         * unsigned long long.  It is leftover because sometimes objects of logical type Timestamp
+         * get stored in BSON documents (or in-memory structures) with effective type Date_t, and
+         * it is necessary to convert between the two.
+         */
+        unsigned long long toULL() const {
+            return static_cast<unsigned long long>(toMillisSinceEpoch());
+        }
+
+        /**
+         * Returns a duration representing the time since the epoch represented by this Date_t.
+         */
         Milliseconds toDurationSinceEpoch() const { return Milliseconds(toMillisSinceEpoch()); }
+
+        /**
+         * Returns the number of milliseconds since the epoch represented by this Date_t.
+         */
         long long toMillisSinceEpoch() const { return static_cast<long long>(millis); }
-        bool isFormatable() const;
+
+        /**
+         * Returns true if this Date_t is in the range of Date_ts that can be formatted as calendar
+         * dates.  This property is guaranteed to be true for all dates from the epoch,
+         * 1970-01-01T00:00:00.000Z, through 3000-12-31T23:59:59.000Z on 64-bit systems and through
+         * 2038-01-19T03:14:07.000Z on 32-bit systems.
+         */
+        bool isFormattable() const;
 
         template <typename Duration>
         Date_t& operator+=(Duration d) {
