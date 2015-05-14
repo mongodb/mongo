@@ -1008,8 +1008,16 @@ fake:	/*
 	 * will update the turtle file and swap the new one into place.  We
 	 * need to make sure the metadata is on disk before the turtle file is
 	 * updated.
+	 *
+	 * Also, if we are doing a checkpoint in a file without a transaction
+	 * (such as closing a dirty tree before an exclusive operation such as
+	 * verify), the metadata update will be auto-committed, so we need to
+	 * sync the file first, or we could roll forward the metadata in
+	 * recovery and try to open a checkpoint that isn'tyet durable.
 	 */
-	if (F_ISSET(conn, WT_CONN_CKPT_SYNC) && WT_IS_METADATA(dhandle))
+	if (F_ISSET(conn, WT_CONN_CKPT_SYNC) &&
+	    (WT_IS_METADATA(dhandle) ||
+	    !F_ISSET(&session->txn, WT_TXN_RUNNING)))
 		WT_ERR(__wt_checkpoint_sync(session, NULL));
 
 	WT_ERR(__wt_meta_ckptlist_set(
