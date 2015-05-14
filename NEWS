@@ -65,8 +65,8 @@ Significant bug fixes and performance enhancements:
   page if we are attempting to split it.
   refs WT-1916, WT-1917
 
-* Fix a bug in btree open where if there was a failure while opening at a
-  checkpoint, the checkpoint may not be unloaded.
+* Fix a bug in btree open where a failure while opening a checkpoint we may
+  not clean up completely.
   refs WT-1598
 
 * Fix a performance problem where long running transactions could continually
@@ -74,68 +74,73 @@ Significant bug fixes and performance enhancements:
   of finding any.
   refs WT-1913
 
-* Move eviction outside transactions and don't start a transaction when reading a page if eviction is prohibited.
+* Fix a performance problem where many threads accessing a single page could
+  stop us from evicting or splitting the page.
   refs WT-1912
 
-* Restructure handle locking so it all happens at the session level, avoid entanglements between handle locks, the schema lock and the handle list lock.
+* Fix a source of deadlock bugs by resturcturing how we lock handles. Clean
+  up the definition of when it is safe to acquire different locks.
   refs WT-1598
 
-* Ensure that a file marked as cache resident is never evicted, add some optimizations for cache resident files.
+* Fix a bug where we could evict pages from a file marked as cache resident.
+  Also add some optimizations for cache resident files.
   refs SERVER-18192
 
-* Fix a deadlock related to LSM. There are cases where closing a file with an existing checkpoint could self deadlock.
+* Fix a deadlock related to LSM. There are cases where closing a file with an
+  existing checkpoint could self deadlock.
   refs WT-716
 
-* Run recovery earlier. TODO: more information
-  WT-1897
-
-* Only split large in-memory pages if there is a need to keep them in cache. Otherwise it is better to reconcile and evict them immediately.
+* Only split large in-memory pages if there is a need to keep them in cache.
+  Otherwise it is better to reconcile and evict them immediately.
   refs WT-1890 WT-1896
 
-* Shut down the eviction server before closing file handles to avoid a race.
+* Fix a race on shutdown where the eviction server could still have been
+  accessing files while they were being closed.
   refs WT-1893
 
-* Look for any number of non-data-changing log records to determine if we can skip recovery.
+* Fix a case where we could run recovery unnecessarily if there were only non
+  data changing log records since the last checkpoint.
   WT-1892
 
-* Update API documentation to explain internal session handle usage. This allows users to do specific calculations based on their session_max setting.
+* Update API documentation to explain internal session handle usage. This
+  allows users to do specific calculations based on their session_max setting.
 
 * Fix a bug in LSM where updates with overwrite could be skipped incorrectly.
   refs BF-829
 
-* Fix a bug in cursors where searching and traversing in different combinations could lead to data buffers being freed before they should be.
+* Fix a bug in cursors where searching and traversing in different combinations
+  could lead to data buffers being freed before they should be.
   refs WT-1887
 
 * Fix a bug when closing bulk cursors where a file could be left pinned open.
 
-* Generated tables for config subcategories now contains the name of the method they are applicable for.  TODO: This is an API change, find details.
-  refs WT-1879
+* Fix a bug on Windows related to truncating files. Since SetEndofFile does not
+  ignore truncation requests like POSIX fallocate.
 
-* Disable fallocate on Windows since SetEndofFile does not ignore truncation requests like POSIX fallocate.
-
-* Fix a bug in file truncate, where we could truncate to the wrong place if there was a race extending the file at the same time.
+* Fix a bug in file truncate, where we could truncate to the wrong place if
+  there was a race extending the file at the same time.
   refs WT-1871
 
-* Fix a bug in reconciliation where the page boundary structures could point into freed memory.
+* Fix a bug in reconciliation where the page boundary structures could point
+  into freed memory.
   refs WT-1852
 
-* Change the WT_CURSOR::search and WT_CURSOR::search_near API to first check the currently pinned page before starting a regular descending search.
+* Change the WT_CURSOR::search and WT_CURSOR::search_near API to first check
+  the currently pinned page before starting a regular descending search.
 
-* Reset eol if we continue.  Return NOTFOUND if checksum mismatch. #1840
-  commit 684fd71475cbc6b15290945af0160fac0313ad6b
+* Fix a bug in recovery where we could return an error if a transaction spanned
+  an entire log file.
 
-* Modify log_scan callback args to send in next LSN. #1837 TODO: API change?
-  commit 9c29e0f13268c03038704372c069353c81357791
+* Fix a bug where we could run recovery unnecessarily on startup.
 
 * Enhance the Python cursor API to allow setting keys and values using array notation.
 
-* The gaps in column-store tables can be large enough we spend too much time looping through the "deleted" records when writing out the page skip the boring part.
+* Fix a performance problem where creating a column store with large gaps in
+  the key range would lead to very poor performance.
   refs WT-1807.
 
-* Set checkpoint LSN to existing log record.
-  refs WT-1700
-
-* Update the btree search routine to use vectorized search. Based on CPU and memory profiling.
+* Improve the performance of the core btree search routine by using a
+  vectorized search. Based on CPU and memory profiling.
 
 
 WiredTiger release 2.5.3, 2015-04-22
