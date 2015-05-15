@@ -33,7 +33,6 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/database_task.h"
-#include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -51,7 +50,7 @@ namespace repl {
                 Lock::GlobalWrite lock(txn->lockState());
                 return task(txn, status);
             } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "globalExclusiveLockTask", "global");
-            MONGO_COMPILER_UNREACHABLE;
+            MONGO_UNREACHABLE;
         };
         return newTask;
     }
@@ -71,7 +70,7 @@ namespace repl {
                 Lock::DBLock lock(txn->lockState(), databaseName, mode);
                 return task(txn, status);
             } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "databaseLockTask", databaseName);
-            MONGO_COMPILER_UNREACHABLE;
+            MONGO_UNREACHABLE;
         };
         return newTask;
     }
@@ -92,7 +91,7 @@ namespace repl {
                 Lock::CollectionLock collectionLock(txn->lockState(), nss.toString(), mode);
                 return task(txn, status);
             } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "collectionLockTask", nss.toString());
-            MONGO_COMPILER_UNREACHABLE;
+            MONGO_UNREACHABLE;
         };
         return newTask;
     }

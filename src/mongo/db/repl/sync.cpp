@@ -44,7 +44,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/repl/oplogreader.h"
-#include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 
@@ -157,8 +156,7 @@ namespace repl {
             }
         } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "InsertRetry", nss.ns());
 
-        // fixes compile errors on GCC - see SERVER-18219 for details
-        MONGO_COMPILER_UNREACHABLE;
+        MONGO_UNREACHABLE;
     }
 
 } // namespace repl

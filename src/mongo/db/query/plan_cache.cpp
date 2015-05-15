@@ -43,7 +43,7 @@
 #include "mongo/db/query/plan_ranker.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/query_knobs.h"
-#include "mongo/platform/compiler.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -409,7 +409,7 @@ namespace {
                 << "tree=" << this->tree->toString()
                 << ")";
         }
-        MONGO_COMPILER_UNREACHABLE;
+        MONGO_UNREACHABLE;
     }
 
     //

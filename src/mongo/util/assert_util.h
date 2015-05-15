@@ -394,3 +394,16 @@ namespace mongo {
             << std::endl; \
     }
 
+/**
+ * The purpose of this macro is to instruct the compiler that a line of code will never be reached.
+ *
+ * Example:
+ *     // code above checks that expr can only be FOO or BAR
+ *     switch (expr) {
+ *     case FOO: { ... }
+ *     case BAR: { ... }
+ *     default:
+ *         MONGO_UNREACHABLE;
+ */
+
+#define MONGO_UNREACHABLE ::mongo::invariantFailed("Hit a MONGO_UNREACHABLE!", __FILE__, __LINE__);

@@ -58,6 +58,7 @@
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/s/d_state.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/hostandport.h"
@@ -238,6 +239,7 @@ namespace {
             } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn,
                                                   "save replica set lastVote",
                                                   lastVoteCollectionName);
+            MONGO_UNREACHABLE;
         }
         catch (const DBException& ex) {
             return ex.toStatus();
