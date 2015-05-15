@@ -32,8 +32,8 @@
 #include <string>
 #include <vector>
 
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/rpc/request.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/rpc/command_request.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/net/message.h"
 
@@ -86,7 +86,7 @@ namespace {
         Message toSend;
         toSend.setData(dbCommand, opCommandData.data(), opCommandData.size());
 
-        rpc::Request opCmd{&toSend};
+        rpc::CommandRequest opCmd{&toSend};
 
         ASSERT_EQUALS(opCmd.getCommandName(), commandName);
         ASSERT_EQUALS(opCmd.getDatabase(), database);
@@ -107,4 +107,3 @@ namespace {
         ASSERT_TRUE(inputDocRangeIter == inputDocRange.end());
     }
 }  // namespace
-

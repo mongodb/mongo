@@ -28,12 +28,10 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/util/builder.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/rpc/command_request.h"
+#include "mongo/rpc/command_request_builder.h"
 #include "mongo/rpc/document_range.h"
-#include "mongo/rpc/request.h"
-#include "mongo/rpc/request_builder.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
@@ -72,7 +70,7 @@ namespace {
 
         rpc::DocumentRange inputDocRange{inputDocs.buf(), inputDocs.buf() + inputDocs.len()};
 
-        rpc::RequestBuilder r;
+        rpc::CommandRequestBuilder r;
 
         auto msg = r.setDatabase(databaseName)
                     .setCommandName(commandName)
@@ -81,7 +79,7 @@ namespace {
                     .addInputDocs(inputDocRange)
                     .done();
 
-        rpc::Request parsed(msg.get());
+        rpc::CommandRequest parsed(msg.get());
 
         ASSERT_EQUALS(parsed.getDatabase(), databaseName);
         ASSERT_EQUALS(parsed.getCommandName(), commandName);

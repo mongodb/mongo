@@ -33,7 +33,7 @@
 
 #include "mongo/base/data_range.h"
 #include "mongo/base/data_range_cursor.h"
-#include "mongo/bson/bsonobj.h"
+#include "mongo/db/jsobj.h"
 
 namespace mongo {
 namespace rpc {

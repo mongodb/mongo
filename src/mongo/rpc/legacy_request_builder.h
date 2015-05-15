@@ -31,60 +31,45 @@
 #include <memory>
 
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonobj.h"
+#include "mongo/db/jsobj.h"
 #include "mongo/rpc/document_range.h"
+#include "mongo/rpc/request_builder_interface.h"
 #include "mongo/util/net/message.h"
 
 namespace mongo {
 namespace rpc {
 
-    /**
-     * Constructs an OP_COMMAND message.
-     */
-    class RequestBuilder {
+    class LegacyRequestBuilder : public RequestBuilderInterface {
     public:
+        LegacyRequestBuilder();
+        ~LegacyRequestBuilder() final;
 
-        /**
-         * Constructs an OP_COMMAND in a new buffer.
-         */
-        RequestBuilder();
+        LegacyRequestBuilder(std::unique_ptr<Message>);
 
-        /**
-         * Construct an OP_COMMAND in an existing buffer. Ownership of the buffer will be
-         * transfered to the RequestBuilder.
-         */
-        RequestBuilder(std::unique_ptr<Message> message);
+        LegacyRequestBuilder& setDatabase(StringData database) final;
+        LegacyRequestBuilder& setCommandName(StringData commandName) final;
+        LegacyRequestBuilder& setMetadata(BSONObj metadata) final;
+        LegacyRequestBuilder& setCommandArgs(BSONObj commandArgs) final;
 
-        RequestBuilder& setDatabase(StringData database);
-        RequestBuilder& setCommandName(StringData commandName);
-        RequestBuilder& setMetadata(const BSONObj& metadata);
-        RequestBuilder& setCommandArgs(const BSONObj& commandArgs);
+        LegacyRequestBuilder& addInputDocs(DocumentRange inputDocs) final;
+        LegacyRequestBuilder& addInputDoc(BSONObj inputDoc) final;
 
-        RequestBuilder& addInputDocs(DocumentRange inputDocs);
-        RequestBuilder& addInputDoc(const BSONObj& inputDoc);
+        State getState() const final;
 
-        /**
-         * Writes data then transfers ownership of the message to the caller.
-         * The behavior of calling any methods on the object is subsequently
-         * undefined.
-         */
-        std::unique_ptr<Message> done();
+        std::unique_ptr<Message> done() final;
 
     private:
-        BufBuilder _builder{};
         std::unique_ptr<Message> _message;
+        BufBuilder _builder{};
 
-        enum class BuildState {
-            kDatabase,
-            kCommandName,
-            kMetadata,
-            kCommandArgs,
-            kInputDocs,
-            kDone
-        };
+        // we need to stash this as we need commandArgs to
+        // upconvert.
+        BSONObj _metadata;
 
-        BuildState _buildState{BuildState::kDatabase};
+        std::string _ns{}; // copied to in setDatabase
+
+        State _state{State::kDatabase};
     };
 
-}  // rpc
-}  // mongo
+}  // namespace rpc
+}  // namespace mongo

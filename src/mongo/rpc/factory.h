@@ -26,57 +26,35 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include "mongo/rpc/reply.h"
+#include "mongo/rpc/protocol.h"
 
-#include <tuple>
+#include <memory>
 
-#include "mongo/base/data_range_cursor.h"
-#include "mongo/util/net/message.h"
+/**
+ * Utilities to construct the correct concrete rpc class based on what the remote server
+ * supports, and what the client has been configured to do.
+ */
 
 namespace mongo {
+    class Message;
+
 namespace rpc {
+    class ReplyInterface;
+    class RequestBuilderInterface;
 
-    Reply::Reply(const Message* message)
-        : _message(message) {
-
-        char* begin = _message->singleData().data();
-        std::size_t length = _message->singleData().dataLen();
-
-        invariant(length <= MaxMessageSizeBytes); // checked by message_port.cpp
-
-        char* messageEnd = begin + length;
-        ConstDataRangeCursor cur(begin, messageEnd);
-
-        // TODO(amidvidy): we don't currently handle BSON validation.
-        // we will eventually have to thread serverGlobalParams.objcheck through here
-        // similarly to DbMessage::nextJsObj
-        uassertStatusOK(cur.readAndAdvance<BSONObj>(&_metadata));
-        uassertStatusOK(cur.readAndAdvance<BSONObj>(&_commandReply));
-        _outputDocs = DocumentRange(cur.data(), messageEnd);
-    }
-
-    const BSONObj& Reply::getMetadata() const {
-        return _metadata;
-    }
-
-    const BSONObj& Reply::getCommandReply() const {
-        return _commandReply;
-    }
-
-    DocumentRange Reply::getOutputDocs() const {
-        return  _outputDocs;
-    }
-
-    bool operator==(const Reply& lhs, const Reply& rhs) {
-        return std::tie(lhs._metadata, lhs._commandReply, lhs._outputDocs) ==
-               std::tie(rhs._metadata, rhs._commandReply, rhs._outputDocs);
-    }
-
-    bool operator!=(const Reply& lhs, const Reply& rhs) {
-        return !(lhs == rhs);
-    }
+    /**
+     * Returns the appropriate concrete RequestBuilder. Throws if one cannot be chosen.
+     */
+    std::unique_ptr<RequestBuilderInterface> makeRequestBuilder(ProtocolSet clientProtos,
+                                                                ProtocolSet serverProtos);
+    /**
+     * Returns the appropriate concrete Reply. Throws if one cannot be chosen.
+     */
+    std::unique_ptr<ReplyInterface> makeReply(const Message* unownedMessage,
+                                              ProtocolSet clientProtos,
+                                              ProtocolSet serverProtos);
 
 }  // namespace rpc
 }  // namespace mongo

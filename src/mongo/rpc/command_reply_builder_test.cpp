@@ -28,12 +28,11 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/rpc/command_reply.h"
+#include "mongo/rpc/command_reply_builder.h"
 #include "mongo/rpc/document_range.h"
-#include "mongo/rpc/reply.h"
-#include "mongo/rpc/reply_builder.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
@@ -47,7 +46,7 @@ namespace {
         auto metadata = metadataBob.done();
 
         BSONObjBuilder commandReplyBob{};
-        commandReplyBob.append("bar", "baz");
+        commandReplyBob.append("bar", "baz").append("ok", 1.0);
         auto commandReply = commandReplyBob.done();
 
         BSONObjBuilder outputDoc1Bob{};
@@ -69,14 +68,14 @@ namespace {
 
         rpc::DocumentRange outputDocRange{outputDocs.buf(), outputDocs.buf() + outputDocs.len()};
 
-        rpc::ReplyBuilder r;
+        rpc::CommandReplyBuilder r;
 
         auto msg = r.setMetadata(metadata)
                     .setCommandReply(commandReply)
                     .addOutputDocs(outputDocRange)
                     .done();
 
-        rpc::Reply parsed(msg.get());
+        rpc::CommandReply parsed(msg.get());
 
         ASSERT_EQUALS(parsed.getMetadata(), metadata);
         ASSERT_EQUALS(parsed.getCommandReply(), commandReply);

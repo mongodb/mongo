@@ -26,11 +26,38 @@ env.Library(
 
 env.Library(
     target=[
-        'request',
+        'protocol',
     ],
     source=[
-        'request.cpp',
-        'request_builder.cpp',
+        'protocol.cpp',
+    ],
+)
+
+env.Library(
+    target=[
+        'rpc',
+    ],
+    source=[
+        'factory.cpp',
+    ],
+    LIBDEPS=[
+        'command_reply',
+        'command_request',
+        'legacy_reply',
+        'legacy_request',
+        'metadata',
+        'protocol',
+        '$BUILD_DIR/mongo/db/server_parameters',
+    ],
+)
+
+env.Library(
+    target=[
+        'command_request',
+    ],
+    source=[
+        'command_request.cpp',
+        'command_request_builder.cpp',
     ],
     LIBDEPS=[
         'document_range',
@@ -40,15 +67,53 @@ env.Library(
 
 env.Library(
     target=[
-        'reply',
+        'legacy_request',
     ],
     source=[
-        'reply.cpp',
-        'reply_builder.cpp'
+        'legacy_request.cpp',
+        'legacy_request_builder.cpp',
     ],
     LIBDEPS=[
         'document_range',
         '$BUILD_DIR/mongo/util/net/network',
+    ],
+)
+
+env.Library(
+    target=[
+        'command_reply',
+    ],
+    source=[
+        'command_reply.cpp',
+        'command_reply_builder.cpp',
+        'reply_builder_interface.cpp',
+    ],
+    LIBDEPS=[
+        'document_range',
+        '$BUILD_DIR/mongo/util/net/network',
+    ],
+)
+
+env.Library(
+    target=[
+        'legacy_reply',
+    ],
+    source=[
+        'legacy_reply.cpp',
+        'legacy_reply_builder.cpp'
+    ],
+    LIBDEPS=[
+        'document_range',
+        '$BUILD_DIR/mongo/util/net/network',
+    ],
+)
+
+env.Library(
+    target=[
+        'metadata',
+    ],
+    source=[
+        'metadata.cpp'
     ],
 )
 
@@ -57,13 +122,15 @@ env.CppUnitTest(
         'rpc_test',
     ],
     source=[
-        'reply_builder_test.cpp',
-        'reply_test.cpp',
-        'request_builder_test.cpp',
-        'request_test.cpp',
+        'command_reply_builder_test.cpp',
+        'command_reply_test.cpp',
+        'command_request_builder_test.cpp',
+        'command_request_test.cpp',
+        'protocol_test.cpp',
     ],
     LIBDEPS=[
-        'request',
-        'reply',
+        'command_request',
+        'command_reply',
+        'protocol',
     ],
 )

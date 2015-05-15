@@ -82,6 +82,8 @@ namespace mongo {
         case dbGetMore: return "getmore";
         case dbDelete: return "remove";
         case dbKillCursors: return "killcursors";
+        case dbCommand: return "command";
+        case dbCommandReply: return "commandReply";
         default:
             massert( 16141, str::stream() << "cannot translate opcode " << op, !op );
             return "";

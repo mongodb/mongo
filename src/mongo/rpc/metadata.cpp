@@ -26,61 +26,44 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/platform/basic.h"
 
-#include <memory>
+#include "mongo/rpc/metadata.h"
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/rpc/document_range.h"
-#include "mongo/util/net/message.h" // need Message destructor for unique_ptr
+#include "mongo/client/dbclientinterface.h"
+#include "mongo/db/jsobj.h"
 
 namespace mongo {
 namespace rpc {
+namespace metadata {
 
-    /**
-     * Constructs an OP_COMMANDREPLY message.
-     */
-    class ReplyBuilder {
-    public:
+    BSONObj empty() {
+        return BSONObj();
+    }
 
-        /**
-         * Constructs an OP_COMMANDREPLY in a new buffer.
-         */
-        ReplyBuilder();
+    const char kSecondaryOk[] = "$secondaryOk";
 
-        /*
-         * Constructs an OP_COMMANDREPLY in an existing buffer. Ownership of the buffer
-         * will be transfered to the ReplyBuilder.
-         */
-        ReplyBuilder(std::unique_ptr<Message> message);
+    StatusWith<CommandAndMetadata> upconvertRequest(BSONObj legacyCmdObj, int queryFlags) {
+        BSONObjBuilder metadataBob;
 
-        ReplyBuilder& setMetadata(const BSONObj& metadata);
-        ReplyBuilder& setCommandReply(const BSONObj& commandReply);
+        // note second check may be erroneous: see SERVER-18194
+        if ((queryFlags & QueryOption_SlaveOk)) {
+            metadataBob.append(kSecondaryOk, 1);
+        }
 
-        ReplyBuilder& addOutputDocs(DocumentRange outputDocs);
-        ReplyBuilder& addOutputDoc(const BSONObj& outputDoc);
+        return std::make_tuple(std::move(legacyCmdObj), std::move(metadataBob.obj()));
+    }
 
-        /**
-         * Writes data then transfers ownership of the message to the caller.
-         * The behavior of calling any methods on the object is subsequently
-         * undefined.
-         */
-        std::unique_ptr<Message> done();
+    StatusWith<LegacyCommandAndFlags> downconvertRequest(BSONObj cmdObj, BSONObj metadata) {
+        int flags = 0;
 
-    private:
-        // Default values are all empty.
-        BufBuilder _builder{};
-        std::unique_ptr<Message> _message;
+        if (metadata.hasField(kSecondaryOk)) {
+            flags |= QueryOption_SlaveOk;
+        }
 
-        enum class BuildState {
-            kMetadata,
-            kCommandReply,
-            kOutputDocs,
-            kDone
-        };
+        return std::make_tuple(std::move(cmdObj), flags);
+    }
 
-        BuildState _buildState{BuildState::kMetadata};
-    };
-
+}  // namespace metadata
 }  // namespace rpc
 }  // namespace mongo

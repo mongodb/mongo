@@ -34,9 +34,9 @@
 
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
-#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/jsobj.h"
 #include "mongo/platform/cstdint.h"
-#include "mongo/rpc/reply.h"
+#include "mongo/rpc/command_reply.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/net/message.h"
@@ -105,7 +105,7 @@ namespace {
         auto outputDoc2 = outputDoc2Bob.done();
         writeObj(outputDoc2);
 
-        rpc::Reply opCmdReply{buildMessage()};
+        rpc::CommandReply opCmdReply{buildMessage()};
 
         ASSERT_EQUALS(opCmdReply.getMetadata(), metadata);
         ASSERT_EQUALS(opCmdReply.getCommandReply(), commandReply);
@@ -125,7 +125,7 @@ namespace {
     }
 
     TEST_F(ReplyTest, EmptyMessageThrows) {
-        ASSERT_THROWS(rpc::Reply{buildMessage()}, UserException);
+        ASSERT_THROWS(rpc::CommandReply{buildMessage()}, UserException);
     }
 
     TEST_F(ReplyTest, MetadataOnlyThrows) {
@@ -134,7 +134,7 @@ namespace {
         auto metadata = metadataBob.done();
         writeObj(metadata);
 
-        ASSERT_THROWS(rpc::Reply{buildMessage()}, UserException);
+        ASSERT_THROWS(rpc::CommandReply{buildMessage()}, UserException);
     }
 
     TEST_F(ReplyTest, MetadataInvalidLengthThrows) {
@@ -151,7 +151,7 @@ namespace {
         auto commandReply = commandReplyBob.done();
         writeObj(commandReply);
 
-        ASSERT_THROWS(rpc::Reply{buildMessage()}, UserException);
+        ASSERT_THROWS(rpc::CommandReply{buildMessage()}, UserException);
     }
 
     TEST_F(ReplyTest, InvalidLengthThrows) {
@@ -169,7 +169,7 @@ namespace {
         DataView(const_cast<char*>(commandReply.objdata())).write<LittleEndian<int32_t>>(100000);
         writeObj(commandReply, trueSize);
 
-        ASSERT_THROWS(rpc::Reply{buildMessage()}, UserException);
+        ASSERT_THROWS(rpc::CommandReply{buildMessage()}, UserException);
     }
 
 }

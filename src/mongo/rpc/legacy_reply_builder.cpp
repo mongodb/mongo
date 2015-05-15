@@ -28,59 +28,74 @@
 
 #include "mongo/platform/basic.h"
 
-#include <utility>
-
-#include "mongo/rpc/reply_builder.h"
+#include "mongo/db/dbmessage.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/rpc/legacy_reply_builder.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace rpc {
 
-    ReplyBuilder::ReplyBuilder()
-        : _message{stdx::make_unique<Message>()}
+    LegacyReplyBuilder::LegacyReplyBuilder()
+        : LegacyReplyBuilder(stdx::make_unique<Message>())
     {}
 
-    ReplyBuilder::ReplyBuilder(std::unique_ptr<Message> message)
-        : _message{std::move(message)}
-    {}
+    LegacyReplyBuilder::LegacyReplyBuilder(std::unique_ptr<Message> message)
+        : _message{std::move(message)} {
+        _builder.skip(sizeof(QueryResult::Value));
+    }
 
-    ReplyBuilder& ReplyBuilder::setMetadata(const BSONObj& metadata) {
-        invariant(_buildState == BuildState::kMetadata);
-        metadata.appendSelfToBufBuilder(_builder);
-        _buildState = BuildState::kCommandReply;
+    LegacyReplyBuilder::~LegacyReplyBuilder() {}
+
+    LegacyReplyBuilder& LegacyReplyBuilder::setMetadata(BSONObj metadata) {
+        invariant(_state == State::kMetadata);
+        // no op for now: SERVER-18236
+        _state = State::kCommandReply;
         return *this;
     }
 
-    ReplyBuilder& ReplyBuilder::setCommandReply(const BSONObj& commandReply) {
-        invariant(_buildState == BuildState::kCommandReply);
+    LegacyReplyBuilder& LegacyReplyBuilder::setRawCommandReply(BSONObj commandReply) {
+        invariant(_state == State::kCommandReply);
         commandReply.appendSelfToBufBuilder(_builder);
-        _buildState = BuildState::kOutputDocs;
+        _state = State::kOutputDocs;
         return *this;
     }
 
-    ReplyBuilder& ReplyBuilder::addOutputDocs(DocumentRange outputDocs) {
-        invariant(_buildState == BuildState::kOutputDocs);
-        auto rangeData = outputDocs.data();
-        _builder.appendBuf(rangeData.data(), rangeData.length());
-        // leave state as is as we can add as many outputDocs as we want.
+    LegacyReplyBuilder& LegacyReplyBuilder::addOutputDocs(DocumentRange outputDocs) {
+        invariant(_state == State::kOutputDocs);
+        // no op
         return *this;
     }
 
-    ReplyBuilder& ReplyBuilder::addOutputDoc(const BSONObj& outputDoc) {
-        invariant(_buildState == BuildState::kOutputDocs);
-        outputDoc.appendSelfToBufBuilder(_builder);
+    LegacyReplyBuilder& LegacyReplyBuilder::addOutputDoc(BSONObj outputDoc) {
+        invariant(_state == State::kOutputDocs);
+        // no op
         return *this;
     }
 
-    std::unique_ptr<Message> ReplyBuilder::done() {
-        invariant(_buildState == BuildState::kOutputDocs);
-        // TODO: we can elide a large copy here by transferring the internal buffer of
-        // the BufBuilder to the Message.
-        _message->setData(dbCommandReply, _builder.buf(), _builder.len());
-        _buildState = BuildState::kDone;
-        return std::move(_message);
+    ReplyBuilderInterface::State LegacyReplyBuilder::getState() const {
+        return _state;
     }
 
-}  // rpc
-}  // mongo
+    std::unique_ptr<Message> LegacyReplyBuilder::done() {
+        invariant(_state == State::kOutputDocs);
+        std::unique_ptr<Message> message = stdx::make_unique<Message>();
+
+        QueryResult::View qr = _builder.buf();
+        qr.setResultFlagsToOk();
+        qr.msgdata().setLen(_builder.len());
+        qr.msgdata().setOperation(opReply);
+        qr.setCursorId(0);
+        qr.setStartingFrom(0);
+        qr.setNReturned(1);
+        _builder.decouple();
+
+        message->setData(qr.view2ptr(), true);
+
+        _state = State::kDone;
+        return std::move(message);
+    }
+
+}  // namespace rpc
+}  // namespace mongo

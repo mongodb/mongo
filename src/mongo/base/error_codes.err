@@ -124,6 +124,8 @@ error_code("DocumentValidationFailure", 121) # Only for the document validator o
 error_code("ReadAfterOptimeTimeout", 122)
 error_code("NotAReplicaSet", 123)
 error_code("IncompatibleElectionProtocol", 124)
+error_code("CommandFailed", 125)
+error_code("RPCProtocolNegotiationFailed", 126)
 
 # Non-sequential error codes (for compatibility only)
 error_code("NotMaster", 10107) #this comes from assert_util.h

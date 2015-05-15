@@ -28,7 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/rpc/request.h"
+#include "mongo/rpc/command_request.h"
 
 #include <string>
 #include <utility>
@@ -36,7 +36,7 @@
 #include "mongo/base/data_range_cursor.h"
 #include "mongo/base/data_type_string_data.h"
 #include "mongo/base/data_type_terminated.h"
-#include "mongo/bson/bsonobj.h"
+#include "mongo/db/jsobj.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/message.h"
@@ -54,7 +54,7 @@ namespace rpc {
 
     }  // namespace
 
-    Request::Request(const Message* message)
+    CommandRequest::CommandRequest(const Message* message)
         : _message(message) {
         char* begin = _message->singleData().data();
         std::size_t length = _message->singleData().dataLen();
@@ -87,27 +87,27 @@ namespace rpc {
         _inputDocs = DocumentRange{cur.data(), messageEnd};
     }
 
-    StringData Request::getDatabase() const {
+    StringData CommandRequest::getDatabase() const {
         return _database;
     }
 
-    StringData Request::getCommandName() const {
+    StringData CommandRequest::getCommandName() const {
         return _commandName;
     }
 
-    const BSONObj& Request::getMetadata() const {
+    const BSONObj& CommandRequest::getMetadata() const {
         return _metadata;
     }
 
-    const BSONObj& Request::getCommandArgs() const {
+    const BSONObj& CommandRequest::getCommandArgs() const {
         return _commandArgs;
     }
 
-    DocumentRange Request::getInputDocs() const {
+    DocumentRange CommandRequest::getInputDocs() const {
         return _inputDocs;
     }
 
-    bool operator==(const Request& lhs, const Request& rhs) {
+    bool operator==(const CommandRequest& lhs, const CommandRequest& rhs) {
         return std::tie(lhs._database,
                         lhs._commandName,
                         lhs._metadata,
@@ -120,7 +120,7 @@ namespace rpc {
                         rhs._inputDocs);
     }
 
-    bool operator!=(const Request& lhs, const Request& rhs) {
+    bool operator!=(const CommandRequest& lhs, const CommandRequest& rhs) {
         return !(lhs == rhs);
     }
 

@@ -28,49 +28,45 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/rpc/document_range.h"
+#include "mongo/base/disallow_copying.h"
 
 namespace mongo {
+    class BSONObj;
     class Message;
+    class StringData;
 
 namespace rpc {
+    class DocumentRange;
 
     /**
-     * An immutable view of an OP_COMMAND message. The underlying bytes are owned
-     * by a mongo::Message, which must outlive any Reply instances created from it.
-     *
-     * TODO: BSON validation. See SERVER-18167 for details.
+     * An immutable view of an RPC message.
      */
-    class Request {
+    class RequestInterface {
+        MONGO_DISALLOW_COPYING(RequestInterface);
     public:
-        /**
-         * Construct a Request from a Message. Underlying message MUST outlive the Request.
-         * Required fields are parsed eagerly, inputDocs are parsed lazily.
-         */
-        explicit Request(const Message* message);
+        virtual ~RequestInterface() = default;
 
         /**
-         * The database that the command is to be executed on.
+         * Gets the database that the command is to be executed on.
          */
-        StringData getDatabase() const;
+        virtual StringData getDatabase() const = 0;
 
         /**
-         * The name of the command to execute.
+         * Gets the name of the command to execute.
          */
-        StringData getCommandName() const;
+        virtual StringData getCommandName() const = 0;
 
         /**
-         * The metadata associated with the command request. This is information that is
-         * independent of any specific command, i.e. auditing information.
+         * Gets the metadata associated with the command request. This is information that is
+         * independent of any specific command, i.e. auditing information. See metadata.h for
+         * further details.
          */
-        const BSONObj& getMetadata() const;
+        virtual const BSONObj& getMetadata() const = 0;
 
         /**
-         * The arguments to the command - this is passed to the command's run() method.
+         * Gets the arguments to the command - this is passed to the command's run() method.
          */
-        const BSONObj& getCommandArgs() const;
+        virtual const BSONObj& getCommandArgs() const = 0;
 
         /**
          * A variable number of BSON documents to pass to the command. It is valid for
@@ -82,18 +78,10 @@ namespace rpc {
          *    ... do stuff with doc
          * }
          */
-        DocumentRange getInputDocs() const;
+        virtual DocumentRange getInputDocs() const = 0;
 
-        friend bool operator==(const Request& lhs, const Request& rhs);
-        friend bool operator!=(const Request& lhs, const Request& rhs);
-
-    private:
-        const Message* _message;
-        StringData _database;
-        StringData _commandName;
-        BSONObj _metadata;
-        BSONObj _commandArgs;
-        DocumentRange _inputDocs;
+    protected:
+        RequestInterface() = default;
     };
 
 }  // namespace rpc

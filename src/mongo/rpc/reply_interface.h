@@ -28,44 +28,33 @@
 
 #pragma once
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/rpc/document_range.h"
+#include "mongo/base/disallow_copying.h"
 
 namespace mongo {
+    class BSONObj;
     class Message;
 
 namespace rpc {
+    class DocumentRange;
 
     /**
-     * An immutable view of an OP_COMMANDREPLY message. The underlying bytes are owned
-     * by a mongo::Message, which must outlive any Reply instances created from it.
-     *
-     * TODO: _metadata and _commandReply are owned by the underlying message. When
-     * we implement a BSONObjView or similar, we should use that here to make these semantics
-     * explicit.
-     * See SERVER-16730 for additional details.
+     * An immutable view of an RPC Reply.
      */
-    class Reply {
+    class ReplyInterface {
+        MONGO_DISALLOW_COPYING(ReplyInterface);
     public:
-        /**
-         * Construct a Reply from a Message.
-         * The underlying message MUST outlive the Reply.
-         * Required fields are parsed eagerly, outputDocs are parsed lazily.
-         *
-         * The underlying Message also handles the wire-protocol header.
-         */
-        explicit Reply(const Message* message);
+        virtual ~ReplyInterface() = default;
 
         /**
          * Accessor for the metadata object. Metadata is generally used for information
          * that is independent of any specific command, e.g. auditing information.
          */
-        const BSONObj& getMetadata() const;
+        virtual const BSONObj& getMetadata() const = 0;
 
         /**
          * The result of executing the command.
          */
-        const BSONObj& getCommandReply() const;
+        virtual const BSONObj& getCommandReply() const = 0;
 
         /**
          * A variable number of BSON documents returned by the command. It is valid for the
@@ -77,17 +66,10 @@ namespace rpc {
          *    ... do stuff with doc
          * }
          */
-        DocumentRange getOutputDocs() const;
+        virtual DocumentRange getOutputDocs() const = 0;
 
-        friend bool operator==(const Reply& lhs, const Reply& rhs);
-        friend bool operator!=(const Reply& lhs, const Reply& rhs);
-
-    private:
-        const Message* _message;
-
-        BSONObj _metadata;
-        BSONObj _commandReply;
-        DocumentRange _outputDocs;
+    protected:
+        ReplyInterface() = default;
     };
 
 }  // namespace rpc

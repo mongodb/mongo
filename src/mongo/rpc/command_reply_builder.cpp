@@ -28,73 +28,63 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/rpc/request_builder.h"
-
 #include <utility>
 
+#include "mongo/rpc/command_reply_builder.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace rpc {
 
-    RequestBuilder::RequestBuilder()
+    CommandReplyBuilder::CommandReplyBuilder()
         : _message{stdx::make_unique<Message>()}
     {}
 
-    RequestBuilder::RequestBuilder(std::unique_ptr<Message> message)
+    CommandReplyBuilder::CommandReplyBuilder(std::unique_ptr<Message> message)
         : _message{std::move(message)}
     {}
 
-    RequestBuilder& RequestBuilder::setDatabase(StringData database) {
-        invariant(_buildState == BuildState::kDatabase);
-        _builder.appendStr(database);
-        _buildState = BuildState::kCommandName;
-        return *this;
-    }
-
-    RequestBuilder& RequestBuilder::setCommandName(StringData commandName) {
-        invariant(_buildState == BuildState::kCommandName);
-        _builder.appendStr(commandName);
-        _buildState = BuildState::kMetadata;
-        return *this;
-    }
-
-    RequestBuilder& RequestBuilder::setMetadata(const BSONObj& metadata) {
-        invariant(_buildState == BuildState::kMetadata);
+    CommandReplyBuilder& CommandReplyBuilder::setMetadata(BSONObj metadata) {
+        invariant(_state == State::kMetadata);
         metadata.appendSelfToBufBuilder(_builder);
-        _buildState = BuildState::kCommandArgs;
+        _state = State::kCommandReply;
         return *this;
     }
 
-    RequestBuilder& RequestBuilder::setCommandArgs(const BSONObj& commandArgs) {
-        invariant(_buildState == BuildState::kCommandArgs);
-        commandArgs.appendSelfToBufBuilder(_builder);
-        _buildState = BuildState::kInputDocs;
+    CommandReplyBuilder& CommandReplyBuilder::setRawCommandReply(BSONObj commandReply) {
+        invariant(_state == State::kCommandReply);
+        commandReply.appendSelfToBufBuilder(_builder);
+        _state = State::kOutputDocs;
         return *this;
     }
 
-    RequestBuilder& RequestBuilder::addInputDocs(DocumentRange inputDocs) {
-        invariant(_buildState == BuildState::kInputDocs);
-        auto rangeData = inputDocs.data();
+    CommandReplyBuilder& CommandReplyBuilder::addOutputDocs(DocumentRange outputDocs) {
+        invariant(_state == State::kOutputDocs);
+        auto rangeData = outputDocs.data();
         _builder.appendBuf(rangeData.data(), rangeData.length());
+        // leave state as is as we can add as many outputDocs as we want.
         return *this;
     }
 
-    RequestBuilder& RequestBuilder::addInputDoc(const BSONObj& inputDoc) {
-        invariant(_buildState == BuildState::kInputDocs);
-        inputDoc.appendSelfToBufBuilder(_builder);
+    CommandReplyBuilder& CommandReplyBuilder::addOutputDoc(BSONObj outputDoc) {
+        invariant(_state == State::kOutputDocs);
+        outputDoc.appendSelfToBufBuilder(_builder);
         return *this;
     }
 
-    std::unique_ptr<Message> RequestBuilder::done() {
-        invariant(_buildState == BuildState::kInputDocs);
+    ReplyBuilderInterface::State CommandReplyBuilder::getState() const {
+        return _state;
+    }
+
+    std::unique_ptr<Message> CommandReplyBuilder::done() {
+        invariant(_state == State::kOutputDocs);
         // TODO: we can elide a large copy here by transferring the internal buffer of
         // the BufBuilder to the Message.
-        _message->setData(dbCommand, _builder.buf(), _builder.len());
-        _buildState = BuildState::kDone;
+        _message->setData(dbCommandReply, _builder.buf(), _builder.len());
+        _state = State::kDone;
         return std::move(_message);
     }
 
-}  // namespace rpc
-}  // namespace mongo
+}  // rpc
+}  // mongo
