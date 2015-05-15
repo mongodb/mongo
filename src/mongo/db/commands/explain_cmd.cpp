@@ -90,10 +90,16 @@ namespace mongo {
         // copied from Command::execCommand and should be abstracted. Until then, make
         // sure to keep it up to date.
         repl::ReplicationCoordinator* replCoord = repl::getGlobalReplicationCoordinator();
-        const bool canRunHere =
-            replCoord->canAcceptWritesForDatabase(dbname) ||
-            commToExplain->slaveOk() ||
-            (commToExplain->slaveOverrideOk() && (options & QueryOption_SlaveOk));
+        bool iAmPrimary = replCoord->canAcceptWritesForDatabase(dbname);
+        bool commandCanRunOnSecondary = commToExplain->slaveOk();
+        bool commandIsOverriddenToRunOnSecondary = commToExplain->slaveOverrideOk() &&
+            ((options & QueryOption_SlaveOk) || Query::hasReadPreference(explainObj));
+        bool iAmStandalone = !txn->writesAreReplicated();
+
+        const bool canRunHere = iAmPrimary ||
+                                commandCanRunOnSecondary ||
+                                commandIsOverriddenToRunOnSecondary ||
+                                iAmStandalone;
 
         if (!canRunHere) {
             mongoutils::str::stream ss;

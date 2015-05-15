@@ -37,6 +37,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/action_set.h"
@@ -91,6 +92,9 @@
 #include "mongo/db/storage/mmap_v1/dur_stats.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/write_concern.h"
+#include "mongo/rpc/request_interface.h"
+#include "mongo/rpc/reply_builder_interface.h"
+#include "mongo/rpc/metadata.h"
 #include "mongo/s/d_state.h"
 #include "mongo/s/stale_exception.h"  // for SendStaleConfigException
 #include "mongo/scripting/engine.h"
@@ -1111,14 +1115,18 @@ namespace mongo {
 
     bool _execCommand(OperationContext* txn,
                       Command *c,
-                      const string& dbname,
-                      BSONObj& cmdObj,
-                      int queryOptions,
-                      std::string& errmsg,
-                      BSONObjBuilder& result) {
+                      const BSONObj& interposedCmd,
+                      const rpc::RequestInterface& request,
+                      rpc::ReplyBuilderInterface* replyBuilder) {
+
+        // This dassert and other similar ones are intended for readability as
+        // a ReplyBuilder will always verify it is in a correct state.
+        dassert(replyBuilder->getState() == rpc::ReplyBuilderInterface::State::kMetadata);
 
         try {
-            return c->run(txn, dbname, cmdObj, queryOptions, errmsg, result);
+            bool res = c->run(txn, interposedCmd, request, replyBuilder);
+            dassert(replyBuilder->getState() == rpc::ReplyBuilderInterface::State::kOutputDocs);
+            return res;
         }
         catch (const SendStaleConfigException& e) {
             LOG(1) << "command failed because of stale config, can retry" << causedBy(e);
@@ -1126,9 +1134,9 @@ namespace mongo {
         }
         catch (const DBException& e) {
             // TODO: Rethrown errors have issues here, should divorce SendStaleConfigException from the DBException tree
-
-            result.append("errmsg", e.what());
-            result.append("code", e.getCode());
+            replyBuilder
+                ->setMetadata(rpc::metadata::empty())
+                .setCommandReply(e.toStatus());
             return false;
         }
     }
@@ -1189,13 +1197,14 @@ namespace mongo {
     };
 
 namespace {
+    // TODO remove as part of SERVER-18236
     void appendGLEHelperData(BSONObjBuilder& bob, const Timestamp& opTime, const OID& oid) {
         BSONObjBuilder subobj(bob.subobjStart(kGLEStatsFieldName));
         subobj.append(kGLEStatsLastOpTimeFieldName, opTime);
         subobj.appendOID(kGLEStatsElectionIdFieldName, const_cast<OID*>(&oid));
         subobj.done();
     }
-} // namespace
+}  // namespace
 
     /**
      * this handles
@@ -1207,22 +1216,34 @@ namespace {
      then calls run()
     */
     void Command::execCommand(OperationContext* txn,
-                              Command * c ,
-                              int queryOptions,
-                              const char *cmdns,
-                              BSONObj& cmdObj,
-                              BSONObjBuilder& result) {
-        std::string dbname = nsToDatabase( cmdns );
+                              Command* command,
+                              const BSONObj& prevInterposedCmd,
+                              const rpc::RequestInterface& request,
+                              rpc::ReplyBuilderInterface* replyBuilder) {
+
+        dassert(replyBuilder->getState() == rpc::ReplyBuilderInterface::State::kMetadata);
+
+        // Right now our metadata handling relies on mutating the command object.
+        // This will go away when SERVER-18236 is implemented
+        BSONObj interposedCmd = prevInterposedCmd;
+
+        std::string dbname = request.getDatabase().toString();
         scoped_ptr<MaintenanceModeSetter> mmSetter;
 
-        if ( cmdObj["help"].trueValue() ) {
+        if ( request.getCommandArgs()["help"].trueValue() ) {
+
             CurOp::get(txn)->ensureStarted();
-            stringstream ss;
-            ss << "help for: " << c->name << " ";
-            c->help( ss );
-            result.append( "help" , ss.str() );
-            result.append("lockType", c->isWriteCommandForConfigServer() ? 1 : 0);
-            appendCommandStatus(result, true, "");
+            BSONObjBuilder helpResult;
+            std::stringstream ss;
+            ss << "help for: " << command->name << " ";
+            command->help(ss);
+            helpResult.append("help", ss.str());
+            helpResult.append("lockType", command->isWriteCommandForConfigServer() ? 1 : 0);
+
+            replyBuilder
+                ->setMetadata(rpc::metadata::empty())
+                .setCommandReply(helpResult.done());
+
             return;
         }
 
@@ -1234,11 +1255,15 @@ namespace {
         AuthorizationSession* authSession = AuthorizationSession::get(txn->getClient());
         bool rolesFieldIsPresent = false;
         bool usersFieldIsPresent = false;
-        audit::parseAndRemoveImpersonatedRolesField(cmdObj,
+
+        // TODO: Remove these once the metadata refactor (SERVER-18236) is complete.
+        // Then we can construct the ImpersonationSessionGuard directly from the contents of the
+        // metadata object rather than slicing elements off of the command object.
+        audit::parseAndRemoveImpersonatedRolesField(interposedCmd,
                                                     authSession,
                                                     &parsedRoleNames,
                                                     &rolesFieldIsPresent);
-        audit::parseAndRemoveImpersonatedUsersField(cmdObj,
+        audit::parseAndRemoveImpersonatedUsersField(interposedCmd,
                                                     authSession,
                                                     &parsedUserNames,
                                                     &usersFieldIsPresent);
@@ -1247,7 +1272,10 @@ namespace {
             // the mongos may fail to pass the role information, causing an error.
             Status s(ErrorCodes::IncompatibleAuditMetadata,
                     "Audit metadata does not include both user and role information.");
-            appendCommandStatus(result, s);
+            replyBuilder
+                ->setMetadata(rpc::metadata::empty())
+                .setCommandReply(s);
+
             return;
         }
         ImpersonationSessionGuard impersonationSession(authSession,
@@ -1255,67 +1283,103 @@ namespace {
                                                        parsedUserNames,
                                                        parsedRoleNames);
 
-        Status status = _checkAuthorization(c,
+        Status status = _checkAuthorization(command,
                                             txn->getClient(),
                                             dbname,
-                                            cmdObj);
+                                            interposedCmd);
         if (!status.isOK()) {
-            appendCommandStatus(result, status);
+
+            replyBuilder
+                ->setMetadata(rpc::metadata::empty())
+                .setCommandReply(status);
+
             return;
         }
 
         repl::ReplicationCoordinator* replCoord = repl::getGlobalReplicationCoordinator();
-        bool canRunHere =
-            replCoord->canAcceptWritesForDatabase(dbname) ||
-            c->slaveOk() ||
-            ( c->slaveOverrideOk() && ( queryOptions & QueryOption_SlaveOk ) ) || 
-            !txn->writesAreReplicated();
 
-        if ( ! canRunHere ) {
-            result.append( "note" , "from execCommand" );
-            if ( c->slaveOverrideOk() ) {
-                appendCommandStatus(result, false, "not master and slaveOk=false");
+        bool iAmPrimary = replCoord->canAcceptWritesForDatabase(dbname);
+
+        bool commandCanRunOnSecondary = command->slaveOk();
+
+        bool commandIsOverriddenToRunOnSecondary = command->slaveOverrideOk() &&
+            // the $secondaryOk option is set
+            (request.getMetadata().hasField(rpc::metadata::kSecondaryOk) ||
+
+             // or the command has a read preference (may be incorrect, see SERVER-18194)
+             // confusingly, we need to check the original (unmodified) command for the read pref
+             // as it will have been removed by now.
+             // TODO: (SERVER-18236 read this off request metadata)
+             Query::hasReadPreference(request.getCommandArgs()));
+
+        bool iAmStandalone = !txn->writesAreReplicated();
+
+        bool canRunHere = iAmPrimary ||
+                          commandCanRunOnSecondary ||
+                          commandIsOverriddenToRunOnSecondary ||
+                          iAmStandalone;
+
+        auto extraErrorData = BSON("note" << "from execCommand");
+
+        if (!canRunHere) {
+
+            replyBuilder->setMetadata(rpc::metadata::empty());
+
+            if (command->slaveOverrideOk()) {
+                replyBuilder
+                    ->setCommandReply(Status(ErrorCodes::NotMasterNoSlaveOkCode,
+                                             "not master and slaveOk=false"),
+                                      extraErrorData);
             }
             else {
-                appendCommandStatus(result, false, "not master");
+                replyBuilder
+                    ->setCommandReply(Status(ErrorCodes::NotMaster, "not master"),
+                                      extraErrorData);
             }
             return;
         }
 
-        if (!c->maintenanceOk()
+        if (!command->maintenanceOk()
                 && replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet
                 && !replCoord->canAcceptWritesForDatabase(dbname)
                 && !replCoord->getMemberState().secondary()) {
-            result.append( "note" , "from execCommand" );
-            appendCommandStatus(result, false, "node is recovering");
+            replyBuilder
+                ->setMetadata(rpc::metadata::empty())
+                .setCommandReply(Status(ErrorCodes::NotMasterOrSecondaryCode, "node is recovering"),
+                                 extraErrorData);
+
             return;
         }
 
-        if ( c->adminOnly() ) {
-            LOG( 2 ) << "command: " << cmdObj << endl;
+        if (command->adminOnly()) {
+            LOG(2) << "command: " << request.getCommandName();
         }
 
-        CurOp::get(txn)->setCommand(c);
+        CurOp::get(txn)->setCommand(command);
 
-        if (c->maintenanceMode()) {
+        if (command->maintenanceMode()) {
             mmSetter.reset(new MaintenanceModeSetter);
         }
 
-        if (c->shouldAffectCommandCounter()) {
+        if (command->shouldAffectCommandCounter()) {
             OpCounters* opCounters = &globalOpCounters;
             opCounters->gotCommand();
         }
 
         // Handle command option maxTimeMS.
-        StatusWith<int> maxTimeMS = LiteParsedQuery::parseMaxTimeMSCommand(cmdObj);
+        StatusWith<int> maxTimeMS = LiteParsedQuery::parseMaxTimeMSCommand(interposedCmd);
         if (!maxTimeMS.isOK()) {
-            appendCommandStatus(result, false, maxTimeMS.getStatus().reason());
+            replyBuilder
+                ->setMetadata(rpc::metadata::empty())
+                .setCommandReply(maxTimeMS.getStatus());
             return;
         }
-        if (cmdObj.hasField("$maxTimeMS")) {
-            appendCommandStatus(result,
-                                false,
-                                "no such command option $maxTimeMS; use maxTimeMS instead");
+        if (interposedCmd.hasField("$maxTimeMS")) {
+            replyBuilder
+                ->setMetadata(rpc::metadata::empty())
+                .setCommandReply(Status(ErrorCodes::InvalidOptions,
+                                        "no such command option $maxTimeMS;"
+                                        " use maxTimeMS instead"));
             return;
         }
 
@@ -1325,7 +1389,10 @@ namespace {
             txn->checkForInterrupt(); // May trigger maxTimeAlwaysTimeOut fail point.
         }
         catch (UserException& e) {
-            appendCommandStatus(result, e.toStatus());
+
+            replyBuilder
+                ->setMetadata(rpc::metadata::empty())
+                .setCommandReply(e.toStatus());
             return;
         }
 
@@ -1334,148 +1401,193 @@ namespace {
 
         CurOp::get(txn)->ensureStarted();
 
-        c->_commandsExecuted.increment();
+        command->_commandsExecuted.increment();
+
+        retval = _execCommand(txn, command, interposedCmd, request, replyBuilder);
+
+        dassert(replyBuilder->getState() == rpc::ReplyBuilderInterface::State::kOutputDocs);
+
+        if (!retval) {
+            command->_commandsFailed.increment();
+        }
+
+        return;
+    }
+
+    // This really belongs in commands.cpp, but we need to move it here so we can
+    // use shardingState and the repl coordinator without changing our entire library
+    // structure.
+    // It will be moved back as part of SERVER-18236.
+    bool Command::run(OperationContext* txn,
+                      const BSONObj& prevInterposedCmd,
+                      const rpc::RequestInterface& request,
+                      rpc::ReplyBuilderInterface* replyBuilder) {
+
+        // Implementation just forwards to the old method signature for now.
+        std::string errmsg;
+        BSONObjBuilder replyBuilderBob;
+
+        // run expects non-const bsonobj
+        BSONObj interposedCmd = prevInterposedCmd;
+
+        // run expects const db std::string (can't bind to temporary)
+        const std::string db = request.getDatabase().toString();
+
+        int queryFlags = 0;
+        std::tie(std::ignore, queryFlags) = uassertStatusOK(
+            rpc::metadata::downconvertRequest(request.getCommandArgs(),
+                                              request.getMetadata())
+        );
+
+        repl::ReplicationCoordinator* replCoord = repl::getGlobalReplicationCoordinator();
 
         {
             // Handle read after opTime.
-
             repl::ReadAfterOpTimeArgs readAfterOptimeSettings;
-            auto readAfterParseStatus = readAfterOptimeSettings.initialize(cmdObj);
+            auto readAfterParseStatus = readAfterOptimeSettings.initialize(interposedCmd);
             if (!readAfterParseStatus.isOK()) {
-                appendCommandStatus(result, readAfterParseStatus);
-                return;
+                replyBuilder
+                    ->setMetadata(rpc::metadata::empty())
+                    .setCommandReply(readAfterParseStatus);
+                return false;
             }
 
             auto readAfterResult = replCoord->waitUntilOpTime(txn, readAfterOptimeSettings);
-            readAfterResult.appendInfo(&result);
-
+            readAfterResult.appendInfo(&replyBuilderBob);
             if (!readAfterResult.getStatus().isOK()) {
-                appendCommandStatus(result, readAfterResult.getStatus());
-                return;
+                replyBuilder
+                    ->setMetadata(rpc::metadata::empty())
+                    .setCommandReply(readAfterResult.getStatus(), replyBuilderBob.done());
+                return false;
             }
         }
 
-        retval = _execCommand(txn, c, dbname, cmdObj, queryOptions, errmsg, result);
-
-        if ( !retval ){
-            c->_commandsFailed.increment();
-        }
-
-        appendCommandStatus(result, retval, errmsg);
+        bool result = this->run(txn, db, interposedCmd, queryFlags, errmsg, replyBuilderBob);
 
         // For commands from mongos, append some info to help getLastError(w) work.
+        // TODO: refactor out of here as part of SERVER-18326
         if (replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet &&
-                shardingState.enabled()) {
+            shardingState.enabled()) {
             appendGLEHelperData(
-                    result,
+                    replyBuilderBob,
                     repl::ReplClientInfo::forClient(txn->getClient()).getLastOp().getTimestamp(),
                     replCoord->getElectionId());
         }
-        return;
+
+        replyBuilder->setMetadata(rpc::metadata::empty());
+
+        auto cmdResponse = replyBuilderBob.done();
+
+        if (result) {
+            replyBuilder->setCommandReply(std::move(cmdResponse));
+        }
+        else {
+            // maintain existing behavior of returning all data appended to builder
+            // even if command returned false
+            replyBuilder->setCommandReply(Status(ErrorCodes::CommandFailed, errmsg),
+                                          std::move(cmdResponse));
+        }
+
+        return result;
     }
+
+namespace {
 
     /* TODO make these all command objects -- legacy stuff here
 
        usage:
-         abc.$cmd.findOne( { ismaster:1 } );
+       abc.$cmd.findOne( { ismaster:1 } );
 
        returns true if ran a cmd
     */
     bool _runCommands(OperationContext* txn,
-                      const char* ns,
-                      BSONObj& _cmdobj,
-                      BufBuilder& b,
-                      BSONObjBuilder& anObjBuilder,
-                      int queryOptions) {
-        string dbname = nsToDatabase( ns );
+                      const rpc::RequestInterface& request,
+                      rpc::ReplyBuilderInterface* replyBuilder) {
 
-        const char *p = strchr(ns, '.');
-        if ( !p ) return false;
-        if ( strcmp(p, ".$cmd") != 0 ) return false;
+        dassert(replyBuilder->getState() == rpc::ReplyBuilderInterface::State::kMetadata);
 
-        BSONObj jsobj;
+        string dbname = request.getDatabase().toString();
+
+        // right now our metadata handling depends on mutating the command
+        // the "interposedCmd" parameters will go away when SERVER-18236
+        // is resolved
+        BSONObj interposedCmd;
         {
-            BSONElement e = _cmdobj.firstElement();
+            BSONElement e = request.getCommandArgs().firstElement();
             if ( e.type() == Object && (e.fieldName()[0] == '$'
-                                         ? str::equals("query", e.fieldName()+1)
-                                         : str::equals("query", e.fieldName())))
-            {
-                jsobj = e.embeddedObject();
-                if (_cmdobj.hasField("$maxTimeMS")) {
-                    Command::appendCommandStatus(anObjBuilder,
-                                                 false,
-                                                 "cannot use $maxTimeMS query option with "
+                                        ? str::equals("query", e.fieldName()+1)
+                                        : str::equals("query", e.fieldName())))
+                {
+                    interposedCmd = e.embeddedObject();
+                    if (request.getCommandArgs().hasField("$maxTimeMS")) {
+                        replyBuilder
+                            ->setMetadata(rpc::metadata::empty())
+                            .setCommandReply(Status(ErrorCodes::BadValue,
+                                                    "cannot use $maxTimeMS query option with "
                                                     "commands; use maxTimeMS command option "
-                                                    "instead");
-                    BSONObj x = anObjBuilder.done();
-                    b.appendBuf(x.objdata(), x.objsize());
-                    return true;
+                                                    "instead"));
+                        return true;
+                    }
                 }
-            }
             else {
-                jsobj = _cmdobj;
+                interposedCmd = request.getCommandArgs();
             }
         }
 
-        // Treat the command the same as if it has slaveOk bit on if it has a read
-        // preference setting. This is to allow these commands to run on a secondary.
-        if (Query::hasReadPreference(_cmdobj)) {
-            queryOptions |= QueryOption_SlaveOk;
-        }
+        BSONElement e = interposedCmd.firstElement();
 
-        BSONElement e = jsobj.firstElement();
+        Command * c = e.type() ? Command::findCommand( e.fieldNameStringData() ) : 0;
 
-        Command * c = e.type() ? Command::findCommand( e.fieldName() ) : 0;
+        if (c) {
+            LOG(2) << "run command " << request.getDatabase() << ".$cmd" << ' '
+                   << c->getRedactedCopyForLogging(request.getCommandArgs());
+            Command::execCommand(txn, c, interposedCmd, request, replyBuilder);
 
-        if ( c ) {
-            LOG(2) << "run command " << ns << ' ' << c->getRedactedCopyForLogging(_cmdobj);
-            Command::execCommand(txn,
-                                 c,
-                                 queryOptions,
-                                 ns,
-                                 jsobj,
-                                 anObjBuilder);
+            dassert(replyBuilder->getState() == rpc::ReplyBuilderInterface::State::kOutputDocs);
         }
         else {
             // In the absence of a Command object, no redaction is possible. Therefore
             // to avoid displaying potentially sensitive information in the logs,
             // we restrict the log message to the name of the unrecognized command.
             // However, the complete command object will still be echoed to the client.
-            string msg = str::stream() << "no such command: " << e.fieldName();
+            string msg = str::stream() << "no such command: " << request.getCommandName();
+
             LOG(2) << msg;
-            Command::appendCommandStatus(anObjBuilder, false, msg);
-            anObjBuilder.append("code", ErrorCodes::CommandNotFound);
-            anObjBuilder.append("bad cmd" , _cmdobj );
+            replyBuilder
+                ->setMetadata(rpc::metadata::empty())
+                .setCommandReply(Status(ErrorCodes::CommandNotFound, std::move(msg)),
+                                 BSON("bad cmd" << request.getCommandArgs()));
+
             Command::unknownCommands.increment();
         }
-
-        BSONObj x = anObjBuilder.done();
-        b.appendBuf(x.objdata(), x.objsize());
 
         return true;
     }
 
+}  // namespace
+
     bool runCommands(OperationContext* txn,
-                     const char* ns,
-                     BSONObj& jsobj,
-                     CurOp& curop,
-                     BufBuilder& b,
-                     BSONObjBuilder& anObjBuilder,
-                     int queryOptions) {
+                     const rpc::RequestInterface& request,
+                     rpc::ReplyBuilderInterface* replyBuilder) {
         try {
-            return _runCommands(txn, ns, jsobj, b, anObjBuilder, queryOptions);
+            bool result = _runCommands(txn, request, replyBuilder);
+            dassert(replyBuilder->getState() == rpc::ReplyBuilderInterface::State::kOutputDocs);
+            return result;
         }
-        catch (const SendStaleConfigException&){
+        catch (const SendStaleConfigException&) {
             throw;
         }
         catch (const AssertionException& e) {
             verify( e.getCode() != SendStaleConfigCode && e.getCode() != RecvStaleConfigCode );
 
-            Command::appendCommandStatus(anObjBuilder, e.toStatus());
-            curop.debug().exceptionInfo = e.getInfo();
+            dassert(replyBuilder->getState() == rpc::ReplyBuilderInterface::State::kCommandReply);
+
+            replyBuilder
+                ->setMetadata(rpc::metadata::empty())
+                .setCommandReply(e.toStatus());
+
+            CurOp::get(txn)->debug().exceptionInfo = e.getInfo();
         }
-        BSONObj x = anObjBuilder.done();
-        b.appendBuf(x.objdata(), x.objsize());
         return true;
     }
 

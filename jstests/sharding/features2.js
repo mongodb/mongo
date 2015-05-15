@@ -176,7 +176,14 @@ catch ( e ){
     y = e;
 }
 
-assert.eq( x.code , y.code , "assert format" )
+// As the forceerror command is written, it doesnt set a code in the reply.
+// OP_COMMAND changes will add a code of 121 (CommandFailed) if a failing command
+// does not set one, so this comparison fails as "undefined" != 121.
+//
+// TODO: Uncomment this line when OP_COMMAND is implemented in mongos (SERVER-18292)
+// as then MongoS should set code 121 as well.
+//
+// assert.eq( x.code , y.code , "assert format" )
 assert.eq( x.errmsg , y.errmsg , "assert format" )
 assert.eq( x.ok , y.ok , "assert format" )
 

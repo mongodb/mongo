@@ -31,13 +31,19 @@
 
 #include "mongo/platform/basic.h"
 
+#include <tuple>
+
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/service_context.h"
+#include "mongo/rpc/metadata.h"
+#include "mongo/rpc/reply_builder_interface.h"
+#include "mongo/rpc/request_interface.h"
 #include "mongo/s/cluster_last_error_info.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/log.h"
 
@@ -58,15 +64,36 @@ namespace mongo {
         ClusterLastErrorInfo::get(cc()).addShardHost(addr);
     }
 
-    // Need a version that takes a Client to match the mongod interface so the web server can call
-    // execCommand and not need to worry if it's in a mongod or mongos.
+    // called into by the web server. For now we just translate the parameters
+    // to their old style equivalents.
     void Command::execCommand(OperationContext* txn,
-                              Command * c,
-                              int queryOptions,
-                              const char *ns,
-                              BSONObj& cmdObj,
-                              BSONObjBuilder& result) {
-        execCommandClientBasic(txn, c, *txn->getClient(), queryOptions, ns, cmdObj, result);
+                              Command* command,
+                              const BSONObj& interposedCmd,
+                              const rpc::RequestInterface& request,
+                              rpc::ReplyBuilderInterface* replyBuilder) {
+
+        int queryFlags = 0;
+
+        std::tie(std::ignore, queryFlags) = uassertStatusOK(
+            rpc::metadata::downconvertRequest(request.getCommandArgs(),
+                                              request.getMetadata())
+        );
+
+        BSONObj cmdObj = interposedCmd;
+        std::string db = request.getDatabase().rawData();
+        BSONObjBuilder result;
+
+        execCommandClientBasic(txn,
+                               command,
+                               *txn->getClient(),
+                               queryFlags,
+                               request.getDatabase().rawData(),
+                               cmdObj,
+                               result);
+
+        replyBuilder
+            ->setMetadata(rpc::metadata::empty())
+            .setCommandReply(result.done());
     }
 
     void Command::execCommandClientBasic(OperationContext* txn,

@@ -34,12 +34,15 @@
 
 #include "mongo/base/counter.h"
 #include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/client_basic.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/explain.h"
+#include "mongo/rpc/reply_builder_interface.h"
+#include "mongo/rpc/request_interface.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
@@ -99,6 +102,21 @@ namespace mutablebson {
                          int options,
                          std::string& errmsg,
                          BSONObjBuilder& result) = 0;
+
+        /**
+         * Translation point between the new request/response types and the legacy types.
+         *
+         * TODO: Remove interposedCmd once we have refactored metadata (SERVER-18236).
+         * Then we won't need to mutate the command object. At that point we can also make
+         * this method virtual so commands can override it directly.
+         *
+         * This function is also temporarily defined in dbcommands.cpp
+         */
+        /*virtual*/ bool run(OperationContext* txn,
+                             const BSONObj& interposedCmd,
+                             const rpc::RequestInterface& request,
+                             rpc::ReplyBuilderInterface* replyBuilder);
+
 
         /**
          * This designation for the command is only used by the 'help' call and has nothing to do 
@@ -251,14 +269,27 @@ namespace mutablebson {
                                          BSONObjBuilder& anObjBuilder,
                                          int queryOptions = 0);
         static Command* findCommand( StringData name );
-        // For mongod and webserver.
+
+        /**
+         * Executes a command after stripping metadata, performing authorization checks,
+         * handling audit impersonation, and (potentially) setting maintenance mode. This method
+         * also checks that the command is permissible to run on the node given its current
+         * replication state. All the logic here is independent of any particular command; any
+         * functionality relevant to a specific command should be confined to its run() method.
+         *
+         * This is currently used by mongod and dbwebserver.
+         *
+         * TODO: Remove interposedCmd, see SERVER-18236
+         */
         static void execCommand(OperationContext* txn,
-                                Command* c,
-                                int queryOptions,
-                                const char *ns,
-                                BSONObj& cmdObj,
-                                BSONObjBuilder& result);
+                                Command* command,
+                                const BSONObj& interposedCmd,
+                                const rpc::RequestInterface& request,
+                                rpc::ReplyBuilderInterface* replyBuilder);
+
         // For mongos
+        // TODO: remove this entirely now that all instances of ClientBasic are instances
+        // of Client. This will happen as part of SERVER-18292
         static void execCommandClientBasic(OperationContext* txn,
                                            Command* c,
                                            ClientBasic& client,
@@ -318,19 +349,8 @@ namespace mutablebson {
                                           const BSONObj& cmdObj);
     };
 
-    bool _runCommands(OperationContext* txn,
-                      const char* ns,
-                      BSONObj& _cmdobj,
-                      BufBuilder& b,
-                      BSONObjBuilder& anObjBuilder,
-                      int queryOptions);
-
     bool runCommands(OperationContext* txn,
-                     const char* ns,
-                     BSONObj& jsobj,
-                     CurOp& curop,
-                     BufBuilder& b,
-                     BSONObjBuilder& anObjBuilder,
-                     int queryOptions);
+                     const rpc::RequestInterface& request,
+                     rpc::ReplyBuilderInterface* replyBuilder);
 
 } // namespace mongo

@@ -125,7 +125,11 @@ namespace {
             break;
         case opReply:
         case dbMsg:
+        case dbCommandReply:
             log() << "unexpected op in Top::record: " << op << endl;
+            break;
+        case dbCommand:
+            c.commands.inc(micros);
             break;
         default:
             log() << "unknown op in Top::record: " << op << endl;

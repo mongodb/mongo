@@ -86,11 +86,19 @@
 #include "mongo/db/storage_options.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/process_id.h"
+#include "mongo/rpc/command_reply_builder.h"
+#include "mongo/rpc/command_request.h"
+#include "mongo/rpc/legacy_reply.h"
+#include "mongo/rpc/legacy_reply_builder.h"
+#include "mongo/rpc/legacy_request.h"
+#include "mongo/rpc/legacy_request_builder.h"
+#include "mongo/rpc/metadata.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/d_state.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/stale_exception.h" // for SendStaleConfigException
 #include "mongo/scripting/engine.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
@@ -164,6 +172,7 @@ namespace {
         return Status::OK();
     }
 
+    // TODO: need a version of this that can return an OP_COMMANDREPLY
     void generateErrorResponse(const AssertionException* exception,
                                const QueryMessage& queryMessage,
                                CurOp* curop,
@@ -230,6 +239,8 @@ namespace {
         DbMessage dbMessage(message);
         QueryMessage queryMessage(dbMessage);
 
+        rpc::LegacyRequest request{&message};
+
         CurOp* op = CurOp::get(client);
 
         std::unique_ptr<Message> response(new Message());
@@ -238,8 +249,10 @@ namespace {
             // Do the namespace validity check under the try/catch block so it does not cause the
             // connection to be terminated.
             uassert(ErrorCodes::InvalidNamespace,
-                    str::stream() << "Invalid ns [" << nss.ns() << "]",
-                    nss.isValid());
+                    str::stream() << "Invalid ns [" << request.getDatabase() << ".$cmd" << "]",
+                    NamespaceString::validDBName(request.getDatabase()));
+
+            rpc::LegacyReplyBuilder builder{std::move(response)};
 
             // Auth checking for Commands happens later.
             int nToReturn = queryMessage.ntoreturn;
@@ -250,34 +263,15 @@ namespace {
                                          << ") for $cmd type ns - can only be 1 or -1",
                     nToReturn == 1 || nToReturn == -1);
 
-            BufBuilder bb;
-            bb.skip(sizeof(QueryResult::Value));
-
-            BSONObjBuilder cmdResBuf;
-            if (!runCommands(txn,
-                             queryMessage.ns,
-                             queryMessage.query,
-                             *op,
-                             bb,
-                             cmdResBuf,
-                             queryMessage.queryOptions)) {
+            if (!runCommands(txn, request, &builder)) {
                 uasserted(13530, "bad or malformed command request?");
             }
 
             op->debug().iscommand = true;
             // TODO: Does this get overwritten/do we really need to set this twice?
-            op->debug().query = queryMessage.query;
+            op->debug().query = request.getCommandArgs();
 
-            QueryResult::View qr = bb.buf();
-            bb.decouple();
-            qr.setResultFlagsToOk();
-            qr.msgdata().setLen(bb.len());
-            op->debug().responseLength = bb.len();
-            qr.msgdata().setOperation(opReply);
-            qr.setCursorId(0);
-            qr.setStartingFrom(0);
-            qr.setNReturned(1);
-            response->setData(qr.view2ptr(), true);
+            response = builder.done();
 
             invariant(!response->empty());
         }
@@ -293,6 +287,52 @@ namespace {
     }
 
 namespace {
+
+    void receivedRpc(OperationContext* txn,
+                     Client& client,
+                     DbResponse& dbResponse,
+                     Message& message) {
+
+        invariant(message.operation() == dbCommand);
+
+        const MSGID responseTo = message.header().getId();
+
+        rpc::CommandReplyBuilder replyBuilder{};
+
+        auto curOp = CurOp::get(txn);
+
+        try {
+            // database is validated here
+            rpc::CommandRequest request{&message};
+
+            // We construct a legacy $cmd namespace so we can fill in curOp using
+            // the existing logic that existed for OP_QUERY commands
+            NamespaceString nss(request.getDatabase(), "$cmd");
+            beginQueryOp(nss, request.getCommandArgs(), 1, 0, curOp);
+            curOp->markCommand();
+
+            if (!runCommands(txn, request, &replyBuilder)) {
+                uasserted(28654, "bad or malformed command request?");
+            }
+
+            curOp->debug().iscommand = true;
+            curOp->debug().query = request.getCommandArgs();
+
+        }
+        catch (...) {
+            // TODO handle SendStaleConfigException here when OP_COMMAND
+            // is implemented in mongos (SERVER-18292).
+            replyBuilder.setMetadata(rpc::metadata::empty())
+                        .setCommandReply(exceptionToStatus());
+        }
+
+        auto response = replyBuilder.done();
+
+        curOp->debug().responseLength = response->header().dataLen();
+
+        dbResponse.response = response.release();
+        dbResponse.responseTo = responseTo;
+    }
 
     // In SERVER-7775 we reimplemented the pseudo-commands fsyncUnlock, inProg, and killOp
     // as ordinary commands. To support old clients for another release, this helper serves
@@ -441,6 +481,10 @@ namespace {
         else if( op == dbGetMore ) {
             opread(m);
         }
+        else if ( op == dbCommand ) {
+            isCommand = true;
+            opwrite(m);
+        }
         else {
             opwrite(m);
         }
@@ -503,6 +547,9 @@ namespace {
             else {
                 receivedQuery(txn, nsString, c, dbresponse, m);
             }
+        }
+        else if ( op == dbCommand ) {
+            receivedRpc(txn, c, dbresponse, m);
         }
         else if ( op == dbGetMore ) {
             if ( ! receivedGetMore(txn, dbresponse, m, currentOp) )
@@ -1082,16 +1129,24 @@ namespace {
         const bool keepGoing = d.reservedField() & InsertOption_ContinueOnError;
         for (BSONObjIterator iter(allCmds); iter.more();) {
             try {
-                BSONObjBuilder resultBuilder;
                 BSONObj cmdObj = iter.next().Obj();
-                Command::execCommand(
-                        txn,
-                        createIndexesCmd,
-                        0, /* what should I use for query option? */
-                        d.getns(),
-                        cmdObj,
-                        resultBuilder);
-                uassertStatusOK(Command::getStatusFromCommandResult(resultBuilder.done()));
+
+                rpc::LegacyRequestBuilder requestBuilder{};
+                auto indexNs = NamespaceString(d.getns());
+                auto cmdRequestMsg = requestBuilder.setDatabase(indexNs.db())
+                                                   .setCommandName("createIndexes")
+                                                   .setMetadata(rpc::metadata::empty())
+                                                   .setCommandArgs(cmdObj).done();
+                rpc::LegacyRequest cmdRequest{cmdRequestMsg.get()};
+                rpc::LegacyReplyBuilder cmdReplyBuilder{};
+                Command::execCommand(txn,
+                                     createIndexesCmd,
+                                     cmdObj, // TODO remove (SERVER-18236)
+                                     cmdRequest,
+                                     &cmdReplyBuilder);
+                auto cmdReplyMsg = cmdReplyBuilder.done();
+                rpc::LegacyReply cmdReply{cmdReplyMsg.get()};
+                uassertStatusOK(Command::getStatusFromCommandResult(cmdReply.getCommandReply()));
             }
             catch (const DBException& ex) {
                 LastError::get(txn->getClient()).setLastError(ex.getCode(), ex.getInfo().msg);
