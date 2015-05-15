@@ -46,7 +46,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/db/repl/sync.h"
+#include "mongo/db/repl/sync_tail.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/util/log.h"
 
@@ -1406,10 +1406,10 @@ namespace ReplTests {
         }
     };
 
-    class SyncTest : public Sync {
+    class SyncTest : public SyncTail {
     public:
         bool returnEmpty;
-        SyncTest() : Sync(""), returnEmpty(false) {}
+        SyncTest() : SyncTail(nullptr, SyncTail::MultiSyncApplyFunc()), returnEmpty(false) {}
         virtual ~SyncTest() {}
         virtual BSONObj getMissingDoc(OperationContext* txn, Database* db, const BSONObj& o) {
             if (returnEmpty) {
@@ -1431,7 +1431,8 @@ namespace ReplTests {
 
             // this should fail because we can't connect
             try {
-                Sync badSource("localhost:123");
+                SyncTail badSource(nullptr, SyncTail::MultiSyncApplyFunc());
+                badSource.setHostname("localhost:123");
 
                 OldClientContext ctx(&_txn, ns());
                 badSource.getMissingDoc(&_txn, ctx.db(), o);

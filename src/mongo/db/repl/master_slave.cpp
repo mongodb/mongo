@@ -66,7 +66,7 @@
 #include "mongo/db/repl/handshake_args.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
-#include "mongo/db/repl/sync.h"
+#include "mongo/db/repl/sync_tail.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/util/concurrency/thread_pool.h"
@@ -624,7 +624,8 @@ namespace repl {
         try {
             Status status = applyCommand_inlock(txn, op);
             if (!status.isOK()) {
-                Sync sync(hostName);
+                SyncTail sync(nullptr, SyncTail::MultiSyncApplyFunc());
+                sync.setHostname(hostName);
                 if (sync.shouldRetry(txn, op)) {
                     uassert(28639,
                             "Failure retrying initial sync update",
@@ -645,7 +646,8 @@ namespace repl {
         try {
             Status status = applyOperation_inlock( txn, db, op );
             if (!status.isOK()) {
-                Sync sync(hostName);
+                SyncTail sync(nullptr, SyncTail::MultiSyncApplyFunc());
+                sync.setHostname(hostName);
                 if (sync.shouldRetry(txn, op)) {
                     uassert(15914,
                             "Failure retrying initial sync update",

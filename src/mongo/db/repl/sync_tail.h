@@ -30,12 +30,15 @@
 
 #include <deque>
 
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
-#include "mongo/db/repl/sync.h"
+#include "mongo/stdx/functional.h"
 #include "mongo/util/concurrency/thread_pool.h"
 
 namespace mongo {
 
+    class Database;
     class OperationContext;
 
 namespace repl {
@@ -45,14 +48,51 @@ namespace repl {
     /**
      * "Normal" replica set syncing
      */
-    class SyncTail : public Sync {
-        typedef void (*MultiSyncApplyFunc)(const std::vector<BSONObj>& ops, SyncTail* st);
+    class SyncTail {
     public:
+        using MultiSyncApplyFunc =
+            stdx::function<void (const std::vector<BSONObj>& ops, SyncTail* st)>;
+
+        /**
+         * Type of function that takes a non-command op and applies it locally.
+         * Used for applying from an oplog.
+         * Last boolean argument 'convertUpdateToUpsert' converts some updates to upserts for
+         * idempotency reasons.
+         * Returns failure status if the op was an update that could not be applied.
+         */
+        using ApplyOperationInLockFn =
+            stdx::function<Status (OperationContext*, Database*, const BSONObj&, bool)>;
+
+        /**
+         * Type of function that takes a command op and applies it locally.
+         * Used for applying from an oplog.
+         * Returns failure status if the op that could not be applied.
+         */
+        using ApplyCommandInLockFn = stdx::function<Status (OperationContext*, const BSONObj&)>;
+
+        /**
+         * Type of function to increment "repl.apply.ops" server status metric.
+         */
+        using IncrementOpsAppliedStatsFn = stdx::function<void ()>;
+
         SyncTail(BackgroundSyncInterface *q, MultiSyncApplyFunc func);
         virtual ~SyncTail();
-        virtual bool syncApply(OperationContext* txn,
-                               const BSONObj &o,
-                               bool convertUpdateToUpsert = false);
+
+        /**
+         * Applies the operation that is in param o.
+         * Functions for applying operations/commands and increment server status counters may
+         * be overridden for testing.
+         */
+        static Status syncApply(OperationContext* txn,
+                                const BSONObj &o,
+                                bool convertUpdateToUpsert,
+                                ApplyOperationInLockFn applyOperationInLock,
+                                ApplyCommandInLockFn applyCommandInLock,
+                                IncrementOpsAppliedStatsFn incrementOpsAppliedStats);
+
+        static Status syncApply(OperationContext* txn,
+                                const BSONObj &o,
+                                bool convertUpdateToUpsert);
 
         /**
          * Runs _applyOplogUntil(stopOpTime)
@@ -65,18 +105,18 @@ namespace repl {
         class OpQueue {
         public:
             OpQueue() : _size(0) {}
-            size_t getSize() { return _size; }
-            std::deque<BSONObj>& getDeque() { return _deque; }
+            size_t getSize() const { return _size; }
+            const std::deque<BSONObj>& getDeque() const { return _deque; }
             void push_back(BSONObj& op) {
                 _deque.push_back(op);
                 _size += op.objsize();
             }
-            bool empty() {
+            bool empty() const {
                 return _deque.empty();
             }
 
-            BSONObj back() {
-                verify(!_deque.empty());
+            BSONObj back() const {
+                invariant(!_deque.empty());
                 return _deque.back();
             }
 
@@ -90,6 +130,17 @@ namespace repl {
         bool tryPopAndWaitForMore(OperationContext* txn,
                                   OpQueue* ops,
                                   ReplicationCoordinator* replCoord);
+
+        /**
+         * Fetch a single document referenced in the operation from the sync source.
+         */
+        virtual BSONObj getMissingDoc(OperationContext* txn, Database* db, const BSONObj& o);
+
+        /**
+         * If applyOperation_inlock should be called again after an update fails.
+         */
+        virtual bool shouldRetry(OperationContext* txn, const BSONObj& o);
+        void setHostname(const std::string& hostname);
 
     protected:
         // Cap the batches using the limit on journal commits.
@@ -105,7 +156,13 @@ namespace repl {
         // Prefetch and write a deque of operations, using the supplied function.
         // Initial Sync and Sync Tail each use a different function.
         // Returns the last OpTime applied.
-        Timestamp multiApply(OperationContext* txn, std::deque<BSONObj>& ops);
+        static Timestamp multiApply(OperationContext* txn,
+                                    const OpQueue& ops,
+                                    threadpool::ThreadPool* prefetcherPool,
+                                    threadpool::ThreadPool* writerPool,
+                                    MultiSyncApplyFunc func,
+                                    SyncTail* sync,
+                                    bool supportsAwaitingCommit);
 
         /**
          * Applies oplog entries until reaching "endOpTime".
@@ -115,21 +172,13 @@ namespace repl {
         void _applyOplogUntil(OperationContext* txn, const Timestamp& endOpTime);
 
     private:
+        std::string _hostname;
+
         BackgroundSyncInterface* _networkQueue;
 
         // Function to use during applyOps
         MultiSyncApplyFunc _applyFunc;
 
-        // Doles out all the work to the reader pool threads and waits for them to complete
-        void prefetchOps(const std::deque<BSONObj>& ops);
-        // Used by the thread pool readers to prefetch an op
-        static void prefetchOp(const BSONObj& op);
-
-        // Doles out all the work to the writer pool threads and waits for them to complete
-        void applyOps(const std::vector< std::vector<BSONObj> >& writerVectors);
-
-        void fillWriterVectors(const std::deque<BSONObj>& ops,
-                               std::vector< std::vector<BSONObj> >* writerVectors);
         void handleSlaveDelay(const BSONObj& op);
 
         // persistent pool of worker threads for writing ops to the databases

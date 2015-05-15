@@ -40,7 +40,8 @@ namespace repl {
             _lockState(new MMAPV1LockerImpl()),
             _opID(0),
             _checkForInterruptStatus(Status::OK()),
-            _maxTimeMicrosRemaining(0) {
+            _maxTimeMicrosRemaining(0),
+            _writesAreReplicated(true) {
     }
 
     OperationContextReplMock::~OperationContextReplMock() {}
@@ -79,6 +80,14 @@ namespace repl {
 
     void OperationContextReplMock::setRemainingMaxTimeMicros(uint64_t micros) {
         _maxTimeMicrosRemaining = micros;
+    }
+
+    void OperationContextReplMock::setReplicatedWrites(bool writesAreReplicated) {
+        _writesAreReplicated = writesAreReplicated;
+    }
+
+    bool OperationContextReplMock::writesAreReplicated() const {
+        return _writesAreReplicated;
     }
 
 }  // namespace repl

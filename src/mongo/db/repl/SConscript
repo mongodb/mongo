@@ -76,6 +76,32 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='sync_tail',
+    source=[
+        'sync_tail.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/mongo/db/concurrency/write_conflict_exception',
+    ],
+)
+
+env.CppUnitTest(
+    target='sync_tail_test',
+    source=[
+        'sync_tail_test.cpp',
+    ],
+    LIBDEPS=[
+        'replmocks',
+        'sync_tail',
+        '$BUILD_DIR/mongo/db/coredb',
+        '$BUILD_DIR/mongo/db/serveronly',
+        '$BUILD_DIR/mongo/util/ntservice_mock',
+    ],
+    NO_CRUTCH = True,
+)
+
 env.Library('topology_coordinator',
             [
                 'heartbeat_response_action.cpp',

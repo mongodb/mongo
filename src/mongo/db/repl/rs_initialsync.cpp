@@ -286,9 +286,9 @@ namespace {
         return true;
     }
 
-    void _tryToApplyOpWithRetry(OperationContext* txn, InitialSync* init, const BSONObj& op) {
+    void _tryToApplyOpWithRetry(OperationContext* txn, SyncTail* init, const BSONObj& op) {
         try {
-            if (!init->syncApply(txn, op)) {
+            if (!SyncTail::syncApply(txn, op, false).isOK()) {
                 bool retry;
                 {
                     ScopedTransaction transaction(txn, MODE_X);
@@ -298,7 +298,7 @@ namespace {
 
                 if (retry) {
                     // retry
-                    if (!init->syncApply(txn, op)) {
+                    if (!SyncTail::syncApply(txn, op, false).isOK()) {
                         uasserted(28542,
                                   str::stream() << "During initial sync, failed to apply op: "
                                                 << op);
