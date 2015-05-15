@@ -56,8 +56,8 @@ __logmgr_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 	*runp = cval.val != 0;
 
 	/*
-	 * Setup a log path and compression even if logging is disabled in
-	 * case we are going to print a log.
+	 * Setup a log path, compression and encryption even if logging is
+	 * disabled in case we are going to print a log.
 	 */
 	conn->log_compressor = NULL;
 	WT_RET(__wt_config_gets_none(session, cfg, "log.compressor", &cval));
@@ -535,9 +535,9 @@ __wt_logmgr_create(WT_SESSION_IMPL *session, const char *cfg[])
 	    &log->log_archive_lock, "log archive lock"));
 	if (FLD_ISSET(conn->direct_io, WT_FILE_TYPE_LOG))
 		log->allocsize =
-		    WT_MAX((uint32_t)conn->buffer_alignment, LOG_ALIGN);
+		    WT_MAX((uint32_t)conn->buffer_alignment, WT_LOG_ALIGN);
 	else
-		log->allocsize = LOG_ALIGN;
+		log->allocsize = WT_LOG_ALIGN;
 	WT_INIT_LSN(&log->alloc_lsn);
 	WT_INIT_LSN(&log->ckpt_lsn);
 	WT_INIT_LSN(&log->first_lsn);
@@ -704,6 +704,5 @@ __wt_logmgr_destroy(WT_SESSION_IMPL *session)
 	__wt_spin_destroy(session, &conn->log->log_sync_lock);
 	__wt_free(session, conn->log_path);
 	__wt_free(session, conn->log);
-
 	return (ret);
 }

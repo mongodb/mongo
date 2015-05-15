@@ -582,7 +582,7 @@ __evict_clear_walk(WT_SESSION_IMPL *session)
 	 * assert we never try to evict the current eviction walk point).
 	 */
 	btree->evict_ref = NULL;
-	return (__wt_page_release(session, ref, 0));
+	return (__wt_page_release(session, ref, WT_READ_NO_EVICT));
 }
 
 /*
@@ -684,14 +684,14 @@ __wt_evict_page(WT_SESSION_IMPL *session, WT_REF *ref)
 	__wt_txn_update_oldest(session, 1);
 	txn = &session->txn;
 	saved_iso = txn->isolation;
-	txn->isolation = TXN_ISO_EVICTION;
+	txn->isolation = WT_ISO_EVICTION;
 
 	/*
 	 * Sanity check: if a transaction has updates, its updates should not
 	 * be visible to eviction.
 	 */
-	WT_ASSERT(session,
-	    !F_ISSET(txn, TXN_HAS_ID) || !__wt_txn_visible(session, txn->id));
+	WT_ASSERT(session, !F_ISSET(txn, WT_TXN_HAS_ID) ||
+	    !__wt_txn_visible(session, txn->id));
 
 	ret = __wt_evict(session, ref, 0);
 	txn->isolation = saved_iso;
@@ -1287,7 +1287,7 @@ fast:		/* If the page can't be evicted, give up. */
 	if ((ref = btree->evict_ref) != NULL && (__wt_ref_is_root(ref) ||
 	    ref->page->read_gen == WT_READGEN_OLDEST)) {
 		btree->evict_ref = NULL;
-		__wt_page_release(session, ref, 0);
+		__wt_page_release(session, ref, WT_READ_NO_EVICT);
 	}
 
 	/* If the walk was interrupted by a locked page, that's okay. */

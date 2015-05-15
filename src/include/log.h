@@ -11,7 +11,7 @@
 #define	WT_LOG_TMPNAME	"WiredTigerTmplog"	/* Log temporary name */
 
 /* Logging subsystem declarations. */
-#define	LOG_ALIGN		128
+#define	WT_LOG_ALIGN			128
 #define	WT_LOG_SLOT_BUF_INIT_SIZE	64 * 1024
 
 #define	WT_INIT_LSN(l)	do {						\
@@ -167,6 +167,7 @@ typedef struct {
 	uint32_t	checksum;	/* 04-07: Checksum of the record */
 
 #define	WT_LOG_RECORD_COMPRESSED	0x01	/* Compressed except hdr */
+#define	WT_LOG_RECORD_ENCRYPTED		0x02	/* Encrypted except hdr */
 	uint16_t	flags;		/* 08-09: Flags */
 	uint8_t		unused[2];	/* 10-11: Padding */
 	uint32_t	mem_len;	/* 12-15: Uncompressed len if needed */

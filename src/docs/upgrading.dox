@@ -1,7 +1,30 @@
 /*! @page upgrading Upgrading WiredTiger applications
 
-@section version_254 Upgrading to Version 2.5.4
+@section version_260 Upgrading to Version 2.6.0
+
 <dl>
+<dt>LZ4 compression</dt>
+<dd>
+The LZ4 compression support has been updated in this release in non-backward
+compatible ways; <b>tables and files compressed using LZ4 compression with
+WiredTiger 2.5.3 must be dumped then re-loaded using WiredTiger 2.6.0.</b>
+</dd>
+
+<dt>wiredtiger_open file manager configuration changes</dt>
+<dd>
+The configuration settings related to file handle management have changed
+significantly in this release. If your application uses the file_manager
+configuration setting, please refer to the API documentation for the latest
+settings.
+</dd>
+
+<dt>Statistic change</dt>
+<dd>
+The statistic "log read operations" was removed.  The function that
+used that statistic was never called inside WiredTiger and was also
+removed.
+</dd>
+
 <dt>File handle closing</dt>
 <dd>
 In WiredTiger, a separate thread of control periodically reviews open
@@ -13,6 +36,13 @@ handles are open. How often file handles are reviewed (the default is
 30 seconds), and how many file handles must be opened before review is
 triggered, can be configured using the \c file_manager configuration
 values to the ::wiredtiger_open call.
+</dd>
+
+<dt>Table drop changes</dt>
+<dd>
+There has been a functionality change to the WT_SESSION::drop API when the
+\c force configuration option is included. The table is now dropped in the
+background and does not flush data from cache.
 </dd>
 
 </dl><hr>

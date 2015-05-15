@@ -23,7 +23,6 @@ __wt_debug_tree_shape
 __wt_fsync
 __wt_lex_compare
 __wt_lex_compare_skip
-__wt_log_read
 __wt_log_scan
 __wt_nlpo2
 __wt_nlpo2_round

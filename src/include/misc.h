@@ -59,6 +59,12 @@
 #define	WT_SKIP_PROBABILITY	(UINT32_MAX >> 2)
 
 /*
+ * Encryption needs to know its original length before either the
+ * block or logging subsystems pad.  Constant value.
+ */
+#define	WT_ENCRYPT_LEN_SIZE	sizeof(uint32_t)
+
+/*
  * __wt_calloc_def, __wt_calloc_one --
  *	Most calloc calls don't need separate count or sizeof arguments.
  */

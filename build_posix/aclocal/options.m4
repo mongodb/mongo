@@ -197,8 +197,8 @@ if test "$wt_cv_enable_lz4" = "yes"; then
 	AC_CHECK_HEADER(lz4.h,,
 	    [AC_MSG_ERROR([--enable-lz4 requires lz4.h])])
 	AC_LANG_POP([C++])
-	AC_CHECK_LIB(lz4, LZ4_compress,,
-	    [AC_MSG_ERROR([--enable-lz4 requires lz4 library])])
+	AC_CHECK_LIB(lz4, LZ4_compress_destSize,,
+	    [AC_MSG_ERROR([--enable-lz4 requires lz4 library with LZ4_compress_destSize support])])
 fi
 AM_CONDITIONAL([LZ4], [test "$wt_cv_enable_lz4" = "yes"])
 

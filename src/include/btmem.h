@@ -42,6 +42,7 @@ struct __wt_page_header {
 #define	WT_PAGE_COMPRESSED	0x01	/* Page is compressed on disk */
 #define	WT_PAGE_EMPTY_V_ALL	0x02	/* Page has all zero-length values */
 #define	WT_PAGE_EMPTY_V_NONE	0x04	/* Page has no zero-length values */
+#define	WT_PAGE_ENCRYPTED	0x08	/* Page is encrypted on disk */
 	uint8_t flags;			/* 25: flags */
 
 	/*

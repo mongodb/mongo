@@ -1,4 +1,5 @@
-AM_CPPFLAGS = -I$(top_builddir) -I$(top_srcdir)/src/include
+AM_CPPFLAGS = -I$(top_builddir) -I$(top_srcdir)/src/include \
+    -I$(top_srcdir)/test/utility
 
 noinst_PROGRAMS = t
 t_SOURCES = salvage.c

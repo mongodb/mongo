@@ -38,8 +38,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#include <wiredtiger.h>
-#include "wt_internal.h"			/* For __wt_random */
+#include "test_util.i"
 
 #define	URI_BASE	"table:__wt"		/* File name */
 
@@ -64,7 +63,6 @@ typedef struct {
 
 typedef struct {
 	char *home;				/* Home directory */
-	char *home_init;			/* Home directory init shell */
 	const char *checkpoint_name;		/* Checkpoint name */
 	WT_CONNECTION *conn;			/* WiredTiger connection */
 	u_int nkeys;				/* Keys to load */

@@ -477,6 +477,10 @@ __create_index(WT_SESSION_IMPL *session,
 		goto err;
 	}
 
+	/* Make sure that the configuration is valid. */
+	WT_ERR(__wt_schema_open_index(
+	    session, table, idxname, strlen(idxname), NULL));
+
 err:	__wt_free(session, idxconf);
 	__wt_free(session, sourceconf);
 	__wt_buf_free(session, &confbuf);

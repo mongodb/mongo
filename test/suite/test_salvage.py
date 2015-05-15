@@ -106,6 +106,9 @@ class test_salvage(wttest.WiredTigerTestCase, suite_subprocess):
         cursor.close()
 
     def damage(self, tablename):
+        self.damage_inner(tablename, self.unique)
+
+    def damage_inner(self, tablename, unique):
         """
         Open the file for the table, find the unique string
         and modify it.
@@ -117,7 +120,7 @@ class test_salvage(wttest.WiredTigerTestCase, suite_subprocess):
 
         fp = open(filename, "r+b")
         found = matchpos = 0
-        match = self.unique
+        match = unique
         matchlen = len(match)
         flen = os.fstat(fp.fileno()).st_size
         c = fp.read(1)

@@ -862,11 +862,11 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 			continue;
 
 		/* Track the largest/smallest transaction IDs on the list. */
-		if (TXNID_LT(max_txn, txnid))
+		if (WT_TXNID_LT(max_txn, txnid))
 			max_txn = txnid;
-		if (TXNID_LT(txnid, min_txn))
+		if (WT_TXNID_LT(txnid, min_txn))
 			min_txn = txnid;
-		if (TXNID_LT(txnid, r->skipped_txn) &&
+		if (WT_TXNID_LT(txnid, r->skipped_txn) &&
 		    !__wt_txn_visible_all(session, txnid))
 			r->skipped_txn = txnid;
 
@@ -894,7 +894,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	 * used to avoid evicting clean pages from memory with changes required
 	 * to satisfy a snapshot read.
 	 */
-	if (TXNID_LT(r->max_txn, max_txn))
+	if (WT_TXNID_LT(r->max_txn, max_txn))
 		r->max_txn = max_txn;
 
 	/*
@@ -2122,7 +2122,7 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session,
 	WT_ITEM *dst, *write_ref;
 	WT_PAGE_HEADER *dsk, *dsk_dst;
 	WT_SESSION *wt_session;
-	size_t corrected_page_size, len, result_len;
+	size_t corrected_page_size, extra_skip, len, result_len;
 	uint64_t recno;
 	uint32_t entry, i, result_slots, slots;
 	int last_block;
@@ -2277,6 +2277,11 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session,
 		WT_RET(compressor->pre_size(compressor, wt_session,
 		    (uint8_t *)dsk + WT_BLOCK_COMPRESS_SKIP,
 		    (size_t)r->raw_offsets[slots], &result_len));
+	extra_skip = 0;
+	if (btree->kencryptor != NULL)
+		extra_skip = btree->kencryptor->size_const +
+		    WT_ENCRYPT_LEN_SIZE;
+
 	corrected_page_size = result_len + WT_BLOCK_COMPRESS_SKIP;
 	WT_RET(bm->write_size(bm, session, &corrected_page_size));
 	WT_RET(__wt_buf_init(session, dst, corrected_page_size));
@@ -2288,7 +2293,8 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session,
 	memcpy(dst->mem, dsk, WT_BLOCK_COMPRESS_SKIP);
 	ret = compressor->compress_raw(compressor, wt_session,
 	    r->page_size_orig, btree->split_pct,
-	    WT_BLOCK_COMPRESS_SKIP, (uint8_t *)dsk + WT_BLOCK_COMPRESS_SKIP,
+	    WT_BLOCK_COMPRESS_SKIP + extra_skip,
+	    (uint8_t *)dsk + WT_BLOCK_COMPRESS_SKIP,
 	    r->raw_offsets, slots,
 	    (uint8_t *)dst->mem + WT_BLOCK_COMPRESS_SKIP,
 	    result_len, no_more_rows, &result_len, &result_slots);

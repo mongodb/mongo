@@ -43,8 +43,7 @@ util_compact(WT_SESSION *session, int argc, char *argv[])
 err:		ret = 1;
 	}
 
-	if (uri != NULL)
-		free(uri);
+	free(uri);
 
 	return (ret);
 }
