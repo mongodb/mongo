@@ -48,9 +48,9 @@ namespace {
 
     template<class T>
     std::string ToString(const T& t) {
-        std::stringstream s;
+        str::stream s;
         s << t;
-        return s.str();
+        return s;
     }
 
     /**
