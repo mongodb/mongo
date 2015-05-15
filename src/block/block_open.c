@@ -68,10 +68,10 @@ __wt_block_manager_create(
 		if ((ret = __wt_open(
 		    session, filename, 1, 1, WT_FILE_TYPE_DATA, &fh)) == 0)
 			break;
-		WT_RET_TEST(ret != EEXIST, ret);
+		WT_ERR_TEST(ret != EEXIST, ret);
 
 		if (tmp == NULL)
-			WT_RET(__wt_scr_alloc(session, 0, &tmp));
+			WT_ERR(__wt_scr_alloc(session, 0, &tmp));
 		for (suffix = 1;; ++suffix) {
 			WT_ERR(__wt_buf_fmt(
 			    session, tmp, "%s.%d", filename, suffix));
