@@ -118,6 +118,7 @@ __sweep_expire(WT_SESSION_IMPL *session)
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 	time_t now;
+	int evict_reset;
 
 	conn = S2C(session);
 
@@ -144,6 +145,7 @@ __sweep_expire(WT_SESSION_IMPL *session)
 
 		WT_WITH_DHANDLE(session, dhandle,
 		    ret = __sweep_expire_handle(session));
+
 		WT_RET_BUSY_OK(ret);
 	}
 
