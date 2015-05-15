@@ -313,15 +313,15 @@ namespace repl {
             return Timestamp();
         }
 
-        const bool mustAwaitCommit = replCoord->isV1ElectionProtocol() && supportsAwaitingCommit();
-        if (mustAwaitCommit) {
-            txn->recoveryUnit()->goingToAwaitCommit();
+        const bool mustWaitUntilDurable = replCoord->isV1ElectionProtocol() && supportsWaitingUntilDurable();
+        if (mustWaitUntilDurable) {
+            txn->recoveryUnit()->goingToWaitUntilDurable();
         }
 
         OpTime lastOpTime = writeOpsToOplog(txn, ops);
 
-        if (mustAwaitCommit) {
-            txn->recoveryUnit()->awaitCommit();
+        if (mustWaitUntilDurable) {
+            txn->recoveryUnit()->waitUntilDurable();
         }
         ReplClientInfo::forClient(txn->getClient()).setLastOp(lastOpTime);
         replCoord->setMyLastOptime(lastOpTime);

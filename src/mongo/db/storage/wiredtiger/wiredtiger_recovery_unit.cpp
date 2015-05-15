@@ -49,8 +49,8 @@
 namespace mongo {
 
     namespace {
-        struct AwaitCommitData {
-            AwaitCommitData() :
+        struct WaitUntilDurableData {
+            WaitUntilDurableData() :
                 numWaitingForSync(0),
                 lastSyncTime(0) {
             }
@@ -62,7 +62,7 @@ namespace mongo {
             }
 
             // return true if happened
-            bool awaitCommit() {
+            bool waitUntilDurable() {
                 boost::unique_lock<boost::mutex> lk( mutex );
                 long long start = lastSyncTime;
                 numWaitingForSync.fetchAndAdd(1);
@@ -76,7 +76,7 @@ namespace mongo {
             boost::mutex mutex; // this just protects lastSyncTime
             boost::condition condvar;
             long long lastSyncTime;
-        } awaitCommitData;
+        } waitUntilDurableData;
     }
 
     WiredTigerRecoveryUnit::WiredTigerRecoveryUnit(WiredTigerSessionCache* sc) :
@@ -170,7 +170,7 @@ namespace mongo {
         }
     }
 
-    void WiredTigerRecoveryUnit::goingToAwaitCommit() {
+    void WiredTigerRecoveryUnit::goingToWaitUntilDurable() {
         if ( _active ) {
             // too late, can't change config
             return;
@@ -179,12 +179,12 @@ namespace mongo {
         _syncing = true;
     }
 
-    bool WiredTigerRecoveryUnit::awaitCommit() {
+    bool WiredTigerRecoveryUnit::waitUntilDurable() {
         if ( _syncing && _everStartedWrite ) {
             // we did a sync, so we're good
             return true;
         }
-        awaitCommitData.awaitCommit();
+        waitUntilDurableData.waitUntilDurable();
         return true;
     }
 
@@ -307,7 +307,7 @@ namespace mongo {
             invariantWTOK( s->commit_transaction(s, NULL) );
             LOG(2) << "WT commit_transaction";
             if ( _syncing )
-                awaitCommitData.syncHappend();
+                waitUntilDurableData.syncHappend();
         }
         else {
             invariantWTOK( s->rollback_transaction(s, NULL) );
@@ -360,7 +360,7 @@ namespace mongo {
         _getTicket(opCtx);
 
         WT_SESSION *s = _session->getSession();
-        _syncing = _syncing || awaitCommitData.numWaitingForSync.load() > 0;
+        _syncing = _syncing || waitUntilDurableData.numWaitingForSync.load() > 0;
         invariantWTOK( s->begin_transaction(s, _syncing ? "sync=true" : NULL) );
         LOG(2) << "WT begin_transaction";
         _timer.reset();

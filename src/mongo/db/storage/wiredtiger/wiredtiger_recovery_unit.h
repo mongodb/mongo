@@ -63,8 +63,8 @@ namespace mongo {
 
         virtual void endUnitOfWork();
 
-        virtual bool awaitCommit();
-        virtual void goingToAwaitCommit();
+        virtual bool waitUntilDurable();
+        virtual void goingToWaitUntilDurable();
 
         virtual void registerChange(Change *);
 

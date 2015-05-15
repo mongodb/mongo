@@ -43,7 +43,7 @@ namespace mongo {
 
         virtual void abandonSnapshot() {}
 
-        virtual bool awaitCommit() {
+        virtual bool waitUntilDurable() {
             return true;
         }
 

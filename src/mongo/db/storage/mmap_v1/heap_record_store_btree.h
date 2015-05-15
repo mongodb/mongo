@@ -187,7 +187,7 @@ namespace mongo {
         virtual void commitUnitOfWork();
         virtual void endUnitOfWork();
 
-        virtual bool awaitCommit() { return true; }
+        virtual bool waitUntilDurable() { return true; }
 
         virtual void abandonSnapshot() {}
 

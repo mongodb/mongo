@@ -85,14 +85,18 @@ namespace mongo {
         // TODO clean up the naming and semantics.
 
         /**
-         * XXX: document
+         * Waits until all writes prior to this call are durable. Returns true, unless the storage
+         * engine cannot guarantee durability, which should never happen when isDurable() returned
+         * true.
          */
-        virtual bool awaitCommit() = 0;
+        virtual bool waitUntilDurable() = 0;
 
-        // This is a hint to the engine that this transaction is going to call awaitCommit at the
-        // end.  This should be called before any work is done so that transactions can be
-        // configured correctly.
-        virtual void goingToAwaitCommit() { }
+        /**
+         * This is a hint to the engine that this transaction is going to call waitUntilDurable at
+         * the end.  This should be called before any work is done so that transactions can be
+         * configured correctly.
+         */
+        virtual void goingToWaitUntilDurable() { }
 
         /**
          * When this is called, if there is an open transaction, it is closed. On return no

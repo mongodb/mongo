@@ -60,7 +60,7 @@ namespace mongo {
 
         if ( writeConcern.syncMode == WriteConcernOptions::JOURNAL ||
              writeConcern.syncMode == WriteConcernOptions::FSYNC ) {
-            txn->recoveryUnit()->goingToAwaitCommit();
+            txn->recoveryUnit()->goingToWaitUntilDurable();
         }
     }
 
@@ -232,12 +232,12 @@ namespace mongo {
             }
             else {
                 // We only need to commit the journal if we're durable
-                txn->recoveryUnit()->awaitCommit();
+                txn->recoveryUnit()->waitUntilDurable();
             }
             break;
         }
         case WriteConcernOptions::JOURNAL:
-            txn->recoveryUnit()->awaitCommit();
+            txn->recoveryUnit()->waitUntilDurable();
             break;
         }
 

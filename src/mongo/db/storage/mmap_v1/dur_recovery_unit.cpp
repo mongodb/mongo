@@ -241,9 +241,9 @@ namespace mongo {
         }
     }
 
-    bool DurRecoveryUnit::awaitCommit() {
+    bool DurRecoveryUnit::waitUntilDurable() {
         invariant(!inAUnitOfWork());
-        return getDur().awaitCommit();
+        return getDur().waitUntilDurable();
     }
 
     void DurRecoveryUnit::mergingWritingPtr(char* addr, size_t len) {

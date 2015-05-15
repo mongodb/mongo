@@ -189,7 +189,7 @@ namespace {
 
         }
         virtual void createdFile(const std::string& filename, unsigned long long len) { }
-        virtual bool awaitCommit() { return false; }
+        virtual bool waitUntilDurable() { return false; }
         virtual bool commitNow(OperationContext* txn) { return false; }
         virtual bool commitIfNeeded() { return false; }
         virtual void syncDataAndTruncateJournal(OperationContext* txn) {}
@@ -209,7 +209,7 @@ namespace {
         // DurableInterface virtual methods
         virtual void declareWriteIntents(const std::vector<std::pair<void*, unsigned> >& intents);
         virtual void createdFile(const std::string& filename, unsigned long long len);
-        virtual bool awaitCommit();
+        virtual bool waitUntilDurable();
         virtual bool commitNow(OperationContext* txn);
         virtual bool commitIfNeeded();
         virtual void syncDataAndTruncateJournal(OperationContext* txn);
@@ -521,7 +521,7 @@ namespace {
         return true;
     }
 
-    bool DurableImpl::awaitCommit() {
+    bool DurableImpl::waitUntilDurable() {
         commitNotify.awaitBeyondNow();
         return true;
     }

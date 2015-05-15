@@ -52,7 +52,7 @@ namespace mongo {
         virtual void commitUnitOfWork();
         virtual void endUnitOfWork();
 
-        virtual bool awaitCommit();
+        virtual bool waitUntilDurable();
 
         virtual void abandonSnapshot();
 

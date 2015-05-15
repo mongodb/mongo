@@ -68,7 +68,7 @@ namespace dur {
             @return true if --dur is on.  There will be delay.
             @return false if --dur is off.
             */
-        virtual bool awaitCommit() = 0;
+        virtual bool waitUntilDurable() = 0;
 
         /** Commit immediately.
 

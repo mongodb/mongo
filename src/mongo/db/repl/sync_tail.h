@@ -100,7 +100,7 @@ namespace repl {
 
         // SyncTail base class always supports awaiting commit if any op has j:true flag
         // that indicates awaiting commit before updating last OpTime.
-        virtual bool supportsAwaitingCommit() { return true; }
+        virtual bool supportsWaitingUntilDurable() { return true; }
 
         // Prefetch and write a deque of operations, using the supplied function.
         // Initial Sync and Sync Tail each use a different function.

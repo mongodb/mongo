@@ -48,9 +48,9 @@ namespace repl {
          */
         void oplogApplication(OperationContext* txn, const Timestamp& endOpTime);
 
-        // Initial sync will ignore all journal requirement flags and doesn't await commit
-        // before updating last OpTime.
-        virtual bool supportsAwaitingCommit() { return false; }
+        // Initial sync will ignore all journal requirement flags and doesn't wait until
+        // operations are durable before updating the last OpTime.
+        virtual bool supportsWaitingUntilDurable() { return false; }
     };
 
     // Used for ReplSetTest testing.
