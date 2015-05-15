@@ -2087,7 +2087,7 @@ buildvariants:
     push_arch: x86_64
     msi_target: msi
     content_type: application/zip
-    compile_flags: --release -j$(grep -c ^processor /proc/cpuinfo)
+    compile_flags: --release -j$(grep -c ^processor /proc/cpuinfo) --variant-dir=win32
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     ext: zip
@@ -2173,7 +2173,7 @@ buildvariants:
     push_arch: x86_64-2008plus
     msi_target: msi
     content_type: application/zip
-    compile_flags: --release --win-version-min=ws08r2 -j$(grep -c ^processor /proc/cpuinfo) --distmod=2008plus
+    compile_flags: --release --win-version-min=ws08r2 -j$(grep -c ^processor /proc/cpuinfo) --distmod=2008plus --variant-dir=win32
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     ext: zip
@@ -2356,7 +2356,7 @@ buildvariants:
     push_arch: x86_64-2008plus-ssl
     msi_target: msi
     content_type: application/zip
-    compile_flags: --release --ssl --distmod=2008plus-ssl CPPPATH="c:/openssl/include" LIBPATH="c:/openssl/lib" -j$(grep -c ^processor /proc/cpuinfo) --dynamic-windows --win-version-min=ws08r2
+    compile_flags: --release --ssl --distmod=2008plus-ssl CPPPATH="c:/openssl/include" LIBPATH="c:/openssl/lib" -j$(grep -c ^processor /proc/cpuinfo) --dynamic-windows --win-version-min=ws08r2 --variant-dir=win32
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     ext: zip
@@ -2433,7 +2433,7 @@ buildvariants:
     push_arch: i386
     msi_target: msi
     content_type: application/zip
-    compile_flags: --release -j$(grep -c ^processor /proc/cpuinfo) --wiredtiger=off TARGET_ARCH=i386
+    compile_flags: --release -j$(grep -c ^processor /proc/cpuinfo) --wiredtiger=off TARGET_ARCH=i386 --variant-dir=win32
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure -j1  # Avoid starting too many mongod's on 32-bit systems.
     ext: zip
