@@ -97,7 +97,7 @@ versionInfo = env.Substfile(
         ('@buildinfo_cflags@', env['CFLAGS']),
         ('@buildinfo_cxxflags@', env['CXXFLAGS']),
         ('@buildinfo_linkflags@', env['LINKFLAGS']),
-        ('@buildinfo_cmdline@', cmd_line),
+        ('@buildinfo_cmdline@', ''),
         ('@buildinfo_modules@', module_list),
         ('@buildinfo_target_arch@', env['TARGET_ARCH']),
         ('@buildinfo_target_os@', env.GetTargetOSName()),
