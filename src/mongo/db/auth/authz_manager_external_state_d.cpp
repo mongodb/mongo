@@ -32,8 +32,6 @@
 
 #include "mongo/db/auth/authz_manager_external_state_d.h"
 
-#include <boost/thread/mutex.hpp>
-#include <boost/date_time/time_duration.hpp>
 #include <string>
 
 #include "mongo/base/status.h"
@@ -187,16 +185,6 @@ namespace mongo {
         } catch (const DBException& e) {
             return e.toStatus();
         }
-    }
-
-    bool AuthzManagerExternalStateMongod::tryAcquireAuthzUpdateLock(StringData why) {
-        LOG(2) << "Attempting to lock user data for: " << why << endl;
-        return _authzDataUpdateLock.timed_lock(
-                boost::posix_time::milliseconds(_authzUpdateLockAcquisitionTimeoutMillis));
-    }
-
-    void AuthzManagerExternalStateMongod::releaseAuthzUpdateLock() {
-        return _authzDataUpdateLock.unlock();
     }
 
 } // namespace mongo

@@ -46,7 +46,6 @@
 #include "mongo/crypto/mechanism_scram.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/authz_documents_update_guard.h"
 #include "mongo/db/auth/authz_manager_external_state.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/role_graph.h"
@@ -748,14 +747,6 @@ namespace mongo {
             return status;
 
         return Status::OK();
-    }
-
-    bool AuthorizationManager::tryAcquireAuthzUpdateLock(StringData why) {
-        return _externalState->tryAcquireAuthzUpdateLock(why);
-    }
-
-    void AuthorizationManager::releaseAuthzUpdateLock() {
-        return _externalState->releaseAuthzUpdateLock();
     }
 
 namespace {

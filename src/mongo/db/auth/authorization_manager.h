@@ -395,20 +395,6 @@ namespace mongo {
         Status _initializeUserFromPrivilegeDocument(User* user, const BSONObj& privDoc);
 
         /**
-         * Tries to acquire the global lock guarding modifications to all persistent data related
-         * to authorization, namely the admin.system.users, admin.system.roles, and
-         * admin.system.version collections.  This serializes all writers to the authorization
-         * documents, but does not impact readers.
-         */
-        bool tryAcquireAuthzUpdateLock(StringData why);
-
-        /**
-         * Releases the lock guarding modifications to persistent authorization data, which must
-         * already be held.
-         */
-        void releaseAuthzUpdateLock();
-
-        /**
          * Performs one step in the process of upgrading the stored authorization data to the
          * newest schema.
          *

@@ -332,31 +332,4 @@ namespace {
         return res;
     }
 
-    bool AuthzManagerExternalStateMongos::tryAcquireAuthzUpdateLock(StringData why) {
-        boost::lock_guard<boost::mutex> lkLocal(_distLockGuard);
-        if (_authzDataUpdateLock.get()) {
-            return false;
-        }
-
-        auto timeout = stdx::chrono::milliseconds(_authzUpdateLockAcquisitionTimeoutMillis);
-        auto scopedDistLock = grid.catalogManager()->getDistLockManager()->lock(
-                "authorizationData", why, timeout);
-
-        if (!scopedDistLock.isOK()) {
-            warning() << "Error while attempting to acquire distributed lock for "
-                      << "user modification: " << scopedDistLock.getStatus().toString();
-            return false;
-        }
-
-        _authzDataUpdateLock = stdx::make_unique<DistLockManager::ScopedDistLock>(
-                std::move(scopedDistLock.getValue()));
-
-        return true;
-    }
-
-    void AuthzManagerExternalStateMongos::releaseAuthzUpdateLock() {
-        boost::lock_guard<boost::mutex> lkLocal(_distLockGuard);
-        _authzDataUpdateLock.reset();
-    }
-
 } // namespace mongo

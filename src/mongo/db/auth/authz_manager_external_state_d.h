@@ -79,11 +79,6 @@ namespace mongo {
                               const BSONObj& query,
                               const BSONObj& writeConcern,
                               int* numRemoved);
-        virtual bool tryAcquireAuthzUpdateLock(StringData why);
-        virtual void releaseAuthzUpdateLock();
-
-    private:
-        boost::timed_mutex _authzDataUpdateLock;
     };
 
 } // namespace mongo

@@ -226,20 +226,6 @@ namespace mongo {
                               const BSONObj& writeConcern,
                               int* numRemoved) = 0;
 
-        /**
-         * Tries to acquire the global lock guarding modifications to all persistent data related
-         * to authorization, namely the admin.system.users, admin.system.roles, and
-         * admin.system.version collections.  This serializes all writers to the authorization
-         * documents, but does not impact readers.
-         */
-        virtual bool tryAcquireAuthzUpdateLock(StringData why) = 0;
-
-        /**
-         * Releases the lock guarding modifications to persistent authorization data, which must
-         * already be held.
-         */
-        virtual void releaseAuthzUpdateLock() = 0;
-
         virtual void logOp(
                 OperationContext* txn,
                 const char* op,
@@ -250,8 +236,6 @@ namespace mongo {
 
     protected:
         AuthzManagerExternalState(); // This class should never be instantiated directly.
-
-        static const long long _authzUpdateLockAcquisitionTimeoutMillis = 5000;
     };
 
 } // namespace mongo

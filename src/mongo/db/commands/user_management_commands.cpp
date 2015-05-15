@@ -32,6 +32,7 @@
 
 #include "mongo/db/commands/user_management_commands.h"
 
+#include <boost/thread/mutex.hpp>
 #include <string>
 #include <vector>
 
@@ -46,7 +47,6 @@
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/authz_documents_update_guard.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authorization_session.h"
@@ -56,14 +56,18 @@
 #include "mongo/db/auth/user.h"
 #include "mongo/db/auth/user_document_parser.h"
 #include "mongo/db/auth/user_management_commands_parser.h"
+#include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
 #include "mongo/platform/unordered_set.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/sequence_util.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
@@ -73,6 +77,15 @@ namespace mongo {
     using std::string;
     using std::stringstream;
     using std::vector;
+
+namespace {
+
+    // Used to obtain mutex that guards modifications to persistent authorization data
+    const auto getAuthzDataMutex = ServiceContext::declareDecoration<boost::timed_mutex>();
+
+    const Seconds authzDataMutexAcquisitionTimeout{5};
+
+} // namespace
 
     class CmdCreateUser : public Command {
     public:
@@ -162,7 +175,8 @@ namespace mongo {
             userObjBuilder.append(AuthorizationManager::USER_DB_FIELD_NAME,
                                   args.userName.getDB());
 
-            AuthorizationManager* authzManager = getGlobalAuthorizationManager();
+            ServiceContext* serviceContext = txn->getClient()->getServiceContext();
+            AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
             int authzVersion;
             status = authzManager->getAuthorizationVersion(txn, &authzVersion);
             if (!status.isOK()) {
@@ -200,8 +214,9 @@ namespace mongo {
                 return appendCommandStatus(result, status);
             }
 
-            AuthzDocumentsUpdateGuard updateGuard(authzManager);
-            if (!updateGuard.tryLock("Create user")) {
+            boost::unique_lock<boost::timed_mutex> lk(getAuthzDataMutex(serviceContext),
+                                                      authzDataMutexAcquisitionTimeout);
+            if (!lk) {
                 return appendCommandStatus(
                         result,
                         Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
@@ -319,14 +334,16 @@ namespace mongo {
                 updateSetBuilder.append("roles", auth::rolesVectorToBSONArray(args.roles));
             }
 
-            AuthorizationManager* authzManager = getGlobalAuthorizationManager();
-            AuthzDocumentsUpdateGuard updateGuard(authzManager);
-            if (!updateGuard.tryLock("Update user")) {
+            ServiceContext* serviceContext = txn->getClient()->getServiceContext();
+            boost::unique_lock<boost::timed_mutex> lk(getAuthzDataMutex(serviceContext),
+                                                      authzDataMutexAcquisitionTimeout);
+            if (!lk) {
                 return appendCommandStatus(
                         result,
                         Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
             }
 
+            AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
             status = auth::requireAuthSchemaVersion26Final(txn, authzManager);
             if (!status.isOK()) {
                 return appendCommandStatus(result, status);
@@ -391,14 +408,16 @@ namespace mongo {
                  int options,
                  string& errmsg,
                  BSONObjBuilder& result) {
-            AuthorizationManager* authzManager = getGlobalAuthorizationManager();
-            AuthzDocumentsUpdateGuard updateGuard(authzManager);
-            if (!updateGuard.tryLock("Drop user")) {
+            ServiceContext* serviceContext = txn->getClient()->getServiceContext();
+            boost::unique_lock<boost::timed_mutex> lk(getAuthzDataMutex(serviceContext),
+                                                      authzDataMutexAcquisitionTimeout);
+            if (!lk) {
                 return appendCommandStatus(
                         result,
                         Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
             }
 
+            AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
             Status status = auth::requireAuthSchemaVersion26Final(txn, authzManager);
             if (!status.isOK()) {
                 return appendCommandStatus(result, status);
@@ -470,14 +489,16 @@ namespace mongo {
                  int options,
                  string& errmsg,
                  BSONObjBuilder& result) {
-            AuthorizationManager* authzManager = getGlobalAuthorizationManager();
-            AuthzDocumentsUpdateGuard updateGuard(authzManager);
-            if (!updateGuard.tryLock("Drop all users from database")) {
+            ServiceContext* serviceContext = txn->getClient()->getServiceContext();
+            boost::unique_lock<boost::timed_mutex> lk(getAuthzDataMutex(serviceContext),
+                                                      authzDataMutexAcquisitionTimeout);
+            if (!lk) {
                 return appendCommandStatus(
                         result,
                         Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
             }
 
+            AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
             Status status = auth::requireAuthSchemaVersion26Final(txn, authzManager);
             if (!status.isOK()) {
                 return appendCommandStatus(result, status);
@@ -538,14 +559,16 @@ namespace mongo {
                  int options,
                  string& errmsg,
                  BSONObjBuilder& result) {
-            AuthorizationManager* authzManager = getGlobalAuthorizationManager();
-            AuthzDocumentsUpdateGuard updateGuard(authzManager);
-            if (!updateGuard.tryLock("Grant roles to user")) {
+            ServiceContext* serviceContext = txn->getClient()->getServiceContext();
+            boost::unique_lock<boost::timed_mutex> lk(getAuthzDataMutex(serviceContext),
+                                                      authzDataMutexAcquisitionTimeout);
+            if (!lk) {
                 return appendCommandStatus(
                         result,
                         Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
             }
 
+            AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
             Status status = auth::requireAuthSchemaVersion26Final(txn, authzManager);
             if (!status.isOK()) {
                 return appendCommandStatus(result, status);
@@ -621,14 +644,16 @@ namespace mongo {
                  int options,
                  string& errmsg,
                  BSONObjBuilder& result) {
-            AuthorizationManager* authzManager = getGlobalAuthorizationManager();
-            AuthzDocumentsUpdateGuard updateGuard(authzManager);
-            if (!updateGuard.tryLock("Revoke roles from user")) {
+            ServiceContext* serviceContext = txn->getClient()->getServiceContext();
+            boost::unique_lock<boost::timed_mutex> lk(getAuthzDataMutex(serviceContext),
+                                                      authzDataMutexAcquisitionTimeout);
+            if (!lk) {
                 return appendCommandStatus(
                         result,
                         Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
             }
 
+            AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
             Status status = auth::requireAuthSchemaVersion26Final(txn, authzManager);
             if (!status.isOK()) {
                 return appendCommandStatus(result, status);
@@ -880,14 +905,16 @@ namespace mongo {
 
             roleObjBuilder.append("roles", auth::rolesVectorToBSONArray(args.roles));
 
-            AuthorizationManager* authzManager = getGlobalAuthorizationManager();
-            AuthzDocumentsUpdateGuard updateGuard(authzManager);
-            if (!updateGuard.tryLock("Create role")) {
+            ServiceContext* serviceContext = txn->getClient()->getServiceContext();
+            boost::unique_lock<boost::timed_mutex> lk(getAuthzDataMutex(serviceContext),
+                                                      authzDataMutexAcquisitionTimeout);
+            if (!lk) {
                 return appendCommandStatus(
                         result,
                         Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
             }
 
+            AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
             status = auth::requireAuthSchemaVersion26Final(txn, authzManager);
             if (!status.isOK()) {
                 return appendCommandStatus(result, status);
@@ -972,14 +999,16 @@ namespace mongo {
                 updateSetBuilder.append("roles", auth::rolesVectorToBSONArray(args.roles));
             }
 
-            AuthorizationManager* authzManager = getGlobalAuthorizationManager();
-            AuthzDocumentsUpdateGuard updateGuard(authzManager);
-            if (!updateGuard.tryLock("Update role")) {
+            ServiceContext* serviceContext = txn->getClient()->getServiceContext();
+            boost::unique_lock<boost::timed_mutex> lk(getAuthzDataMutex(serviceContext),
+                                                      authzDataMutexAcquisitionTimeout);
+            if (!lk) {
                 return appendCommandStatus(
                         result,
                         Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
             }
 
+            AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
             status = auth::requireAuthSchemaVersion26Final(txn, authzManager);
             if (!status.isOK()) {
                 return appendCommandStatus(result, status);
@@ -1047,14 +1076,16 @@ namespace mongo {
                  int options,
                  string& errmsg,
                  BSONObjBuilder& result) {
-            AuthorizationManager* authzManager = getGlobalAuthorizationManager();
-            AuthzDocumentsUpdateGuard updateGuard(authzManager);
-            if (!updateGuard.tryLock("Grant privileges to role")) {
+            ServiceContext* serviceContext = txn->getClient()->getServiceContext();
+            boost::unique_lock<boost::timed_mutex> lk(getAuthzDataMutex(serviceContext),
+                                                      authzDataMutexAcquisitionTimeout);
+            if (!lk) {
                 return appendCommandStatus(
                         result,
                         Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
             }
 
+            AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
             Status status = auth::requireAuthSchemaVersion26Final(txn, authzManager);
             if (!status.isOK()) {
                 return appendCommandStatus(result, status);
@@ -1168,14 +1199,16 @@ namespace mongo {
                  int options,
                  string& errmsg,
                  BSONObjBuilder& result) {
-            AuthorizationManager* authzManager = getGlobalAuthorizationManager();
-            AuthzDocumentsUpdateGuard updateGuard(authzManager);
-            if (!updateGuard.tryLock("Revoke privileges from role")) {
+            ServiceContext* serviceContext = txn->getClient()->getServiceContext();
+            boost::unique_lock<boost::timed_mutex> lk(getAuthzDataMutex(serviceContext),
+                                                      authzDataMutexAcquisitionTimeout);
+            if (!lk) {
                 return appendCommandStatus(
                         result,
                         Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
             }
 
+            AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
             Status status = auth::requireAuthSchemaVersion26Final(txn, authzManager);
             if (!status.isOK()) {
                 return appendCommandStatus(result, status);
@@ -1314,14 +1347,16 @@ namespace mongo {
                                " is a built-in role and cannot be modified."));
             }
 
-            AuthorizationManager* authzManager = getGlobalAuthorizationManager();
-            AuthzDocumentsUpdateGuard updateGuard(authzManager);
-            if (!updateGuard.tryLock("Grant roles to role")) {
+            ServiceContext* serviceContext = txn->getClient()->getServiceContext();
+            boost::unique_lock<boost::timed_mutex> lk(getAuthzDataMutex(serviceContext),
+                                                      authzDataMutexAcquisitionTimeout);
+            if (!lk) {
                 return appendCommandStatus(
                         result,
                         Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
             }
 
+            AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
             status = auth::requireAuthSchemaVersion26Final(txn, authzManager);
             if (!status.isOK()) {
                 return appendCommandStatus(result, status);
@@ -1396,14 +1431,16 @@ namespace mongo {
                  int options,
                  string& errmsg,
                  BSONObjBuilder& result) {
-            AuthorizationManager* authzManager = getGlobalAuthorizationManager();
-            AuthzDocumentsUpdateGuard updateGuard(authzManager);
-            if (!updateGuard.tryLock("Revoke roles from role")) {
+            ServiceContext* serviceContext = txn->getClient()->getServiceContext();
+            boost::unique_lock<boost::timed_mutex> lk(getAuthzDataMutex(serviceContext),
+                                                      authzDataMutexAcquisitionTimeout);
+            if (!lk) {
                 return appendCommandStatus(
                         result,
                         Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
             }
 
+            AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
             Status status = auth::requireAuthSchemaVersion26Final(txn, authzManager);
             if (!status.isOK()) {
                 return appendCommandStatus(result, status);
@@ -1498,14 +1535,16 @@ namespace mongo {
                  int options,
                  string& errmsg,
                  BSONObjBuilder& result) {
-            AuthorizationManager* authzManager = getGlobalAuthorizationManager();
-            AuthzDocumentsUpdateGuard updateGuard(authzManager);
-            if (!updateGuard.tryLock("Drop role")) {
+            ServiceContext* serviceContext = txn->getClient()->getServiceContext();
+            boost::unique_lock<boost::timed_mutex> lk(getAuthzDataMutex(serviceContext),
+                                                      authzDataMutexAcquisitionTimeout);
+            if (!lk) {
                 return appendCommandStatus(
                         result,
                         Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
             }
 
+            AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
             Status status = auth::requireAuthSchemaVersion26Final(txn, authzManager);
             if (!status.isOK()) {
                 return appendCommandStatus(result, status);
@@ -1669,14 +1708,16 @@ namespace mongo {
                 return appendCommandStatus(result, status);
             }
 
-            AuthorizationManager* authzManager = getGlobalAuthorizationManager();
-            AuthzDocumentsUpdateGuard updateGuard(authzManager);
-            if (!updateGuard.tryLock("Drop roles from database")) {
+            ServiceContext* serviceContext = txn->getClient()->getServiceContext();
+            boost::unique_lock<boost::timed_mutex> lk(getAuthzDataMutex(serviceContext),
+                                                      authzDataMutexAcquisitionTimeout);
+            if (!lk) {
                 return appendCommandStatus(
                         result,
                         Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
             }
 
+            AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
             status = auth::requireAuthSchemaVersion26Final(txn, authzManager);
             if (!status.isOK()) {
                 return appendCommandStatus(result, status);
@@ -2320,14 +2361,16 @@ namespace mongo {
                                        "\"tempRolescollection\""));
             }
 
-            AuthorizationManager* authzManager = getGlobalAuthorizationManager();
-            AuthzDocumentsUpdateGuard updateGuard(authzManager);
-            if (!updateGuard.tryLock("_mergeAuthzCollections")) {
+            ServiceContext* serviceContext = txn->getClient()->getServiceContext();
+            boost::unique_lock<boost::timed_mutex> lk(getAuthzDataMutex(serviceContext),
+                                                      authzDataMutexAcquisitionTimeout);
+            if (!lk) {
                 return appendCommandStatus(
                         result,
                         Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
             }
 
+            AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
             status = auth::requireAuthSchemaVersion26Final(txn, authzManager);
             if (!status.isOK()) {
                 return appendCommandStatus(result, status);

@@ -105,12 +105,6 @@ namespace mongo {
                               const BSONObj& query,
                               const BSONObj& writeConcern,
                               int* numRemoved);
-        virtual bool tryAcquireAuthzUpdateLock(StringData why);
-        virtual void releaseAuthzUpdateLock();
-
-    private:
-        boost::mutex _distLockGuard; // Guards access to _authzDataUpdateLock
-        std::unique_ptr<DistLockManager::ScopedDistLock> _authzDataUpdateLock;
     };
 
 } // namespace mongo

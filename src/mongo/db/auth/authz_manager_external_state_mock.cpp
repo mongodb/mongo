@@ -271,12 +271,6 @@ namespace {
         return Status::OK();
     }
 
-    bool AuthzManagerExternalStateMock::tryAcquireAuthzUpdateLock(StringData) {
-        return true;
-    }
-
-    void AuthzManagerExternalStateMock::releaseAuthzUpdateLock() {}
-
     std::vector<BSONObj> AuthzManagerExternalStateMock::getCollectionContents(
             const NamespaceString& collectionName) {
         return mapFindWithDefault(_documents, collectionName, std::vector<BSONObj>());
