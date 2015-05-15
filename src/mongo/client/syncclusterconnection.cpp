@@ -205,6 +205,30 @@ namespace mongo {
         return _conns[0]->callRead( toSend , response );
     }
 
+    bool SyncClusterConnection::runCommand(const std::string& dbname,
+                                           const BSONObj& cmd,
+                                           BSONObj& info,
+                                           int options) {
+
+        std::string ns = dbname + ".$cmd";
+        BSONObj interposedCmd = cmd;
+
+        if (_runCommandHook) {
+            BSONObjBuilder cmdObjBob;
+            cmdObjBob.appendElements(cmd);
+            _runCommandHook(&cmdObjBob);
+            interposedCmd = cmdObjBob.obj();
+        }
+
+        info = findOne(ns, Query(interposedCmd), 0, options);
+
+        if (_postRunCommandHook) {
+            _postRunCommandHook(info, getServerAddress());
+        }
+
+        return isOk(info);
+    }
+
     BSONObj SyncClusterConnection::findOne(const string &ns, const Query& query, const BSONObj *fieldsToReturn, int queryOptions) {
 
         if ( ns.find( ".$cmd" ) != string::npos ) {

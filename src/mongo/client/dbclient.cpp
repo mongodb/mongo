@@ -31,6 +31,9 @@
 
 #include "mongo/platform/basic.h"
 
+#include <utility>
+
+#include "mongo/base/status.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/client/constants.h"
@@ -41,8 +44,14 @@
 #include "mongo/db/auth/internal_user_auth.h"
 #include "mongo/db/json.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/rpc/factory.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/rpc/metadata.h"
+#include "mongo/rpc/reply_interface.h"
+#include "mongo/rpc/request_builder_interface.h"
 #include "mongo/s/stale_exception.h"  // for RecvStaleConfigException
+#include "mongo/stdx/functional.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/debug_util.h"
@@ -199,7 +208,12 @@ namespace {
     bool Query::hasReadPreference(const BSONObj& queryObj) {
         const bool hasReadPrefOption = queryObj["$queryOptions"].isABSONObj() &&
                         queryObj["$queryOptions"].Obj().hasField(ReadPrefField.name());
-        return (Query::isComplex(queryObj) &&
+
+        bool canHaveReadPrefField = Query::isComplex(queryObj) ||
+            // The find command has a '$readPreference' option.
+            queryObj.firstElementFieldName() == StringData("find");
+
+        return (canHaveReadPrefField &&
                     queryObj.hasField(ReadPrefField.name())) ||
                 hasReadPrefOption;
     }
@@ -267,24 +281,94 @@ namespace {
         _postRunCommandHook = func;
     }
 
-    bool DBClientWithCommands::runCommand(const string &dbname,
+    rpc::ProtocolSet DBClientWithCommands::getClientRPCProtocols() const {
+        return _clientRPCProtocols;
+    }
+
+    rpc::ProtocolSet DBClientWithCommands::getServerRPCProtocols() const {
+        return _serverRPCProtocols;
+    }
+
+    void DBClientWithCommands::setClientRPCProtocols(rpc::ProtocolSet protocols) {
+        _clientRPCProtocols = std::move(protocols);
+    }
+
+    void DBClientWithCommands::_setServerRPCProtocols(rpc::ProtocolSet protocols) {
+        _serverRPCProtocols = std::move(protocols);
+    }
+
+    bool DBClientWithCommands::runCommand(const string& dbname,
                                           const BSONObj& cmd,
                                           BSONObj &info,
                                           int options) {
-        string ns = dbname + ".$cmd";
+
+        uassert(ErrorCodes::InvalidNamespace, str::stream() << "Database name '" << dbname
+                                                            << "' is not valid.",
+                NamespaceString::validDBName(dbname));
+
+        BSONObj maybeInterposedCommand = cmd;
+
         if (_runCommandHook) {
-            BSONObjBuilder cmdObj;
-            cmdObj.appendElements(cmd);
-            _runCommandHook(&cmdObj);
-            
-            info = findOne(ns, cmdObj.done(), 0 , options);
+            BSONObjBuilder hookInterposedBob;
+            hookInterposedBob.appendElements(cmd);
+            _runCommandHook(&hookInterposedBob);
+            maybeInterposedCommand = hookInterposedBob.obj();
         }
-        else {
-            info = findOne(ns, cmd, 0 , options);
+
+        auto requestBuilder =
+            rpc::makeRequestBuilder(getClientRPCProtocols(), getServerRPCProtocols());
+
+        // upconvert command and metadata to new format
+        // right now this only handles slaveOk
+        BSONObj upconvertedCmd;
+        BSONObj upconvertedMetadata;
+
+        // TODO: This will be downconverted immediately if the underlying
+        // requestBuilder is a legacyRequest builder. Not sure what the best
+        // way to get around that is without breaking the abstraction.
+        std::tie(upconvertedCmd, upconvertedMetadata) = uassertStatusOK(
+            rpc::metadata::upconvertRequest(maybeInterposedCommand, options)
+        );
+
+        auto commandName = upconvertedCmd.firstElementFieldName();
+
+        auto requestMsg = requestBuilder->setDatabase(dbname)
+                                         .setCommandName(commandName)
+                                         .setMetadata(upconvertedMetadata)
+                                         .setCommandArgs(upconvertedCmd)
+                                         .done();
+
+        auto replyMsg = stdx::make_unique<Message>();
+        // call oddly takes this by pointer, so we need to put it on the stack.
+        auto host = getServerAddress();
+
+        // We always want to throw if there was a network error, we do it here
+        // instead of passing 'true' for the 'assertOk' parameter so we can construct a
+        // more helpful error message. Note that call() can itself throw a socket exception.
+        uassert(ErrorCodes::HostUnreachable,
+                str::stream() << "network error while attempting to run "
+                              << "command '" << commandName << "' "
+                              << "on host '" << host << "' "
+                              << "with arguments '" << upconvertedCmd << "' "
+                              << "and metadata '" << upconvertedMetadata << "' ",
+                call(*requestMsg, *replyMsg, false, &host));
+
+        auto commandReply = rpc::makeReply(replyMsg.get(),
+                                           getClientRPCProtocols(),
+                                           getServerRPCProtocols());
+
+        if (ErrorCodes::SendStaleConfig ==
+            getStatusFromCommandResult(commandReply->getCommandReply())) {
+            throw RecvStaleConfigException("stale config in runCommand",
+                                           commandReply->getCommandReply());
         }
+
+        info = std::move(commandReply->getCommandReply().getOwned());
+
         if (_postRunCommandHook) {
-            _postRunCommandHook(info, getServerAddress());
+            _postRunCommandHook(info, host);
         }
+
         return isOk(info);
     }
 

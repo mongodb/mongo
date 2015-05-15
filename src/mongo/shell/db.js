@@ -118,12 +118,10 @@ DB.prototype.commandHelp = function( name ){
          // "error doing query: failed". Even though this message is arguably incorrect
          // for a command failing due to a connection failure, we preserve it for backwards
          // compatibility. See SERVER-18334 for details.
-         if (ex.message.indexOf("transport error") >= 0) {
+         if (ex.message.indexOf("network error") >= 0) {
              throw new Error("error doing query: failed");
          }
-         else {
-             throw ex;
-         }
+         throw ex;
      }
      return res;
  };

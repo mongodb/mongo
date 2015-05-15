@@ -34,9 +34,10 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
-#include "mongo/config.h"
 #include "mongo/client/sasl_client_authenticate.h"
+#include "mongo/config.h"
 #include "mongo/db/server_options.h"
+#include "mongo/rpc/protocol.h"
 #include "mongo/shell/shell_utils.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/sock.h"
@@ -148,6 +149,11 @@ namespace mongo {
                                    moe::String,
                                    "mode to determine how .find() queries are done:"
                                    " commands, compatibility").hidden();
+
+        options->addOptionChaining("rpcProtocols",
+                                   "rpcProtocols",
+                                   moe::String,
+                                   " none, opQueryOnly, opCommandOnly, all").hidden();
 
         return Status::OK();
     }
@@ -276,6 +282,18 @@ namespace mongo {
                                             << "'. Valid modes are: {commands, compatibility}");
             }
             shellGlobalParams.readMode = mode;
+        }
+        if (params.count("rpcProtocols")) {
+            std::string protos = params["rpcProtocols"].as<string>();
+            auto parsedRPCProtos = rpc::parseProtocolSet(protos);
+            if (!parsedRPCProtos.isOK()) {
+                throw MsgAssertionException(28653,
+                                            str::stream()
+                                            << "Unknown RPC Protocols: '" << protos
+                                            << "'. Valid values are {none, opQueryOnly, "
+                                            << "opCommandOnly, all}");
+            }
+            shellGlobalParams.rpcProtocols = parsedRPCProtos.getValue();
         }
 
         /* This is a bit confusing, here are the rules:

@@ -347,6 +347,7 @@ namespace mongo {
             if ( _nokillop ) {
                 return;
             }
+            c.setClientRPCProtocols(shellGlobalParams.rpcProtocols);
             connectionRegistry.registerConnection( c );
         }
 

@@ -32,6 +32,7 @@
 #include <vector>
 
 #include "mongo/base/status.h"
+#include "mongo/rpc/protocol.h"
 
 namespace mongo {
 
@@ -68,10 +69,13 @@ namespace mongo {
 
         std::string readMode;
 
+        rpc::ProtocolSet rpcProtocols;
+
         ShellGlobalParams() : autoKillOp(false),
                               useWriteCommandsDefault(true),
                               writeMode("commands"),
-                              readMode("compatibility") {
+                              readMode("compatibility"),
+                              rpcProtocols(rpc::supports::kOpQueryOnly) {
         }
     };
 

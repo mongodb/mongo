@@ -35,8 +35,9 @@
 #include <boost/shared_ptr.hpp>
 
 #include "mongo/base/init.h"
-#include "mongo/client/sasl_client_authenticate.h"
+#include "mongo/base/status_with.h"
 #include "mongo/client/native_sasl_client_session.h"
+#include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/client/sasl_scramsha1_client_conversation.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/d_state.h"
@@ -120,6 +121,9 @@ namespace mongo {
         scope->injectV8Method("logout", mongoLogout, proto);
         scope->injectV8Method("cursorFromId", mongoCursorFromId, proto);
         scope->injectV8Method("copyDatabaseWithSCRAM", mongoCopyDatabaseWithSCRAM, proto);
+        scope->injectV8Method("getClientRPCProtocols", mongoGetClientRPCProtocols, proto);
+        scope->injectV8Method("setClientRPCProtocols", mongoSetClientRPCProtocols, proto);
+        scope->injectV8Method("getServerRPCProtocols", mongoGetServerRPCProtocols, proto);
 
         fassert(16468, _mongoPrototypeManipulatorsFrozen);
         for (size_t i = 0; i < _mongoPrototypeManipulators.size(); ++i)
@@ -493,6 +497,44 @@ namespace mongo {
         }
 
         return scope->mongoToLZV8(inputObj, true);
+    }
+
+    v8::Handle<v8::Value> mongoGetClientRPCProtocols(V8Scope* scope, const v8::Arguments& args) {
+        argumentCheck(args.Length() == 0, "getClientRPCProtocols takes no args");
+        auto conn = getConnection(scope, args);
+        auto clientRPCProtocols = rpc::toString(conn->getClientRPCProtocols());
+        if (!clientRPCProtocols.isOK()) {
+            return v8AssertionException(clientRPCProtocols.getStatus().reason());
+        }
+
+        // make an owned copy so we can safely pass a null-terminated string to v8
+        auto protoStr = clientRPCProtocols.getValue().toString();
+        return v8::String::New(protoStr.c_str());
+    }
+
+    v8::Handle<v8::Value> mongoSetClientRPCProtocols(V8Scope* scope, const v8::Arguments& args) {
+        argumentCheck(args.Length() == 1, "setClientRPCProtocols needs 1 arg");
+        argumentCheck(args[0]->IsString(),
+                      "first argument to setClientRPCProtocols must be a string");
+        auto conn = getConnection(scope, args);
+        const auto rpcProtosStr = toSTLString(args[0]);
+        auto clientRPCProtocols = rpc::parseProtocolSet(rpcProtosStr);
+        if (!clientRPCProtocols.isOK()) {
+            return v8AssertionException(clientRPCProtocols.getStatus().reason());
+        }
+        conn->setClientRPCProtocols(clientRPCProtocols.getValue());
+        return v8::Undefined();
+    }
+
+    v8::Handle<v8::Value> mongoGetServerRPCProtocols(V8Scope* scope, const v8::Arguments& args) {
+        argumentCheck(args.Length() == 0, "getServerRPCProtocols takes no args");
+        auto conn = getConnection(scope, args);
+        auto serverRPCProtocols = rpc::toString(conn->getServerRPCProtocols());
+        if (!serverRPCProtocols.isOK()) {
+            return v8AssertionException(serverRPCProtocols.getStatus().reason());
+        }
+        auto protoStr = serverRPCProtocols.getValue().toString();
+        return v8::String::New(protoStr.c_str());
     }
 
     /**

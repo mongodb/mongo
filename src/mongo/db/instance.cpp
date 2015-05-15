@@ -195,6 +195,7 @@ namespace {
         BSONObjBuilder err;
         exception->getInfo().append(err);
         if (scex) {
+            err.append("ok", 0.0);
             err.append("ns", scex->getns());
             scex->getVersionReceived().addToBSON(err, "vReceived");
             scex->getVersionWanted().addToBSON(err, "vWanted");

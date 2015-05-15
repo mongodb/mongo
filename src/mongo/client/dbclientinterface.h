@@ -36,6 +36,8 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/platform/cstdint.h"
+#include "mongo/rpc/protocol.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/message.h"
@@ -412,7 +414,7 @@ namespace mongo {
        DB "commands"
        Basically just invocations of connection.$cmd.findOne({...});
     */
-    class DBClientWithCommands : public DBClientInterface {
+    class DBClientWithCommands : public DBClientInterface, public DBConnector {
     public:
         /** controls how chatty the client is about network errors & such.  See log.h */
         logger::LogSeverity _logLevel;
@@ -428,6 +430,15 @@ namespace mongo {
             @return true if the command returned "ok".
          */
         bool simpleCommand(const std::string &dbname, BSONObj *info, const std::string &command);
+
+        rpc::ProtocolSet getClientRPCProtocols() const;
+        rpc::ProtocolSet getServerRPCProtocols() const;
+
+        void setClientRPCProtocols(rpc::ProtocolSet clientProtocols);
+
+        // TODO: add variant of runCommand that takes a RequestInterface when we have
+        // an owned Reply type
+        // virtual StatusWith<OwnedReply> runCommand(const RequestInterface& request);
 
         /** Run a database command.  Database commands are represented as BSON objects.  Common database
             commands have prebuilt helper functions -- see below.  If a helper is not available you can
@@ -823,8 +834,27 @@ namespace mongo {
         RunCommandHookFunc _runCommandHook;
         PostRunCommandHookFunc _postRunCommandHook;
 
+        // should be set by subclasses during connection.
+        void _setServerRPCProtocols(rpc::ProtocolSet serverProtocols);
 
     private:
+
+        /**
+         * The rpc protocols this client supports.
+         *
+         * TODO: Change to rpc::supports::kAll once OP_COMMAND is implemented in
+         * mongos (SERVER-18292).
+         */
+        rpc::ProtocolSet _clientRPCProtocols{rpc::supports::kOpQueryOnly};
+
+        /**
+         * The rpc protocol the remote server(s) support.
+         *
+         * TODO: implement proper detection of RPC protocol support when OP_COMMAND
+         * is implemented in mongos (SERVER-18292).
+         */
+        rpc::ProtocolSet _serverRPCProtocols{rpc::supports::kAll};
+
         enum QueryOptions _cachedAvailableOptions;
         bool _haveCachedAvailableOptions;
     };
@@ -832,7 +862,7 @@ namespace mongo {
     /**
      abstract class that implements the core db operations
      */
-    class DBClientBase : public DBClientWithCommands, public DBConnector {
+    class DBClientBase : public DBClientWithCommands {
     protected:
         static AtomicInt64 ConnectionIdSequence;
         long long _connectionId; // unique connection id for this connection

@@ -40,7 +40,11 @@ namespace mongo {
         BSONElement okElement = result["ok"];
         BSONElement codeElement = result["code"];
         BSONElement errmsgElement = result["errmsg"];
-        if (okElement.eoo()) {
+
+        // StaleConfigException doesn't pass "ok" in legacy servers
+        BSONElement dollarErrElement = result["$err"];
+
+        if (okElement.eoo() && dollarErrElement.eoo()) {
             return Status(ErrorCodes::CommandResultSchemaViolation,
                           mongoutils::str::stream() << "No \"ok\" field in command result " <<
                           result);
