@@ -582,7 +582,7 @@ __evict_clear_walk(WT_SESSION_IMPL *session)
 	 * assert we never try to evict the current eviction walk point).
 	 */
 	btree->evict_ref = NULL;
-	return (__wt_page_release(session, ref, 0));
+	return (__wt_page_release(session, ref, WT_READ_NO_EVICT));
 }
 
 /*
@@ -1287,7 +1287,7 @@ fast:		/* If the page can't be evicted, give up. */
 	if ((ref = btree->evict_ref) != NULL && (__wt_ref_is_root(ref) ||
 	    ref->page->read_gen == WT_READGEN_OLDEST)) {
 		btree->evict_ref = NULL;
-		__wt_page_release(session, ref, 0);
+		__wt_page_release(session, ref, WT_READ_NO_EVICT);
 	}
 
 	/* If the walk was interrupted by a locked page, that's okay. */
