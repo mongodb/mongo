@@ -26,8 +26,8 @@ values to the ::wiredtiger_open call.
 <dt>LZ4 compression</dt>
 <dd>
 The LZ4 compression support has been updated in this release in non-backward
-compatible ways; tables and files compressed using LZ4 compression should be
-dumped and re-loaded into a new database.
+compatible ways; <b>tables and files compressed using LZ4 compression with
+WiredTiger 2.5.3 must be dumped then re-loaded using WiredTiger 2.6.0.</b>
 </dd>
 
 <dt>wiredtiger_open file manager configuration changes</dt>
