@@ -30,7 +30,6 @@
 
 #include <string>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/jsobj.h"
 
@@ -58,7 +57,6 @@ namespace mongo {
      *
      */
     class LocksType {
-        MONGO_DISALLOW_COPYING(LocksType);
     public:
 
         enum State {
@@ -81,6 +79,7 @@ namespace mongo {
         static const BSONField<OID> lockID;
         static const BSONField<std::string> who;
         static const BSONField<std::string> why;
+        static const BSONField<Date_t> when;
 
         //
         // locks type methods

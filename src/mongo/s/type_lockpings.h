@@ -30,7 +30,6 @@
 
 #include <string>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/jsobj.h"
 
@@ -58,7 +57,6 @@ namespace mongo {
      *
      */
     class LockpingsType {
-        MONGO_DISALLOW_COPYING(LockpingsType);
     public:
 
         //
@@ -121,9 +119,13 @@ namespace mongo {
             _isProcessSet = true;
         }
 
-        void unsetProcess() { _isProcessSet = false; }
+        void unsetProcess() {
+            _isProcessSet = false;
+        }
 
-        bool isProcessSet() const { return _isProcessSet; }
+        bool isProcessSet() const {
+            return _isProcessSet;
+        }
 
         // Calling get*() methods when the member is not set results in undefined behavior
         const std::string& getProcess() const {
@@ -136,9 +138,13 @@ namespace mongo {
             _isPingSet = true;
         }
 
-        void unsetPing() { _isPingSet = false; }
+        void unsetPing() {
+            _isPingSet = false;
+        }
 
-        bool isPingSet() const { return _isPingSet; }
+        bool isPingSet() const {
+            return _isPingSet;
+        }
 
         // Calling get*() methods when the member is not set results in undefined behavior
         const Date_t getPing() const {
@@ -150,9 +156,9 @@ namespace mongo {
 
     private:
         // Convention: (M)andatory, (O)ptional, (S)pecial rule.
-        std::string _process;     // (M)  std::string describing the process holding the lock
+        std::string _process; // (M)  std::string describing the process holding the lock
         bool _isProcessSet;
-        Date_t _ping;     // (M)  last time the holding process updated this document
+        Date_t _ping; // (M)  last time the holding process updated this document
         bool _isPingSet;
     };
 

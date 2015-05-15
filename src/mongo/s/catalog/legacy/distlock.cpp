@@ -572,7 +572,7 @@ namespace mongo {
         BSONObj lockDetails = BSON( LocksType::state(1)
                 << LocksType::who(getDistLockId())
                 << LocksType::process(_processId)
-                << "when" << jsTime()
+                << LocksType::when(jsTime())
                 << LocksType::why(why)
                 << LocksType::lockID(OID::gen()) );
         BSONObj whatIWant = BSON( "$set" << lockDetails );
