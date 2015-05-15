@@ -429,7 +429,7 @@ Suite: mongodb
 Codename: %s
 Version: %s
 Architectures: i386 amd64
-Components: mongodb
+Components: 10gen
 Description: mongodb packages
 """ % ("dist", "dist")
     if os.path.exists(repo+"../../Release"):
