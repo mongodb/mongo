@@ -44,7 +44,7 @@ namespace mongo {
         return "bypassDocumentValidation";
     }
 
-    inline bool shouldBypassDocumentValidationforCommand(const BSONObj& cmdObj) {
+    inline bool shouldBypassDocumentValidationForCommand(const BSONObj& cmdObj) {
         return cmdObj[bypassDocumentValidationCommandOption()].trueValue();
     }
 

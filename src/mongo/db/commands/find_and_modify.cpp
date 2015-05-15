@@ -428,7 +428,7 @@ namespace {
             setupSynchronousCommit(txn);
 
             boost::optional<DisableDocumentValidation> maybeDisableValidation;
-            if (shouldBypassDocumentValidationforCommand(cmdObj))
+            if (shouldBypassDocumentValidationForCommand(cmdObj))
                 maybeDisableValidation.emplace(txn);
 
             // We may encounter a WriteConflictException when creating a collection during an

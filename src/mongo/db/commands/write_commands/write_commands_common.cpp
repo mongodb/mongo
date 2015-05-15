@@ -51,16 +51,16 @@ namespace auth {
                                      const BSONObj& cmdObj ) {
 
         vector<Privilege> privileges;
-        ActionSet actionsOnCommandNSSS;
+        ActionSet actionsOnCommandNSS;
 
-        if (shouldBypassDocumentValidationforCommand(cmdObj)) {
-            actionsOnCommandNSSS.addAction(ActionType::bypassDocumentValidation);
+        if (shouldBypassDocumentValidationForCommand(cmdObj)) {
+            actionsOnCommandNSS.addAction(ActionType::bypassDocumentValidation);
         }
 
         if ( cmdType == BatchedCommandRequest::BatchType_Insert ) {
 
             if ( !cmdNSS.isSystemDotIndexes() ) {
-                actionsOnCommandNSSS.addAction(ActionType::insert);
+                actionsOnCommandNSS.addAction(ActionType::insert);
             }
             else {
                 // Special-case indexes until we have a command
@@ -75,22 +75,22 @@ namespace auth {
             }
         }
         else if ( cmdType == BatchedCommandRequest::BatchType_Update ) {
-            actionsOnCommandNSSS.addAction(ActionType::update);
+            actionsOnCommandNSS.addAction(ActionType::update);
 
             // Upsert also requires insert privs
             if ( BatchedCommandRequest::containsUpserts( cmdObj ) ) {
-                actionsOnCommandNSSS.addAction(ActionType::insert);
+                actionsOnCommandNSS.addAction(ActionType::insert);
             }
         }
         else {
             fassert( 17251, cmdType == BatchedCommandRequest::BatchType_Delete );
-            actionsOnCommandNSSS.addAction(ActionType::remove);
+            actionsOnCommandNSS.addAction(ActionType::remove);
         }
 
 
-        if (!actionsOnCommandNSSS.empty()) {
+        if (!actionsOnCommandNSS.empty()) {
             privileges.emplace_back(ResourcePattern::forExactNamespace(cmdNSS),
-                                    actionsOnCommandNSSS);
+                                    actionsOnCommandNSS);
         }
 
         if ( authzSession->isAuthorizedForPrivileges( privileges ) )

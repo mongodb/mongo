@@ -127,7 +127,7 @@ namespace mongo {
                     outputActions.addAction(ActionType::update);
                 }
 
-                if (shouldBypassDocumentValidationforCommand(cmdObj)) {
+                if (shouldBypassDocumentValidationForCommand(cmdObj)) {
                     outputActions.addAction(ActionType::bypassDocumentValidation);
                 }
 

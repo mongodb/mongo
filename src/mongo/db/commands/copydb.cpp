@@ -130,7 +130,7 @@ namespace mongo {
                          BSONObjBuilder& result) {
 
             boost::optional<DisableDocumentValidation> maybeDisableValidation;
-            if (shouldBypassDocumentValidationforCommand(cmdObj))
+            if (shouldBypassDocumentValidationForCommand(cmdObj))
                 maybeDisableValidation.emplace(txn);
 
             string fromhost = cmdObj.getStringField("fromhost");

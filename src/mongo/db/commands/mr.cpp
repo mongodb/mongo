@@ -1289,7 +1289,7 @@ namespace mongo {
                 Timer t;
 
                 boost::optional<DisableDocumentValidation> maybeDisableValidation;
-                if (shouldBypassDocumentValidationforCommand(cmd))
+                if (shouldBypassDocumentValidationForCommand(cmd))
                     maybeDisableValidation.emplace(txn);
 
                 if (txn->getClient()->isInDirectClient()) {
@@ -1575,7 +1575,7 @@ namespace mongo {
                      string& errmsg,
                      BSONObjBuilder& result) {
                 boost::optional<DisableDocumentValidation> maybeDisableValidation;
-                if (shouldBypassDocumentValidationforCommand(cmdObj))
+                if (shouldBypassDocumentValidationForCommand(cmdObj))
                     maybeDisableValidation.emplace(txn);
 
                 ShardedConnectionInfo::addHook();

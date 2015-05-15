@@ -51,7 +51,7 @@ namespace find_and_modify {
             bool update = cmdObj["update"].trueValue();
             bool upsert = cmdObj["upsert"].trueValue();
             bool remove = cmdObj["remove"].trueValue();
-            bool bypassDocumentValidation = shouldBypassDocumentValidationforCommand(cmdObj);
+            bool bypassDocumentValidation = shouldBypassDocumentValidationForCommand(cmdObj);
 
             ActionSet actions;
             actions.addAction(ActionType::find);

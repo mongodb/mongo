@@ -81,7 +81,7 @@ namespace mongo {
             ActionSet actions;
             actions.addAction(ActionType::insert);
             actions.addAction(ActionType::createIndex);
-            if (shouldBypassDocumentValidationforCommand(cmdObj)) {
+            if (shouldBypassDocumentValidationForCommand(cmdObj)) {
                 actions.addAction(ActionType::bypassDocumentValidation);
             }
 
@@ -100,7 +100,7 @@ namespace mongo {
                          BSONObjBuilder& result) {
 
             boost::optional<DisableDocumentValidation> maybeDisableValidation;
-            if (shouldBypassDocumentValidationforCommand(cmdObj))
+            if (shouldBypassDocumentValidationForCommand(cmdObj))
                 maybeDisableValidation.emplace(txn);
 
             string from = cmdObj.getStringField("clone");

@@ -65,7 +65,7 @@ namespace copydb {
         ActionSet actions;
         actions.addAction(ActionType::insert);
         actions.addAction(ActionType::createIndex);
-        if (shouldBypassDocumentValidationforCommand(cmdObj)) {
+        if (shouldBypassDocumentValidationForCommand(cmdObj)) {
             actions.addAction(ActionType::bypassDocumentValidation);
         }
 

@@ -359,7 +359,7 @@ namespace mongo {
                 ActionSet actions;
                 actions.addAction(ActionType::remove);
                 actions.addAction(ActionType::insert);
-                if (shouldBypassDocumentValidationforCommand(cmdObj)) {
+                if (shouldBypassDocumentValidationForCommand(cmdObj)) {
                     actions.addAction(ActionType::bypassDocumentValidation);
                 }
 
