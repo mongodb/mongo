@@ -35,6 +35,7 @@
 
 #include <boost/functional/hash.hpp>
 #include <boost/ref.hpp>
+#include <memory>
 #include "third_party/murmurhash3/MurmurHash3.h"
 
 #include "mongo/base/counter.h"
@@ -155,84 +156,81 @@ namespace repl {
             return Status::OK();
         }
 
-        for ( int createCollection = 0; createCollection < 2; createCollection++ ) {
-            try {
-                boost::scoped_ptr<Lock::GlobalWrite> globalWriteLock;
+        if (isCommand) {
+            MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+                // a command may need a global write lock. so we will conservatively go
+                // ahead and grab one here. suboptimal. :-(
+                Lock::GlobalWrite globalWriteLock(txn->lockState());
 
-                // DB lock always acquires the global lock
-                boost::scoped_ptr<Lock::DBLock> dbLock;
-                boost::scoped_ptr<Lock::CollectionLock> collectionLock;
-
-                bool isIndexBuild = opType[0] == 'i' &&
-                    nsToCollectionSubstring( ns ) == "system.indexes";
-
-                if (isCommand) {
-                    // a command may need a global write lock. so we will conservatively go
-                    // ahead and grab one here. suboptimal. :-(
-                    globalWriteLock.reset(new Lock::GlobalWrite(txn->lockState()));
-                    
-                    // special case apply for commands to avoid implicit database creation
-                    Status status = applyCommandInLock(txn, op);
-                    incrementOpsAppliedStats();
-                    return status;
-                }
-                else if (isIndexBuild) {
-                    dbLock.reset(new Lock::DBLock(txn->lockState(),
-                                                  nsToDatabaseSubstring(ns), MODE_X));
-                }
-                else if (isCrudOpType(opType)) {
-                    LockMode mode = createCollection ? MODE_X : MODE_IX;
-                    dbLock.reset(new Lock::DBLock(txn->lockState(),
-                                                  nsToDatabaseSubstring(ns), mode));
-                    collectionLock.reset(new Lock::CollectionLock(txn->lockState(), ns, mode));
-
-                    if (!createCollection && !dbHolder().get(txn, nsToDatabaseSubstring(ns))) {
-                        // need to create database, try again
-                        continue;
-                    }
-                }
-                else if (isNoOp) {
-                    dbLock.reset(new Lock::DBLock(txn->lockState(),
-                                                  nsToDatabaseSubstring(ns), MODE_X));
-                }
-                else {
-                    // unknown opType
-                    str::stream ss;
-                    ss << "bad opType '" << opType << "' in oplog entry: " << op.toString();
-                    error() << std::string(ss);
-                    return Status(ErrorCodes::BadValue, ss);
-                }
-
-                OldClientContext ctx(txn, ns);
-
-                if ( createCollection == 0 &&
-                     !isIndexBuild &&
-                     isCrudOpType(opType) &&
-                     ctx.db()->getCollection(ns) == NULL ) {
-                    // uh, oh, we need to create collection
-                    // try again
-                    continue;
-                }
-
-                // For non-initial-sync, we convert updates to upserts
-                // to suppress errors when replaying oplog entries.
-                txn->setReplicatedWrites(false);
-                DisableDocumentValidation validationDisabler(txn);
-
-                Status status = applyOperationInLock(txn, ctx.db(), op, convertUpdateToUpsert);
+                // special case apply for commands to avoid implicit database creation
+                Status status = applyCommandInLock(txn, op);
                 incrementOpsAppliedStats();
                 return status;
-            }
-            catch (const WriteConflictException&) {
-                log() << "WriteConflictException while doing oplog application on: " << ns
-                      << ", retrying.";
-                createCollection--;
-            }
+            } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "syncApply_command", ns);
         }
 
-        // Keeps the compiler warnings happy
-        invariant(false);
-        return Status(ErrorCodes::InternalError, "unreachable code");
+        auto applyOp = [&](Database* db) {
+            // For non-initial-sync, we convert updates to upserts
+            // to suppress errors when replaying oplog entries.
+            txn->setReplicatedWrites(false);
+            DisableDocumentValidation validationDisabler(txn);
+
+            Status status = applyOperationInLock(txn, db, op, convertUpdateToUpsert);
+            incrementOpsAppliedStats();
+            return status;
+        };
+
+        if (isNoOp ||
+            (opType[0] == 'i' && nsToCollectionSubstring( ns ) == "system.indexes")) {
+            auto opStr = isNoOp ? "syncApply_noop" : "syncApply_indexBuild";
+            MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+                Lock::DBLock dbLock(txn->lockState(), nsToDatabaseSubstring(ns), MODE_X);
+                OldClientContext ctx(txn, ns);
+                return applyOp(ctx.db());
+            } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, opStr, ns);
+        }
+
+        if (isCrudOpType(opType)) {
+            MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+                // DB lock always acquires the global lock
+                std::unique_ptr<Lock::DBLock> dbLock;
+                std::unique_ptr<Lock::CollectionLock> collectionLock;
+                std::unique_ptr<OldClientContext> ctx;
+
+                auto dbName = nsToDatabaseSubstring(ns);
+
+                auto resetLocks = [&](LockMode mode) {
+                    collectionLock.reset();
+                    dbLock.reset(new Lock::DBLock(txn->lockState(), dbName, mode));
+                    collectionLock.reset(new Lock::CollectionLock(txn->lockState(), ns, mode));
+                };
+
+                resetLocks(MODE_IX);
+                if (!dbHolder().get(txn, dbName)) {
+                    // need to create database, try again
+                    resetLocks(MODE_X);
+                    ctx.reset(new OldClientContext(txn, ns));
+                }
+                else {
+                    ctx.reset(new OldClientContext(txn, ns));
+                    if (!ctx->db()->getCollection(ns)) {
+                        // uh, oh, we need to create collection
+                        // try again
+                        ctx.reset();
+                        resetLocks(MODE_X);
+                        ctx.reset(new OldClientContext(txn, ns));
+                    }
+                }
+
+                return applyOp(ctx->db());
+            } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "syncApply_CRUD", ns);
+        }
+
+        // unknown opType
+        str::stream ss;
+        ss << "bad opType '" << opType << "' in oplog entry: " << op.toString();
+        error() << std::string(ss);
+        return Status(ErrorCodes::BadValue, ss);
     }
 
     Status SyncTail::syncApply(OperationContext* txn,
