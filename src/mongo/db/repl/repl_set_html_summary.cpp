@@ -46,6 +46,13 @@ namespace repl {
 
 namespace {
 
+    template<class T>
+    std::string ToString(const T& t) {
+        std::stringstream s;
+        s << t;
+        return s.str();
+    }
+
     /**
      * Turns an unsigned int representing a duration of time in milliseconds and turns it into
      * a human readable time string representation.
@@ -158,8 +165,8 @@ namespace {
                 memberTable << td("1"); // up
                 memberTable << td(ago(_selfUptime));
                 memberTable << td(""); // last heartbeat
-                memberTable << td(std::to_string(memberConfig.getNumVotes()));
-                memberTable << td(std::to_string(memberConfig.getPriority()));
+                memberTable << td(ToString(memberConfig.getNumVotes()));
+                memberTable << td(ToString(memberConfig.getPriority()));
                 memberTable << td(stateAsHtml(_selfState) +
                                   (memberConfig.isHidden() ? " (hidden)" : ""));
                 memberTable << td(_selfHeartbeatMessage);
@@ -180,8 +187,8 @@ namespace {
                 else {
                     memberTable << td(ago(timeDifference(_now, memberHB.getLastHeartbeat())));
                 }
-                memberTable << td(std::to_string(memberConfig.getNumVotes()));
-                memberTable << td(std::to_string(memberConfig.getPriority()));
+                memberTable << td(ToString(memberConfig.getNumVotes()));
+                memberTable << td(ToString(memberConfig.getPriority()));
                 std::string state = memberHB.getState().toString() +
                         (memberConfig.isHidden() ? " (hidden)" : "");
                 if (up) {
