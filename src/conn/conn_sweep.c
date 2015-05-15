@@ -63,6 +63,7 @@ __sweep_expire(WT_SESSION_IMPL *session)
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 	time_t now;
+	int evict_reset;
 
 	conn = S2C(session);
 
@@ -114,6 +115,10 @@ __sweep_expire(WT_SESSION_IMPL *session)
 		    !__wt_txn_visible_all(session, btree->rec_max_txn))
 			goto unlock;
 
+		if ((ret = 
+		    __wt_evict_file_exclusive_on(session, &evict_reset)) != 0)
+			goto unlock;
+
 		/*
 		 * Mark the handle as dead and close the underlying file
 		 * handle. Closing the handle decrements the open file count,
@@ -121,6 +126,9 @@ __sweep_expire(WT_SESSION_IMPL *session)
 		 */
 		WT_WITH_DHANDLE(session, dhandle, ret =
 		    __wt_conn_btree_sync_and_close(session, 0, 1));
+
+		if (evict_reset)
+			__wt_evict_file_exclusive_off(session);
 
 unlock:		WT_TRET(__wt_writeunlock(session, dhandle->rwlock));
 		WT_RET_BUSY_OK(ret);
