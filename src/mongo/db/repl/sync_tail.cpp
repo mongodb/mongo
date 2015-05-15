@@ -132,7 +132,7 @@ namespace repl {
         }
 
         // Count each log op application as a separate operation, for reporting purposes
-        txn->getCurOp()->reset();
+        CurOp::get(txn)->reset();
 
         const char *ns = op.getStringField("ns");
         verify(ns);

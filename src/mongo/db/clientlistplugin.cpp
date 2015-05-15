@@ -96,7 +96,7 @@ namespace {
                 const OperationContext* txn = client->getOperationContext();
                 if (!txn) continue;
 
-                CurOp* curOp = txn->getCurOp();
+                CurOp* curOp = CurOp::get(txn);
                 if (!curOp) continue;
 
                 ss << "<tr><td>" << client->desc() << "</td>";
@@ -213,8 +213,8 @@ namespace {
                 if (txn) {
 
                     // CurOp
-                    if (txn->getCurOp()) {
-                        txn->getCurOp()->reportState(&b);
+                    if (CurOp::get(txn)) {
+                        CurOp::get(txn)->reportState(&b);
                     }
 
                     // LockState

@@ -250,7 +250,7 @@ namespace mongo {
 
         if ( needToEnforceWC ) {
 
-            _txn->getCurOp()->setMessage( "waiting for write concern" );
+            CurOp::get(_txn)->setMessage( "waiting for write concern" );
 
             WriteConcernResult res;
             Status status = waitForWriteConcern(
@@ -622,7 +622,7 @@ namespace mongo {
         }
 
         if (currentOp->shouldDBProfile(executionTime)) {
-            profile(txn, txn->getCurOp()->getOp());
+            profile(txn, CurOp::get(txn)->getOp());
         }
     }
 
@@ -993,7 +993,7 @@ namespace mongo {
                                                                  bool intentLock) {
         if (hasLock()) {
             // TODO: OldClientContext legacy, needs to be removed
-            txn->getCurOp()->enter(_context->ns(),
+            CurOp::get(txn)->enter(_context->ns(),
                                    _context->db() ? _context->db()->getProfilingLevel() : 0);
             return true;
         }
@@ -1102,7 +1102,7 @@ namespace mongo {
             }
             catch ( const WriteConflictException& wce ) {
                 state->unlock();
-                state->txn->getCurOp()->debug().writeConflicts++;
+                CurOp::get(state->txn)->debug().writeConflicts++;
                 state->txn->recoveryUnit()->abandonSnapshot();
                 WriteConflictException::logAndBackoff( attempt++,
                                                        "insert",
@@ -1334,7 +1334,7 @@ namespace mongo {
                 continue;
             }
 
-            OpDebug* debug = &txn->getCurOp()->debug();
+            OpDebug* debug = &CurOp::get(txn)->debug();
 
             try {
                 invariant(collection);
@@ -1456,7 +1456,7 @@ namespace mongo {
                 break;
             }
             catch ( const WriteConflictException& dle ) {
-                txn->getCurOp()->debug().writeConflicts++;
+                CurOp::get(txn)->debug().writeConflicts++;
                 WriteConflictException::logAndBackoff( attempt++, "delete", nss.ns() );
             }
             catch (const StaleConfigException& staleExcep) {

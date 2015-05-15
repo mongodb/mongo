@@ -174,7 +174,7 @@ namespace mongo {
                         scopedXact.reset();
                         globalWriteLock.reset();
 
-                        txn->getCurOp()->yielded();
+                        CurOp::get(txn)->yielded();
 
                         scopedXact.reset(new ScopedTransaction(txn, MODE_X));
                         globalWriteLock.reset(new Lock::GlobalWrite(txn->lockState()));

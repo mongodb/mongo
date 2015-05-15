@@ -119,27 +119,23 @@ namespace {
                                                     const std::string &name,
                                                     unsigned long long progressMeterTotal,
                                                     int secondsBetween) {
-        return &getCurOp()->setMessage(msg, name, progressMeterTotal, secondsBetween);
+        return &CurOp::get(this)->setMessage(msg, name, progressMeterTotal, secondsBetween);
     }
 
     string OperationContextImpl::getNS() const {
-        return getCurOp()->getNS();
+        return CurOp::get(this)->getNS();
     }
 
     Client* OperationContextImpl::getClient() const {
         return _client;
     }
 
-    CurOp* OperationContextImpl::getCurOp() const {
-        return CurOp::get(getClient());
-    }
-
     unsigned int OperationContextImpl::getOpID() const {
-        return getCurOp()->opNum();
+        return CurOp::get(this)->opNum();
     }
 
     uint64_t OperationContextImpl::getRemainingMaxTimeMicros() const {
-        return getCurOp()->getRemainingMaxTimeMicros();
+        return CurOp::get(this)->getRemainingMaxTimeMicros();
     }
 
     // Enabling the checkForInterruptFail fail point will start a game of random chance on the

@@ -217,7 +217,7 @@ namespace {
                 retries = 0;
             }
             catch (const WriteConflictException& wce) {
-                txn->getCurOp()->debug().writeConflicts++;
+                CurOp::get(txn)->debug().writeConflicts++;
                 retries++; // logAndBackoff expects this to be 1 on first call.
                 wce.logAndBackoff(retries, "cloneCollectionAsCapped", fromNs);
 

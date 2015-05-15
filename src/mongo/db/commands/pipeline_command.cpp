@@ -129,7 +129,7 @@ namespace mongo {
         if (cursor) {
             // If a time limit was set on the pipeline, remaining time is "rolled over" to the
             // cursor (for use by future getmore ops).
-            cursor->setLeftoverMaxTimeMicros( txn->getCurOp()->getRemainingMaxTimeMicros() );
+            cursor->setLeftoverMaxTimeMicros( CurOp::get(txn)->getRemainingMaxTimeMicros() );
 
             if (txn->getClient()->isInDirectClient()) {
                 cursor->setUnownedRecoveryUnit(txn->recoveryUnit());

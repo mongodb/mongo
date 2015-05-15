@@ -693,10 +693,9 @@ namespace mongo {
                 return false;
             }
 
-            if ((notBeforeMillis > curTimeMillis64()) ||
-                (curTimeMillis64() > notAfterMillis)) {
-                dbexit(EXIT_BADOPTIONS,
-                       "The provided SSL certificate is expired or not yet valid.");
+            if ((notBeforeMillis > curTimeMillis64()) || (curTimeMillis64() > notAfterMillis)) {
+                severe() << "The provided SSL certificate is expired or not yet valid.";
+                fassertFailedNoTrace(28652);
             }
 
             *serverCertificateExpirationDate = Date_t::fromMillisSinceEpoch(notAfterMillis);

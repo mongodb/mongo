@@ -179,9 +179,9 @@ env.Install(
                         "client/examples/mongoperf.cpp",
                     ],
                     LIBDEPS=[
-                        "util/ntservice_mock",
-                        "db/serveronly",
                         "db/coredb",
+                        "db/serveronly",
+                        "util/ntservice_mock",
                         "util/signal_handlers_synchronous",
                     ]),
     ])

@@ -647,7 +647,7 @@ namespace mongo {
 
             // Generate exec stats BSON for the winning plan.
             OperationContext* opCtx = exec->getOpCtx();
-            long long totalTimeMillis = opCtx->getCurOp()->elapsedMillis();
+            long long totalTimeMillis = CurOp::get(opCtx)->elapsedMillis();
             generateExecStats(winningStats.get(), verbosity, &execBob, totalTimeMillis);
 
             // Also generate exec stats for all plans, if the verbosity level is high enough.

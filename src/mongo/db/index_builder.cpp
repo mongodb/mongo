@@ -87,7 +87,7 @@ namespace {
 
         AuthorizationSession::get(txn.getClient())->grantInternalAuthorization();
 
-        txn.getCurOp()->reset(HostAndPort(), dbInsert);
+        CurOp::get(txn)->reset(HostAndPort(), dbInsert);
         NamespaceString ns(_index["ns"].String());
 
         ScopedTransaction transaction(&txn, MODE_IX);
@@ -142,7 +142,7 @@ namespace {
         }
 
         // Show which index we're building in the curop display.
-        txn->getCurOp()->setQuery(_index);
+        CurOp::get(txn)->setQuery(_index);
 
         bool haveSetBgIndexStarting = false;
         while (true) {

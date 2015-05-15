@@ -90,7 +90,7 @@ namespace mongo {
             }
 
             // log the opId so the user can use it to cancel the delete using killOp.
-            unsigned int opId = txn->getCurOp()->opNum();
+            unsigned int opId = CurOp::get(txn)->opNum();
             log() << "Deleter starting delete for: " << ns
                   << " from " << inclusiveLower
                   << " -> " << exclusiveUpper

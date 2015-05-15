@@ -1298,7 +1298,7 @@ namespace mongo {
                                                       "Cannot run mapReduce command from eval()"));
                 }
 
-                CurOp* op = txn->getCurOp();
+                CurOp* op = CurOp::get(txn);
 
                 Config config( dbname , cmd );
 
@@ -1590,7 +1590,7 @@ namespace mongo {
                     inputNS = dbname + "." + shardedOutputCollection;
                 }
 
-                CurOp * op = txn->getCurOp();
+                CurOp * op = CurOp::get(txn);
 
                 Config config( dbname , cmdObj.firstElement().embeddedObjectUserCheck() );
                 State state(txn, config);
