@@ -71,7 +71,7 @@ namespace mongo {
         virtual void beingReleasedFromOperationContext();
         virtual void beingSetOnOperationContext();
 
-        virtual void commitAndRestart();
+        virtual void abandonSnapshot();
 
         // un-used API
         virtual void* writingPtr(void* data, size_t len) { invariant(!"don't call writingPtr"); }

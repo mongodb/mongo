@@ -131,7 +131,7 @@ namespace mongo {
             uow.commit();
         }
 
-        opCtx.recoveryUnit()->commitAndRestart();
+        opCtx.recoveryUnit()->abandonSnapshot();
 
         // now clean up orphaned idents
 

@@ -189,7 +189,7 @@ namespace mongo {
 
         virtual bool awaitCommit() { return true; }
 
-        virtual void commitAndRestart() {}
+        virtual void abandonSnapshot() {}
 
         virtual void registerChange(Change* change) { 
             change->commit();

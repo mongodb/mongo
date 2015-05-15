@@ -54,7 +54,7 @@ namespace mongo {
 
         virtual bool awaitCommit();
 
-        virtual void commitAndRestart();
+        virtual void abandonSnapshot();
 
         //  The recovery unit takes ownership of change.
         virtual void registerChange(Change* change);

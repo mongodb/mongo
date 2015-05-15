@@ -95,10 +95,11 @@ namespace mongo {
         virtual void goingToAwaitCommit() { }
 
         /**
-         * When this is called, if there is an open transaction, it is commited and a new one is
-         * started.  This cannot be called inside of a WriteUnitOfWork, and should fail if it is.
+         * When this is called, if there is an open transaction, it is closed. On return no
+         * transaction is active. This cannot be called inside of a WriteUnitOfWork, and should
+         * fail if it is.
          */
-        virtual void commitAndRestart() = 0;
+        virtual void abandonSnapshot() = 0;
 
         virtual SnapshotId getSnapshotId() const = 0;
 

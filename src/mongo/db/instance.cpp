@@ -996,7 +996,7 @@ namespace {
             }
             catch( const WriteConflictException& e ) {
                 txn->getCurOp()->debug().writeConflicts++;
-                txn->recoveryUnit()->commitAndRestart();
+                txn->recoveryUnit()->abandonSnapshot();
                 WriteConflictException::logAndBackoff( attempt++, "insert", ns);
             }
         }

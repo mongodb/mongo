@@ -137,7 +137,7 @@ namespace mongo {
             else {
                 // We stash away the RecoveryUnit in the ClientCursor.  It's used for subsequent
                 // getMore requests.  The calling OpCtx gets a fresh RecoveryUnit.
-                txn->recoveryUnit()->commitAndRestart();
+                txn->recoveryUnit()->abandonSnapshot();
                 cursor->setOwnedRecoveryUnit(txn->releaseRecoveryUnit());
                 StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
                 txn->setRecoveryUnit(storageEngine->newRecoveryUnit());

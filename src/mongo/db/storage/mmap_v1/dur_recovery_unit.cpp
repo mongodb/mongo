@@ -93,7 +93,7 @@ namespace mongo {
         _startOfUncommittedChangesForLevel.pop_back();
     }
 
-    void DurRecoveryUnit::commitAndRestart() {
+    void DurRecoveryUnit::abandonSnapshot() {
         invariant( !inAUnitOfWork() );
         // no-op since we have no transaction
     }

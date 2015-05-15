@@ -271,7 +271,7 @@ namespace mongo {
             catch (const WriteConflictException& exp) {
                 warning() << "could not drop temp collection '" << ns << "' due to "
                     "WriteConflictException";
-                txn->recoveryUnit()->commitAndRestart();
+                txn->recoveryUnit()->abandonSnapshot();
             }
         }
     }

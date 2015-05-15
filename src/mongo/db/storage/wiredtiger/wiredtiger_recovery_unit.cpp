@@ -213,7 +213,7 @@ namespace mongo {
         return _session;
     }
 
-    void WiredTigerRecoveryUnit::commitAndRestart() {
+    void WiredTigerRecoveryUnit::abandonSnapshot() {
         invariant(_depth == 0);
         if (_active) {
             // Can't be in a WriteUnitOfWork, so safe to rollback

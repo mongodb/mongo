@@ -591,7 +591,7 @@ namespace mongo {
 
             log() << "moveChunk number of documents: " << cloneLocsRemaining() << migrateLog;
 
-            txn->recoveryUnit()->commitAndRestart();
+            txn->recoveryUnit()->abandonSnapshot();
             return true;
         }
 

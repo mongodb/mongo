@@ -87,7 +87,7 @@ namespace mongo {
             YIELD_AUTO,
 
             // This will handle WriteConflictExceptions that occur while processing the query, but
-            // will not yield locks. commitAndRestart() will be called if a WriteConflictException
+            // will not yield locks. abandonSnapshot() will be called if a WriteConflictException
             // occurs so callers must be prepared to get a new snapshot.
             WRITE_CONFLICT_RETRY_ONLY,
 

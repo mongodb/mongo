@@ -726,7 +726,7 @@ namespace {
         it->getNext();
         ASSERT_FALSE(it->isEOF());
         it->saveState();
-        cursorCtx->recoveryUnit()->commitAndRestart();
+        cursorCtx->recoveryUnit()->abandonSnapshot();
 
         { // insert 100 documents which causes rollover
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
@@ -881,7 +881,7 @@ namespace {
 
         // See that things work if you yield before you first call getNext().
         it->saveState();
-        cursorCtx->recoveryUnit()->commitAndRestart();
+        cursorCtx->recoveryUnit()->abandonSnapshot();
         ASSERT_TRUE(it->restoreState(cursorCtx.get()));
         ASSERT_EQ(loc1, it->getNext());
         ASSERT_TRUE(it->isEOF());

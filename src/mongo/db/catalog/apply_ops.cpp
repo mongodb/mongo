@@ -192,7 +192,7 @@ namespace mongo {
                 catch (const WriteConflictException& wce) {
                     LOG(2) <<
                         "WriteConflictException while logging applyOps command, retrying.";
-                    txn->recoveryUnit()->commitAndRestart();
+                    txn->recoveryUnit()->abandonSnapshot();
                     continue;
                 }
             }

@@ -90,7 +90,7 @@ namespace mongo {
 
                 if (_policy == PlanExecutor::WRITE_CONFLICT_RETRY_ONLY) {
                     // Just reset the snapshot. Leave all LockManager locks alone.
-                    opCtx->recoveryUnit()->commitAndRestart();
+                    opCtx->recoveryUnit()->abandonSnapshot();
                 }
                 else {
                     // Release and reacquire locks.

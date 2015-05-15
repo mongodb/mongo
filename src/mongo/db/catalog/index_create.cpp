@@ -305,9 +305,9 @@ namespace mongo {
                 wce.logAndBackoff(retries, "index creation", _collection->ns().ns());
 
                 // Can't use WRITE_CONFLICT_RETRY_LOOP macros since we need to save/restore exec
-                // around call to commitAndRestart.
+                // around call to abandonSnapshot.
                 exec->saveState();
-                _txn->recoveryUnit()->commitAndRestart();
+                _txn->recoveryUnit()->abandonSnapshot();
                 exec->restoreState(_txn); // Handles any WCEs internally.
             }
         }

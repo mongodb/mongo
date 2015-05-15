@@ -53,7 +53,7 @@ namespace mongo {
             return true;
         }
 
-        virtual void commitAndRestart() {}
+        virtual void abandonSnapshot() {}
 
         virtual void registerChange(Change* change) {
             _changes.push_back(ChangePtr(change));

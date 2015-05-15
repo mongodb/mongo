@@ -41,7 +41,7 @@ namespace mongo {
         virtual void commitUnitOfWork() {}
         virtual void endUnitOfWork() {}
 
-        virtual void commitAndRestart() {}
+        virtual void abandonSnapshot() {}
 
         virtual bool awaitCommit() {
             return true;

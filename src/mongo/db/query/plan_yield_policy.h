@@ -40,7 +40,7 @@ namespace mongo {
     public:
         /**
          * If policy == WRITE_CONFLICT_RETRY_ONLY, shouldYield will only return true after
-         * forceYield has been called, and yield will only commitAndRestart without releasing any
+         * forceYield has been called, and yield will only abandonSnapshot without releasing any
          * locks.
          */
         PlanYieldPolicy(PlanExecutor* exec, PlanExecutor::YieldPolicy policy);

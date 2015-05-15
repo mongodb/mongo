@@ -77,7 +77,7 @@ namespace mongo {
               _txn(txn),
               _dismissed(false) {
         // Save this for later.  We restore it upon destruction.
-        _txn->recoveryUnit()->commitAndRestart();
+        _txn->recoveryUnit()->abandonSnapshot();
         _txnPreviousRecoveryUnit.reset(txn->releaseRecoveryUnit());
 
         // Transfer ownership of the RecoveryUnit from the ClientCursor to the OpCtx.
@@ -90,7 +90,7 @@ namespace mongo {
     }
 
     ScopedRecoveryUnitSwapper::~ScopedRecoveryUnitSwapper() {
-        _txn->recoveryUnit()->commitAndRestart();
+        _txn->recoveryUnit()->abandonSnapshot();
 
         if (_dismissed) {
             // Just clean up the recovery unit which we originally got from the ClientCursor.
@@ -706,7 +706,7 @@ namespace mongo {
             else {
                 // We stash away the RecoveryUnit in the ClientCursor.  It's used for subsequent
                 // getMore requests.  The calling OpCtx gets a fresh RecoveryUnit.
-                txn->recoveryUnit()->commitAndRestart();
+                txn->recoveryUnit()->abandonSnapshot();
                 cc->setOwnedRecoveryUnit(txn->releaseRecoveryUnit());
                 StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
                 txn->setRecoveryUnit(storageEngine->newRecoveryUnit());

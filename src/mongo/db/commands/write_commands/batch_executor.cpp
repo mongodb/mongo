@@ -874,7 +874,7 @@ namespace mongo {
                     state.unlock();
 
                     // This releases any storage engine held locks/snapshots.
-                    _txn->recoveryUnit()->commitAndRestart();
+                    _txn->recoveryUnit()->abandonSnapshot();
                 }
 
                 _txn->checkForInterrupt();
@@ -927,7 +927,7 @@ namespace mongo {
         finishCurrentOp( _txn, &currentOp, result.getError() );
 
         // End current transaction and release snapshot.
-        _txn->recoveryUnit()->commitAndRestart();
+        _txn->recoveryUnit()->abandonSnapshot();
 
         if ( result.getError() ) {
             result.getError()->setIndex( updateItem.getItemIndex() );
@@ -968,7 +968,7 @@ namespace mongo {
         finishCurrentOp( _txn, &currentOp, result.getError() );
 
         // End current transaction and release snapshot.
-        _txn->recoveryUnit()->commitAndRestart();
+        _txn->recoveryUnit()->abandonSnapshot();
 
         if ( result.getError() ) {
             result.getError()->setIndex( removeItem.getItemIndex() );
@@ -1103,7 +1103,7 @@ namespace mongo {
             catch ( const WriteConflictException& wce ) {
                 state->unlock();
                 state->txn->getCurOp()->debug().writeConflicts++;
-                state->txn->recoveryUnit()->commitAndRestart();
+                state->txn->recoveryUnit()->abandonSnapshot();
                 WriteConflictException::logAndBackoff( attempt++,
                                                        "insert",
                                                        state->getCollection() ?
@@ -1129,7 +1129,7 @@ namespace mongo {
 
         // Errors release the write lock, as a matter of policy.
         if (result->getError()) {
-            state->txn->recoveryUnit()->commitAndRestart();
+            state->txn->recoveryUnit()->abandonSnapshot();
             state->unlock();
         }
     }
@@ -1366,7 +1366,7 @@ namespace mongo {
                 createCollection = false;
                 // RESTART LOOP
                 fakeLoop = -1;
-                txn->recoveryUnit()->commitAndRestart();
+                txn->recoveryUnit()->abandonSnapshot();
 
                 WriteConflictException::logAndBackoff( attempt++, "update", nsString.ns() );
             }

@@ -135,7 +135,7 @@ namespace {
                 catch (const WriteConflictException& wce) {
                     LOG(2) << "WriteConflictException while creating collection in IndexBuilder"
                            << ", retrying.";
-                    txn->recoveryUnit()->commitAndRestart();
+                    txn->recoveryUnit()->abandonSnapshot();
                     continue;
                 }
             }
@@ -216,7 +216,7 @@ namespace {
 
 
             LOG(2) << "WriteConflictException while creating index in IndexBuilder, retrying.";
-            txn->recoveryUnit()->commitAndRestart();
+            txn->recoveryUnit()->abandonSnapshot();
         }
     }
 

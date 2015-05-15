@@ -199,7 +199,7 @@ namespace mongo {
 
     /**
      * RAII-style class to mark the scope of a transaction. ScopedTransactions may be nested.
-     * An outermost ScopedTransaction calls commitAndRestart() on destruction, so that the storage
+     * An outermost ScopedTransaction calls abandonSnapshot() on destruction, so that the storage
      * engine can release resources, such as snapshots or locks, that it may have acquired during
      * the transaction. Note that any writes are committed in nested WriteUnitOfWork scopes,
      * so write conflicts cannot happen on completing a ScopedTransaction.
@@ -218,7 +218,7 @@ namespace mongo {
 
         ~ScopedTransaction() {
             if (!_txn->lockState()->isLocked()) {
-                _txn->recoveryUnit()->commitAndRestart();
+                _txn->recoveryUnit()->abandonSnapshot();
             }
         }
 

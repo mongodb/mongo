@@ -41,7 +41,7 @@
             ++ptxn->getCurOp()->debug().writeConflicts;                 \
             wce.logAndBackoff(wcr__Attempts, (OPSTR), (NSSTR));         \
             ++wcr__Attempts;                                            \
-            ptxn->recoveryUnit()->commitAndRestart();                   \
+            ptxn->recoveryUnit()->abandonSnapshot();                   \
             continue;                                                   \
         }                                                               \
         break;                                                          \
