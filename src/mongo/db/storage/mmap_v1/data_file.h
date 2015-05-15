@@ -104,9 +104,9 @@ namespace mongo {
           DataFileHeader
           ----------------------
           Extent (for a particular namespace)
-            Record
+            MmapV1RecordHeader
             ...
-            Record (some chained for unused space)
+            MmapV1RecordHeader (some chained for unused space)
           ----------------------
           more Extents...
           ----------------------

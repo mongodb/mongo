@@ -354,7 +354,7 @@ namespace mongo {
         typedef DiskLoc56Bit LocType;
         typedef BtreeBucketV1 BucketType;
 
-        enum { BucketSize = 8192 - 16,  // The -16 is to leave room for the Record header
+        enum { BucketSize = 8192 - 16,  // The -16 is to leave room for the MmapV1RecordHeader header
                BucketBodySize = BucketSize - BucketType::HeaderSize 
         };
 

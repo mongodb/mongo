@@ -43,7 +43,7 @@ namespace mongo {
     RecordData HeapRecordStoreBtree::dataFor(OperationContext* txn, const RecordId& loc) const {
         Records::const_iterator it = _records.find(loc);
         invariant(it != _records.end());
-        const Record& rec = it->second;
+        const MmapV1RecordHeader& rec = it->second;
 
         return RecordData(rec.data.get(), rec.dataSize);
     }
@@ -53,7 +53,7 @@ namespace mongo {
         Records::const_iterator it = _records.find(loc);
         if ( it == _records.end() )
             return false;
-        const Record& rec = it->second;
+        const MmapV1RecordHeader& rec = it->second;
         *out = RecordData(rec.data.get(), rec.dataSize);
         return true;
     }
@@ -66,7 +66,7 @@ namespace mongo {
                                                            const char* data,
                                                            int len,
                                                            bool enforceQuota) {
-        Record rec(len);
+        MmapV1RecordHeader rec(len);
         memcpy(rec.data.get(), data, len);
 
         const RecordId loc = allocateLoc();
@@ -80,7 +80,7 @@ namespace mongo {
     StatusWith<RecordId> HeapRecordStoreBtree::insertRecord(OperationContext* txn,
                                                            const DocWriter* doc,
                                                            bool enforceQuota) {
-        Record rec(doc->documentSize());
+        MmapV1RecordHeader rec(doc->documentSize());
         doc->writeDocument(rec.data.get());
 
         const RecordId loc = allocateLoc();

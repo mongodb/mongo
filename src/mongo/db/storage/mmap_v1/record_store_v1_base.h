@@ -42,7 +42,7 @@ namespace mongo {
     class DeletedRecord;
     class DocWriter;
     class ExtentManager;
-    class Record;
+    class MmapV1RecordHeader;
     class OperationContext;
 
     struct Extent;
@@ -261,7 +261,7 @@ namespace mongo {
         }
     protected:
 
-        virtual Record* recordFor( const DiskLoc& loc ) const;
+        virtual MmapV1RecordHeader* recordFor( const DiskLoc& loc ) const;
 
         const DeletedRecord* deletedRecordFor( const DiskLoc& loc ) const;
 
@@ -299,7 +299,7 @@ namespace mongo {
         /** add a record to the end of the linked list chain within this extent.
             require: you must have already declared write intent for the record header.
         */
-        void _addRecordToRecListInExtent(OperationContext* txn, Record* r, DiskLoc loc);
+        void _addRecordToRecListInExtent(OperationContext* txn, MmapV1RecordHeader* r, DiskLoc loc);
 
         /**
          * internal
@@ -345,7 +345,7 @@ namespace mongo {
         virtual RecordData dataFor( const RecordId& loc ) const { return _rs->dataFor(_txn, loc); }
 
     private:
-        virtual const Record* recordFor( const DiskLoc& loc ) const { return _rs->recordFor(loc); }
+        virtual const MmapV1RecordHeader* recordFor( const DiskLoc& loc ) const { return _rs->recordFor(loc); }
         OperationContext* _txn;
         DiskLoc _curr;
         const RecordStoreV1Base* _rs;

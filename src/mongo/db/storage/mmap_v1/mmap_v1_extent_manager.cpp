@@ -74,7 +74,7 @@ namespace mongo {
     class MmapV1RecordFetcher : public RecordFetcher {
         MONGO_DISALLOW_COPYING(MmapV1RecordFetcher);
     public:
-        explicit MmapV1RecordFetcher(const Record* record)
+        explicit MmapV1RecordFetcher(const MmapV1RecordHeader* record)
             : _record(record) { }
 
         virtual void setup() {
@@ -100,9 +100,9 @@ namespace mongo {
 
     private:
         // The record which needs to be touched in order to page fault. Not owned by us.
-        const Record* _record;
+        const MmapV1RecordHeader* _record;
 
-        // This ensures that our Record* does not drop out from under our feet before
+        // This ensures that our MmapV1RecordHeader* does not drop out from under our feet before
         // we dereference it.
         boost::scoped_ptr<LockMongoFilesShared> _filesLock;
     };
@@ -276,7 +276,7 @@ namespace mongo {
         return size;
     }
 
-    Record* MmapV1ExtentManager::_recordForV1( const DiskLoc& loc ) const {
+    MmapV1RecordHeader* MmapV1ExtentManager::_recordForV1( const DiskLoc& loc ) const {
         loc.assertOk();
         const DataFile* df = _getOpenFile( loc.a() );
 
@@ -285,17 +285,17 @@ namespace mongo {
             df->badOfs(ofs); // will msgassert - external call to keep out of the normal code path
         }
 
-        return reinterpret_cast<Record*>( df->p() + ofs );
+        return reinterpret_cast<MmapV1RecordHeader*>( df->p() + ofs );
     }
 
-    Record* MmapV1ExtentManager::recordForV1( const DiskLoc& loc ) const {
-        Record* record = _recordForV1( loc );
+    MmapV1RecordHeader* MmapV1ExtentManager::recordForV1( const DiskLoc& loc ) const {
+        MmapV1RecordHeader* record = _recordForV1( loc );
         _recordAccessTracker->markAccessed( record );
         return record;
     }
 
     RecordFetcher* MmapV1ExtentManager::recordNeedsFetch( const DiskLoc& loc ) const {
-        Record* record = _recordForV1( loc );
+        MmapV1RecordHeader* record = _recordForV1( loc );
 
         // For testing: if failpoint is enabled we randomly request fetches without
         // going to the RecordAccessTracker.
@@ -314,7 +314,7 @@ namespace mongo {
     }
 
     DiskLoc MmapV1ExtentManager::extentLocForV1( const DiskLoc& loc ) const {
-        Record* record = recordForV1( loc );
+        MmapV1RecordHeader* record = recordForV1( loc );
         return DiskLoc( loc.a(), record->extentOfs() );
     }
 

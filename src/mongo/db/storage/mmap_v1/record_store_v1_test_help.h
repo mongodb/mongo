@@ -134,7 +134,7 @@ namespace mongo {
                                    int* numExtents,
                                    int64_t* totalFreeSizeBytes) const;
 
-        virtual Record* recordForV1( const DiskLoc& loc ) const;
+        virtual MmapV1RecordHeader* recordForV1( const DiskLoc& loc ) const;
 
         virtual RecordFetcher* recordNeedsFetch( const DiskLoc& loc ) const;
 

@@ -90,9 +90,9 @@ namespace {
     BSONObj docForRecordSize( int size ) {
         BSONObjBuilder b;
         b.append( "_id", 5 );
-        b.append( "x", string( size - Record::HeaderSize - 22, 'x' ) );
+        b.append( "x", string( size - MmapV1RecordHeader::HeaderSize - 22, 'x' ) );
         BSONObj x = b.obj();
-        ASSERT_EQUALS( Record::HeaderSize + x.objsize(), size );
+        ASSERT_EQUALS( MmapV1RecordHeader::HeaderSize + x.objsize(), size );
         return x;
     }
 
@@ -123,7 +123,7 @@ namespace {
         ASSERT( result.isOK() );
 
         // The length of the allocated record is quantized.
-        ASSERT_EQUALS( 512 , rs.dataFor( &txn, result.getValue() ).size() + Record::HeaderSize );
+        ASSERT_EQUALS( 512 , rs.dataFor( &txn, result.getValue() ).size() + MmapV1RecordHeader::HeaderSize );
     }
 
     TEST(SimpleRecordStoreV1, AllocNonQuantized) {
@@ -140,7 +140,7 @@ namespace {
         ASSERT( result.isOK() );
 
         // The length of the allocated record is quantized.
-        ASSERT_EQUALS( 300 , rs.dataFor( &txn, result.getValue() ).size() + Record::HeaderSize );
+        ASSERT_EQUALS( 300 , rs.dataFor( &txn, result.getValue() ).size() + MmapV1RecordHeader::HeaderSize );
     }
 
     TEST(SimpleRecordStoreV1, AllocNonQuantizedStillAligned) {
@@ -157,7 +157,7 @@ namespace {
         ASSERT( result.isOK() );
 
         // The length of the allocated record is quantized.
-        ASSERT_EQUALS( 300 , rs.dataFor( &txn, result.getValue() ).size() + Record::HeaderSize );
+        ASSERT_EQUALS( 300 , rs.dataFor( &txn, result.getValue() ).size() + MmapV1RecordHeader::HeaderSize );
     }
 
     /** alloc() quantizes the requested size if DocWriter::addPadding() returns true. */
@@ -174,7 +174,7 @@ namespace {
         ASSERT( result.isOK() );
 
         // The length of the allocated record is quantized.
-        ASSERT_EQUALS( 512 , rs.dataFor( &txn, result.getValue() ).size() + Record::HeaderSize );
+        ASSERT_EQUALS( 512 , rs.dataFor( &txn, result.getValue() ).size() + MmapV1RecordHeader::HeaderSize );
     }
 
     /**
@@ -193,7 +193,7 @@ namespace {
         ASSERT( result.isOK() );
 
         // The length of the allocated record is not quantized.
-        ASSERT_EQUALS( 300, rs.dataFor( &txn, result.getValue() ).size() + Record::HeaderSize );
+        ASSERT_EQUALS( 300, rs.dataFor( &txn, result.getValue() ).size() + MmapV1RecordHeader::HeaderSize );
 
     }
 
@@ -210,7 +210,7 @@ namespace {
         StatusWith<RecordId> result = rs.insertRecord(&txn, &docWriter, false);
         ASSERT( result.isOK() );
 
-        ASSERT_EQUALS( 300, rs.dataFor( &txn, result.getValue() ).size() + Record::HeaderSize );
+        ASSERT_EQUALS( 300, rs.dataFor( &txn, result.getValue() ).size() + MmapV1RecordHeader::HeaderSize );
     }
     /**
      * alloc() with quantized size doesn't split if enough room left over.

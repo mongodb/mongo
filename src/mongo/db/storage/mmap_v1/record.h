@@ -39,7 +39,7 @@ namespace mongo {
 
     class DeletedRecord;
 
-    /* Record is a record in a datafile.  DeletedRecord is similar but for deleted space.
+    /* MmapV1RecordHeader is a record in a datafile.  DeletedRecord is similar but for deleted space.
 
     *11:03:20 AM) dm10gen: regarding extentOfs...
     (11:03:42 AM) dm10gen: an extent is a continugous disk area, which contains many Records and DeleteRecords
@@ -47,11 +47,11 @@ namespace mongo {
     (11:04:16 AM) dm10gen: to keep the headesr small, instead of storing a 64 bit ptr to the full extent address, we keep just the offset
     (11:04:29 AM) dm10gen: we can do this as we know the record's address, and it has the same fileNo
     (11:04:33 AM) dm10gen: see class DiskLoc for more info
-    (11:04:43 AM) dm10gen: so that is how Record::myExtent() works
-    (11:04:53 AM) dm10gen: on an alloc(), when we build a new Record, we must populate its extentOfs then
+    (11:04:43 AM) dm10gen: so that is how MmapV1RecordHeader::myExtent() works
+    (11:04:53 AM) dm10gen: on an alloc(), when we build a new MmapV1RecordHeader, we must populate its extentOfs then
     */
 #pragma pack(1)
-    class Record {
+    class MmapV1RecordHeader {
     public:
         enum HeaderSizeValue { HeaderSize = 16 };
 

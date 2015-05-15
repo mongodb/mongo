@@ -40,7 +40,7 @@ namespace mongo {
 
        This is an internal part of the catalog.  Nothing outside of the catalog should use this.
 
-       ** MemoryMapped Record ** (i.e., this is on disk data)
+       ** MemoryMapped in NamespaceDetails ** (i.e., this is on disk data)
      */
 #pragma pack(1)
     struct IndexDetails {

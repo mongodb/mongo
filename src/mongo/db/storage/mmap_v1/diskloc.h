@@ -72,12 +72,12 @@ namespace mongo {
         DiskLoc(int a, int Ofs) : _a(a), ofs(Ofs) { }
         DiskLoc() { Null(); }
 
-        // Minimum allowed DiskLoc.  No Record may begin at this location because file and extent
+        // Minimum allowed DiskLoc.  No MmapV1RecordHeader may begin at this location because file and extent
         // headers must precede Records in a file.
         static DiskLoc min() { return DiskLoc(0, 0); }
 
         // Maximum allowed DiskLoc.
-        // No Record may begin at this location because the minimum size of a Record is larger than
+        // No MmapV1RecordHeader may begin at this location because the minimum size of a MmapV1RecordHeader is larger than
         // one byte.  Also, the last bit is not able to be used because mmapv1 uses that for "used".
         static DiskLoc max() { return DiskLoc(0x7fffffff, 0x7ffffffe); }
 

@@ -47,7 +47,7 @@ namespace mongo {
 
     class DataFile;
     class DataFileVersion;
-    class Record;
+    class MmapV1RecordHeader;
     class OperationContext;
 
     struct Extent;
@@ -116,24 +116,24 @@ namespace mongo {
                            int64_t* totalFreeSizeBytes) const;
 
         /**
-         * @param loc - has to be for a specific Record
+         * @param loc - has to be for a specific MmapV1RecordHeader
          * Note(erh): this sadly cannot be removed.
-         * A Record DiskLoc has an offset from a file, while a RecordStore really wants an offset
+         * A MmapV1RecordHeader DiskLoc has an offset from a file, while a RecordStore really wants an offset
          * from an extent.  This intrinsically links an original record store to the original extent
          * manager.
          */
-        Record* recordForV1( const DiskLoc& loc ) const;
+        MmapV1RecordHeader* recordForV1( const DiskLoc& loc ) const;
 
         RecordFetcher* recordNeedsFetch( const DiskLoc& loc ) const;
 
         /**
-         * @param loc - has to be for a specific Record (not an Extent)
+         * @param loc - has to be for a specific MmapV1RecordHeader (not an Extent)
          * Note(erh) see comment on recordFor
          */
         Extent* extentForV1( const DiskLoc& loc ) const;
 
         /**
-         * @param loc - has to be for a specific Record (not an Extent)
+         * @param loc - has to be for a specific MmapV1RecordHeader (not an Extent)
          * Note(erh) see comment on recordFor
          */
         DiskLoc extentLocForV1( const DiskLoc& loc ) const;
@@ -172,7 +172,7 @@ namespace mongo {
          * Shared record retrieval logic used by the public recordForV1() and likelyInPhysicalMem()
          * above.
          */
-        Record* _recordForV1( const DiskLoc& loc ) const;
+        MmapV1RecordHeader* _recordForV1( const DiskLoc& loc ) const;
 
         DiskLoc _getFreeListStart() const;
         DiskLoc _getFreeListEnd() const;

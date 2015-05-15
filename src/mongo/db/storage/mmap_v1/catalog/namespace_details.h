@@ -114,7 +114,7 @@ namespace mongo {
         DiskLoc deletedListLarge[LargeBuckets];
 
         // Think carefully before using this. We need at least 8 bytes reserved to leave room for a
-        // DiskLoc pointing to more data (eg in a dummy Record or Extent). There is still _reservedA
+        // DiskLoc pointing to more data (eg in a dummy MmapV1RecordHeader or Extent). There is still _reservedA
         // above, but these are the final two reserved 8-byte regions.
         char _reserved[8];
         /*-------- end data 496 bytes */

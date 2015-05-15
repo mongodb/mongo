@@ -166,7 +166,7 @@ namespace mongo {
         // this is a bit odd, as the semantics of using the storage engine imply it _has_ to be.
         // And in fact we can't actually check.
         // So we assume the best.
-        Record* rec = recordFor(DiskLoc::fromRecordId(loc));
+        MmapV1RecordHeader* rec = recordFor(DiskLoc::fromRecordId(loc));
         if ( !rec ) {
             return false;
         }
@@ -174,7 +174,7 @@ namespace mongo {
         return true;
     }
 
-    Record* RecordStoreV1Base::recordFor( const DiskLoc& loc ) const {
+    MmapV1RecordHeader* RecordStoreV1Base::recordFor( const DiskLoc& loc ) const {
         return _extentManager->recordForV1( loc );
     }
 
@@ -296,7 +296,7 @@ namespace mongo {
         if ( docSize < 4 ) {
             return StatusWith<RecordId>(ErrorCodes::InvalidLength, "record has to be >= 4 bytes");
         }
-        const int lenWHdr = docSize + Record::HeaderSize;
+        const int lenWHdr = docSize + MmapV1RecordHeader::HeaderSize;
         if ( lenWHdr > MaxAllowedAllocation ) {
             return StatusWith<RecordId>(ErrorCodes::InvalidLength, "record has to be <= 16.5MB");
         }
@@ -308,10 +308,10 @@ namespace mongo {
         if ( !loc.isOK() )
             return StatusWith<RecordId>(loc.getStatus());
 
-        Record *r = recordFor( loc.getValue() );
+        MmapV1RecordHeader *r = recordFor( loc.getValue() );
         fassert( 17319, r->lengthWithHeaders() >= lenWHdr );
 
-        r = reinterpret_cast<Record*>( txn->recoveryUnit()->writingPtr(r, lenWHdr) );
+        r = reinterpret_cast<MmapV1RecordHeader*>( txn->recoveryUnit()->writingPtr(r, lenWHdr) );
         doc->writeDocument( r->data() );
 
         _addRecordToRecListInExtent(txn, r, loc.getValue());
@@ -330,7 +330,7 @@ namespace mongo {
             return StatusWith<RecordId>( ErrorCodes::InvalidLength, "record has to be >= 4 bytes" );
         }
 
-        if ( len + Record::HeaderSize > MaxAllowedAllocation ) {
+        if ( len + MmapV1RecordHeader::HeaderSize > MaxAllowedAllocation ) {
             return StatusWith<RecordId>( ErrorCodes::InvalidLength, "record has to be <= 16.5MB" );
         }
 
@@ -342,7 +342,7 @@ namespace mongo {
                                                           int len,
                                                           bool enforceQuota ) {
 
-        const int lenWHdr = len + Record::HeaderSize;
+        const int lenWHdr = len + MmapV1RecordHeader::HeaderSize;
         const int lenToAlloc = shouldPadInserts() ? quantizeAllocationSpace(lenWHdr)
                                                   : lenWHdr;
         fassert( 17208, lenToAlloc >= lenWHdr );
@@ -351,11 +351,11 @@ namespace mongo {
         if ( !loc.isOK() )
             return StatusWith<RecordId>(loc.getStatus());
 
-        Record *r = recordFor( loc.getValue() );
+        MmapV1RecordHeader *r = recordFor( loc.getValue() );
         fassert( 17210, r->lengthWithHeaders() >= lenWHdr );
 
         // copy the data
-        r = reinterpret_cast<Record*>( txn->recoveryUnit()->writingPtr(r, lenWHdr) );
+        r = reinterpret_cast<MmapV1RecordHeader*>( txn->recoveryUnit()->writingPtr(r, lenWHdr) );
         memcpy( r->data(), data, len );
 
         _addRecordToRecListInExtent(txn, r, loc.getValue());
@@ -371,7 +371,7 @@ namespace mongo {
                                                          int dataSize,
                                                          bool enforceQuota,
                                                          UpdateNotifier* notifier ) {
-        Record* oldRecord = recordFor( DiskLoc::fromRecordId(oldLocation) );
+        MmapV1RecordHeader* oldRecord = recordFor( DiskLoc::fromRecordId(oldLocation) );
         if ( oldRecord->netLength() >= dataSize ) {
             // Make sure to notify other queries before we do an in-place update.
             if ( notifier ) {
@@ -392,7 +392,7 @@ namespace mongo {
                                          10003 );
 
         // we have to move
-        if ( dataSize + Record::HeaderSize > MaxAllowedAllocation ) {
+        if ( dataSize + MmapV1RecordHeader::HeaderSize > MaxAllowedAllocation ) {
             return StatusWith<RecordId>( ErrorCodes::InvalidLength, "record has to be <= 16.5MB" );
         }
 
@@ -424,7 +424,7 @@ namespace mongo {
                                                  const RecordData& oldRec,
                                                  const char* damageSource,
                                                  const mutablebson::DamageVector& damages ) {
-        Record* rec = recordFor( DiskLoc::fromRecordId(loc) );
+        MmapV1RecordHeader* rec = recordFor( DiskLoc::fromRecordId(loc) );
         char* root = rec->data();
 
         // All updates were in place. Apply them via durability and writing pointer.
@@ -442,20 +442,20 @@ namespace mongo {
     void RecordStoreV1Base::deleteRecord( OperationContext* txn, const RecordId& rid ) {
         const DiskLoc dl = DiskLoc::fromRecordId(rid);
 
-        Record* todelete = recordFor( dl );
+        MmapV1RecordHeader* todelete = recordFor( dl );
         invariant( todelete->netLength() >= 4 ); // this is required for defensive code
 
         /* remove ourself from the record next/prev chain */
         {
             if ( todelete->prevOfs() != DiskLoc::NullOfs ) {
                 DiskLoc prev = getPrevRecordInExtent( txn, dl );
-                Record* prevRecord = recordFor( prev );
+                MmapV1RecordHeader* prevRecord = recordFor( prev );
                 txn->recoveryUnit()->writingInt( prevRecord->nextOfs() ) = todelete->nextOfs();
             }
 
             if ( todelete->nextOfs() != DiskLoc::NullOfs ) {
                 DiskLoc next = getNextRecord( txn, dl );
-                Record* nextRecord = recordFor( next );
+                MmapV1RecordHeader* nextRecord = recordFor( next );
                 txn->recoveryUnit()->writingInt( nextRecord->prevOfs() ) = todelete->prevOfs();
             }
         }
@@ -508,7 +508,7 @@ namespace mongo {
     }
 
     void RecordStoreV1Base::_addRecordToRecListInExtent(OperationContext* txn,
-                                                        Record *r,
+                                                        MmapV1RecordHeader *r,
                                                         DiskLoc loc) {
         dassert( recordFor(loc) == r );
         DiskLoc extentLoc = _getExtentLocForRecord( txn, loc );
@@ -519,7 +519,7 @@ namespace mongo {
             r->prevOfs() = r->nextOfs() = DiskLoc::NullOfs;
         }
         else {
-            Record *oldlast = recordFor(e->lastRecord);
+            MmapV1RecordHeader *oldlast = recordFor(e->lastRecord);
             r->prevOfs() = e->lastRecord.getOfs();
             r->nextOfs() = DiskLoc::NullOfs;
             txn->recoveryUnit()->writingInt(oldlast->nextOfs()) = loc.getOfs();
@@ -734,7 +734,7 @@ namespace mongo {
                         cl_last = cl;
                     }
 
-                    Record *r = recordFor(cl);
+                    MmapV1RecordHeader *r = recordFor(cl);
                     len += r->lengthWithHeaders();
                     nlen += r->netLength();
 
@@ -927,7 +927,7 @@ namespace mongo {
             return RecordId();
 
         const DiskLoc out = _curr; // we always return where we were, not where we will be.
-        const Record* rec = recordFor(_curr);
+        const MmapV1RecordHeader* rec = recordFor(_curr);
         const int nextOfs = _forward ? rec->nextOfs() : rec->prevOfs();
         _curr = (nextOfs == DiskLoc::NullOfs ? DiskLoc() : DiskLoc(_curr.a(), nextOfs));
         return out.toRecordId();;

@@ -122,7 +122,7 @@ namespace {
             initializeV1RS(&txn, records, drecs, NULL, &em, md);
         }
 
-        rs.insertRecord(&txn, zeros, 100 - Record::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 100 - MmapV1RecordHeader::HeaderSize, false);
 
         {
             LocAndSize recs[] = {
@@ -164,7 +164,7 @@ namespace {
             initializeV1RS(&txn, records, drecs, NULL, &em, md);
         }
 
-        rs.insertRecord(&txn, zeros, 100 - Record::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 100 - MmapV1RecordHeader::HeaderSize, false);
 
         {
             LocAndSize recs[] = {
@@ -210,7 +210,7 @@ namespace {
             initializeV1RS(&txn, records, drecs, NULL, &em, md);
         }
 
-        rs.insertRecord(&txn, zeros, 100 - Record::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 100 - MmapV1RecordHeader::HeaderSize, false);
 
         {
             LocAndSize recs[] = {
@@ -259,7 +259,7 @@ namespace {
             initializeV1RS(&txn, records, drecs, NULL, &em, md);
         }
 
-        rs.insertRecord(&txn, zeros, 100 - Record::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 100 - MmapV1RecordHeader::HeaderSize, false);
 
         {
             LocAndSize recs[] = {
@@ -305,7 +305,7 @@ namespace {
             initializeV1RS(&txn, records, drecs, NULL, &em, md);
         }
 
-        rs.insertRecord(&txn, zeros, 100 - Record::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 100 - MmapV1RecordHeader::HeaderSize, false);
 
         {
             LocAndSize recs[] = {
@@ -352,7 +352,7 @@ namespace {
             initializeV1RS(&txn, records, drecs, NULL, &em, md);
         }
 
-        rs.insertRecord(&txn, zeros, 100 - Record::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 100 - MmapV1RecordHeader::HeaderSize, false);
 
         {
             LocAndSize recs[] = {
@@ -402,7 +402,7 @@ namespace {
             initializeV1RS(&txn, records, drecs, NULL, &em, md);
         }
 
-        rs.insertRecord(&txn, zeros, 200 - Record::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 200 - MmapV1RecordHeader::HeaderSize, false);
 
         {
             LocAndSize recs[] = {
@@ -472,7 +472,7 @@ namespace {
             initializeV1RS(&txn, records, drecs, NULL, &em, md);
         }
 
-        StatusWith<RecordId> status = rs.insertRecord(&txn, zeros, 1004 - Record::HeaderSize, false);
+        StatusWith<RecordId> status = rs.insertRecord(&txn, zeros, 1004 - MmapV1RecordHeader::HeaderSize, false);
         ASSERT_EQUALS(status.getStatus(), ErrorCodes::DocTooLargeForCapped);
         ASSERT_EQUALS(status.getStatus().location(), 28575);
     }
@@ -507,11 +507,11 @@ namespace {
             initializeV1RS(&txn, records, drecs, NULL, &em, md);
         }
 
-        rs.insertRecord(&txn, zeros, 500 - Record::HeaderSize, false);
-        rs.insertRecord(&txn, zeros, 300 - Record::HeaderSize, false);
-        rs.insertRecord(&txn, zeros, 400 - Record::HeaderSize, false); // won't fit at end so wraps
-        rs.insertRecord(&txn, zeros, 120 - Record::HeaderSize, false); // fits at end
-        rs.insertRecord(&txn, zeros,  60 - Record::HeaderSize, false); // fits in earlier hole
+        rs.insertRecord(&txn, zeros, 500 - MmapV1RecordHeader::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 300 - MmapV1RecordHeader::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 400 - MmapV1RecordHeader::HeaderSize, false); // won't fit at end so wraps
+        rs.insertRecord(&txn, zeros, 120 - MmapV1RecordHeader::HeaderSize, false); // fits at end
+        rs.insertRecord(&txn, zeros,  60 - MmapV1RecordHeader::HeaderSize, false); // fits in earlier hole
 
         {
             LocAndSize recs[] = {
@@ -559,34 +559,34 @@ namespace {
 
         // This list of sizes was empirically generated to achieve this outcome. Don't think too
         // much about them.
-        rs.insertRecord(&txn, zeros, 500 - Record::HeaderSize, false);
-        rs.insertRecord(&txn, zeros, 300 - Record::HeaderSize, false);
-        rs.insertRecord(&txn, zeros, 304 - Record::HeaderSize, false);
-        rs.insertRecord(&txn, zeros, 76 - Record::HeaderSize, false);
-        rs.insertRecord(&txn, zeros, 100 - Record::HeaderSize, false);
-        rs.insertRecord(&txn, zeros, 96 - Record::HeaderSize, false);
-        rs.insertRecord(&txn, zeros, 76 - Record::HeaderSize, false);
-        rs.insertRecord(&txn, zeros, 200 - Record::HeaderSize, false);
-        rs.insertRecord(&txn, zeros, 100 - Record::HeaderSize, false);
-        rs.insertRecord(&txn, zeros, 100 - Record::HeaderSize, false);
-        rs.insertRecord(&txn, zeros, 200 - Record::HeaderSize, false);
-        rs.insertRecord(&txn, zeros, 56 - Record::HeaderSize, false);
-        rs.insertRecord(&txn, zeros, 100 - Record::HeaderSize, false);
-        rs.insertRecord(&txn, zeros, 96 - Record::HeaderSize, false);
-        rs.insertRecord(&txn, zeros, 104 - Record::HeaderSize, false);
-        rs.insertRecord(&txn, zeros, 96 - Record::HeaderSize, false);
-        rs.insertRecord(&txn, zeros, 60 - Record::HeaderSize, false);
-        rs.insertRecord(&txn, zeros, 60 - Record::HeaderSize, false);
-        rs.insertRecord(&txn, zeros, 146 - Record::HeaderSize, false);
-        rs.insertRecord(&txn, zeros, 146 - Record::HeaderSize, false);
-        rs.insertRecord(&txn, zeros, 40 - Record::HeaderSize, false);
-        rs.insertRecord(&txn, zeros, 40 - Record::HeaderSize, false);
-        rs.insertRecord(&txn, zeros, 36 - Record::HeaderSize, false);
-        rs.insertRecord(&txn, zeros, 100 - Record::HeaderSize, false);
-        rs.insertRecord(&txn, zeros, 96 - Record::HeaderSize, false);
-        rs.insertRecord(&txn, zeros, 200 - Record::HeaderSize, false);
-        rs.insertRecord(&txn, zeros, 60 - Record::HeaderSize, false);
-        rs.insertRecord(&txn, zeros, 64 - Record::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 500 - MmapV1RecordHeader::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 300 - MmapV1RecordHeader::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 304 - MmapV1RecordHeader::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 76 - MmapV1RecordHeader::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 100 - MmapV1RecordHeader::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 96 - MmapV1RecordHeader::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 76 - MmapV1RecordHeader::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 200 - MmapV1RecordHeader::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 100 - MmapV1RecordHeader::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 100 - MmapV1RecordHeader::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 200 - MmapV1RecordHeader::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 56 - MmapV1RecordHeader::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 100 - MmapV1RecordHeader::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 96 - MmapV1RecordHeader::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 104 - MmapV1RecordHeader::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 96 - MmapV1RecordHeader::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 60 - MmapV1RecordHeader::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 60 - MmapV1RecordHeader::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 146 - MmapV1RecordHeader::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 146 - MmapV1RecordHeader::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 40 - MmapV1RecordHeader::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 40 - MmapV1RecordHeader::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 36 - MmapV1RecordHeader::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 100 - MmapV1RecordHeader::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 96 - MmapV1RecordHeader::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 200 - MmapV1RecordHeader::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 60 - MmapV1RecordHeader::HeaderSize, false);
+        rs.insertRecord(&txn, zeros, 64 - MmapV1RecordHeader::HeaderSize, false);
 
         {
             LocAndSize recs[] = {
@@ -661,9 +661,9 @@ namespace {
                 + em.recordForV1(e->lastRecord)->lengthWithHeaders();
             }
             DiskLoc dl( ext.a(), ofs );
-            Record *r = em.recordForV1(dl);
-            r = (Record*) txn.recoveryUnit()->writingPtr(r, Record::HeaderSize + len);
-            r->lengthWithHeaders() = Record::HeaderSize + len;
+            MmapV1RecordHeader *r = em.recordForV1(dl);
+            r = (MmapV1RecordHeader*) txn.recoveryUnit()->writingPtr(r, MmapV1RecordHeader::HeaderSize + len);
+            r->lengthWithHeaders() = MmapV1RecordHeader::HeaderSize + len;
             r->extentOfs() = e->myLoc.getOfs();
             r->nextOfs() = DiskLoc::NullOfs;
             r->prevOfs() = e->lastRecord.isNull() ? DiskLoc::NullOfs : e->lastRecord.getOfs();

@@ -43,7 +43,7 @@ namespace mongo {
      * functionality necessary to test btree.
      */
     class HeapRecordStoreBtree : public RecordStore {
-        struct Record;
+        struct MmapV1RecordHeader;
 
     public:
         // RecordId(0,0) isn't valid for records.
@@ -143,7 +143,7 @@ namespace mongo {
 
         virtual long long dataSize(OperationContext* txn) const { invariant(false); }
 
-        virtual Record* recordFor(const RecordId& loc) const { invariant(false); }
+        virtual MmapV1RecordHeader* recordFor(const RecordId& loc) const { invariant(false); }
 
         virtual bool isCapped() const { invariant(false); }
 
@@ -157,9 +157,9 @@ namespace mongo {
         // more things that we actually care about below
 
     private:
-        struct Record {
-            Record(): dataSize(-1), data() { }
-            explicit Record(int size): dataSize(size), data(new char[size]) { }
+        struct MmapV1RecordHeader {
+            MmapV1RecordHeader(): dataSize(-1), data() { }
+            explicit MmapV1RecordHeader(int size): dataSize(size), data(new char[size]) { }
 
             int dataSize;
             boost::shared_array<char> data;
@@ -167,7 +167,7 @@ namespace mongo {
 
         RecordId allocateLoc();
 
-        typedef std::map<RecordId, HeapRecordStoreBtree::Record> Records;
+        typedef std::map<RecordId, HeapRecordStoreBtree::MmapV1RecordHeader> Records;
         Records _records;
         int64_t _nextId;
     };

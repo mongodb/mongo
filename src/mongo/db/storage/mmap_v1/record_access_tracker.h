@@ -34,7 +34,7 @@
 
 namespace mongo {
 
-    class Record;
+    class MmapV1RecordHeader;
 
     /**
      * Used to implement likelyInPhysicalMemory() for the MMAP v1 storage engine. Since
