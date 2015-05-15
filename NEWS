@@ -230,7 +230,7 @@ refs SERVER-17424
   refs WT-1745
 
 * Fix when aggregation is set on statistics fields. Fixes problems with
-  visualising statistics via wtstats graphs.
+  visualizing statistics via wtstats graphs.
   refs WT-1742
 
 * Change how checkpoints use empty blocks in on-disk files. Use a first-fit

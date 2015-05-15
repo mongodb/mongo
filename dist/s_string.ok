@@ -215,6 +215,7 @@ ObWgfvgw
 Obama
 PARAM
 POSIX
+PREDEFINE
 PRIu
 PTHREAD
 PTR
@@ -345,6 +346,7 @@ argv
 async
 asyncopp
 asyncops
+atomicity
 autocommit
 autoconf
 automake
@@ -638,6 +640,7 @@ kvraw
 kvs
 kvsbdb
 lang
+latencies
 lbrace
 lbracket
 len
@@ -746,6 +749,7 @@ onpage
 oo
 opendir
 openfile
+optimizations
 optype
 os
 ovfl
