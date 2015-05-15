@@ -60,7 +60,9 @@ namespace mongo {
             _language = swl.getValue();
             _caseSensitive = caseSensitive;
 
-            std::unique_ptr<FTSTokenizer> tokenizer(_language->createTokenizer());
+            // Build a space delimited list of words to have the FtsTokenizer tokenize
+            string positiveTermSentence;
+            string negativeTermSentence;
 
             bool inNegation = false;
             bool inPhrase = false;
@@ -78,7 +80,14 @@ namespace mongo {
                         // don't add term
                     }
                     else {
-                        _addTerm( tokenizer.get(), s, inNegation );
+                        if (inNegation) {
+                            negativeTermSentence.append(s);
+                            negativeTermSentence.push_back(' ');
+                        }
+                        else {
+                            positiveTermSentence.append(s);
+                            positiveTermSentence.push_back(' ');
+                        }
                     }
 
                     if ( inNegation && !inPhrase )
@@ -119,13 +128,19 @@ namespace mongo {
                 }
             }
 
+            std::unique_ptr<FTSTokenizer> tokenizer(_language->createTokenizer());
+
+            _addTerms(tokenizer.get(), positiveTermSentence, false);
+            _addTerms(tokenizer.get(), negativeTermSentence, true);
+
             return Status::OK();
         }
 
-        void FTSQuery::_addTerm( FTSTokenizer* tokenizer,
-                                 const string& token,
+        void FTSQuery::_addTerms( FTSTokenizer* tokenizer,
+                                 const string& sentence,
                                  bool negated ) {
-            tokenizer->reset(token.c_str(), FTSTokenizer::FilterStopWords);
+
+            tokenizer->reset(sentence.c_str(), FTSTokenizer::FilterStopWords);
 
             auto& activeTerms = negated ? _negatedTerms : _positiveTerms;
 
@@ -152,7 +167,7 @@ namespace mongo {
                 return;
             }
 
-            tokenizer->reset(token.c_str(), static_cast<FTSTokenizer::Options>(
+            tokenizer->reset(sentence.c_str(), static_cast<FTSTokenizer::Options>(
                 FTSTokenizer::FilterStopWords
                 | FTSTokenizer::GenerateCaseSensitiveTokens));
 

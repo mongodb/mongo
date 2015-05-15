@@ -79,8 +79,8 @@ namespace mongo {
             static const bool caseSensitiveDefault;
 
         private:
-            void _addTerm( FTSTokenizer* tokenizer,
-                           const std::string& token,
+            void _addTerms( FTSTokenizer* tokenizer,
+                           const std::string& tokens,
                            bool negated );
 
             const FTSLanguage* _language;
