@@ -146,14 +146,14 @@ read_index(WT_SESSION *session)
 	char *first_name, *last_name;
 	uint16_t term_end, term_start, year;
 
-	srandom((unsigned int)getpid());
+	srand((unsigned int)getpid());
 	ret = session->open_cursor(
 	    session, "index:presidents:term", NULL, NULL, &cursor);
 	/*
 	 * Pick 10 random years and read the data.
 	 */
 	for (i = 0; i < 10; i++) {
-		year = (uint16_t)((random() % YEAR_SPAN) + YEAR_BASE);
+		year = (uint16_t)((rand() % YEAR_SPAN) + YEAR_BASE);
 		cursor->set_key(cursor, year);
 		if ((ret = cursor->search(cursor)) == 0) {
 			if ((ret = cursor->get_value(cursor, &last_name,
