@@ -81,7 +81,7 @@ __wt_block_manager_create(
 				    __wt_rename(session, filename, tmp->data));
 				WT_ERR(__wt_msg(session,
 				    "unexpected file %s found, renamed to %s",
-				    filename, tmp->data));
+				    filename, (char *)tmp->data));
 				break;
 			}
 		}
