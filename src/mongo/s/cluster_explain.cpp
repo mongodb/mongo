@@ -211,7 +211,7 @@ namespace mongo {
             BSONObj serverInfo = shardResults[i].result["serverInfo"].Obj();
 
             singleShardBob.append("shardName", shardResults[i].shardTarget.getName());
-            std::string connStr = shardResults[i].shardTarget.getAddress().toString();
+            std::string connStr = shardResults[i].shardTarget.getConnString().toString();
             singleShardBob.append("connectionString", connStr);
             appendIfRoom(&singleShardBob, serverInfo, "serverInfo");
             appendElementsIfRoom(&singleShardBob, queryPlanner);

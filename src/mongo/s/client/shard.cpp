@@ -93,24 +93,9 @@ namespace {
 
     Shard::Shard()
         : _name(""),
-          _addr(""),
           _maxSizeMB(0),
           _isDraining(false) {
 
-    }
-
-    Shard::Shard(const std::string& name,
-                 const std::string& addr,
-                 long long maxSizeMB,
-                 bool isDraining)
-        : _name(name),
-          _addr(addr),
-          _maxSizeMB(maxSizeMB),
-          _isDraining(isDraining) {
-
-        if (!_addr.empty()) {
-            _cs = ConnectionString(addr, ConnectionString::SET);
-        }
     }
 
     Shard::Shard(const std::string& name,
@@ -118,11 +103,11 @@ namespace {
                  long long maxSizeMB,
                  bool isDraining)
         : _name(name),
-          _addr(connStr.toString()),
           _cs(connStr),
           _maxSizeMB(maxSizeMB),
           _isDraining(isDraining) {
 
+        invariant(_cs.isValid());
     }
 
     Shard Shard::findIfExists( const string& shardName ) {
@@ -138,8 +123,9 @@ namespace {
     }
 
     bool Shard::containsNode( const string& node ) const {
-        if ( _addr == node )
+        if (_cs.toString() == node) {
             return true;
+        }
 
         if ( _cs.type() == ConnectionString::SET ) {
             ReplicaSetMonitorPtr rs = ReplicaSetMonitor::get( _cs.getSetName(), true );
@@ -233,8 +219,8 @@ namespace {
 
     ShardStatus Shard::getStatus() const {
         return ShardStatus(*this,
-                           getShardDataSizeBytes(getConnString()),
-                           getShardMongoVersion(getConnString()));
+                           getShardDataSizeBytes(getConnString().toString()),
+                           getShardMongoVersion(getConnString().toString()));
     }
 
     void Shard::reloadShardInfo() {

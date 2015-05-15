@@ -30,7 +30,6 @@
 
 #include <boost/shared_ptr.hpp>
 
-#include "mongo/client/dbclient_rs.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/concurrency/mutex.h"
@@ -205,8 +204,6 @@ namespace mongo {
         int dbConfigVersion( DBClientBase& conn );
 
         void reloadSettings();
-
-        ConnectionString getConnectionString() const;
 
         void replicaSetChange(const std::string& setName, const std::string& newConnectionString);
 

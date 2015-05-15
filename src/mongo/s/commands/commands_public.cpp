@@ -638,7 +638,7 @@ namespace mongo {
                         }
                     }
 
-                    b.append("fromhost", confFrom->getPrimary().getConnString());
+                    b.append("fromhost", confFrom->getPrimary().getConnString().toString());
                     BSONObj fixed = b.obj();
 
                     return adminPassthrough( confTo , fixed , result );
@@ -871,7 +871,7 @@ namespace mongo {
 
                 Strategy::CommandResult cmdResult;
                 cmdResult.shardTarget = shard;
-                cmdResult.target = shard.getAddress();
+                cmdResult.target = shard.getConnString();
                 cmdResult.result = result.obj();
 
                 vector<Strategy::CommandResult> shardResults;
@@ -1395,7 +1395,10 @@ namespace mongo {
                 list< shared_ptr<Future::CommandResult> > futures;
                 BSONArrayBuilder shardArray;
                 for ( set<Shard>::const_iterator i=shards.begin(), end=shards.end() ; i != end ; i++ ) {
-                    futures.push_back( Future::spawnCommand( i->getConnString() , dbName , cmdObj, options ) );
+                    futures.push_back(Future::spawnCommand(i->getConnString().toString(),
+                                                           dbName,
+                                                           cmdObj,
+                                                           options));
                     shardArray.append(i->getName());
                 }
 
@@ -1579,8 +1582,9 @@ namespace mongo {
                 shared_ptr<DBConfig> conf = status.getValue();
                 bool retval = passthrough( conf, cmdObj, result );
 
-                Status storeCursorStatus = storePossibleCursor(conf->getPrimary().getConnString(),
-                                                               result.asTempObj());
+                Status storeCursorStatus =
+                        storePossibleCursor(conf->getPrimary().getConnString().toString(),
+                                            result.asTempObj());
                 if (!storeCursorStatus.isOK()) {
                     return appendCommandStatus(result, storeCursorStatus);
                 }
@@ -1611,14 +1615,16 @@ namespace mongo {
                 auto conf = uassertStatusOK(grid.catalogCache()->getDatabase(dbName));
                 bool retval = passthrough( conf, cmdObj, result );
 
-                Status storeCursorStatus = storePossibleCursor(conf->getPrimary().getConnString(),
-                                                               result.asTempObj());
+                Status storeCursorStatus =
+                        storePossibleCursor(conf->getPrimary().getConnString().toString(),
+                                            result.asTempObj());
                 if (!storeCursorStatus.isOK()) {
                     return appendCommandStatus(result, storeCursorStatus);
                 }
 
                 return retval;
             }
+
         } cmdListIndexes;
 
         class AvailableQueryOptions : public Command {

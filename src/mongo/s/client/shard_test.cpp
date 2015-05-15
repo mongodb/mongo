@@ -26,31 +26,47 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
+#include "mongo/client/connection_string.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
 
     using namespace mongo;
+    using unittest::assertGet;
 
-    TEST( Shard, EqualityRs ) {
-        Shard a("foo", "bar/a,b", 0, false);
-        Shard b("foo", "bar/a,b", 0, false);
-        ASSERT_EQUALS( a, b );
+    TEST(Shard, EqualityRs) {
+        Shard a("foo", assertGet(ConnectionString::parse("bar/a,b")), 0, false);
 
-        b = Shard("foo", "bar/b,a", 0, false);
-        ASSERT_EQUALS( a, b );
+        {
+            Shard s("foo", assertGet(ConnectionString::parse("bar/a,b")), 0, false);
+            ASSERT_EQUALS(a, s);
+        }
+
+        {
+            Shard s("foo", assertGet(ConnectionString::parse("bar/b,a")), 0, false);
+            ASSERT_EQUALS(a, s);
+        }
     }
 
-    TEST( Shard, EqualitySingle ) {
-        ASSERT_EQUALS(Shard("foo", "b.foo.com:123", 0, false),
-                      Shard("foo", "b.foo.com:123", 0, false));
-        ASSERT_NOT_EQUALS(Shard("foo", "b.foo.com:123", 0, false),
-                          Shard("foo", "a.foo.com:123", 0, false));
-        ASSERT_NOT_EQUALS(Shard("foo", "b.foo.com:123", 0, false),
-                          Shard("foo", "b.foo.com:124", 0, false));
-        ASSERT_NOT_EQUALS(Shard("foo", "b.foo.com:123", 0, false),
-                          Shard("foa", "b.foo.com:123", 0, false));
+    TEST(Shard, EqualitySingle) {
+        ASSERT_EQUALS(
+            Shard("foo", assertGet(ConnectionString::parse("b.foo.com:123")), 0, false),
+            Shard("foo", assertGet(ConnectionString::parse("b.foo.com:123")), 0, false));
+
+        ASSERT_NOT_EQUALS(
+            Shard("foo", assertGet(ConnectionString::parse("b.foo.com:123")), 0, false),
+            Shard("foo", assertGet(ConnectionString::parse("a.foo.com:123")), 0, false));
+
+        ASSERT_NOT_EQUALS(
+            Shard("foo", assertGet(ConnectionString::parse("b.foo.com:123")), 0, false),
+            Shard("foo", assertGet(ConnectionString::parse("b.foo.com:124")), 0, false));
+
+        ASSERT_NOT_EQUALS(
+            Shard("foo", assertGet(ConnectionString::parse("b.foo.com:123")), 0, false),
+            Shard("foa", assertGet(ConnectionString::parse("b.foo.com:123")), 0, false));
     }
 
 } // namespace

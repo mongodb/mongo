@@ -534,7 +534,7 @@ namespace mongo {
         // Fill out the command result.
         cmdResult->shardTarget = primaryShard;
         cmdResult->result = shardResult;
-        cmdResult->target = primaryShard.getAddress();
+        cmdResult->target = primaryShard.getConnString();
 
         return Status::OK();
     }

@@ -87,22 +87,31 @@ namespace mongo {
         for (const ShardType& shardData : shards) {
             uassertStatusOK(shardData.validate());
 
+            // This validation should ideally go inside the ShardType::validate call. However,
+            // doing it there would prevent us from loading previously faulty shard hosts, which
+            // might have been stored (i.e., the entire getAllShards call would fail).
+            auto shardHostStatus = ConnectionString::parse(shardData.getHost());
+            if (!shardHostStatus.isOK()) {
+                warning() << "Unable to parse shard host "
+                          << shardHostStatus.getStatus().toString();
+            }
+
+            const ConnectionString& shardHost(shardHostStatus.getValue());
+
             shared_ptr<Shard> shard = boost::make_shared<Shard>(shardData.getName(),
-                                                                shardData.getHost(),
+                                                                shardHost,
                                                                 shardData.getMaxSize(),
                                                                 shardData.getDraining());
             _lookup[shardData.getName()] = shard;
             _lookup[shardData.getHost()] = shard;
 
-            const ConnectionString& cs = shard->getAddress();
-
-            if (cs.type() == ConnectionString::SET) {
-                if (cs.getSetName().size()) {
+            if (shardHost.type() == ConnectionString::SET) {
+                if (shardHost.getSetName().size()) {
                     boost::lock_guard<boost::mutex> lk(_rsMutex);
-                    _rsLookup[cs.getSetName()] = shard;
+                    _rsLookup[shardHost.getSetName()] = shard;
                 }
 
-                vector<HostAndPort> servers = cs.getServers();
+                vector<HostAndPort> servers = shardHost.getServers();
                 for (unsigned i = 0; i < servers.size(); i++) {
                     _lookup[servers[i].toString()] = shard;
                 }
@@ -237,7 +246,7 @@ namespace mongo {
         boost::lock_guard<boost::mutex> lk(_mutex);
 
         for (ShardMap::const_iterator i = _lookup.begin(); i != _lookup.end(); ++i) {
-            b.append(i->first, i->second->getConnString());
+            b.append(i->first, i->second->getConnString().toString());
         }
 
         result->append("map", b.obj());

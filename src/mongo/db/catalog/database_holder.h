@@ -38,6 +38,7 @@
 namespace mongo {
 
     class Database;
+    class OperationContext;
 
     /**
      * Registry of opened databases.

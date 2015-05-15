@@ -272,7 +272,6 @@ namespace {
                 Status* ss = i->second;
                 if ( ss->avail )
                     ss->avail->getLastError();
-                
             }
         }
 
@@ -289,7 +288,7 @@ namespace {
 
                 Shard& shard = all[i];
                 try {
-                    string sconnString = shard.getConnString();
+                    string sconnString = shard.getConnString().toString();
                     Status* s = _getStatus( sconnString );
 
                     if( ! s->avail ) {
@@ -410,8 +409,10 @@ namespace {
     void usingAShardConnection(const string& addr);
 
 
-    ShardConnection::ShardConnection(const string& addr, const string& ns, ChunkManagerPtr manager)
-        : _addr(addr),
+    ShardConnection::ShardConnection(const ConnectionString& connectionString,
+                                     const string& ns,
+                                     boost::shared_ptr<ChunkManager> manager)
+        : _cs(connectionString),
           _ns(ns),
           _manager(manager) {
 
@@ -441,10 +442,10 @@ namespace {
     }
 
     void ShardConnection::_init() {
-        verify( _addr.size() );
-        _conn = ClientConnections::threadInstance()->get( _addr , _ns );
+        invariant(_cs.isValid());
+        _conn = ClientConnections::threadInstance()->get(_cs.toString(), _ns);
         _finishedInit = false;
-        usingAShardConnection( _addr );
+        usingAShardConnection(_cs.toString());
     }
 
     void ShardConnection::_finishInit() {
@@ -467,7 +468,7 @@ namespace {
 
     void ShardConnection::done() {
         if ( _conn ) {
-            ClientConnections::threadInstance()->done( _addr , _conn );
+            ClientConnections::threadInstance()->done(_cs.toString(), _conn);
             _conn = 0;
             _finishedInit = true;
         }
@@ -481,7 +482,7 @@ namespace {
 
             if (_conn->isFailed()) {
                 // Let the pool know about the bad connection and also delegate disposal to it.
-                ClientConnections::threadInstance()->done(_addr, _conn);
+                ClientConnections::threadInstance()->done(_cs.toString(), _conn);
             }
             else {
                 delete _conn;
@@ -528,7 +529,7 @@ namespace {
 
         Shard s = Shard::make(conn.getServerAddress());
         cmdBuilder.append("shard", s.getName());
-        cmdBuilder.append("shardHost", s.getConnString());
+        cmdBuilder.append("shardHost", s.getConnString().toString());
 
         if (ns.size() > 0) {
             version.addToBSON(cmdBuilder);

@@ -1131,11 +1131,10 @@ namespace mongo {
         // Put the cursors in the legacy format
         int index = 0;
         for( map< Shard, PCMData >::iterator i = _cursorMap.begin(), end = _cursorMap.end(); i != end; ++i ){
-
             PCMData& mdata = i->second;
 
             _cursors[ index ].reset( mdata.pcState->cursor.get(), &mdata );
-            _servers.insert(i->first.getConnString());
+            _servers.insert(i->first.getConnString().toString());
 
             index++;
         }
@@ -1250,14 +1249,19 @@ namespace mongo {
 
                     // This may be the first time connecting to this shard, if so we can get an error here
                     try {
-                        conns.push_back(shared_ptr<ShardConnection>(new ShardConnection(serverHost, _ns)));
+                        conns.push_back(
+                            shared_ptr<ShardConnection>(
+                                new ShardConnection(uassertStatusOK(
+                                                        ConnectionString::parse(serverHost)),
+                                                    _ns)));
                     }
-                    catch( std::exception& e ){
+                    catch( std::exception& e ) {
                         socketExs.push_back( e.what() + errLoc );
                         if( ! returnPartial ){
                             num--;
                             break;
                         }
+
                         conns.push_back( shared_ptr<ShardConnection>() );
                         continue;
                     }
@@ -1558,7 +1562,7 @@ namespace mongo {
 
         for( set<Shard>::iterator i = shards.begin(), end = shards.end(); i != end; ++i ){
             // TODO: Make this the shard name, not address
-            list<BSONObj>& l = out[ i->getAddress().toString() ];
+            list<BSONObj>& l = out[i->getConnString().toString()];
             l.push_back( getShardCursor( *i )->peekFirst().getOwned() );
         }
 
@@ -1589,11 +1593,15 @@ namespace mongo {
         try {
             if ( ! _conn ){
                 if ( _useShardConn) {
-                    _connHolder.reset( new ShardConnection( _server, "" ));
+                    _connHolder.reset(
+                        new ShardConnection(uassertStatusOK(ConnectionString::parse(_server)),
+                                            "",
+                                            NULL));
                 }
                 else {
                     _connHolder.reset( new ScopedDbConnection( _server ) );
                 }
+
                 _conn = _connHolder->get();
             }
 

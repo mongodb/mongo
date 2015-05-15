@@ -40,15 +40,9 @@ namespace mongo {
     /*
      * A "shard" one partition of the overall database (and a replica set typically).
      */
-
     class Shard {
     public:
         Shard();
-
-        Shard(const std::string& name,
-              const std::string& addr,
-              long long maxSizeMB,
-              bool isDraining);
 
         Shard(const std::string& name,
               const ConnectionString& connStr,
@@ -82,9 +76,8 @@ namespace mongo {
          */
         void reset( const std::string& ident );
 
-        const ConnectionString& getAddress() const { return _cs; }
         const std::string& getName() const { return _name; }
-        const std::string& getConnString() const { return _addr; }
+        const ConnectionString& getConnString() const { return _cs; }
 
         long long getMaxSizeMB() const {
             return _maxSizeMB;
@@ -95,7 +88,7 @@ namespace mongo {
         }
 
         std::string toString() const {
-            return _name + ":" + _addr;
+            return _name + ":" + _cs.toString();
         }
 
         friend std::ostream& operator << (std::ostream& out, const Shard& s) {
@@ -112,19 +105,11 @@ namespace mongo {
             return ! ( *this == s );
         }
 
-        bool operator==( const std::string& s ) const {
-            return _name == s || _addr == s;
-        }
-
-        bool operator!=( const std::string& s ) const {
-            return _name != s && _addr != s;
-        }
-
         bool operator<(const Shard& o) const {
             return _name < o._name;
         }
 
-        bool ok() const { return _addr.size() > 0; }
+        bool ok() const { return _cs.isValid(); }
 
         BSONObj runCommand(const std::string& db, const std::string& simple) const;
         BSONObj runCommand(const std::string& db, const BSONObj& cmd) const;
@@ -175,7 +160,6 @@ namespace mongo {
 
     private:
         std::string    _name;
-        std::string    _addr;
         ConnectionString _cs;
         long long _maxSizeMB;    // in MBytes, 0 is unlimited
         bool      _isDraining; // shard is currently being removed

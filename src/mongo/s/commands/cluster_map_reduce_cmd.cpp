@@ -329,7 +329,7 @@ namespace {
 
                 for (const auto& result : results) {
                     // Need to gather list of all servers even if an error happened
-                    const string server = result.shardTarget.getConnString();
+                    const string server = result.shardTarget.getConnString().toString();
                     servers.insert(server);
 
                     if (!ok) {
@@ -497,7 +497,7 @@ namespace {
                     for (vector<Strategy::CommandResult>::iterator i = results.begin();
                         i != results.end(); ++i) {
 
-                        string server = i->shardTarget.getConnString();
+                        const string server = i->shardTarget.getConnString().toString();
                         singleResult = i->result;
                         ok = singleResult["ok"].trueValue();
                         if (!ok) break;

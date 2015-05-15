@@ -31,8 +31,10 @@
 #include "mongo/db/exec/working_set.h"
 
 namespace mongo {
+
     class CanonicalQuery;
     class Collection;
+    class OperationContext;
 
     class WorkingSetCommon {
     public:

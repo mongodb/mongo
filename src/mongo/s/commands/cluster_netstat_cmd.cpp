@@ -29,7 +29,8 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/commands.h"
-#include "mongo/s/config.h"
+#include "mongo/s/catalog/catalog_manager.h"
+#include "mongo/s/grid.h"
 
 namespace mongo {
 namespace {
@@ -69,7 +70,7 @@ namespace {
                          std::string& errmsg,
                          BSONObjBuilder& result) {
 
-            result.append("configserver", configServer.getPrimary().getConnString());
+            result.append("configserver", grid.catalogManager()->connectionString().toString());
             result.append("isdbgrid", 1);
             return true;
         }

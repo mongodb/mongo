@@ -169,14 +169,15 @@ namespace {
             remoteCmdObjB.append( cmdObj[ ClusterMergeChunksCommand::nsField() ] );
             remoteCmdObjB.append( cmdObj[ ClusterMergeChunksCommand::boundsField() ] );
             remoteCmdObjB.append( ClusterMergeChunksCommand::configField(),
-                                  configServer.getPrimary().getAddress().toString() );
+                                  configServer.getPrimary().getConnString().toString() );
             remoteCmdObjB.append( ClusterMergeChunksCommand::shardNameField(),
                                   shard.getName() );
 
             BSONObj remoteResult;
+
             // Throws, but handled at level above.  Don't want to rewrap to preserve exception
             // formatting.
-            ScopedDbConnection conn( shard.getAddress() );
+            ScopedDbConnection conn(shard.getConnString());
             bool ok = conn->runCommand( "admin", remoteCmdObjB.obj(), remoteResult );
             conn.done();
 

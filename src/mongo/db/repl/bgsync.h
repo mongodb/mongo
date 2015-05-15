@@ -35,6 +35,9 @@
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
+
+    class OperationContext;
+
 namespace repl {
 
     class Member;

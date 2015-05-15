@@ -45,6 +45,7 @@
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/dist_lock_manager.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/log.h"
@@ -130,29 +131,28 @@ namespace {
                 return false;
             }
 
-            Shard s = Shard::findIfExists(to);
-            if (!s.ok()) {
-                string msg(str::stream() <<
-                           "Could not move database '" << dbname <<
-                           "' to shard '" << to <<
-                           "' because that shard does not exist");
+            shared_ptr<Shard> s = grid.shardRegistry()->findIfExists(to);
+            if (!s) {
+                string msg(str::stream() << "Could not move database '" << dbname
+                                         << "' to shard '" << to
+                                         << "' because the shard does not exist");
                 log() << msg;
                 return appendCommandStatus(result,
                                            Status(ErrorCodes::ShardNotFound, msg));
             }
 
-            if (config->getPrimary() == s.getConnString()) {
+            if (config->getPrimary().getConnString().sameLogicalEndpoint(s->getConnString())) {
                 errmsg = "it is already the primary";
                 return false;
             }
 
-            if (!grid.catalogManager()->isShardHost(s.getAddress())) {
+            if (!grid.catalogManager()->isShardHost(s->getConnString())) {
                 errmsg = "that server isn't known to me";
                 return false;
             }
 
             log() << "Moving " << dbname << " primary from: "
-                  << config->getPrimary().toString() << " to: " << s.toString();
+                  << config->getPrimary().toString() << " to: " << s->toString();
 
             string whyMessage(str::stream() << "Moving primary shard of " << dbname);
             auto scopedDistLock = grid.catalogManager()->getDistLockManager()->lock(
@@ -168,7 +168,7 @@ namespace {
             // Record start in changelog
             BSONObj moveStartDetails = _buildMoveEntry(dbname,
                                                        config->getPrimary().toString(),
-                                                       s.toString(),
+                                                       s->toString(),
                                                        shardedColls);
 
             grid.catalogManager()->logChange(txn, "movePrimary.start", dbname, moveStartDetails);
@@ -176,16 +176,17 @@ namespace {
             BSONArrayBuilder barr;
             barr.append(shardedColls);
 
-            ScopedDbConnection toconn(s.getConnString());
+            ScopedDbConnection toconn(s->getConnString());
 
             // TODO ERH - we need a clone command which replays operations from clone start to now
             //            can just use local.oplog.$main
             BSONObj cloneRes;
-            bool worked = toconn->runCommand(dbname.c_str(),
-                                             BSON("clone" << config->getPrimary().getConnString()
-                                               << "collsToIgnore" << barr.arr()
-                                               << bypassDocumentValidationCommandOption() << true),
-                                             cloneRes);
+            bool worked = toconn->runCommand(
+                            dbname.c_str(),
+                            BSON("clone" << config->getPrimary().getConnString().toString()
+                                         << "collsToIgnore" << barr.arr()
+                                         << bypassDocumentValidationCommandOption() << true),
+                            cloneRes);
             toconn.done();
 
             if (!worked) {
@@ -194,11 +195,11 @@ namespace {
                 return false;
             }
 
-            string oldPrimary = config->getPrimary().getConnString();
+            const string oldPrimary = config->getPrimary().getConnString().toString();
 
             ScopedDbConnection fromconn(config->getPrimary().getConnString());
 
-            config->setPrimary(s.getConnString());
+            config->setPrimary(s->getConnString().toString());
 
             if (shardedColls.empty()){
 
@@ -247,12 +248,12 @@ namespace {
 
             fromconn.done();
 
-            result << "primary " << s.toString();
+            result << "primary " << s->toString();
 
             // Record finish in changelog
             BSONObj moveFinishDetails = _buildMoveEntry(dbname,
                                                         oldPrimary,
-                                                        s.toString(),
+                                                        s->toString(),
                                                         shardedColls);
 
             grid.catalogManager()->logChange(txn, "movePrimary", dbname, moveFinishDetails);

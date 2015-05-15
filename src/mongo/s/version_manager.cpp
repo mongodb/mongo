@@ -36,6 +36,7 @@
 
 #include <boost/shared_ptr.hpp>
 
+#include "mongo/client/dbclient_rs.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/chunk_manager.h"
@@ -319,7 +320,7 @@ namespace mongo {
                                          << refVersion.toString()
                                          << " : " << refManager->getSequenceNumber() << ") "
                                          << "on shard " << shard.getName()
-                                         << " (" << shard.getAddress().toString() << ")");
+                                         << " (" << shard.getConnString().toString() << ")");
 
                 throw SendStaleConfigException(ns,
                                                msg,

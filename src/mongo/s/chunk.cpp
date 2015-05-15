@@ -480,8 +480,8 @@ namespace {
 
         BSONObjBuilder builder;
         builder.append("moveChunk", _manager->getns());
-        builder.append("from", from.getAddress().toString());
-        builder.append("to", to.getAddress().toString());
+        builder.append("from", from.getConnString().toString());
+        builder.append("to", to.getConnString().toString());
         // NEEDED FOR 2.0 COMPATIBILITY
         builder.append("fromShard", from.getName());
         builder.append("toShard", to.getName());

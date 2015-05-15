@@ -315,7 +315,7 @@ namespace {
     OperationContext* ReplicationCoordinatorExternalStateImpl::createOperationContext(
             const std::string& threadName) {
         Client::initThreadIfNotAlready(threadName.c_str());
-        return new OperationContextImpl;
+        return new OperationContextImpl();
     }
 
     void ReplicationCoordinatorExternalStateImpl::dropAllTempCollections(OperationContext* txn) {

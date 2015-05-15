@@ -108,7 +108,7 @@ namespace ShardingTests {
             // Since we've redirected the conns, the host doesn't matter here so long as it's
             // prefixed with a "$"
             _shard = Shard("shard0000",
-                           "$hostFooBar:27017",
+                           ConnectionString(HostAndPort("$hostFooBar:27017")),
                            0 /* maxSize */,
                            false /* draining */);
             // Need to run this to ensure the shard is in the global lookup table
@@ -116,7 +116,7 @@ namespace ShardingTests {
             // Add dummy shard to config DB
             _client.insert(ShardType::ConfigNS,
                            BSON(ShardType::name() << _shard.getName() <<
-                                ShardType::host() << _shard.getConnString()));
+                                ShardType::host() << _shard.getConnString().toString()));
 
             // Create an index so that diffing works correctly, otherwise no cursors from S&O
             ASSERT_OK(dbtests::createIndex(

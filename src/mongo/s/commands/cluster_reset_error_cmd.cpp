@@ -77,7 +77,7 @@ namespace {
 
                 const std::string shardName = *i;
 
-                ShardConnection conn(shardName, "");
+                ShardConnection conn(ConnectionString(shardName, ConnectionString::SET), "");
 
                 BSONObj res;
 

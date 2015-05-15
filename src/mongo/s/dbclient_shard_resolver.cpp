@@ -61,7 +61,7 @@ namespace mongo {
             return Status( ErrorCodes::ShardNotFound,
                            string("unknown shard name ") + shardName );
         }
-        return findMaster(shard.getConnString(), shardHost);
+        return findMaster(shard.getConnString().toString(), shardHost);
     }
 
     Status DBClientShardResolver::findMaster( const std::string connString,

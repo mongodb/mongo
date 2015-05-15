@@ -42,7 +42,9 @@ namespace mongo {
     
     class ShardConnection : public AScopedConnection {
     public:
-        ShardConnection(const std::string& addr, const std::string& ns, ChunkManagerPtr manager = ChunkManagerPtr());
+        ShardConnection(const ConnectionString& connectionString,
+                        const std::string& ns,
+                        boost::shared_ptr<ChunkManager> manager = nullptr);
 
         ~ShardConnection();
 
@@ -77,14 +79,14 @@ namespace mongo {
         }
 
         std::string getHost() const {
-            return _addr;
+            return _cs.toString();
         }
 
         std::string getNS() const {
             return _ns;
         }
 
-        ChunkManagerPtr getManager() const {
+        boost::shared_ptr<ChunkManager> getManager() const {
             return _manager;
         }
 
@@ -126,9 +128,10 @@ namespace mongo {
         void _init();
         void _finishInit();
 
-        std::string _addr;
-        std::string _ns;
-        ChunkManagerPtr _manager;
+        const ConnectionString _cs;
+        const std::string _ns;
+
+        boost::shared_ptr<ChunkManager> _manager;
 
         bool _finishedInit;
 

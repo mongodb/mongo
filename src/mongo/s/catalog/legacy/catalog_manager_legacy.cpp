@@ -983,7 +983,8 @@ namespace {
                     conn.done();
                     continue;
                 }
-                errors[shard.getConnString()] = info;
+
+                errors[shard.getConnString().toString()] = info;
             }
 
             conn.done();

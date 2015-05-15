@@ -194,8 +194,7 @@ namespace {
 
             // Run merging command on primary shard of database. Need to use ShardConnection so
             // that the merging mongod is sent the config servers on connection init.
-            const string mergeServer = conf->getPrimary().getConnString();
-            ShardConnection conn(mergeServer, outputNsOrEmpty);
+            ShardConnection conn(conf->getPrimary().getConnString(), outputNsOrEmpty);
             BSONObj mergedResults = aggRunCommand(conn.get(),
                                                   dbname,
                                                   mergeCmd.freeze().toBson(),

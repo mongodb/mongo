@@ -84,7 +84,7 @@ namespace mongo {
         // TODO: Future is deprecated, replace with commandOp()
         std::list< boost::shared_ptr<Future::CommandResult> > futures;
         for (std::set<Shard>::const_iterator i=shards.begin(), end=shards.end() ; i != end ; i++) {
-            futures.push_back( Future::spawnCommand( i->getConnString(),
+            futures.push_back( Future::spawnCommand( i->getConnString().toString(),
                                                      dbName,
                                                      cmdObj,
                                                      0,

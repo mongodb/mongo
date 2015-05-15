@@ -38,11 +38,15 @@
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
+
+    class OperationContext;
+
 namespace repl {
 
-    extern const BSONObj reverseNaturalObj; // {"$natural": -1 }
-
     class ReplicationCoordinator;
+
+    // {"$natural": -1 }
+    extern const BSONObj reverseNaturalObj;
 
     /**
      * Authenticates conn using the server's cluster-membership credentials.

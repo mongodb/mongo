@@ -114,7 +114,7 @@ namespace {
                 size_t newConnsToCreate) {
             vector<ShardConnection*> newConnList;
             for (size_t x = 0; x < newConnsToCreate; x++) {
-                ShardConnection* newConn = new ShardConnection(TARGET_HOST, "test.user");
+                ShardConnection* newConn = new ShardConnection(ConnectionString(HostAndPort(TARGET_HOST)), "test.user");
                 checkFunc(newConn->get()->getSockCreationMicroSec(), arg2);
                 newConnList.push_back(newConn);
             }
@@ -131,7 +131,7 @@ namespace {
 
             // Check that connections created after the purge was put back to the pool.
             for (size_t x = 0; x < newConnsToCreate; x++) {
-                ShardConnection* newConn = new ShardConnection(TARGET_HOST, "test.user");
+                ShardConnection* newConn = new ShardConnection(ConnectionString(HostAndPort(TARGET_HOST)), "test.user");
                 ASSERT_LESS_THAN(newConn->get()->getSockCreationMicroSec(), oldCreationTime);
                 newConnList.push_back(newConn);
             }
@@ -149,13 +149,13 @@ namespace {
     };
 
     TEST_F(ShardConnFixture, BasicShardConnection) {
-        ShardConnection conn1(TARGET_HOST, "test.user");
-        ShardConnection conn2(TARGET_HOST, "test.user");
+        ShardConnection conn1(ConnectionString(HostAndPort(TARGET_HOST)), "test.user");
+        ShardConnection conn2(ConnectionString(HostAndPort(TARGET_HOST)), "test.user");
 
         DBClientBase* conn1Ptr = conn1.get();
         conn1.done();
 
-        ShardConnection conn3(TARGET_HOST, "test.user");
+        ShardConnection conn3(ConnectionString(HostAndPort(TARGET_HOST)), "test.user");
         ASSERT_EQUALS(conn1Ptr, conn3.get());
 
         conn2.done();
@@ -163,9 +163,9 @@ namespace {
     }
 
     TEST_F(ShardConnFixture, InvalidateBadConnInPool) {
-        ShardConnection conn1(TARGET_HOST, "test.user");
-        ShardConnection conn2(TARGET_HOST, "test.user");
-        ShardConnection conn3(TARGET_HOST, "test.user");
+        ShardConnection conn1(ConnectionString(HostAndPort(TARGET_HOST)), "test.user");
+        ShardConnection conn2(ConnectionString(HostAndPort(TARGET_HOST)), "test.user");
+        ShardConnection conn3(ConnectionString(HostAndPort(TARGET_HOST)), "test.user");
 
         conn1.done();
         conn3.done();
@@ -186,9 +186,9 @@ namespace {
     }
 
     TEST_F(ShardConnFixture, DontReturnKnownBadConnToPool) {
-        ShardConnection conn1(TARGET_HOST, "test.user");
-        ShardConnection conn2(TARGET_HOST, "test.user");
-        ShardConnection conn3(TARGET_HOST, "test.user");
+        ShardConnection conn1(ConnectionString(HostAndPort(TARGET_HOST)), "test.user");
+        ShardConnection conn2(ConnectionString(HostAndPort(TARGET_HOST)), "test.user");
+        ShardConnection conn3(ConnectionString(HostAndPort(TARGET_HOST)), "test.user");
 
         conn1.done();
         killServer();
@@ -210,9 +210,9 @@ namespace {
     }
 
     TEST_F(ShardConnFixture, BadConnClearsPoolWhenKilled) {
-        ShardConnection conn1(TARGET_HOST, "test.user");
-        ShardConnection conn2(TARGET_HOST, "test.user");
-        ShardConnection conn3(TARGET_HOST, "test.user");
+        ShardConnection conn1(ConnectionString(HostAndPort(TARGET_HOST)), "test.user");
+        ShardConnection conn2(ConnectionString(HostAndPort(TARGET_HOST)), "test.user");
+        ShardConnection conn3(ConnectionString(HostAndPort(TARGET_HOST)), "test.user");
 
         conn1.done();
         killServer();
@@ -234,9 +234,9 @@ namespace {
     }
 
     TEST_F(ShardConnFixture, KilledGoodConnShouldNotClearPool) {
-        ShardConnection conn1(TARGET_HOST, "test.user");
-        ShardConnection conn2(TARGET_HOST, "test.user");
-        ShardConnection conn3(TARGET_HOST, "test.user");
+        ShardConnection conn1(ConnectionString(HostAndPort(TARGET_HOST)), "test.user");
+        ShardConnection conn2(ConnectionString(HostAndPort(TARGET_HOST)), "test.user");
+        ShardConnection conn3(ConnectionString(HostAndPort(TARGET_HOST)), "test.user");
 
         const uint64_t upperBoundCreationTime =
                 conn3.get()->getSockCreationMicroSec();
@@ -247,8 +247,8 @@ namespace {
 
         conn2.done();
 
-        ShardConnection conn4(TARGET_HOST, "test.user");
-        ShardConnection conn5(TARGET_HOST, "test.user");
+        ShardConnection conn4(ConnectionString(HostAndPort(TARGET_HOST)), "test.user");
+        ShardConnection conn5(ConnectionString(HostAndPort(TARGET_HOST)), "test.user");
 
         ASSERT_GREATER_THAN(conn4.get()->getSockCreationMicroSec(), badCreationTime);
         ASSERT_LESS_THAN_OR_EQUALS(conn4.get()->getSockCreationMicroSec(),
@@ -264,9 +264,9 @@ namespace {
     TEST_F(ShardConnFixture, InvalidateBadConnEvenWhenPoolIsFull) {
         mongo::shardConnectionPool.setMaxPoolSize(2);
 
-        ShardConnection conn1(TARGET_HOST, "test.user");
-        ShardConnection conn2(TARGET_HOST, "test.user");
-        ShardConnection conn3(TARGET_HOST, "test.user");
+        ShardConnection conn1(ConnectionString(HostAndPort(TARGET_HOST)), "test.user");
+        ShardConnection conn2(ConnectionString(HostAndPort(TARGET_HOST)), "test.user");
+        ShardConnection conn3(ConnectionString(HostAndPort(TARGET_HOST)), "test.user");
 
         conn1.done();
         conn3.done();
@@ -287,13 +287,13 @@ namespace {
     }
 
     TEST_F(ShardConnFixture, DontReturnConnGoneBadToPool) {
-        ShardConnection conn1(TARGET_HOST, "test.user");
+        ShardConnection conn1(ConnectionString(HostAndPort(TARGET_HOST)), "test.user");
         const uint64_t conn1CreationTime = conn1.get()->getSockCreationMicroSec();
 
         uint64_t conn2CreationTime = 0;
 
         {
-            ShardConnection conn2(TARGET_HOST, "test.user");
+            ShardConnection conn2(ConnectionString(HostAndPort(TARGET_HOST)), "test.user");
             conn2CreationTime = conn2.get()->getSockCreationMicroSec();
 
             conn1.done();
@@ -304,7 +304,7 @@ namespace {
         // also not invalidate older connections since it didn't encounter
         // a socket exception.
 
-        ShardConnection conn1Again(TARGET_HOST, "test.user");
+        ShardConnection conn1Again(ConnectionString(HostAndPort(TARGET_HOST)), "test.user");
         ASSERT_EQUALS(conn1CreationTime, conn1Again.get()->getSockCreationMicroSec());
 
         checkNewConns(assertNotEqual, conn2CreationTime, 10);

@@ -59,7 +59,7 @@ namespace mongo {
             for( unsigned i = 1; i < mySplitPoints.size(); ++i ) {
                 string name = str::stream() << (i-1);
                 Shard shard(name,
-                            name,
+                            ConnectionString(HostAndPort(name)),
                             0 /* maxSize */,
                             false /* draining */);
                 shards.insert( shard );

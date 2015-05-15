@@ -1304,7 +1304,7 @@ namespace mongo {
 
                 BSONObjBuilder recvChunkStartBuilder;
                 recvChunkStartBuilder.append("_recvChunkStart", ns);
-                recvChunkStartBuilder.append("from", fromShard.getConnString());
+                recvChunkStartBuilder.append("from", fromShard.getConnString().toString());
                 recvChunkStartBuilder.append("fromShardName", fromShard.getName());
                 recvChunkStartBuilder.append("toShardName", toShard.getName());
                 recvChunkStartBuilder.append("min", min);
@@ -1369,7 +1369,7 @@ namespace mongo {
                 conn.done();
 
                 if ( res["ns"].str() != ns ||
-                        res["from"].str() != fromShard.getConnString() ||
+                        res["from"].str() != fromShard.getConnString().toString() ||
                         !res["min"].isABSONObj() ||
                         res["min"].Obj().woCompare(min) != 0 ||
                         !res["max"].isABSONObj() ||
@@ -1490,9 +1490,9 @@ namespace mongo {
                 }
                 catch ( DBException& e ) {
                     errmsg = str::stream() << "moveChunk could not contact to: shard "
-                                           << toShard.getConnString() << " to commit transfer"
-                                           << causedBy( e );
-                    warning() << errmsg << endl;
+                                           << toShard.getConnString().toString()
+                                           << " to commit transfer" << causedBy(e);
+                    warning() << errmsg;
                     ok = false;
                 }
 

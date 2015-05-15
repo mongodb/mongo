@@ -656,11 +656,7 @@ namespace mongo {
 
     const std::string& ConfigServer::modelServer() const {
         uassert(10190, "ConfigServer not setup", _primary.ok());
-        return _primary.getConnString();
-    }
-
-    ConnectionString ConfigServer::getConnectionString() const {
-        return _primary.getAddress();
+        return _primary.getConnString().toString();
     }
 
     bool ConfigServer::init( const ConnectionString& configCS ) {
