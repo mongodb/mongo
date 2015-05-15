@@ -58,7 +58,6 @@ namespace {
         virtual ~DefaultDiffAdapter() {}
 
         virtual bool isTracked(const ChunkType& chunk) const { return true; }
-        virtual BSONObj maxFrom(const BSONObj& max) const { return max; }
 
         virtual pair<BSONObj,BSONObj> rangeFor(const ChunkType& chunk) const {
             return make_pair(chunk.getMin(), chunk.getMax());

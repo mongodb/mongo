@@ -59,17 +59,10 @@ namespace mongo {
      */
     class SCMConfigDiffTracker : public ConfigDiffTracker<BSONObj, string> {
     public:
-        SCMConfigDiffTracker( const string& currShard ) :
-                _currShard( currShard )
-        {
-        }
+        SCMConfigDiffTracker(const string& currShard) : _currShard( currShard ) { }
 
         virtual bool isTracked(const ChunkType& chunk) const {
             return chunk.getShard() == _currShard;
-        }
-
-        virtual BSONObj maxFrom( const BSONObj& val ) const {
-            return val;
         }
 
         virtual pair<BSONObj, BSONObj> rangeFor(const ChunkType& chunk) const {
@@ -199,11 +192,9 @@ namespace mongo {
             //
             int diffsApplied = differ.calculateConfigDiff(chunks);
             if ( diffsApplied > 0 ) {
-
                 // Chunks found, return ok
-
                 LOG(2) << "loaded " << diffsApplied << " chunks into new metadata for " << ns
-                           << " with version " << metadata->_collVersion << endl;
+                       << " with version " << metadata->_collVersion;
 
                 metadata->_shardVersion = versionMap[shard];
                 metadata->fillRanges();
@@ -233,31 +224,25 @@ namespace mongo {
                                     Status( ErrorCodes::RemoteChangeDetected, errMsg );
             }
             else {
-
                 // Invalid chunks found, our epoch may have changed because we dropped/recreated
                 // the collection.
-
-                string errMsg = // br
-                        str::stream() << "invalid chunks found when reloading " << ns
-                                      << ", previous version was "
-                                      << metadata->_collVersion.toString()
-                                      << ", this should be rare";
-
-                warning() << errMsg << endl;
+                string errMsg = str::stream() << "invalid chunks found when reloading " << ns
+                                              << ", previous version was "
+                                              << metadata->_collVersion.toString()
+                                              << ", this should be rare";
+                warning() << errMsg;
 
                 metadata->_collVersion = ChunkVersion( 0, 0, OID() );
                 metadata->_chunksMap.clear();
 
-                return Status( ErrorCodes::RemoteChangeDetected, errMsg );
+                return Status(ErrorCodes::RemoteChangeDetected, errMsg);
             }
         }
-        catch ( const DBException& e ) {
-            string errMsg = str::stream() << "problem querying chunks metadata" << causedBy( e );
-
-            // We deliberately do not return connPtr to the pool, since it was involved
-            // with the error here.
-
-            return Status( ErrorCodes::HostUnreachable, errMsg );
+        catch (const DBException& e) {
+            // We deliberately do not return connPtr to the pool, since it was involved with the
+            // error here.
+            return Status(ErrorCodes::HostUnreachable,
+                          str::stream() << "problem querying chunks metadata" << causedBy(e));
         }
     }
 

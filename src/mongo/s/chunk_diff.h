@@ -1,42 +1,42 @@
-// @file chunk_diff.h
-
 /**
-*    Copyright (C) 2008 10gen Inc.
-*
-*    This program is free software: you can redistribute it and/or  modify
-*    it under the terms of the GNU Affero General Public License, version 3,
-*    as published by the Free Software Foundation.
-*
-*    This program is distributed in the hope that it will be useful,
-*    but WITHOUT ANY WARRANTY; without even the implied warranty of
-*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-*    GNU Affero General Public License for more details.
-*
-*    You should have received a copy of the GNU Affero General Public License
-*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*
-*    As a special exception, the copyright holders give permission to link the
-*    code of portions of this program with the OpenSSL library under certain
-*    conditions as described in each individual source file and distribute
-*    linked combinations including the program with the OpenSSL library. You
-*    must comply with the GNU Affero General Public License in all respects
-*    for all of the code used other than as permitted herein. If you modify
-*    file(s) with this exception, you may extend this exception to your
-*    version of the file(s), but you are not obligated to do so. If you do not
-*    wish to do so, delete this exception statement from your version. If you
-*    delete this exception statement from all source files in the program,
-*    then also delete it in the license file.
-*/
+ *    Copyright (C) 2008-2015 MongoDB Inc.
+ *
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
+ *
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
+ */
 
 #pragma once
 
+#include <string>
+
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/s/chunk.h"
-#include "mongo/s/chunk_version.h"
 
 namespace mongo {
 
     class ChunkType;
+    struct ChunkVersion;
     class CatalogManager;
     class Query;
 
@@ -50,24 +50,25 @@ namespace mongo {
      * mongod, but the actual chunk maps used differ in implementation.  We don't want to copy the
      * implementation, because the logic is identical, or the chunk data, because that would be
      * slow for big clusters, so this is the alternative for now.
+     *
      * TODO: Standardize between mongos and mongod and convert template parameters to types.
      */
-    template < class ValType, class ShardType >
+    template <class ValType, class ShardType>
     class ConfigDiffTracker {
     public:
-
-        //
-        // Useful composite types
-        //
-
-        // RangeMap stores ranges indexed by max or  min key
+        // Stores ranges indexed by max or  min key
         typedef typename std::map<BSONObj, ValType, BSONObjCmp> RangeMap;
 
-        // RangeOverlap is a pair of iterators defining a subset of ranges
-        typedef typename std::pair< typename RangeMap::iterator, typename RangeMap::iterator> RangeOverlap;
+        // Pair of iterators defining a subset of ranges
+        typedef typename std::pair<typename RangeMap::iterator,
+                                   typename RangeMap::iterator> RangeOverlap;
 
-        ConfigDiffTracker() { detach(); }
-        virtual ~ConfigDiffTracker() {}
+        // Map of shard identifiers to the maximum chunk version on that shard
+        typedef typename std::map<ShardType, ChunkVersion> MaxChunkVersionMap;
+
+
+        ConfigDiffTracker();
+        virtual ~ConfigDiffTracker();
 
         /**
          * The tracker attaches to a set of ranges with versions, and uses a config server
@@ -77,70 +78,22 @@ namespace mongo {
          *
          * TODO: Make a standard VersionedRange to encapsulate this info in both mongod and mongos?
          */
-        void attach( const std::string& ns,
-                     RangeMap& currMap,
-                     ChunkVersion& maxVersion,
-                     std::map<ShardType, ChunkVersion>& maxShardVersions )
-        {
-            _ns = ns;
-            _currMap = &currMap;
-            _maxVersion = &maxVersion;
-            _maxShardVersions = &maxShardVersions;
-            _validDiffs = 0;
-        }
-
-        void detach(){
-            _ns = "";
-            _currMap = NULL;
-            _maxVersion = NULL;
-            _maxShardVersions = NULL;
-            _validDiffs = 0;
-        }
-
-        void verifyAttached() const { verify( _currMap ); verify( _maxVersion ); verify( _maxShardVersions ); }
+        void attach(const std::string& ns,
+                    RangeMap& currMap,
+                    ChunkVersion& maxVersion,
+                    MaxChunkVersionMap& maxShardVersions);
 
         // Call after load for more information
         int numValidDiffs() const { return _validDiffs; }
 
-    protected:
-
-        //
-        // To be implemented by subclasses
-        //
-
-        // Determines which chunks are actually being remembered by our RangeMap
-        virtual bool isTracked(const ChunkType& chunk) const = 0;
-
-        // Whether or not our RangeMap uses min or max keys
-        virtual bool isMinKeyIndexed() const { return true; }
-
-        ///
-        /// Start adapter functions
-        /// TODO: Remove these when able
-        ///
-
-        // If we're indexing on the min of the chunk bound, implement maxFrom (default)
-        virtual BSONObj maxFrom( const ValType& max ) const { verify( false ); return BSONObj(); }
-        // If we're indexing on the max of the chunk bound, implement minFrom
-        virtual BSONObj minFrom( const ValType& max ) const { verify( false ); return BSONObj(); }
-
-        virtual std::pair<BSONObj,ValType> rangeFor(const ChunkType& chunk) const = 0;
-        virtual ShardType shardFor( const std::string& name ) const = 0;
-
-        ///
-        /// End adapter functions
-        ///
-
-    public:
-
         // Whether or not a range exists in the min/max region
-        bool isOverlapping( const BSONObj& min, const BSONObj& max );
+        bool isOverlapping(const BSONObj& min, const BSONObj& max);
 
         // Removes all ranges in the region from min/max
-        void removeOverlapping( const BSONObj& min, const BSONObj& max );
+        void removeOverlapping(const BSONObj& min, const BSONObj& max);
 
         // Returns a subset of ranges overlapping the region min/max
-        RangeOverlap overlappingRange( const BSONObj& min, const BSONObj& max );
+        RangeOverlap overlappingRange(const BSONObj& min, const BSONObj& max);
 
         // Finds and applies the changes to a collection from the config servers via
         // the catalog manager.
@@ -159,20 +112,27 @@ namespace mongo {
         // Needed only if a custom connection is required to the config server
         Query configDiffQuery() const;
 
+    protected:
+        // Determines which chunks are actually being remembered by our RangeMap
+        virtual bool isTracked(const ChunkType& chunk) const = 0;
+
+        // Whether or not our RangeMap uses min or max keys
+        virtual bool isMinKeyIndexed() const { return true; }
+
+        virtual std::pair<BSONObj, ValType> rangeFor(const ChunkType& chunk) const = 0;
+
+        virtual ShardType shardFor(const std::string& name) const = 0;
+
     private:
+        void _assertAttached() const;
 
         std::string _ns;
         RangeMap* _currMap;
         ChunkVersion* _maxVersion;
-        std::map<ShardType, ChunkVersion>* _maxShardVersions;
+        MaxChunkVersionMap* _maxShardVersions;
 
         // Store for later use
         int _validDiffs;
-
     };
 
 } // namespace mongo
-
-// Include template definition
-#include "chunk_diff-inl.h"
-

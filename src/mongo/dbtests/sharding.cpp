@@ -317,12 +317,10 @@ namespace ShardingTests {
         // The default pass-through adapter for using config diffs
         class DefaultDiffAdapter : public ConfigDiffTracker<BSONObj,string> {
         public:
-
             DefaultDiffAdapter() {}
             virtual ~DefaultDiffAdapter() {}
 
             virtual bool isTracked(const ChunkType& chunk) const { return true; }
-            virtual BSONObj maxFrom( const BSONObj& max ) const { return max; }
 
             virtual pair<BSONObj,BSONObj> rangeFor(const ChunkType& chunk) const {
                 return make_pair(chunk.getMin(), chunk.getMax());
@@ -334,13 +332,8 @@ namespace ShardingTests {
         // Inverts the storage order for chunks from min to max
         class InverseDiffAdapter : public DefaultDiffAdapter {
         public:
-
             InverseDiffAdapter() {}
             virtual ~InverseDiffAdapter() {}
-
-            // Disable
-            virtual BSONObj maxFrom( const BSONObj& max ) const { ASSERT( false ); return max; }
-            virtual BSONObj minFrom( const BSONObj& min ) const { return min; }
 
             virtual bool isMinKeyIndexed() const { return false; }
 

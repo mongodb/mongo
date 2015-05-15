@@ -239,6 +239,7 @@ env.Library(
         # This is only here temporarily for auto-split logic in chunk.cpp.
         'balancer_policy.cpp',
         'chunk.cpp',
+        'chunk_diff.cpp',
         'chunk_manager.cpp',
         'config.cpp',
         'grid.cpp',

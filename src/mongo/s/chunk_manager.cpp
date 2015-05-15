@@ -41,7 +41,9 @@
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/catalog_manager.h"
+#include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
+#include "mongo/s/chunk.h"
 #include "mongo/s/chunk_diff.h"
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/config.h"
@@ -69,7 +71,7 @@ namespace {
      *
      * The mongos adapter here tracks all shards, and stores ranges by (max, Chunk) in the map.
      */
-    class CMConfigDiffTracker : public ConfigDiffTracker<ChunkPtr, std::string> {
+    class CMConfigDiffTracker : public ConfigDiffTracker<shared_ptr<const Chunk>, std::string> {
     public:
         CMConfigDiffTracker( ChunkManager* manager ) : _manager( manager ) { }
 
@@ -78,14 +80,10 @@ namespace {
             return true;
         }
 
-        virtual BSONObj minFrom( const ChunkPtr& val ) const {
-            return val.get()->getMin();
-        }
-
         virtual bool isMinKeyIndexed() const { return false; }
 
-        virtual pair<BSONObj,ChunkPtr> rangeFor(const ChunkType& chunk) const {
-            ChunkPtr c(new Chunk(_manager, chunk.toBSON()));
+        virtual pair<BSONObj, ChunkPtr> rangeFor(const ChunkType& chunk) const {
+            shared_ptr<Chunk> c(new Chunk(_manager, chunk.toBSON()));
             return make_pair(chunk.getMax(), c);
         }
 
@@ -95,7 +93,7 @@ namespace {
         }
 
     private:
-        ChunkManager* _manager;
+        ChunkManager* const _manager;
     };
 
 
