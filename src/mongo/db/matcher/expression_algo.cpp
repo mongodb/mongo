@@ -32,6 +32,7 @@
 
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
+#include "mongo/db/matcher/expression_tree.h"
 
 namespace mongo {
 namespace {
@@ -65,7 +66,8 @@ namespace {
      * 'rhs', i.e. a document matched by 'lhs' must also be matched by 'rhs', and false otherwise.
      */
     bool _isSubsetOf(const ComparisonMatchExpression* lhs, const ComparisonMatchExpression* rhs) {
-        // An expression can only be a subset of another if they are comparing the same field.
+        // An expression can only match a subset of the documents matched by another if they are
+        // comparing the same field.
         if (lhs->path() != rhs->path()) {
             return false;
         }
@@ -129,13 +131,11 @@ namespace {
      * 'rhs', i.e. a document matched by 'lhs' must also be matched by 'rhs', and false otherwise.
      */
     bool _isSubsetOf(const MatchExpression* lhs, const ExistsMatchExpression* rhs) {
-        // An expression can only be a subset of another if they are comparing the same field.
-        if (lhs->path() != rhs->path()) {
+        // An expression can only match a subset of the documents matched by another if they are
+        // comparing the same field. Defer checking the path for $not expressions until the
+        // subexpression is examined.
+        if (lhs->matchType() != MatchExpression::NOT && lhs->path() != rhs->path()) {
             return false;
-        }
-
-        if (lhs->matchType() == MatchExpression::TYPE_OPERATOR) {
-            return true;
         }
 
         if (isComparisonMatchExpression(lhs)) {
@@ -146,8 +146,44 @@ namespace {
             return cme->getData().type() != jstNULL;
         }
 
-        // TODO: Add support for using $exists with other query operators.
-        return false;
+        switch (lhs->matchType()) {
+        case MatchExpression::ELEM_MATCH_VALUE:
+        case MatchExpression::ELEM_MATCH_OBJECT:
+        case MatchExpression::EXISTS:
+        case MatchExpression::GEO:
+        case MatchExpression::MOD:
+        case MatchExpression::REGEX:
+        case MatchExpression::SIZE:
+        case MatchExpression::TYPE_OPERATOR:
+            return true;
+        case MatchExpression::MATCH_IN: {
+            const InMatchExpression* ime = static_cast<const InMatchExpression*>(lhs);
+            return !ime->getData().hasNull();
+        }
+        case MatchExpression::NOT:
+            // An expression can only match a subset of the documents matched by another if they are
+            // comparing the same field.
+            if (lhs->getChild(0)->path() != rhs->path()) {
+                return false;
+            }
+
+            switch (lhs->getChild(0)->matchType()) {
+            case MatchExpression::EQ: {
+                const ComparisonMatchExpression* cme =
+                    static_cast<const ComparisonMatchExpression*>(lhs->getChild(0));
+                return cme->getData().type() == jstNULL;
+            }
+            case MatchExpression::MATCH_IN: {
+                const InMatchExpression* ime =
+                    static_cast<const InMatchExpression*>(lhs->getChild(0));
+                return ime->getData().hasNull();
+            }
+            default:
+                return false;
+            }
+        default:
+            return false;
+        }
     }
 
 }  // namespace
@@ -163,7 +199,7 @@ namespace expression {
         }
 
         if (rhs->matchType() == MatchExpression::AND) {
-            // 'lhs' must be a subset of each clause of 'rhs'.
+            // 'lhs' must match a subset of the documents matched by each clause of 'rhs'.
             for (size_t i = 0; i < rhs->numChildren(); i++) {
                 if (!isSubsetOf(lhs, rhs->getChild(i))) {
                     return false;
@@ -173,7 +209,7 @@ namespace expression {
         }
 
         if (lhs->matchType() == MatchExpression::AND) {
-            // At least one clause of 'lhs' must be a subset of 'rhs'.
+            // At least one clause of 'lhs' must match a subset of the documents matched by 'rhs'.
             for (size_t i = 0; i < lhs->numChildren(); i++) {
                 if (isSubsetOf(lhs->getChild(i), rhs)) {
                     return true;

@@ -323,4 +323,104 @@ namespace mongo {
         ASSERT_FALSE(expression::isSubsetOf(bType2.get(), aExists.get()));
     }
 
+    TEST(ExpressionAlgoIsSubsetOf, AllAndExists) {
+        ParsedMatchExpression aExists("{a: {$exists: true}}");
+        ParsedMatchExpression aAll("{a: {$all: ['x', 'y', 'z']}}");
+        ParsedMatchExpression bAll("{b: {$all: ['x', 'y', 'z']}}");
+        ParsedMatchExpression aAllWithNull("{a: {$all: ['x', null, 'z']}}");
+
+        ASSERT_TRUE(expression::isSubsetOf(aAll.get(), aExists.get()));
+        ASSERT_FALSE(expression::isSubsetOf(bAll.get(), aExists.get()));
+        ASSERT_TRUE(expression::isSubsetOf(aAllWithNull.get(), aExists.get()));
+    }
+
+    TEST(ExpressionAlgoIsSubsetOf, ElemMatchAndExists_Value) {
+        ParsedMatchExpression aExists("{a: {$exists: true}}");
+        ParsedMatchExpression aElemMatch("{a: {$elemMatch: {$gt: 5, $lte: 10}}}");
+        ParsedMatchExpression bElemMatch("{b: {$elemMatch: {$gt: 5, $lte: 10}}}");
+        ParsedMatchExpression aElemMatchNull("{a: {$elemMatch: {$eq: null}}}");
+
+        ASSERT_TRUE(expression::isSubsetOf(aElemMatch.get(), aExists.get()));
+        ASSERT_FALSE(expression::isSubsetOf(aExists.get(), aElemMatch.get()));
+        ASSERT_FALSE(expression::isSubsetOf(bElemMatch.get(), aExists.get()));
+        ASSERT_TRUE(expression::isSubsetOf(aElemMatchNull.get(), aExists.get()));
+    }
+
+    TEST(ExpressionAlgoIsSubsetOf, ElemMatchAndExists_Object) {
+        ParsedMatchExpression aExists("{a: {$exists: true}}");
+        ParsedMatchExpression aElemMatch("{a: {$elemMatch: {x: {$gt: 5}, y: {$lte: 10}}}}");
+        ParsedMatchExpression bElemMatch("{b: {$elemMatch: {x: {$gt: 5}, y: {$lte: 10}}}}");
+        ParsedMatchExpression aElemMatchNull("{a: {$elemMatch: {x: null, y: null}}}");
+
+        ASSERT_TRUE(expression::isSubsetOf(aElemMatch.get(), aExists.get()));
+        ASSERT_FALSE(expression::isSubsetOf(aExists.get(), aElemMatch.get()));
+        ASSERT_FALSE(expression::isSubsetOf(bElemMatch.get(), aExists.get()));
+        ASSERT_TRUE(expression::isSubsetOf(aElemMatchNull.get(), aExists.get()));
+    }
+
+    TEST(ExpressionAlgoIsSubsetOf, SizeAndExists) {
+        ParsedMatchExpression aExists("{a: {$exists: true}}");
+        ParsedMatchExpression aSize0("{a: {$size: 0}}");
+        ParsedMatchExpression aSize1("{a: {$size: 1}}");
+        ParsedMatchExpression aSize3("{a: {$size: 3}}");
+        ParsedMatchExpression bSize3("{b: {$size: 3}}");
+
+        ASSERT_TRUE(expression::isSubsetOf(aSize0.get(), aExists.get()));
+        ASSERT_TRUE(expression::isSubsetOf(aSize1.get(), aExists.get()));
+        ASSERT_TRUE(expression::isSubsetOf(aSize3.get(), aExists.get()));
+        ASSERT_FALSE(expression::isSubsetOf(aExists.get(), aSize3.get()));
+        ASSERT_FALSE(expression::isSubsetOf(bSize3.get(), aExists.get()));
+    }
+
+    TEST(ExpressionAlgoIsSubsetOf, ModAndExists) {
+        ParsedMatchExpression aExists("{a: {$exists: true}}");
+        ParsedMatchExpression aMod5("{a: {$mod: [5, 0]}}");
+        ParsedMatchExpression bMod5("{b: {$mod: [5, 0]}}");
+
+        ASSERT_TRUE(expression::isSubsetOf(aMod5.get(), aExists.get()));
+        ASSERT_FALSE(expression::isSubsetOf(bMod5.get(), aExists.get()));
+    }
+
+    TEST(ExpressionAlgoIsSubsetOf, RegexAndExists) {
+        ParsedMatchExpression aExists("{a: {$exists: true}}");
+        ParsedMatchExpression aRegex("{a: {$regex: 'pattern'}}");
+        ParsedMatchExpression bRegex("{b: {$regex: 'pattern'}}");
+
+        ASSERT_TRUE(expression::isSubsetOf(aRegex.get(), aExists.get()));
+        ASSERT_FALSE(expression::isSubsetOf(bRegex.get(), aExists.get()));
+    }
+
+    TEST(ExpressionAlgoIsSubsetOf, InAndExists) {
+        ParsedMatchExpression aExists("{a: {$exists: true}}");
+        ParsedMatchExpression aIn("{a: {$in: [1, 2, 3]}}");
+        ParsedMatchExpression bIn("{b: {$in: [1, 2, 3]}}");
+        ParsedMatchExpression aInWithNull("{a: {$in: [1, null, 3]}}");
+
+        ASSERT_TRUE(expression::isSubsetOf(aIn.get(), aExists.get()));
+        ASSERT_FALSE(expression::isSubsetOf(bIn.get(), aExists.get()));
+        ASSERT_FALSE(expression::isSubsetOf(aInWithNull.get(), aExists.get()));
+    }
+
+    TEST(ExpressionAlgoIsSubsetOf, NinAndExists) {
+        ParsedMatchExpression aExists("{a: {$exists: true}}");
+        ParsedMatchExpression aNin("{a: {$nin: [1, 2, 3]}}");
+        ParsedMatchExpression bNin("{b: {$nin: [1, 2, 3]}}");
+        ParsedMatchExpression aNinWithNull("{a: {$nin: [1, null, 3]}}");
+
+        ASSERT_FALSE(expression::isSubsetOf(aNin.get(), aExists.get()));
+        ASSERT_FALSE(expression::isSubsetOf(bNin.get(), aExists.get()));
+        ASSERT_TRUE(expression::isSubsetOf(aNinWithNull.get(), aExists.get()));
+    }
+
+    TEST(ExpressionAlgoIsSubsetOf, Compare_Exists_NE) {
+        ParsedMatchExpression aExists("{a: {$exists: true}}");
+        ParsedMatchExpression aNotEqual1("{a: {$ne: 1}}");
+        ParsedMatchExpression bNotEqual1("{b: {$ne: 1}}");
+        ParsedMatchExpression aNotEqualNull("{a: {$ne: null}}");
+
+        ASSERT_FALSE(expression::isSubsetOf(aNotEqual1.get(), aExists.get()));
+        ASSERT_FALSE(expression::isSubsetOf(bNotEqual1.get(), aExists.get()));
+        ASSERT_TRUE(expression::isSubsetOf(aNotEqualNull.get(), aExists.get()));
+    }
+
 }  // namespace mongo
