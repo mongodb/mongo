@@ -64,6 +64,21 @@ static const char *compressor(uint32_t compress_flag) {
 	}
 }
 
+static const char *encryptor(uint32_t encrypt_flag) {
+	/* Configure encryption. */
+	switch (encrypt_flag) {
+	case ENCRYPT_NONE:
+		return ("none");
+		break;
+	case ENCRYPT_ROTN_7:
+		return ("rotn,keyid=7");
+		break;
+	default:
+		die(EINVAL, "illegal encryption flag: 0x%x", encrypt_flag);
+		break;
+	}
+}
+
 static int
 handle_message(WT_EVENT_HANDLER *handler,
     WT_SESSION *session, const char *message)
@@ -155,6 +170,11 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 		    g.c_logging_prealloc ? 1 : 0,
 		    compressor(g.c_logging_compression_flag));
 
+	if (g.c_encryption)
+		p += snprintf(p, REMAIN(p, end),
+		    ",encryption=(name=%s)",
+		    encryptor(g.c_encryption_flag));
+
 	/* Miscellaneous. */
 #ifndef _WIN32
 	p += snprintf(p, REMAIN(p, end), ",buffer_alignment=512");
@@ -185,13 +205,14 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 	/* Extensions. */
 	p += snprintf(p, REMAIN(p, end),
 	    ",extensions=["
-	    "\"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],",
+	    "\"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],",
 	    g.c_reverse ? REVERSE_PATH : "",
 	    access(BZIP_PATH, R_OK) == 0 ? BZIP_PATH : "",
 	    access(LZ4_PATH, R_OK) == 0 ? LZ4_PATH : "",
 	    access(LZO_PATH, R_OK) == 0 ? LZO_PATH : "",
 	    access(SNAPPY_PATH, R_OK) == 0 ? SNAPPY_PATH : "",
 	    access(ZLIB_PATH, R_OK) == 0 ? ZLIB_PATH : "",
+	    access(ROTN_PATH, R_OK) == 0 ? ROTN_PATH : "",
 	    DATASOURCE("kvsbdb") ? KVS_BDB_PATH : "");
 
 	/*

@@ -131,6 +131,10 @@ static CONFIG c[] = {
 	  "if values are dictionary compressed",		/* 20% */
 	  C_BOOL, 20, 0, 0, &g.c_dictionary, NULL },
 
+	{ "encryption",
+	  "type of encryption (none | rotn-7)",
+	  C_IGNORE|C_STRING, 0, 0, 0, NULL, &g.c_encryption },
+
 	{ "evict_max",
 	  "the maximum number of eviction workers",
 	  0x0, 0, 5, 100, &g.c_evict_max, NULL },
