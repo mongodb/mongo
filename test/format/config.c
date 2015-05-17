@@ -31,7 +31,7 @@
 
 static void	   config_checksum(void);
 static void	   config_compression(const char *);
-static void	   config_encryption();
+static void	   config_encryption(void);
 static const char *config_file_type(u_int);
 static CONFIG	  *config_find(const char *, size_t);
 static int	   config_is_perm(const char *);
