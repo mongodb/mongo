@@ -273,7 +273,7 @@ config_compression(const char *conf_name)
  *	Encryption configuration.
  */
 static void
-config_encryption()
+config_encryption(void)
 {
 	const char *cstr;
 
