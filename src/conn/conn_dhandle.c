@@ -486,6 +486,7 @@ __wt_conn_btree_apply_single(WT_SESSION_IMPL *session,
 	bucket = hash % WT_HASH_ARRAY_SIZE;
 	SLIST_FOREACH(dhandle, &conn->dhhash[bucket], hashl)
 		if (F_ISSET(dhandle, WT_DHANDLE_OPEN) &&
+		    !F_ISSET(dhandle, WT_DHANDLE_DEAD) &&
 		    (hash == dhandle->name_hash &&
 		     strcmp(uri, dhandle->name) == 0) &&
 		    ((dhandle->checkpoint == NULL && checkpoint == NULL) ||
@@ -500,7 +501,8 @@ __wt_conn_btree_apply_single(WT_SESSION_IMPL *session,
 			 * still open.
 			 */
 			__wt_spin_lock(session, &dhandle->close_lock);
-			if (F_ISSET(dhandle, WT_DHANDLE_OPEN)) {
+			if (F_ISSET(dhandle, WT_DHANDLE_OPEN) &&
+			    !F_ISSET(dhandle, WT_DHANDLE_DEAD)) {
 				WT_WITH_DHANDLE(session, dhandle,
 				    ret = func(session, cfg));
 			}

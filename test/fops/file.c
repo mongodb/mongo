@@ -58,7 +58,7 @@ obj_bulk(void)
 }
 
 void
-obj_bulk_unique(void)
+obj_bulk_unique(int force)
 {
 	WT_CURSOR *c;
 	WT_SESSION *session;
@@ -86,7 +86,8 @@ obj_bulk_unique(void)
 	if ((ret = c->close(c)) != 0)
 		testutil_die(ret, "cursor.close");
 
-	while ((ret = session->drop(session, new_uri, NULL)) != 0)
+	while ((ret = session->drop(
+	    session, new_uri, force ? "force" : NULL)) != 0)
 		if (ret != EBUSY)
 			testutil_die(ret, "session.drop: %s", new_uri);
 
@@ -134,7 +135,7 @@ obj_create(void)
 }
 
 void
-obj_create_unique(void)
+obj_create_unique(int force)
 {
 	WT_SESSION *session;
 	int ret;
@@ -154,7 +155,8 @@ obj_create_unique(void)
 		testutil_die(ret, "session.create");
 
 	sched_yield();
-	while ((ret = session->drop(session, new_uri, NULL)) != 0)
+	while ((ret = session->drop(
+	    session, new_uri, force ? "force" : NULL)) != 0)
 		if (ret != EBUSY)
 			testutil_die(ret, "session.drop: %s", new_uri);
 
@@ -163,7 +165,7 @@ obj_create_unique(void)
 }
 
 void
-obj_drop(void)
+obj_drop(int force)
 {
 	WT_SESSION *session;
 	int ret;
@@ -171,7 +173,7 @@ obj_drop(void)
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		testutil_die(ret, "conn.session");
 
-	if ((ret = session->drop(session, uri, NULL)) != 0)
+	if ((ret = session->drop(session, uri, force ? "force" : NULL)) != 0)
 		if (ret != ENOENT && ret != EBUSY)
 			testutil_die(ret, "session.drop");
 
