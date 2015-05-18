@@ -46,15 +46,18 @@ __wt_thread_join(WT_SESSION_IMPL *session, wt_thread_t tid)
 void
 __wt_thread_id(char *buf, size_t buflen)
 {
+	pthread_t self;
+
 	/*
 	 * POSIX 1003.1 allows pthread_t to be an opaque type; on systems where
 	 * it's a pointer, print the pointer to match gdb output.
 	 */
+	self = pthread_self();
 #ifdef __sun
 	(void)snprintf(buf, buflen,
-	    "%" PRIuMAX ":%u", (uintmax_t)getpid(), pthread_self());
+	    "%" PRIuMAX ":%u", (uintmax_t)getpid(), self);
 #else
 	(void)snprintf(buf, buflen,
-	    "%" PRIuMAX ":%p", (uintmax_t)getpid(), pthread_self());
+	    "%" PRIuMAX ":%p", (uintmax_t)getpid(), (void *)self);
 #endif
 }
