@@ -73,6 +73,16 @@ env.Library(
 )
 
 env.Library(
+    target='remote_command_executor_mock',
+    source=[
+        'remote_command_executor_mock.cpp',
+    ],
+    LIBDEPS=[
+         'remote_command_executor',
+    ]
+)
+
+env.Library(
     target='remote_command_targeter',
     source=[
         'remote_command_targeter_rs.cpp',
@@ -80,6 +90,16 @@ env.Library(
     ],
     LIBDEPS=[
 
+    ]
+)
+
+env.Library(
+    target='remote_command_targeter_mock',
+    source=[
+        'remote_command_targeter_mock.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/util/net/hostandport',
     ]
 )
 
