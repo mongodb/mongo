@@ -156,9 +156,6 @@ namespace mongo_test {
 
     class FailPointStress: public mongo::unittest::Test {
     public:
-        FailPointStress(): _tasks(NULL) {
-        }
-
         void setUp() {
             _fp.setMode(FailPoint::alwaysOn, 0, BSON("a" << 44));
         }
@@ -169,26 +166,29 @@ namespace mongo_test {
         }
 
         void startTest() {
-            verify(_tasks == NULL);
+            ASSERT_EQUALS(0U, _tasks.size());
 
-            _tasks = new boost::thread_group();
-            _tasks->add_thread(new boost::thread(blockTask, &_fp));
-            _tasks->add_thread(new boost::thread(blockWithExceptionTask, &_fp));
-            _tasks->add_thread(new boost::thread(simpleTask, &_fp));
-            _tasks->add_thread(new boost::thread(flipTask, &_fp));
+            _tasks.emplace_back(&FailPointStress::blockTask, this);
+            _tasks.emplace_back(&FailPointStress::blockWithExceptionTask, this);
+            _tasks.emplace_back(&FailPointStress::simpleTask, this);
+            _tasks.emplace_back(&FailPointStress::flipTask, this);
         }
 
         void stopTest() {
-            _tasks->interrupt_all();
-            _tasks->join_all();
-            delete _tasks;
-            _tasks = NULL;
+            {
+                boost::lock_guard<boost::mutex> lk(_mutex);
+                _inShutdown = true;
+            }
+            for (auto& t : _tasks) {
+                t.join();
+            }
+            _tasks.clear();
         }
 
     private:
-        static void blockTask(FailPoint* failPoint) {
+        void blockTask() {
             while (true) {
-                MONGO_FAIL_POINT_BLOCK((*failPoint), scopedFp) {
+                MONGO_FAIL_POINT_BLOCK(_fp, scopedFp) {
                     const mongo::BSONObj& data = scopedFp.getData();
 
                     // Expanded ASSERT_EQUALS since the error is not being
@@ -200,14 +200,16 @@ namespace mongo_test {
                     }
                 }
 
-                stdx::this_thread::interruption_point();
+                boost::lock_guard<boost::mutex> lk(_mutex);
+                if (_inShutdown)
+                    break;
             }
         }
 
-        static void blockWithExceptionTask(FailPoint* failPoint) {
+        void blockWithExceptionTask() {
             while (true) {
                 try {
-                    MONGO_FAIL_POINT_BLOCK((*failPoint), scopedFp) {
+                    MONGO_FAIL_POINT_BLOCK(_fp, scopedFp) {
                         const mongo::BSONObj& data = scopedFp.getData();
 
                         if (data["a"].numberInt() != 44) {
@@ -222,32 +224,40 @@ namespace mongo_test {
                 catch (const std::logic_error&) {
                 }
 
-                stdx::this_thread::interruption_point();
+                boost::lock_guard<boost::mutex> lk(_mutex);
+                if (_inShutdown)
+                    break;
+           }
+        }
+
+        void simpleTask() {
+            while (true) {
+                static_cast<void>(MONGO_FAIL_POINT(_fp));
+                boost::lock_guard<boost::mutex> lk(_mutex);
+                if (_inShutdown)
+                    break;
             }
         }
 
-        static void simpleTask(FailPoint* failPoint) {
+        void flipTask() {
             while (true) {
-                static_cast<void>(MONGO_FAIL_POINT((*failPoint)));
-                stdx::this_thread::interruption_point();
-            }
-        }
-
-        static void flipTask(FailPoint* failPoint) {
-            while (true) {
-                if(failPoint->shouldFail()) {
-                    failPoint->setMode(FailPoint::off, 0);
+                if(_fp.shouldFail()) {
+                    _fp.setMode(FailPoint::off, 0);
                 }
                 else {
-                    failPoint->setMode(FailPoint::alwaysOn, 0, BSON("a" << 44));
+                    _fp.setMode(FailPoint::alwaysOn, 0, BSON("a" << 44));
                 }
 
-                stdx::this_thread::interruption_point();
+                boost::lock_guard<boost::mutex> lk(_mutex);
+                if (_inShutdown)
+                    break;
             }
         }
 
         FailPoint _fp;
-        boost::thread_group* _tasks;
+        std::vector<boost::thread> _tasks;
+        boost::mutex _mutex;
+        bool _inShutdown = false;
     };
 
     TEST_F(FailPointStress, Basic) {
