@@ -65,16 +65,22 @@ namespace mongo {
     class DeadlineMonitor {
     MONGO_DISALLOW_COPYING(DeadlineMonitor);
     public:
-        DeadlineMonitor() :
-            _tasks(),
-            _newDeadlineAvailable(),
-            _nearestDeadlineWallclock(kMaxDeadline),
-            _monitorThread(&mongo::DeadlineMonitor<_Task>::deadlineMonitorThread, this) {
+        DeadlineMonitor() {
+            // NOTE(schwerin): Because _monitorThread takes a pointer to "this", all of the fields
+            // of this instance must be initialized before the thread is created.  As a result, we
+            // should not create the thread in the initializer list.  Creating it there leaves us
+            // vulnerable to errors introduced by rearranging the order of fields in the class.
+            _monitorThread =
+                boost::thread(&mongo::DeadlineMonitor<_Task>::deadlineMonitorThread, this);
         }
 
         ~DeadlineMonitor() {
-            // ensure the monitor thread has been stopped before destruction
-            _monitorThread.interrupt();
+            {
+                // ensure the monitor thread has been stopped before destruction
+                boost::lock_guard<boost::mutex> lk(_deadlineMutex);
+                _inShutdown = true;
+                _newDeadlineAvailable.notify_one();
+            }
             _monitorThread.join();
         }
 
@@ -86,19 +92,13 @@ namespace mongo {
          * @param   timeoutMs   number of milliseconds before the deadline expires
          */
         void startDeadline(_Task* const task, uint64_t timeoutMs) {
-            uint64_t now = curTimeMillis64();
+            const auto deadline = Date_t::now() + Milliseconds(timeoutMs);
             boost::lock_guard<boost::mutex> lk(_deadlineMutex);
 
-            // insert or update the deadline
-            std::pair<typename TaskDeadlineMap::iterator, bool> inserted =
-                _tasks.insert(std::make_pair(task, now + timeoutMs));
+            _tasks[task] = deadline;
 
-            if (!inserted.second)
-                inserted.first->second = now + timeoutMs;
-
-            if (inserted.first->second < _nearestDeadlineWallclock) {
-                // notify the monitor thread of the new, closer deadline
-                _nearestDeadlineWallclock = inserted.first->second;
+            if (deadline < _nearestDeadlineWallclock) {
+                _nearestDeadlineWallclock = deadline;
                 _newDeadlineAvailable.notify_one();
             }
         }
@@ -121,33 +121,25 @@ namespace mongo {
          */
         void deadlineMonitorThread() {
             boost::unique_lock<boost::mutex> lk(_deadlineMutex);
-            while (true) {
+            while (!_inShutdown) {
 
                 // get the next interval to wait
-                uint64_t now = curTimeMillis64();
+                const Date_t now = Date_t::now();
 
                 // wait for a task to be added or a deadline to expire
-                while (_nearestDeadlineWallclock > now) {
-                    uint64_t nearestDeadlineMs;
-                    if (_nearestDeadlineWallclock == kMaxDeadline) {
+                if (_nearestDeadlineWallclock > now) {
+                    if (_nearestDeadlineWallclock == Date_t::max()) {
                         _newDeadlineAvailable.wait(lk);
                     }
                     else {
-                        nearestDeadlineMs = _nearestDeadlineWallclock - now;
-                        _newDeadlineAvailable.timed_wait(lk,
-                                boost::posix_time::milliseconds(nearestDeadlineMs));
+                        _newDeadlineAvailable.wait_until(
+                                lk, _nearestDeadlineWallclock.toSystemTimePoint());
                     }
-                    now = curTimeMillis64();
-                }
-
-                if (_tasks.empty()) {
-                    // all deadline timers have been stopped
-                    _nearestDeadlineWallclock = kMaxDeadline;
                     continue;
                 }
 
                 // set the next interval to wait for deadline completion
-                _nearestDeadlineWallclock = kMaxDeadline;
+                _nearestDeadlineWallclock = Date_t::max();
                 typename TaskDeadlineMap::iterator i = _tasks.begin();
                 while (i != _tasks.end()) {
                     if (i->second < now) {
@@ -156,27 +148,24 @@ namespace mongo {
                         _tasks.erase(i++);
                     }
                     else {
-                        if (i->second < _nearestDeadlineWallclock)
+                        if (i->second < _nearestDeadlineWallclock) {
                             // nearest deadline seen so far
                             _nearestDeadlineWallclock = i->second;
+                        }
                         ++i;
                     }
                 }
             }
         }
 
-        static const uint64_t kMaxDeadline;
-        typedef unordered_map<_Task*, uint64_t> TaskDeadlineMap;
-        TaskDeadlineMap _tasks;       // map of running tasks with deadlines
-        mongo::mutex _deadlineMutex;  // protects all non-const members, except _monitorThread
-        boost::condition _newDeadlineAvailable; // condition variable for timeout, start and stop
-        uint64_t _nearestDeadlineWallclock;     // absolute time of the nearest deadline
+        typedef unordered_map<_Task*, Date_t> TaskDeadlineMap;
+        TaskDeadlineMap _tasks; // map of running tasks with deadlines
+        boost::mutex _deadlineMutex; // protects all non-const members, except _monitorThread
+        boost::condition_variable _newDeadlineAvailable; // Signaled for timeout, start and stop
         boost::thread _monitorThread; // the deadline monitor thread
+        Date_t _nearestDeadlineWallclock = Date_t::max(); // absolute time of the nearest deadline
+        bool _inShutdown = false;
     };
-
-    template <typename _Task>
-    const uint64_t DeadlineMonitor<_Task>::kMaxDeadline =
-            std::numeric_limits<uint64_t>::max();
 
 } // namespace mongo
 
