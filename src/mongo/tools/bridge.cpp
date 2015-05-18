@@ -49,10 +49,6 @@
 using namespace mongo;
 using namespace std;
 
-namespace mongo {
-bool inShutdown() { return false; }
-}  // namespace mongo
-
 void cleanup( int sig );
 
 class Forwarder {

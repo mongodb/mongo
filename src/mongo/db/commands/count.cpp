@@ -142,8 +142,8 @@ namespace mongo {
             scoped_ptr<PlanExecutor> exec(rawExec);
 
             // Store the plan summary string in CurOp.
-            if (NULL != CurOp::get(txn)) {
-                CurOp::get(txn)->debug().planSummary = Explain::getPlanSummary(exec.get());
+            if (NULL != txn->getCurOp()) {
+                txn->getCurOp()->debug().planSummary = Explain::getPlanSummary(exec.get());
             }
 
             Status execPlanStatus = exec->executePlan();

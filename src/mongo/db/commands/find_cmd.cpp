@@ -201,7 +201,7 @@ namespace mongo {
             }
 
             // Fill out curop information.
-            beginQueryOp(nss, cmdObj, lpq->getNumToReturn(), lpq->getSkip(), CurOp::get(txn));
+            beginQueryOp(nss, cmdObj, lpq->getNumToReturn(), lpq->getSkip(), txn->getCurOp());
 
             // 1b) Finish the parsing step by using the LiteParsedQuery to create a CanonicalQuery.
             std::unique_ptr<CanonicalQuery> cq;
@@ -263,7 +263,7 @@ namespace mongo {
                 const int numResults = 0;
                 const CursorId cursorId = 0;
                 endQueryOp(execHolder.get(), dbProfilingLevel, numResults, cursorId,
-                           CurOp::get(txn));
+                           txn->getCurOp());
                 appendCursorResponseObject(cursorId, nss.ns(), BSONArray(), &result);
                 return true;
             }
@@ -325,7 +325,7 @@ namespace mongo {
                 // State will be restored on getMore.
                 exec->saveState();
 
-                cursor->setLeftoverMaxTimeMicros(CurOp::get(txn)->getRemainingMaxTimeMicros());
+                cursor->setLeftoverMaxTimeMicros(txn->getCurOp()->getRemainingMaxTimeMicros());
                 cursor->setPos(numResults);
 
                 // Don't stash the RU for tailable cursors at EOF, let them get a new RU on their
@@ -345,7 +345,7 @@ namespace mongo {
             }
 
             // Fill out curop based on the results.
-            endQueryOp(exec, dbProfilingLevel, numResults, cursorId, CurOp::get(txn));
+            endQueryOp(exec, dbProfilingLevel, numResults, cursorId, txn->getCurOp());
 
             // 7) Generate the response object to send to the client.
             appendCursorResponseObject(cursorId, nss.ns(), firstBatch.arr(), &result);

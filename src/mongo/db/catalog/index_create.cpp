@@ -228,7 +228,7 @@ namespace mongo {
         invariant(_indexes.size() == 1);
         invariant(_buildInBackground);
         IndexDescriptor* descriptor = _indexes[0].block->getEntry()->descriptor();
-        _collection->getIndexCatalog()->registerIndexBuild(descriptor, CurOp::get(_txn)->opNum());
+        _collection->getIndexCatalog()->registerIndexBuild(descriptor, _txn->getCurOp()->opNum());
         return descriptor;
     }
 
@@ -300,7 +300,7 @@ namespace mongo {
                 retries = 0;
             }
             catch (const WriteConflictException& wce) {
-                CurOp::get(_txn)->debug().writeConflicts++;
+                _txn->getCurOp()->debug().writeConflicts++;
                 retries++; // logAndBackoff expects this to be 1 on first call.
                 wce.logAndBackoff(retries, "index creation", _collection->ns().ns());
 

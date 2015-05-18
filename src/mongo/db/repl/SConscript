@@ -452,7 +452,6 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/concurrency/write_conflict_exception',
-        '$BUILD_DIR/mongo/db/curop',
     ],
 )
 

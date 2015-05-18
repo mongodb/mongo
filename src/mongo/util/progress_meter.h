@@ -107,7 +107,7 @@ namespace mongo {
     };
 
     // e.g.: 
-    // CurOp * op = CurOp::get(txn);
+    // CurOp * op = txn.getCurOp();
     // ProgressMeterHolder pm(op->setMessage("index: (1/3) external sort", "Index: External Sort Progress", d->stats.nrecords, 10));
     // loop { pm.hit(); }
     class ProgressMeterHolder : boost::noncopyable {

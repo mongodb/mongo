@@ -91,20 +91,20 @@ namespace {
         {
             Locker::LockerInfo lockerInfo;
             txn->lockState()->getLockerInfo(&lockerInfo);
-            CurOp::get(txn)->debug().append(*CurOp::get(txn), lockerInfo.stats, b);
+            txn->getCurOp()->debug().append(*txn->getCurOp(), lockerInfo.stats, b);
         }
 
         b.appendDate("ts", jsTime());
         b.append("client", txn->getClient()->clientAddress());
 
         AuthorizationSession * authSession = AuthorizationSession::get(txn->getClient());
-        _appendUserInfo(*CurOp::get(txn), b, authSession);
+        _appendUserInfo(*txn->getCurOp(), b, authSession);
 
         const BSONObj p = b.done();
 
         const bool wasLocked = txn->lockState()->isLocked();
 
-        const string dbName(nsToDatabase(CurOp::get(txn)->getNS()));
+        const string dbName(nsToDatabase(txn->getCurOp()->getNS()));
 
         try {
             bool acquireDbXLock = false;
@@ -126,7 +126,7 @@ namespace {
                 if (!db) {
                     // Database disappeared
                     log() << "note: not profiling because db went away for "
-                          << CurOp::get(txn)->getNS();
+                          << txn->getCurOp()->getNS();
                     break;
                 }
 
@@ -156,7 +156,7 @@ namespace {
         catch (const AssertionException& assertionEx) {
             warning() << "Caught Assertion while trying to profile "
                       << opToString(op)
-                      << " against " << CurOp::get(txn)->getNS()
+                      << " against " << txn->getCurOp()->getNS()
                       << ": " << assertionEx.toString() << endl;
         }
     }

@@ -63,7 +63,7 @@ namespace mongo {
         txn->recoveryUnit()->abandonSnapshot();
 
         // Track the number of yields in CurOp.
-        CurOp::get(txn)->yielded();
+        txn->getCurOp()->yielded();
 
         if (fetcher) {
             fetcher->fetch();

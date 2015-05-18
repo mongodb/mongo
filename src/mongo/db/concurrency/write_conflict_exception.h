@@ -38,7 +38,7 @@
 #define MONGO_WRITE_CONFLICT_RETRY_LOOP_END(PTXN, OPSTR, NSSTR)         \
         catch (const ::mongo::WriteConflictException &wce) {            \
             const OperationContext* ptxn = (PTXN);                      \
-            ++CurOp::get(ptxn)->debug().writeConflicts;      \
+            ++ptxn->getCurOp()->debug().writeConflicts;                 \
             wce.logAndBackoff(wcr__Attempts, (OPSTR), (NSSTR));         \
             ++wcr__Attempts;                                            \
             ptxn->recoveryUnit()->abandonSnapshot();                   \

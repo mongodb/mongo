@@ -58,6 +58,8 @@ namespace mongo {
 
         virtual Client* getClient() const override;
 
+        virtual CurOp* getCurOp() const override;
+
         virtual unsigned int getOpID() const override;
 
         virtual uint64_t getRemainingMaxTimeMicros() const override;

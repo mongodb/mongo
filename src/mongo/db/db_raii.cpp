@@ -86,8 +86,8 @@ namespace mongo {
         massert(28535, "need a non-empty collection name", !coll.empty());
 
         // TODO: OldClientContext legacy, needs to be removed
-        CurOp::get(_txn)->ensureStarted();
-        CurOp::get(_txn)->setNS(ns);
+        _txn->getCurOp()->ensureStarted();
+        _txn->getCurOp()->setNS(ns);
 
         // We have both the DB and collection locked, which the prerequisite to do a stable shard
         // version check.
@@ -97,7 +97,7 @@ namespace mongo {
         // constructor, so it is safe to load the DB pointer.
         if (_db.getDb()) {
             // TODO: OldClientContext legacy, needs to be removed
-            CurOp::get(_txn)->enter(ns.c_str(), _db.getDb()->getProfilingLevel());
+            _txn->getCurOp()->enter(ns.c_str(), _db.getDb()->getProfilingLevel());
 
             _coll = _db.getDb()->getCollection(ns);
         }
@@ -105,7 +105,7 @@ namespace mongo {
 
     AutoGetCollectionForRead::~AutoGetCollectionForRead() {
         // Report time spent in read lock
-        CurOp::get(_txn)->recordGlobalTime(false, _timer.micros());
+        _txn->getCurOp()->recordGlobalTime(false, _timer.micros());
     }
 
 
@@ -156,11 +156,11 @@ namespace mongo {
             _checkNotStale();
         }
 
-        CurOp::get(_txn)->enter(_ns.c_str(), _db->getProfilingLevel());
+        _txn->getCurOp()->enter(_ns.c_str(), _db->getProfilingLevel());
     }
 
     void OldClientContext::_checkNotStale() const {
-        switch (CurOp::get(_txn)->getOp()) {
+        switch (_txn->getCurOp()->getOp()) {
         case dbGetMore: // getMore is special and should be handled elsewhere.
         case dbUpdate:  // update & delete check shard version in instance.cpp, so don't check
         case dbDelete:  // here as well.
@@ -174,7 +174,7 @@ namespace mongo {
         // Lock must still be held
         invariant(_txn->lockState()->isLocked());
 
-        CurOp::get(_txn)->recordGlobalTime(_txn->lockState()->isWriteLocked(), _timer.micros());
+        _txn->getCurOp()->recordGlobalTime(_txn->lockState()->isWriteLocked(), _timer.micros());
     }
 
 

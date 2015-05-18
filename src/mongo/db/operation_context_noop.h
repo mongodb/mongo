@@ -58,6 +58,11 @@ namespace mongo {
             return NULL;
         }
 
+        virtual CurOp* getCurOp() const override {
+            invariant(false);
+            return NULL;
+        }
+
         virtual RecoveryUnit* recoveryUnit() const override {
             return _recoveryUnit.get();
         }

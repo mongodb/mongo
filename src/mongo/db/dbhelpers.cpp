@@ -206,7 +206,7 @@ namespace mongo {
         auto_ptr<PlanExecutor> exec(InternalPlanner::collectionScan(txn, ns, ctx.getCollection()));
         PlanExecutor::ExecState state = exec->getNext(&result, NULL);
 
-        CurOp::get(txn)->done();
+        txn->getCurOp()->done();
 
         if (PlanExecutor::ADVANCED == state) {
             result = result.getOwned();

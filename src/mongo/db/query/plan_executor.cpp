@@ -415,7 +415,7 @@ namespace mongo {
             else if (PlanStage::NEED_YIELD == code) {
                 if (id == WorkingSet::INVALID_ID) {
                     if (!_yieldPolicy->allowedToYield()) throw WriteConflictException();
-                    CurOp::get(_opCtx)->debug().writeConflicts++;
+                    _opCtx->getCurOp()->debug().writeConflicts++;
                     writeConflictsInARow++;
                     WriteConflictException::logAndBackoff(writeConflictsInARow,
                                                           "plan execution",

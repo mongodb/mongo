@@ -212,7 +212,7 @@ namespace mongo {
             // Explained updates can yield.
             updateRequest.setYieldPolicy(PlanExecutor::YIELD_AUTO);
 
-            OpDebug* debug = &CurOp::get(txn)->debug();
+            OpDebug* debug = &txn->getCurOp()->debug();
 
             ParsedUpdate parsedUpdate( txn, &updateRequest );
             Status parseStatus = parsedUpdate.parseRequest();

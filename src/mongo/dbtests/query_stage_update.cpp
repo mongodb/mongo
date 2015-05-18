@@ -372,7 +372,7 @@ namespace QueryStageUpdate {
 
             // Various variables we'll need.
             OldClientWriteContext ctx(&_txn, ns());
-            OpDebug* opDebug = &CurOp::get(_txn)->debug();
+            OpDebug* opDebug = &_txn.getCurOp()->debug();
             Collection* coll = ctx.getCollection();
             UpdateLifecycleImpl updateLifecycle(false, nsString());
             UpdateRequest request(nsString());
@@ -459,7 +459,7 @@ namespace QueryStageUpdate {
 
             // Various variables we'll need.
             OldClientWriteContext ctx(&_txn, ns());
-            OpDebug* opDebug = &CurOp::get(_txn)->debug();
+            OpDebug* opDebug = &_txn.getCurOp()->debug();
             Collection* coll = ctx.getCollection();
             UpdateLifecycleImpl updateLifecycle(false, nsString());
             UpdateRequest request(nsString());
@@ -540,7 +540,7 @@ namespace QueryStageUpdate {
         void run() {
             // Various variables we'll need.
             OldClientWriteContext ctx(&_txn, ns());
-            OpDebug* opDebug = &CurOp::get(_txn)->debug();
+            OpDebug* opDebug = &_txn.getCurOp()->debug();
             Collection* coll = ctx.getCollection();
             UpdateLifecycleImpl updateLifecycle(false, nsString());
             UpdateRequest request(nsString());

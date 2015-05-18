@@ -1018,8 +1018,8 @@ namespace mongo {
             const string ns = parseNs(dbname, jsobj);
 
             // TODO: OldClientContext legacy, needs to be removed
-            CurOp::get(txn)->ensureStarted();
-            CurOp::get(txn)->setNS(dbname);
+            txn->getCurOp()->ensureStarted();
+            txn->getCurOp()->setNS(dbname);
 
             // We lock the entire database in S-mode in order to ensure that the contents will not
             // change for the stats snapshot. This might be unnecessary and if it becomes a
@@ -1048,7 +1048,7 @@ namespace mongo {
             }
             else {
                 // TODO: OldClientContext legacy, needs to be removed
-                CurOp::get(txn)->enter(dbname.c_str(), db->getProfilingLevel());
+                txn->getCurOp()->enter(dbname.c_str(), db->getProfilingLevel());
 
                 db->getStats(txn, &result, scale);
             }
@@ -1078,7 +1078,7 @@ namespace mongo {
                          int,
                          string& errmsg,
                          BSONObjBuilder& result) {
-            result << "you" << CurOp::get(txn)->getRemoteString();
+            result << "you" << txn->getCurOp()->getRemoteString();
             return true;
         }
     } cmdWhatsMyUri;
@@ -1216,7 +1216,7 @@ namespace {
         scoped_ptr<MaintenanceModeSetter> mmSetter;
 
         if ( cmdObj["help"].trueValue() ) {
-            CurOp::get(txn)->ensureStarted();
+            txn->getCurOp()->ensureStarted();
             stringstream ss;
             ss << "help for: " << c->name << " ";
             c->help( ss );
@@ -1295,7 +1295,7 @@ namespace {
             LOG( 2 ) << "command: " << cmdObj << endl;
         }
 
-        CurOp::get(txn)->setCommand(c);
+        txn->getCurOp()->setCommand(c);
 
         if (c->maintenanceMode()) {
             mmSetter.reset(new MaintenanceModeSetter);
@@ -1319,7 +1319,7 @@ namespace {
             return;
         }
 
-        CurOp::get(txn)->setMaxTimeMicros(static_cast<unsigned long long>(maxTimeMS.getValue())
+        txn->getCurOp()->setMaxTimeMicros(static_cast<unsigned long long>(maxTimeMS.getValue())
                                           * 1000);
         try {
             txn->checkForInterrupt(); // May trigger maxTimeAlwaysTimeOut fail point.
@@ -1332,7 +1332,7 @@ namespace {
         std::string errmsg;
         bool retval = false;
 
-        CurOp::get(txn)->ensureStarted();
+        txn->getCurOp()->ensureStarted();
 
         c->_commandsExecuted.increment();
 

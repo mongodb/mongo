@@ -134,6 +134,11 @@ namespace mongo {
          */
         virtual Client* getClient() const = 0;
 
+        /**
+         * Returns CurOp. Caller does not own pointer
+         */
+        virtual CurOp* getCurOp() const = 0;
+
         virtual uint64_t getRemainingMaxTimeMicros() const = 0;
 
         /**

@@ -100,7 +100,7 @@ namespace mongo {
                 return _planYielding->restoreStateWithoutRetrying(opCtx);
             }
             catch (const WriteConflictException& wce) {
-                CurOp::get(opCtx)->debug().writeConflicts++;
+                opCtx->getCurOp()->debug().writeConflicts++;
                 WriteConflictException::logAndBackoff(attempt,
                                                       "plan execution restoreState",
                                                       _planYielding->collection()->ns().ns());
