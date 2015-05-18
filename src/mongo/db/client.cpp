@@ -42,6 +42,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/service_context.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/mongoutils/str.h"
@@ -93,7 +94,7 @@ namespace mongo {
                    AbstractMessagingPort *p)
         : ClientBasic(serviceContext, p),
           _desc(std::move(desc)),
-          _threadId(boost::this_thread::get_id()),
+          _threadId(stdx::this_thread::get_id()),
           _connectionId(p ? p->connectionId() : 0) {
     }
 

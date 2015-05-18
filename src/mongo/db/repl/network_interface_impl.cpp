@@ -40,6 +40,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/time_support.h"
@@ -215,7 +216,7 @@ namespace {
         // This thread is ending because it was idle for too long.
         // Find self in _threads, remove self from _threads, detach self.
         for (size_t i = 0; i < _threads.size(); ++i) {
-            if (_threads[i]->get_id() != boost::this_thread::get_id()) {
+            if (_threads[i]->get_id() != stdx::this_thread::get_id()) {
                 continue;
             }
             _threads[i]->detach();
@@ -224,7 +225,7 @@ namespace {
             return;
         }
         severe().stream() << "Could not find this thread, with id " <<
-            boost::this_thread::get_id() << " in the replication networking thread pool";
+            stdx::this_thread::get_id() << " in the replication networking thread pool";
         fassertFailedNoTrace(28581);
     }
 

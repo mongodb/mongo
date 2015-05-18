@@ -45,6 +45,7 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/bits.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/mvar.h"
 #include "mongo/util/concurrency/rwlock.h"
 #include "mongo/util/concurrency/thread_pool.h"
@@ -302,7 +303,7 @@ namespace ThreadedTests {
                 int val = target.take();
 #if BOOST_VERSION >= 103500
                 //increase chances of catching failure
-                boost::this_thread::yield();
+                stdx::this_thread::yield();
 #endif
                 target.put(val+1);
             }
@@ -574,7 +575,7 @@ namespace ThreadedTests {
     void sleepalittle() { 
         Timer t;
         while( 1 ) { 
-            boost::this_thread::yield();
+            stdx::this_thread::yield();
             if( t.micros() > 8 )
                 break;
         }

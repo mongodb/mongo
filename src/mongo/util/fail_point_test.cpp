@@ -200,7 +200,7 @@ namespace mongo_test {
                     }
                 }
 
-                boost::this_thread::interruption_point();
+                stdx::this_thread::interruption_point();
             }
         }
 
@@ -222,14 +222,14 @@ namespace mongo_test {
                 catch (const std::logic_error&) {
                 }
 
-                boost::this_thread::interruption_point();
+                stdx::this_thread::interruption_point();
             }
         }
 
         static void simpleTask(FailPoint* failPoint) {
             while (true) {
                 static_cast<void>(MONGO_FAIL_POINT((*failPoint)));
-                boost::this_thread::interruption_point();
+                stdx::this_thread::interruption_point();
             }
         }
 
@@ -242,7 +242,7 @@ namespace mongo_test {
                     failPoint->setMode(FailPoint::alwaysOn, 0, BSON("a" << 44));
                 }
 
-                boost::this_thread::interruption_point();
+                stdx::this_thread::interruption_point();
             }
         }
 
