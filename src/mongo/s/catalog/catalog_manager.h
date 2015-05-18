@@ -148,8 +148,6 @@ namespace mongo {
          * metadata and sets the specified shard as primary.
          *
          * @param dbName name of the database (case sensitive)
-         * @param shard Optional shard to use as primary. If nullptr is specified, one will be
-         *      picked by the system.
          *
          * Returns Status::OK on success or any error code indicating the failure. These are some
          * of the known failures:
@@ -157,7 +155,7 @@ namespace mongo {
          *  - DatabaseDifferCaseCode - database already exists, but with a different case
          *  - ShardNotFound - could not find a shard to place the DB on
          */
-        virtual Status createDatabase(const std::string& dbName, const Shard* shard) = 0;
+        virtual Status createDatabase(const std::string& dbName) = 0;
 
         /**
          * Updates or creates the metadata for a given database.

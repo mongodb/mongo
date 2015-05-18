@@ -79,7 +79,7 @@ namespace mongo {
         virtual StatusWith<ShardDrainingStatus> removeShard(OperationContext* txn,
                                                             const std::string& name);
 
-        virtual Status createDatabase(const std::string& dbName, const Shard* shard);
+        virtual Status createDatabase(const std::string& dbName);
 
         virtual Status updateDatabase(const std::string& dbName, const DatabaseType& db);
 

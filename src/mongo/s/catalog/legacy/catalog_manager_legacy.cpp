@@ -553,7 +553,7 @@ namespace {
         return Status::OK();
     }
 
-    Status CatalogManagerLegacy::createDatabase(const std::string& dbName, const Shard* shard) {
+    Status CatalogManagerLegacy::createDatabase(const std::string& dbName) {
         invariant(nsIsDbOnly(dbName));
 
         // The admin and config databases should never be explicitly created. They "just exist",
@@ -577,7 +577,7 @@ namespace {
         }
 
         // Database does not exist, pick a shard and create a new entry
-        const Shard primaryShard = (shard ? *shard : Shard::pick());
+        const Shard primaryShard = Shard::pick();
         if (!primaryShard.ok()) {
             return Status(ErrorCodes::ShardNotFound, "can't find a shard to put new db on");
         }

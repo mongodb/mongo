@@ -73,7 +73,7 @@ namespace mongo {
         }
 
         if (status == ErrorCodes::DatabaseNotFound) {
-            auto statusCreateDb = catalogManager()->createDatabase(dbName, NULL);
+            auto statusCreateDb = catalogManager()->createDatabase(dbName);
             if (statusCreateDb.isOK() || statusCreateDb == ErrorCodes::NamespaceExists) {
                 return catalogCache()->getDatabase(dbName);
             }
