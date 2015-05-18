@@ -362,7 +362,7 @@ __log_wrlsn_server(void *arg)
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_LOG *log;
-	WT_LOG_WRLSN_ENTRY written[SLOT_POOL];
+	WT_LOG_WRLSN_ENTRY written[WT_SLOT_POOL];
 	WT_LOGSLOT *slot;
 	WT_SESSION_IMPL *session;
 	size_t written_i;
@@ -385,7 +385,7 @@ __log_wrlsn_server(void *arg)
 		 * Walk the array once saving any slots that are in the
 		 * WT_LOG_SLOT_WRITTEN state.
 		 */
-		while (i < SLOT_POOL) {
+		while (i < WT_SLOT_POOL) {
 			save_i = i;
 			slot = &log->slot_pool[i++];
 			if (slot->slot_state != WT_LOG_SLOT_WRITTEN)
@@ -427,7 +427,7 @@ __log_wrlsn_server(void *arg)
 				/*
 				 * Signal the close thread if needed.
 				 */
-				if (F_ISSET(slot, SLOT_CLOSEFH))
+				if (F_ISSET(slot, WT_SLOT_CLOSEFH))
 					WT_ERR(__wt_cond_signal(session,
 					    conn->log_close_cond));
 				WT_ERR(__wt_log_slot_free(session, slot));
