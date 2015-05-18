@@ -131,6 +131,10 @@ static CONFIG c[] = {
 	  "if values are dictionary compressed",		/* 20% */
 	  C_BOOL, 20, 0, 0, &g.c_dictionary, NULL },
 
+	{ "encryption",
+	  "type of encryption (none | rotn-7)",
+	  C_IGNORE|C_STRING, 0, 0, 0, NULL, &g.c_encryption },
+
 	{ "evict_max",
 	  "the maximum number of eviction workers",
 	  0x0, 0, 5, 100, &g.c_evict_max, NULL },
@@ -191,6 +195,11 @@ static CONFIG c[] = {
 	{ "logging",
 	  "if logging configured",				/* 30% */
 	  C_BOOL, 30, 0, 0, &g.c_logging, NULL },
+
+	{ "logging_compression",
+	  "type of logging compression "
+	  "(none | bzip | bzip-raw | lzo | snappy | zlib | zlib-noraw)",
+	  C_IGNORE|C_STRING, 1, 7, 7, NULL, &g.c_logging_compression },
 
 	{ "logging_archive",
 	  "if log file archival configured",			/* 50% */

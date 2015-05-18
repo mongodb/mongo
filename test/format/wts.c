@@ -28,6 +28,57 @@
 
 #include "format.h"
 
+static const char *compressor(uint32_t compress_flag) {
+	/* Configure compression. */
+	switch (compress_flag) {
+	case COMPRESS_NONE:
+		return ("none");
+		break;
+	case COMPRESS_BZIP:
+		return ("bzip2");
+		break;
+	case COMPRESS_BZIP_RAW:
+		return ("bzip2-raw-test");
+		break;
+	case COMPRESS_LZ4:
+		return ("lz4");
+		break;
+	case COMPRESS_LZ4_NO_RAW:
+		return ("lz4-noraw");
+		break;
+	case COMPRESS_LZO:
+		return ("LZO1B-6");
+		break;
+	case COMPRESS_SNAPPY:
+		return ("snappy");
+		break;
+	case COMPRESS_ZLIB:
+		return ("zlib");
+		break;
+	case COMPRESS_ZLIB_NO_RAW:
+		return ("zlib-noraw");
+		break;
+	default:
+		die(EINVAL, "illegal compression flag: 0x%x", compress_flag);
+		break;
+	}
+}
+
+static const char *encryptor(uint32_t encrypt_flag) {
+	/* Configure encryption. */
+	switch (encrypt_flag) {
+	case ENCRYPT_NONE:
+		return ("none");
+		break;
+	case ENCRYPT_ROTN_7:
+		return ("rotn,keyid=7");
+		break;
+	default:
+		die(EINVAL, "illegal encryption flag: 0x%x", encrypt_flag);
+		break;
+	}
+}
+
 static int
 handle_message(WT_EVENT_HANDLER *handler,
     WT_SESSION *session, const char *message)
@@ -113,9 +164,16 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 	/* Logging configuration. */
 	if (g.c_logging)
 		p += snprintf(p, REMAIN(p, end),
-		    ",log=(enabled=true,archive=%d,prealloc=%d)",
+		    ",log=(enabled=true,archive=%d,prealloc=%d"
+		    ",compressor=\"%s\")",
 		    g.c_logging_archive ? 1 : 0,
-		    g.c_logging_prealloc ? 1 : 0);
+		    g.c_logging_prealloc ? 1 : 0,
+		    compressor(g.c_logging_compression_flag));
+
+	if (g.c_encryption)
+		p += snprintf(p, REMAIN(p, end),
+		    ",encryption=(name=%s)",
+		    encryptor(g.c_encryption_flag));
 
 	/* Miscellaneous. */
 #ifndef _WIN32
@@ -147,13 +205,14 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 	/* Extensions. */
 	p += snprintf(p, REMAIN(p, end),
 	    ",extensions=["
-	    "\"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],",
+	    "\"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],",
 	    g.c_reverse ? REVERSE_PATH : "",
 	    access(BZIP_PATH, R_OK) == 0 ? BZIP_PATH : "",
 	    access(LZ4_PATH, R_OK) == 0 ? LZ4_PATH : "",
 	    access(LZO_PATH, R_OK) == 0 ? LZO_PATH : "",
 	    access(SNAPPY_PATH, R_OK) == 0 ? SNAPPY_PATH : "",
 	    access(ZLIB_PATH, R_OK) == 0 ? ZLIB_PATH : "",
+	    access(ROTN_PATH, R_OK) == 0 ? ROTN_PATH : "",
 	    DATASOURCE("kvsbdb") ? KVS_BDB_PATH : "");
 
 	/*
@@ -313,42 +372,9 @@ wts_create(void)
 	}
 
 	/* Configure compression. */
-	switch (g.c_compression_flag) {
-	case COMPRESS_NONE:
-		break;
-	case COMPRESS_BZIP:
-		p += snprintf(p, REMAIN(p, end),
-		    ",block_compressor=\"bzip2\"");
-		break;
-	case COMPRESS_BZIP_RAW:
-		p += snprintf(p, REMAIN(p, end),
-		    ",block_compressor=\"bzip2-raw-test\"");
-		break;
-	case COMPRESS_LZ4:
-		p += snprintf(p, REMAIN(p, end),
-		    ",block_compressor=\"lz4\"");
-		break;
-	case COMPRESS_LZ4_NO_RAW:
-		p += snprintf(p, REMAIN(p, end),
-		    ",block_compressor=\"lz4-noraw\"");
-		break;
-	case COMPRESS_LZO:
-		p += snprintf(p, REMAIN(p, end),
-		    ",block_compressor=\"LZO1B-6\"");
-		break;
-	case COMPRESS_SNAPPY:
-		p += snprintf(p, REMAIN(p, end),
-		    ",block_compressor=\"snappy\"");
-		break;
-	case COMPRESS_ZLIB:
-		p += snprintf(p, REMAIN(p, end),
-		    ",block_compressor=\"zlib\"");
-		break;
-	case COMPRESS_ZLIB_NO_RAW:
-		p += snprintf(p, REMAIN(p, end),
-		    ",block_compressor=\"zlib-noraw\"");
-		break;
-	}
+	if (g.c_compression_flag != COMPRESS_NONE)
+		p += snprintf(p, REMAIN(p, end), ",block_compressor=\"%s\"",
+		    compressor(g.c_compression_flag));
 
 	/* Configure Btree internal key truncation. */
 	p += snprintf(p, REMAIN(p, end), ",internal_key_truncate=%s",
