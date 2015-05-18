@@ -564,8 +564,8 @@ namespace {
         // Lock the database globally to prevent conflicts with simultaneous database creation.
         auto scopedDistLock = getDistLockManager()->lock(dbName,
                                                          "createDatabase",
-                                                         stdx::chrono::milliseconds(1000),
-                                                         stdx::chrono::milliseconds(500));
+                                                         Seconds{5},
+                                                         Milliseconds{500});
         if (!scopedDistLock.isOK()) {
             return scopedDistLock.getStatus();
         }
@@ -1222,7 +1222,7 @@ namespace {
 
         auto scopedDistLock = getDistLockManager()->lock("authorizationData",
                                                          commandName,
-                                                         stdx::chrono::milliseconds(5000));
+                                                         Seconds{5});
         if (!scopedDistLock.isOK()) {
             return Command::appendCommandStatus(*result, scopedDistLock.getStatus());
         }
