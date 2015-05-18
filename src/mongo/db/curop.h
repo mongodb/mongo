@@ -291,9 +291,6 @@ namespace mongo {
 
         void reportState(BSONObjBuilder* builder);
 
-        // Fetches less information than "info()"; used to search for ops with certain criteria
-        BSONObj description();
-
         std::string getRemoteString( bool includePort = true ) {
             if (includePort)
                 return _remote.toString();

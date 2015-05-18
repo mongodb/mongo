@@ -303,27 +303,6 @@ namespace mongo {
         builder->append( "numYields" , _numYields );
     }
 
-    BSONObj CurOp::description() {
-        BSONObjBuilder bob;
-        bool a = _active && _start;
-        bob.append("active", a);
-        bob.append( "op" , opToString( _op ) );
-
-        // Fill out "ns" from our namespace member (and if it's not available, fall back to the
-        // OpDebug namespace member).
-        bob.append("ns", !_ns.empty() ? _ns.toString() : _debug.ns.toString());
-
-        if (_op == dbInsert) {
-            _query.append(bob, "insert");
-        }
-        else {
-            _query.append(bob, "query");
-        }
-        if( killPending() )
-            bob.append("killPending", true);
-        return bob.obj();
-    }
-
     void CurOp::kill() {
         _killPending.store(1);
     }
