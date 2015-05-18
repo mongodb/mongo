@@ -84,10 +84,9 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
 		if (json && i > 0)
 			if ((ret = dump_json_separator(session)) != 0)
 				goto err;
-		if (name != NULL) {
-			free(name);
-			name = NULL;
-		}
+		free(name);
+		name = NULL;
+
 		if ((name = util_name(session, argv[i], "table")) == NULL)
 			goto err;
 
@@ -131,10 +130,8 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
 err:		ret = 1;
 	}
 
-	if (config != NULL)
-		free(config);
-	if (name != NULL)
-		free(name);
+	free(config);
+	free(name);
 
 	return (ret);
 }

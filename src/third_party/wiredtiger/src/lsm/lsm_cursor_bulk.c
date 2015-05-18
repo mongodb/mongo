@@ -16,13 +16,28 @@ static int
 __clsm_close_bulk(WT_CURSOR *cursor)
 {
 	WT_CURSOR_LSM *clsm;
+	WT_CURSOR *bulk_cursor;
 	WT_LSM_TREE *lsm_tree;
+	WT_SESSION_IMPL *session;
 
 	clsm = (WT_CURSOR_LSM *)cursor;
 	lsm_tree = clsm->lsm_tree;
-	F_SET(lsm_tree->chunk[0], WT_LSM_CHUNK_ONDISK);
+	session = (WT_SESSION_IMPL *)clsm->iface.session;
 
+	/* Close the bulk cursor to ensure the chunk is written to disk. */
+	bulk_cursor = clsm->cursors[0];
+	WT_RET(bulk_cursor->close(bulk_cursor));
+	clsm->cursors[0] = NULL;
+	clsm->nchunks = 0;
+
+	/* Set ondisk, and flush the metadata */
+	F_SET(lsm_tree->chunk[0], WT_LSM_CHUNK_ONDISK);
+	WT_RET(__wt_lsm_meta_write(session, lsm_tree));
+	++lsm_tree->dsk_gen;
+
+	/* Close the LSM cursor */
 	WT_RET(__wt_clsm_close(cursor));
+
 	return (0);
 }
 /*
@@ -113,4 +128,3 @@ __wt_clsm_open_bulk(WT_CURSOR_LSM *clsm, const char *cfg[])
 
 	return (0);
 }
-

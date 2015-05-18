@@ -33,151 +33,146 @@
 #include <wiredtiger.h>
 #include <wiredtiger_ext.h>
 
-/*! [WT_COMPRESSOR initialization structure] */
-/* Local compressor structure. */
+/*! [WT_ENCRYPTOR initialization structure] */
+/* Local encryptor structure. */
 typedef struct {
-	WT_COMPRESSOR compressor;		/* Must come first */
+	WT_ENCRYPTOR encryptor;		/* Must come first */
 
 	WT_EXTENSION_API *wt_api;		/* Extension API */
 
 	unsigned long nop_calls;		/* Count of calls */
 
-} NOP_COMPRESSOR;
-/*! [WT_COMPRESSOR initialization structure] */
+} NOP_ENCRYPTOR;
+/*! [WT_ENCRYPTOR initialization structure] */
 
-/*! [WT_COMPRESSOR compress] */
+/*! [WT_ENCRYPTOR encrypt] */
 /*
- * nop_compress --
- *	A simple compression example that passes data through unchanged.
+ * nop_encrypt --
+ *	A simple encryption example that passes data through unchanged.
  */
 static int
-nop_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
+nop_encrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
     uint8_t *src, size_t src_len,
     uint8_t *dst, size_t dst_len,
-    size_t *result_lenp, int *compression_failed)
+    size_t *result_lenp)
 {
-	NOP_COMPRESSOR *nop_compressor = (NOP_COMPRESSOR *)compressor;
+	NOP_ENCRYPTOR *nop_encryptor = (NOP_ENCRYPTOR *)encryptor;
 
 	(void)session;				/* Unused parameters */
 
-	++nop_compressor->nop_calls;		/* Call count */
+	++nop_encryptor->nop_calls;		/* Call count */
 
-	*compression_failed = 0;
-	if (dst_len < src_len) {
-		*compression_failed = 1;
-		return (0);
-	}
+	if (dst_len < src_len)
+		return (ENOMEM);
 
 	memcpy(dst, src, src_len);
 	*result_lenp = src_len;
 
 	return (0);
 }
-/*! [WT_COMPRESSOR compress] */
+/*! [WT_ENCRYPTOR encrypt] */
 
-/*! [WT_COMPRESSOR decompress] */
+/*! [WT_ENCRYPTOR decrypt] */
 /*
- * nop_decompress --
- *	A simple decompression example that passes data through unchanged.
+ * nop_decrypt --
+ *	A simple decryption example that passes data through unchanged.
  */
 static int
-nop_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
+nop_decrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
     uint8_t *src, size_t src_len,
     uint8_t *dst, size_t dst_len,
     size_t *result_lenp)
 {
-	NOP_COMPRESSOR *nop_compressor = (NOP_COMPRESSOR *)compressor;
+	NOP_ENCRYPTOR *nop_encryptor = (NOP_ENCRYPTOR *)encryptor;
 
 	(void)session;				/* Unused parameters */
 	(void)src_len;
 
-	++nop_compressor->nop_calls;		/* Call count */
+	++nop_encryptor->nop_calls;		/* Call count */
 
 	/*
-	 * The destination length is the number of uncompressed bytes we're
+	 * The destination length is the number of unencrypted bytes we're
 	 * expected to return.
 	 */
 	memcpy(dst, src, dst_len);
 	*result_lenp = dst_len;
 	return (0);
 }
-/*! [WT_COMPRESSOR decompress] */
+/*! [WT_ENCRYPTOR decrypt] */
 
-/*! [WT_COMPRESSOR presize] */
+/*! [WT_ENCRYPTOR sizing] */
 /*
- * nop_pre_size --
- *	A simple pre-size example that returns the source length.
+ * nop_sizing --
+ *	A simple sizing example that tells wiredtiger that the
+ *	encrypted buffer is always the same as the source buffer.
  */
 static int
-nop_pre_size(WT_COMPRESSOR *compressor, WT_SESSION *session,
-    uint8_t *src, size_t src_len,
-    size_t *result_lenp)
+nop_sizing(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
+    size_t *expansion_constantp)
 {
-	NOP_COMPRESSOR *nop_compressor = (NOP_COMPRESSOR *)compressor;
+	NOP_ENCRYPTOR *nop_encryptor = (NOP_ENCRYPTOR *)encryptor;
 
 	(void)session;				/* Unused parameters */
-	(void)src;
 
-	++nop_compressor->nop_calls;		/* Call count */
+	++nop_encryptor->nop_calls;		/* Call count */
 
-	*result_lenp = src_len;
+	*expansion_constantp = 0;
 	return (0);
 }
-/*! [WT_COMPRESSOR presize] */
+/*! [WT_ENCRYPTOR sizing] */
 
-/*! [WT_COMPRESSOR terminate] */
+/*! [WT_ENCRYPTOR terminate] */
 /*
  * nop_terminate --
- *	WiredTiger no-op compression termination.
+ *	WiredTiger no-op encryption termination.
  */
 static int
-nop_terminate(WT_COMPRESSOR *compressor, WT_SESSION *session)
+nop_terminate(WT_ENCRYPTOR *encryptor, WT_SESSION *session)
 {
-	NOP_COMPRESSOR *nop_compressor = (NOP_COMPRESSOR *)compressor;
+	NOP_ENCRYPTOR *nop_encryptor = (NOP_ENCRYPTOR *)encryptor;
 
 	(void)session;				/* Unused parameters */
 
-	++nop_compressor->nop_calls;		/* Call count */
+	++nop_encryptor->nop_calls;		/* Call count */
 
 	/* Free the allocated memory. */
-	free(compressor);
+	free(encryptor);
 
 	return (0);
 }
-/*! [WT_COMPRESSOR terminate] */
+/*! [WT_ENCRYPTOR terminate] */
 
-/*! [WT_COMPRESSOR initialization function] */
+/*! [WT_ENCRYPTOR initialization function] */
 /*
  * wiredtiger_extension_init --
- *	A simple shared library compression example.
+ *	A simple shared library encryption example.
  */
 int
 wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 {
-	NOP_COMPRESSOR *nop_compressor;
+	NOP_ENCRYPTOR *nop_encryptor;
 
 	(void)config;				/* Unused parameters */
 
-	if ((nop_compressor = calloc(1, sizeof(NOP_COMPRESSOR))) == NULL)
+	if ((nop_encryptor = calloc(1, sizeof(NOP_ENCRYPTOR))) == NULL)
 		return (errno);
 
 	/*
-	 * Allocate a local compressor structure, with a WT_COMPRESSOR structure
+	 * Allocate a local encryptor structure, with a WT_ENCRYPTOR structure
 	 * as the first field, allowing us to treat references to either type of
 	 * structure as a reference to the other type.
 	 *
 	 * Heap memory (not static), because it can support multiple databases.
 	 */
-	nop_compressor->compressor.compress = nop_compress;
-	nop_compressor->compressor.compress_raw = NULL;
-	nop_compressor->compressor.decompress = nop_decompress;
-	nop_compressor->compressor.pre_size = nop_pre_size;
-	nop_compressor->compressor.terminate = nop_terminate;
+	nop_encryptor->encryptor.encrypt = nop_encrypt;
+	nop_encryptor->encryptor.decrypt = nop_decrypt;
+	nop_encryptor->encryptor.sizing = nop_sizing;
+	nop_encryptor->encryptor.terminate = nop_terminate;
 
-	nop_compressor->wt_api = connection->get_extension_api(connection);
+	nop_encryptor->wt_api = connection->get_extension_api(connection);
 
-						/* Load the compressor */
-	return (connection->add_compressor(
-	    connection, "nop", (WT_COMPRESSOR *)nop_compressor, NULL));
+						/* Load the encryptor */
+	return (connection->add_encryptor(
+	    connection, "nop", (WT_ENCRYPTOR *)nop_encryptor, NULL));
 }
-/*! [WT_COMPRESSOR initialization function] */
+/*! [WT_ENCRYPTOR initialization function] */

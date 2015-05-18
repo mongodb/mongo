@@ -47,8 +47,7 @@ util_upgrade(WT_SESSION *session, int argc, char *argv[])
 err:		ret = 1;
 	}
 
-	if (name != NULL)
-		free(name);
+	free(name);
 
 	return (ret);
 }

@@ -31,6 +31,7 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 	SLIST_INIT(&conn->fhlh);		/* File list */
 	TAILQ_INIT(&conn->collqh);		/* Collator list */
 	TAILQ_INIT(&conn->compqh);		/* Compressor list */
+	TAILQ_INIT(&conn->encryptqh);		/* Encryptor list */
 	TAILQ_INIT(&conn->extractorqh);		/* Extractor list */
 
 	TAILQ_INIT(&conn->lsmqh);		/* WT_LSM_TREE list */
@@ -50,6 +51,7 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 	WT_RET(__wt_spin_init(session, &conn->api_lock, "api"));
 	WT_RET(__wt_spin_init(session, &conn->checkpoint_lock, "checkpoint"));
 	WT_RET(__wt_spin_init(session, &conn->dhandle_lock, "data handle"));
+	WT_RET(__wt_spin_init(session, &conn->encryptor_lock, "encryptor"));
 	WT_RET(__wt_spin_init(session, &conn->fh_lock, "file list"));
 	WT_RET(__wt_spin_init(session, &conn->hot_backup_lock, "hot backup"));
 	WT_RET(__wt_spin_init(session, &conn->reconfig_lock, "reconfigure"));
@@ -132,6 +134,7 @@ __wt_connection_destroy(WT_CONNECTION_IMPL *conn)
 	__wt_spin_destroy(session, &conn->block_lock);
 	__wt_spin_destroy(session, &conn->checkpoint_lock);
 	__wt_spin_destroy(session, &conn->dhandle_lock);
+	__wt_spin_destroy(session, &conn->encryptor_lock);
 	__wt_spin_destroy(session, &conn->fh_lock);
 	__wt_spin_destroy(session, &conn->hot_backup_lock);
 	__wt_spin_destroy(session, &conn->reconfig_lock);

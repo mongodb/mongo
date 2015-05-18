@@ -397,7 +397,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	    "starting write leaves", &verb_timer));
 
 	/* Flush dirty leaf pages before we start the checkpoint. */
-	session->isolation = txn->isolation = TXN_ISO_READ_COMMITTED;
+	session->isolation = txn->isolation = WT_ISO_READ_COMMITTED;
 	WT_ERR(__checkpoint_apply(session, cfg, __checkpoint_write_leaves));
 
 	/*
@@ -470,8 +470,8 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 */
 	session->dhandle = NULL;
 
-	/* Commit the transaction before syncing the file(s). */
-	WT_ERR(__wt_txn_commit(session, NULL));
+	/* Release the snapshot so we aren't pinning pages in cache. */
+	__wt_txn_release_snapshot(session);
 
 	/* Clear the global checkpoint transaction IDs */
 	txn_global->checkpoint_id = WT_TXN_NONE;
@@ -491,24 +491,27 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	    "sync completed", &verb_timer));
 
 	/*
+	 * Commit the transaction now that we are sure that all files in the
+	 * checkpoint have been flushed to disk. It's OK to commit before
+	 * checkpointing the metadata since we know that all files in the
+	 * checkpoint are now in a consistent state.
+	 */
+	WT_ERR(__wt_txn_commit(session, NULL));
+
+	/*
 	 * Disable metadata tracking during the metadata checkpoint.
 	 *
 	 * We don't lock old checkpoints in the metadata file: there is no way
 	 * to open one.  We are holding other handle locks, it is not safe to
 	 * lock conn->spinlock.
 	 */
-	session->isolation = txn->isolation = TXN_ISO_READ_UNCOMMITTED;
+	session->isolation = txn->isolation = WT_ISO_READ_UNCOMMITTED;
 	saved_meta_next = session->meta_track_next;
 	session->meta_track_next = NULL;
 	WT_WITH_DHANDLE(session,
 	    session->meta_dhandle, ret = __wt_checkpoint(session, cfg));
 	session->meta_track_next = saved_meta_next;
 	WT_ERR(ret);
-	if (F_ISSET(conn, WT_CONN_CKPT_SYNC)) {
-		WT_WITH_DHANDLE(session, session->meta_dhandle,
-		    ret = __wt_checkpoint_sync(session, NULL));
-		WT_ERR(ret);
-	}
 
 	WT_ERR(__checkpoint_verbose_track(session,
 	    "metadata sync completed", &verb_timer));
@@ -531,11 +534,11 @@ err:	/*
 	 * overwritten the checkpoint, so what ends up on disk is not
 	 * consistent.
 	 */
-	session->isolation = txn->isolation = TXN_ISO_READ_UNCOMMITTED;
+	session->isolation = txn->isolation = WT_ISO_READ_UNCOMMITTED;
 	if (tracking)
 		WT_TRET(__wt_meta_track_off(session, 0, ret != 0));
 
-	if (F_ISSET(txn, TXN_RUNNING)) {
+	if (F_ISSET(txn, WT_TXN_RUNNING)) {
 		/*
 		 * Clear the dhandle so the visibility check doesn't get
 		 * confused about the snap min. Don't bother restoring the
@@ -998,7 +1001,25 @@ fake:	/*
 	if (fake_ckpt && FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED))
 		WT_INIT_LSN(&ckptlsn);
 
-	/* Update the object's metadata. */
+	/*
+	 * Update the object's metadata.
+	 *
+	 * If the object is the metadata, the call to __wt_meta_ckptlist_set
+	 * will update the turtle file and swap the new one into place.  We
+	 * need to make sure the metadata is on disk before the turtle file is
+	 * updated.
+	 *
+	 * If we are doing a checkpoint in a file without a transaction (e.g.,
+	 * closing a dirty tree before an exclusive operation like verify),
+	 * the metadata update will be auto-committed.  In that case, we need to
+	 * sync the file here or we could roll forward the metadata in
+	 * recovery and open a checkpoint that isn't yet durable.
+	 */
+	if (F_ISSET(conn, WT_CONN_CKPT_SYNC) &&
+	    (WT_IS_METADATA(dhandle) ||
+	    !F_ISSET(&session->txn, WT_TXN_RUNNING)))
+		WT_ERR(__wt_checkpoint_sync(session, NULL));
+
 	WT_ERR(__wt_meta_ckptlist_set(
 	    session, dhandle->name, ckptbase, &ckptlsn));
 

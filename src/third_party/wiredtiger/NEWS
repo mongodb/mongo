@@ -1,3 +1,150 @@
+WiredTiger release 2.6.0, 2015-05-13
+------------------------------------
+
+The WiredTiger 2.6.0 release contains new features, minor API changes and many
+bug fixes.
+
+New features:
+
+* Add support for "at rest" encryption of WiredTiger databases via a new
+  encryption API.
+  refs WT-1822
+
+* Add support for bulk load in LSM trees (previously the bulk configuration
+  for cursor create was ignored by LSM trees).
+  refs SERVER-18321, WT-1922
+
+* Add enhanced compression support for LZ4. Change is not compatible with
+  tables created with LZ4 compression using earlier versions of WiredTiger.
+  See the upgrading documentation for more information.
+
+API and behavior changes:
+
+* Enhance performance of WT_SESSION::drop with force enabled (mark the table
+  as dead and discard it in the background without writing any content to disk,
+  rather than flushing content from the cache).
+  refs WT-1894
+
+* Add an API to validate configuration strings.
+  refs WT-1739
+
+* Disallow the cache_resident flag on LSM trees.
+  refs WT-1905
+
+* Enhance the controls for how aggressively idle handles are closed, update the
+  wiredtiger_open file_manager configuration options to expose that control.
+  refs SERVER-17907, WT-1856
+
+
+Significant bug fixes and performance enhancements:
+
+* Fix bugs in checkpoint: committing the checkpoint transaction before it was
+  safe, failure to sync the metadata file before updating the turtle file.
+  refs SERVER-18316
+
+* Don't attempt to validate configuration settings for extensions (collators,
+  compressors, encryptors, extractors). The extension may be valid but not yet
+  loaded so it is not possible to validate.
+
+* Check the magic and version numbers in log files when first opening them.
+
+* Fix a bug with cache leaf size accounting for statistics.
+  refs WT-1885, WT-1919
+
+* Fix a bug where checkpoint could skip a page that was rewritten in memory.
+  refs WT-1946
+
+* Fix a bug in WT_CURSOR::search_near with a random cursor where deleted
+  records could be returned.
+  refs WT-1921, WT-1944
+
+* Fix a bug in handle close where we could fail to clear the open handle
+  flag.
+  refs WT-1915
+
+* Fix a bug in in-memory splits, don't allow any other eviction of a page if
+  the page is being split.
+  refs WT-1916, WT-1917
+
+* Fix a bug in btree open where failure while opening a checkpoint may not
+  clean up completely.
+  refs WT-1598
+
+* Fix a performance problem where long running transactions could continually
+  scan long update chains looking for obsolete entries, when there is no chance
+  of finding any.
+  refs WT-1913
+
+* Fix a performance problem where many threads accessing a single page could
+  prevent WiredTiger from evicting or splitting the page.
+  refs WT-1912
+
+* Fix a source of deadlock bugs by restructuring how we lock handles. Clean
+  up the definition of when it is safe to acquire different locks.
+  refs WT-1598
+
+* Fix a bug where we could evict pages from a file marked as cache resident,
+  add optimizations for cache resident files.
+  refs SERVER-18192
+
+* Fix a deadlock related to LSM (cases where closing a file with an existing
+  checkpoint could self deadlock).
+  refs WT-716
+
+* Only split large in-memory pages if there is a need to keep them in cache
+  (otherwise, it is better to reconcile and evict them immediately).
+  refs WT-1890, WT-1896
+
+* Fix a race on shutdown where the eviction server could still have been
+  accessing files while they were being closed.
+  refs WT-1893
+
+* Fix a case where we could run recovery unnecessarily if there were only
+  non-data changing log records since the last checkpoint.
+  refs WT-1892
+
+* Update API documentation to explain internal session handle usage. This
+  allows users to do specific calculations based on the session_max setting.
+
+* Fix a bug in LSM where updates with overwrite could be skipped incorrectly.
+  refs BF-829
+
+* Fix a cursor bug where searching and traversing in different combinations
+  could lead to data buffers being freed before they should be.
+  refs WT-1887
+
+* Fix a bug when closing bulk cursors, where a file could be left open.
+
+* Fix a bug on Windows related to truncating files (SetEndofFile does not
+  ignore truncation requests like POSIX fallocate).
+
+* Fix a bug in file truncate, where we could truncate to the wrong place if
+  there was a race extending the file at the same time.
+  refs WT-1871
+
+* Fix a bug in reconciliation where page boundary structures could reference
+  freed memory.
+  refs WT-1852
+
+* Change the WT_CURSOR::search and WT_CURSOR::search_near API to first check
+  any currently pinned page before starting a regular descending search.
+
+* Fix a bug in recovery where an error was returned if a transaction spanned
+  an entire log file.
+
+* Fix a bug where recovery could be unnecessarily run during startup.
+
+* Enhance the Python cursor API to allow setting keys and values using array
+  notation.
+
+* Fix a bug where creating a column store with large gaps in the key range
+  would lead to poor performance.
+  refs WT-1807.
+
+* Improve the performance of the core btree search routine by using low-level
+  x86 vectorized search instructions.
+
+
 WiredTiger release 2.5.3, 2015-04-22
 ------------------------------------
 
@@ -45,7 +192,7 @@ Bug fixes and other significant changes:
   file could be left in an invalid state.
   refs WT-1775, WT-1776, SERVER-17571
 
-* Fix cases where WT_SESSSION::truncate could return EBUSY when a schema level
+* Fix cases where WT_SESSION::truncate could return EBUSY when a schema level
   operation is running - for example a checkpoint.
   refs WT-1404, WT-1643
 
@@ -83,7 +230,7 @@ refs SERVER-17424
   refs WT-1745
 
 * Fix when aggregation is set on statistics fields. Fixes problems with
-  visualising statistics via wtstats graphs.
+  visualizing statistics via wtstats graphs.
   refs WT-1742
 
 * Change how checkpoints use empty blocks in on-disk files. Use a first-fit
@@ -97,7 +244,7 @@ The WiredTiger 2.5.2 release contains important bug fixes.
 
 API changes:
 
-* Allow memory_page_max to be at most a quater of the cache size not half.
+* Allow memory_page_max to be at most a quarter of the cache size not half.
   This avoids operations getting stalled due to the cache being filled with
   one or two pages.
 
@@ -342,7 +489,7 @@ New features and API changes:
   configuration settings, see upgrading documentation for further
   information. [#1282]
 
-* Add support for compressing log files.  When configured each compressable
+* Add support for compressing log files.  When configured each compressible
   log record will be compressed.  This is configure with the
   `log=(compressor=X)` configuration setting.  See upgrading documentation
   for further information. [#1359]
@@ -458,7 +605,7 @@ New features and API changes:
 
 * Rename WT_DEADLOCK error return to WT_ROLLBACK. WiredTiger uses the return
   in cases other than traditional application deadlock. The old value is
-  retained as an alias to maintain backward compatability. [#1204]
+  retained as an alias to maintain backward compatibility. [#1204]
 
 * Increase the maximum configurable cache size to 100GB.
 
@@ -630,7 +777,7 @@ Changes to the WiredTiger API (see upgrading documentation for details):
 * Add a LevelDB API implementation for WiredTiger.  This includes support for
   stock LevelDB as well as Basho, HyperLevelDB and RocksDB versions of the API.
   To build the LevelDB API include --enable-leveldb in the configure command,
-  to specify compatability with an alternative LevelDB API use
+  to specify compatibility with an alternative LevelDB API use
   --enable-leveldb=[basho,hyper,rocksdb]. [#1028]
 
 * Add ability to build some common extensions into the WiredTiger library.
@@ -1439,11 +1586,11 @@ New features and API changes:
 
 [232] Add a "size of checkpoint" statistic.
 
-* Add a shared cache pool implemention.  Manages a single cache among
+* Add a shared cache pool implementation.  Manages a single cache among
   multiple databases within a process.
 
 * Merge statistics from file and LSM sources into a "data source" statistic
-  structure.  Rename and regroup some shared stastistics.  Add a helper to
+  structure.  Rename and regroup some shared statistics.  Add a helper to
   the Python API to lookup in a cursor in a simple expression.
 
 * Add support for sub groups of options in configuration strings.
@@ -1541,7 +1688,7 @@ This is a bugfix and performance tuning release. The changes are as follows:
        which had dictionaries configured and one of which didn't, we failed to
        clear the dictionary when starting page reconciliation.   Be consistent,
        never use anything other than the btree handle's configuration to decide
-       if we're using a dictionary in a reconcilation run.
+       if we're using a dictionary in a reconciliation run.
 
 [#372] Fix several potential integer overflow bugs.
 
@@ -1665,7 +1812,7 @@ fixes.  The full list of changes is:
   latter requires a "timed condition wait" operation.
 
 * Tweaks to file handle flags for out-of-cache read performance on Linux
-  (disable readahead and access time updates).
+  (disable read-ahead and access time updates).
 
 * Replace the WT_SESSION::dumpfile method with configuration strings to
   WT_SESSION::verify.
@@ -1938,7 +2085,7 @@ upgrade.  Here is the full list of changes:
 
 [#305] Have "wt dump" fail more gracefully if the object doesn't exist.
 
-[#310] When freeing a tracked address in reconcilation, clear it to avoid
+[#310] When freeing a tracked address in reconciliation, clear it to avoid
        freeing the same address again on error. 
 
 [#314] Replace cursor.equals with cursor.compare
@@ -1975,7 +2122,7 @@ upgrade.  Here is the full list of changes:
   cursor that was duplicated.
 
 * Fix a (very unlikely) deadlock at startup, if an application issues a
-  checkpoint before the eviction server has managed to open its sesssion.
+  checkpoint before the eviction server has managed to open its session.
 
 * Fix a core dump if we verify a file that's corrupted such that we are
   unable to load any checkpoints at all, and the per-checkpoint bit map is
@@ -2035,7 +2182,7 @@ This is a bugfix release.  The changes are as follows:
 * Defer making free pages available until the end of a checkpoint, in case
   there is a failure after processing some files.
 
-* When checking the value of the "isolation" key, don't assume it is NUL
+* When checking the value of the "isolation" key, don't assume it is nul
   terminated.  This bug could cause transactions to run with incorrect
   isolation.
 

@@ -112,10 +112,10 @@ __clsm_enter_update(WT_CURSOR_LSM *clsm)
 	} else {
 		primary = clsm->cursors[clsm->nchunks - 1];
 		primary_chunk = clsm->primary_chunk;
-		WT_ASSERT(session, F_ISSET(&session->txn, TXN_HAS_ID));
+		WT_ASSERT(session, F_ISSET(&session->txn, WT_TXN_HAS_ID));
 		have_primary = (primary != NULL && primary_chunk != NULL &&
 		    (primary_chunk->switch_txn == WT_TXN_NONE ||
-		    TXNID_LT(session->txn.id, primary_chunk->switch_txn)));
+		    WT_TXNID_LT(session->txn.id, primary_chunk->switch_txn)));
 	}
 
 	/*
@@ -165,11 +165,13 @@ __clsm_enter(WT_CURSOR_LSM *clsm, int reset, int update)
 	WT_DECL_RET;
 	WT_LSM_TREE *lsm_tree;
 	WT_SESSION_IMPL *session;
+	WT_TXN *txn;
 	uint64_t *switch_txnp;
 	uint64_t snap_min;
 
 	lsm_tree = clsm->lsm_tree;
 	session = (WT_SESSION_IMPL *)clsm->iface.session;
+	txn = &session->txn;
 
 	/* Merge cursors never update. */
 	if (F_ISSET(clsm, WT_CLSM_MERGE))
@@ -207,7 +209,7 @@ __clsm_enter(WT_CURSOR_LSM *clsm, int reset, int update)
 			if (clsm->dsk_gen != clsm->lsm_tree->dsk_gen)
 				goto open;
 
-			if (session->txn.isolation == TXN_ISO_SNAPSHOT)
+			if (txn->isolation == WT_ISO_SNAPSHOT)
 				__wt_txn_cursor_op(session);
 
 			/*
@@ -220,16 +222,16 @@ __clsm_enter(WT_CURSOR_LSM *clsm, int reset, int update)
 			 * conflict.
 			 */
 			clsm->nupdates = 1;
-			if (session->txn.isolation == TXN_ISO_SNAPSHOT &&
+			if (txn->isolation == WT_ISO_SNAPSHOT &&
 			    F_ISSET(clsm, WT_CLSM_OPEN_SNAPSHOT)) {
 				WT_ASSERT(session,
-				    F_ISSET(&session->txn, TXN_HAS_SNAPSHOT));
-				snap_min = session->txn.snap_min;
+				    F_ISSET(txn, WT_TXN_HAS_SNAPSHOT));
+				snap_min = txn->snap_min;
 				for (switch_txnp =
 				    &clsm->switch_txn[clsm->nchunks - 2];
 				    clsm->nupdates < clsm->nchunks;
 				    clsm->nupdates++, switch_txnp--) {
-					if (TXNID_LT(*switch_txnp, snap_min))
+					if (WT_TXNID_LT(*switch_txnp, snap_min))
 						break;
 					WT_ASSERT(session,
 					    !__wt_txn_visible_all(
@@ -246,7 +248,7 @@ __clsm_enter(WT_CURSOR_LSM *clsm, int reset, int update)
 		 *   - a read operation and the cursor is open for reading.
 		 */
 		if ((!update ||
-		    session->txn.isolation != TXN_ISO_SNAPSHOT ||
+		    txn->isolation != WT_ISO_SNAPSHOT ||
 		    F_ISSET(clsm, WT_CLSM_OPEN_SNAPSHOT)) &&
 		    ((update && clsm->primary_chunk != NULL) ||
 		    (!update && F_ISSET(clsm, WT_CLSM_OPEN_READ))))
@@ -418,7 +420,7 @@ __clsm_open_cursors(
 	 * Ensure that any snapshot update has cursors on the right set of
 	 * chunks to guarantee visibility is correct.
 	 */
-	if (update && txn->isolation == TXN_ISO_SNAPSHOT)
+	if (update && txn->isolation == WT_ISO_SNAPSHOT)
 		F_SET(clsm, WT_CLSM_OPEN_SNAPSHOT);
 
 	/*
@@ -1286,10 +1288,10 @@ __clsm_put(WT_SESSION_IMPL *session,
 	lsm_tree = clsm->lsm_tree;
 
 	WT_ASSERT(session,
-	    F_ISSET(&session->txn, TXN_HAS_ID) &&
+	    F_ISSET(&session->txn, WT_TXN_HAS_ID) &&
 	    clsm->primary_chunk != NULL &&
 	    (clsm->primary_chunk->switch_txn == WT_TXN_NONE ||
-	    TXNID_LE(session->txn.id, clsm->primary_chunk->switch_txn)));
+	    WT_TXNID_LE(session->txn.id, clsm->primary_chunk->switch_txn)));
 
 	/*
 	 * Clear the existing cursor position.  Don't clear the primary cursor:
@@ -1535,7 +1537,10 @@ __wt_clsm_open(WT_SESSION_IMPL *session,
 		WT_ERR_MSG(session, EINVAL,
 		    "bulk-load is only supported on newly created LSM trees");
 	/* Flag any errors from the tree get. */
-	WT_RET(ret);
+	WT_ERR(ret);
+
+	/* Make sure we have exclusive access if and only if we want it */
+	WT_ASSERT(session, !bulk || lsm_tree->exclusive);
 
 	WT_ERR(__wt_calloc_one(session, &clsm));
 

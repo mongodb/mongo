@@ -172,11 +172,11 @@ err:	__wt_free(session, fname);
 }
 
 /*
- * __wt_huffman_confchk --
+ * __huffman_confchk --
  *	Verify Huffman configuration.
  */
-int
-__wt_huffman_confchk(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *v)
+static int
+__huffman_confchk(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *v)
 {
 	if (v->len == 0)
 		return (0);
@@ -208,10 +208,10 @@ __wt_btree_huffman_open(WT_SESSION_IMPL *session)
 	cfg = btree->dhandle->cfg;
 
 	WT_RET(__wt_config_gets_none(session, cfg, "huffman_key", &key_conf));
-	WT_RET(__wt_huffman_confchk(session, &key_conf));
+	WT_RET(__huffman_confchk(session, &key_conf));
 	WT_RET(
 	    __wt_config_gets_none(session, cfg, "huffman_value", &value_conf));
-	WT_RET(__wt_huffman_confchk(session, &value_conf));
+	WT_RET(__huffman_confchk(session, &value_conf));
 	if (key_conf.len == 0 && value_conf.len == 0)
 		return (0);
 
