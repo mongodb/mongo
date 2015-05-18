@@ -66,12 +66,6 @@ namespace mongo {
         virtual void commitUnitOfWork() = 0;
         virtual void abortUnitOfWork() = 0;
 
-        // WARNING: "commit" in functions below refers to a global journal flush which implicitly
-        // commits the current UnitOfWork as well. They are actually stronger than commitUnitOfWork
-        // as they can commit even if the UnitOfWork is nested. That is because we have already
-        // verified that the db will be left in a valid state at these commit points.
-        // TODO clean up the naming and semantics.
-
         /**
          * Waits until all writes prior to this call are durable. Returns true, unless the storage
          * engine cannot guarantee durability, which should never happen when isDurable() returned
