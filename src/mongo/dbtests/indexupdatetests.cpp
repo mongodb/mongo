@@ -175,7 +175,7 @@ namespace IndexUpdateTests {
                                                     nDocs,
                                                     nDocs));
             // Register a request to kill the current operation.
-            txn.getCurOp()->kill();
+            CurOp::get(txn)->kill();
             if ( _mayInterrupt ) {
                 // Add keys to phaseOne.
                 ASSERT_THROWS( BtreeBasedBuilder::addKeysToPhaseOne( collection(),
@@ -225,7 +225,7 @@ namespace IndexUpdateTests {
             phaseOne.sorter->sort( false );
             // Set up remaining arguments.
             set<RecordId> dups;
-            CurOp* op = txn.getCurOp();
+            CurOp* op = CurOp::get(txn);
             ProgressMeterHolder pm (op->setMessage("BuildBottomUp",
                                                    "BuildBottomUp Progress",
                                                    nKeys,
@@ -291,7 +291,7 @@ namespace IndexUpdateTests {
             phaseOne.sorter->sort( false );
             // Set up remaining arguments.
             set<RecordId> dups;
-            CurOp* op = txn.getCurOp();
+            CurOp* op = CurOp::get(txn);
             ProgressMeterHolder pm (op->setMessage("InterruptBuildBottomUp",
                                                    "InterruptBuildBottomUp Progress",
                                                    nKeys,
@@ -301,7 +301,7 @@ namespace IndexUpdateTests {
             // The index's root has not yet been set.
             ASSERT( id->getHead().isNull() );
             // Register a request to kill the current operation.
-            txn.getCurOp()->kill();
+            CurOp::get(txn)->kill();
             if ( _mayInterrupt ) {
                 // The build is aborted due to the kill request.
                 ASSERT_THROWS
@@ -483,7 +483,7 @@ namespace IndexUpdateTests {
                 wunit.commit();
             }
             // Initialize curop.
-            _txn.getCurOp()->reset();
+            CurOp::get(_txn)->reset();
             // Request an interrupt.
             getGlobalServiceContext()->setKillAllOperations();
             BSONObj indexInfo = BSON( "key" << BSON( "a" << 1 ) << "ns" << _ns << "name" << "a_1" );
@@ -516,7 +516,7 @@ namespace IndexUpdateTests {
                 wunit.commit();
             }
             // Initialize curop.
-            _txn.getCurOp()->reset();
+            CurOp::get(_txn)->reset();
             // Request an interrupt.
             getGlobalServiceContext()->setKillAllOperations();
             BSONObj indexInfo = BSON( "key" << BSON( "a" << 1 ) << "ns" << _ns << "name" << "a_1" );
@@ -552,7 +552,7 @@ namespace IndexUpdateTests {
                 wunit.commit();
             }
             // Initialize curop.
-            _txn.getCurOp()->reset();
+            CurOp::get(_txn)->reset();
             // Request an interrupt.
             getGlobalServiceContext()->setKillAllOperations();
             BSONObj indexInfo = BSON( "key" << BSON( "_id" << 1 ) <<
@@ -590,7 +590,7 @@ namespace IndexUpdateTests {
                 wunit.commit();
             }
             // Initialize curop.
-            _txn.getCurOp()->reset();
+            CurOp::get(_txn)->reset();
             // Request an interrupt.
             getGlobalServiceContext()->setKillAllOperations();
             BSONObj indexInfo = BSON( "key" << BSON( "_id" << 1 ) <<
@@ -617,7 +617,7 @@ namespace IndexUpdateTests {
             // Start with just _id
             ASSERT_EQUALS( 1U, _client.getIndexSpecs(_ns).size());
             // Initialize curop.
-            _txn.getCurOp()->reset();
+            CurOp::get(_txn)->reset();
             // Request an interrupt.
             getGlobalServiceContext()->setKillAllOperations();
             // The call is not interrupted.

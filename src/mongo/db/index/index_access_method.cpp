@@ -436,7 +436,7 @@ namespace mongo {
 
         pm.finished();
 
-        txn->getCurOp()->setMessage("Index Bulk Build: (3/3) btree-middle",
+        CurOp::get(txn)->setMessage("Index Bulk Build: (3/3) btree-middle",
                                      "Index: (3/3) BTree Middle Progress");
 
         LOG(timer.seconds() > 10 ? 0 : 1 ) << "\t done building bottom layer, going to commit";

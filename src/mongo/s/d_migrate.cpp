@@ -200,7 +200,7 @@ namespace mongo {
             ss << "step " << step << " of " << _total;
             string s = ss.str();
 
-            CurOp * op = _txn->getCurOp();
+            CurOp * op = CurOp::get(_txn);
             if ( op )
                 op->setMessage( s.c_str() );
             else
@@ -2658,7 +2658,7 @@ namespace mongo {
         }
 
         // Make curop active so this will show up in currOp.
-        txn.getCurOp()->reset();
+        CurOp::get(txn)->reset();
 
         migrateStatus.go(&txn, ns, min, max, shardKeyPattern, fromShard, epoch, writeConcern);
     }

@@ -111,9 +111,11 @@ namespace mongo {
 
                 if (!includeAll) {
                     // Skip over inactive connections.
-                    if (!opCtx || !opCtx->getCurOp() || !opCtx->getCurOp()->active()) {
+                    if (!opCtx)
                         continue;
-                    }
+                    auto curOp = CurOp::get(opCtx);
+                    if (!curOp || !curOp->active())
+                        continue;
                 }
 
                 BSONObjBuilder infoBuilder;
@@ -124,8 +126,8 @@ namespace mongo {
                 // Operation context specific information
                 if (opCtx) {
                     // CurOp
-                    if (opCtx->getCurOp()) {
-                        opCtx->getCurOp()->reportState(&infoBuilder);
+                    if (CurOp::get(opCtx)) {
+                        CurOp::get(opCtx)->reportState(&infoBuilder);
                     }
 
                     // LockState

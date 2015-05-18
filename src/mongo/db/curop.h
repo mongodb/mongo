@@ -48,6 +48,7 @@ namespace mongo {
     class Client;
     class Command;
     class CurOp;
+    class OperationContext;
 
     /**
      * stores a copy of a bson obj in a fixed size buffer
@@ -196,6 +197,8 @@ namespace mongo {
     public:
         static CurOp* get(const Client* client);
         static CurOp* get(const Client& client);
+        static CurOp* get(const OperationContext* opCtx);
+        static CurOp* get(const OperationContext& opCtx);
 
         explicit CurOp(Client* client);
         ~CurOp();

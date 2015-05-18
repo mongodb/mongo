@@ -146,6 +146,8 @@ namespace mongo {
 
     CurOp* CurOp::get(const Client* client) { return _curopStack(client).top(); }
     CurOp* CurOp::get(const Client& client) { return _curopStack(client).top(); }
+    CurOp* CurOp::get(const OperationContext* opCtx) { return get(opCtx->getClient()); }
+    CurOp* CurOp::get(const OperationContext& opCtx) { return get(opCtx.getClient()); }
 
     CurOp::CurOp(Client* client) : CurOp(client, &_curopStack(client)) {}
 

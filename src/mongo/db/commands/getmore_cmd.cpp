@@ -194,7 +194,7 @@ namespace mongo {
 
             // If the operation that spawned this cursor had a time limit set, apply leftover
             // time to this getmore.
-            txn->getCurOp()->setMaxTimeMicros(cursor->getLeftoverMaxTimeMicros());
+            CurOp::get(txn)->setMaxTimeMicros(cursor->getLeftoverMaxTimeMicros());
             txn->checkForInterrupt(); // May trigger maxTimeAlwaysTimeOut fail point.
 
             if (cursor->isAggCursor()) {
@@ -239,7 +239,7 @@ namespace mongo {
 
                     exec->saveState();
 
-                    cursor->setLeftoverMaxTimeMicros(txn->getCurOp()->getRemainingMaxTimeMicros());
+                    cursor->setLeftoverMaxTimeMicros(CurOp::get(txn)->getRemainingMaxTimeMicros());
                     cursor->incPos(numResults);
 
                     if (isCursorTailable(cursor) && state == PlanExecutor::IS_EOF) {
@@ -249,7 +249,7 @@ namespace mongo {
                     }
                 }
                 else {
-                    txn->getCurOp()->debug().cursorExhausted = true;
+                    CurOp::get(txn)->debug().cursorExhausted = true;
                 }
 
                 appendGetMoreResponseObject(respondWithId,

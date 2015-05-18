@@ -366,7 +366,7 @@ namespace {
                     return parsedUpdateStatus;
                 }
 
-                OpDebug* opDebug = &txn->getCurOp()->debug();
+                OpDebug* opDebug = &CurOp::get(txn)->debug();
 
                 // Explain calls of the findAndModify command are read-only, but we take write
                 // locks so that the timing information is more accurate.
@@ -491,7 +491,7 @@ namespace {
                         return appendCommandStatus(result, parsedUpdateStatus);
                     }
 
-                    OpDebug* opDebug = &txn->getCurOp()->debug();
+                    OpDebug* opDebug = &CurOp::get(txn)->debug();
 
                     AutoGetOrCreateDb autoDb(txn, dbName, MODE_IX);
                     Lock::CollectionLock collLock(txn->lockState(), nsString.ns(), MODE_IX);
