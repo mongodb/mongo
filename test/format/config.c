@@ -234,7 +234,7 @@ config_compression(const char *conf_name)
 	 * robust, since it's possible to build compression libraries into
 	 * the WiredTiger library.
 	 */
-	if (!config_is_perm("compression")) {
+	if (!config_is_perm(conf_name)) {
 		cstr = "none";
 		switch (mmrand(NULL, 1, 20)) {
 		case 1: case 2: case 3: case 4:		/* 20% no compression */
