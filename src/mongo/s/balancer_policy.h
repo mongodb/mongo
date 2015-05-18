@@ -30,10 +30,7 @@
 
 #pragma once
 
-#include <boost/noncopyable.hpp>
-
-#include "mongo/base/status_with.h"
-#include "mongo/base/owned_pointer_vector.h"
+#include "mongo/base/disallow_copying.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/s/catalog/type_chunk.h"
 
@@ -44,17 +41,16 @@ namespace mongo {
     struct ChunkInfo {
         const BSONObj min;
         const BSONObj max;
-        
-        ChunkInfo( const BSONObj& a_min, const BSONObj& a_max ) 
-            : min( a_min.getOwned() ), max( a_max.getOwned() ){}
 
-        ChunkInfo( const BSONObj& chunk )
+        ChunkInfo(const BSONObj& chunk)
             : min(chunk[ChunkType::min()].Obj().getOwned()),
               max(chunk[ChunkType::max()].Obj().getOwned()) {
+
         }
 
         std::string toString() const;
     };
+
 
     struct TagRange {
         BSONObj min;
@@ -64,9 +60,11 @@ namespace mongo {
         TagRange(){}
 
         TagRange( const BSONObj& a_min, const BSONObj& a_max, const std::string& a_tag )
-            : min( a_min.getOwned() ), max( a_max.getOwned() ), tag( a_tag ){}
+            : min( a_min.getOwned() ), max( a_max.getOwned() ), tag( a_tag ) {}
+
         std::string toString() const;
     };
+
     
     class ShardInfo {
     public:
@@ -111,25 +109,34 @@ namespace mongo {
         std::string _mongoVersion;
     };
     
+
     struct MigrateInfo {
+        MigrateInfo(const std::string& a_ns,
+                    const std::string& a_to,
+                    const std::string& a_from,
+                    const BSONObj& a_chunk)
+            : ns(a_ns),
+              to(a_to),
+              from(a_from),
+              chunk(a_chunk) {
+
+        }
+
         const std::string ns;
         const std::string to;
         const std::string from;
         const ChunkInfo chunk;
-
-        MigrateInfo( const std::string& a_ns , const std::string& a_to , const std::string& a_from , const BSONObj& a_chunk )
-            : ns( a_ns ) , to( a_to ) , from( a_from ), chunk( a_chunk ) {}
-
-
     };
 
-    typedef std::map< std::string,ShardInfo > ShardInfoMap;
-    typedef std::map<std::string, OwnedPointerVector<ChunkType>* > ShardToChunksMap;
+    typedef std::map<std::string, ShardInfo> ShardInfoMap;
+    typedef std::map<std::string, std::vector<ChunkType>> ShardToChunksMap;
 
-    class DistributionStatus : boost::noncopyable {
+
+    class DistributionStatus {
+        MONGO_DISALLOW_COPYING(DistributionStatus);
     public:
-        DistributionStatus( const ShardInfoMap& shardInfo,
-                            const ShardToChunksMap& shardToChunksMap );
+        DistributionStatus(const ShardInfoMap& shardInfo,
+                           const ShardToChunksMap& shardToChunksMap);
 
         // only used when building
         
@@ -165,7 +172,7 @@ namespace mongo {
         unsigned numberOfChunksInShardWithTag( const std::string& shard, const std::string& tag ) const;
 
         /** @return chunks for the shard */
-        const std::vector<ChunkType*>& getChunks(const std::string& shard) const;
+        const std::vector<ChunkType>& getChunks(const std::string& shard) const;
 
         /** @return all tags we know about, not include "" */
         const std::set<std::string>& tags() const { return _allTags; }
@@ -212,6 +219,7 @@ namespace mongo {
         std::set<std::string> _shards;
     };
 
+
     class BalancerPolicy {
     public:
 
@@ -230,7 +238,5 @@ namespace mongo {
                                      const DistributionStatus& distribution,
                                      int balancedLastTime );
     };
-
-
 
 }  // namespace mongo
