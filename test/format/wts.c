@@ -28,55 +28,54 @@
 
 #include "format.h"
 
-static const char *compressor(uint32_t compress_flag) {
-	/* Configure compression. */
+/*
+ * compressor --
+ *	Configure compression.
+ */
+static const char *
+compressor(uint32_t compress_flag)
+{
 	switch (compress_flag) {
 	case COMPRESS_NONE:
 		return ("none");
-		break;
 	case COMPRESS_BZIP:
 		return ("bzip2");
-		break;
 	case COMPRESS_BZIP_RAW:
 		return ("bzip2-raw-test");
-		break;
 	case COMPRESS_LZ4:
 		return ("lz4");
-		break;
 	case COMPRESS_LZ4_NO_RAW:
 		return ("lz4-noraw");
-		break;
 	case COMPRESS_LZO:
 		return ("LZO1B-6");
-		break;
 	case COMPRESS_SNAPPY:
 		return ("snappy");
-		break;
 	case COMPRESS_ZLIB:
 		return ("zlib");
-		break;
 	case COMPRESS_ZLIB_NO_RAW:
 		return ("zlib-noraw");
-		break;
 	default:
-		die(EINVAL, "illegal compression flag: 0x%x", compress_flag);
 		break;
 	}
+	die(EINVAL, "illegal compression flag: 0x%x", compress_flag);
 }
 
-static const char *encryptor(uint32_t encrypt_flag) {
-	/* Configure encryption. */
+/*
+ * encryptor --
+ *	Configure encryption.
+ */
+static const char *
+encryptor(uint32_t encrypt_flag)
+{
 	switch (encrypt_flag) {
 	case ENCRYPT_NONE:
 		return ("none");
-		break;
 	case ENCRYPT_ROTN_7:
 		return ("rotn,keyid=7");
-		break;
 	default:
-		die(EINVAL, "illegal encryption flag: 0x%x", encrypt_flag);
 		break;
 	}
+	die(EINVAL, "illegal encryption flag: 0x%x", encrypt_flag);
 }
 
 static int
