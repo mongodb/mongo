@@ -481,8 +481,7 @@ config_single(const char *s, int perm)
 		} else if (strncmp(s, "file_type", strlen("file_type")) == 0) {
 			config_map_file_type(ep, &g.type);
 			*cp->vstr = strdup(config_file_type(g.type));
-		} else if (strncmp(
-		    s, "logging_compression",
+		} else if (strncmp(s, "logging_compression",
 		    strlen("logging_compression")) == 0) {
 			config_map_compression(ep,
 			    &g.c_logging_compression_flag);

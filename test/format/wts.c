@@ -171,8 +171,7 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 
 	if (g.c_encryption)
 		p += snprintf(p, REMAIN(p, end),
-		    ",encryption=(name=%s)",
-		    encryptor(g.c_encryption_flag));
+		    ",encryption=(name=%s)", encryptor(g.c_encryption_flag));
 
 	/* Miscellaneous. */
 #ifndef _WIN32
@@ -209,9 +208,9 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 	    access(BZIP_PATH, R_OK) == 0 ? BZIP_PATH : "",
 	    access(LZ4_PATH, R_OK) == 0 ? LZ4_PATH : "",
 	    access(LZO_PATH, R_OK) == 0 ? LZO_PATH : "",
+	    access(ROTN_PATH, R_OK) == 0 ? ROTN_PATH : "",
 	    access(SNAPPY_PATH, R_OK) == 0 ? SNAPPY_PATH : "",
 	    access(ZLIB_PATH, R_OK) == 0 ? ZLIB_PATH : "",
-	    access(ROTN_PATH, R_OK) == 0 ? ROTN_PATH : "",
 	    DATASOURCE("kvsbdb") ? KVS_BDB_PATH : "");
 
 	/*
