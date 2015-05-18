@@ -55,6 +55,7 @@ namespace mongo {
     class ShardType;
     class Status;
     template<typename T> class StatusWith;
+    class TagsType;
 
     /**
      * Used to indicate to the caller of the removeShard method whether draining of chunks for
@@ -216,8 +217,8 @@ namespace mongo {
          *
          * Returns a !OK status if an error occurs.
          */
-        virtual void getDatabasesForShard(const std::string& shardName,
-                                          std::vector<std::string>* dbs) = 0;
+        virtual Status getDatabasesForShard(const std::string& shardName,
+                                            std::vector<std::string>* dbs) = 0;
 
         /**
          * Gets the requested number of chunks (of type ChunkType) that satisfy a query.
@@ -231,6 +232,19 @@ namespace mongo {
         virtual Status getChunks(const Query& query,
                                  int nToReturn,
                                  std::vector<ChunkType>* chunks) = 0;
+
+        /**
+         * Retrieves all tags for the specified collection.
+         */
+        virtual Status getTagsForCollection(const std::string& collectionNs,
+                                            std::vector<TagsType>* tags) = 0;
+
+        /**
+         * Retrieves the most appropriate tag, which overlaps with the specified chunk. If no tags
+         * overlap, returns an empty string.
+         */
+        virtual StatusWith<std::string> getTagForChunk(const std::string& collectionNs,
+                                                       const ChunkType& chunk) = 0;
 
         /**
          * Retrieves all shards in this sharded cluster.

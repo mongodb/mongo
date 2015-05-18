@@ -32,6 +32,7 @@
 
 #include "mongo/s/balance.h"
 
+#include <algorithm>
 #include <boost/scoped_ptr.hpp>
 
 #include "mongo/client/connpool.h"
@@ -49,13 +50,13 @@
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_settings.h"
+#include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/config.h"
 #include "mongo/s/catalog/dist_lock_manager.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/type_mongos.h"
-#include "mongo/s/type_tags.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
@@ -373,23 +374,19 @@ namespace mongo {
 
             DistributionStatus status(shardInfo, shardToChunksMap);
 
-            cursor = conn.query(TagsType::ConfigNS,
-                                QUERY(TagsType::ns(ns)).sort(TagsType::min()));
-
+            // TODO: TagRange contains all the information from TagsType except for the namespace,
+            //       so maybe the two can be merged at some point in order to avoid the
+            //       transformation below.
             vector<TagRange> ranges;
 
-            while ( cursor->more() ) {
-                BSONObj tag = cursor->nextSafe();
-                TagRange tr(tag[TagsType::min()].Obj().getOwned(),
-                            tag[TagsType::max()].Obj().getOwned(),
-                            tag[TagsType::tag()].String());
-                ranges.push_back(tr);
-                uassert(16356,
-                        str::stream() << "tag ranges not valid for: " << ns.toString(),
-                        status.addTagRange(tr) );
-
+            {
+                vector<TagsType> collectionTags;
+                uassertStatusOK(grid.catalogManager()->getTagsForCollection(ns.toString(),
+                                                                            &collectionTags));
+                for (const auto& tt : collectionTags) {
+                    ranges.push_back(TagRange(tt.getMinKey(), tt.getMaxKey(), tt.getTag()));
+                }
             }
-            cursor.reset();
 
             auto statusGetDb = grid.catalogCache()->getDatabase(ns.db().toString());
             if (!statusGetDb.isOK()) {

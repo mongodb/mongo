@@ -18,8 +18,7 @@ env.Library('base', ['mongo_version_range.cpp',
                      'type_locks.cpp',
                      'type_lockpings.cpp',
                      'type_config_version.cpp',
-                     'type_mongos.cpp',
-                     'type_tags.cpp'],
+                     'type_mongos.cpp'],
             LIBDEPS=['$BUILD_DIR/mongo/base/base',
                      '$BUILD_DIR/mongo/bson/bson'])
 
@@ -45,10 +44,6 @@ env.CppUnitTest('type_lockpings_test', 'type_lockpings_test.cpp',
                          '$BUILD_DIR/mongo/db/common'])
 
 env.CppUnitTest('type_mongos_test', 'type_mongos_test.cpp',
-                LIBDEPS=['base',
-                         '$BUILD_DIR/mongo/db/common'])
-
-env.CppUnitTest('type_tags_test', 'type_tags_test.cpp',
                 LIBDEPS=['base',
                          '$BUILD_DIR/mongo/db/common'])
 

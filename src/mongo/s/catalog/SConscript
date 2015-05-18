@@ -17,7 +17,8 @@ env.Library(
         'type_collection.cpp',
         'type_database.cpp',
         'type_settings.cpp',
-        'type_shard.cpp'
+        'type_shard.cpp',
+        'type_tags.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base/base',
@@ -50,7 +51,8 @@ env.CppUnitTest(
         'type_collection_test.cpp',
         'type_database_test.cpp',
         'type_settings_test.cpp',
-        'type_shard_test.cpp'
+        'type_shard_test.cpp',
+        'type_tags_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/s/catalog/catalog_types'
