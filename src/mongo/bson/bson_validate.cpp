@@ -383,4 +383,12 @@ namespace mongo {
         return validateBSONIterative( &buf );
     }
 
+    Status Validator<BSONObj>::validateLoad(const char* ptr, size_t length) {
+        return validateBSON(ptr, length);
+    }
+
+    Status Validator<BSONObj>::validateStore(const BSONObj& toStore) {
+        return Status::OK();
+    }
+
 }  // namespace mongo
