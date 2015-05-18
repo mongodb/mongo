@@ -40,6 +40,14 @@ var ifaceNumAsFloat64 = map[string]interface{}{
 	"k4": map[string]interface{}{"kk1": "s", "kk2": float64(2)},
 }
 
+// ifaceNumAsMixedTypes is used to test unmarshalling with extended JSON
+var ifaceNumAsMixedTypes = map[string]interface{}{
+	"k1": int32(1),
+	"k2": "s",
+	"k3": []interface{}{int32(1), int32(2), float64(3e-3)},
+	"k4": map[string]interface{}{"kk1": "s", "kk2": int32(2)},
+}
+
 var ifaceNumAsNumber = map[string]interface{}{
 	"k1": Number("1"),
 	"k2": "s",
@@ -224,7 +232,7 @@ var unmarshalTests = []unmarshalTest{
 	{in: `-5`, ptr: new(int16), out: int16(-5)},
 	{in: `2`, ptr: new(Number), out: Number("2"), useNumber: true},
 	{in: `2`, ptr: new(Number), out: Number("2")},
-	{in: `2`, ptr: new(interface{}), out: float64(2.0)},
+	{in: `2`, ptr: new(interface{}), out: int32(2)},
 	{in: `2`, ptr: new(interface{}), out: Number("2"), useNumber: true},
 	{in: `"a\u1234"`, ptr: new(string), out: "a\u1234"},
 	{in: `"http:\/\/"`, ptr: new(string), out: "http://"},
@@ -233,9 +241,9 @@ var unmarshalTests = []unmarshalTest{
 	{in: "null", ptr: new(interface{}), out: nil},
 	{in: `{"X": [1,2,3], "Y": 4}`, ptr: new(T), out: T{Y: 4}, err: &UnmarshalTypeError{"array", reflect.TypeOf("")}},
 	{in: `{"x": 1}`, ptr: new(tx), out: tx{}},
-	{in: `{"F1":1,"F2":2,"F3":3}`, ptr: new(V), out: V{F1: float64(1), F2: int32(2), F3: Number("3")}},
+	{in: `{"F1":1,"F2":2,"F3":3}`, ptr: new(V), out: V{F1: int32(1), F2: int32(2), F3: Number("3")}},
 	{in: `{"F1":1,"F2":2,"F3":3}`, ptr: new(V), out: V{F1: Number("1"), F2: int32(2), F3: Number("3")}, useNumber: true},
-	{in: `{"k1":1,"k2":"s","k3":[1,2.0,3e-3],"k4":{"kk1":"s","kk2":2}}`, ptr: new(interface{}), out: ifaceNumAsFloat64},
+	{in: `{"k1":1,"k2":"s","k3":[1,2,3e-3],"k4":{"kk1":"s","kk2":2}}`, ptr: new(interface{}), out: ifaceNumAsMixedTypes},
 	{in: `{"k1":1,"k2":"s","k3":[1,2.0,3e-3],"k4":{"kk1":"s","kk2":2}}`, ptr: new(interface{}), out: ifaceNumAsNumber, useNumber: true},
 
 	// raw values with whitespace
@@ -1093,7 +1101,7 @@ var interfaceSetTests = []struct {
 	post interface{}
 }{
 	{"foo", `"bar"`, "bar"},
-	{"foo", `2`, 2.0},
+	{"foo", `2`, int32(2)},
 	{"foo", `true`, true},
 	{"foo", `null`, nil},
 
@@ -1311,12 +1319,12 @@ func TestPrefilled(t *testing.T) {
 		{
 			in:  `{"X": 1, "Y": 2}`,
 			ptr: &XYZ{X: float32(3), Y: int16(4), Z: 1.5},
-			out: &XYZ{X: float64(1), Y: float64(2), Z: 1.5},
+			out: &XYZ{X: int32(1), Y: int32(2), Z: 1.5},
 		},
 		{
 			in:  `{"X": 1, "Y": 2}`,
 			ptr: ptrToMap(map[string]interface{}{"X": float32(3), "Y": int16(4), "Z": 1.5}),
-			out: ptrToMap(map[string]interface{}{"X": float64(1), "Y": float64(2), "Z": 1.5}),
+			out: ptrToMap(map[string]interface{}{"X": int32(1), "Y": int32(2), "Z": 1.5}),
 		},
 	}
 

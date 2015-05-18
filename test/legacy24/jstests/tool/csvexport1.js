@@ -8,7 +8,7 @@ assert.eq( 0 , c.count() , "setup1" );
 
 objId = ObjectId()
 
-c.insert({ a : new NumberInt(1) , b : objId , c: [1, 2, 3], d : {a : "hello", b : "world"} , e: '-'})
+c.insert({ a : new NumberInt(1) , b : objId , c: [1.0, 2.0, 3.0], d : {a : "hello", b : "world"} , e: '-'})
 c.insert({ a : -2.0, c : MinKey, d : "Then he said, \"Hello World!\"", e : new NumberLong(3)})
 c.insert({ a : new BinData(0, "1234"), b : ISODate("2009-08-27"), c : new Timestamp(1234, 9876), d : /foo*\"bar\"/i, e : function foo() { print("Hello World!"); }})
 
@@ -27,7 +27,7 @@ assert.soon ( 3 + " == c.count()", "after import");
 
 // Note: Exporting and Importing to/from CSV is not designed to be round-trippable
 expected = []
-expected.push({ a : 1, b : "ObjectId(" + objId.valueOf() + ")", c : "[1,2,3]", d : "{\"a\":\"hello\",\"b\":\"world\"}", e : "-"})
+expected.push({ a : 1, b : "ObjectId(" + objId.valueOf() + ")", c : "[1.0,2.0,3.0]", d : "{\"a\":\"hello\",\"b\":\"world\"}", e : "-"})
 expected.push({ a : -2.0, b : "", c : "$MinKey", d : "Then he said, \"Hello World!\"", e : 3})
 // "t" should be 1234, but the shell interprets the first field of timestamps as milliseconds while
 // they are stored as seconds.  See SERVER-7718.

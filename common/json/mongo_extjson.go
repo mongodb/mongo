@@ -45,6 +45,9 @@ type NumberInt int32
 // Represents a signed 64-bit integer.
 type NumberLong int64
 
+// Represents a signed 64-bit float.
+type NumberFloat float64
+
 // Represents a regular expression.
 type RegExp struct {
 	Pattern string
@@ -83,6 +86,7 @@ var (
 	minKeyType      = reflect.TypeOf(MinKey{})
 	numberIntType   = reflect.TypeOf(NumberInt(0))
 	numberLongType  = reflect.TypeOf(NumberLong(0))
+	numberFloatType = reflect.TypeOf(NumberFloat(0))
 	objectIdType    = reflect.TypeOf(ObjectId(""))
 	regexpType      = reflect.TypeOf(RegExp{})
 	timestampType   = reflect.TypeOf(Timestamp{})

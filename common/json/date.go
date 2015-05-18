@@ -2,8 +2,8 @@ package json
 
 import (
 	"fmt"
-	"reflect"
 	"github.com/mongodb/mongo-tools/common/util"
+	"reflect"
 )
 
 // Transition functions for recognizing Date.
@@ -67,6 +67,7 @@ func (d *decodeState) getDate() interface{} {
 		if err != nil {
 			d.error(fmt.Errorf("unexpected ISODate format"))
 		}
+		d.useNumber = useNumber
 		return ISODate(args[0].(string))
 	}
 	arg0, err := arg0num.Int64()

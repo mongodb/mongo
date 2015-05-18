@@ -40,7 +40,7 @@ func ConvertJSONValueToBSON(x interface{}) (interface{}, error) {
 		}
 		return v, nil
 
-	case string, float64:
+	case string, float64, int32, int64:
 		return v, nil // require no conversion
 
 	case json.ObjectId: // ObjectId
@@ -64,6 +64,8 @@ func ConvertJSONValueToBSON(x interface{}) (interface{}, error) {
 	case json.NumberInt: // NumberInt
 		return int32(v), nil
 
+	case json.NumberFloat: // NumberFloat
+		return float64(v), nil
 	case json.BinData: // BinData
 		data, err := base64.StdEncoding.DecodeString(v.Base64)
 		if err != nil {
@@ -172,10 +174,10 @@ func ConvertBSONValueToJSON(x interface{}) (interface{}, error) {
 		return json.NumberInt(v), nil
 
 	case float64:
-		return json.Float(v), nil
+		return json.NumberFloat(v), nil
 
 	case float32:
-		return json.Float(float64(v)), nil
+		return json.NumberFloat(float64(v)), nil
 
 	case []byte: // BinData (with generic type)
 		data := base64.StdEncoding.EncodeToString(v)

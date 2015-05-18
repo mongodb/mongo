@@ -14,6 +14,7 @@ import (
 	"errors"
 	"fmt"
 	"gopkg.in/mgo.v2/bson"
+	"math"
 	"reflect"
 	"runtime"
 	"strconv"
@@ -760,26 +761,29 @@ func (d *decodeState) literal(v reflect.Value) {
 	d.literalStore(d.data[start:d.off], v, false)
 }
 
-// convertNumber converts the number literal s to an int64, a float64,
+// convertNumber converts the number literal s to an int32, int64, a float64,
 // or a Number depending on the setting of d.useNumber and whether the
-// string is specified in hexadecimal.
+// string is specified in hexadecimal. It does this by parsing the string to see if it
+// can an integer, if not it is treated as a float. If the integer is within the bounds of an int32 it
+// is returned as an int32.
 func (d *decodeState) convertNumber(s string) (interface{}, error) {
 	if d.useNumber {
 		return Number(s), nil
 	}
-	if isHexPrefix(s) {
-		// strconv.ParseInt will infer base 16
-		n, err := strconv.ParseInt(s, 0, 64)
-		if err != nil {
-			return nil, &UnmarshalTypeError{"number " + s, reflect.TypeOf(0)}
-		}
-		return n, nil
-	}
-	f, err := strconv.ParseFloat(s, 64)
+	parsedInteger, err := strconv.ParseInt(s, 0, 64)
 	if err != nil {
-		return nil, &UnmarshalTypeError{"number " + s, reflect.TypeOf(0.0)}
+		parsedFloat, err := strconv.ParseFloat(s, 64)
+		if err != nil {
+			return nil, &UnmarshalTypeError{"number " + s, reflect.TypeOf(0.0)}
+		}
+		return parsedFloat, nil
 	}
-	return f, nil
+
+	if parsedInteger <= math.MaxInt32 && parsedInteger >= math.MinInt32 {
+		return int32(parsedInteger), nil
+	}
+	return int64(parsedInteger), nil
+
 }
 
 var numberType = reflect.TypeOf(Number(""))

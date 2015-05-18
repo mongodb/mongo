@@ -76,7 +76,7 @@ func (csvExporter *CSVExportOutput) ExportDocument(document bson.M) error {
 				rowOut = append(rowOut, string(buf))
 			}
 		} else {
-			rowOut = append(rowOut, fmt.Sprintf("%s", fieldVal))
+			rowOut = append(rowOut, fmt.Sprintf("%v", fieldVal))
 		}
 	}
 	csvExporter.csvWriter.Write(rowOut)

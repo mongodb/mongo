@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/json"
+	"github.com/mongodb/mongo-tools/common/util"
 	"gopkg.in/mgo.v2/bson"
 )
 
@@ -40,12 +41,9 @@ func (md MarshalD) MarshalJSON() ([]byte, error) {
 func MakeSortString(sortObj bson.D) ([]string, error) {
 	sortStrs := make([]string, 0, len(sortObj))
 	for _, docElem := range sortObj {
-		valueAsNumber := float64(0)
-		switch v := docElem.Value.(type) {
-		case float64:
-			valueAsNumber = v
-		default:
-			return nil, fmt.Errorf("sort direction must be numeric type")
+		valueAsNumber, err := util.ToFloat64(docElem.Value)
+		if err != nil {
+			return nil, err
 		}
 		prefix := "+"
 		if valueAsNumber < 0 {
