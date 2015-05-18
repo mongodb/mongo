@@ -28,13 +28,32 @@
 
 #pragma once
 
-#include <boost/thread.hpp>
+#include <boost/thread/mutex.hpp>
 
 namespace mongo {
 namespace stdx {
 
-    using thread = boost::thread;
-    namespace this_thread = boost::this_thread;
+    using boost::mutex;
+    using boost::timed_mutex;
+
+    using boost::adopt_lock_t;
+    using boost::defer_lock_t;
+    using boost::try_to_lock_t;
+
+    using boost::lock_guard;
+    using boost::unique_lock;
+
+#if _MSC_VER < 1900
+#define MONGO_STDX_CONSTEXPR const
+#else
+#define MONGO_STDX_CONSTEXPR constexpr
+#endif
+
+    MONGO_STDX_CONSTEXPR adopt_lock_t adopt_lock{};
+    MONGO_STDX_CONSTEXPR defer_lock_t defer_lock{};
+    MONGO_STDX_CONSTEXPR try_to_lock_t try_to_lock{};
+
+#undef MONGO_STDX_CONSTEXPR
 
 }  // namespace stdx
 }  // namespace mongo

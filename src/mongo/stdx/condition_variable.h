@@ -28,13 +28,13 @@
 
 #pragma once
 
-#include <boost/thread.hpp>
+#include <boost/thread/condition_variable.hpp>
 
 namespace mongo {
 namespace stdx {
 
-    using thread = boost::thread;
-    namespace this_thread = boost::this_thread;
+    using condition_variable = boost::condition_variable;
+    using cv_status = boost::cv_status;
 
 }  // namespace stdx
 }  // namespace mongo

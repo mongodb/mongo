@@ -30,9 +30,9 @@
 #include <semaphore.h>
 #endif
 
-#include <boost/thread/condition_variable.hpp>
-
 #include "mongo/base/disallow_copying.h"
+#include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/mutex.h"
 
 namespace mongo {
@@ -63,14 +63,14 @@ namespace mongo {
 
         // You can read _outof without a lock, but have to hold _resizeMutex to change.
         AtomicInt32 _outof;
-        boost::mutex _resizeMutex;
+        stdx::mutex _resizeMutex;
 #else
         bool _tryAcquire();
 
         AtomicInt32 _outof;
         int _num;
-        mongo::mutex _mutex;
-        boost::condition_variable_any _newTicket;
+        stdx::mutex _mutex;
+        stdx::condition_variable _newTicket;
 #endif
     };
 

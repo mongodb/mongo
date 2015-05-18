@@ -80,7 +80,7 @@ namespace mongo {
     }
 
     Status TicketHolder::resize(int newSize) {
-        boost::lock_guard<boost::mutex> lk(_resizeMutex);
+        stdx::lock_guard<stdx::mutex> lk(_resizeMutex);
 
         if (newSize < 5)
             return Status(ErrorCodes::BadValue,
@@ -127,12 +127,12 @@ namespace mongo {
     TicketHolder::~TicketHolder() = default;
 
     bool TicketHolder::tryAcquire() {
-        boost::lock_guard<boost::mutex> lk( _mutex );
+        stdx::lock_guard<stdx::mutex> lk( _mutex );
         return _tryAcquire();
     }
 
     void TicketHolder::waitForTicket() {
-        boost::unique_lock<boost::mutex> lk( _mutex );
+        stdx::unique_lock<stdx::mutex> lk( _mutex );
 
         while( ! _tryAcquire() ) {
             _newTicket.wait( lk );
@@ -141,14 +141,14 @@ namespace mongo {
 
     void TicketHolder::release() {
         {
-            boost::lock_guard<boost::mutex> lk( _mutex );
+            stdx::lock_guard<stdx::mutex> lk( _mutex );
             _num++;
         }
         _newTicket.notify_one();
     }
 
     Status TicketHolder::resize( int newSize ) {
-        boost::lock_guard<boost::mutex> lk( _mutex );
+        stdx::lock_guard<stdx::mutex> lk( _mutex );
 
         int used = _outof.load() - _num;
         if ( used > newSize ) {
