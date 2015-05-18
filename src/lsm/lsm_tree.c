@@ -27,6 +27,13 @@ __lsm_tree_discard(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, int final)
 
 	WT_UNUSED(final);	/* Only used in diagnostic builds */
 
+	/*
+	 * The work unit queue should be empty, but it's worth checking
+	 * since work units use a different locking scheme to regular tree
+	 * operations.
+	 */
+	WT_ASSERT(session, lsm_tree->queue_ref == 0);
+
 	/* We may be destroying an lsm_tree before it was added. */
 	if (F_ISSET(lsm_tree, WT_LSM_TREE_OPEN)) {
 		WT_ASSERT(session, final ||

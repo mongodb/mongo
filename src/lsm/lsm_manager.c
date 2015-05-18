@@ -658,6 +658,14 @@ __wt_lsm_manager_push_entry(WT_SESSION_IMPL *session,
 	manager = &S2C(session)->lsm_manager;
 
 	/*
+	 * Don't allow any work units unless a tree is active, this avoids
+	 * races on shutdown between clearing out queues and pushing new
+	 * work units.
+	 */
+	if (!F_ISSET(lsm_tree, WT_LSM_TREE_ACTIVE))
+		return (0);
+
+	/*
 	 * Don't add merges or bloom filter creates if merges
 	 * or bloom filters are disabled in the tree.
 	 */
