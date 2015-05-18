@@ -28,7 +28,7 @@
     // make sure it contains the json output
     assert.neq(-1, output.indexOf('exported 20 records'));
     for (var i = 0; i < 20; i++) {
-        assert.neq(-1, output.indexOf('{"_id":'+i+'}'));
+        assert.neq(-1, output.indexOf('{"_id":'+i+".0"+'}'));
     }
 
     // success

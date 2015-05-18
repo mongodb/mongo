@@ -338,7 +338,7 @@ func TestDBRefValue(t *testing.T) {
 				So(ok, ShouldBeTrue)
 				So(jsonValue.Collection, ShouldEqual, "ref")
 
-				id, ok := jsonValue.Id.(float64)
+				id, ok := jsonValue.Id.(int32)
 				So(ok, ShouldBeTrue)
 				So(id, ShouldAlmostEqual, 123)
 			})

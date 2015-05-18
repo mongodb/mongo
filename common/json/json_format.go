@@ -3,6 +3,9 @@ package json
 import (
 	"bytes"
 	"fmt"
+	"math"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -94,12 +97,36 @@ func (_ MaxKey) MarshalJSON() ([]byte, error) {
 }
 
 func (n NumberInt) MarshalJSON() ([]byte, error) {
-	return []byte(fmt.Sprintf("NumberInt(%d)", int32(n))), nil
+	return []byte(strconv.FormatInt(int64(n), 10)), nil
 }
 
 func (n NumberLong) MarshalJSON() ([]byte, error) {
 	data := fmt.Sprintf(`{ "$numberLong": "%v" }`, int64(n))
 	return []byte(data), nil
+}
+
+func (n NumberFloat) MarshalJSON() ([]byte, error) {
+
+	// check floats for infinity and return +Infinity or -Infinity if so
+	if math.IsInf(float64(n), 1) {
+		return []byte("+Infinity"), nil
+	}
+	if math.IsInf(float64(n), -1) {
+		return []byte("-Infinity"), nil
+	}
+
+	floatString := strconv.FormatFloat(float64(n), 'g', -1, 64)
+
+	// determine if the float has a decimal point and if not
+	// add one to maintain consistency when importing.
+	if _, d := math.Modf(float64(n)); d == 0 {
+		// check for 'e' to determine if the float's formatted in scientific notation
+		if strings.IndexByte(floatString, 'e') == -1 {
+			return []byte(floatString + ".0"), nil
+		}
+
+	}
+	return []byte(floatString), nil
 }
 
 // Assumes that o represents a valid ObjectId

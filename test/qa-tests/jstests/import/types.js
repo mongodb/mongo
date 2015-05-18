@@ -24,6 +24,7 @@
       n : ISODate("2015-02-25T16:42:11Z"),
       o: DBRef('namespace', 'identifier', 'database'),
       p: NumberInt(5),
+      q: 5.0
     }
 
     //Make a dummy file to import by writing a test collection and exporting it
@@ -46,17 +47,20 @@
     // DBPointer should turn into a DBRef with a $ref field and hte $id field being an ObjectId. It will not convert back to a DBPointer. 
     
     var oid = ObjectId()
-    var testDBPointer = {
+    var irregularObjects = {
       _id : ObjectId(),
       a : DBPointer('namespace', oid),
       b : NumberInt("5"),
       c : NumberLong("5000"),
+      d : 5, 
+      e : 9223372036854775
+
     }
 
     db1.c.drop()
     db1.c.getDB().getSiblingDB("imported").testcoll3.drop()
     assert.eq( 0 , db1.c.count() , "setup1" );
-    db1.c.save(testDBPointer);
+    db1.c.save(irregularObjects);
     toolTest.runTool.apply(toolTest, ["export" , "--out" , toolTest.extFile , "-d" , toolTest.baseName , "-c" , db1.c.getName()].concat(commonToolArgs));
 
     var ret = toolTest.runTool.apply(toolTest, ["import", "--file",toolTest.extFile, "--db", "imported", "--collection", "testcoll3"].concat(commonToolArgs))
@@ -67,11 +71,15 @@
     var dbRef = DBRef("namespace", oid );
     assert.eq(postImportDoc["a"], dbRef);
 
-    var numInt = NumberInt(5);
-    assert.eq(postImportDoc["b"], numInt);
+    assert.eq(postImportDoc["b"], 5);
+    assert.eq(postImportDoc["d"], 5);
 
     var numLong = NumberLong(5000);
     assert.eq(postImportDoc["c"], numLong);
+
+    numLong = NumberLong(9223372036854775)
+    assert.eq(postImportDoc["e"], numLong)
+
 
 
     toolTest.stop();

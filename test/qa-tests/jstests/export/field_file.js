@@ -16,7 +16,7 @@
     var destColl = testDB.dest;
 
     // the export target
-    var exportTarget = 'field_file_export.csv';
+    var exportTarget = 'jstests/export/testdata/field_file_export.csv';
     removeFile(exportTarget);
 
     // insert some data
@@ -30,21 +30,23 @@
     var ret = toolTest.runTool.apply(
         toolTest,    
         ['export', '--out', exportTarget,
-        '--db', 'test', '--collection', 'source', '--csv',
+        '--db', 'test', '--collection', 'source', '--type=csv',
         '--fieldFile', 'jstests/export/testdata/simple_field_file'].
             concat(commonToolArgs)
     );
     assert.eq(0, ret);
 
+
     // import the data into the destination collection 
     ret = toolTest.runTool.apply(
         toolTest,
         ['import', '--file', exportTarget, '--db', 'test',
-            '--collection', 'dest', '--type', 'csv',
+            '--collection', 'dest', '--type=csv',
             '--fields', 'a,b,c'].
             concat(commonToolArgs)
     );
     assert.eq(0, ret);
+
 
     // make sure only the specified fields were exported
     assert.eq(3, destColl.count({ a: 1 }));

@@ -63,3 +63,16 @@ func ToInt(number interface{}) (int, error) {
 	// no check for "ok" here, since we know it will work
 	return asInterface.(int), nil
 }
+
+var float64Converter = newNumberConverter(reflect.TypeOf(float64(0)))
+
+// ToFloat64 is a function for converting any numeric type
+// into a float64.
+func ToFloat64(number interface{}) (float64, error) {
+	asInterface, err := float64Converter(number)
+	if err != nil {
+		return 0, err
+	}
+	// no check for "ok" here, since we know it will work
+	return asInterface.(float64), nil
+}
