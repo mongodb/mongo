@@ -76,7 +76,7 @@ namespace mongo {
     // static
     bool WorkingSetCommon::fetch(OperationContext* txn,
                                  WorkingSetMember* member,
-                                 const Collection* collection) {
+                                 unowned_ptr<RecordCursor> cursor) {
         // The RecordFetcher should already have been transferred out of the WSM and used.
         invariant(!member->hasFetcher());
 
@@ -85,9 +85,12 @@ namespace mongo {
         invariant(member->hasLoc());
 
         member->obj.reset();
-        if (!collection->findDoc(txn, member->loc, &member->obj)) {
+        auto record = cursor->seekExact(member->loc);
+        if (!record) {
             return false;
         }
+
+        member->obj = {txn->recoveryUnit()->getSnapshotId(), record->data.releaseToBson()};
 
         if (member->isSuspicious) {
             // Make sure that all of the keyData is still valid for this copy of the document.

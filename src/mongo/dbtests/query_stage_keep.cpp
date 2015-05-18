@@ -66,12 +66,10 @@ namespace QueryStageKeep {
         }
 
         void getLocs(set<RecordId>* out, Collection* coll) {
-            RecordIterator* it = coll->getIterator(&_txn);
-            while (!it->isEOF()) {
-                RecordId nextLoc = it->getNext();
-                out->insert(nextLoc);
+            auto cursor = coll->getCursor(&_txn);
+            while (auto record = cursor->next()) {
+                out->insert(record->id);
             }
-            delete it;
         }
 
         void insert(const BSONObj& obj) {
@@ -154,7 +152,10 @@ namespace QueryStageKeep {
                 ASSERT_EQUALS(member->obj.value()["x"].numberInt(), 1);
             }
 
-            ASSERT(cs->isEOF());
+            {
+                WorkingSetID out;
+                ASSERT_EQ(cs->work(&out), PlanStage::IS_EOF);
+            }
 
             // Flagged results *must* be at the end.
             for (size_t i = 0; i < 10; ++i) {

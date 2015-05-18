@@ -50,6 +50,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_size_storer.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
@@ -88,6 +89,195 @@ namespace {
     const std::string kWiredTigerEngineName = "wiredTiger";
 
     const long long WiredTigerRecordStore::kCollectionScanOnCreationThreshold = 10000;
+
+    class WiredTigerRecordStore::Cursor final : public RecordCursor {
+    public:
+        Cursor(OperationContext* txn,
+               const WiredTigerRecordStore& rs,
+               bool forward = true,
+               bool forParallelCollectionScan = false)
+            : _rs(rs)
+            , _txn(txn)
+            , _forward(forward)
+            , _forParallelCollectionScan(forParallelCollectionScan)
+            , _cursor(new WiredTigerCursor(rs.getURI(), rs.instanceId(), true, txn))
+            , _readUntilForOplog(WiredTigerRecoveryUnit::get(txn)->getOplogReadTill())
+        {}
+
+        boost::optional<Record> next() final {
+            if (_eof) return {};
+
+            WT_CURSOR* c = _cursor->get();
+            {
+                // Nothing after the next line can throw WCEs.
+                // Note that an unpositioned (or eof) WT_CURSOR returns the first/last entry in the
+                // table when you call next/prev.
+                int advanceRet = WT_OP_CHECK(_forward ? c->next(c) : c->prev(c));
+                if (advanceRet == WT_NOTFOUND) {
+                    _eof = true;
+                    return {};
+                }
+                invariantWTOK(advanceRet);
+            }
+
+            int64_t key;
+            invariantWTOK(c->get_key(c, &key));
+            const RecordId id = _fromKey(key);
+
+            if (!isVisible(id)) {
+                _eof = true;
+                return {};
+            }
+
+            WT_ITEM value;
+            invariantWTOK(c->get_value(c, &value));
+            auto data = RecordData(static_cast<const char*>(value.data), value.size);
+            data.makeOwned(); // TODO delete this line once safe.
+
+            _lastReturnedId = id;
+            return {{id, std::move(data)}};
+        }
+
+        boost::optional<Record> seekExact(const RecordId& id) final {
+            if (!isVisible(id)) {
+                _eof = true;
+                return {};
+            }
+
+            WT_CURSOR* c = _cursor->get();
+            c->set_key(c, _makeKey(id));
+            // Nothing after the next line can throw WCEs.
+            int seekRet = WT_OP_CHECK(c->search(c));
+            if (seekRet == WT_NOTFOUND) {
+                _eof = true;
+                return {};
+            }
+            invariantWTOK(seekRet);
+
+            WT_ITEM value;
+            invariantWTOK(c->get_value(c, &value));
+            auto data = RecordData(static_cast<const char*>(value.data), value.size);
+            data.makeOwned(); // TODO delete this line once safe.
+
+            _lastReturnedId = id;
+            return {{id, std::move(data)}};
+        }
+
+        void savePositioned() final {
+            // It must be safe to call save() twice in a row without calling restore().
+            if (!_txn) return;
+
+            // the cursor and recoveryUnit are valid on restore
+            // so we just record the recoveryUnit to make sure
+            _savedRecoveryUnit = _txn->recoveryUnit();
+            if ( _cursor && !wt_keeptxnopen() ) {
+                try {
+                    _cursor->reset();
+                }
+                catch (const WriteConflictException& wce) {
+                    // Ignore since this is only called when we are about to kill our transaction
+                    // anyway.
+                }
+            }
+
+            if (_forParallelCollectionScan) {
+                // Delete the cursor since we may come back to a different RecoveryUnit
+                _cursor.reset();
+            }
+            _txn = nullptr;
+        }
+
+        void saveUnpositioned() final {
+            savePositioned();
+            _lastReturnedId = RecordId();
+        }
+
+        bool restore(OperationContext* txn) final {
+            _txn = txn;
+
+            // If we've hit EOF, then this iterator is done and need not be restored.
+            if (_eof) return true;
+
+            bool needRestore = false;
+
+            if (_forParallelCollectionScan) {
+                needRestore = true;
+                _savedRecoveryUnit = txn->recoveryUnit();
+                _cursor.reset( new WiredTigerCursor( _rs.getURI(), _rs.instanceId(), true, txn ) );
+                _forParallelCollectionScan = false; // we only do this the first time
+            }
+            invariant( _savedRecoveryUnit == txn->recoveryUnit() );
+
+            if (!needRestore && wt_keeptxnopen()) return true;
+            if (_lastReturnedId.isNull()) return true;
+
+            // This will ensure an active session exists, so any restored cursors will bind to it
+            invariant(WiredTigerRecoveryUnit::get(txn)->getSession(txn) == _cursor->getSession());
+
+            WT_CURSOR* c = _cursor->get();
+            c->set_key(c, _makeKey(_lastReturnedId));
+
+            int cmp;
+            int ret = WT_OP_CHECK(c->search_near(c, &cmp));
+            if (ret == WT_NOTFOUND) {
+                _eof = true;
+                return !_rs._isCapped;
+            }
+            invariantWTOK(ret);
+
+            if (cmp == 0) return true; // Landed right where we left off.
+
+            if (_rs._isCapped) {
+                // Doc was deleted either by cappedDeleteAsNeeded() or cappedTruncateAfter().
+                // It is important that we error out in this case so that consumers don't
+                // silently get 'holes' when scanning capped collections. We don't make 
+                // this guarantee for normal collections so it is ok to skip ahead in that case.
+                _eof = true;
+                return false;
+            }
+
+            if (_forward && cmp > 0) {
+                // We landed after where we were. Move back one so that next() will return this
+                // document.
+                ret = WT_OP_CHECK(c->prev(c));
+            }
+            else if (!_forward && cmp < 0) {
+                // Do the opposite for reverse cursors.
+                ret = WT_OP_CHECK(c->next(c));
+            }
+            if (ret != WT_NOTFOUND) invariantWTOK(ret);
+
+            return true;
+        }
+
+    private:
+        bool isVisible(const RecordId& id) {
+            if (!_rs._isCapped) return true;
+
+            if ( _readUntilForOplog.isNull() || !_rs._isOplog ) {
+                // this is the normal capped case
+                return !_rs.isCappedHidden(id);
+            }
+
+            // this is for oplogs
+            if (id == _readUntilForOplog) {
+                // we allow if its been committed already
+                return !_rs.isCappedHidden(id);
+            }
+
+            return id < _readUntilForOplog;
+        }
+
+        const WiredTigerRecordStore& _rs;
+        OperationContext* _txn;
+        RecoveryUnit* _savedRecoveryUnit; // only used to sanity check between save/restore.
+        const bool _forward;
+        bool _forParallelCollectionScan; // This can go away once SERVER-17364 is resolved.
+        std::unique_ptr<WiredTigerCursor> _cursor;
+        bool _eof = false;
+        RecordId _lastReturnedId;
+        const RecordId _readUntilForOplog;
+    };
 
     StatusWith<std::string> WiredTigerRecordStore::parseOptionsField(const BSONObj options) {
         StringBuilder ss;
@@ -207,20 +397,10 @@ namespace {
         }
 
         // Find the largest RecordId currently in use and estimate the number of records.
-        scoped_ptr<RecordIterator> iterator( getIterator( ctx, RecordId(),
-                                                          CollectionScanParams::BACKWARD ) );
-        if ( iterator->isEOF() ) {
-            _dataSize.store(0);
-            _numRecords.store(0);
-            // Need to start at 1 so we are always higher than RecordId::min()
-            _nextIdNum.store( 1 );
-            if ( sizeStorer )
-                _sizeStorer->onCreate( this, 0, 0 );
-        }
-        else {
-            RecordId maxLoc = iterator->curr();
-            int64_t max = _makeKey( maxLoc );
-            _oplog_highestSeen = maxLoc;
+        Cursor cursor(ctx, *this, /*forward=*/false);
+        if (auto record = cursor.next()) {
+            int64_t max = _makeKey(record->id);
+            _oplog_highestSeen = record->id;
             _nextIdNum.store( 1 + max );
 
             if ( _sizeStorer ) {
@@ -238,18 +418,24 @@ namespace {
                 _numRecords.store(0);
                 _dataSize.store(0);
 
-                while( !iterator->isEOF() ) {
-                    RecordId loc = iterator->getNext();
-                    RecordData data = iterator->dataFor( loc );
+                do {
                     _numRecords.fetchAndAdd(1);
-                    _dataSize.fetchAndAdd(data.size());
-                }
+                    _dataSize.fetchAndAdd(record->data.size());
+                } while ((record = cursor.next()));
 
                 if ( _sizeStorer ) {
                     _sizeStorer->storeToCache( _uri, _numRecords.load(), _dataSize.load() );
                 }
             }
 
+        }
+        else {
+            _dataSize.store(0);
+            _numRecords.store(0);
+            // Need to start at 1 so we are always higher than RecordId::min()
+            _nextIdNum.store( 1 );
+            if ( sizeStorer )
+                _sizeStorer->onCreate( this, 0, 0 );
         }
 
         _hasBackgroundThread = WiredTigerKVEngine::initRsOplogBackgroundThread(ns);
@@ -688,12 +874,10 @@ namespace {
         }
     }
 
-    RecordIterator* WiredTigerRecordStore::getIterator(
-        OperationContext* txn,
-        const RecordId& start,
-        const CollectionScanParams::Direction& dir) const {
+    std::unique_ptr<RecordCursor> WiredTigerRecordStore::getCursor(OperationContext* txn,
+                                                                   bool forward) const {
 
-        if ( _isOplog && dir == CollectionScanParams::FORWARD ) {
+        if ( _isOplog && forward ) {
             WiredTigerRecoveryUnit* wru = WiredTigerRecoveryUnit::get(txn);
             if ( !wru->inActiveTxn() || wru->getOplogReadTill().isNull() ) {
                 // if we don't have a session, we have no snapshot, so we can update our view
@@ -701,20 +885,15 @@ namespace {
             }
         }
 
-        return new Iterator(*this, txn, start, dir, false);
+        return stdx::make_unique<Cursor>(txn, *this, forward);
     }
 
-
-    std::vector<RecordIterator*> WiredTigerRecordStore::getManyIterators(
-        OperationContext* txn ) const {
-
-        // XXX do we want this to actually return a set of iterators?
-
-        std::vector<RecordIterator*> iterators;
-        iterators.push_back( new Iterator(*this, txn, RecordId(),
-                                          CollectionScanParams::FORWARD, true) );
-
-        return iterators;
+    std::vector<std::unique_ptr<RecordCursor>> WiredTigerRecordStore::getManyCursors(
+            OperationContext* txn) const {
+        std::vector<std::unique_ptr<RecordCursor>> cursors(1);
+        cursors[0] = stdx::make_unique<Cursor>(txn, *this, /*forward=*/true,
+                                               /*forParallelCollectionScan=*/true);
+        return cursors;
     }
 
     Status WiredTigerRecordStore::truncate( OperationContext* txn ) {
@@ -776,22 +955,19 @@ namespace {
 
         long long nrecords = 0;
         long long dataSizeTotal = 0;
-        boost::scoped_ptr<RecordIterator> iter( getIterator( txn ) );
         results->valid = true;
-        while( !iter->isEOF() ) {
+        Cursor cursor(txn, *this, true);
+        while (auto record = cursor.next()) {
             ++nrecords;
             if ( full && scanData ) {
                 size_t dataSize;
-                RecordId loc = iter->curr();
-                RecordData data = dataFor( txn, loc );
-                Status status = adaptor->validate( data, &dataSize );
+                Status status = adaptor->validate( record->data, &dataSize );
                 if ( !status.isOK() ) {
                     results->valid = false;
-                    results->errors.push_back( str::stream() << loc << " is corrupted" );
+                    results->errors.push_back( str::stream() << record->id << " is corrupted" );
                 }
                 dataSizeTotal += static_cast<long long>(dataSize);
             }
-            iter->getNext();
         }
 
         if (_sizeStorer && full && scanData && results->valid) {
@@ -1019,254 +1195,13 @@ namespace {
         return RecordId(key);
     }
 
-    // --------
-
-    WiredTigerRecordStore::Iterator::Iterator(
-        const WiredTigerRecordStore& rs,
-        OperationContext *txn,
-        const RecordId& start,
-        const CollectionScanParams::Direction& dir,
-        bool forParallelCollectionScan)
-        : _rs( rs ),
-          _txn( txn ),
-          _forward( dir == CollectionScanParams::FORWARD ),
-          _forParallelCollectionScan( forParallelCollectionScan ),
-          _cursor( new WiredTigerCursor( rs.getURI(), rs.instanceId(), true, txn ) ),
-          _eof(false),
-          _readUntilForOplog(WiredTigerRecoveryUnit::get(txn)->getOplogReadTill()) {
-        RS_ITERATOR_TRACE("start");
-        _locate(start, true);
-    }
-
-    WiredTigerRecordStore::Iterator::~Iterator() {
-    }
-
-    void WiredTigerRecordStore::Iterator::_locate(const RecordId &loc, bool exact) {
-        RS_ITERATOR_TRACE("_locate " << loc);
-        WT_CURSOR *c = _cursor->get();
-        invariant( c );
-        int ret;
-        if (loc.isNull()) {
-            ret = WT_OP_CHECK(_forward ? c->next(c) : c->prev(c));
-            _eof = (ret == WT_NOTFOUND);
-            if (!_eof) invariantWTOK(ret);
-            _loc = _curr();
-
-            RS_ITERATOR_TRACE("_locate   null loc eof: " << _eof);
-            return;
-        }
-
-        c->set_key(c, _makeKey(loc));
-        if (exact) {
-            ret = WT_OP_CHECK(c->search(c));
-        }
-        else {
-            // If loc doesn't exist, inexact matches should find the first existing record before
-            // it, in the direction of the scan. Note that inexact callers will call _getNext()
-            // after locate so they actually return the record *after* the one we seek to.
-            int cmp;
-            ret = WT_OP_CHECK(c->search_near(c, &cmp));
-            if ( ret == WT_NOTFOUND ) {
-                _eof = true;
-                _loc = RecordId();
-                return;
-            }
-            invariantWTOK(ret);
-            if (_forward) {
-                // return >= loc
-                if (cmp < 0)
-                    ret = WT_OP_CHECK(c->next(c));
-            }
-            else {
-                // return <= loc
-                if (cmp > 0)
-                    ret = WT_OP_CHECK(c->prev(c));
-            }
-        }
-        if (ret != WT_NOTFOUND) invariantWTOK(ret);
-        _eof = (ret == WT_NOTFOUND);
-        _loc = _curr();
-        RS_ITERATOR_TRACE("_locate   not null loc eof: " << _eof);
-    }
-
-    bool WiredTigerRecordStore::Iterator::isEOF() {
-        RS_ITERATOR_TRACE( "isEOF " << _eof << " " << _lastLoc );
-        return _eof;
-    }
-
-    // Allow const functions to use curr to find current location.
-    RecordId WiredTigerRecordStore::Iterator::_curr() const {
-        RS_ITERATOR_TRACE( "_curr" );
-        if (_eof)
-            return RecordId();
-
-        WT_CURSOR *c = _cursor->get();
-        dassert( c );
-        int64_t key;
-        int ret = c->get_key(c, &key);
-        invariantWTOK(ret);
-        return _fromKey(key);
-    }
-
-    RecordId WiredTigerRecordStore::Iterator::curr() {
-        return _loc;
-    }
-
-    void WiredTigerRecordStore::Iterator::_getNext() {
-        // Once you go EOF you never go back.
-        if (_eof) return;
-
-        RS_ITERATOR_TRACE("_getNext");
-        WT_CURSOR *c = _cursor->get();
-        int ret = WT_OP_CHECK(_forward ? c->next(c) : c->prev(c));
-        _eof = (ret == WT_NOTFOUND);
-        RS_ITERATOR_TRACE("_getNext " << ret << " " << _eof );
-        if ( !_eof ) {
-            RS_ITERATOR_TRACE("_getNext " << ret << " " << _eof << " " << _curr() );
-            invariantWTOK(ret);
-            _loc = _curr();
-            RS_ITERATOR_TRACE("_getNext " << ret << " " << _eof << " " << _loc );
-            if ( _rs._isCapped ) {
-                RecordId loc = _curr();
-                if ( _readUntilForOplog.isNull() ) {
-                    // this is the normal capped case
-                    if ( _rs.isCappedHidden( loc ) ) {
-                        _eof = true;
-                    }
-                }
-                else {
-                    // this is for oplogs
-                    if ( loc > _readUntilForOplog ) {
-                        _eof = true;
-                    }
-                    else if ( loc == _readUntilForOplog && _rs.isCappedHidden( loc ) ) {
-                        // we allow if its been commited already
-                        _eof = true;
-                    }
-                }
-            }
-        }
-
-        if (_eof) {
-            _loc = RecordId();
-        }
-    }
-
-    RecordId WiredTigerRecordStore::Iterator::getNext() {
-        RS_ITERATOR_TRACE( "getNext" );
-        const RecordId toReturn = _loc;
-        RS_ITERATOR_TRACE( "getNext toReturn: " << toReturn );
-        _getNext();
-        RS_ITERATOR_TRACE( " ----" );
-        _lastLoc = toReturn;
-        return toReturn;
-    }
-
-    void WiredTigerRecordStore::Iterator::invalidate( const RecordId& dl ) {
-        // this should never be called
-    }
-
-    void WiredTigerRecordStore::Iterator::saveState() {
-        RS_ITERATOR_TRACE("saveState");
-
-        // It must be safe to call saveState() twice in a row without calling restoreState().
-        if (!_txn) return;
-
-        // the cursor and recoveryUnit are valid on restore
-        // so we just record the recoveryUnit to make sure
-        _savedRecoveryUnit = _txn->recoveryUnit();
-        if ( _cursor && !wt_keeptxnopen() ) {
-            try {
-                _cursor->reset();
-            }
-            catch (const WriteConflictException& wce) {
-                // Ignore since this is only called when we are about to kill our transaction
-                // anyway.
-            }
-        }
-
-        if ( _forParallelCollectionScan ) {
-            _cursor.reset( NULL );
-        }
-        _txn = NULL;
-    }
-
-    bool WiredTigerRecordStore::Iterator::restoreState( OperationContext *txn ) {
-
-        // This is normally already the case, but sometimes we are given a new
-        // OperationContext on restore - update the iterators context in that
-        // case
-        _txn = txn;
-
-        // If we've hit EOF, then this iterator is done and need not be restored.
-        if ( _eof ) {
-            return true;
-        }
-
-        bool needRestore = false;
-
-        if ( _forParallelCollectionScan ) {
-            // parallel collection scan or something
-            needRestore = true;
-            _savedRecoveryUnit = txn->recoveryUnit();
-            _cursor.reset( new WiredTigerCursor( _rs.getURI(), _rs.instanceId(), true, txn ) );
-            _forParallelCollectionScan = false; // we only do this the first time
-        }
-
-        invariant( _savedRecoveryUnit == txn->recoveryUnit() );
-        if ( needRestore || !wt_keeptxnopen() ) {
-            // This will ensure an active session exists, so any restored cursors will bind to it
-            invariant(WiredTigerRecoveryUnit::get(txn)->getSession(txn) == _cursor->getSession());
-
-            RecordId saved = _lastLoc;
-            _locate(_lastLoc, false);
-            RS_ITERATOR_TRACE( "isEOF check " << _eof );
-            if ( _eof ) {
-                _lastLoc = RecordId();
-            }
-            else if ( _loc != saved ) {
-                if (_rs._isCapped && _lastLoc != RecordId()) {
-                    // Doc was deleted either by cappedDeleteAsNeeded() or cappedTruncateAfter().
-                    // It is important that we error out in this case so that consumers don't
-                    // silently get 'holes' when scanning capped collections. We don't make 
-                    // this guarantee for normal collections so it is ok to skip ahead in that case.
-                    _eof = true;
-                    return false;
-                }
-                // lastLoc was either deleted or never set (yielded before first call to getNext()),
-                // so bump ahead to the next record.
-            }
-            else {
-                // we found where we left off!
-                // now we advance to the next one
-                RS_ITERATOR_TRACE( "isEOF found " << _curr() );
-                _getNext();
-            }
-        }
-
-        return true;
-    }
-
-    RecordData WiredTigerRecordStore::Iterator::dataFor( const RecordId& loc ) const {
-        // Retrieve the data if the iterator is already positioned at loc, otherwise
-        // open a new cursor and find the data to avoid upsetting the iterators
-        // cursor position.
-        if (loc == _loc) {
-            dassert(loc == _curr());
-            return _rs._getData(*_cursor);
-        }
-        else {
-            return _rs.dataFor( _txn, loc );
-        }
-    }
-
     void WiredTigerRecordStore::temp_cappedTruncateAfter( OperationContext* txn,
                                                           RecordId end,
                                                           bool inclusive ) {
         WriteUnitOfWork wuow(txn);
-        boost::scoped_ptr<RecordIterator> iter( getIterator( txn, end ) );
-        while( !iter->isEOF() ) {
-            RecordId loc = iter->getNext();
+        Cursor cursor(txn, *this);
+        while (auto record = cursor.next()) {
+            RecordId loc = record->id;
             if ( end < loc || ( inclusive && end == loc ) ) {
                 deleteRecord( txn, loc );
             }

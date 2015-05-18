@@ -136,8 +136,10 @@ namespace mongo {
             try {
                 // If the snapshot changed, then we have to make sure we have the latest copy of the
                 // doc and that it still matches.
+                std::unique_ptr<RecordCursor> cursor;
                 if (_txn->recoveryUnit()->getSnapshotId() != member->obj.snapshotId()) {
-                    if (!WorkingSetCommon::fetch(_txn, member, _collection)) {
+                    cursor = _collection->getCursor(_txn);
+                    if (!WorkingSetCommon::fetch(_txn, member, cursor)) {
                         // Doc is already deleted. Nothing more to do.
                         ++_commonStats.needTime;
                         return PlanStage::NEED_TIME;

@@ -124,7 +124,7 @@ namespace mongo {
          */
         MmapV1RecordHeader* recordForV1( const DiskLoc& loc ) const;
 
-        RecordFetcher* recordNeedsFetch( const DiskLoc& loc ) const;
+        std::unique_ptr<RecordFetcher> recordNeedsFetch( const DiskLoc& loc ) const final;
 
         /**
          * @param loc - has to be for a specific MmapV1RecordHeader (not an Extent)

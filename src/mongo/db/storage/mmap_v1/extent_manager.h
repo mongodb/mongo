@@ -30,6 +30,7 @@
 
 #pragma once
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -115,8 +116,10 @@ namespace mongo {
         /**
          * The extent manager tracks accesses to DiskLocs. This returns non-NULL if the DiskLoc has
          * been recently accessed, and therefore has likely been paged into physical memory.
+         * Returns nullptr if the DiskLoc is Null.
+         *
          */
-        virtual RecordFetcher* recordNeedsFetch( const DiskLoc& loc ) const = 0;
+        virtual std::unique_ptr<RecordFetcher> recordNeedsFetch( const DiskLoc& loc ) const = 0;
 
         /**
          * @param loc - has to be for a specific MmapV1RecordHeader (not an Extent)

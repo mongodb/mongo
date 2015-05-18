@@ -149,11 +149,10 @@ namespace ReplTests {
             }
 
             int count = 0;
-            RecordIterator* it = coll->getIterator(&_txn);
-            for ( ; !it->isEOF(); it->getNext() ) {
+            auto cursor = coll->getCursor(&_txn);
+            while (auto record = cursor->next()) {
                 ++count;
             }
-            delete it;
             return count;
         }
         int opCount() {
@@ -170,11 +169,10 @@ namespace ReplTests {
             }
 
             int count = 0;
-            RecordIterator* it = coll->getIterator(&_txn);
-            for ( ; !it->isEOF(); it->getNext() ) {
+            auto cursor = coll->getCursor(&_txn);
+            while (auto record = cursor->next()) {
                 ++count;
             }
-            delete it;
             return count;
         }
         void applyAllOperations() {
@@ -186,12 +184,10 @@ namespace ReplTests {
                 Database* db = ctx.db();
                 Collection* coll = db->getCollection( cllNS() );
 
-                RecordIterator* it = coll->getIterator(&_txn);
-                while ( !it->isEOF() ) {
-                    RecordId currLoc = it->getNext();
-                    ops.push_back(coll->docFor(&_txn, currLoc).value());
+                auto cursor = coll->getCursor(&_txn);
+                while (auto record = cursor->next()) {
+                    ops.push_back(record->data.releaseToBson().getOwned());
                 }
-                delete it;
             }
             {
                 OldClientContext ctx(&_txn,  ns() );
@@ -222,13 +218,11 @@ namespace ReplTests {
                 wunit.commit();
             }
 
-            RecordIterator* it = coll->getIterator(&_txn);
+            auto cursor = coll->getCursor(&_txn);
             ::mongo::log() << "all for " << ns << endl;
-            while ( !it->isEOF() ) {
-                RecordId currLoc = it->getNext();
-                ::mongo::log() << coll->docFor(&_txn, currLoc).value().toString() << endl;
+            while (auto record = cursor->next()) {
+                ::mongo::log() << record->data.releaseToBson() << endl;
             }
-            delete it;
         }
         // These deletes don't get logged.
         void deleteAll( const char *ns ) const {
@@ -243,11 +237,13 @@ namespace ReplTests {
             }
 
             vector< RecordId > toDelete;
-            RecordIterator* it = coll->getIterator(&_txn);
-            while ( !it->isEOF() ) {
-                toDelete.push_back( it->getNext() );
+            {
+                auto cursor = coll->getCursor(&_txn);
+                while (auto record = cursor->next()) {
+                    toDelete.push_back(record->id);
+                }
             }
-            delete it;
+
             for( vector< RecordId >::iterator i = toDelete.begin(); i != toDelete.end(); ++i ) {
                 _txn.setReplicatedWrites(false);
                 coll->deleteDocument( &_txn, *i, true );

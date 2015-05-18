@@ -133,17 +133,14 @@ namespace {
 
     void KVCatalog::init( OperationContext* opCtx ) {
         // No locking needed since called single threaded.
-        scoped_ptr<RecordIterator> it( _rs->getIterator( opCtx ) );
-        while ( !it->isEOF()  ) {
-            RecordId loc = it->getNext();
-            RecordData data = it->dataFor( loc );
-            BSONObj obj( data.data() );
+        auto cursor = _rs->getCursor(opCtx);
+        while (auto record = cursor->next()) {
+            BSONObj obj = record->data.releaseToBson();
 
-            // No locking needed since can only be called from one thread.
             // No rollback since this is just loading already committed data.
             string ns = obj["ns"].String();
             string ident = obj["ident"].String();
-            _idents[ns] = Entry( ident, loc );
+            _idents[ns] = Entry(ident, record->id);
         }
 
         // In the unlikely event that we have used this _rand before generate a new one.
@@ -415,11 +412,9 @@ namespace {
     std::vector<std::string> KVCatalog::getAllIdents( OperationContext* opCtx ) const {
         std::vector<std::string> v;
 
-        scoped_ptr<RecordIterator> it( _rs->getIterator( opCtx ) );
-        while ( !it->isEOF()  ) {
-            RecordId loc = it->getNext();
-            RecordData data = it->dataFor( loc );
-            BSONObj obj( data.data() );
+        auto cursor = _rs->getCursor(opCtx);
+        while (auto record = cursor->next()) {
+            BSONObj obj = record->data.releaseToBson();
             v.push_back( obj["ident"].String() );
 
             BSONElement e = obj["idxIdent"];

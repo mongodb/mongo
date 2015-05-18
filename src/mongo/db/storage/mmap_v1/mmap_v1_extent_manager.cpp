@@ -48,6 +48,7 @@
 #include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
 #include "mongo/db/storage/record_fetcher.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/file.h"
 #include "mongo/util/log.h"
@@ -294,7 +295,8 @@ namespace mongo {
         return record;
     }
 
-    RecordFetcher* MmapV1ExtentManager::recordNeedsFetch( const DiskLoc& loc ) const {
+    std::unique_ptr<RecordFetcher> MmapV1ExtentManager::recordNeedsFetch(const DiskLoc& loc) const {
+        if (loc.isNull()) return {};
         MmapV1RecordHeader* record = _recordForV1( loc );
 
         // For testing: if failpoint is enabled we randomly request fetches without
@@ -302,15 +304,15 @@ namespace mongo {
         if ( MONGO_FAIL_POINT( recordNeedsFetchFail ) ) {
             needsFetchFailCounter.increment();
             if ( ( needsFetchFailCounter.get() % kNeedsFetchFailFreq ) == 0 ) {
-                return new MmapV1RecordFetcher( record );
+                return stdx::make_unique<MmapV1RecordFetcher>( record );
             }
         }
 
         if ( !_recordAccessTracker->checkAccessedAndMark( record ) ) {
-            return new MmapV1RecordFetcher( record );
+            return stdx::make_unique<MmapV1RecordFetcher>( record );
         }
 
-        return NULL;
+        return {};
     }
 
     DiskLoc MmapV1ExtentManager::extentLocForV1( const DiskLoc& loc ) const {

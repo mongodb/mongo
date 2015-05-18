@@ -339,10 +339,9 @@ namespace mongo {
                 OldClientContext ctx(txn,  ns );
                 Collection* coll = originalDatabase->getCollection( ns );
                 if ( coll ) {
-                    scoped_ptr<RecordIterator> it( coll->getIterator(txn) );
-                    while ( !it->isEOF() ) {
-                        RecordId loc = it->getNext();
-                        BSONObj obj = coll->docFor(txn, loc).value();
+                    auto cursor = coll->getCursor(txn);
+                    while (auto record = cursor->next()) {
+                        BSONObj obj = record->data.releaseToBson();
 
                         string ns = obj["name"].String();
 
@@ -404,12 +403,9 @@ namespace mongo {
                     }
                 }
 
-                scoped_ptr<RecordIterator> iterator(originalCollection->getIterator(txn));
-                while ( !iterator->isEOF() ) {
-                    RecordId loc = iterator->getNext();
-                    invariant( !loc.isNull() );
-
-                    BSONObj doc = originalCollection->docFor(txn, loc).value();
+                auto cursor = originalCollection->getCursor(txn);
+                while (auto record = cursor->next()) {
+                    BSONObj doc = record->data.releaseToBson();
 
                     WriteUnitOfWork wunit(txn);
                     StatusWith<RecordId> result = tempCollection->insertDocument(txn,

@@ -44,6 +44,7 @@
 #include "mongo/db/storage/mmap_v1/record.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/mmap_v1/record_store_v1_simple_iterator.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 #include "mongo/util/progress_meter.h"
 #include "mongo/util/mongoutils/str.h"
@@ -238,24 +239,26 @@ namespace mongo {
         _details->setDeletedListEntry(txn, b, dloc);
     }
 
-    RecordIterator* SimpleRecordStoreV1::getIterator( OperationContext* txn,
-                                                      const RecordId& start,
-                                                      const CollectionScanParams::Direction& dir) const {
-        return new SimpleRecordStoreV1Iterator( txn, this, start, dir );
+    std::unique_ptr<RecordCursor> SimpleRecordStoreV1::getCursor(OperationContext* txn,
+                                                                 bool forward) const {
+        return stdx::make_unique<SimpleRecordStoreV1Iterator>( txn, this, forward );
     }
 
-    vector<RecordIterator*> SimpleRecordStoreV1::getManyIterators( OperationContext* txn ) const {
-        OwnedPointerVector<RecordIterator> iterators;
+    vector<std::unique_ptr<RecordCursor>> SimpleRecordStoreV1::getManyCursors(
+            OperationContext* txn) const {
+        vector<std::unique_ptr<RecordCursor>> cursors;
         const Extent* ext;
         for (DiskLoc extLoc = details()->firstExtent(txn); !extLoc.isNull(); extLoc = ext->xnext) {
             ext = _getExtent(txn, extLoc);
             if (ext->firstRecord.isNull())
                 continue;
-            iterators.push_back(
-                new RecordStoreV1Base::IntraExtentIterator(txn, ext->firstRecord, this));
+            cursors.push_back(
+                stdx::make_unique<RecordStoreV1Base::IntraExtentIterator>(txn,
+                                                                          ext->firstRecord,
+                                                                          this));
         }
 
-        return iterators.release();
+        return cursors;
     }
 
     class CompactDocWriter : public DocWriter {

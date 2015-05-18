@@ -194,6 +194,9 @@ namespace mongo {
         typedef unordered_map<RecordId, TextRecordData, RecordId::Hasher> ScoreMap;
         ScoreMap _scores;
         ScoreMap::const_iterator _scoreIterator;
+
+        // Used for fetching records from the collection.
+        std::unique_ptr<RecordCursor> _recordCursor;
     };
 
 } // namespace mongo

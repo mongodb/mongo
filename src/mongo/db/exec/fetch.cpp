@@ -104,24 +104,22 @@ namespace mongo {
                 verify(WorkingSetMember::LOC_AND_IDX == member->state);
                 verify(member->hasLoc());
 
-                // We might need to retrieve 'nextLoc' from secondary storage, in which case we send
-                // a NEED_YIELD request up to the PlanExecutor.
-                std::auto_ptr<RecordFetcher> fetcher(_collection->documentNeedsFetch(_txn,
-                                                                                     member->loc));
-                if (NULL != fetcher.get()) {
-                    // There's something to fetch. Hand the fetcher off to the WSM, and pass up
-                    // a fetch request.
-                    _idRetrying = id;
-                    member->setFetcher(fetcher.release());
-                    *out = id;
-                    _commonStats.needYield++;
-                    return NEED_YIELD;
-                }
-
-                // The doc is already in memory, so go ahead and grab it. Now we have a RecordId
-                // as well as an unowned object
                 try {
-                    if (!WorkingSetCommon::fetch(_txn, member, _collection)) {
+                    if (!_cursor) _cursor = _collection->getCursor(_txn);
+
+                    if (auto fetcher = _cursor->fetcherForId(member->loc)) {
+                        // There's something to fetch. Hand the fetcher off to the WSM, and pass up
+                        // a fetch request.
+                        _idRetrying = id;
+                        member->setFetcher(fetcher.release());
+                        *out = id;
+                        _commonStats.needYield++;
+                        return NEED_YIELD;
+                    }
+
+                    // The doc is already in memory, so go ahead and grab it. Now we have a RecordId
+                    // as well as an unowned object
+                    if (!WorkingSetCommon::fetch(_txn, member, _cursor)) {
                         _ws->free(id);
                         _commonStats.needTime++;
                         return NEED_TIME;
@@ -164,6 +162,7 @@ namespace mongo {
     void FetchStage::saveState() {
         _txn = NULL;
         ++_commonStats.yields;
+        if (_cursor) _cursor->saveUnpositioned();
         _child->saveState();
     }
 
@@ -171,6 +170,7 @@ namespace mongo {
         invariant(_txn == NULL);
         _txn = opCtx;
         ++_commonStats.unyields;
+        if (_cursor) _cursor->restore(opCtx);
         _child->restoreState(opCtx);
     }
 

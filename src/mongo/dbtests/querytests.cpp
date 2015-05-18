@@ -1518,10 +1518,25 @@ namespace QueryTests {
             for( int i = 0; i < 5; ++i ) {
                 insert( ns(), BSONObj() );
             }
-            auto_ptr<DBClientCursor> c = _client.query( ns(), Query(), 5 );
-            ASSERT( c->more() );
-            // With five results and a batch size of 5, no cursor is created.
-            ASSERT_EQUALS( 0, c->getCursorId() );
+            {
+                // With five results and a batch size of 5, a cursor is created since we don't know
+                // there are no more results.
+                std::auto_ptr<DBClientCursor> c = _client.query( ns(), Query(), 5 );
+                ASSERT(c->more());
+                ASSERT_NE(0, c->getCursorId());
+                for (int i = 0; i < 5; ++i) {
+                    ASSERT(c->more());
+                    c->next();
+                }
+                ASSERT(!c->more());
+            }
+            {
+                // With a batchsize of 6 we know there are no more results so we don't create a
+                // cursor.
+                std::auto_ptr<DBClientCursor> c = _client.query( ns(), Query(), 6 );
+                ASSERT(c->more());
+                ASSERT_EQ(0, c->getCursorId());
+            }
         }
     };
     

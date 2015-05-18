@@ -29,12 +29,14 @@
 #pragma once
 
 #include "mongo/db/exec/working_set.h"
+#include "mongo/util/unowned_ptr.h"
 
 namespace mongo {
 
     class CanonicalQuery;
     class Collection;
     class OperationContext;
+    class RecordCursor;
 
     class WorkingSetCommon {
     public:
@@ -68,13 +70,13 @@ namespace mongo {
          */
         static bool fetch(OperationContext* txn,
                           WorkingSetMember* member,
-                          const Collection* collection);
+                          unowned_ptr<RecordCursor> cursor);
 
         static bool fetchIfUnfetched(OperationContext* txn,
                                      WorkingSetMember* member,
-                                     const Collection* collection) {
+                                     unowned_ptr<RecordCursor> cursor) {
             if (member->hasObj()) return true;
-            return fetch(txn, member, collection);
+            return fetch(txn, member, cursor);
         }
 
         /**

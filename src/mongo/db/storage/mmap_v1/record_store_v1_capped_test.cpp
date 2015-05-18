@@ -680,13 +680,10 @@ namespace {
         void walkAndCount (int expectedCount) {
             // Walk the collection going forward.
             {
-                CappedRecordStoreV1Iterator it(&txn, &rs, RecordId(), false,
-                                               CollectionScanParams::FORWARD);
-
+                CappedRecordStoreV1Iterator cursor(&txn, &rs, /*forward=*/true);
                 int resultCount = 0;
-                while (!it.isEOF()) {
+                while (auto record = cursor.next()) {
                     ++resultCount;
-                    it.getNext();
                 }
 
                 ASSERT_EQUALS(resultCount, expectedCount);
@@ -694,13 +691,10 @@ namespace {
 
             // Walk the collection going backwards.
             {
-                CappedRecordStoreV1Iterator it(&txn, &rs, RecordId(), false,
-                                               CollectionScanParams::BACKWARD);
-
+                CappedRecordStoreV1Iterator cursor(&txn, &rs, /*forward=*/false);
                 int resultCount = expectedCount;
-                while (!it.isEOF()) {
+                while (auto record = cursor.next()) {
                     --resultCount;
-                    it.getNext();
                 }
 
                 ASSERT_EQUALS(resultCount, 0);

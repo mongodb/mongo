@@ -93,19 +93,10 @@ namespace mongo {
             invariant(false);
         }
 
-        virtual RecordIterator* getIterator(OperationContext* txn,
-                                            const RecordId& start,
-                                            const CollectionScanParams::Direction& dir) const {
+        std::unique_ptr<RecordCursor> getCursor(OperationContext* txn, bool forward) const final {
             invariant(false);
         }
 
-        virtual RecordIterator* getIteratorForRepair(OperationContext* txn) const {
-            invariant(false);
-        }
-
-        virtual std::vector<RecordIterator*> getManyIterators(OperationContext* txn) const {
-            invariant(false);
-        }
 
         virtual Status truncate(OperationContext* txn) { invariant(false); }
 

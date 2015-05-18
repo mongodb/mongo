@@ -85,34 +85,28 @@ namespace mongo {
             return PlanStage::DEAD; 
         }
 
-        // Do some init if we haven't already.
-        if (NULL == _iter) {
-            if (_params.collection == NULL) {
-                _isDead = true;
-                Status status(ErrorCodes::InternalError,
-                              "CollectionScan died: collection pointer was null");
-                *out = WorkingSetCommon::allocateStatusMember(_workingSet, status);
-                return PlanStage::DEAD;
-            }
+        if ((0 != _params.maxScan) && (_specificStats.docsTested >= _params.maxScan)) {
+            _commonStats.isEOF = true;
+        }
 
-            try {
-                if (_lastSeenLoc.isNull()) {
-                    _iter.reset( _params.collection->getIterator( _txn,
-                                                                  _params.start,
-                                                                  _params.direction ) );
-                }
-                else {
+        if (_commonStats.isEOF) { return PlanStage::IS_EOF; }
+
+        boost::optional<Record> record;
+        const bool needToMakeCursor = !_cursor;
+        try {
+            if (needToMakeCursor) {
+                const bool forward = _params.direction == CollectionScanParams::FORWARD;
+                _cursor = _params.collection->getCursor(_txn, forward);
+
+                if (!_lastSeenId.isNull()) {
                     invariant(_params.tailable);
-
-                    _iter.reset( _params.collection->getIterator( _txn,
-                                                                  _lastSeenLoc,
-                                                                  _params.direction ) );
-
-                    // Advance _iter past where we were last time. If it returns something else,
-                    // mark us as dead since we want to signal an error rather than silently
-                    // dropping data from the stream. This is related to the _lastSeenLoc handling
-                    // in invalidate.
-                    if (_iter->getNext() != _lastSeenLoc) {
+                    // Seek to where we were last time. If it no longer exists, mark us as dead
+                    // since we want to signal an error rather than silently dropping data from the
+                    // stream. This is related to the _lastSeenId handling in invalidate. Note that
+                    // we want to return the record *after* this one since we have already returned
+                    // this one. This is only possible in the tailing case because that is the only
+                    // time we'd need to create a cursor after already getting a record out of it.
+                    if (!_cursor->seekExact(_lastSeenId)) {
                         _isDead = true;
                         Status status(ErrorCodes::InternalError,
                                       "CollectionScan died: Unexpected RecordId");
@@ -120,74 +114,57 @@ namespace mongo {
                         return PlanStage::DEAD;
                     }
                 }
-            }
-            catch (const WriteConflictException& wce) {
-                // Leave us in a state to try again next time.
-                _iter.reset();
-                *out = WorkingSet::INVALID_ID;
-                return PlanStage::NEED_YIELD;
+
+                _commonStats.needTime++;
+                return PlanStage::NEED_TIME;
             }
 
-            ++_commonStats.needTime;
-            return PlanStage::NEED_TIME;
-        }
-
-        // Should we try getNext() on the underlying _iter?
-        if (isEOF()) {
-            _commonStats.isEOF = true;
-            return PlanStage::IS_EOF;
-        }
-
-        const RecordId curr = _iter->curr();
-        if (curr.isNull()) {
-            // We just hit EOF
-            if (_params.tailable)
-                _iter.reset(); // pick up where we left off on the next call to work()
-            else
-                _commonStats.isEOF = true;
-
-            return PlanStage::IS_EOF;
-        }
-
-        _lastSeenLoc = curr;
-
-        // See if the record we're about to access is in memory. If not, pass a fetch request up.
-        // Note that curr() does not touch the record. This way, we are able to yield before
-        // fetching the record.
-        {
-            std::auto_ptr<RecordFetcher> fetcher(
-                _params.collection->documentNeedsFetch(_txn, curr));
-            if (NULL != fetcher.get()) {
-                WorkingSetMember* member = _workingSet->get(_wsidForFetch);
-                member->loc = curr;
-                // Pass the RecordFetcher off to the WSM.
-                member->setFetcher(fetcher.release());
-                *out = _wsidForFetch;
-                _commonStats.needYield++;
-                return PlanStage::NEED_YIELD;
+            if (_lastSeenId.isNull() && !_params.start.isNull()) {
+                record = _cursor->seekExact(_params.start);
             }
-        }
+            else {
+                // See if the record we're about to access is in memory. If not, pass a fetch
+                // request up.
+                if (auto fetcher = _cursor->fetcherForNext()) {
+                    // Pass the RecordFetcher up.
+                    WorkingSetMember* member = _workingSet->get(_wsidForFetch);
+                    member->setFetcher(fetcher.release());
+                    *out = _wsidForFetch;
+                    _commonStats.needYield++;
+                    return PlanStage::NEED_YIELD;
+                }
 
-        // Do this before advancing because it is more efficient while the iterator is still on this
-        // document.
-        const Snapshotted<BSONObj> obj = Snapshotted<BSONObj>(_txn->recoveryUnit()->getSnapshotId(),
-                                                              _iter->dataFor(curr).releaseToBson());
-
-        // Advance the iterator.
-        try {
-            invariant(_iter->getNext() == curr);
+                record = _cursor->next();
+            }
         }
         catch (const WriteConflictException& wce) {
-            // If getNext thows, it leaves us on the original document.
-            invariant(_iter->curr() == curr);
+            // Leave us in a state to try again next time.
+            if (needToMakeCursor)
+                _cursor.reset();
             *out = WorkingSet::INVALID_ID;
             return PlanStage::NEED_YIELD;
         }
 
+        if (!record) {
+            // We just hit EOF. If we are tailable and have already returned data, leave us in a
+            // state to pick up where we left off on the next call to work(). Otherwise EOF is
+            // permanent.
+            if (_params.tailable && !_lastSeenId.isNull()) {
+                _cursor.reset();
+            }
+            else {
+                _commonStats.isEOF = true;
+            }
+            
+            return PlanStage::IS_EOF;
+        }
+
+        _lastSeenId = record->id;
+
         WorkingSetID id = _workingSet->allocate();
         WorkingSetMember* member = _workingSet->get(id);
-        member->loc = curr;
-        member->obj = obj;
+        member->loc = record->id;
+        member->obj = {_txn->recoveryUnit()->getSnapshotId(), record->data.releaseToBson()};
         member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
 
         return returnIfMatches(member, id, out);
@@ -211,17 +188,11 @@ namespace mongo {
     }
 
     bool CollectionScan::isEOF() {
-        if ((0 != _params.maxScan) && (_specificStats.docsTested >= _params.maxScan)) {
-            return true;
-        }
-        if (_isDead) { return true; }
-        if (NULL == _iter) { return false; }
-        if (_params.tailable) { return false; } // tailable cursors can return data later.
-        return _iter->isEOF();
+        return _commonStats.isEOF || _isDead;
     }
 
     void CollectionScan::invalidate(OperationContext* txn,
-                                    const RecordId& dl,
+                                    const RecordId& id,
                                     InvalidationType type) {
         ++_commonStats.invalidates;
 
@@ -231,14 +202,14 @@ namespace mongo {
             return;
         }
 
-        // If we're here, 'dl' is being deleted.
+        // If we're here, 'id' is being deleted.
 
-        // Deletions can harm the underlying RecordIterator so we must pass them down.
-        if (NULL != _iter) {
-            _iter->invalidate(dl);
+        // Deletions can harm the underlying RecordCursor so we must pass them down.
+        if (_cursor) {
+            _cursor->invalidate(id);
         }
 
-        if (_params.tailable && dl == _lastSeenLoc) {
+        if (_params.tailable && id == _lastSeenId) {
             // This means that deletes have caught up to the reader. We want to error in this case
             // so readers don't miss potentially important data.
             _isDead = true;
@@ -248,8 +219,8 @@ namespace mongo {
     void CollectionScan::saveState() {
         _txn = NULL;
         ++_commonStats.yields;
-        if (NULL != _iter) {
-            _iter->saveState();
+        if (_cursor) {
+            _cursor->savePositioned();
         }
     }
 
@@ -257,8 +228,8 @@ namespace mongo {
         invariant(_txn == NULL);
         _txn = opCtx;
         ++_commonStats.unyields;
-        if (NULL != _iter) {
-            if (!_iter->restoreState(opCtx)) {
+        if (_cursor) {
+            if (!_cursor->restore(opCtx)) {
                 warning() << "Collection dropped or state deleted during yield of CollectionScan: "
                           << opCtx->getNS();
                 _isDead = true;

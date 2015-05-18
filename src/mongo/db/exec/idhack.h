@@ -28,12 +28,16 @@
 
 #pragma once
 
+#include <memory>
+
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/record_id.h"
 
 namespace mongo {
+
+    class RecordCursor;
 
     /**
      * A standalone stage implementing the fast path for key-value retrievals
@@ -87,6 +91,8 @@ namespace mongo {
 
         // Not owned here.
         const Collection* _collection;
+
+        std::unique_ptr<RecordCursor> _recordCursor;
 
         // The WorkingSet we annotate with results.  Not owned by us.
         WorkingSet* _workingSet;

@@ -36,7 +36,7 @@
 
 namespace mongo {
 
-    class SimpleRecordStoreV1Iterator;
+    class SimpleRecordStoreV1Cursor;
 
     // used by index and original collections
     class SimpleRecordStoreV1 : public RecordStoreV1Base {
@@ -51,10 +51,10 @@ namespace mongo {
 
         const char* name() const { return "SimpleRecordStoreV1"; }
 
-        virtual RecordIterator* getIterator( OperationContext* txn, const RecordId& start,
-                                             const CollectionScanParams::Direction& dir) const;
+        std::unique_ptr<RecordCursor> getCursor(OperationContext* txn, bool forward) const final;
 
-        virtual std::vector<RecordIterator*> getManyIterators(OperationContext* txn) const;
+        std::vector<std::unique_ptr<RecordCursor>> getManyCursors(
+            OperationContext* txn) const final;
 
         virtual Status truncate(OperationContext* txn);
 

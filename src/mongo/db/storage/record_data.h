@@ -71,6 +71,18 @@ namespace mongo {
         // TODO uncomment once we require compilers that support overloading for rvalue this.
         // BSONObj toBson() && { return releaseToBson(); }
 
+        RecordData getOwned() const {
+            if (isOwned()) return *this;
+            auto buffer = SharedBuffer::allocate(_size);
+            memcpy(buffer.get(), _data, _size);
+            return RecordData(buffer, _size);
+        }
+
+        void makeOwned() {
+            if (isOwned()) return;
+            *this = getOwned();
+        }
+
     private:
         const char* _data;
         int _size;

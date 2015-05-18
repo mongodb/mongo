@@ -107,7 +107,7 @@ details.
 
 * KVEngine
 * RecordStore
-* RecordIterator
+* RecordCursor
 * RecoveryUnit
 * SortedDataInterface
 * ServerStatusSection

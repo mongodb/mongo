@@ -417,29 +417,25 @@ namespace mongo {
         {
             int x = 0;
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            scoped_ptr<RecordIterator> it( rs->getIterator( opCtx.get() ) );
-            while ( !it->isEOF() ) {
-                RecordId loc = it->getNext();
-                RecordData data = it->dataFor( loc );
+            auto cursor = rs->getCursor(opCtx.get());
+            while (auto record = cursor->next()) {
                 string s = str::stream() << "eliot" << x++;
-                ASSERT_EQUALS( s, data.data() );
+                ASSERT_EQUALS(s, record->data.data());
             }
             ASSERT_EQUALS( N, x );
+            ASSERT(!cursor->next());
         }
 
         {
             int x = N;
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            scoped_ptr<RecordIterator> it( rs->getIterator( opCtx.get(),
-                                                           RecordId(),
-                                                           CollectionScanParams::BACKWARD ) );
-            while ( !it->isEOF() ) {
-                RecordId loc = it->getNext();
-                RecordData data = it->dataFor( loc );
+            auto cursor = rs->getCursor(opCtx.get(), false);
+            while (auto record = cursor->next()) {
                 string s = str::stream() << "eliot" << --x;
-                ASSERT_EQUALS( s, data.data() );
+                ASSERT_EQUALS(s, record->data.data());
             }
             ASSERT_EQUALS( 0, x );
+            ASSERT(!cursor->next());
         }
 
     }

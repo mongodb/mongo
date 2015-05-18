@@ -41,6 +41,7 @@
 #include "mongo/db/storage/mmap_v1/extent_manager.h"
 #include "mongo/db/storage/mmap_v1/record.h"
 #include "mongo/db/storage/mmap_v1/record_store_v1_repair_iterator.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 #include "mongo/util/progress_meter.h"
 #include "mongo/util/timer.h"
@@ -283,12 +284,6 @@ namespace mongo {
         return result;
     }
 
-    RecordFetcher* RecordStoreV1Base::recordNeedsFetch( OperationContext* txn,
-                                                        const RecordId& loc ) const {
-        return _extentManager->recordNeedsFetch( DiskLoc::fromRecordId(loc) );
-    }
-
-
     StatusWith<RecordId> RecordStoreV1Base::insertRecord( OperationContext* txn,
                                                           const DocWriter* doc,
                                                           bool enforceQuota ) {
@@ -503,8 +498,9 @@ namespace mongo {
 
     }
 
-    RecordIterator* RecordStoreV1Base::getIteratorForRepair(OperationContext* txn) const {
-        return new RecordStoreV1RepairIterator(txn, this);
+    std::unique_ptr<RecordCursor> RecordStoreV1Base::getCursorForRepair(
+            OperationContext* txn) const {
+        return stdx::make_unique<RecordStoreV1RepairCursor>(txn, this);
     }
 
     void RecordStoreV1Base::_addRecordToRecListInExtent(OperationContext* txn,
@@ -719,22 +715,22 @@ namespace mongo {
                 long long nlen = 0;
                 long long bsonLen = 0;
                 int outOfOrder = 0;
-                DiskLoc cl_last;
+                DiskLoc dl_last;
 
-                scoped_ptr<RecordIterator> iterator( getIterator(txn) );
-                DiskLoc cl;
-                while ( !( cl = DiskLoc::fromRecordId(iterator->getNext()) ).isNull() ) {
+                auto cursor = getCursor(txn);
+                while (auto record = cursor->next()) {
+                    const auto dl = DiskLoc::fromRecordId(record->id);
                     n++;
 
                     if ( n < 1000000 )
-                        recs.insert(cl);
+                        recs.insert(dl);
                     if ( isCapped() ) {
-                        if ( cl < cl_last )
+                        if ( dl < dl_last )
                             outOfOrder++;
-                        cl_last = cl;
+                        dl_last = dl;
                     }
 
-                    MmapV1RecordHeader *r = recordFor(cl);
+                    MmapV1RecordHeader *r = recordFor(dl);
                     len += r->lengthWithHeaders();
                     nlen += r->netLength();
 
@@ -922,21 +918,34 @@ namespace mongo {
         return Status::OK();
     }
 
-    RecordId RecordStoreV1Base::IntraExtentIterator::getNext() {
-        if (_curr.isNull())
-            return RecordId();
+    boost::optional<Record> RecordStoreV1Base::IntraExtentIterator::next() {
+        if (_curr.isNull()) return {};
+        auto out = _curr.toRecordId();
+        advance();
+        return {{out, _rs->dataFor(_txn, out)}};
+    }
 
-        const DiskLoc out = _curr; // we always return where we were, not where we will be.
+    boost::optional<Record> RecordStoreV1Base::IntraExtentIterator::seekExact(const RecordId& id) {
+        invariant(!"seekExact not supported");
+    }
+
+    void RecordStoreV1Base::IntraExtentIterator::advance() {
+        if (_curr.isNull())
+            return;
+
         const MmapV1RecordHeader* rec = recordFor(_curr);
         const int nextOfs = _forward ? rec->nextOfs() : rec->prevOfs();
         _curr = (nextOfs == DiskLoc::NullOfs ? DiskLoc() : DiskLoc(_curr.a(), nextOfs));
-        return out.toRecordId();;
     }
 
     void RecordStoreV1Base::IntraExtentIterator::invalidate(const RecordId& rid) {
         if (rid == _curr.toRecordId()) {
-            getNext();
+            advance();
         }
+    }
+
+    std::unique_ptr<RecordFetcher> RecordStoreV1Base::IntraExtentIterator::fetcherForNext() const {
+        return _rs->_extentManager->recordNeedsFetch(_curr);
     }
 
     int RecordStoreV1Base::quantizeAllocationSpace(int allocSize) {

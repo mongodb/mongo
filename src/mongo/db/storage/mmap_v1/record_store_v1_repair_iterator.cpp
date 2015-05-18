@@ -40,31 +40,34 @@ namespace mongo {
 
     using std::endl;
 
-    RecordStoreV1RepairIterator::RecordStoreV1RepairIterator(OperationContext* txn,
+    RecordStoreV1RepairCursor::RecordStoreV1RepairCursor(OperationContext* txn,
                                                              const RecordStoreV1Base* recordStore)
         : _txn(txn), _recordStore(recordStore), _stage(FORWARD_SCAN) {
         
         // Position the iterator at the first record
         //
-        getNext();
+        advance();
     }
 
-    bool RecordStoreV1RepairIterator::isEOF() {
-        return _currRecord.isNull();
+    boost::optional<Record> RecordStoreV1RepairCursor::next() {
+        if (_currRecord.isNull()) return {};
+        auto out = _currRecord.toRecordId();
+        advance();
+        return {{out, _recordStore->dataFor(_txn, out)}};
     }
 
-    RecordId RecordStoreV1RepairIterator::curr() { return _currRecord.toRecordId(); }
+    boost::optional<Record> RecordStoreV1RepairCursor::seekExact(const RecordId& id) {
+        invariant(!"seekExact not supported");
+    }
 
-    RecordId RecordStoreV1RepairIterator::getNext() {
-        const DiskLoc retVal = _currRecord;
-
+    void RecordStoreV1RepairCursor::advance() {
         const ExtentManager* em = _recordStore->_extentManager;
 
         while (true) {
             if (_currRecord.isNull()) {
 
                 if (!_advanceToNextValidExtent()) {
-                    return retVal.toRecordId();
+                    return;
                 }
 
                 _seenInCurrentExtent.clear();
@@ -108,11 +111,11 @@ namespace mongo {
                 continue;
             }
 
-            return retVal.toRecordId();
+            return;
         }
     }
 
-    bool RecordStoreV1RepairIterator::_advanceToNextValidExtent() {
+    bool RecordStoreV1RepairCursor::_advanceToNextValidExtent() {
         const ExtentManager* em = _recordStore->_extentManager;
 
         while (true) {
@@ -186,7 +189,7 @@ namespace mongo {
         return true;
     }
 
-    void RecordStoreV1RepairIterator::invalidate(const RecordId& id) {
+    void RecordStoreV1RepairCursor::invalidate(const RecordId& id) {
         // If we see this record again it probably means it was reinserted rather than an infinite
         // loop. If we do loop, we should quickly hit another seen record that hasn't been
         // invalidated.
@@ -196,22 +199,18 @@ namespace mongo {
         if (_currRecord == dl) {
             // The DiskLoc being invalidated is also the one pointed at by this iterator. We
             // advance the iterator so it's not pointing at invalid data.
-            getNext();
+            advance();
 
             if (_currRecord == dl) {
                 // Even after advancing the iterator, we're still pointing at the DiskLoc being
                 // invalidated. This is expected when 'dl' is the last DiskLoc in the FORWARD scan,
                 // and the initial call to getNext() moves the iterator to the first loc in the
                 // BACKWARDS scan.
-                getNext();
+                advance();
             }
 
             invariant(_currRecord != dl);
         }
-    }
-
-    RecordData RecordStoreV1RepairIterator::dataFor(const RecordId& loc) const {
-        return _recordStore->dataFor( _txn, loc );
     }
 
 }  // namespace mongo

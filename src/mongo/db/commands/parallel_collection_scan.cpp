@@ -100,8 +100,7 @@ namespace mongo {
                                                     "numCursors has to be between 1 and 10000" <<
                                                     " was: " << numCursors ) );
 
-            OwnedPointerVector<RecordIterator> iterators(collection->getManyIterators(txn));
-
+            auto iterators = collection->getManyCursors(txn);
             if (iterators.size() < numCursors) {
                 numCursors = iterators.size();
             }
@@ -135,9 +134,9 @@ namespace mongo {
                 MultiIteratorStage* mis = static_cast<MultiIteratorStage*>(theExec->getRootStage());
 
                 // This wasn't called above as they weren't assigned yet
-                iterators[i]->saveState();
+                iterators[i]->savePositioned();
 
-                mis->addIterator(iterators.releaseAt(i));
+                mis->addIterator(std::move(iterators[i]));
             }
 
             {

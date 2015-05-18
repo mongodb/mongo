@@ -98,29 +98,34 @@ namespace mongo {
         }
 
         // we work from the back to the front since the back has the newest data.
-        const RecordId loc = _subIterators.back()->curr();
-        if (loc.isNull()) return PlanStage::NEED_TIME;
-
-        // TODO: should we ever try and return NEED_YIELD here?
-        const BSONObj obj = _subIterators.back()->dataFor(loc).releaseToBson();
-        if (!_filter->matchesBSON(obj)) {
-            _done = true;
-            WorkingSetID id = _workingSet->allocate();
-            WorkingSetMember* member = _workingSet->get(id);
-            member->loc = loc;
-            member->obj = Snapshotted<BSONObj>(_txn->recoveryUnit()->getSnapshotId(), obj);
-            member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
-            *out = id;
-            return PlanStage::ADVANCED;
+        try {
+            // TODO: should we ever check fetcherForNext()?
+            if (auto record = _subIterators.back()->next()) {
+                BSONObj obj = record->data.releaseToBson();
+                if (!_filter->matchesBSON(obj)) {
+                    _done = true;
+                    WorkingSetID id = _workingSet->allocate();
+                    WorkingSetMember* member = _workingSet->get(id);
+                    member->loc = record->id;
+                    member->obj = {_txn->recoveryUnit()->getSnapshotId(), std::move(obj)};
+                    member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
+                    *out = id;
+                    return PlanStage::ADVANCED;
+                }
+            }
+        }
+        catch (const WriteConflictException& wce) {
+            *out = WorkingSet::INVALID_ID;
+            return PlanStage::NEED_YIELD;
         }
 
-        _subIterators.popAndDeleteBack();
+        _subIterators.pop_back();
         return PlanStage::NEED_TIME;
     }
 
     void OplogStart::switchToExtentHopping() {
         // Set up our extent hopping state.
-        _subIterators = _collection->getManyIterators(_txn);
+        _subIterators = _collection->getManyCursors(_txn);
 
         // Transition from backwards scanning to extent hopping.
         _backwardsScanning = false;
@@ -179,7 +184,7 @@ namespace mongo {
         }
 
         for (size_t i = 0; i < _subIterators.size(); i++) {
-            _subIterators[i]->saveState();
+            _subIterators[i]->savePositioned();
         }
     }
 
@@ -191,7 +196,7 @@ namespace mongo {
         }
 
         for (size_t i = 0; i < _subIterators.size(); i++) {
-            if (!_subIterators[i]->restoreState(opCtx)) {
+            if (!_subIterators[i]->restore(opCtx)) {
                 _subIterators.erase(_subIterators.begin() + i);
                 // need to hit same i on next pass through loop
                 i--;

@@ -263,8 +263,8 @@ namespace mongo {
         invariant(false);
     }
 
-    RecordFetcher* DummyExtentManager::recordNeedsFetch( const DiskLoc& loc ) const {
-        return NULL;
+    std::unique_ptr<RecordFetcher> DummyExtentManager::recordNeedsFetch(const DiskLoc& loc) const {
+        return {};
     }
 
     MmapV1RecordHeader* DummyExtentManager::recordForV1( const DiskLoc& loc ) const {

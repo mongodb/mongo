@@ -110,8 +110,7 @@ namespace mongo {
         boost::scoped_ptr<CollectionScan> _cs;
 
         // This is only used for the extent hopping scan.
-        typedef OwnedPointerVector<RecordIterator> SubIterators;
-        SubIterators _subIterators;
+        std::vector<std::unique_ptr<RecordCursor>> _subIterators;
 
         // Have we done our heavy init yet?
         bool _needInit;

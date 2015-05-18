@@ -39,8 +39,6 @@
 
 namespace mongo {
 
-    class InMemoryRecordIterator;
-
     /**
      * A RecordStore that stores all data in-memory.
      *
@@ -87,13 +85,7 @@ namespace mongo {
                                           const char* damageSource,
                                           const mutablebson::DamageVector& damages );
 
-        virtual RecordIterator* getIterator( OperationContext* txn,
-                                             const RecordId& start,
-                                             const CollectionScanParams::Direction& dir) const;
-
-        virtual RecordIterator* getIteratorForRepair( OperationContext* txn ) const;
-
-        virtual std::vector<RecordIterator*> getManyIterators( OperationContext* txn ) const;
+        std::unique_ptr<RecordCursor> getCursor(OperationContext* txn, bool forward) const final;
 
         virtual Status truncate( OperationContext* txn );
 
@@ -166,6 +158,9 @@ namespace mongo {
         class RemoveChange;
         class TruncateChange;
 
+        class Cursor;
+        class ReverseCursor;
+
         StatusWith<RecordId> extractAndCheckLocForOplog(const char* data, int len) const;
 
         RecordId allocateLoc();
@@ -189,70 +184,6 @@ namespace mongo {
         };
 
         Data* const _data;
-    };
-
-    class InMemoryRecordIterator : public RecordIterator {
-    public:
-        InMemoryRecordIterator(OperationContext* txn,
-                               const InMemoryRecordStore::Records& records,
-                               const InMemoryRecordStore& rs,
-                               RecordId start = RecordId(),
-                               bool tailable = false);
-
-        virtual bool isEOF();
-
-        virtual RecordId curr();
-
-        virtual RecordId getNext();
-
-        virtual void invalidate(const RecordId& dl);
-
-        virtual void saveState();
-
-        virtual bool restoreState(OperationContext* txn);
-
-        virtual RecordData dataFor( const RecordId& loc ) const;
-
-    private:
-        OperationContext* _txn; // not owned
-        InMemoryRecordStore::Records::const_iterator _it;
-        bool _tailable;
-        RecordId _lastLoc; // only for restarting tailable
-        bool _killedByInvalidate;
-
-        const InMemoryRecordStore::Records& _records;
-        const InMemoryRecordStore& _rs;
-    };
-
-    class InMemoryRecordReverseIterator : public RecordIterator {
-    public:
-        InMemoryRecordReverseIterator(OperationContext* txn,
-                                      const InMemoryRecordStore::Records& records,
-                                      const InMemoryRecordStore& rs,
-                                      RecordId start = RecordId());
-
-        virtual bool isEOF();
-
-        virtual RecordId curr();
-
-        virtual RecordId getNext();
-
-        virtual void invalidate(const RecordId& dl);
-
-        virtual void saveState();
-
-        virtual bool restoreState(OperationContext* txn);
-
-        virtual RecordData dataFor( const RecordId& loc ) const;
-
-    private:
-        OperationContext* _txn; // not owned
-        InMemoryRecordStore::Records::const_reverse_iterator _it;
-        bool _killedByInvalidate;
-        RecordId _savedLoc; // isNull if saved at EOF
-
-        const InMemoryRecordStore::Records& _records;
-        const InMemoryRecordStore& _rs;
     };
 
 } // namespace mongo

@@ -38,6 +38,7 @@
 #include "mongo/db/storage/mmap_v1/mmap.h"
 #include "mongo/db/storage/mmap_v1/record.h"
 #include "mongo/db/storage/mmap_v1/record_store_v1_capped_iterator.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -599,14 +600,15 @@ namespace mongo {
         }
     }
 
-    RecordIterator* CappedRecordStoreV1::getIterator( OperationContext* txn,
-                                                      const RecordId& start,
-                                                      const CollectionScanParams::Direction& dir) const {
-        return new CappedRecordStoreV1Iterator( txn, this, start, false, dir );
+    std::unique_ptr<RecordCursor> CappedRecordStoreV1::getCursor(OperationContext* txn,
+                                                                 bool forward) const {
+
+        return stdx::make_unique<CappedRecordStoreV1Iterator>(txn, this, forward);
     }
 
-    vector<RecordIterator*> CappedRecordStoreV1::getManyIterators( OperationContext* txn ) const {
-        OwnedPointerVector<RecordIterator> iterators;
+    vector<std::unique_ptr<RecordCursor>> CappedRecordStoreV1::getManyCursors(
+            OperationContext* txn) const {
+        vector<std::unique_ptr<RecordCursor>> cursors;
 
         if (!_details->capLooped()) {
             // if we haven't looped yet, just spit out all extents (same as non-capped impl)
@@ -616,9 +618,8 @@ namespace mongo {
                 if (ext->firstRecord.isNull())
                     continue;
 
-                iterators.push_back(new RecordStoreV1Base::IntraExtentIterator(txn,
-                                                                               ext->firstRecord,
-                                                                               this));
+                cursors.push_back(stdx::make_unique<RecordStoreV1Base::IntraExtentIterator>(
+                        txn, ext->firstRecord, this));
             }
         }
         else {
@@ -634,9 +635,8 @@ namespace mongo {
                 const Extent* ext = _getExtent(txn, extLoc);
                 if (ext->firstRecord != details()->capFirstNewRecord()) {
                     // this means there is old data in capExtent
-                    iterators.push_back(new RecordStoreV1Base::IntraExtentIterator(txn,
-                                                                                   ext->firstRecord,
-                                                                                   this));
+                    cursors.push_back(stdx::make_unique<RecordStoreV1Base::IntraExtentIterator>(
+                            txn, ext->firstRecord, this));
                 }
 
                 extLoc = ext->xnext.isNull() ? details()->firstExtent(txn) : ext->xnext;
@@ -645,21 +645,18 @@ namespace mongo {
             // Next handle all the other extents
             while (extLoc != capExtent) {
                 const Extent* ext = _getExtent(txn, extLoc);
-                iterators.push_back(new RecordStoreV1Base::IntraExtentIterator(txn,
-                                                                               ext->firstRecord,
-                                                                               this));
+                cursors.push_back(stdx::make_unique<RecordStoreV1Base::IntraExtentIterator>(
+                        txn, ext->firstRecord, this));
 
                 extLoc = ext->xnext.isNull() ? details()->firstExtent(txn) : ext->xnext;
             }
 
             // Finally handle the "new" data in the capExtent
-            iterators.push_back(
-                new RecordStoreV1Base::IntraExtentIterator(txn,
-                                                           details()->capFirstNewRecord(),
-                                                           this));
+            cursors.push_back(stdx::make_unique<RecordStoreV1Base::IntraExtentIterator>(
+                    txn, details()->capFirstNewRecord(), this));
         }
 
-        return iterators.release();
+        return cursors;
     }
 
     void CappedRecordStoreV1::_maybeComplain( OperationContext* txn, int len ) const {

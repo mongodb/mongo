@@ -270,11 +270,9 @@ namespace {
         invariant( details );
 
         RecordStoreV1Base* systemIndexRecordStore = _getIndexRecordStore();
-        scoped_ptr<RecordIterator> it( systemIndexRecordStore->getIterator(txn) );
-
-        while ( !it->isEOF() ) {
-            RecordId loc = it->getNext();
-            BSONObj oldIndexSpec = it->dataFor( loc ).toBson();
+        auto cursor = systemIndexRecordStore->getCursor(txn);
+        while (auto record = cursor->next()) {
+            BSONObj oldIndexSpec = record->data.releaseToBson();
             if ( fromNS != oldIndexSpec["ns"].valuestrsafe() )
                 continue;
 
@@ -326,7 +324,7 @@ namespace {
                     return s;
             }
 
-            systemIndexRecordStore->deleteRecord( txn, loc );
+            systemIndexRecordStore->deleteRecord( txn, record->id );
         }
 
         return Status::OK();
@@ -381,12 +379,11 @@ namespace {
             BSONObj oldSpec;
             {
                 RecordStoreV1Base* rs = _getNamespaceRecordStore();
-                scoped_ptr<RecordIterator> it( rs->getIterator(txn) );
-                while ( !it->isEOF() ) {
-                    RecordId loc = it->getNext();
-                    BSONObj entry = it->dataFor( loc ).toBson();
+                auto cursor = rs->getCursor(txn);
+                while (auto record = cursor->next()) {
+                    BSONObj entry = record->data.releaseToBson();
                     if ( fromNS == entry["name"].String() ) {
-                        oldSpecLocation = loc;
+                        oldSpecLocation = record->id;
                         oldSpec = entry.getOwned();
                         break;
                     }
@@ -864,13 +861,12 @@ namespace {
         RecordStoreV1Base* rs = _getNamespaceRecordStore();
         invariant( rs );
 
-        scoped_ptr<RecordIterator> it( rs->getIterator(txn) );
-        while ( !it->isEOF() ) {
-            RecordId loc = it->getNext();
-            BSONObj entry = it->dataFor( loc ).toBson();
+        auto cursor = rs->getCursor(txn);
+        while (auto record = cursor->next()) {
+            BSONObj entry = record->data.releaseToBson();
             BSONElement name = entry["name"];
             if ( name.type() == String && name.String() == ns ) {
-                rs->deleteRecord( txn, loc );
+                rs->deleteRecord( txn, record->id );
                 break;
             }
         }
@@ -885,10 +881,9 @@ namespace {
         RecordStoreV1Base* rs = _getNamespaceRecordStore();
         invariant( rs );
 
-        scoped_ptr<RecordIterator> it( rs->getIterator(txn) );
-        while ( !it->isEOF() ) {
-            RecordId loc = it->getNext();
-            BSONObj entry = it->dataFor( loc ).toBson();
+        auto cursor = rs->getCursor(txn);
+        while (auto record = cursor->next()) {
+            BSONObj entry = record->data.releaseToBson();
             BSONElement name = entry["name"];
             if ( name.type() == String && name.String() == ns ) {
                 CollectionOptions options;

@@ -39,112 +39,83 @@ namespace mongo {
     //
     // Capped collection traversal
     //
-    CappedRecordStoreV1Iterator::CappedRecordStoreV1Iterator( OperationContext* txn,
-                                                              const CappedRecordStoreV1* collection,
-                                                              const RecordId& start, bool tailable,
-                                                              const CollectionScanParams::Direction& dir)
-        : _txn(txn), _recordStore(collection), _curr(DiskLoc::fromRecordId(start))
-        , _tailable(tailable), _direction(dir), _killedByInvalidate(false) {
+    CappedRecordStoreV1Iterator::CappedRecordStoreV1Iterator(OperationContext* txn,
+                                                             const CappedRecordStoreV1* collection,
+                                                             bool forward)
+        : _txn(txn), _recordStore(collection), _forward(forward) {
 
-        if (_curr.isNull()) {
+        const RecordStoreV1MetaData* nsd = _recordStore->details();
 
-            const RecordStoreV1MetaData* nsd = _recordStore->details();
-
-            // If a start position isn't specified, we fill one out from the start of the
-            // collection.
-            if (CollectionScanParams::FORWARD == _direction) {
-                // Going forwards.
-                if (!nsd->capLooped()) {
-                    // If our capped collection doesn't loop around, the first record is easy.
-                    _curr = collection->firstRecord(_txn);
-                }
-                else {
-                    // Our capped collection has "looped' around.
-                    // Copied verbatim from ForwardCappedCursor::init.
-                    // TODO ELABORATE
-                    _curr = _getExtent( nsd->capExtent() )->firstRecord;
-                    if (!_curr.isNull() && _curr == nsd->capFirstNewRecord()) {
-                        _curr = _getExtent( nsd->capExtent() )->lastRecord;
-                        _curr = nextLoop(_curr);
-                    }
-                }
+        // If a start position isn't specified, we fill one out from the start of the
+        // collection.
+        if (_forward) {
+            // Going forwards.
+            if (!nsd->capLooped()) {
+                // If our capped collection doesn't loop around, the first record is easy.
+                _curr = collection->firstRecord(_txn);
             }
             else {
-                // Going backwards
-                if (!nsd->capLooped()) {
-                    // Start at the end.
-                    _curr = collection->lastRecord(_txn);
-                }
-                else {
+                // Our capped collection has "looped' around.
+                // Copied verbatim from ForwardCappedCursor::init.
+                // TODO ELABORATE
+                _curr = _getExtent( nsd->capExtent() )->firstRecord;
+                if (!_curr.isNull() && _curr == nsd->capFirstNewRecord()) {
                     _curr = _getExtent( nsd->capExtent() )->lastRecord;
+                    _curr = nextLoop(_curr);
                 }
+            }
+        }
+        else {
+            // Going backwards
+            if (!nsd->capLooped()) {
+                // Start at the end.
+                _curr = collection->lastRecord(_txn);
+            }
+            else {
+                _curr = _getExtent( nsd->capExtent() )->lastRecord;
             }
         }
     }
 
-    bool CappedRecordStoreV1Iterator::isEOF() { return _curr.isNull(); }
+    boost::optional<Record> CappedRecordStoreV1Iterator::next() {
+        if (isEOF()) return {};
+        auto toReturn = _curr.toRecordId();
+        _curr = getNextCapped(_curr);
+        return {{toReturn, _recordStore->RecordStore::dataFor(_txn, toReturn)}};
+    }
 
-    RecordId CappedRecordStoreV1Iterator::curr() { return _curr.toRecordId(); }
-
-    RecordId CappedRecordStoreV1Iterator::getNext() {
-        DiskLoc ret = _curr;
-
-        // Move to the next thing.
-        if (!isEOF()) {
-            _prev = _curr;
-            _curr = getNextCapped(_curr);
-        }
-        else if (_tailable && !_prev.isNull()) {
-            // If we're tailable, there COULD have been something inserted even though we were
-            // previously EOF.  Look at the next thing from 'prev' and see.
-            DiskLoc newCurr = getNextCapped(_prev);
-
-            if (!newCurr.isNull()) {
-                // There's something new to return.  _curr always points to the next thing to
-                // return.  Update it, and move _prev to the thing we just returned.
-                _prev = ret = newCurr;
-                _curr = getNextCapped(_prev);
-            }
-        }
-
-        return ret.toRecordId();
+    boost::optional<Record> CappedRecordStoreV1Iterator::seekExact(const RecordId& id) {
+        _curr = getNextCapped(DiskLoc::fromRecordId(id));
+        return {{id, _recordStore->RecordStore::dataFor(_txn, id)}};
     }
 
     void CappedRecordStoreV1Iterator::invalidate(const RecordId& id) {
         const DiskLoc dl = DiskLoc::fromRecordId(id);
-        if ((_tailable && _curr.isNull() && dl == _prev) || (dl == _curr)) {
-            // In the _tailable case, we're about to kill the DiskLoc that we're tailing.  Nothing
-            // that we can possibly do to survive that.
-            //
-            // In the _curr case, we *could* move to the next thing, since there is actually a next
+        if (dl == _curr) {
+            // We *could* move to the next thing, since there is actually a next
             // thing, but according to clientcursor.cpp:
             // "note we cannot advance here. if this condition occurs, writes to the oplog
-            //  have "caught" the reader.  skipping ahead, the reader would miss postentially
+            //  have "caught" the reader.  skipping ahead, the reader would miss potentially
             //  important data."
-            _curr = _prev = DiskLoc();
+            _curr = DiskLoc();
             _killedByInvalidate = true;
         }
     }
 
-    void CappedRecordStoreV1Iterator::saveState() {
+    void CappedRecordStoreV1Iterator::savePositioned() {
+        _txn = nullptr;
     }
 
-    bool CappedRecordStoreV1Iterator::restoreState(OperationContext* txn) {
+    bool CappedRecordStoreV1Iterator::restore(OperationContext* txn) {
         _txn = txn;
-        // If invalidate invalidated the DiskLoc we relied on, give up now.
-        if (_killedByInvalidate) {
-            _recordStore = NULL;
-            return false;
-        }
-
-        return true;
+        return !_killedByInvalidate;
     }
 
     DiskLoc CappedRecordStoreV1Iterator::getNextCapped(const DiskLoc& dl) {
         invariant(!dl.isNull());
         const RecordStoreV1MetaData* details = _recordStore->details();
 
-        if (CollectionScanParams::FORWARD == _direction) {
+        if (_forward) {
             // If it's not looped, it's easy.
             if (!_recordStore->details()->capLooped()) {
                 return _getNextRecord( dl );
@@ -220,9 +191,6 @@ namespace mongo {
         return _recordStore->lastRecord(_txn);
     }
 
-    RecordData CappedRecordStoreV1Iterator::dataFor( const RecordId& loc ) const {
-        return _recordStore->dataFor( _txn, loc );
-    }
 
     Extent* CappedRecordStoreV1Iterator::_getExtent( const DiskLoc& loc ) {
         return _recordStore->_extentManager->getExtent( loc );
@@ -234,6 +202,15 @@ namespace mongo {
 
     DiskLoc CappedRecordStoreV1Iterator::_getPrevRecord( const DiskLoc& loc ) {
         return _recordStore->getPrevRecord( _txn, loc );
+    }
+
+    std::unique_ptr<RecordFetcher> CappedRecordStoreV1Iterator::fetcherForNext() const {
+        return _recordStore->_extentManager->recordNeedsFetch(_curr);
+    }
+
+    std::unique_ptr<RecordFetcher> CappedRecordStoreV1Iterator::fetcherForId(
+            const RecordId& id) const {
+        return _recordStore->_extentManager->recordNeedsFetch(DiskLoc::fromRecordId(id));
     }
 
 }  // namespace mongo

@@ -364,10 +364,9 @@ namespace {
         if (!namespaces)
             return;
 
-        boost::scoped_ptr<RecordIterator> iterator(namespaces->getIterator(txn));
-        while (!iterator->isEOF()) {
-            const RecordId loc = iterator->getNext();
-            const BSONObj oldEntry = iterator->dataFor(loc).toBson();
+        auto cursor = namespaces->getCursor(txn);
+        while (auto record = cursor->next()) {
+            BSONObj oldEntry = record->data.releaseToBson();
             BSONElement e = oldEntry["name"];
             if (e.type() != String)
                 continue;
@@ -376,8 +375,10 @@ namespace {
                 continue;
 
             const BSONObj newEntry = applyUpdateOperators(oldEntry, update);
-            StatusWith<RecordId> result = namespaces->updateRecord(txn, loc, newEntry.objdata(),
-                                                                   newEntry.objsize(), false, NULL);
+            StatusWith<RecordId> result = namespaces->updateRecord(txn, record->id,
+                                                                   newEntry.objdata(),
+                                                                   newEntry.objsize(),
+                                                                   false, NULL);
             fassert(17486, result.getStatus());
             return;
         }

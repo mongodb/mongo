@@ -54,8 +54,8 @@ namespace mongo {
         member->state = WorkingSetMember::LOC_AND_OWNED_OBJ;
     }
 
-    void MultiIteratorStage::addIterator(RecordIterator* it) {
-        _iterators.push_back(it);
+    void MultiIteratorStage::addIterator(std::unique_ptr<RecordCursor> it) {
+        _iterators.push_back(std::move(it));
     }
 
     PlanStage::StageState MultiIteratorStage::work(WorkingSetID* out) {
@@ -66,47 +66,36 @@ namespace mongo {
             return PlanStage::DEAD;
         }
 
-        if (_iterators.empty())
-            return PlanStage::IS_EOF;
-
-        const RecordId curr = _iterators.back()->curr();
-        Snapshotted<BSONObj> obj;
-
-        // The RecordId we're about to look at it might not be in memory. In this case
-        // we request a yield while we fetch the document.
-        if (!curr.isNull()) {
-            std::auto_ptr<RecordFetcher> fetcher(_collection->documentNeedsFetch(_txn, curr));
-            if (NULL != fetcher.get()) {
-                WorkingSetMember* member = _ws->get(_wsidForFetch);
-                member->loc = curr;
-                // Pass the RecordFetcher off to the WSM on which we're performing the fetch.
-                member->setFetcher(fetcher.release());
-                *out = _wsidForFetch;
-                return NEED_YIELD;
-            }
-
-            obj = Snapshotted<BSONObj>(_txn->recoveryUnit()->getSnapshotId(),
-                                       _iterators.back()->dataFor(curr).releaseToBson());
-        }
-
+        boost::optional<Record> record;
         try {
-            _advance();
+            while (!_iterators.empty()) {
+                if (auto fetcher = _iterators.back()->fetcherForNext()) {
+                    // Pass the RecordFetcher off up.
+                    WorkingSetMember* member = _ws->get(_wsidForFetch);
+                    member->setFetcher(fetcher.release());
+                    *out = _wsidForFetch;
+                    return NEED_YIELD;
+                }
+
+                record = _iterators.back()->next();
+                if (record) break;
+                _iterators.pop_back();
+            }
         }
         catch (const WriteConflictException& wce) {
             // If _advance throws a WCE we shouldn't have moved.
             invariant(!_iterators.empty());
-            invariant(_iterators.back()->curr() == curr);
             *out = WorkingSet::INVALID_ID;
             return NEED_YIELD;
         }
 
-        if (curr.isNull())
-            return NEED_TIME;
+        if (!record)
+            return IS_EOF;
 
         *out = _ws->allocate();
         WorkingSetMember* member = _ws->get(*out);
-        member->loc = curr;
-        member->obj = obj;
+        member->loc = record->id;
+        member->obj = {_txn->recoveryUnit()->getSnapshotId(), record->data.releaseToBson()};
         member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
         return PlanStage::ADVANCED;
     }
@@ -123,7 +112,7 @@ namespace mongo {
     void MultiIteratorStage::saveState() {
         _txn = NULL;
         for (size_t i = 0; i < _iterators.size(); i++) {
-            _iterators[i]->saveState();
+            _iterators[i]->savePositioned();
         }
     }
 
@@ -131,7 +120,7 @@ namespace mongo {
         invariant(_txn == NULL);
         _txn = opCtx;
         for (size_t i = 0; i < _iterators.size(); i++) {
-            if (!_iterators[i]->restoreState(opCtx)) {
+            if (!_iterators[i]->restore(opCtx)) {
                 kill();
             }
         }
@@ -162,15 +151,6 @@ namespace mongo {
                                                                STAGE_MULTI_ITERATOR));
         ret->specific.reset(new CollectionScanStats());
         return ret.release();
-    }
-
-    void MultiIteratorStage::_advance() {
-        if (_iterators.back()->isEOF()) {
-            _iterators.popAndDeleteBack();
-        }
-        else {
-            _iterators.back()->getNext();
-        }
     }
 
 } // namespace mongo

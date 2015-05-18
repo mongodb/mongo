@@ -189,9 +189,6 @@ namespace mongo {
         void deleteRecord( OperationContext* txn,
                            const RecordId& dl );
 
-        virtual RecordFetcher* recordNeedsFetch( OperationContext* txn,
-                                                 const RecordId& loc ) const;
-
         StatusWith<RecordId> insertRecord( OperationContext* txn,
                                            const char* data,
                                            int len,
@@ -216,7 +213,7 @@ namespace mongo {
                                           const char* damageSource,
                                           const mutablebson::DamageVector& damages );
 
-        virtual RecordIterator* getIteratorForRepair( OperationContext* txn ) const;
+        virtual std::unique_ptr<RecordCursor> getCursorForRepair( OperationContext* txn ) const;
 
         void increaseStorageSize( OperationContext* txn, int size, bool enforceQuota );
 
@@ -314,7 +311,7 @@ namespace mongo {
         ExtentManager* _extentManager;
         bool _isSystemIndexes;
 
-        friend class RecordStoreV1RepairIterator;
+        friend class RecordStoreV1RepairCursor;
     };
 
     /**
@@ -322,7 +319,7 @@ namespace mongo {
      *
      * EOF at end of extent, even if there are more extents.
      */
-    class RecordStoreV1Base::IntraExtentIterator : public RecordIterator {
+    class RecordStoreV1Base::IntraExtentIterator final : public RecordCursor {
     public:
         IntraExtentIterator(OperationContext* txn,
                             DiskLoc start,
@@ -330,22 +327,20 @@ namespace mongo {
                             bool forward = true)
             : _txn(txn), _curr(start), _rs(rs), _forward(forward) {}
 
-        virtual bool isEOF() { return _curr.isNull(); }
-
-        virtual RecordId curr() { return _curr.toRecordId(); }
-
-        virtual RecordId getNext( );
-
-        virtual void invalidate(const RecordId& dl);
-
-        virtual void saveState() {}
-
-        virtual bool restoreState(OperationContext* txn) { return true; }
-
-        virtual RecordData dataFor( const RecordId& loc ) const { return _rs->dataFor(_txn, loc); }
+        boost::optional<Record> next() final;
+        boost::optional<Record> seekExact(const RecordId& id) final;
+        void invalidate(const RecordId& dl) final;
+        void savePositioned() final {}
+        bool restore(OperationContext* txn) final { return true; }
+        std::unique_ptr<RecordFetcher> fetcherForNext() const final;
 
     private:
-        virtual const MmapV1RecordHeader* recordFor( const DiskLoc& loc ) const { return _rs->recordFor(loc); }
+        virtual const MmapV1RecordHeader* recordFor( const DiskLoc& loc ) const {
+            return _rs->recordFor(loc);
+        }
+
+        void advance();
+
         OperationContext* _txn;
         DiskLoc _curr;
         const RecordStoreV1Base* _rs;

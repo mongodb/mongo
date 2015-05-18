@@ -58,19 +58,9 @@ namespace mongo {
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            vector<RecordIterator*> v = rs->getManyIterators( opCtx.get() );
-
-            for (vector<RecordIterator*>::iterator vIter = v.begin();
-                 vIter != v.end(); vIter++) {
-
-                RecordIterator *rIter = *vIter;
-                ASSERT( rIter->isEOF() );
-                ASSERT_EQUALS( RecordId(), rIter->curr() );
-                ASSERT_EQUALS( RecordId(), rIter->getNext() );
-                ASSERT( rIter->isEOF() );
-                ASSERT_EQUALS( RecordId(), rIter->curr() );
-
-                delete rIter;
+            for (auto&& cursor : rs->getManyCursors(opCtx.get())) {
+                ASSERT(!cursor->next());
+                ASSERT(!cursor->next());
             }
         }
     }
@@ -113,24 +103,12 @@ namespace mongo {
         set<RecordId> remain( locs, locs + nToInsert );
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            vector<RecordIterator*> v = rs->getManyIterators( opCtx.get() );
-
-            for (vector<RecordIterator*>::iterator vIter = v.begin();
-                 vIter != v.end(); vIter++) {
-
-                RecordIterator *rIter = *vIter;
-                while ( !rIter->isEOF() ) {
-                    RecordId loc = rIter->curr();
-                    ASSERT( 1 == remain.erase( loc ) );
-                    ASSERT_EQUALS( loc, rIter->getNext() );
+            for (auto&& cursor : rs->getManyCursors(opCtx.get())) {
+                while (auto record = cursor->next()) {
+                    ASSERT_EQ(remain.erase(record->id), size_t(1));
                 }
 
-                ASSERT_EQUALS( RecordId(), rIter->curr() );
-                ASSERT_EQUALS( RecordId(), rIter->getNext() );
-                ASSERT( rIter->isEOF() );
-                ASSERT_EQUALS( RecordId(), rIter->curr() );
-
-                delete rIter;
+                ASSERT(!cursor->next());
             }
             ASSERT( remain.empty() );
         }

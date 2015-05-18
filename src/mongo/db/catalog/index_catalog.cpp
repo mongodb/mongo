@@ -277,9 +277,9 @@ namespace {
         // which allows creation of indexes using new plugins.
 
         RecordStore* indexes = dbce->getRecordStore(dbce->name() + ".system.indexes");
-        boost::scoped_ptr<RecordIterator> it(indexes->getIterator(txn));
-        while (!it->isEOF()) {
-            const BSONObj index = it->dataFor(it->getNext()).toBson();
+        auto cursor = indexes->getCursor(txn);
+        while (auto record = cursor->next()) {
+            const BSONObj index = record->data.releaseToBson();
             const BSONObj key = index.getObjectField("key");
             const string plugin = IndexNames::findPluginName(key);
             if ( IndexNames::existedBefore24(plugin) )

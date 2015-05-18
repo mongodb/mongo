@@ -80,9 +80,8 @@ namespace mongo {
                                                   "ns does not exist: " + ns.ns()));
             }
 
-            std::auto_ptr<RecordIterator> iter(
-                collection->getRecordStore()->getIteratorForRepair(txn));
-            if (iter.get() == NULL) {
+            auto cursor = collection->getRecordStore()->getCursorForRepair(txn);
+            if (!cursor) {
                 return appendCommandStatus(result,
                                            Status(ErrorCodes::CommandNotSupported,
                                                   "repair iterator not supported"));
@@ -91,7 +90,7 @@ namespace mongo {
             std::auto_ptr<WorkingSet> ws(new WorkingSet());
             std::auto_ptr<MultiIteratorStage> stage(new MultiIteratorStage(txn, ws.get(),
                                                                            collection));
-            stage->addIterator(iter.release());
+            stage->addIterator(std::move(cursor));
 
             PlanExecutor* rawExec;
             Status execStatus = PlanExecutor::make(txn,

@@ -38,7 +38,7 @@
 
 namespace mongo {
 
-    class CappedRecordStoreV1 : public RecordStoreV1Base {
+    class CappedRecordStoreV1 final : public RecordStoreV1Base {
     public:
         CappedRecordStoreV1( OperationContext* txn,
                              CappedDocumentDeleteCallback* collection,
@@ -47,11 +47,11 @@ namespace mongo {
                              ExtentManager* em,
                              bool isSystemIndexes );
 
-        virtual ~CappedRecordStoreV1();
+        ~CappedRecordStoreV1() final;
 
-        const char* name() const { return "CappedRecordStoreV1"; }
+        const char* name() const final { return "CappedRecordStoreV1"; }
 
-        virtual Status truncate(OperationContext* txn);
+        Status truncate(OperationContext* txn) final;
 
         /**
          * Truncate documents newer than the document at 'end' from the capped
@@ -60,13 +60,12 @@ namespace mongo {
          * @param inclusive - Truncate 'end' as well iff true
          * XXX: this will go away soon, just needed to move for now
          */
-        virtual void temp_cappedTruncateAfter(OperationContext* txn, RecordId end, bool inclusive);
+        void temp_cappedTruncateAfter(OperationContext* txn, RecordId end, bool inclusive) final;
 
-        virtual RecordIterator* getIterator( OperationContext* txn,
-                                             const RecordId& start,
-                                             const CollectionScanParams::Direction& dir) const;
+        std::unique_ptr<RecordCursor> getCursor(OperationContext* txn, bool forward) const final;
 
-        virtual std::vector<RecordIterator*> getManyIterators( OperationContext* txn ) const;
+        std::vector<std::unique_ptr<RecordCursor>> getManyCursors(
+            OperationContext* txn) const final;
 
         // Start from firstExtent by default.
         DiskLoc firstRecord( OperationContext* txn,
@@ -77,18 +76,18 @@ namespace mongo {
 
     protected:
 
-        virtual bool isCapped() const { return true; }
-        virtual bool shouldPadInserts() const { return false; }
+        bool isCapped() const final { return true; }
+        bool shouldPadInserts() const final { return false; }
 
-        virtual void setCappedDeleteCallback( CappedDocumentDeleteCallback* cb ) {
+        void setCappedDeleteCallback( CappedDocumentDeleteCallback* cb ) final {
             _deleteCallback = cb;
         }
 
-        virtual StatusWith<DiskLoc> allocRecord( OperationContext* txn,
+        StatusWith<DiskLoc> allocRecord( OperationContext* txn,
                                                  int lengthWithHeaders,
-                                                 bool enforceQuota );
+                                                 bool enforceQuota ) final;
 
-        virtual void addDeletedRec(OperationContext* txn, const DiskLoc& dloc);
+        void addDeletedRec(OperationContext* txn, const DiskLoc& dloc) final;
 
     private:
         // -- start copy from cap.cpp --

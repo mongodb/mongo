@@ -28,7 +28,7 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
+#include <memory>
 
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/jsobj.h"
@@ -36,6 +36,8 @@
 #include "mongo/db/record_id.h"
 
 namespace mongo {
+
+    class RecordCursor;
 
     /**
      * This stage turns a RecordId into a BSONObj.
@@ -88,10 +90,12 @@ namespace mongo {
         // Collection which is used by this stage. Used to resolve record ids retrieved by child
         // stages. The lifetime of the collection must supersede that of the stage.
         const Collection* _collection;
+        // Used to fetch Records from _collection.
+        std::unique_ptr<RecordCursor> _cursor;
 
         // _ws is not owned by us.
         WorkingSet* _ws;
-        boost::scoped_ptr<PlanStage> _child;
+        std::unique_ptr<PlanStage> _child;
 
         // The filter is not owned by us.
         const MatchExpression* _filter;

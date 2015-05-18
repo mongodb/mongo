@@ -133,6 +133,8 @@ namespace mongo {
         for (size_t i = 0; i < _scanners.size(); ++i) {
             _scanners.mutableVector()[i]->saveState();
         }
+
+        if (_recordCursor) _recordCursor->saveUnpositioned();
     }
 
     void TextStage::restoreState(OperationContext* opCtx) {
@@ -143,6 +145,8 @@ namespace mongo {
         for (size_t i = 0; i < _scanners.size(); ++i) {
             _scanners.mutableVector()[i]->restoreState(opCtx);
         }
+
+        if (_recordCursor) invariant(_recordCursor->restore(opCtx));
     }
 
     void TextStage::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {
@@ -195,6 +199,8 @@ namespace mongo {
 
     PlanStage::StageState TextStage::initScans(WorkingSetID* out) {
         invariant(0 == _scanners.size());
+
+        _recordCursor = _params.index->getCollection()->getCursor(_txn);
 
         _specificStats.parsedTextQuery = _params.query.toBSON();
 
@@ -304,7 +310,7 @@ namespace mongo {
 
         WorkingSetMember* wsm = _ws->get(textRecordData.wsid);
         try {
-            if (!WorkingSetCommon::fetchIfUnfetched(_txn, wsm, _params.index->getCollection())) {
+            if (!WorkingSetCommon::fetchIfUnfetched(_txn, wsm, _recordCursor)) {
                 _scoreIterator++;
                 _ws->free(textRecordData.wsid);
                 _commonStats.needTime++;
@@ -338,9 +344,9 @@ namespace mongo {
                               const BSONObj& keyPattern,
                               const BSONObj& key,
                               WorkingSetMember* wsm,
-                              const Collection* collection)
+                              unowned_ptr<RecordCursor> recordCursor)
             : _txn(txn),
-              _collection(collection),
+              _recordCursor(recordCursor),
               _keyPattern(keyPattern),
               _key(key),
               _wsm(wsm) { }
@@ -384,14 +390,16 @@ namespace mongo {
 
     private:
         BSONObj getObj() const {
-            if (!WorkingSetCommon::fetchIfUnfetched(_txn, _wsm, _collection))
+            if (!WorkingSetCommon::fetchIfUnfetched(_txn, _wsm, _recordCursor))
                 throw DocumentDeletedException();
 
+            // Make it owned since we are buffering results.
+            _wsm->obj.setValue(_wsm->obj.value().getOwned());
             return _wsm->obj.value();
         }
 
         OperationContext* _txn;
-        const Collection* _collection;
+        unowned_ptr<RecordCursor> _recordCursor;
         BSONObj _keyPattern;
         BSONObj _key;
         WorkingSetMember* _wsm;
@@ -420,7 +428,7 @@ namespace mongo {
                                                newKeyData.indexKeyPattern,
                                                newKeyData.keyData,
                                                wsm,
-                                               _params.index->getCollection());
+                                               _recordCursor);
                     shouldKeep = _filter->matches(&tdoc);
                 }
                 catch (const WriteConflictException& wce) {

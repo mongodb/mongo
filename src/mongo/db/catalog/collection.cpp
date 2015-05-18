@@ -203,19 +203,17 @@ namespace {
         return true;
     }
 
-    RecordIterator* Collection::getIterator( OperationContext* txn,
-                                             const RecordId& start,
-                                             const CollectionScanParams::Direction& dir) const {
+    std::unique_ptr<RecordCursor> Collection::getCursor(OperationContext* txn, bool forward) const {
         dassert(txn->lockState()->isCollectionLockedForMode(ns().toString(), MODE_IS));
         invariant( ok() );
 
-        return _recordStore->getIterator( txn, start, dir );
+        return _recordStore->getCursor(txn, forward);
     }
 
-    vector<RecordIterator*> Collection::getManyIterators( OperationContext* txn ) const {
+    vector<std::unique_ptr<RecordCursor>> Collection::getManyCursors(OperationContext* txn) const {
         dassert(txn->lockState()->isCollectionLockedForMode(ns().toString(), MODE_IS));
 
-        return _recordStore->getManyIterators(txn);
+        return _recordStore->getManyCursors(txn);
     }
 
     Snapshotted<BSONObj> Collection::docFor(OperationContext* txn, const RecordId& loc) const {
@@ -370,12 +368,6 @@ namespace {
 
         return loc;
     }
-
-    RecordFetcher* Collection::documentNeedsFetch( OperationContext* txn,
-                                                   const RecordId& loc ) const {
-        return _recordStore->recordNeedsFetch( txn, loc );
-    }
-
 
     StatusWith<RecordId> Collection::_insertDocument( OperationContext* txn,
                                                      const BSONObj& docToInsert,

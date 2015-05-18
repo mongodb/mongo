@@ -97,11 +97,12 @@ namespace mongo {
         if (_done) { return PlanStage::IS_EOF; }
 
         if (WorkingSet::INVALID_ID != _idBeingPagedIn) {
+            invariant(_recordCursor);
             WorkingSetID id = _idBeingPagedIn;
             _idBeingPagedIn = WorkingSet::INVALID_ID;
             WorkingSetMember* member = _workingSet->get(id);
 
-            invariant(WorkingSetCommon::fetchIfUnfetched(_txn, member, _collection));
+            invariant(WorkingSetCommon::fetchIfUnfetched(_txn, member, _recordCursor));
 
             return advance(id, member, out);
         }
@@ -136,9 +137,10 @@ namespace mongo {
             member->state = WorkingSetMember::LOC_AND_IDX;
             member->loc = loc;
 
+            if (!_recordCursor) _recordCursor = _collection->getCursor(_txn);
+
             // We may need to request a yield while we fetch the document.
-            std::auto_ptr<RecordFetcher> fetcher(_collection->documentNeedsFetch(_txn, loc));
-            if (NULL != fetcher.get()) {
+            if (auto fetcher = _recordCursor->fetcherForId(loc)) {
                 // There's something to fetch. Hand the fetcher off to the WSM, and pass up a
                 // fetch request.
                 _idBeingPagedIn = id;
@@ -149,7 +151,7 @@ namespace mongo {
             }
 
             // The doc was already in memory, so we go ahead and return it.
-            if (!WorkingSetCommon::fetch(_txn, member, _collection)) {
+            if (!WorkingSetCommon::fetch(_txn, member, _recordCursor)) {
                 // _id is immutable so the index would return the only record that could
                 // possibly match the query.
                 _workingSet->free(id);
@@ -162,6 +164,7 @@ namespace mongo {
         }
         catch (const WriteConflictException& wce) {
             // Restart at the beginning on retry.
+            _recordCursor.reset();
             if (id != WorkingSet::INVALID_ID)
                 _workingSet->free(id);
 
@@ -192,12 +195,14 @@ namespace mongo {
     void IDHackStage::saveState() {
         _txn = NULL;
         ++_commonStats.yields;
+        if (_recordCursor) _recordCursor->saveUnpositioned();
     }
 
     void IDHackStage::restoreState(OperationContext* opCtx) {
         invariant(_txn == NULL);
         _txn = opCtx;
         ++_commonStats.unyields;
+        if (_recordCursor) _recordCursor->restore(opCtx);
     }
 
     void IDHackStage::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {

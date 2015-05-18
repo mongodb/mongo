@@ -34,20 +34,16 @@
 #include "mongo/db/storage/in_memory/in_memory_record_store.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/sorted_data_interface.h"
+#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
-    class EmptyRecordIterator: public RecordIterator {
+    class EmptyRecordCursor final : public RecordCursor {
     public:
-        virtual bool isEOF() { return true; }
-        virtual RecordId curr() { return RecordId(); }
-        virtual RecordId getNext() { return RecordId(); }
-        virtual void invalidate(const RecordId& dl) { }
-        virtual void saveState() { }
-        virtual bool restoreState(OperationContext* txn) { return false; }
-        virtual RecordData dataFor( const RecordId& loc ) const {
-            invariant( false );
-        }
+        boost::optional<Record> next() final { return {}; }
+        boost::optional<Record> seekExact(const RecordId& id) final { return {}; }
+        void savePositioned() final {}
+        bool restore(OperationContext* txn) final { return true; }
     };
 
     class DevNullRecordStore : public RecordStore {
@@ -120,20 +116,9 @@ namespace mongo {
             invariant(false);
         }
 
-        virtual RecordIterator* getIterator( OperationContext* txn,
-                                             const RecordId& start,
-                                             const CollectionScanParams::Direction& dir ) const {
-            return new EmptyRecordIterator();
-        }
 
-        virtual RecordIterator* getIteratorForRepair( OperationContext* txn ) const {
-            return new EmptyRecordIterator();
-        }
-
-        virtual std::vector<RecordIterator*> getManyIterators( OperationContext* txn ) const {
-            std::vector<RecordIterator*> v;
-            v.push_back( new EmptyRecordIterator() );
-            return v;
+        std::unique_ptr<RecordCursor> getCursor(OperationContext* txn, bool forward) const final {
+            return stdx::make_unique<EmptyRecordCursor>();
         }
 
         virtual Status truncate( OperationContext* txn ) { return Status::OK(); }

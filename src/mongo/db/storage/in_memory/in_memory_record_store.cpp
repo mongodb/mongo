@@ -36,12 +36,14 @@
 #include <boost/shared_ptr.hpp>
 
 #include "mongo/db/jsobj.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/oplog_hack.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/unowned_ptr.h"
 
 namespace mongo {
 
@@ -108,6 +110,152 @@ namespace mongo {
         int64_t _dataSize;
         Records _records;
     };
+
+    class InMemoryRecordStore::Cursor final : public RecordCursor {
+    public:
+        Cursor(OperationContext* txn, const InMemoryRecordStore& rs)
+                : _txn(txn)
+                , _records(rs._data->records)
+                , _isCapped(rs.isCapped())
+        {}
+
+        boost::optional<Record> next() final {
+            if (_needFirstSeek) {
+                _needFirstSeek = false;
+                _it = _records.begin();
+            }
+            else if (!_lastMoveWasRestore && _it != _records.end()) {
+                ++_it;
+            }
+            _lastMoveWasRestore = false;
+
+            if (_it == _records.end()) return {};
+            return {{_it->first, _it->second.toRecordData()}};
+        }
+
+        boost::optional<Record> seekExact(const RecordId& id) final {
+            _lastMoveWasRestore = false;
+            _needFirstSeek = false;
+            _it = _records.find(id);
+            if (_it == _records.end()) return {};
+            return {{_it->first, _it->second.toRecordData()}};
+        }
+
+        void savePositioned() final {
+            _txn = nullptr;
+            if (!_needFirstSeek && !_lastMoveWasRestore)
+                _savedId = _it == _records.end() ? RecordId() : _it->first;
+        }
+
+        void saveUnpositioned() final {
+            _txn = nullptr;
+            _savedId = RecordId();
+        }
+
+        bool restore(OperationContext* txn) final {
+            _txn = txn;
+            if (_savedId.isNull()) {
+                _it = _records.end();
+                return true;
+            }
+
+            _it = _records.lower_bound(_savedId);
+            _lastMoveWasRestore = _it == _records.end() || _it->first != _savedId;
+
+            // Capped iterators die on invalidation rather than advancing.
+            return !(_isCapped && _lastMoveWasRestore);
+        }
+
+    private:
+        unowned_ptr<OperationContext> _txn;
+        Records::const_iterator _it;
+        bool _needFirstSeek = true;
+        bool _lastMoveWasRestore = false;
+        RecordId _savedId; // Location to restore() to. Null means EOF.
+
+        const InMemoryRecordStore::Records& _records;
+        const bool _isCapped;
+    };
+
+    class InMemoryRecordStore::ReverseCursor final : public RecordCursor {
+    public:
+        ReverseCursor(OperationContext* txn, const InMemoryRecordStore& rs)
+                : _txn(txn)
+                , _records(rs._data->records)
+                , _isCapped(rs.isCapped())
+        {}
+
+        boost::optional<Record> next() final {
+            if (_needFirstSeek) {
+                _needFirstSeek = false;
+                _it = _records.rbegin();
+            }
+            else if (!_lastMoveWasRestore && _it != _records.rend()) {
+                ++_it;
+            }
+            _lastMoveWasRestore = false;
+
+            if (_it == _records.rend()) return {};
+            return {{_it->first, _it->second.toRecordData()}};
+        }
+
+        boost::optional<Record> seekExact(const RecordId& id) final {
+            _lastMoveWasRestore = false;
+            _needFirstSeek = false;
+
+            auto forwardIt = _records.find(id);
+            if (forwardIt == _records.end()) {
+                _it = _records.rend();
+                return {};
+            }
+
+            // The reverse_iterator will point to the preceding element, so increment the base
+            // iterator to make it point past the found element.
+            ++forwardIt;
+            _it = Records::const_reverse_iterator(forwardIt);
+            dassert(_it != _records.rend());
+            dassert(_it->first == id);
+            return {{_it->first, _it->second.toRecordData()}};
+        }
+
+        void savePositioned() final {
+            _txn = nullptr;
+            if (!_needFirstSeek && !_lastMoveWasRestore)
+                _savedId = _it == _records.rend() ? RecordId() : _it->first;
+        }
+
+        void saveUnpositioned() final {
+            _txn = nullptr;
+            _savedId = RecordId();
+        }
+
+        bool restore(OperationContext* txn) final {
+            _txn = txn;
+            if (_savedId.isNull()) {
+                _it = _records.rend();
+                return true;
+            }
+
+            // Note: upper_bound returns the first entry > _savedId and reverse_iterators
+            // dereference to the element before their base iterator. This combine to make this
+            // dereference to the first element <= _savedId which is what we want here.
+            _it = Records::const_reverse_iterator(_records.upper_bound(_savedId));
+            _lastMoveWasRestore = _it == _records.rend() || _it->first != _savedId;
+
+            // Capped iterators die on invalidation rather than advancing.
+            return !(_isCapped && _lastMoveWasRestore);
+        }
+
+    private:
+        unowned_ptr<OperationContext> _txn;
+        Records::const_reverse_iterator _it;
+        bool _needFirstSeek = true;
+        bool _lastMoveWasRestore = false;
+        RecordId _savedId; // Location to restore() to. Null means EOF.
+        const InMemoryRecordStore::Records& _records;
+        const bool _isCapped;
+    };
+
 
     //
     // RecordStore
@@ -369,30 +517,11 @@ namespace mongo {
         return Status::OK();
     }
 
-    RecordIterator* InMemoryRecordStore::getIterator(
-            OperationContext* txn,
-            const RecordId& start,
-            const CollectionScanParams::Direction& dir) const {
+    std::unique_ptr<RecordCursor> InMemoryRecordStore::getCursor(OperationContext* txn,
+                                                                 bool forward) const {
 
-        if (dir == CollectionScanParams::FORWARD) {
-            return new InMemoryRecordIterator(txn, _data->records, *this, start, false);
-        }
-        else {
-            return new InMemoryRecordReverseIterator(txn, _data->records, *this, start);
-        }
-    }
-
-    RecordIterator* InMemoryRecordStore::getIteratorForRepair(OperationContext* txn) const {
-        // TODO maybe make different from InMemoryRecordIterator
-        return new InMemoryRecordIterator(txn, _data->records, *this);
-    }
-
-    std::vector<RecordIterator*> InMemoryRecordStore::getManyIterators(
-            OperationContext* txn) const {
-        std::vector<RecordIterator*> out;
-        // TODO maybe find a way to return multiple iterators.
-        out.push_back(new InMemoryRecordIterator(txn, _data->records, *this));
-        return out;
+        if (forward) return stdx::make_unique<Cursor>(txn, *this);
+        return stdx::make_unique<ReverseCursor>(txn, *this);
     }
 
     Status InMemoryRecordStore::truncate(OperationContext* txn) {
@@ -496,182 +625,6 @@ namespace mongo {
             --it;
 
         return it->first;
-    }
-
-    //
-    // Forward Iterator
-    //
-
-    InMemoryRecordIterator::InMemoryRecordIterator(OperationContext* txn,
-                                                   const InMemoryRecordStore::Records& records,
-                                                   const InMemoryRecordStore& rs,
-                                                   RecordId start,
-                                                   bool tailable)
-            : _txn(txn),
-              _tailable(tailable),
-              _lastLoc(RecordId::min()),
-              _killedByInvalidate(false),
-              _records(records),
-              _rs(rs) {
-        if (start.isNull()) {
-            _it = _records.begin();
-        }
-        else {
-            _it = _records.find(start);
-            invariant(_it != _records.end());
-        }
-    }
-
-    bool InMemoryRecordIterator::isEOF() {
-        return _it == _records.end();
-    }
-
-    RecordId InMemoryRecordIterator::curr() {
-        if (isEOF())
-            return RecordId();
-        return _it->first;
-    }
-
-    RecordId InMemoryRecordIterator::getNext() {
-        if (isEOF()) {
-            if (!_tailable)
-                return RecordId();
-
-            if (_records.empty())
-                return RecordId();
-
-            invariant(!_killedByInvalidate);
-
-            // recover to last returned record
-            invariant(!_lastLoc.isNull());
-            _it = _records.find(_lastLoc);
-            invariant(_it != _records.end());
-
-            if (++_it == _records.end())
-                return RecordId();
-        }
-
-        const RecordId out = _it->first;
-        ++_it;
-        if (_tailable && _it == _records.end())
-            _lastLoc = out;
-        return out;
-    }
-
-    void InMemoryRecordIterator::invalidate(const RecordId& loc) {
-        if (_rs.isCapped()) {
-            // Capped iterators die on invalidation rather than advancing.
-            if (isEOF()) {
-                if (_lastLoc == loc) {
-                    _killedByInvalidate = true;
-                }
-            }
-            else if (_it->first == loc) {
-                _killedByInvalidate = true;
-            }
-
-            return;
-        }
-
-        if (_it != _records.end() && _it->first == loc)
-            ++_it;
-    }
-
-    void InMemoryRecordIterator::saveState() {
-    }
-
-    bool InMemoryRecordIterator::restoreState(OperationContext* txn) {
-        _txn = txn;
-        return !_killedByInvalidate;
-    }
-
-    RecordData InMemoryRecordIterator::dataFor(const RecordId& loc) const {
-        return _rs.dataFor(_txn, loc);
-    }
-
-    //
-    // Reverse Iterator
-    //
-
-    InMemoryRecordReverseIterator::InMemoryRecordReverseIterator(
-            OperationContext* txn,
-            const InMemoryRecordStore::Records& records,
-            const InMemoryRecordStore& rs,
-            RecordId start) : _txn(txn),
-                             _killedByInvalidate(false),
-                             _records(records),
-                             _rs(rs) {
-
-        if (start.isNull()) {
-            _it = _records.rbegin();
-        }
-        else {
-            // The reverse iterator will point to the preceding element, so we
-            // increment the base iterator to make it point past the found element
-            InMemoryRecordStore::Records::const_iterator baseIt(++_records.find(start));
-            _it = InMemoryRecordStore::Records::const_reverse_iterator(baseIt);
-            invariant(_it != _records.rend());
-        }
-    }
-
-    bool InMemoryRecordReverseIterator::isEOF() {
-        return _it == _records.rend();
-    }
-
-    RecordId InMemoryRecordReverseIterator::curr() {
-        if (isEOF())
-            return RecordId();
-        return _it->first;
-    }
-
-    RecordId InMemoryRecordReverseIterator::getNext() {
-        if (isEOF())
-            return RecordId();
-
-        const RecordId out = _it->first;
-        ++_it;
-        return out;
-    }
-
-    void InMemoryRecordReverseIterator::invalidate(const RecordId& loc) {
-        if (_killedByInvalidate)
-            return;
-
-        if (_savedLoc == loc) {
-            if (_rs.isCapped()) {
-                // Capped iterators die on invalidation rather than advancing.
-                _killedByInvalidate = true;
-                return;
-            }
-
-            restoreState(_txn);
-            invariant(_it->first == _savedLoc);
-            ++_it;
-            saveState();
-        }
-    }
-
-    void InMemoryRecordReverseIterator::saveState() {
-        if (isEOF()) {
-            _savedLoc = RecordId();
-        }
-        else {
-            _savedLoc = _it->first;
-        }
-    }
-
-    bool InMemoryRecordReverseIterator::restoreState(OperationContext* txn) {
-        if (_savedLoc.isNull()) {
-            _it = _records.rend();
-        }
-        else {
-            _it = InMemoryRecordStore::Records::const_reverse_iterator(++_records.find(_savedLoc));
-        }
-        return !_killedByInvalidate;
-    }
-
-    RecordData InMemoryRecordReverseIterator::dataFor(const RecordId& loc) const {
-        return _rs.dataFor(_txn, loc);
     }
 
 } // namespace mongo

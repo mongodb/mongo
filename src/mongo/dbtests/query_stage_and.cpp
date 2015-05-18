@@ -82,13 +82,10 @@ namespace QueryStageAnd {
         }
 
         void getLocs(set<RecordId>* out, Collection* coll) {
-            RecordIterator* it = coll->getIterator(&_txn, RecordId(),
-                                                   CollectionScanParams::FORWARD);
-            while (!it->isEOF()) {
-                RecordId nextLoc = it->getNext();
-                out->insert(nextLoc);
+            auto cursor = coll->getCursor(&_txn);
+            while (auto record = cursor->next()) {
+                out->insert(record->id);
             }
-            delete it;
         }
 
         void insert(const BSONObj& obj) {

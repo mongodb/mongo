@@ -28,7 +28,7 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
+#include <memory>
 
 #include "mongo/db/exec/collection_scan_common.h"
 #include "mongo/db/exec/plan_stage.h"
@@ -37,7 +37,7 @@
 
 namespace mongo {
 
-    class RecordIterator;
+    class RecordCursor;
     class WorkingSet;
     class OperationContext;
 
@@ -91,13 +91,13 @@ namespace mongo {
         // The filter is not owned by us.
         const MatchExpression* _filter;
 
-        boost::scoped_ptr<RecordIterator> _iter;
+        std::unique_ptr<RecordCursor> _cursor;
 
         CollectionScanParams _params;
 
         bool _isDead;
 
-        RecordId _lastSeenLoc;
+        RecordId _lastSeenId; // Null if nothing has been returned from _cursor yet.
 
         // We allocate a working set member with this id on construction of the stage. It gets
         // used for all fetch requests, changing the RecordId as appropriate.

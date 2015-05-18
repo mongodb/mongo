@@ -12,6 +12,13 @@
     var oneKB = 1024;
     var oneMB = 1024 * oneKB;
 
+    function assertCursorExhausted(id) {
+        var cmdRes = db.runCommand({getMore: id, collection: collName});
+        assert.eq(cmdRes.cursor.id, NumberLong(0));
+        assert.eq(cmdRes.cursor.ns, coll.getFullName());
+        assert.eq(cmdRes.cursor.nextBatch, []);
+    }
+
     // Build a 1 MB - 1 KB) string.
     var smallStr = 'x';
     while (smallStr.length < oneMB) {
@@ -40,11 +47,12 @@
     assert.eq(cmdRes.cursor.ns, coll.getFullName());
     assert.eq(cmdRes.cursor.firstBatch.length, 1);
 
-    // The 16 MB doc should be returned on getMore.
+    // The 16 MB doc should be returned alone on getMore. The following getMore will return nothing.
     cmdRes = db.runCommand({getMore: cmdRes.cursor.id, collection: collName});
-    assert.eq(cmdRes.cursor.id, NumberLong(0));
+    assert.eq(cmdRes.cursor.id, cmdRes.cursor.id);
     assert.eq(cmdRes.cursor.ns, coll.getFullName());
     assert.eq(cmdRes.cursor.nextBatch.length, 1);
+    assertCursorExhausted(cmdRes.cursor.id);
 
     // Setup a cursor without returning any results (batchSize of zero).
     cmdRes = db.runCommand({find: collName, batchSize: 0});
@@ -59,9 +67,10 @@
     assert.eq(cmdRes.cursor.ns, coll.getFullName());
     assert.eq(cmdRes.cursor.nextBatch.length, 1);
 
-    // Second getMore should return the second doc and close the cursor.
+    // Second getMore should return the second doc and a third will close the cursor.
     cmdRes = db.runCommand({getMore: cmdRes.cursor.id, collection: collName});
-    assert.eq(cmdRes.cursor.id, NumberLong(0));
+    assert.eq(cmdRes.cursor.id, cmdRes.cursor.id);
     assert.eq(cmdRes.cursor.ns, coll.getFullName());
     assert.eq(cmdRes.cursor.nextBatch.length, 1);
+    assertCursorExhausted(cmdRes.cursor.id);
 })();

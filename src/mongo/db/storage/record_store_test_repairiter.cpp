@@ -56,19 +56,12 @@ namespace mongo {
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            RecordIterator *it = rs->getIteratorForRepair( opCtx.get() );
-
-            // returns NULL if getIteratorForRepair is not supported
-            if (it == NULL) {
+            auto cursor = rs->getCursorForRepair( opCtx.get() );
+            // returns NULL if getCursorForRepair is not supported
+            if (!cursor) {
                 return;
             }
-            ASSERT( it->isEOF() );
-            ASSERT_EQUALS( RecordId(), it->curr() );
-            ASSERT_EQUALS( RecordId(), it->getNext() );
-            ASSERT( it->isEOF() );
-            ASSERT_EQUALS( RecordId(), it->curr() );
-
-            delete it;
+            ASSERT(!cursor->next());
         }
     }
 
@@ -111,24 +104,18 @@ namespace mongo {
         set<RecordId> remain( locs, locs + nToInsert );
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            RecordIterator *it = rs->getIteratorForRepair( opCtx.get() );
-            // returns NULL if getIteratorForRepair is not supported
-            if (it == NULL) {
+            auto cursor = rs->getCursorForRepair( opCtx.get() );
+            // returns NULL if getCursorForRepair is not supported
+            if (!cursor) {
                 return;
             }
 
-            while ( !it->isEOF() ) {
-                RecordId loc = it->getNext();
-                remain.erase( loc ); // can happen more than once per doc
+            while (auto record = cursor->next()) {
+                remain.erase(record->id); // can happen more than once per doc
             }
             ASSERT( remain.empty() );
 
-            ASSERT_EQUALS( RecordId(), it->curr() );
-            ASSERT_EQUALS( RecordId(), it->getNext() );
-            ASSERT( it->isEOF() );
-            ASSERT_EQUALS( RecordId(), it->curr() );
-
-            delete it;
+            ASSERT(!cursor->next());
         }
     }
 
@@ -163,24 +150,21 @@ namespace mongo {
 
         {
             scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
-            scoped_ptr<RecordIterator> it(rs->getIteratorForRepair(opCtx.get()));
-            // Return value of NULL is expected if getIteratorForRepair is not supported.
-            if (!it) {
+            auto cursor = rs->getCursorForRepair( opCtx.get() );
+            // returns NULL if getCursorForRepair is not supported
+            if (!cursor) {
                 return;
             }
 
             // We should be pointing at the only record in the store.
-            ASSERT_EQ(idToInvalidate, it->curr());
-            ASSERT(!it->isEOF());
 
             // Invalidate the record we're pointing at.
-            it->saveState();
-            it->invalidate(idToInvalidate);
-            it->restoreState(opCtx.get());
+            cursor->savePositioned();
+            cursor->invalidate(idToInvalidate);
+            cursor->restore(opCtx.get());
 
             // Iterator should be EOF now because the only thing in the collection got deleted.
-            ASSERT(it->isEOF());
-            ASSERT_EQ(it->getNext(), RecordId());
+            ASSERT(!cursor->next());
         }
     }
 

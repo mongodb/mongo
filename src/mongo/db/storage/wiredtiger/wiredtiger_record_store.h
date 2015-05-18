@@ -146,12 +146,9 @@ namespace mongo {
                                           const char* damageSource,
                                           const mutablebson::DamageVector& damages );
 
-        virtual RecordIterator* getIterator( OperationContext* txn,
-                                             const RecordId& start = RecordId(),
-                                             const CollectionScanParams::Direction& dir =
-                                             CollectionScanParams::FORWARD ) const;
-
-        virtual std::vector<RecordIterator*> getManyIterators( OperationContext* txn ) const;
+        std::unique_ptr<RecordCursor> getCursor(OperationContext* txn, bool forward) const final;
+        std::vector<std::unique_ptr<RecordCursor>> getManyCursors(
+            OperationContext* txn) const final;
 
         virtual Status truncate( OperationContext* txn );
 
@@ -213,43 +210,9 @@ namespace mongo {
                                             const RecordId& justInserted);
 
         boost::timed_mutex& cappedDeleterMutex() { return _cappedDeleterMutex; }
+
     private:
-
-        class Iterator : public RecordIterator {
-        public:
-            Iterator( const WiredTigerRecordStore& rs,
-                      OperationContext* txn,
-                      const RecordId& start,
-                      const CollectionScanParams::Direction& dir,
-                      bool forParallelCollectionScan );
-
-            virtual ~Iterator();
-
-            virtual bool isEOF();
-            virtual RecordId curr();
-            virtual RecordId getNext();
-            virtual void invalidate(const RecordId& dl);
-            virtual void saveState();
-            virtual bool restoreState(OperationContext *txn);
-            virtual RecordData dataFor( const RecordId& loc ) const;
-
-        private:
-            void _getNext();
-            void _locate( const RecordId &loc, bool exact );
-            RecordId _curr() const; // const version of public curr method
-
-            const WiredTigerRecordStore& _rs;
-            OperationContext* _txn;
-            RecoveryUnit* _savedRecoveryUnit; // only used to sanity check between save/restore
-            const bool _forward;
-            bool _forParallelCollectionScan;
-            boost::scoped_ptr<WiredTigerCursor> _cursor;
-            bool _eof;
-            const RecordId _readUntilForOplog;
-
-            RecordId _loc; // Cached key of _cursor. Update any time _cursor is moved.
-            RecordId _lastLoc; // the last thing returned from getNext()
-        };
+        class Cursor;
 
         class CappedInsertChange;
         class NumRecordsChange;

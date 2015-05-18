@@ -61,8 +61,8 @@ namespace mongo {
     class MultiIndexBlock;
     class OpDebug;
     class OperationContext;
+    class RecordCursor;
     class RecordFetcher;
-    class RecordIterator;
     class UpdateDriver;
     class UpdateRequest;
 
@@ -184,20 +184,13 @@ namespace mongo {
          */
         bool findDoc(OperationContext* txn, const RecordId& loc, Snapshotted<BSONObj>* out) const;
 
-        // ---- things that should move to a CollectionAccessMethod like thing
-        /**
-         * Default arguments will return all items in the collection.
-         */
-        RecordIterator* getIterator( OperationContext* txn,
-                                     const RecordId& start = RecordId(),
-                                     const CollectionScanParams::Direction& dir = CollectionScanParams::FORWARD ) const;
+        std::unique_ptr<RecordCursor> getCursor(OperationContext* txn, bool forward = true) const;
 
         /**
-         * Returns many iterators that partition the Collection into many disjoint sets. Iterating
-         * all returned iterators is equivalent to Iterating the full collection.
-         * Caller owns all pointers in the vector.
+         * Returns many cursors that partition the Collection into many disjoint sets. Iterating
+         * all returned cursors is equivalent to iterating the full collection.
          */
-        std::vector<RecordIterator*> getManyIterators( OperationContext* txn ) const;
+        std::vector<std::unique_ptr<RecordCursor>> getManyCursors(OperationContext* txn) const;
 
         void deleteDocument( OperationContext* txn,
                              const RecordId& loc,
@@ -228,18 +221,6 @@ namespace mongo {
                                             const BSONObj& doc,
                                             MultiIndexBlock* indexBlock,
                                             bool enforceQuota );
-
-        /**
-         * If the document at 'loc' is unlikely to be in physical memory, the storage
-         * engine gives us back a RecordFetcher functor which we can invoke in order
-         * to page fault on that record.
-         *
-         * Returns NULL if the document does not need to be fetched.
-         *
-         * Caller takes ownership of the returned RecordFetcher*.
-         */
-        RecordFetcher* documentNeedsFetch( OperationContext* txn,
-                                           const RecordId& loc ) const;
 
         /**
          * updates the document @ oldLocation with newDoc
