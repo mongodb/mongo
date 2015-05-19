@@ -195,14 +195,6 @@ namespace mongo {
                                   "awaitData cannot be set on an aggregation cursor");
                     return appendCommandStatus(result, status);
                 }
-
-                if (!request.nss.isOplog()) {
-                    Status status(ErrorCodes::BadValue,
-                                  str::stream() << "awaitData can only be used for querying "
-                                                << "local.oplog, but namespace is: "
-                                                << request.nss.ns());
-                    return appendCommandStatus(result, status);
-                }
             }
 
             // On early return, get rid of the cursor.
@@ -236,10 +228,12 @@ namespace mongo {
             PlanExecutor* exec = cursor->getExecutor();
             exec->restoreState(txn);
 
-            // If this is an awaitData cursor tailing the oplog, retrieve the last oplog timestamp.
-            Timestamp lastTimestamp;
+            // If we're tailing a capped collection, retrieve a monotonically increasing insert
+            // counter.
+            uint64_t lastInsertCount = 0;
             if (isCursorAwaitData(cursor)) {
-                lastTimestamp = getLastSetTimestamp();
+                invariant(ctx->getCollection()->isCapped());
+                lastInsertCount = ctx->getCollection()->getCappedInsertNotifier()->getCount();
             }
 
             CursorId respondWithId = 0;
@@ -255,18 +249,26 @@ namespace mongo {
             // If this is an await data cursor, and we hit EOF without generating any results, then
             // we block waiting for new oplog data to arrive.
             if (isCursorAwaitData(cursor) && state == PlanExecutor::IS_EOF && numResults == 0) {
+                // Retrieve the notifier which we will wait on until new data arrives. We make sure
+                // to do this in the lock because once we drop the lock it is possible for the
+                // collection to become invalid. The notifier itself will outlive the collection if
+                // the collection is dropped, as we keep a shared_ptr to it.
+                auto notifier = ctx->getCollection()->getCappedInsertNotifier();
+
+                // Save the PlanExecutor and drop our locks.
                 exec->saveState();
                 ctx.reset();
 
+                // Block waiting for data.
                 Microseconds timeout(CurOp::get(txn)->getRemainingMaxTimeMicros());
-                repl::waitForTimestampChange(lastTimestamp, timeout);
+                notifier->waitForInsert(lastInsertCount, timeout);
+                notifier.reset();
 
                 ctx.reset(new AutoGetCollectionForRead(txn, request.nss));
                 exec->restoreState(txn);
 
                 // We woke up because either the timed_wait expired, or there was more data. Either
                 // way, attempt to generate another batch of results.
-                //
                 batchStatus = generateBatch(cursor, request, &nextBatch, &state, &numResults);
                 if (!batchStatus.isOK()) {
                     return appendCommandStatus(result, batchStatus);
@@ -368,6 +370,11 @@ namespace mongo {
                 return Status(ErrorCodes::OperationFailed,
                               str::stream() << "GetMore executor error: "
                                             << WorkingSetCommon::toStatusString(obj));
+            }
+            else if (PlanExecutor::DEAD == *state) {
+                return Status(ErrorCodes::OperationFailed,
+                              str::stream() << "Plan executor killed during getMore command, "
+                                            << "ns: " << request.nss.ns());
             }
 
             return Status::OK();

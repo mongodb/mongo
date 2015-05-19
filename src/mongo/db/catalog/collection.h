@@ -48,6 +48,8 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/platform/cstdint.h"
+#include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 
@@ -99,6 +101,45 @@ namespace mongo {
         }
 
         long long corruptDocuments;
+    };
+
+    /**
+     * Queries with the awaitData option use this notifier object to wait for more data to be
+     * inserted into the capped collection.
+     */
+    class CappedInsertNotifier {
+    public:
+        CappedInsertNotifier();
+
+        /**
+         * Wakes up threads waiting on this object for the arrival of new data.
+         */
+        void notifyOfInsert();
+
+        /**
+         * Get a counter value which is incremented on every insert into a capped collection.
+         * The return value should be used as a reference value to pass into waitForCappedInsert().
+         */
+        uint64_t getCount() const;
+
+        /**
+         * Waits for 'timeout' microseconds, or until notifyAll() is called to indicate that new
+         * data is available in the capped collection.
+         */
+        void waitForInsert(uint64_t referenceCount, Microseconds timeout) const;
+
+    private:
+        // Signalled when a successful insert is made into a capped collection.
+        mutable stdx::condition_variable _cappedNewDataNotifier;
+
+        // Mutex used with '_cappedNewDataNotifier'. Protects access to '_cappedInsertCount'.
+        mutable stdx::mutex _cappedNewDataMutex;
+
+        // A counter, incremented on insertion of new data into the capped collection.
+        //
+        // The condition which '_cappedNewDataNotifier' is being notified of is an increment of this
+        // counter. Access to this counter is synchronized with '_cappedNewDataMutex'.
+        uint64_t _cappedInsertCount;
     };
 
     /**
@@ -282,6 +323,14 @@ namespace mongo {
 
         bool isCapped() const;
 
+        /**
+         * Get a pointer to a capped insert notifier object. The caller can wait on this object
+         * until it is notified of a new insert into the capped collection.
+         *
+         * It is invalid to call this method unless the collection is capped.
+         */
+        std::shared_ptr<CappedInsertNotifier> getCappedInsertNotifier() const;
+
         uint64_t numRecords( OperationContext* txn ) const;
 
         uint64_t dataSize( OperationContext* txn ) const;
@@ -350,6 +399,12 @@ namespace mongo {
         // use it keep state.  This seems valid as const correctness of Collection
         // should be about the data.
         mutable CursorManager _cursorManager;
+
+        // Notifier object for awaitData. Threads polling a capped collection for new data can wait
+        // on this object until notified of the arrival of new data.
+        //
+        // This is non-null if and only if the collection is a capped collection.
+        std::shared_ptr<CappedInsertNotifier> _cappedNotifier;
 
         friend class Database;
         friend class IndexCatalog;
