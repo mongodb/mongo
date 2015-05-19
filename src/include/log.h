@@ -68,6 +68,9 @@
  * WT_LOG_SLOT_WRITTEN - slot is written and should be processed by worker.
  * WT_LOG_SLOT_READY - slot is ready for threads to join.
  * > WT_LOG_SLOT_READY - threads are actively consolidating on this slot.
+ *
+ * The slot state must be volatile: threads loop checking the state and can't
+ * cache the first value they see.
  */
 #define	WT_LOG_SLOT_DONE	0
 #define	WT_LOG_SLOT_FREE	1
@@ -75,7 +78,7 @@
 #define	WT_LOG_SLOT_WRITTEN	3
 #define	WT_LOG_SLOT_READY	4
 typedef WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) struct {
-	int64_t	 slot_state;		/* Slot state */
+	volatile int64_t slot_state;	/* Slot state */
 	uint64_t slot_group_size;	/* Group size */
 	int32_t	 slot_error;		/* Error value */
 #define	SLOT_INVALID_INDEX	0xffffffff
