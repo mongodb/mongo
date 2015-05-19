@@ -430,6 +430,20 @@ namespace mongo {
                                                                                  &newDoc));
                         }
 
+                        // Return an error if the primary stepped down while our PlanExecutor was
+                        // yielding locks.  update() and deleteObjects() check this for us in the
+                        // update and delete cases, respectively, but we need to perform an explicit
+                        // check here for the upsert case.
+                        if (!repl::getGlobalReplicationCoordinator()
+                                ->canAcceptWritesForDatabase(dbname)) {
+                            return appendCommandStatus(result,
+                                                       Status(ErrorCodes::NotMaster,
+                                                              str::stream()
+                                                                  << "Stepped down from primary "
+                                                                  << "while running findAndModify "
+                                                                  << "in " << ns));
+                        }
+
                         const bool enforceQuota = true;
                         uassertStatusOK(collection->insertDocument(txn, newDoc, enforceQuota)
                                         .getStatus());
