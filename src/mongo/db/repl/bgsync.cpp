@@ -103,8 +103,9 @@ namespace {
     }
 
     BackgroundSync::BackgroundSync() : _buffer(bufferMaxSizeGauge, &getSize),
-                                       _lastOpTimeFetched(std::numeric_limits<int>::max(),
-                                                          0),
+                                       _lastOpTimeFetched(
+                                               Timestamp(std::numeric_limits<int>::max(), 0),
+                                               std::numeric_limits<long long>::max()),
                                        _lastAppliedHash(0),
                                        _lastFetchedHash(0),
                                        _pause(true),
@@ -227,7 +228,7 @@ namespace {
 
 
         // find a target to sync from the last optime fetched
-        Timestamp lastOpTimeFetched;
+        OpTime lastOpTimeFetched;
         {
             boost::unique_lock<boost::mutex> lock(_mutex);
             lastOpTimeFetched = _lastOpTimeFetched;
@@ -250,7 +251,7 @@ namespace {
             _replCoord->signalUpstreamUpdater();
         }
 
-        _syncSourceReader.tailingQueryGTE(rsOplogName.c_str(), lastOpTimeFetched);
+        _syncSourceReader.tailingQueryGTE(rsOplogName.c_str(), lastOpTimeFetched.getTimestamp());
 
         // if target cut connections between connecting and querying (for
         // example, because it stepped down) we might not have a cursor
@@ -353,8 +354,8 @@ namespace {
             {
                 boost::unique_lock<boost::mutex> lock(_mutex);
                 _lastFetchedHash = o["h"].numberLong();
-                _lastOpTimeFetched = o["ts"].timestamp();
-                LOG(3) << "lastOpTimeFetched: " << _lastOpTimeFetched.toStringPretty();
+                _lastOpTimeFetched = extractOpTime(o);
+                LOG(3) << "lastOpTimeFetched: " << _lastOpTimeFetched;
             }
         }
     }
@@ -401,10 +402,10 @@ namespace {
                     sleepsecs(2);
                     return true;
                 }
-                Timestamp theirTS = theirLastOp["ts"].timestamp();
-                if (theirTS < _lastOpTimeFetched) {
+                OpTime theirOpTime = extractOpTime(theirLastOp);
+                if (theirOpTime < _lastOpTimeFetched) {
                     log() << "we are ahead of the sync source, will try to roll back";
-                    syncRollback(txn, _replCoord->getMyLastOptime().getTimestamp(), &r, _replCoord);
+                    syncRollback(txn, _replCoord->getMyLastOptime(), &r, _replCoord);
                     return true;
                 }
                 /* we're not ahead?  maybe our new query got fresher data.  best to come back and try again */
@@ -419,12 +420,12 @@ namespace {
         }
 
         BSONObj o = r.nextSafe();
-        Timestamp ts = o["ts"].timestamp();
+        OpTime opTime = extractOpTime(o);
         long long hash = o["h"].numberLong();
-        if( ts != _lastOpTimeFetched || hash != _lastFetchedHash ) {
-            log() << "our last op time fetched: " << _lastOpTimeFetched.toStringPretty();
-            log() << "source's GTE: " << ts.toStringPretty();
-            syncRollback(txn, _replCoord->getMyLastOptime().getTimestamp(), &r, _replCoord);
+        if ( opTime != _lastOpTimeFetched || hash != _lastFetchedHash ) {
+            log() << "our last op time fetched: " << _lastOpTimeFetched;
+            log() << "source's GTE: " << opTime;
+            syncRollback(txn, _replCoord->getMyLastOptime(), &r, _replCoord);
             return true;
         }
 
@@ -446,7 +447,7 @@ namespace {
 
         _pause = true;
         _syncSourceHost = HostAndPort();
-        _lastOpTimeFetched = Timestamp(0,0);
+        _lastOpTimeFetched = OpTime();
         _lastFetchedHash = 0;
         _appliedBufferCondition.notify_all();
         _pausedCondition.notify_all();
@@ -461,7 +462,7 @@ namespace {
 
         // reset _last fields with current oplog data
         _lastAppliedHash = updatedLastAppliedHash;
-        _lastOpTimeFetched = _replCoord->getMyLastOptime().getTimestamp();
+        _lastOpTimeFetched = _replCoord->getMyLastOptime();
         _lastFetchedHash = _lastAppliedHash;
 
         LOG(1) << "bgsync fetch queue set to: " << _lastOpTimeFetched <<

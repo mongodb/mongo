@@ -341,13 +341,13 @@ namespace {
 
     // Doles out all the work to the writer pool threads and waits for them to complete
     // static
-    Timestamp SyncTail::multiApply(OperationContext* txn,
-                                   const OpQueue& ops,
-                                   threadpool::ThreadPool* prefetcherPool,
-                                   threadpool::ThreadPool* writerPool,
-                                   MultiSyncApplyFunc func,
-                                   SyncTail* sync,
-                                   bool supportsWaitingUntilDurable) {
+    OpTime SyncTail::multiApply(OperationContext* txn,
+                                const OpQueue& ops,
+                                threadpool::ThreadPool* prefetcherPool,
+                                threadpool::ThreadPool* writerPool,
+                                MultiSyncApplyFunc func,
+                                SyncTail* sync,
+                                bool supportsWaitingUntilDurable) {
         invariant(prefetcherPool);
         invariant(writerPool);
         invariant(func);
@@ -381,7 +381,7 @@ namespace {
         applyOps(writerVectors, writerPool, func, sync);
 
         if (inShutdown()) {
-            return Timestamp();
+            return OpTime();
         }
 
         const bool mustWaitUntilDurable = replCoord->isV1ElectionProtocol() &&
@@ -397,19 +397,19 @@ namespace {
         }
         ReplClientInfo::forClient(txn->getClient()).setLastOp(lastOpTime);
         replCoord->setMyLastOptime(lastOpTime);
-        setNewOptime(lastOpTime.getTimestamp());
+        setNewTimestamp(lastOpTime.getTimestamp());
 
         BackgroundSync::get()->notify(txn);
 
-        return lastOpTime.getTimestamp();
+        return lastOpTime;
     }
 
-    void SyncTail::oplogApplication(OperationContext* txn, const Timestamp& endOpTime) {
+    void SyncTail::oplogApplication(OperationContext* txn, const OpTime& endOpTime) {
         _applyOplogUntil(txn, endOpTime);
     }
 
     /* applies oplog from "now" until endOpTime using the applier threads for initial sync*/
-    void SyncTail::_applyOplogUntil(OperationContext* txn, const Timestamp& endOpTime) {
+    void SyncTail::_applyOplogUntil(OperationContext* txn, const OpTime& endOpTime) {
         unsigned long long bytesApplied = 0;
         unsigned long long entriesApplied = 0;
         while (true) {
@@ -421,7 +421,7 @@ namespace {
 
                 // Check if we reached the end
                 const BSONObj currentOp = ops.back();
-                const Timestamp currentOpTime = currentOp["ts"].timestamp();
+                const OpTime currentOpTime = extractOpTime(currentOp);
 
                 // When we reach the end return this batch
                 if (currentOpTime == endOpTime) {
@@ -451,14 +451,13 @@ namespace {
             bytesApplied += ops.getSize();
             entriesApplied += ops.getDeque().size();
 
-            const Timestamp lastOpTime = multiApply(txn,
-                                                    ops,
-                                                    &_prefetcherPool,
-                                                    &_writerPool,
-                                                    _applyFunc,
-                                                    this,
-                                                    supportsWaitingUntilDurable());
-
+            const OpTime lastOpTime = multiApply(txn,
+                                                 ops,
+                                                 &_prefetcherPool,
+                                                 &_writerPool,
+                                                 _applyFunc,
+                                                 this,
+                                                 supportsWaitingUntilDurable());
             if (inShutdown()) {
                 return;
             }
@@ -467,7 +466,7 @@ namespace {
             if (lastOpTime == endOpTime) {
                 LOG(1) << "SyncTail applied " << entriesApplied
                        << " entries (" << bytesApplied << " bytes)"
-                       << " and finished at opTime " << endOpTime.toStringPretty();
+                       << " and finished at opTime " << endOpTime;
                 return;
             }
         } // end of while (true)
@@ -493,8 +492,8 @@ namespace {
             return;
         }
 
-        Timestamp minvalid = getMinValid(txn);
-        if (minvalid > replCoord->getMyLastOptime().getTimestamp()) {
+        OpTime minvalid = getMinValid(txn);
+        if (minvalid > replCoord->getMyLastOptime()) {
             return;
         }
 
@@ -578,8 +577,7 @@ namespace {
             // Set minValid to the last op to be applied in this next batch.
             // This will cause this node to go into RECOVERING state
             // if we should crash and restart before updating the oplog
-            Timestamp minValid = lastOp["ts"].timestamp();
-            setMinValid(&txn, minValid);
+            setMinValid(&txn, extractOpTime(lastOp));
             multiApply(&txn,
                        ops,
                        &_prefetcherPool,

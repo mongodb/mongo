@@ -620,6 +620,11 @@ namespace repl {
          */
         virtual void summarizeAsHtml(ReplSetHtmlSummary* output) = 0;
 
+        /**
+         * Return the current term.
+         */
+        virtual long long getTerm() = 0;
+
     protected:
 
         ReplicationCoordinator();

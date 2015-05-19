@@ -46,7 +46,7 @@ namespace repl {
         /**
          * applies up to endOpTime, fetching missing documents as needed.
          */
-        void oplogApplication(OperationContext* txn, const Timestamp& endOpTime);
+        void oplogApplication(OperationContext* txn, const OpTime& endOpTime);
 
         // Initial sync will ignore all journal requirement flags and doesn't wait until
         // operations are durable before updating the last OpTime.

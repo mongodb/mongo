@@ -31,9 +31,9 @@
 namespace mongo {
     class BSONObj;
     class OperationContext;
-    class Timestamp;
 
 namespace repl {
+    class OpTime;
 
     /**
      * Helper functions for maintaining local.replset.minvalid collection contents.
@@ -61,7 +61,7 @@ namespace repl {
      * consider the dataset consistent.  Do not allow client reads if our last applied operation is
      * before the minValid time.
      */
-    void setMinValid(OperationContext* ctx, Timestamp ts);
-    Timestamp getMinValid(OperationContext* txn);
+    void setMinValid(OperationContext* ctx, const OpTime& opTime);
+    OpTime getMinValid(OperationContext* txn);
 }
 }

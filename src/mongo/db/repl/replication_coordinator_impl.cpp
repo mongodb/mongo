@@ -2711,5 +2711,29 @@ namespace {
         _topCoord->summarizeAsHtml(output);
     }
 
+    long long ReplicationCoordinatorImpl::getTerm() {
+        long long term = OpTime::kDefaultTerm;
+        CBHStatus cbh = _replExecutor.scheduleWork(
+            stdx::bind(&ReplicationCoordinatorImpl::_getTerm_helper,
+                       this,
+                       stdx::placeholders::_1,
+                       &term));
+        if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
+            return term;
+        }
+        fassert(28660, cbh.getStatus());
+        _replExecutor.wait(cbh.getValue());
+        return term;
+    }
+
+    void ReplicationCoordinatorImpl::_getTerm_helper(
+            const ReplicationExecutor::CallbackData& cbData,
+            long long* term) {
+        if (cbData.status == ErrorCodes::CallbackCanceled) {
+            return;
+        }
+        *term = _topCoord->getTerm();
+    }
+
 } // namespace repl
 } // namespace mongo

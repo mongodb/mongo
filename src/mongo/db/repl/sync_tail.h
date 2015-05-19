@@ -44,6 +44,7 @@ namespace mongo {
 namespace repl {
     class BackgroundSyncInterface;
     class ReplicationCoordinator;
+    class OpTime;
 
     /**
      * "Normal" replica set syncing
@@ -97,7 +98,7 @@ namespace repl {
         /**
          * Runs _applyOplogUntil(stopOpTime)
          */
-        virtual void oplogApplication(OperationContext* txn, const Timestamp& stopOpTime);
+        virtual void oplogApplication(OperationContext* txn, const OpTime& stopOpTime);
 
         void oplogApplication();
         bool peek(BSONObj* obj);
@@ -156,20 +157,20 @@ namespace repl {
         // Prefetch and write a deque of operations, using the supplied function.
         // Initial Sync and Sync Tail each use a different function.
         // Returns the last OpTime applied.
-        static Timestamp multiApply(OperationContext* txn,
-                                    const OpQueue& ops,
-                                    threadpool::ThreadPool* prefetcherPool,
-                                    threadpool::ThreadPool* writerPool,
-                                    MultiSyncApplyFunc func,
-                                    SyncTail* sync,
-                                    bool supportsAwaitingCommit);
+        static OpTime multiApply(OperationContext* txn,
+                                 const OpQueue& ops,
+                                 threadpool::ThreadPool* prefetcherPool,
+                                 threadpool::ThreadPool* writerPool,
+                                 MultiSyncApplyFunc func,
+                                 SyncTail* sync,
+                                 bool supportsAwaitingCommit);
 
         /**
          * Applies oplog entries until reaching "endOpTime".
          *
          * NOTE:Will not transition or check states
          */
-        void _applyOplogUntil(OperationContext* txn, const Timestamp& endOpTime);
+        void _applyOplogUntil(OperationContext* txn, const OpTime& endOpTime);
 
     private:
         std::string _hostname;

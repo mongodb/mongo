@@ -264,6 +264,11 @@ namespace repl {
 
         virtual void summarizeAsHtml(ReplSetHtmlSummary* s) override;
 
+        /**
+         * Get current term from topology coordinator
+         */
+        long long getTerm() override;
+
         // ================== Test support API ===================
 
         /**
@@ -851,6 +856,12 @@ namespace repl {
 
         void _summarizeAsHtml_finish(const ReplicationExecutor::CallbackData& cbData,
                                      ReplSetHtmlSummary* output);
+
+        /**
+         * Callback that gets the current term from topology coordinator.
+         */
+        void _getTerm_helper(const ReplicationExecutor::CallbackData& cbData, long long* term);
+
 
         //
         // All member variables are labeled with one of the following codes indicating the

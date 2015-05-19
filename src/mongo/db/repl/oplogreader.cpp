@@ -142,10 +142,11 @@ namespace repl {
     }
 
     void OplogReader::connectToSyncSource(OperationContext* txn,
-                                          Timestamp lastOpTimeFetched,
+                                          const OpTime& lastOpTimeFetched,
                                           ReplicationCoordinator* replCoord) {
-        const Timestamp sentinel(duration_cast<Seconds>(Milliseconds(curTimeMillis64())), 0);
-        Timestamp oldestOpTimeSeen = sentinel;
+        const Timestamp sentinelTimestamp(duration_cast<Seconds>(Milliseconds(curTimeMillis64())), 0);
+        const OpTime sentinel(sentinelTimestamp, std::numeric_limits<long long>::max());
+        OpTime oldestOpTimeSeen = sentinel;
 
         invariant(conn() == NULL);
 
@@ -164,9 +165,9 @@ namespace repl {
 
                 // Connected to at least one member, but in all cases we were too stale to use them
                 // as a sync source.
-                error() << "RS102 too stale to catch up";
-                log() << "our last optime : " << lastOpTimeFetched.toStringLong();
-                log() << "oldest available is " << oldestOpTimeSeen.toStringLong();
+                error() << "too stale to catch up";
+                log() << "our last optime : " << lastOpTimeFetched;
+                log() << "oldest available is " << oldestOpTimeSeen;
                 log() << "See http://dochub.mongodb.org/core/resyncingaverystalereplicasetmember";
                 setMinValid(txn, oldestOpTimeSeen);
                 bool worked = replCoord->setFollowerMode(MemberState::RS_RECOVERING);
@@ -188,15 +189,7 @@ namespace repl {
             // Read the first (oldest) op and confirm that it's not newer than our last
             // fetched op. Otherwise, we have fallen off the back of that source's oplog.
             BSONObj remoteOldestOp(findOne(rsOplogName.c_str(), Query()));
-            BSONElement tsElem(remoteOldestOp["ts"]);
-            if (tsElem.type() != bsonTimestamp) {
-                // This member's got a bad op in its oplog.
-                warning() << "oplog invalid format on node " << candidate.toString();
-                resetConnection();
-                replCoord->blacklistSyncSource(candidate, Date_t::now() + Minutes(10));
-                continue;
-            }
-            Timestamp remoteOldOpTime = tsElem.timestamp();
+            OpTime remoteOldOpTime = extractOpTime(remoteOldestOp);
 
             if (lastOpTimeFetched < remoteOldOpTime) {
                 // We're too stale to use this sync source.

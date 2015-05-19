@@ -203,6 +203,8 @@ namespace repl {
 
         virtual void summarizeAsHtml(ReplSetHtmlSummary* output);
 
+        virtual long long getTerm();
+
     private:
 
         const ReplSettings _settings;

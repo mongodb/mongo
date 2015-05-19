@@ -248,7 +248,7 @@ namespace {
     }
 
     void ReplicationCoordinatorExternalStateImpl::setGlobalTimestamp(const Timestamp& newTime) {
-        setNewOptime(newTime);
+        setNewTimestamp(newTime);
     }
 
     StatusWith<OpTime> ReplicationCoordinatorExternalStateImpl::loadLastOpTime(
@@ -276,8 +276,7 @@ namespace {
                         "\" in most recent " << rsOplogName <<
                         " entry to have type Timestamp, but found " << typeName(tsElement.type()));
             }
-            // TODO(siyuan) add term
-            return StatusWith<OpTime>(OpTime(tsElement.timestamp(), 0));
+            return StatusWith<OpTime>(extractOpTime(oplogEntry));
         }
         catch (const DBException& ex) {
             return StatusWith<OpTime>(ex.toStatus());

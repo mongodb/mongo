@@ -467,8 +467,8 @@ namespace {
 
         // we have items we are writing that aren't from a point-in-time.  thus best not to come
         // online until we get to that point in freshness.
-        Timestamp minValid = newMinValid["ts"].timestamp();
-        log() << "minvalid=" << minValid.toStringLong();
+        OpTime minValid = extractOpTime(newMinValid);
+        log() << "minvalid=" << minValid;
         setMinValid(txn, minValid);
 
         // any full collection resyncs required?
@@ -572,8 +572,8 @@ namespace {
                     err = "can't get minvalid from sync source";
                 }
                 else {
-                    Timestamp minValid = newMinValid["ts"].timestamp();
-                    log() << "minvalid=" << minValid.toStringLong();
+                    OpTime minValid = extractOpTime(newMinValid);
+                    log() << "minvalid=" << minValid;
                     setMinValid(txn, minValid);
                 }
             }
@@ -932,13 +932,13 @@ namespace {
 } // namespace
 
     void syncRollback(OperationContext* txn,
-                      Timestamp lastOpTimeApplied,
+                      const OpTime& lastOpTimeApplied,
                       OplogReader* oplogreader, 
                       ReplicationCoordinator* replCoord) {
         // check that we are at minvalid, otherwise we cannot rollback as we may be in an
         // inconsistent state
         {
-            Timestamp minvalid = getMinValid(txn);
+            OpTime minvalid = getMinValid(txn);
             if( minvalid > lastOpTimeApplied ) {
                 severe() << "need to rollback, but in inconsistent state" << endl;
                 log() << "minvalid: " << minvalid.toString() << " our last optime: "

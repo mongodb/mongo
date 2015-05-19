@@ -33,7 +33,8 @@ namespace mongo {
     class Timestamp;
 
 namespace repl {
-    class OplogReader; 
+    class OplogReader;
+    class OpTime;
     class ReplicationCoordinator;
 
     /**
@@ -59,7 +60,7 @@ namespace repl {
      */
 
     void syncRollback(OperationContext* txn,
-                      Timestamp lastOpTimeWritten,
+                      const OpTime& lastOpTimeWritten,
                       OplogReader* oplogreader,
                       ReplicationCoordinator* replCoord);
 

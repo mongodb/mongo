@@ -44,6 +44,7 @@ namespace mongo {
 namespace repl {
 
     class ReplicationCoordinator;
+    class OpTime;
 
     // {"$natural": -1 }
     extern const BSONObj reverseNaturalObj;
@@ -145,8 +146,8 @@ namespace repl {
          * sync source blacklist.
          * This function may throw DB exceptions.
          */
-        void connectToSyncSource(OperationContext* txn, 
-                                 Timestamp lastOpTimeFetched,
+        void connectToSyncSource(OperationContext* txn,
+                                 const OpTime& lastOpTimeFetched,
                                  ReplicationCoordinator* replCoord);
     };
 

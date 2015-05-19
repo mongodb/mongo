@@ -32,6 +32,7 @@
 
 #include "mongo/util/queue.h"
 #include "mongo/db/repl/oplogreader.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
@@ -140,8 +141,7 @@ namespace repl {
         // _mutex protects all of the class variables except _syncSourceReader and _buffer
         mutable boost::mutex _mutex;
 
-        // TODO(siyuan) Change to OpTime after adding term to oplogs.
-        Timestamp _lastOpTimeFetched;
+        OpTime _lastOpTimeFetched;
 
         // lastAppliedHash is used to generate a new hash for the following op, when primary.
         long long _lastAppliedHash;

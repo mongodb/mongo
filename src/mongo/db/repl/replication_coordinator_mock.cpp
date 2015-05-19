@@ -334,5 +334,7 @@ namespace repl {
 
     void ReplicationCoordinatorMock::summarizeAsHtml(ReplSetHtmlSummary* output) {}
 
+    long long ReplicationCoordinatorMock::getTerm() { return OpTime::kDefaultTerm; }
+
 } // namespace repl
 } // namespace mongo

@@ -48,7 +48,7 @@ namespace repl {
 
     /* initial oplog application, during initial sync, after cloning.
     */
-    void InitialSync::oplogApplication(OperationContext* txn, const Timestamp& endOpTime) {
+    void InitialSync::oplogApplication(OperationContext* txn, const OpTime& endOpTime) {
         if (replSetForceInitialSyncFailure > 0) {
             log() << "test code invoked, forced InitialSync failure: "
                   << replSetForceInitialSyncFailure;

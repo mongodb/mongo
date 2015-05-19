@@ -33,6 +33,7 @@
 #include "mongo/base/init.h"
 #include "mongo/db/client.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/util/decorable.h"
 
 namespace mongo {
@@ -40,6 +41,13 @@ namespace repl {
 
     const Client::Decoration<ReplClientInfo> ReplClientInfo::forClient =
         Client::declareDecoration<ReplClientInfo>();
+
+    long long ReplClientInfo::getTerm() {
+        if (_cachedTerm == kUninitializedTerm) {
+            _cachedTerm = getGlobalReplicationCoordinator()->getTerm();
+        }
+        return _cachedTerm;
+    }
 
 }  // namespace repl
 }  // namespace mongo

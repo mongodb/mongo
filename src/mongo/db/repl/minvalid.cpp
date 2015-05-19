@@ -32,13 +32,13 @@
 
 #include "mongo/db/repl/minvalid.h"
 
-#include "mongo/bson/timestamp.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 
@@ -70,12 +70,15 @@ namespace {
         } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "setInitialSyncFlags", minvalidNS);
     }
 
-    // TODO(siyuan) Change minValid to OpTime
-    void setMinValid(OperationContext* ctx, Timestamp ts) {
+    void setMinValid(OperationContext* ctx, const OpTime& opTime) {
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
             ScopedTransaction transaction(ctx, MODE_IX);
             Lock::DBLock dblk(ctx->lockState(), "local", MODE_X);
-            Helpers::putSingleton(ctx, minvalidNS, BSON("$set" << BSON("ts" << ts)));
+            Helpers::putSingleton(ctx,
+                                  minvalidNS,
+                                  BSON("$set" << BSON("ts" << opTime.getTimestamp() <<
+                                                      "t" << opTime.getTerm())));
+
         } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(ctx, "setMinValid", minvalidNS);
     }
 
@@ -98,7 +101,7 @@ namespace {
         MONGO_UNREACHABLE;
     }
 
-    Timestamp getMinValid(OperationContext* txn) {
+    OpTime getMinValid(OperationContext* txn) {
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
             ScopedTransaction transaction(txn, MODE_IS);
             Lock::DBLock dblk(txn->lockState(), "local", MODE_IS);
@@ -106,9 +109,9 @@ namespace {
             BSONObj mv;
             bool found = Helpers::getSingleton(txn, minvalidNS, mv);
             if (found) {
-                return mv["ts"].timestamp();
+                return extractOpTime(mv);
             }
-            return Timestamp();
+            return OpTime();
         } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "getMinValid", minvalidNS);
     }
 

@@ -116,14 +116,19 @@ namespace repl {
     void waitForTimestampChange(const Timestamp& referenceTime, Microseconds timeout);
 
     /**
-     * Initializes the global OpTime with the value from the timestamp of the last oplog entry.
+     * Initializes the global Timestamp with the value from the timestamp of the last oplog entry.
      */
-    void initOpTimeFromOplog(OperationContext* txn, const std::string& oplogNS);
+    void initTimestampFromOplog(OperationContext* txn, const std::string& oplogNS);
 
     /**
-     * Sets the global OpTime to be 'newTime'.
+     * Sets the global Timestamp to be 'newTime'.
      */
-    void setNewOptime(const Timestamp& newTime);
+    void setNewTimestamp(const Timestamp& newTime);
+
+    /*
+     * Extract the OpTime from log entry.
+     */
+    OpTime extractOpTime(const BSONObj& op);
 
     /**
      * Detects the current replication mode and sets the "_oplogCollectionName" accordingly.
