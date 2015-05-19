@@ -131,6 +131,10 @@ namespace mongo {
         return cursor->queryOptions() & QueryOption_CursorTailable;
     }
 
+    bool isCursorAwaitData(const ClientCursor* cursor) {
+        return cursor->queryOptions() & QueryOption_AwaitData;
+    }
+
     bool shouldSaveCursor(OperationContext* txn,
                           const Collection* collection,
                           PlanExecutor::ExecState finalState,

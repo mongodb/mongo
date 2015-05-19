@@ -619,6 +619,7 @@ namespace {
     TEST(LiteParsedQueryTest, ParseFromCommandAwaitDataWrongType) {
         BSONObj cmdObj = fromjson("{find: 'testns',"
                                    "filter:  {a: 1},"
+                                   "tailable: true,"
                                    "awaitData: 3}");
 
         LiteParsedQuery* rawLpq;
@@ -764,6 +765,15 @@ namespace {
 
     TEST(LiteParsedQueryTest, ParseCommandForbidExhaust) {
         BSONObj cmdObj = fromjson("{find: 'testns', exhaust: true}");
+
+        LiteParsedQuery* rawLpq;
+        const bool isExplain = false;
+        Status status = LiteParsedQuery::make("testns", cmdObj, isExplain, &rawLpq);
+        ASSERT_NOT_OK(status);
+    }
+
+    TEST(LiteParsedQueryTest, ParseCommandAwaitDataButNotTailable) {
+        BSONObj cmdObj = fromjson("{find: 'testns', awaitData: true}");
 
         LiteParsedQuery* rawLpq;
         const bool isExplain = false;

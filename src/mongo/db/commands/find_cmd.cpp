@@ -200,6 +200,15 @@ namespace mongo {
                 lpq.reset(rawLpq);
             }
 
+            // awaitData for the find command is currently only allowed on the oplog.
+            if (lpq->isAwaitData() && !nss.isOplog()) {
+                Status status(ErrorCodes::IllegalOperation,
+                              str::stream() << "find command awaitData option is only allowed for "
+                                            << "querying the oplog, but namespace is: "
+                                            << nss.ns());
+                return appendCommandStatus(result, status);
+            }
+
             // Fill out curop information.
             beginQueryOp(nss, cmdObj, lpq->getNumToReturn(), lpq->getSkip(), CurOp::get(txn));
 

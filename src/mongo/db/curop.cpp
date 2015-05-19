@@ -324,6 +324,10 @@ namespace mongo {
         }
     }
 
+    bool CurOp::isMaxTimeSet() const {
+        return _maxTimeMicros != 0;
+    }
+
     bool CurOp::maxTimeHasExpired() {
         if (MONGO_FAIL_POINT(maxTimeNeverTimeOut)) {
             return false;

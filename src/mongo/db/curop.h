@@ -239,6 +239,11 @@ namespace mongo {
         void setMaxTimeMicros(uint64_t maxTimeMicros);
 
         /**
+         * Returns true if a time limit has been set on this operation, and false otherwise.
+         */
+        bool isMaxTimeSet() const;
+
+        /**
          * Checks whether this operation has been running longer than its time limit.  Returns
          * false if not, or if the operation has no time limit.
          *

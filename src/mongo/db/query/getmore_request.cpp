@@ -114,6 +114,11 @@ namespace mongo {
 
                 batchSize = el.numberInt();
             }
+            else if (str::equals(fieldName, "maxTimeMS")) {
+                // maxTimeMS is parsed by the command handling code, so we don't repeat the parsing
+                // here.
+                continue;
+            }
             else if (!str::startsWith(fieldName, "$")) {
                 return {ErrorCodes::FailedToParse,
                         str::stream() << "Failed to parse: " << cmdObj << ". "

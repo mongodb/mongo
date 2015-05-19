@@ -34,8 +34,9 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/disallow_copying.h"
-#include "mongo/util/concurrency/mutex.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/util/concurrency/mutex.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
     class BSONObj;
@@ -110,9 +111,9 @@ namespace repl {
     Status applyCommand_inlock(OperationContext* txn, const BSONObj& op);
 
     /**
-     * Waits one second for the Timestamp from the oplog to change.
+     * Waits up to 'timeout' microseconds for the Timestamp from the oplog to change.
      */
-    void waitUpToOneSecondForTimestampChange(const Timestamp& referenceTime);
+    void waitForTimestampChange(const Timestamp& referenceTime, Microseconds timeout);
 
     /**
      * Initializes the global OpTime with the value from the timestamp of the last oplog entry.

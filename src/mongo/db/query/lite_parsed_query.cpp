@@ -349,6 +349,10 @@ namespace mongo {
             pq->addShowRecordIdMetaProj();
         }
 
+        if (pq->isAwaitData() && !pq->isTailable()) {
+            return Status(ErrorCodes::BadValue, "Cannot set awaitData without tailable");
+        }
+
         Status validateStatus = pq->validate();
         if (!validateStatus.isOK()) {
             return validateStatus;

@@ -161,4 +161,13 @@ namespace {
         ASSERT_EQUALS(CursorId(123), result.getValue().cursorid);
     }
 
+    TEST(GetMoreRequestTest, parseFromBSONIgnoreMaxTimeMS) {
+        StatusWith<GetMoreRequest> result = GetMoreRequest::parseFromBSON(
+            "db",
+            BSON("getMore" << CursorId(123) << "collection" << "coll" << "maxTimeMS" << 100));
+        ASSERT_OK(result.getStatus());
+        ASSERT_EQUALS("db.coll", result.getValue().nss.toString());
+        ASSERT_EQUALS(CursorId(123), result.getValue().cursorid);
+    }
+
 } // namespace
