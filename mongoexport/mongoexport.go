@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/bsonutil"
 	"github.com/mongodb/mongo-tools/common/db"
-	sloppyjson "github.com/mongodb/mongo-tools/common/json"
+	"github.com/mongodb/mongo-tools/common/json"
 	"github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/common/util"
@@ -132,17 +132,25 @@ func (exp *MongoExport) GetOutputWriter() (io.WriteCloser, error) {
 }
 
 // Take a comma-delimited set of field names and build a selector doc for query projection.
-// e.g. "a,b,c.d" -> {a:1, b:1, "c.d":1}
+// For fields containing a dot '.', we project the entire top-level portion.
+// e.g. "a,b,c.d.e,f.$" -> {a:1, b:1, "c":1, "f.$": 1}.
 func makeFieldSelector(fields string) bson.M {
-	r := bson.M{"_id": 1}
+	selector := bson.M{"_id": 1}
 	if fields == "" {
-		return r
+		return selector
 	}
-	f := strings.Split(fields, ",")
-	for _, v := range f {
-		r[v] = 1
+
+	for _, field := range strings.Split(fields, ",") {
+		// Projections like "a.0" work fine for nested documents not for arrays
+		// - if passed directly to mongod. To handle this, we have to retrieve
+		// the entire top-level document and then filter afterwards. An exception
+		// is made for '$' projections - which are passed directly to mongod.
+		if i := strings.LastIndex(field, "."); i != -1 && field[i+1:] != "$" {
+			field = field[:strings.Index(field, ".")]
+		}
+		selector[field] = 1
 	}
-	return r
+	return selector
 }
 
 // getCursor returns a cursor that can be iterated over to get all the documents
@@ -244,6 +252,7 @@ func (exp *MongoExport) exportInternal(out io.Writer) (int64, error) {
 	var result bson.M
 
 	docsCount := int64(0)
+
 	// Write document content
 	for cursor.Next(&result) {
 		err := exportOutput.ExportDocument(result)
@@ -291,7 +300,17 @@ func (exp *MongoExport) getExportOutput(out io.Writer) (ExportOutput, error) {
 		} else {
 			return nil, fmt.Errorf("CSV mode requires a field list")
 		}
-		return NewCSVExportOutput(fields, out), nil
+
+		exportFields := make([]string, 0, len(fields))
+		for _, field := range fields {
+			// for '$' field projections, exclude '.$' from the field name
+			if i := strings.LastIndex(field, "."); i != -1 && field[i+1:] == "$" {
+				exportFields = append(exportFields, field[:i])
+			} else {
+				exportFields = append(exportFields, field)
+			}
+		}
+		return NewCSVExportOutput(exportFields, out), nil
 	}
 	return NewJSONExportOutput(exp.OutputOpts.JSONArray, exp.OutputOpts.Pretty, out), nil
 }
@@ -301,7 +320,7 @@ func (exp *MongoExport) getExportOutput(out io.Writer) (ExportOutput, error) {
 // Returns an error if the string is not valid JSON, or extended JSON.
 func getObjectFromArg(queryRaw string) (map[string]interface{}, error) {
 	parsedJSON := map[string]interface{}{}
-	err := sloppyjson.Unmarshal([]byte(queryRaw), &parsedJSON)
+	err := json.Unmarshal([]byte(queryRaw), &parsedJSON)
 	if err != nil {
 		return nil, fmt.Errorf("query '%v' is not valid JSON: %v", queryRaw, err)
 	}
@@ -317,7 +336,7 @@ func getObjectFromArg(queryRaw string) (map[string]interface{}, error) {
 // object which preserves the ordering of the keys as they appear in the input.
 func getSortFromArg(queryRaw string) (bson.D, error) {
 	parsedJSON := bson.D{}
-	err := sloppyjson.Unmarshal([]byte(queryRaw), &parsedJSON)
+	err := json.Unmarshal([]byte(queryRaw), &parsedJSON)
 	if err != nil {
 		return nil, fmt.Errorf("query '%v' is not valid JSON: %v", queryRaw, err)
 	}
