@@ -34,7 +34,6 @@
 
 #include <boost/scoped_ptr.hpp>
 
-#include "mongo/base/owned_pointer_map.h"
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/client.h"
@@ -43,6 +42,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/s/balancer_policy.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/type_actionlog.h"
@@ -53,7 +53,6 @@
 #include "mongo/s/config.h"
 #include "mongo/s/catalog/dist_lock_manager.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/server.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/type_mongos.h"
 #include "mongo/s/type_tags.h"
@@ -88,13 +87,13 @@ namespace mongo {
 
     }
 
-    int Balancer::_moveChunks(const vector<CandidateChunkPtr>* candidateChunks,
+    int Balancer::_moveChunks(const vector<shared_ptr<MigrateInfo>>* candidateChunks,
                               const WriteConcernOptions* writeConcern,
                               bool waitForDelete)
     {
         int movedCount = 0;
 
-        for ( vector<CandidateChunkPtr>::const_iterator it = candidateChunks->begin(); it != candidateChunks->end(); ++it ) {
+        for ( vector<shared_ptr<MigrateInfo>>::const_iterator it = candidateChunks->begin(); it != candidateChunks->end(); ++it ) {
 
             // If the balancer was disabled since we started this round, don't start new
             // chunks moves.
@@ -120,7 +119,7 @@ namespace mongo {
             // with the config servers, but its impossible to distinguish those types of failures
             // at the moment.
             // TODO: Handle all these things more cleanly, since they're expected problems
-            const CandidateChunk& chunkInfo = *it->get();
+            const MigrateInfo& chunkInfo = *it->get();
             const NamespaceString nss(chunkInfo.ns);
 
             try {
@@ -292,7 +291,7 @@ namespace mongo {
         }        
     }
 
-    void Balancer::_doBalanceRound(DBClientBase& conn, vector<CandidateChunkPtr>* candidateChunks) {
+    void Balancer::_doBalanceRound(DBClientBase& conn, vector<shared_ptr<MigrateInfo>>* candidateChunks) {
         invariant(candidateChunks);
 
         vector<CollectionType> collections;
@@ -337,7 +336,7 @@ namespace mongo {
                 continue;
             }
 
-            OwnedPointerMap<string, OwnedPointerVector<ChunkType> > shardToChunksMap;
+            map<string, vector<ChunkType>> shardToChunksMap;
             auto_ptr<DBClientCursor> cursor =
                                     conn.query(ChunkType::ConfigNS,
                                                QUERY(ChunkType::ns(ns)).sort(ChunkType::min()));
@@ -354,36 +353,25 @@ namespace mongo {
                     return;
                 }
 
-                auto_ptr<ChunkType> chunk(new ChunkType(chunkRes.getValue()));
+                const ChunkType& chunk = chunkRes.getValue();
+                allChunkMinimums.insert(chunk.getMin().getOwned());
 
-                allChunkMinimums.insert(chunk->getMin().getOwned());
-                OwnedPointerVector<ChunkType>*& chunkList =
-                        shardToChunksMap.mutableMap()[chunk->getShard()];
-
-                if (chunkList == NULL) {
-                    chunkList = new OwnedPointerVector<ChunkType>();
-                }
-
-                chunkList->mutableVector().push_back(chunk.release());
+                vector<ChunkType>& chunkList = shardToChunksMap[chunk.getShard()];
+                chunkList.push_back(chunk);
             }
             cursor.reset();
 
-            if (shardToChunksMap.map().empty()) {
+            if (shardToChunksMap.empty()) {
                 LOG(1) << "skipping empty collection (" << ns << ")";
                 continue;
             }
 
             for (ShardInfoMap::const_iterator i = shardInfo.begin(); i != shardInfo.end(); ++i) {
-                // this just makes sure there is an entry in shardToChunksMap for every shard
-                OwnedPointerVector<ChunkType>*& chunkList =
-                        shardToChunksMap.mutableMap()[i->first];
-
-                if (chunkList == NULL) {
-                    chunkList = new OwnedPointerVector<ChunkType>();
-                }
+                // This loop just makes sure there is an entry in shardToChunksMap for every shard
+                shardToChunksMap[i->first];
             }
 
-            DistributionStatus status(shardInfo, shardToChunksMap.map());
+            DistributionStatus status(shardInfo, shardToChunksMap);
 
             cursor = conn.query(TagsType::ConfigNS,
                                 QUERY(TagsType::ns(ns)).sort(TagsType::min()));
@@ -455,9 +443,9 @@ namespace mongo {
                 continue;
             }
 
-            CandidateChunk* p = _policy->balance(ns, status, _balancedLastTime);
+            MigrateInfo* p = _policy->balance(ns, status, _balancedLastTime);
             if (p) {
-                candidateChunks->push_back(CandidateChunkPtr(p));
+                candidateChunks->push_back(shared_ptr<MigrateInfo>(p));
             }
         }
     }
@@ -494,11 +482,11 @@ namespace mongo {
     }
 
     void Balancer::run() {
-
         Client::initThread("Balancer");
-        // this is the body of a BackgroundJob so if we throw here we're basically ending the balancer thread prematurely
-        while ( ! inShutdown() ) {
 
+        // This is the body of a BackgroundJob so if we throw here we're basically ending the
+        // balancer thread prematurely
+        while ( ! inShutdown() ) {
             if ( ! _init() ) {
                 log() << "will retry to initialize balancer in one minute" << endl;
                 sleepsecs( 60 );
@@ -595,7 +583,7 @@ namespace mongo {
                            << (writeConcern.get() ? writeConcern->toBSON().toString() : "default")
                            << endl;
 
-                    vector<CandidateChunkPtr> candidateChunks;
+                    vector<shared_ptr<MigrateInfo>> candidateChunks;
                     _doBalanceRound( conn.conn() , &candidateChunks );
                     if ( candidateChunks.size() == 0 ) {
                         LOG(1) << "no need to move any chunk" << endl;

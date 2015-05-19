@@ -122,6 +122,7 @@ namespace repl {
          * DB worker callback function - applies all operations.
          */
         void _callback(const ReplicationExecutor::CallbackData& cbd);
+        void _finishCallback(const StatusWith<Timestamp>& result, const Operations& operations);
 
         // Not owned by us.
         ReplicationExecutor* _executor;

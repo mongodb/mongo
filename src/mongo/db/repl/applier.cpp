@@ -129,13 +129,8 @@ namespace repl {
     }
 
     void Applier::_callback(const ReplicationExecutor::CallbackData& cbd) {
-        boost::lock_guard<boost::mutex> lk(_mutex);
-
-        _active = false;
-
         if (!cbd.status.isOK()) {
-            _onCompletion(cbd.status, _operations);
-            _condition.notify_all();
+            _finishCallback(cbd.status, _operations);
             return;
         }
 
@@ -148,9 +143,9 @@ namespace repl {
         cbd.txn->lockState()->setIsBatchWriter(true);
 
         Status applyStatus(ErrorCodes::InternalError, "not mutated");
-        auto i = _operations.cbegin();
-        invariant(i != _operations.cend());
-        for (; i != _operations.cend(); ++i) {
+
+        invariant(!_operations.empty());
+        for (auto i = _operations.cbegin(); i != _operations.cend(); ++i) {
             try {
                 applyStatus = _applyOperation(cbd.txn, *i);
             }
@@ -158,17 +153,19 @@ namespace repl {
                 applyStatus = exceptionToStatus();
             }
             if (!applyStatus.isOK()) {
-                break;
+                // 'i' points to last operation that was not applied.
+                _finishCallback(applyStatus, Operations(i, _operations.cend()));
+                return;
             }
         }
-        // 'i' points to last operation that was not applied; or cend() if all operations were
-        // applied successfully.
-        if (!applyStatus.isOK()) {
-            _onCompletion(applyStatus, Operations(i, _operations.cend()));
-        }
-        else {
-            _onCompletion(_operations.back().getField("ts").timestamp(), Operations());
-        }
+        _finishCallback(_operations.back().getField("ts").timestamp(), Operations());
+    }
+
+    void Applier::_finishCallback(const StatusWith<Timestamp>& result,
+                                  const Operations& operations) {
+        _onCompletion(result, operations);
+        boost::lock_guard<boost::mutex> lk(_mutex);
+        _active = false;
         _condition.notify_all();
     }
 

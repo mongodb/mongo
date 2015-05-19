@@ -34,7 +34,6 @@
 
 #include <iostream>
 
-#include "mongo/base/owned_pointer_map.h"
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/config.h"
@@ -92,12 +91,10 @@ namespace {
             return false;
         }
 
-        OwnedPointerMap<string, OwnedPointerVector<ChunkType> > shardToChunkMap;
-        DistributionStatus::populateShardToChunksMap(shardInfo,
-                                                     *chunkMgr,
-                                                     &shardToChunkMap.mutableMap());
+        map<string, vector<ChunkType>> shardToChunkMap;
+        DistributionStatus::populateShardToChunksMap(shardInfo, *chunkMgr, &shardToChunkMap);
 
-        DistributionStatus chunkDistribution(shardInfo, shardToChunkMap.map());
+        DistributionStatus chunkDistribution(shardInfo, shardToChunkMap);
 
         const string configServerStr = configServer.getConnectionString().toString();
         StatusWith<string> tagStatus =

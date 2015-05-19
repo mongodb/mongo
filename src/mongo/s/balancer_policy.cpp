@@ -43,12 +43,9 @@
 #include "mongo/s/type_tags.h"
 #include "mongo/util/log.h"
 #include "mongo/util/stringutils.h"
-#include "mongo/util/text.h"
 
 namespace mongo {
 
-    using std::auto_ptr;
-    using std::endl;
     using std::map;
     using std::numeric_limits;
     using std::set;
@@ -59,12 +56,13 @@ namespace mongo {
         return str::stream() << min << " -->> " << max << "  on  " << tag;
     }
 
-    DistributionStatus::DistributionStatus( const ShardInfoMap& shardInfo,
-                                            const ShardToChunksMap& shardToChunksMap )
-        : _shardInfo( shardInfo ), _shardChunks( shardToChunksMap ) {
+    DistributionStatus::DistributionStatus(const ShardInfoMap& shardInfo,
+                                           const ShardToChunksMap& shardToChunksMap)
+            : _shardInfo(shardInfo),
+              _shardChunks(shardToChunksMap) {
 
-        for ( ShardInfoMap::const_iterator i = _shardInfo.begin(); i != _shardInfo.end(); ++i ) {
-            _shards.insert( i->first );
+        for (ShardInfoMap::const_iterator i = _shardInfo.begin(); i != _shardInfo.end(); ++i) {
+            _shards.insert(i->first);
         }
     }
 
@@ -78,8 +76,10 @@ namespace mongo {
         unsigned total = 0;
 
         for (ShardToChunksMap::const_iterator i = _shardChunks.begin();
-                i != _shardChunks.end(); ++i) {
-            total += i->second->size();
+             i != _shardChunks.end();
+             ++i) {
+
+            total += i->second.size();
         }
 
         return total;
@@ -91,7 +91,7 @@ namespace mongo {
             return 0;
         }
 
-        return i->second->size();
+        return i->second.size();
     }
 
     unsigned DistributionStatus::numberOfChunksInShardWithTag( const string& shard , const string& tag ) const {
@@ -101,9 +101,10 @@ namespace mongo {
         }
 
         unsigned total = 0;
-        const vector<ChunkType*>& chunkList = i->second->vector();
-        for (unsigned j = 0; j < i->second->size(); j++) {
-            if (tag == getTagForChunk(*chunkList[j])) {
+
+        const vector<ChunkType>& chunkList = i->second;
+        for (unsigned j = 0; j < i->second.size(); j++) {
+            if (tag == getTagForChunk(chunkList[j])) {
                 total++;
             }
         }
@@ -117,23 +118,23 @@ namespace mongo {
 
         for ( ShardInfoMap::const_iterator i = _shardInfo.begin(); i != _shardInfo.end(); ++i ) {
             if ( i->second.isSizeMaxed() ) {
-                LOG(1) << i->first << " has already reached the maximum total chunk size." << endl;
+                LOG(1) << i->first << " has already reached the maximum total chunk size.";
                 continue;
             }
 
             if ( i->second.isDraining() ) {
-                LOG(1) << i->first << " is currently draining." << endl;
+                LOG(1) << i->first << " is currently draining.";
                 continue;
             }
 
             if ( ! i->second.hasTag( tag ) ) {
-                LOG(1) << i->first << " doesn't have right tag" << endl;
+                LOG(1) << i->first << " doesn't have right tag";
                 continue;
             }
 
             unsigned myChunks = numberOfChunksInShard( i->first );
             if ( myChunks >= minChunks ) {
-                LOG(1) << i->first << " has more chunks me:" << myChunks << " best: " << best << ":" << minChunks << endl;
+                LOG(1) << i->first << " has more chunks me:" << myChunks << " best: " << best << ":" << minChunks;
                 continue;
             }
 
@@ -160,12 +161,11 @@ namespace mongo {
         return worst;
     }
 
-    const vector<ChunkType*>& DistributionStatus::getChunks(
-            const string& shard) const {
+    const vector<ChunkType>& DistributionStatus::getChunks(const string& shard) const {
         ShardToChunksMap::const_iterator i = _shardChunks.find(shard);
-        verify(i != _shardChunks.end());
+        invariant(i != _shardChunks.end());
 
-        return i->second->vector();
+        return i->second;
     }
 
     bool DistributionStatus::addTagRange( const TagRange& range ) {
@@ -176,20 +176,20 @@ namespace mongo {
             const TagRange& tocheck = i->second;
 
             if ( range.min == tocheck.min ) {
-                LOG(1) << "have 2 ranges with the same min " << range << " " << tocheck << endl;
+                LOG(1) << "have 2 ranges with the same min " << range << " " << tocheck;
                 return false;
             }
 
             if ( range.min < tocheck.min ) {
                 if ( range.max > tocheck.min ) {
-                    LOG(1) << "have overlapping ranges " << range << " " << tocheck << endl;
+                    LOG(1) << "have overlapping ranges " << range << " " << tocheck;
                     return false;
                 }
             }
             else {
                 // range.min > tocheck.min
                 if ( tocheck.max > range.min ) {
-                    LOG(1) << "have overlapping ranges " << range << " " << tocheck << endl;
+                    LOG(1) << "have overlapping ranges " << range << " " << tocheck;
                     return false;
                 }
             }
@@ -220,26 +220,28 @@ namespace mongo {
     }
 
     void DistributionStatus::dump() const {
-        log() << "DistributionStatus" << endl;
-        log() << "  shards" << endl;
+        log() << "DistributionStatus";
+        log() << "  shards";
+
         for ( ShardInfoMap::const_iterator i = _shardInfo.begin(); i != _shardInfo.end(); ++i ) {
-            log() << "      " << i->first << "\t" << i->second.toString() << endl;
+            log() << "      " << i->first << "\t" << i->second.toString();
 
             ShardToChunksMap::const_iterator j = _shardChunks.find(i->first);
             verify(j != _shardChunks.end());
 
-            const OwnedPointerVector<ChunkType>& v = *j->second;
-            for ( unsigned x = 0; x < v.size(); x++ )
-                log() << "          " << *v[x] << endl;
+            const vector<ChunkType>& v = j->second;
+            for (unsigned x = 0; x < v.size(); x++) {
+                log() << "          " << v[x];
+            }
         }
 
         if ( _tagRanges.size() > 0 ) {
-            log() << " tag ranges" << endl;
+            log() << " tag ranges";
 
             for ( map<BSONObj,TagRange>::const_iterator i = _tagRanges.begin();
                   i != _tagRanges.end();
                   ++i )
-                log() << i->second.toString() << endl;
+                log() << i->second.toString();
         }
     }
 
@@ -280,31 +282,26 @@ namespace mongo {
     void DistributionStatus::populateShardToChunksMap(const ShardInfoMap& allShards,
                                                       const ChunkManager& chunkMgr,
                                                       ShardToChunksMap* shardToChunksMap) {
+
         // Makes sure there is an entry in shardToChunksMap for every shard.
-        for (ShardInfoMap::const_iterator it = allShards.begin();
-                it != allShards.end(); ++it) {
-
-            OwnedPointerVector<ChunkType>*& chunkList =
-                    (*shardToChunksMap)[it->first];
-
-            if (chunkList == NULL) {
-                chunkList = new OwnedPointerVector<ChunkType>();
-            }
+        for (ShardInfoMap::const_iterator it = allShards.begin(); it != allShards.end(); ++it) {
+            (*shardToChunksMap)[it->first];
         }
 
         const ChunkMap& chunkMap = chunkMgr.getChunkMap();
         for (ChunkMap::const_iterator it = chunkMap.begin(); it != chunkMap.end(); ++it) {
             const ChunkPtr chunkPtr = it->second;
 
-            auto_ptr<ChunkType> chunk(new ChunkType());
-            chunk->setNS(chunkPtr->getns());
-            chunk->setMin(chunkPtr->getMin().getOwned());
-            chunk->setMax(chunkPtr->getMax().getOwned());
-            chunk->setJumbo(chunkPtr->isJumbo()); // TODO: is this reliable?
-            const string shardName(chunkPtr->getShard().getName());
-            chunk->setShard(shardName);
+            ChunkType chunk;
+            chunk.setNS(chunkPtr->getns());
+            chunk.setMin(chunkPtr->getMin().getOwned());
+            chunk.setMax(chunkPtr->getMax().getOwned());
+            chunk.setJumbo(chunkPtr->isJumbo()); // TODO: is this reliable?
 
-            (*shardToChunksMap)[shardName]->push_back(chunk.release());
+            const string shardName(chunkPtr->getShard().getName());
+            chunk.setShard(shardName);
+
+            (*shardToChunksMap)[shardName].push_back(chunk);
         }
     }
 
@@ -366,12 +363,12 @@ namespace mongo {
 
                 // now we know we need to move to chunks off this shard
                 // we will if we are allowed
-                const vector<ChunkType* >& chunks = distribution.getChunks( shard );
+                const vector<ChunkType>& chunks = distribution.getChunks( shard );
                 unsigned numJumboChunks = 0;
 
                 // since we have to move all chunks, lets just do in order
                 for ( unsigned i=0; i<chunks.size(); i++ ) {
-                    const ChunkType& chunkToMove = *chunks[i];
+                    const ChunkType& chunkToMove = chunks[i];
                     if (chunkToMove.getJumbo()) {
                         numJumboChunks++;
                         continue;
@@ -384,14 +381,14 @@ namespace mongo {
                         warning() << "want to move chunk: " << chunkToMove
                                   << "(" << tag << ") "
                                   << "from " << shard
-                                  << " but can't find anywhere to put it" << endl;
+                                  << " but can't find anywhere to put it";
                         continue;
                     }
 
                     log() << "going to move " << chunkToMove
                           << " from " << shard
                           << "(" << tag << ")"
-                          << " to " << to << endl;
+                          << " to " << to;
 
                     return new MigrateInfo(ns, to, shard, chunkToMove.toBSON());
                 }
@@ -399,7 +396,7 @@ namespace mongo {
                 warning() << "can't find any chunk to move from: " << shard
                           << " but we want to. "
                           << " numJumboChunks: " << numJumboChunks
-                          << endl;
+                         ;
             }
         }
 
@@ -411,9 +408,9 @@ namespace mongo {
                 string shard = *i;
                 const ShardInfo& info = distribution.shardInfo( shard );
 
-                const vector<ChunkType *>& chunks = distribution.getChunks(shard);
+                const vector<ChunkType>& chunks = distribution.getChunks(shard);
                 for ( unsigned j = 0; j < chunks.size(); j++ ) {
-                    const ChunkType& chunk = *chunks[j];
+                    const ChunkType& chunk = chunks[j];
                     string tag = distribution.getTagForChunk(chunk);
 
                     if ( info.hasTag( tag ) )
@@ -422,20 +419,20 @@ namespace mongo {
                     // uh oh, this chunk is in the wrong place
                     log() << "chunk " << chunk
                           << " is not on a shard with the right tag: "
-                          << tag << endl;
+                          << tag;
 
                     if (chunk.getJumbo()) {
-                        warning() << "chunk " << chunk << " is jumbo, so cannot be moved" << endl;
+                        warning() << "chunk " << chunk << " is jumbo, so cannot be moved";
                         continue;
                     }
 
                     string to = distribution.getBestReceieverShard( tag );
                     if ( to.size() == 0 ) {
-                        log() << "no where to put it :(" << endl;
+                        log() << "no where to put it :(";
                         continue;
                     }
                     verify( to != shard );
-                    log() << " going to move to: " << to << endl;
+                    log() << " going to move to: " << to;
                     return new MigrateInfo(ns, to, shard, chunk.toBSON());
                 }
             }
@@ -474,7 +471,7 @@ namespace mongo {
 
             string to = distribution.getBestReceieverShard( tag );
             if ( to.size() == 0 ) {
-                log() << "no available shards to take chunks for tag [" << tag << "]" << endl;
+                log() << "no available shards to take chunks for tag [" << tag << "]";
                 return NULL;
             }
 
@@ -482,18 +479,18 @@ namespace mongo {
 
             const int imbalance = max - min;
 
-            LOG(1) << "collection : " << ns << endl;
-            LOG(1) << "donor      : " << from << " chunks on " << max << endl;
-            LOG(1) << "receiver   : " << to << " chunks on " << min << endl;
-            LOG(1) << "threshold  : " << threshold << endl;
+            LOG(1) << "collection : " << ns;
+            LOG(1) << "donor      : " << from << " chunks on " << max;
+            LOG(1) << "receiver   : " << to << " chunks on " << min;
+            LOG(1) << "threshold  : " << threshold;
 
             if ( imbalance < threshold )
                 continue;
 
-            const vector<ChunkType *>& chunks = distribution.getChunks(from);
+            const vector<ChunkType>& chunks = distribution.getChunks(from);
             unsigned numJumboChunks = 0;
             for ( unsigned j = 0; j < chunks.size(); j++ ) {
-                const ChunkType& chunk = *chunks[j];
+                const ChunkType& chunk = chunks[j];
                 if (distribution.getTagForChunk(chunk) != tag)
                     continue;
 
@@ -504,7 +501,7 @@ namespace mongo {
 
                 log() << " ns: " << ns << " going to move " << chunk
                       << " from: " << from << " to: " << to << " tag [" << tag << "]"
-                      << endl;
+                     ;
                 return new MigrateInfo(ns, to, from, chunk.toBSON());
             }
 
@@ -512,7 +509,7 @@ namespace mongo {
                 error() << "shard: " << from << " ns: " << ns
                         << " has too many chunks, but they are all jumbo "
                         << " numJumboChunks: " << numJumboChunks
-                        << endl;
+                       ;
                 continue;
             }
 
