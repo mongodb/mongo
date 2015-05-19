@@ -685,7 +685,7 @@ __wt_lsm_manager_push_entry(WT_SESSION_IMPL *session,
 	 */
 	(void)WT_ATOMIC_ADD4(lsm_tree->queue_ref, 1);
 	if (!F_ISSET(lsm_tree, WT_LSM_TREE_ACTIVE)) {
-		(void)WT_ATOMIC_SUB4(entry->lsm_tree->queue_ref, 1);
+		(void)WT_ATOMIC_SUB4(lsm_tree->queue_ref, 1);
 		return (0);
 	}
 
@@ -712,6 +712,6 @@ __wt_lsm_manager_push_entry(WT_SESSION_IMPL *session,
 	return (0);
 err:
 	if (!pushed)
-		(void)WT_ATOMIC_SUB4(entry->lsm_tree->queue_ref, 1);
+		(void)WT_ATOMIC_SUB4(lsm_tree->queue_ref, 1);
 	return (ret);
 }
