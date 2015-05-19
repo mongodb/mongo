@@ -45,11 +45,10 @@ DB.prototype.commandHelp = function( name ){
 }
 
  // utility to attach readPreference if needed.
- DB.prototype._attachReadPreferenceToCommand = function (cmdObj) {
+ DB.prototype._attachReadPreferenceToCommand = function (cmdObj, readPref) {
      "use strict";
-     var readPref = this.getMongo().getReadPref();
      // if the user has not set a readpref, return the original cmdObj
-     if (readPref === null) {
+     if ((readPref === null) || typeof(readPref) !== "object") {
          return cmdObj;
      }
 
@@ -86,21 +85,24 @@ DB.prototype.commandHelp = function( name ){
  };
 
  // Like runCommand but applies readPreference if one has been set
- // on the connection. Also sets options automatically.
+ // on the connection. Also sets slaveOk if a (non-primary) readPref has been set.
  DB.prototype.runReadCommand = function (obj, extra) {
      "use strict";
 
+     // Support users who call this function with a string commandName, e.g.
+     // db.runReadCommand("commandName", {arg1: "value", arg2: "value"}).
      var mergedObj = (typeof(obj) === "string") ? this._mergeCommandOptions(obj, extra) : obj;
-     var cmdObjWithReadPref = this._attachReadPreferenceToCommand(obj);
+     var cmdObjWithReadPref =
+         this._attachReadPreferenceToCommand(mergedObj,
+                                             this.getMongo().getReadPref());
 
      var options = 0;
-     // automatically set slaveOk if readPreference is anything but primary
+     // We automatically set slaveOk if readPreference is anything but primary.
      if (this.getMongo().getReadPrefMode() !== "primary") {
          options |= 4;
      }
 
-     // allow options to be overridden
-     // extra is not used since mergedObj is an object
+     // The 'extra' parameter is not used as we have already created a merged command object.
      return this.runCommand(cmdObjWithReadPref, null, options);
  };
 

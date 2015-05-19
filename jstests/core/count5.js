@@ -26,5 +26,5 @@ assert.eq( 2 , t.find( q ).skip(48).limit(5).size() , "I" );
 assert.eq( 20 , t.find().limit(20).size() , "J" );
 
 assert.eq( 0 , t.find().skip(120).size() , "K" );
-assert.eq( 1 , db.$cmd.findOne( { count: "count5" } )["ok"] , "L" );
-assert.eq( 1 , db.$cmd.findOne( { count: "count5", skip: 120 } )["ok"] , "M" );
+assert.eq( 1 , db.runCommand( { count: "count5" } )["ok"] , "L" );
+assert.eq( 1 , db.runCommand( { count: "count5", skip: 120 } )["ok"] , "M" );
