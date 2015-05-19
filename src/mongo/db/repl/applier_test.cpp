@@ -68,6 +68,7 @@ namespace {
         void _testApplyOperationFailed(size_t opIndex, stdx::function<Status ()> fail);
 
         std::unique_ptr<Applier> _applier;
+        std::unique_ptr<boost::barrier> _barrier;
     };
 
     Status ApplierTest::getDetectableErrorStatus() {
@@ -81,12 +82,17 @@ namespace {
         _applier.reset(new Applier(&getExecutor(),
                                    {BSON("ts" << Timestamp(Seconds(123), 0))},
                                    apply,
-                                   [](const StatusWith<Timestamp>&, const Operations&) {}));
+                                   [this](const StatusWith<Timestamp>&, const Operations&) {
+            if (_barrier.get()) {
+                _barrier->count_down_and_wait();
+            }
+        }));
     }
 
     void ApplierTest::tearDown() {
         ReplicationExecutorTest::tearDown();
         _applier.reset();
+        _barrier.reset();
     }
 
     Applier* ApplierTest::getApplier() const {
@@ -124,16 +130,24 @@ namespace {
     }
 
     TEST_F(ApplierTest, IsActiveAfterStart) {
+        // Use a barrier to ensure that the callback blocks while
+        // we check isActive().
+        _barrier.reset(new boost::barrier(2U));
         ASSERT_FALSE(getApplier()->isActive());
         ASSERT_OK(getApplier()->start());
         ASSERT_TRUE(getApplier()->isActive());
+        _barrier->count_down_and_wait();
     }
 
     TEST_F(ApplierTest, StartWhenActive) {
+        // Use a barrier to ensure that the callback blocks while
+        // we check isActive().
+        _barrier.reset(new boost::barrier(2U));
         ASSERT_OK(getApplier()->start());
         ASSERT_TRUE(getApplier()->isActive());
         ASSERT_NOT_OK(getApplier()->start());
         ASSERT_TRUE(getApplier()->isActive());
+        _barrier->count_down_and_wait();
     }
 
     TEST_F(ApplierTest, CancelWithoutStart) {
