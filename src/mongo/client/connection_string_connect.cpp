@@ -59,7 +59,6 @@ namespace mongo {
             return c;
         }
 
-        case PAIR:
         case SET: {
             DBClientReplicaSet * set = new DBClientReplicaSet( _setName , _servers , socketTimeout );
             if( ! set->connect() ) {

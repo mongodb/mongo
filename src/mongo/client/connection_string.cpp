@@ -93,12 +93,6 @@ namespace mongo {
             return true;
         case MASTER:
             return _servers[0] == other._servers[0];
-        case PAIR:
-            if ( _servers[0] == other._servers[0] )
-                return _servers[1] == other._servers[1];
-            return
-                ( _servers[0] == other._servers[1] ) &&
-                ( _servers[1] == other._servers[0] );
         case SET:
             return _setName == other._setName;
         case SYNC:
@@ -136,9 +130,6 @@ namespace mongo {
         if( numCommas == 0 )
             return ConnectionString( HostAndPort( host ) );
 
-        if ( numCommas == 1 )
-            return ConnectionString( PAIR , host );
-
         if ( numCommas == 2 )
             return ConnectionString( SYNC , host );
 
@@ -146,14 +137,12 @@ namespace mongo {
         return ConnectionString(); // INVALID
     }
 
-    std::string ConnectionString::typeToString( ConnectionType type ) {
-        switch ( type ) {
+    std::string ConnectionString::typeToString(ConnectionType type) {
+        switch (type) {
         case INVALID:
             return "invalid";
         case MASTER:
             return "master";
-        case PAIR:
-            return "pair";
         case SET:
             return "set";
         case SYNC:
@@ -161,8 +150,8 @@ namespace mongo {
         case CUSTOM:
             return "custom";
         }
-        verify(0);
-        return "";
+
+        MONGO_UNREACHABLE;
     }
 
 } // namespace mongo

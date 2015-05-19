@@ -58,8 +58,7 @@ namespace mongo {
      */
     class ConnectionString {
     public:
-
-        enum ConnectionType { INVALID , MASTER , PAIR , SET , SYNC, CUSTOM };
+        enum ConnectionType { INVALID, MASTER, SET, SYNC, CUSTOM };
 
         ConnectionString() {
             _type = INVALID;
@@ -85,9 +84,6 @@ namespace mongo {
             case SET:
                 verify( _setName.size() );
                 verify( _servers.size() >= 1 ); // 1 is ok since we can derive
-                break;
-            case PAIR:
-                verify( _servers.size() == 2 );
                 break;
             default:
                 verify( _servers.size() > 0 );
@@ -115,11 +111,9 @@ namespace mongo {
 
         bool isValid() const { return _type != INVALID; }
 
-        std::string toString() const { return _string; }
+        const std::string& toString() const { return _string; }
 
-        DBClientBase* connect( std::string& errmsg, double socketTimeout = 0 ) const;
-
-        std::string getSetName() const { return _setName; }
+        const std::string& getSetName() const { return _setName; }
 
         const std::vector<HostAndPort>& getServers() const { return _servers; }
 
@@ -132,6 +126,8 @@ namespace mongo {
          * For pair (deprecated) or sync cluster connections, that's the same hosts in any ordering.
          */
         bool sameLogicalEndpoint( const ConnectionString& other ) const;
+
+        DBClientBase* connect(std::string& errmsg, double socketTimeout = 0) const;
 
         static ConnectionString parse( const std::string& url , std::string& errmsg );
 

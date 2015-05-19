@@ -122,30 +122,28 @@ namespace mongo {
         return conn->type() == ConnectionString::MASTER || conn->type() == ConnectionString::SET;
     }
 
-    DBClientBase* getVersionable( DBClientBase* conn ){
-
-        switch ( conn->type() ) {
-        case ConnectionString::INVALID:
-           massert( 15904, str::stream() << "cannot set version on invalid connection " << conn->toString(), false );
-           return NULL;
-        case ConnectionString::MASTER:
-           return conn;
-        case ConnectionString::PAIR:
-           massert( 15905, str::stream() << "cannot set version or shard on pair connection " << conn->toString(), false );
-           return NULL;
-        case ConnectionString::SYNC:
-           massert( 15906, str::stream() << "cannot set version or shard on sync connection " << conn->toString(), false );
-           return NULL;
-        case ConnectionString::CUSTOM:
-           massert( 16334, str::stream() << "cannot set version or shard on custom connection " << conn->toString(), false );
-           return NULL;
+    DBClientBase* getVersionable(DBClientBase* conn) {
+        switch (conn->type()) {
         case ConnectionString::SET:
-           DBClientReplicaSet* set = (DBClientReplicaSet*) conn;
-           return &( set->masterConn() );
+            DBClientReplicaSet* set = static_cast<DBClientReplicaSet*>(conn);
+            return &(set->masterConn());
+        case ConnectionString::MASTER:
+            return conn;
+        case ConnectionString::INVALID:
+            massert(15904, str::stream() << "cannot set version on invalid connection "
+                                         << conn->toString(), false);
+            return NULL;
+        case ConnectionString::SYNC:
+            massert(15906, str::stream() << "cannot set version or shard on sync connection "
+                                         << conn->toString(), false);
+            return NULL;
+        case ConnectionString::CUSTOM:
+            massert(16334, str::stream() << "cannot set version or shard on custom connection "
+                                         << conn->toString(), false);
+            return NULL;
         }
 
-        verify( false );
-        return NULL;
+        MONGO_UNREACHABLE;
     }
 
     bool VersionManager::forceRemoteCheckShardVersionCB(const string& ns) {
