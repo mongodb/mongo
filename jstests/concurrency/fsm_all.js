@@ -19,11 +19,6 @@ var blacklist = [
     'auth_create_user.js',
     'auth_drop_role.js',
     'auth_drop_user.js', // SERVER-16739 OpenSSL libcrypto crash
-
-    // These workloads are disabled because of recent changes in capped
-    // collection behavior with wiredTiger (see: SERVER-16235)
-    'create_capped_collection.js',
-    'create_capped_collection_maxdocs.js',
 ].map(function(file) { return dir + '/' + file; });
 
 runWorkloadsSerially(ls(dir).filter(function(file) {

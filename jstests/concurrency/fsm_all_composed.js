@@ -20,11 +20,6 @@ var blacklist = [
     'auth_drop_role.js',
     'auth_drop_user.js', // SERVER-16739 OpenSSL libcrypto crash
 
-    // These workloads are disabled because of recent changes in capped
-    // collection behavior with wiredTiger (see: SERVER-16235)
-    'create_capped_collection.js',
-    'create_capped_collection_maxdocs.js',
-
     // These workloads take too long when composed because eval takes a
     // global lock and the composer doesn't honor iteration counts:
     'remove_single_document_eval.js',
