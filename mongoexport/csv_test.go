@@ -27,7 +27,7 @@ func TestWriteCSV(t *testing.T) {
 			csvExporter.ExportDocument(bson.M{"_id": "12345"})
 			csvExporter.WriteFooter()
 			csvExporter.Flush()
-			So(out.String(), ShouldEqual, `12345,"","",""`+"\n")
+			So(out.String(), ShouldEqual, `12345,,,`+"\n")
 		})
 
 		Convey("Exported document with index into nested objects should print correctly", func() {
@@ -35,7 +35,7 @@ func TestWriteCSV(t *testing.T) {
 			csvExporter.ExportDocument(bson.M{"z": []interface{}{"x", bson.M{"a": "T", "B": 1}}})
 			csvExporter.WriteFooter()
 			csvExporter.Flush()
-			So(out.String(), ShouldEqual, `"","","",T`+"\n")
+			So(out.String(), ShouldEqual, `,,,T`+"\n")
 		})
 
 		Reset(func() {
