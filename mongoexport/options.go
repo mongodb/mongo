@@ -28,7 +28,7 @@ type OutputFormatOptions struct {
 }
 
 // Name returns a human-readable group name for output format options.
-func (_ *OutputFormatOptions) Name() string {
+func (*OutputFormatOptions) Name() string {
 	return "output"
 }
 
@@ -43,6 +43,6 @@ type InputOptions struct {
 }
 
 // Name returns a human-readable group name for input options.
-func (_ *InputOptions) Name() string {
+func (*InputOptions) Name() string {
 	return "querying"
 }

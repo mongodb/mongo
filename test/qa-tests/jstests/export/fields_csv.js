@@ -90,6 +90,64 @@
     var fromDest = destColl.findOne({ a: 1, b: 1 });
     assert.neq(fromSource._id, fromDest._id);
 
+
+    /* Test passing positional arguments to --fields */
+
+    // outputMatchesExpected takes an output string and returns
+    // a boolean indicating if any line of the output matched
+    // the expected string.
+    var outputMatchesExpected = function(output, expected) {
+        var found = false;
+        output.split('\n').forEach(function(line) {
+          if (line.match(expected)) found = true;
+        });
+        return found;
+    }
+
+    // remove the export, clear the destination collection
+    removeFile(exportTarget);
+    sourceColl.remove({});
+
+    // ensure source collection is empty
+    assert.eq(0, sourceColl.count());
+
+    // insert some data
+    sourceColl.insert({ a: [1, 2, 3, 4, 5], b: { c: [-1, -2, -3, -4] } });
+    sourceColl.insert({ a: 1, b: 2, c: 3, d: { e: [4, 5, 6] } });
+    sourceColl.insert({ a: 1, b: 2, c: 3, d: 5, e: {"0": ["foo", "bar", "baz"] } });
+    sourceColl.insert({ a: 1, b: 2, c: 3, d: [4, 5, 6], e: [ {"0": 0, "1": 1}, {"2": 2, "3": 3} ] });
+
+    // ensure the insertion worked
+    assert.eq(4, sourceColl.count());
+
+    // use the following fields as filters:
+    var cases = [
+        { field: 'd.e.2', expected: /6/ }, // specify nested field with array value
+        { field: 'e.0.0', expected: /foo/ }, // specify nested field with numeric array value
+        { field: 'b,d.1,e.1.3', expected: /2,5,3/ }, // specify varying levels of field nesting
+    ];
+
+    for (var i = 0; i < cases.length; i++) {
+        assert.eq(0, toolTest.runTool.apply(toolTest,['export', '--fields', cases[i].field, '--out', exportTarget, '--db', 'test', '--collection', 'source', '--csv'].concat(commonToolArgs)));
+        var output = cat(exportTarget);
+        jsTest.log("Fields Test " + (i + 1) + ": \n" + output);
+        assert.eq(outputMatchesExpected(output, cases[i].expected), true);
+    }
+
+    // test with $ projection and query
+    cases = [
+        { query: '{ d: 4 }', field: 'd.$', expected: /[4]/ },
+        { query: '{ a: { $gt: 1 } }', field: 'a.$', expected: /[2]/ },
+        { query: '{ "b.c": -1 }', field: 'b.c.$', expected: /[-1]/ },
+    ];
+
+    for (var i = 0; i < cases.length; i++) {
+        assert.eq(0, toolTest.runTool.apply(toolTest,['export', '--query', cases[i].query, '--fields', cases[i].field, '--out', exportTarget, '--db', 'test', '--collection', 'source', '--csv'].concat(commonToolArgs)));
+        var output = cat(exportTarget);
+        jsTest.log("Fields + Query Test " + (i + 1) + ": \n" + output);
+        assert.eq(outputMatchesExpected(output, cases[i].expected), true);
+    }
+
     // success
     toolTest.stop();
 
