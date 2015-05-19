@@ -1327,16 +1327,16 @@ namespace JsobjTests {
         public:
             void run() {
                 OID min, oid, max;
-                Date_t now = Date_t::now();
-                oid.init(); // slight chance this has different time. If its a problem, can change.
-                min.init(now);
+                oid.init();
+                const Date_t now = oid.asDateT();
+                min.init(now, false);
                 max.init(now, true);
 
-                ASSERT_EQUALS( oid.asTimeT() , now.toTimeT() );
-                ASSERT_EQUALS( min.asTimeT() , now.toTimeT() );
-                ASSERT_EQUALS( max.asTimeT() , now.toTimeT() );
-                ASSERT( BSON("" << min).woCompare( BSON("" << oid) ) < 0  );
-                ASSERT( BSON("" << max).woCompare( BSON("" << oid)  )> 0  );
+                ASSERT_EQUALS(oid.asDateT(), now);
+                ASSERT_EQUALS(min.asDateT(), now);
+                ASSERT_EQUALS(max.asDateT(), now);
+                ASSERT_LT(BSON("" << min), BSON("" << oid));
+                ASSERT_GT(BSON("" << max), BSON("" << oid));
             }
         };
 
