@@ -32,7 +32,7 @@
 
 namespace mongo {
 
-    class ReadPreferenceSetting;
+    struct ReadPreferenceSetting;
     struct HostAndPort;
     template<typename T> class StatusWith;
 

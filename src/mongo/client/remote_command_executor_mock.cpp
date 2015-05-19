@@ -31,32 +31,33 @@
 #include "mongo/client/remote_command_executor_mock.h"
 
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
-    RemoteCommandExecutorMock::RemoteCommandExecutorMock(): _areExpectationsSet(false),
-                _response(Status(ErrorCodes::InternalError, "response not set")) {
+namespace {
+    void noCheckerSet(const RemoteCommandRequest& request) {
+        FAIL(str::stream() << "runCommand not expected to be called. request: "
+                           << request.toString());
+    }
+}
+
+    RemoteCommandExecutorMock::RemoteCommandExecutorMock():
+            _runCommandChecker(noCheckerSet),
+            _response(Status(ErrorCodes::InternalError, "response not set")) {
     }
 
     StatusWith<RemoteCommandResponse> RemoteCommandExecutorMock::runCommand(
             const RemoteCommandRequest& request) {
-        ASSERT_TRUE(_areExpectationsSet);
-        ASSERT_EQUALS(_expectedHost, request.target);
-        ASSERT_EQUALS(_expectedDatabase, request.dbname);
-        ASSERT_EQUALS(0, request.cmdObj.woCompare(_expectedDoc));
-
+        _runCommandChecker(request);
+        _runCommandChecker = noCheckerSet;
         return _response;
     }
 
-    void RemoteCommandExecutorMock::expectRunCommand(HostAndPort expectedHost,
-                          std::string expectedDatabase,
-                          BSONObj expectedDoc,
-                          StatusWith<RemoteCommandResponse> returnThis) {
-        _areExpectationsSet = true;
-        _expectedHost = std::move(expectedHost);
-        _expectedDatabase = std::move(expectedDatabase);
-        _expectedDoc = std::move(expectedDoc);
+    void RemoteCommandExecutorMock::setNextExpectedCommand(
+            stdx::function<void (const RemoteCommandRequest& request)> checkerFunc,
+            StatusWith<RemoteCommandResponse> returnThis) {
+        _runCommandChecker = checkerFunc;
         _response = std::move(returnThis);
     }
-
 }
