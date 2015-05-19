@@ -64,6 +64,11 @@ namespace fts {
 
             Token token = _tokenizer->next();
 
+            // Do not return delimiters
+            if (token.type != Token::TEXT) {
+                continue;
+            }
+
             string word = token.data.toString();
 
             word = tolowerString(token.data);

@@ -67,6 +67,9 @@ env.CppUnitTest( "fts_stop_words_test", "stop_words_test.cpp",
 env.CppUnitTest( "fts_stemmer_test", "stemmer_test.cpp",
                  LIBDEPS=["base"] )
 
+env.CppUnitTest( "fts_basic_tokenizer_test", "fts_basic_tokenizer_test.cpp",
+                 LIBDEPS=["base"] )
+
 env.CppUnitTest( "fts_tokenizer_test", "tokenizer_test.cpp",
                  LIBDEPS=["base"] )
 
