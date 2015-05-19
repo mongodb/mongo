@@ -1580,7 +1580,7 @@ namespace {
         catch (const AssertionException& e) {
             verify( e.getCode() != SendStaleConfigCode && e.getCode() != RecvStaleConfigCode );
 
-            dassert(replyBuilder->getState() == rpc::ReplyBuilderInterface::State::kCommandReply);
+            dassert(replyBuilder->getState() == rpc::ReplyBuilderInterface::State::kMetadata);
 
             replyBuilder
                 ->setMetadata(rpc::metadata::empty())
