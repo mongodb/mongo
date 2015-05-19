@@ -1230,13 +1230,13 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 		    "LSM compaction requires active merge threads");
 
 	/*
-	 * We are done if there is a single chunk in the tree and we have
-	 * already created a bloom filter for it or we are configured not to.
+	 * There is no work to do if there is only a single chunk in the tree
+	 * and it has a bloom filter or is configured to never have a bloom
+	 * filter.
 	 */
 	if (lsm_tree->nchunks == 1 &&
-	    ((FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_OLDEST) &&
-	    F_ISSET(lsm_tree->chunk[0], WT_LSM_CHUNK_BLOOM)) ||
-	    !FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_OLDEST))) {
+	    (!FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_OLDEST) ||
+	    F_ISSET(lsm_tree->chunk[0], WT_LSM_CHUNK_BLOOM))) {
 		__wt_lsm_tree_release(session, lsm_tree);
 		return (0);
 	}
