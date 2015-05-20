@@ -499,19 +499,27 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_ERR(__wt_txn_commit(session, NULL));
 
 	/*
+	 * If any tree was dirty, we will have updated the metadata with the
+	 * new checkpoint information.  If the metadata is clean, all other
+	 * trees must have been clean.
+	 *
 	 * Disable metadata tracking during the metadata checkpoint.
 	 *
 	 * We don't lock old checkpoints in the metadata file: there is no way
 	 * to open one.  We are holding other handle locks, it is not safe to
 	 * lock conn->spinlock.
 	 */
-	session->isolation = txn->isolation = WT_ISO_READ_UNCOMMITTED;
-	saved_meta_next = session->meta_track_next;
-	session->meta_track_next = NULL;
-	WT_WITH_DHANDLE(session,
-	    session->meta_dhandle, ret = __wt_checkpoint(session, cfg));
-	session->meta_track_next = saved_meta_next;
-	WT_ERR(ret);
+	WT_WITH_DHANDLE(session, session->meta_dhandle,
+	    idle = !S2BT(session)->modified);
+	if (!idle) {
+		session->isolation = txn->isolation = WT_ISO_READ_UNCOMMITTED;
+		saved_meta_next = session->meta_track_next;
+		session->meta_track_next = NULL;
+		WT_WITH_DHANDLE(session, session->meta_dhandle,
+		    ret = __wt_checkpoint(session, cfg));
+		session->meta_track_next = saved_meta_next;
+		WT_ERR(ret);
+	}
 
 	WT_ERR(__checkpoint_verbose_track(session,
 	    "metadata sync completed", &verb_timer));
@@ -553,23 +561,14 @@ err:	/*
 	txn_global->checkpoint_id = WT_TXN_NONE;
 	txn_global->checkpoint_snap_min = WT_TXN_NONE;
 
-	/* Tell logging that we have finished a database checkpoint. */
-	if (logging) {
-		/*
-		 * If we did a full checkpoint on an idle system, then we do
-		 * not update the metadata. If we skipped writing the
-		 * metadata or have any error then do not write a log record.
-		 * We do need to call the function to clean up resources.
-		 */
-		if (ret == 0 && full &&
-		    F_ISSET((WT_BTREE *)session->meta_dhandle->handle,
-		    WT_BTREE_SKIP_CKPT))
-			idle = 1;
+	/*
+	 * Tell logging that we have finished a database checkpoint.  Do not
+	 * write a log record if the database was idle.
+	 */
+	if (logging)
 		WT_TRET(__wt_txn_checkpoint_log(session, full,
-		    (ret == 0 && idle == 0) ?
-		    WT_TXN_LOG_CKPT_STOP : WT_TXN_LOG_CKPT_CLEANUP,
-		    NULL));
-	}
+		    (ret == 0 && !idle) ?
+		    WT_TXN_LOG_CKPT_STOP : WT_TXN_LOG_CKPT_CLEANUP, NULL));
 
 	for (i = 0; i < session->ckpt_handle_next; ++i) {
 		if (session->ckpt_handle[i].dhandle == NULL) {
@@ -589,7 +588,6 @@ err:	/*
 	}
 
 	session->isolation = txn->isolation = saved_isolation;
-
 	return (ret);
 }
 
@@ -800,7 +798,6 @@ __checkpoint_worker(
 	 * means it must exist.
 	 */
 	force = 0;
-	F_CLR(btree, WT_BTREE_SKIP_CKPT);
 	if (!btree->modified && cfg != NULL) {
 		ret = __wt_config_gets(session, cfg, "force", &cval);
 		if (ret != 0 && ret != WT_NOTFOUND)
@@ -809,10 +806,8 @@ __checkpoint_worker(
 			force = 1;
 	}
 	if (!btree->modified && !force) {
-		if (!is_checkpoint) {
-			F_SET(btree, WT_BTREE_SKIP_CKPT);
+		if (!is_checkpoint)
 			goto done;
-		}
 
 		deleted = 0;
 		WT_CKPT_FOREACH(ckptbase, ckpt)
@@ -830,10 +825,8 @@ __checkpoint_worker(
 		    (strcmp(name, (ckpt - 1)->name) == 0 ||
 		    (WT_PREFIX_MATCH(name, WT_CHECKPOINT) &&
 		    WT_PREFIX_MATCH((ckpt - 1)->name, WT_CHECKPOINT))) &&
-		    deleted < 2) {
-			F_SET(btree, WT_BTREE_SKIP_CKPT);
+		    deleted < 2)
 			goto done;
-		}
 	}
 
 	/* Add a new checkpoint entry at the end of the list. */
