@@ -118,7 +118,7 @@ namespace {
                << "] trying to create ["
                << dbname.toString()
                << "]";
-            uasserted(DatabaseDifferCaseCode, ss.str());
+            uasserted(ErrorCodes::DatabaseDifferCase, ss.str());
         }
 
         StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();

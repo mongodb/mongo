@@ -249,10 +249,9 @@ namespace mongo {
             return c;
         }
 
-        string errmsg;
-        ConnectionString cs = ConnectionString::parse( host , errmsg );
-        uassert( 13071 , (string)"invalid hostname [" + host + "]" + errmsg , cs.isValid() );
+        const ConnectionString cs(uassertStatusOK(ConnectionString::parse(host)));
 
+        string errmsg;
         c = cs.connect( errmsg, socketTimeout );
         if ( ! c )
             throw SocketException( SocketException::CONNECT_ERROR , host , 11002 , str::stream() << _name << " error: " << errmsg );

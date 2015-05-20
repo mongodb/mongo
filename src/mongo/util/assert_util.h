@@ -44,7 +44,6 @@ namespace mongo {
 
     enum CommonErrorCodes {
         OkCode = 0,
-        DatabaseDifferCaseCode = 13297 ,  // uassert( 13297 )
         SendStaleConfigCode = 13388 ,     // uassert( 13388 )
         RecvStaleConfigCode = 9996,       // uassert( 9996 )
         PrepareConfigsFailedCode = 13104, // uassert( 13104 )

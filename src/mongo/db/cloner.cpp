@@ -424,27 +424,22 @@ namespace mongo {
         return true;
     }
 
-    bool Cloner::go(OperationContext* txn,
-                    const std::string& toDBName,
-                    const string& masterHost,
-                    const CloneOptions& opts,
-                    set<string>* clonedColls,
-                    string& errmsg,
-                    int* errCode) {
+    Status Cloner::copyDb(OperationContext* txn,
+                          const std::string& toDBName,
+                          const string& masterHost,
+                          const CloneOptions& opts,
+                          set<string>* clonedColls) {
 
-        if ( errCode ) {
-            *errCode = 0;
-        }
         massert(10289,
                 "useReplAuth is not written to replication log",
                 !opts.useReplAuth || !txn->writesAreReplicated());
 
-        const ConnectionString cs = ConnectionString::parse(masterHost, errmsg);
-        if (!cs.isValid()) {
-            if (errCode)
-                *errCode = ErrorCodes::FailedToParse;
-            return false;
+        auto statusWithMasterHost = ConnectionString::parse(masterHost);
+        if (!statusWithMasterHost.isOK()) {
+            return statusWithMasterHost.getStatus();
         }
+
+        const ConnectionString cs(statusWithMasterHost.getValue());
 
         bool masterSameProcess = false;
         std::vector<HostAndPort> csServers = cs.getServers();
@@ -460,10 +455,8 @@ namespace mongo {
 
         if (masterSameProcess) {
             if (opts.fromDB == toDBName) {
-                // guard against an "infinite" loop
-                /* if you are replicating, the local.sources config may be wrong if you get this */
-                errmsg = "can't clone from self (localhost).";
-                return false;
+                // Guard against re-entrance
+                return Status(ErrorCodes::IllegalOperation, "can't clone from self (localhost)");
             }
         }
 
@@ -473,13 +466,17 @@ namespace mongo {
                 // nothing to do
             }
             else if ( !masterSameProcess ) {
+                std::string errmsg;
                 auto_ptr<DBClientBase> con( cs.connect( errmsg ));
-                if ( !con.get() )
-                    return false;
-                if (getGlobalAuthorizationManager()->isAuthEnabled() &&
-                    !authenticateInternalUser(con.get())) {
+                if (!con.get()) {
+                    return Status(ErrorCodes::HostUnreachable, errmsg);
+                }
 
-                    return false;
+                if (getGlobalAuthorizationManager()->isAuthEnabled() &&
+                        !authenticateInternalUser(con.get())) {
+
+                    return Status(ErrorCodes::AuthenticationFailed,
+                                  "Unable to authenticate as internal user");
                 }
 
                 _conn = con;
@@ -509,10 +506,8 @@ namespace mongo {
                 BSONElement collectionOptions = collection["options"];
                 if ( collectionOptions.isABSONObj() ) {
                     Status parseOptionsStatus = CollectionOptions().parse(collectionOptions.Obj());
-                    if ( !parseOptionsStatus.isOK() ) {
-                        errmsg = str::stream() << "invalid collection options: " << collection
-                                               << ", reason: " << parseOptionsStatus.reason();
-                        return false;
+                    if (!parseOptionsStatus.isOK()) {
+                        return parseOptionsStatus;
                     }
                 }
 
@@ -580,12 +575,10 @@ namespace mongo {
                         // we defer building id index for performance - building it in batch is much
                         // faster
                         Status createStatus = userCreateNS(txn, db, to_name.ns(), options, false);
-                        if ( !createStatus.isOK() ) {
-                            errmsg = str::stream() << "failed to create collection \""
-                                                   << to_name.ns() << "\": "
-                                                   << createStatus.reason();
-                            return false;
+                        if (!createStatus.isOK()) {
+                            return createStatus;
                         }
+
                         wunit.commit();
                     } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "createUser", to_name.ns());
                 }
@@ -680,7 +673,7 @@ namespace mongo {
             }
         }
 
-        return true;
+        return Status::OK();
     }
 
 } // namespace mongo

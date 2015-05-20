@@ -179,8 +179,6 @@ namespace {
             else
                 log() << "initial sync cloning indexes for : " << db;
 
-            string err;
-            int errCode;
             CloneOptions options;
             options.fromDB = db;
             options.slaveOk = true;
@@ -195,10 +193,11 @@ namespace {
             ScopedTransaction transaction(txn, MODE_IX);
             Lock::DBLock dbWrite(txn->lockState(), db, MODE_X);
 
-            if (!cloner.go(txn, db, host, options, NULL, err, &errCode)) {
+            Status status = cloner.copyDb(txn, db, host, options, NULL);
+            if (!status.isOK()) {
                 log() << "initial sync: error while "
                       << (dataPass ? "cloning " : "indexing ") << db
-                      << ".  " << (err.empty() ? "" : err + ".  ");
+                      << ".  " << status.toString();
                 return false;
             }
 

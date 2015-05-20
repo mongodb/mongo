@@ -140,6 +140,7 @@ error_code("NotMasterOrSecondaryCode", 13436);
 error_code("NotMasterNoSlaveOkCode", 13435);
 error_code("ShardKeyTooBig", 13334);
 error_code("SendStaleConfig", 13388);
+error_code("DatabaseDifferCase", 13297);
 
 error_class("NetworkError", ["HostUnreachable", "HostNotFound", "NetworkTimeout"])
 error_class("Interruption", ["Interrupted", "InterruptedAtShutdown", "ExceededTimeLimit"])

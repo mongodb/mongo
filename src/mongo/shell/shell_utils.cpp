@@ -305,11 +305,15 @@ namespace mongo {
             boost::lock_guard<boost::mutex> lk( _mutex );
             for( map<string,set<string> >::const_iterator i = _connectionUris.begin();
                 i != _connectionUris.end(); ++i ) {
-                string errmsg;
-                ConnectionString cs = ConnectionString::parse( i->first, errmsg );
-                if ( !cs.isValid() ) {
-                    continue;   
+
+                auto status = ConnectionString::parse(i->first);
+                if (!status.isOK()) {
+                    continue;
                 }
+
+                const ConnectionString cs(status.getValue());
+
+                string errmsg;
                 boost::scoped_ptr<DBClientWithCommands> conn( cs.connect( errmsg ) );
                 if ( !conn ) {
                     continue;

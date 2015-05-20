@@ -145,12 +145,14 @@ namespace mongo {
                 args.IsConstructCall());
         verify(scope->MongoFT()->HasInstance(args.This()));
 
-        string errmsg;
-        ConnectionString cs = ConnectionString::parse(host, errmsg);
-        if (!cs.isValid()) {
-            return v8AssertionException(errmsg);
+        auto statusWithHost = ConnectionString::parse(host);
+        if (!statusWithHost.isOK()) {
+            return v8AssertionException(statusWithHost.getStatus().reason());
         }
 
+        const ConnectionString cs(statusWithHost.getValue());
+
+        string errmsg;
         DBClientBase* conn;
         conn = cs.connect(errmsg);
         if (!conn) {

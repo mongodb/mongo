@@ -50,14 +50,14 @@ namespace mongo {
             _conn.reset(c);
         }
 
-        /** copy the entire database */
-        bool go(OperationContext* txn,
-                const std::string& toDBName,
-                const std::string& masterHost,
-                const CloneOptions& opts,
-                std::set<std::string>* clonedColls,
-                std::string& errmsg,
-                int *errCode = 0);
+        /**
+         * Copies an entire database from the specified host.
+         */
+        Status copyDb(OperationContext* txn,
+                      const std::string& toDBName,
+                      const std::string& masterHost,
+                      const CloneOptions& opts,
+                      std::set<std::string>* clonedColls);
 
         bool copyCollection(OperationContext* txn,
                             const std::string& ns,

@@ -28,32 +28,22 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/base/init.h"
 #include "mongo/base/status.h"
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/bson/util/builder.h"
-#include "mongo/client/dbclientinterface.h"
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/cloner.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/copydb.h"
 #include "mongo/db/commands/copydb_start_commands.h"
-#include "mongo/db/commands/rename_collection.h"
-#include "mongo/db/db.h"
-#include "mongo/db/dbhelpers.h"
-#include "mongo/db/index_builder.h"
-#include "mongo/db/instance.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context_impl.h"
-#include "mongo/db/storage_options.h"
 
-namespace mongo {
+namespace {
+
+    using namespace mongo;
 
     using std::string;
     using std::stringstream;
@@ -205,11 +195,7 @@ namespace mongo {
             }
             else if (!fromSelf) {
                 // If fromSelf leave the cloner's conn empty, it will use a DBDirectClient instead.
-
-                ConnectionString cs = ConnectionString::parse(fromhost, errmsg);
-                if (!cs.isValid()) {
-                    return false;
-                }
+                const ConnectionString cs(uassertStatusOK(ConnectionString::parse(fromhost)));
 
                 DBClientBase* conn = cs.connect(errmsg);
                 if (!conn) {
@@ -222,14 +208,17 @@ namespace mongo {
                 // SERVER-4328 todo lock just the two db's not everything for the fromself case
                 ScopedTransaction transaction(txn, MODE_X);
                 Lock::GlobalWrite lk(txn->lockState());
-                return cloner.go(txn, todb, fromhost, cloneOptions, NULL, errmsg);
+                uassertStatusOK(cloner.copyDb(txn, todb, fromhost, cloneOptions, NULL));
+            }
+            else {
+                ScopedTransaction transaction(txn, MODE_IX);
+                Lock::DBLock lk(txn->lockState(), todb, MODE_X);
+                uassertStatusOK(cloner.copyDb(txn, todb, fromhost, cloneOptions, NULL));
             }
 
-            ScopedTransaction transaction(txn, MODE_IX);
-            Lock::DBLock lk (txn->lockState(), todb, MODE_X);
-            return cloner.go(txn, todb, fromhost, cloneOptions, NULL, errmsg);
+            return true;
         }
 
     } cmdCopyDB;
 
-} // namespace mongo
+} // namespace

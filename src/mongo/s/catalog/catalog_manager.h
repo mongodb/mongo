@@ -91,7 +91,7 @@ namespace mongo {
          *
          * Returns Status::OK on success or any error code indicating the failure. These are some
          * of the known failures:
-         *  - DatabaseDifferCaseCode - database already exists, but with a different case
+         *  - DatabaseDifferCase - database already exists, but with a different case
          *  - ShardNotFound - could not find a shard to place the DB on
          */
         virtual Status enableSharding(const std::string& dbName) = 0;
@@ -152,7 +152,7 @@ namespace mongo {
          * Returns Status::OK on success or any error code indicating the failure. These are some
          * of the known failures:
          *  - NamespaceExists - database already exists
-         *  - DatabaseDifferCaseCode - database already exists, but with a different case
+         *  - DatabaseDifferCase - database already exists, but with a different case
          *  - ShardNotFound - could not find a shard to place the DB on
          */
         virtual Status createDatabase(const std::string& dbName) = 0;

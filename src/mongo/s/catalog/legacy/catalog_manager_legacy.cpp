@@ -1495,7 +1495,7 @@ namespace {
         }
 
         if (!dbObj.isEmpty()) {
-            return Status(static_cast<ErrorCodes::Error>(DatabaseDifferCaseCode),
+            return Status(ErrorCodes::DatabaseDifferCase,
                           str::stream() << "can't have 2 databases that just differ on case "
                                         << " have: " << dbObj[DatabaseType::name()].String()
                                         << " want to add: " << dbName);

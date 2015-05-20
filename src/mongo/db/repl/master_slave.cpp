@@ -473,8 +473,7 @@ namespace repl {
         {
             log() << "resync: cloning database " << db << " to get an initial copy" << endl;
             ReplInfo r("resync: cloning a database");
-            string errmsg;
-            int errCode = 0;
+
             CloneOptions cloneOptions;
             cloneOptions.fromDB = db;
             cloneOptions.slaveOk = true;
@@ -484,30 +483,28 @@ namespace repl {
             cloneOptions.mayBeInterrupted = false;
 
             Cloner cloner;
-            bool ok = cloner.go(txn,
-                                db,
-                                hostName.c_str(),
-                                cloneOptions,
-                                NULL,
-                                errmsg,
-                                &errCode);
+            Status status = cloner.copyDb(txn,
+                                          db,
+                                          hostName.c_str(),
+                                          cloneOptions,
+                                          NULL);
 
-            if ( !ok ) {
-                if ( errCode == DatabaseDifferCaseCode ) {
+            if (!status.isOK()) {
+                if (status.code() == ErrorCodes::DatabaseDifferCase) {
                     resyncDrop( txn,  db );
-                    log() << "resync: database " << db << " not valid on the master due to a name conflict, dropping." << endl;
+                    log() << "resync: database " << db
+                          << " not valid on the master due to a name conflict, dropping.";
                     return;
                 }
                 else {
-                    log() << "resync of " << db << " from " << hostName << " failed " << errmsg << endl;
+                    log() << "resync of " << db << " from " << hostName
+                          << " failed due to: " << status.toString();
                     throw SyncException();
                 }
             }
         }
 
         log() << "resync: done with initial clone for db: " << db << endl;
-
-        return;
     }
     
     static DatabaseIgnorer ___databaseIgnorer;

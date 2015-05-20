@@ -30,28 +30,17 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/base/init.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/util/bson_extract.h"
-#include "mongo/bson/util/builder.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/cloner.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/copydb.h"
-#include "mongo/db/commands/rename_collection.h"
-#include "mongo/db/db.h"
-#include "mongo/db/dbhelpers.h"
-#include "mongo/db/index_builder.h"
-#include "mongo/db/instance.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context_impl.h"
-#include "mongo/db/storage_options.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -110,17 +99,14 @@ namespace mongo {
                 fromhost = ss.str();
             }
 
-            BSONObj ret;
-
-            ConnectionString cs = ConnectionString::parse(fromhost, errmsg);
-            if (!cs.isValid()) {
-                return false;
-            }
+            const ConnectionString cs(uassertStatusOK(ConnectionString::parse(fromhost)));
 
             authConn_.reset(cs.connect(errmsg));
             if (!authConn_.get()) {
                 return false;
             }
+
+            BSONObj ret;
 
             if( !authConn_->runCommand( "admin", BSON( "getnonce" << 1 ), ret ) ) {
                 errmsg = "couldn't get nonce " + ret.toString();
@@ -175,7 +161,8 @@ namespace mongo {
                          string& errmsg,
                          BSONObjBuilder& result) {
 
-            string fromDb = cmdObj.getStringField("fromdb");
+            const string fromDb = cmdObj.getStringField("fromdb");
+
             string fromHost = cmdObj.getStringField("fromhost");
             if ( fromHost.empty() ) {
                 /* copy from self */
@@ -184,11 +171,7 @@ namespace mongo {
                 fromHost = ss.str();
             }
 
-            ConnectionString cs = ConnectionString::parse(fromHost, errmsg);
-            if (!cs.isValid()) {
-                appendCommandStatus(result, false, errmsg);
-                return false;
-            }
+            const ConnectionString cs(uassertStatusOK(ConnectionString::parse(fromHost)));
 
             BSONElement mechanismElement;
             Status status = bsonExtractField(cmdObj,
@@ -226,4 +209,5 @@ namespace mongo {
         }
 
     } cmdCopyDBSaslStart;
+
 } // namespace mongo
