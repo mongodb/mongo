@@ -21,97 +21,112 @@ __nsnap_destroy(WT_SESSION_IMPL *session, WT_NAMED_SNAPSHOT *nsnap)
 }
 
 /*
- * __wt_txn_named_snapshot --
- *	Manage a set of named, in-memory transactional snapshots.
+ * __wt_txn_named_snapshot_begin --
+ *	Begin an named in-memory snapshot.
  */
 int
-__wt_txn_named_snapshot(WT_SESSION_IMPL *session,
-    WT_CONFIG_ITEM *nameval, WT_CONFIG_ITEM *dropval, const char *cfg[])
+__wt_txn_named_snapshot_begin(WT_SESSION_IMPL *session,
+    WT_CONFIG_ITEM *nameval, const char *cfg[])
 {
-	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	WT_NAMED_SNAPSHOT *last, *nsnap, *nsnap_new;
+	WT_NAMED_SNAPSHOT *nsnap, *nsnap_new;
 	WT_TXN *txn;
 	WT_TXN_GLOBAL *txn_global;
 	const char *txn_cfg[] =
 	    { WT_CONFIG_BASE(session, WT_SESSION_begin_transaction),
 	      "isolation=snapshot", NULL };
-	int locked;
 
-	conn = S2C(session);
+	WT_ASSERT(session, nameval->len > 0);
+
 	nsnap_new = NULL;
-	txn_global = &conn->txn_global;
+	txn_global = &S2C(session)->txn_global;
 	txn = &session->txn;
-	locked = 0;
 
 	WT_UNUSED(cfg);
 
-	if (nameval->len > 0) {
-		WT_RET(__wt_name_check(session, nameval->str, nameval->len));
+	WT_RET(__wt_name_check(session, nameval->str, nameval->len));
 
-		/*
-		 * TODO more config checking -- make sure no checkpoint config
-		 * is supplied.
-		 *
-		 * TODO what if a snapshot with that name exists?
-		 */
-		WT_RET(__wt_txn_begin(session, txn_cfg));
+	/*
+	 * TODO more config checking -- make sure no checkpoint config
+	 * is supplied.
+	 *
+	 * TODO what if a snapshot with that name exists?
+	 */
+	WT_RET(__wt_txn_begin(session, txn_cfg));
 
-		/* Save a copy of the transaction's snapshot. */
-		WT_ERR(__wt_calloc_one(session, &nsnap_new));
-		nsnap = nsnap_new;
-		WT_ERR(__wt_strndup(
-		    session, nameval->str, nameval->len, &nsnap->name));
-		nsnap->snap_min = txn->snap_min;
-		nsnap->snap_max = txn->snap_max;
-		if (txn->snapshot_count > 0) {
-			WT_ERR(__wt_calloc_def(
-			    session, txn->snapshot_count, &nsnap->snapshot));
-			memcpy(nsnap->snapshot, txn->snapshot,
-			    txn->snapshot_count * sizeof(*nsnap->snapshot));
-		}
-		nsnap->snapshot_count = txn->snapshot_count;
+	/* Save a copy of the transaction's snapshot. */
+	WT_ERR(__wt_calloc_one(session, &nsnap_new));
+	nsnap = nsnap_new;
+	WT_ERR(__wt_strndup(
+	    session, nameval->str, nameval->len, &nsnap->name));
+	nsnap->snap_min = txn->snap_min;
+	nsnap->snap_max = txn->snap_max;
+	if (txn->snapshot_count > 0) {
+		WT_ERR(__wt_calloc_def(
+		    session, txn->snapshot_count, &nsnap->snapshot));
+		memcpy(nsnap->snapshot, txn->snapshot,
+		    txn->snapshot_count * sizeof(*nsnap->snapshot));
 	}
+	nsnap->snapshot_count = txn->snapshot_count;
 
 	/* Update the list. */
 	WT_ERR(__wt_writelock(session, txn_global->nsnap_rwlock));
-	locked = 1;
 
-	if (nsnap_new != NULL) {
-		if (STAILQ_EMPTY(&txn_global->nsnaph))
-			txn_global->nsnap_oldest_id = nsnap_new->snap_min;
-		STAILQ_INSERT_TAIL(&txn_global->nsnaph, nsnap_new, q);
-		nsnap_new = NULL;
-	}
+	if (STAILQ_EMPTY(&txn_global->nsnaph))
+		txn_global->nsnap_oldest_id = nsnap_new->snap_min;
+	STAILQ_INSERT_TAIL(&txn_global->nsnaph, nsnap_new, q);
+	nsnap_new = NULL;
 
-	if (dropval->len != 0) {
-		STAILQ_FOREACH(last, &txn_global->nsnaph, q)
-			if (WT_STRING_MATCH(
-			    last->name, dropval->str, dropval->len))
-				break;
+	WT_TRET(__wt_writeunlock(session, txn_global->nsnap_rwlock));
 
-		if (last == NULL)
-			WT_ERR_MSG(session, EINVAL,
-			    "Named snapshot '%.*s' for drop not found",
-			    (int)dropval->len, dropval->str);
-
-		txn_global->nsnap_oldest_id = (STAILQ_NEXT(last, q) != NULL) ?
-		    STAILQ_NEXT(last, q)->snap_min : WT_TXN_NONE;
-
-		do {
-			nsnap = STAILQ_FIRST(&txn_global->nsnaph);
-			WT_ASSERT(session, nsnap != NULL);
-			STAILQ_REMOVE_HEAD(&txn_global->nsnaph, q);
-			__nsnap_destroy(session, nsnap);
-		} while (nsnap != last);
-	}
-
-err:	if (locked)
-		WT_TRET(__wt_writeunlock(session, txn_global->nsnap_rwlock));
-	if (F_ISSET(txn, WT_TXN_RUNNING))
+err:	if (F_ISSET(txn, WT_TXN_RUNNING))
 		WT_TRET(__wt_txn_rollback(session, NULL));
 	if (nsnap_new != NULL)
 		__nsnap_destroy(session, nsnap_new);
+
+	return (ret);
+}
+
+/*
+ * __wt_txn_named_snapshot_drop --
+ *	Drop named snapshots
+ */
+int
+__wt_txn_named_snapshot_drop(WT_SESSION_IMPL *session,
+    WT_CONFIG_ITEM *dropval, const char *cfg[])
+{
+	WT_DECL_RET;
+	WT_NAMED_SNAPSHOT *last, *nsnap;
+	WT_TXN_GLOBAL *txn_global;
+
+	txn_global = &S2C(session)->txn_global;
+
+	WT_ASSERT(session, dropval->len != 0);
+	WT_UNUSED(cfg);
+
+	WT_RET(__wt_writelock(session, txn_global->nsnap_rwlock));
+
+	STAILQ_FOREACH(last, &txn_global->nsnaph, q)
+		if (WT_STRING_MATCH(
+		    last->name, dropval->str, dropval->len))
+			break;
+
+	if (last == NULL)
+		WT_ERR_MSG(session, EINVAL,
+		    "Named snapshot '%.*s' for drop not found",
+		    (int)dropval->len, dropval->str);
+
+	txn_global->nsnap_oldest_id = (STAILQ_NEXT(last, q) != NULL) ?
+	    STAILQ_NEXT(last, q)->snap_min : WT_TXN_NONE;
+
+	do {
+		nsnap = STAILQ_FIRST(&txn_global->nsnaph);
+		WT_ASSERT(session, nsnap != NULL);
+		STAILQ_REMOVE_HEAD(&txn_global->nsnaph, q);
+		__nsnap_destroy(session, nsnap);
+	} while (nsnap != last);
+
+err:	WT_TRET(__wt_writeunlock(session, txn_global->nsnap_rwlock));
 
 	return (ret);
 }
