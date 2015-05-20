@@ -396,7 +396,8 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 	 */
 	__wt_txn_release_snapshot(session);
 	txn->isolation = session->isolation;
-	F_CLR(txn, WT_TXN_ERROR | WT_TXN_HAS_ID | WT_TXN_RUNNING);
+	F_CLR(txn, WT_TXN_ERROR | WT_TXN_HAS_ID |
+	    WT_TXN_NAMED_SNAPSHOT | WT_TXN_RUNNING);
 }
 
 /*
