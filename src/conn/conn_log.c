@@ -325,7 +325,7 @@ __log_close_server(void *arg)
 		/*
 		 * If a later thread asked for a background sync, do it now.
 		 */
-		if (WT_LOG_CMP(&log->bg_sync_lsn, &log->sync_lsn)) {
+		if (WT_LOG_CMP(&log->bg_sync_lsn, &log->sync_lsn) > 0) {
 			/*
 			 * Save the latest write LSN which is the minimum
 			 * we will have written to disk.

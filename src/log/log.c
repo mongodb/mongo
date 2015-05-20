@@ -1697,8 +1697,16 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 		ret = __log_direct_write(session, record, &lsn, flags);
 		if (ret == 0 && lsnp != NULL)
 			*lsnp = lsn;
-		if (ret == 0)
-			return (0);
+		/*
+		 * All needed syncing will be handled directly except
+		 * a background sync.  Handle that here.
+		 */
+		 if (ret == 0) {
+			if (LF_ISSET(WT_LOG_BACKGROUND))
+				goto bg;
+			else
+				return (0);
+		}
 		if (ret != EAGAIN)
 			WT_ERR(ret);
 		/*
@@ -1765,6 +1773,7 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	 * Advance the background sync LSN if needed and it is later than
 	 * another transaction.
 	 */
+bg:
 	if (LF_ISSET(WT_LOG_BACKGROUND) &&
 	    WT_LOG_CMP(&session->bg_sync_lsn, &lsn) <= 0) {
 		session->bg_sync_lsn = lsn;

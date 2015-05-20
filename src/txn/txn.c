@@ -400,12 +400,14 @@ int
 __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_CONFIG_ITEM cval;
+	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_TXN *txn;
 	WT_TXN_OP *op;
 	u_int i;
 
 	txn = &session->txn;
+	conn = S2C(session);
 	WT_ASSERT(session, !F_ISSET(txn, WT_TXN_ERROR));
 
 	if (!F_ISSET(txn, WT_TXN_RUNNING))
@@ -441,7 +443,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	 * set in begin_transaction, so we explicitly check it.
 	 */
 	else if (WT_STRING_MATCH("on", cval.str, cval.len))
-		txn->txn_logsync = S2C(session)->txn_logsync;
+		txn->txn_logsync = conn->txn_logsync;
 
 	/* Commit notification. */
 	if (txn->notify != NULL)
@@ -450,7 +452,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 
 	/* If we are logging, write a commit log record. */
 	if (ret == 0 && txn->mod_count > 0 &&
-	    FLD_ISSET(S2C(session)->log_flags, WT_CONN_LOG_ENABLED) &&
+	    FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED) &&
 	    !F_ISSET(session, WT_SESSION_NO_LOGGING)) {
 		/*
 		 * We are about to block on I/O writing the log.
@@ -459,6 +461,11 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 		 */
 		__wt_txn_release_snapshot(session);
 		ret = __wt_txn_log_commit(session, cfg);
+		/*
+		 * If we're doing a background sync, signal the thread.
+		 */
+		if (txn->txn_logsync == WT_LOG_BACKGROUND)
+			__wt_cond_signal(session, conn->log_close_cond);
 	}
 
 	/*

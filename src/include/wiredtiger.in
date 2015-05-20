@@ -1482,7 +1482,8 @@ struct __wt_session {
 	/*!
 	 * Wait for a transaction to become synchronized.  This method is
 	 * only useful when ::wiredtiger_open is configured with the
-	 * \c background setting for \c transaction_sync.
+	 * \c transaction_sync setting disabled.  This method must be called
+	 * when no transactions are active in the session.
 	 *
 	 * @snippet ex_all.c Transaction sync
 	 *

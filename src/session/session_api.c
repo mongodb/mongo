@@ -862,11 +862,16 @@ __session_transaction_sync(WT_SESSION *wt_session, const char *config)
 	WT_DECL_RET;
 	WT_LOG *log;
 	WT_SESSION_IMPL *session;
+	WT_TXN *txn;
 	struct timespec now, start;
 	uint64_t timeout_ms, waited_ms;
 
 	session = (WT_SESSION_IMPL *)wt_session;
 	conn = S2C(session);
+	txn = &session->txn;
+	if (F_ISSET(txn, WT_TXN_RUNNING))
+		WT_RET_MSG(session, EINVAL, "transaction in progress");
+
 	/*
 	 * If logging is not enabled there is nothing to do.
 	 */
@@ -915,7 +920,7 @@ __session_transaction_sync(WT_SESSION *wt_session, const char *config)
 		waited_ms = WT_TIMEDIFF(now, start) / WT_MILLION;
 		if (waited_ms < timeout_ms)
 			WT_ERR(__wt_cond_wait(
-			    session, log->log_sync_cond, WT_MILLION));
+			    session, log->log_sync_cond, waited_ms));
 		else
 			WT_ERR(ETIMEDOUT);
 	}
