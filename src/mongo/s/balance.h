@@ -38,6 +38,7 @@
 namespace mongo {
 
     class BalancerPolicy;
+    class DBClientBase;
     struct MigrateInfo;
     struct WriteConcernOptions;
 
@@ -91,7 +92,7 @@ namespace mongo {
          * @param conn is the connection with the config server(s)
          * @param candidateChunks (IN/OUT) filled with candidate chunks, one per collection, that could possibly be moved
          */
-        void _doBalanceRound(std::vector<boost::shared_ptr<MigrateInfo>>* candidateChunks);
+        void _doBalanceRound(DBClientBase& conn, std::vector<boost::shared_ptr<MigrateInfo>>* candidateChunks);
 
         /**
          * Issues chunk migration request, one at a time.
