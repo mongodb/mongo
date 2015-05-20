@@ -215,10 +215,12 @@ namespace mongo {
                 CurOp * c = cc().curop();
                 while ( c->parent() )
                     c = c->parent();
-                warning() << "ClientCursor::staticYield can't unlock b/c of recursive lock"
-                          << " ns: " << ns 
-                          << " top: " << c->info()
-                          << endl;
+                RARELY {
+                    warning() << "ClientCursor::staticYield can't unlock b/c of recursive lock"
+                              << " ns: " << ns
+                              << " top: " << c->info()
+                              << endl;
+                }
             }
 
             if ( rec )
