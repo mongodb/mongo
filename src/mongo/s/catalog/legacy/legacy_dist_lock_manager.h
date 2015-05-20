@@ -61,10 +61,13 @@ namespace mongo {
         // For testing only.
         void enablePinger(bool enable);
 
-    private:
-        virtual void unlock(const DistLockHandle& lockHandle) BOOST_NOEXCEPT;
+    protected:
 
-        virtual Status checkStatus(const DistLockHandle& lockHandle);
+        virtual void unlock(const DistLockHandle& lockHandle) BOOST_NOEXCEPT override;
+
+        virtual Status checkStatus(const DistLockHandle& lockHandle) override;
+
+    private:
 
         const ConnectionString _configServer;
 

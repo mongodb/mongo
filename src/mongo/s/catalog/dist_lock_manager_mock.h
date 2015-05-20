@@ -28,27 +28,29 @@
 
 #pragma once
 
-#include "mongo/client/dbclientinterface.h"
-#include "mongo/s/dist_lock_manager.h"
+#include <string>
+#include <vector>
+
+#include "mongo/s/catalog/dist_lock_manager.h"
 
 namespace mongo {
 
-    class CatalogManager;
-
-    class ReplSetDistLockManager: public DistLockManager {
+    class DistLockManagerMock: public DistLockManager {
     public:
-        ReplSetDistLockManager(CatalogManager* lockCatalogue);
+        DistLockManagerMock();
 
-        virtual ~ReplSetDistLockManager() = default;
+        virtual ~DistLockManagerMock() = default;
 
-        virtual void startUp();
-        virtual void shutDown();
+        virtual void startUp() override;
+        virtual void shutDown() override;
 
         virtual StatusWith<DistLockManager::ScopedDistLock> lock(
                 StringData name,
                 StringData whyMessage,
                 stdx::chrono::milliseconds waitFor,
-                stdx::chrono::milliseconds lockTryInterval);
+                stdx::chrono::milliseconds lockTryInterval) override;
+
+        void setLockReturnStatus(Status status);
 
     protected:
 
@@ -57,7 +59,14 @@ namespace mongo {
         virtual Status checkStatus(const DistLockHandle& lockHandle) override;
 
     private:
-        CatalogManager* _lockCatalogue; // Not owned here.
+
+        struct LockInfo {
+            DistLockHandle lockID;
+            std::string name;
+        };
+
+        std::vector<LockInfo> _locks;
+        Status _lockReturnStatus;
     };
 
 }

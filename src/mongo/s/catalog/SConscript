@@ -69,3 +69,12 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='dist_lock_manager_mock',
+    source=[
+        'dist_lock_manager_mock.cpp',
+    ],
+    LIBDEPS=[
+        'dist_lock_manager',
+    ],
+)

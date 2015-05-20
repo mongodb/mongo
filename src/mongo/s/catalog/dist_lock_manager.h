@@ -108,7 +108,8 @@ namespace mongo {
                 stdx::chrono::milliseconds waitFor = stdx::chrono::milliseconds(0),
                 stdx::chrono::milliseconds lockTryInterval = stdx::chrono::milliseconds(1000)) = 0;
 
-    private:
+    protected:
+
         /**
          * Unlocks the given lockHandle. Will attempt to retry again later if the config
          * server is not reachable.
