@@ -32,10 +32,12 @@
 #include "mongo/client/connection_string.h"
 
 #include <list>
+#include <memory>
 
-#include "mongo/client/dbclientinterface.h"
 #include "mongo/client/dbclient_rs.h"
+#include "mongo/client/dbclientinterface.h"
 #include "mongo/client/syncclusterconnection.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 
@@ -48,26 +50,24 @@ namespace mongo {
 
         switch ( _type ) {
         case MASTER: {
-            DBClientConnection * c = new DBClientConnection(true);
+            auto c = stdx::make_unique<DBClientConnection>(true);
             c->setSoTimeout( socketTimeout );
             LOG(1) << "creating new connection to:" << _servers[0];
             if ( ! c->connect( _servers[0] , errmsg ) ) {
-                delete c;
                 return 0;
             }
             LOG(1) << "connected connection!";
-            return c;
+            return c.release();
         }
 
         case SET: {
-            DBClientReplicaSet * set = new DBClientReplicaSet( _setName , _servers , socketTimeout );
+            auto set = stdx::make_unique<DBClientReplicaSet>(_setName, _servers, socketTimeout);
             if( ! set->connect() ) {
-                delete set;
                 errmsg = "connect failed to replica set ";
                 errmsg += toString();
                 return 0;
             }
-            return set;
+            return set.release();
         }
 
         case SYNC: {
@@ -99,12 +99,10 @@ namespace mongo {
         }
 
         case INVALID:
-            throw UserException( 13421 , "trying to connect to invalid ConnectionString" );
-            break;
+            uasserted(13421, "trying to connect to invalid ConnectionString");
         }
 
-        verify( 0 );
-        return 0;
+        MONGO_UNREACHABLE;
     }
 
 } // namepspace mongo
