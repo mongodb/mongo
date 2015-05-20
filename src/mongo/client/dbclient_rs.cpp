@@ -33,6 +33,7 @@
 
 #include <memory>
 #include <boost/shared_ptr.hpp>
+#include <utility>
 
 #include "mongo/bson/util/builder.h"
 #include "mongo/client/connpool.h"
@@ -80,7 +81,7 @@ namespace {
     /**
      * Extracts the read preference settings from the query document. Note that this method
      * assumes that the query is ok for secondaries so it defaults to
-     * ReadPreference_SecondaryPreferred when nothing is specified. Supports the following
+     * ReadPreference::SecondaryPreferred when nothing is specified. Supports the following
      * format:
      *
      * Format A (official format):
@@ -100,9 +101,6 @@ namespace {
     ReadPreferenceSetting* _extractReadPref(const BSONObj& query, int queryOptions) {
 
         if (Query::hasReadPreference(query)) {
-
-            ReadPreference pref = mongo::ReadPreference_SecondaryPreferred;
-
             BSONElement readPrefElement;
 
             if (query.hasField(Query::ReadPrefField.name())) {
@@ -114,54 +112,18 @@ namespace {
 
             uassert(16381, "$readPreference should be an object",
                     readPrefElement.isABSONObj());
+
             const BSONObj& prefDoc = readPrefElement.Obj();
 
-            uassert(16382, "mode not specified for read preference",
-                    prefDoc.hasField(Query::ReadPrefModeField.name()));
+            auto readPrefSetting = uassertStatusOK(ReadPreferenceSetting::fromBSON(prefDoc));
 
-            const string mode = prefDoc[Query::ReadPrefModeField.name()].String();
-
-            if (mode == "primary") {
-                pref = mongo::ReadPreference_PrimaryOnly;
-            }
-            else if (mode == "primaryPreferred") {
-                pref = mongo::ReadPreference_PrimaryPreferred;
-            }
-            else if (mode == "secondary") {
-                pref = mongo::ReadPreference_SecondaryOnly;
-            }
-            else if (mode == "secondaryPreferred") {
-                pref = mongo::ReadPreference_SecondaryPreferred;
-            }
-            else if (mode == "nearest") {
-                pref = mongo::ReadPreference_Nearest;
-            }
-            else {
-                uasserted(16383, str::stream() << "Unknown read preference mode: " << mode);
-            }
-
-            if (prefDoc.hasField(Query::ReadPrefTagsField.name())) {
-                const BSONElement& tagsElem = prefDoc[Query::ReadPrefTagsField.name()];
-                uassert(16385, "tags for read preference should be an array",
-                        tagsElem.type() == mongo::Array);
-
-                TagSet tags(BSONArray(tagsElem.Obj().getOwned()));
-                if (pref == mongo::ReadPreference_PrimaryOnly && !tags.getTagBSON().isEmpty()) {
-                    uassert(16384, "Only empty tags are allowed with primary read preference",
-                            tags.getTagBSON().firstElement().Obj().isEmpty());
-                }
-
-                return new ReadPreferenceSetting(pref, tags);
-            }
-            else {
-                return new ReadPreferenceSetting(pref, TagSet());
-            }
+            return new ReadPreferenceSetting(std::move(readPrefSetting));
         }
 
         // Default read pref is primary only or secondary preferred with slaveOK
         ReadPreference pref =
             queryOptions & QueryOption_SlaveOk ?
-                mongo::ReadPreference_SecondaryPreferred : mongo::ReadPreference_PrimaryOnly;
+                mongo::ReadPreference::SecondaryPreferred : mongo::ReadPreference::PrimaryOnly;
         return new ReadPreferenceSetting(pref, TagSet());
     }
 } // namespace
@@ -259,7 +221,7 @@ namespace {
                                    const ReadPreferenceSetting& readPref ) {
 
         // If the read pref is primary only, this is not a secondary query
-        if (readPref.pref == ReadPreference_PrimaryOnly) return false;
+        if (readPref.pref == ReadPreference::PrimaryOnly) return false;
 
         if (ns.find(".$cmd") == string::npos) {
             return true;
@@ -404,7 +366,7 @@ namespace {
 
     DBClientConnection& DBClientReplicaSet::slaveConn() {
         shared_ptr<ReadPreferenceSetting> readPref(
-                new ReadPreferenceSetting(ReadPreference_SecondaryPreferred, TagSet()));
+                new ReadPreferenceSetting(ReadPreference::SecondaryPreferred, TagSet()));
         DBClientConnection* conn = selectNodeUsingTags(readPref);
 
         uassert( 16369, str::stream() << "No good nodes available for set: "
@@ -415,7 +377,7 @@ namespace {
 
     bool DBClientReplicaSet::connect() {
         // Returns true if there are any up hosts.
-        const ReadPreferenceSetting anyUpHost(ReadPreference_Nearest, TagSet());
+        const ReadPreferenceSetting anyUpHost(ReadPreference::Nearest, TagSet());
         return !_getMonitor()->getHostOrRefresh(anyUpHost).empty();
     }
 
@@ -428,7 +390,7 @@ namespace {
         // We prefer to authenticate against a primary, but otherwise a secondary is ok too
         // Empty tag matches every secondary
         shared_ptr<ReadPreferenceSetting> readPref(
-            new ReadPreferenceSetting( ReadPreference_PrimaryPreferred, TagSet() ) );
+            new ReadPreferenceSetting( ReadPreference::PrimaryPreferred, TagSet() ) );
 
         LOG(3) << "dbclient_rs authentication of " << _getMonitor()->getName() << endl;
 

@@ -498,7 +498,7 @@ TEST(ReplicaSetMonitorTests, SlavesUsableEvenIfNoMaster) {
     SetStatePtr state = boost::make_shared<SetState>("name", seeds);
     Refresher refresher(state);
 
-    const ReadPreferenceSetting secondary(ReadPreference_SecondaryOnly, TagSet());
+    const ReadPreferenceSetting secondary(ReadPreference::SecondaryOnly, TagSet());
 
     // Mock a reply from the only host we know about and have it claim to not be master or know
     // about any other hosts. This leaves the scan with no more hosts to scan, but all hosts are
@@ -545,7 +545,7 @@ TEST(ReplicaSetMonitorTests, MultipleMasterLastNodeWins) {
         seen.insert(ns.host);
     }
 
-    const ReadPreferenceSetting primaryOnly(ReadPreference_PrimaryOnly, TagSet());
+    const ReadPreferenceSetting primaryOnly(ReadPreference::PrimaryOnly, TagSet());
 
     // mock all replies
     for (size_t i = 0; i != basicSeeds.size(); ++i) {
@@ -635,7 +635,7 @@ TEST(ReplicaSetMonitorTests, MultipleMastersDisagree) {
         seen.insert(ns.host);
     }
 
-    const ReadPreferenceSetting primaryOnly(ReadPreference_PrimaryOnly, TagSet());
+    const ReadPreferenceSetting primaryOnly(ReadPreference::PrimaryOnly, TagSet());
 
     // mock all replies
     for (size_t i = 0; i != basicSeeds.size(); ++i) {
@@ -701,8 +701,8 @@ TEST(ReplicaSetMonitorTests, GetMatchingDuringScan) {
     SetStatePtr state = boost::make_shared<SetState>("name", basicSeedsSet);
     Refresher refresher(state);
 
-    const ReadPreferenceSetting primaryOnly(ReadPreference_PrimaryOnly, TagSet());
-    const ReadPreferenceSetting secondaryOnly(ReadPreference_SecondaryOnly, TagSet());
+    const ReadPreferenceSetting primaryOnly(ReadPreference::PrimaryOnly, TagSet());
+    const ReadPreferenceSetting secondaryOnly(ReadPreference::SecondaryOnly, TagSet());
 
     for (std::vector<HostAndPort>::const_iterator it = basicSeeds.begin(); it != basicSeeds.end();
             ++it) {

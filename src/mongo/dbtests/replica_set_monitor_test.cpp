@@ -207,11 +207,11 @@ namespace mongo_test {
 
         TagSet tags(BSONArray(builder.done()));
 
-        ASSERT(isCompatible(node, mongo::ReadPreference_PrimaryOnly, tags));
-        ASSERT(isCompatible(node, mongo::ReadPreference_PrimaryPreferred, tags));
-        ASSERT(isCompatible(node, mongo::ReadPreference_SecondaryPreferred, tags));
-        ASSERT(!isCompatible(node, mongo::ReadPreference_SecondaryOnly, tags));
-        ASSERT(isCompatible(node, mongo::ReadPreference_Nearest, tags));
+        ASSERT(isCompatible(node, mongo::ReadPreference::PrimaryOnly, tags));
+        ASSERT(isCompatible(node, mongo::ReadPreference::PrimaryPreferred, tags));
+        ASSERT(isCompatible(node, mongo::ReadPreference::SecondaryPreferred, tags));
+        ASSERT(!isCompatible(node, mongo::ReadPreference::SecondaryOnly, tags));
+        ASSERT(isCompatible(node, mongo::ReadPreference::Nearest, tags));
     }
 
     TEST(ReplSetMonitorNode, SecNodeCompatibleTag) {
@@ -226,11 +226,11 @@ namespace mongo_test {
 
         TagSet tags(BSONArray(builder.done()));
 
-        ASSERT(!isCompatible(node, mongo::ReadPreference_PrimaryOnly, tags));
-        ASSERT(isCompatible(node, mongo::ReadPreference_PrimaryPreferred, tags));
-        ASSERT(isCompatible(node, mongo::ReadPreference_SecondaryPreferred, tags));
-        ASSERT(isCompatible(node, mongo::ReadPreference_SecondaryOnly, tags));
-        ASSERT(isCompatible(node, mongo::ReadPreference_Nearest, tags));
+        ASSERT(!isCompatible(node, mongo::ReadPreference::PrimaryOnly, tags));
+        ASSERT(isCompatible(node, mongo::ReadPreference::PrimaryPreferred, tags));
+        ASSERT(isCompatible(node, mongo::ReadPreference::SecondaryPreferred, tags));
+        ASSERT(isCompatible(node, mongo::ReadPreference::SecondaryOnly, tags));
+        ASSERT(isCompatible(node, mongo::ReadPreference::Nearest, tags));
     }
 
     TEST(ReplSetMonitorNode, PriNodeNotCompatibleTag) {
@@ -245,11 +245,11 @@ namespace mongo_test {
 
         TagSet tags(BSONArray(builder.done()));
 
-        ASSERT(isCompatible(node, mongo::ReadPreference_PrimaryOnly, tags));
-        ASSERT(isCompatible(node, mongo::ReadPreference_PrimaryPreferred, tags));
-        ASSERT(isCompatible(node, mongo::ReadPreference_SecondaryPreferred, tags));
-        ASSERT(!isCompatible(node, mongo::ReadPreference_SecondaryOnly, tags));
-        ASSERT(!isCompatible(node, mongo::ReadPreference_Nearest, tags));
+        ASSERT(isCompatible(node, mongo::ReadPreference::PrimaryOnly, tags));
+        ASSERT(isCompatible(node, mongo::ReadPreference::PrimaryPreferred, tags));
+        ASSERT(isCompatible(node, mongo::ReadPreference::SecondaryPreferred, tags));
+        ASSERT(!isCompatible(node, mongo::ReadPreference::SecondaryOnly, tags));
+        ASSERT(!isCompatible(node, mongo::ReadPreference::Nearest, tags));
     }
 
     TEST(ReplSetMonitorNode, SecNodeNotCompatibleTag) {
@@ -264,11 +264,11 @@ namespace mongo_test {
 
         TagSet tags(BSONArray(builder.done()));
 
-        ASSERT(!isCompatible(node, mongo::ReadPreference_PrimaryOnly, tags));
-        ASSERT(!isCompatible(node, mongo::ReadPreference_PrimaryPreferred, tags));
-        ASSERT(!isCompatible(node, mongo::ReadPreference_SecondaryPreferred, tags));
-        ASSERT(!isCompatible(node, mongo::ReadPreference_SecondaryOnly, tags));
-        ASSERT(!isCompatible(node, mongo::ReadPreference_Nearest, tags));
+        ASSERT(!isCompatible(node, mongo::ReadPreference::PrimaryOnly, tags));
+        ASSERT(!isCompatible(node, mongo::ReadPreference::PrimaryPreferred, tags));
+        ASSERT(!isCompatible(node, mongo::ReadPreference::SecondaryPreferred, tags));
+        ASSERT(!isCompatible(node, mongo::ReadPreference::SecondaryOnly, tags));
+        ASSERT(!isCompatible(node, mongo::ReadPreference::Nearest, tags));
     }
 
     TEST(ReplSetMonitorNode, PriNodeCompatiblMultiTag) {
@@ -284,11 +284,11 @@ namespace mongo_test {
 
         TagSet tags(BSONArray(builder.done()));
 
-        ASSERT(isCompatible(node, mongo::ReadPreference_PrimaryOnly, tags));
-        ASSERT(isCompatible(node, mongo::ReadPreference_PrimaryPreferred, tags));
-        ASSERT(isCompatible(node, mongo::ReadPreference_SecondaryPreferred, tags));
-        ASSERT(!isCompatible(node, mongo::ReadPreference_SecondaryOnly, tags));
-        ASSERT(isCompatible(node, mongo::ReadPreference_Nearest, tags));
+        ASSERT(isCompatible(node, mongo::ReadPreference::PrimaryOnly, tags));
+        ASSERT(isCompatible(node, mongo::ReadPreference::PrimaryPreferred, tags));
+        ASSERT(isCompatible(node, mongo::ReadPreference::SecondaryPreferred, tags));
+        ASSERT(!isCompatible(node, mongo::ReadPreference::SecondaryOnly, tags));
+        ASSERT(isCompatible(node, mongo::ReadPreference::Nearest, tags));
     }
 
     TEST(ReplSetMonitorNode, SecNodeCompatibleMultiTag) {
@@ -304,11 +304,11 @@ namespace mongo_test {
 
         TagSet tags(BSONArray(builder.done()));
 
-        ASSERT(!isCompatible(node, mongo::ReadPreference_PrimaryOnly, tags));
-        ASSERT(isCompatible(node, mongo::ReadPreference_PrimaryPreferred, tags));
-        ASSERT(isCompatible(node, mongo::ReadPreference_SecondaryPreferred, tags));
-        ASSERT(isCompatible(node, mongo::ReadPreference_SecondaryOnly, tags));
-        ASSERT(isCompatible(node, mongo::ReadPreference_Nearest, tags));
+        ASSERT(!isCompatible(node, mongo::ReadPreference::PrimaryOnly, tags));
+        ASSERT(isCompatible(node, mongo::ReadPreference::PrimaryPreferred, tags));
+        ASSERT(isCompatible(node, mongo::ReadPreference::SecondaryPreferred, tags));
+        ASSERT(isCompatible(node, mongo::ReadPreference::SecondaryOnly, tags));
+        ASSERT(isCompatible(node, mongo::ReadPreference::Nearest, tags));
     }
 
     TEST(ReplSetMonitorNode, PriNodeNotCompatibleMultiTag) {
@@ -324,11 +324,11 @@ namespace mongo_test {
 
         TagSet tags(BSONArray(builder.done()));
 
-        ASSERT(isCompatible(node, mongo::ReadPreference_PrimaryOnly, tags));
-        ASSERT(isCompatible(node, mongo::ReadPreference_PrimaryPreferred, tags));
-        ASSERT(isCompatible(node, mongo::ReadPreference_SecondaryPreferred, tags));
-        ASSERT(!isCompatible(node, mongo::ReadPreference_SecondaryOnly, tags));
-        ASSERT(!isCompatible(node, mongo::ReadPreference_Nearest, tags));
+        ASSERT(isCompatible(node, mongo::ReadPreference::PrimaryOnly, tags));
+        ASSERT(isCompatible(node, mongo::ReadPreference::PrimaryPreferred, tags));
+        ASSERT(isCompatible(node, mongo::ReadPreference::SecondaryPreferred, tags));
+        ASSERT(!isCompatible(node, mongo::ReadPreference::SecondaryOnly, tags));
+        ASSERT(!isCompatible(node, mongo::ReadPreference::Nearest, tags));
     }
 
     TEST(ReplSetMonitorNode, SecNodeNotCompatibleMultiTag) {
@@ -344,11 +344,11 @@ namespace mongo_test {
 
         TagSet tags(BSONArray(builder.done()));
 
-        ASSERT(!isCompatible(node, mongo::ReadPreference_PrimaryOnly, tags));
-        ASSERT(!isCompatible(node, mongo::ReadPreference_PrimaryPreferred, tags));
-        ASSERT(!isCompatible(node, mongo::ReadPreference_SecondaryPreferred, tags));
-        ASSERT(!isCompatible(node, mongo::ReadPreference_SecondaryOnly, tags));
-        ASSERT(!isCompatible(node, mongo::ReadPreference_Nearest, tags));
+        ASSERT(!isCompatible(node, mongo::ReadPreference::PrimaryOnly, tags));
+        ASSERT(!isCompatible(node, mongo::ReadPreference::PrimaryPreferred, tags));
+        ASSERT(!isCompatible(node, mongo::ReadPreference::SecondaryPreferred, tags));
+        ASSERT(!isCompatible(node, mongo::ReadPreference::SecondaryOnly, tags));
+        ASSERT(!isCompatible(node, mongo::ReadPreference::Nearest, tags));
     }
 
 
@@ -419,7 +419,7 @@ namespace mongo_test {
 
         bool isPrimarySelected = false;
         HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference_PrimaryOnly, tags, 3,
+            mongo::ReadPreference::PrimaryOnly, tags, 3,
             &isPrimarySelected);
 
         ASSERT(isPrimarySelected);
@@ -435,7 +435,7 @@ namespace mongo_test {
 
         bool isPrimarySelected = false;
         HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference_PrimaryOnly, tags, 3, 
+            mongo::ReadPreference::PrimaryOnly, tags, 3,
             &isPrimarySelected);
 
         ASSERT(host.empty());
@@ -450,7 +450,7 @@ namespace mongo_test {
 
         bool isPrimarySelected = false;
         HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference_PrimaryOnly, tags, 3,
+            mongo::ReadPreference::PrimaryOnly, tags, 3,
             &isPrimarySelected);
 
         ASSERT(host.empty());
@@ -464,7 +464,7 @@ namespace mongo_test {
 
         bool isPrimarySelected = false;
         HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference_PrimaryPreferred, tags, 1,
+            mongo::ReadPreference::PrimaryPreferred, tags, 1,
             &isPrimarySelected);
 
         ASSERT(isPrimarySelected);
@@ -480,7 +480,7 @@ namespace mongo_test {
 
         bool isPrimarySelected = false;
         HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference_PrimaryPreferred, tags, 1,
+            mongo::ReadPreference::PrimaryPreferred, tags, 1,
             &isPrimarySelected);
 
         ASSERT(!isPrimarySelected);
@@ -496,7 +496,7 @@ namespace mongo_test {
 
         bool isPrimarySelected = false;
         HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference_SecondaryOnly, tags, 1,
+            mongo::ReadPreference::SecondaryOnly, tags, 1,
             &isPrimarySelected);
 
         ASSERT(!isPrimarySelected);
@@ -513,7 +513,7 @@ namespace mongo_test {
 
         bool isPrimarySelected = false;
         HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference_SecondaryOnly, tags, 1,
+            mongo::ReadPreference::SecondaryOnly, tags, 1,
             &isPrimarySelected);
 
         ASSERT(host.empty());
@@ -528,7 +528,7 @@ namespace mongo_test {
 
         bool isPrimarySelected = false;
         HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference_SecondaryPreferred, tags, 1,
+            mongo::ReadPreference::SecondaryPreferred, tags, 1,
             &isPrimarySelected);
 
         ASSERT(!isPrimarySelected);
@@ -545,7 +545,7 @@ namespace mongo_test {
 
         bool isPrimarySelected = false;
         HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference_SecondaryPreferred, tags, 1,
+            mongo::ReadPreference::SecondaryPreferred, tags, 1,
             &isPrimarySelected);
 
         ASSERT(isPrimarySelected);
@@ -563,7 +563,7 @@ namespace mongo_test {
 
         bool isPrimarySelected = false;
         HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference_SecondaryPreferred, tags, 1,
+            mongo::ReadPreference::SecondaryPreferred, tags, 1,
             &isPrimarySelected);
 
         ASSERT(host.empty());
@@ -580,7 +580,7 @@ namespace mongo_test {
 
         bool isPrimarySelected = 0;
         HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference_Nearest, tags, 3,
+            mongo::ReadPreference::Nearest, tags, 3,
             &isPrimarySelected);
 
         // Any host is ok
@@ -599,7 +599,7 @@ namespace mongo_test {
 
         bool isPrimarySelected = false;
         HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference_Nearest, tags, 3,
+            mongo::ReadPreference::Nearest, tags, 3,
             &isPrimarySelected);
 
         ASSERT_EQUALS("a", host.host());
@@ -613,7 +613,7 @@ namespace mongo_test {
 
         bool isPrimarySelected = false;
         HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference_PrimaryOnly, tags, 3,
+            mongo::ReadPreference::PrimaryOnly, tags, 3,
             &isPrimarySelected);
 
         ASSERT(isPrimarySelected);
@@ -630,7 +630,7 @@ namespace mongo_test {
 
         bool isPrimarySelected = false;
         HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference_PrimaryPreferred, tags, 3,
+            mongo::ReadPreference::PrimaryPreferred, tags, 3,
             &isPrimarySelected);
 
         ASSERT(!isPrimarySelected);
@@ -644,7 +644,7 @@ namespace mongo_test {
 
         bool isPrimarySelected = false;
         HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference_PrimaryPreferred, tags, 3,
+            mongo::ReadPreference::PrimaryPreferred, tags, 3,
             &isPrimarySelected);
 
         ASSERT(isPrimarySelected);
@@ -660,7 +660,7 @@ namespace mongo_test {
 
         bool isPrimarySelected = false;
         HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference_PrimaryPreferred, tags, 3,
+            mongo::ReadPreference::PrimaryPreferred, tags, 3,
             &isPrimarySelected);
 
         ASSERT(host.empty());
@@ -673,7 +673,7 @@ namespace mongo_test {
 
         bool isPrimarySelected;
         HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference_SecondaryOnly, tags, 3,
+            mongo::ReadPreference::SecondaryOnly, tags, 3,
             &isPrimarySelected);
 
         ASSERT(!isPrimarySelected);
@@ -690,7 +690,7 @@ namespace mongo_test {
 
         bool isPrimarySelected = false;
         HostAndPort host = selectNode(nodes,
-             mongo::ReadPreference_SecondaryOnly, tags, 3,
+             mongo::ReadPreference::SecondaryOnly, tags, 3,
              &isPrimarySelected);
 
         ASSERT(host.empty());
@@ -703,7 +703,7 @@ namespace mongo_test {
 
         bool isPrimarySelected = false;
         HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference_SecondaryPreferred, tags, 3,
+            mongo::ReadPreference::SecondaryPreferred, tags, 3,
             &isPrimarySelected);
 
         ASSERT(!isPrimarySelected);
@@ -722,7 +722,7 @@ namespace mongo_test {
 
         bool isPrimarySelected = false;
         HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference_SecondaryPreferred, tags, 3,
+            mongo::ReadPreference::SecondaryPreferred, tags, 3,
             &isPrimarySelected);
 
         ASSERT(!isPrimarySelected);
@@ -736,7 +736,7 @@ namespace mongo_test {
 
         bool isPrimarySelected = false;
         HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference_SecondaryPreferred, tags, 3,
+            mongo::ReadPreference::SecondaryPreferred, tags, 3,
             &isPrimarySelected);
 
         ASSERT(isPrimarySelected);
@@ -752,7 +752,7 @@ namespace mongo_test {
 
         bool isPrimarySelected = false;
         HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference_SecondaryPreferred, tags, 3,
+            mongo::ReadPreference::SecondaryPreferred, tags, 3,
             &isPrimarySelected);
 
         ASSERT(host.empty());
@@ -765,7 +765,7 @@ namespace mongo_test {
 
         bool isPrimarySelected = false;
         HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference_SecondaryPreferred, tags, 3,
+            mongo::ReadPreference::SecondaryPreferred, tags, 3,
             &isPrimarySelected);
 
         ASSERT(isPrimarySelected);
@@ -782,7 +782,7 @@ namespace mongo_test {
 
         bool isPrimarySelected = false;
         HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference_Nearest, tags, 3,
+            mongo::ReadPreference::Nearest, tags, 3,
             &isPrimarySelected);
 
         ASSERT(!isPrimarySelected);
@@ -796,7 +796,7 @@ namespace mongo_test {
 
         bool isPrimarySelected = false;
         HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference_Nearest, tags, 3,
+            mongo::ReadPreference::Nearest, tags, 3,
             &isPrimarySelected);
 
         ASSERT(host.empty());
@@ -809,7 +809,7 @@ namespace mongo_test {
 
         bool isPrimarySelected = false;
         HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference_PrimaryOnly, tags, 3,
+            mongo::ReadPreference::PrimaryOnly, tags, 3,
             &isPrimarySelected);
 
         ASSERT(isPrimarySelected);
@@ -825,7 +825,7 @@ namespace mongo_test {
 
         bool isPrimarySelected = false;
         HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference_PrimaryOnly, tags, 3,
+            mongo::ReadPreference::PrimaryOnly, tags, 3,
             &isPrimarySelected);
 
         ASSERT(host.empty());
@@ -843,7 +843,7 @@ namespace mongo_test {
 
         bool isPrimarySelected = false;
         HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference_PrimaryPreferred, tags, 3,
+            mongo::ReadPreference::PrimaryPreferred, tags, 3,
             &isPrimarySelected);
 
         ASSERT(isPrimarySelected);
@@ -926,7 +926,7 @@ namespace mongo_test {
 
         bool isPrimarySelected = false;
         HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference_PrimaryPreferred, getMatchesFirstTagSet(),
+            mongo::ReadPreference::PrimaryPreferred, getMatchesFirstTagSet(),
             3, &isPrimarySelected);
 
         ASSERT(!isPrimarySelected);
@@ -941,7 +941,7 @@ namespace mongo_test {
 
         bool isPrimarySelected = false;
         HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference_PrimaryPreferred, getMatchesFirstTagSet(),
+            mongo::ReadPreference::PrimaryPreferred, getMatchesFirstTagSet(),
             3, &isPrimarySelected);
 
         ASSERT(!isPrimarySelected);
@@ -955,7 +955,7 @@ namespace mongo_test {
 
         bool isPrimarySelected = false;
         HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference_PrimaryPreferred, getMatchesSecondTagSet(),
+            mongo::ReadPreference::PrimaryPreferred, getMatchesSecondTagSet(),
             3, &isPrimarySelected);
 
         ASSERT(!isPrimarySelected);
@@ -970,7 +970,7 @@ namespace mongo_test {
 
         bool isPrimarySelected = false;
         HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference_PrimaryPreferred, getMatchesSecondTagSet(),
+            mongo::ReadPreference::PrimaryPreferred, getMatchesSecondTagSet(),
             3, &isPrimarySelected);
 
         ASSERT(!isPrimarySelected);
@@ -984,7 +984,7 @@ namespace mongo_test {
 
         bool isPrimarySelected = false;
         HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference_PrimaryPreferred, getMatchesLastTagSet(),
+            mongo::ReadPreference::PrimaryPreferred, getMatchesLastTagSet(),
             3, &isPrimarySelected);
 
         ASSERT(!isPrimarySelected);
@@ -999,7 +999,7 @@ namespace mongo_test {
 
         bool isPrimarySelected = false;
         HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference_PrimaryPreferred, getMatchesLastTagSet(),
+            mongo::ReadPreference::PrimaryPreferred, getMatchesLastTagSet(),
             3, &isPrimarySelected);
 
         ASSERT(host.empty());
@@ -1013,7 +1013,7 @@ namespace mongo_test {
 
         bool isPrimarySelected = false;
         HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference_PrimaryPreferred, tags, 3,
+            mongo::ReadPreference::PrimaryPreferred, tags, 3,
             &isPrimarySelected);
 
         ASSERT(isPrimarySelected);
@@ -1029,7 +1029,7 @@ namespace mongo_test {
 
         bool isPrimarySelected = false;
         HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference_PrimaryPreferred, tags, 3,
+            mongo::ReadPreference::PrimaryPreferred, tags, 3,
             &isPrimarySelected);
 
         ASSERT(host.empty());
@@ -1040,7 +1040,7 @@ namespace mongo_test {
 
         bool isPrimarySelected = false;
         HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference_SecondaryOnly, getMatchesFirstTagSet(),
+            mongo::ReadPreference::SecondaryOnly, getMatchesFirstTagSet(),
             3, &isPrimarySelected);
 
         ASSERT(!isPrimarySelected);
@@ -1054,7 +1054,7 @@ namespace mongo_test {
 
         bool isPrimarySelected = false;
         HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference_SecondaryOnly, getMatchesFirstTagSet(),
+            mongo::ReadPreference::SecondaryOnly, getMatchesFirstTagSet(),
             3, &isPrimarySelected);
 
         ASSERT(!isPrimarySelected);
@@ -1066,7 +1066,7 @@ namespace mongo_test {
 
         bool isPrimarySelected = false;
         HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference_SecondaryOnly, getMatchesSecondTagSet(),
+            mongo::ReadPreference::SecondaryOnly, getMatchesSecondTagSet(),
             3, &isPrimarySelected);
 
         ASSERT(!isPrimarySelected);
@@ -1080,7 +1080,7 @@ namespace mongo_test {
 
         bool isPrimarySelected = false;
         HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference_SecondaryOnly, getMatchesSecondTagSet(),
+            mongo::ReadPreference::SecondaryOnly, getMatchesSecondTagSet(),
             3, &isPrimarySelected);
 
         ASSERT(!isPrimarySelected);
@@ -1092,7 +1092,7 @@ namespace mongo_test {
 
         bool isPrimarySelected = false;
         HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference_SecondaryOnly, getMatchesLastTagSet(),
+            mongo::ReadPreference::SecondaryOnly, getMatchesLastTagSet(),
             3, &isPrimarySelected);
 
         ASSERT(!isPrimarySelected);
@@ -1106,7 +1106,7 @@ namespace mongo_test {
 
         bool isPrimarySelected = false;
         HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference_SecondaryOnly, getMatchesLastTagSet(),
+            mongo::ReadPreference::SecondaryOnly, getMatchesLastTagSet(),
             3, &isPrimarySelected);
 
         ASSERT(host.empty());
@@ -1118,7 +1118,7 @@ namespace mongo_test {
 
         bool isPrimarySelected = false;
         HostAndPort host = selectNode(nodes,
-             mongo::ReadPreference_SecondaryOnly, getMatchesPriTagSet(),
+             mongo::ReadPreference::SecondaryOnly, getMatchesPriTagSet(),
              3, &isPrimarySelected);
 
         ASSERT(!isPrimarySelected);
@@ -1132,7 +1132,7 @@ namespace mongo_test {
 
         bool isPrimarySelected = false;
         HostAndPort host = selectNode(nodes,
-             mongo::ReadPreference_SecondaryOnly, tags, 3,
+             mongo::ReadPreference::SecondaryOnly, tags, 3,
              &isPrimarySelected);
 
         ASSERT(host.empty());
@@ -1143,7 +1143,7 @@ namespace mongo_test {
 
         bool isPrimarySelected = false;
         HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference_SecondaryPreferred, getMatchesFirstTagSet(),
+            mongo::ReadPreference::SecondaryPreferred, getMatchesFirstTagSet(),
             3, &isPrimarySelected);
 
         ASSERT(!isPrimarySelected);
@@ -1157,7 +1157,7 @@ namespace mongo_test {
 
         bool isPrimarySelected = false;
         HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference_SecondaryPreferred, getMatchesFirstTagSet(),
+            mongo::ReadPreference::SecondaryPreferred, getMatchesFirstTagSet(),
             3, &isPrimarySelected);
 
         ASSERT(!isPrimarySelected);
@@ -1169,7 +1169,7 @@ namespace mongo_test {
 
         bool isPrimarySelected = false;
         HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference_SecondaryPreferred, getMatchesSecondTagSet(),
+            mongo::ReadPreference::SecondaryPreferred, getMatchesSecondTagSet(),
             3, &isPrimarySelected);
 
         ASSERT(!isPrimarySelected);
@@ -1183,7 +1183,7 @@ namespace mongo_test {
 
         bool isPrimarySelected = false;
         HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference_SecondaryPreferred, getMatchesSecondTagSet(),
+            mongo::ReadPreference::SecondaryPreferred, getMatchesSecondTagSet(),
             3, &isPrimarySelected);
 
         ASSERT(!isPrimarySelected);
@@ -1195,7 +1195,7 @@ namespace mongo_test {
 
         bool isPrimarySelected = false;
         HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference_SecondaryPreferred, getMatchesLastTagSet(),
+            mongo::ReadPreference::SecondaryPreferred, getMatchesLastTagSet(),
             3, &isPrimarySelected);
 
         ASSERT(!isPrimarySelected);
@@ -1209,7 +1209,7 @@ namespace mongo_test {
 
         bool isPrimarySelected = false;
         HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference_SecondaryPreferred, getMatchesLastTagSet(),
+            mongo::ReadPreference::SecondaryPreferred, getMatchesLastTagSet(),
             3, &isPrimarySelected);
 
         ASSERT(isPrimarySelected);
@@ -1221,7 +1221,7 @@ namespace mongo_test {
 
         bool isPrimarySelected = false;
         HostAndPort host = selectNode(nodes,
-             mongo::ReadPreference_SecondaryPreferred, getMatchesPriTagSet(),
+             mongo::ReadPreference::SecondaryPreferred, getMatchesPriTagSet(),
              3, &isPrimarySelected);
 
         ASSERT(!isPrimarySelected);
@@ -1235,7 +1235,7 @@ namespace mongo_test {
 
         bool isPrimarySelected = false;
         HostAndPort host = selectNode(nodes,
-             mongo::ReadPreference_SecondaryPreferred, tags, 3,
+             mongo::ReadPreference::SecondaryPreferred, tags, 3,
              &isPrimarySelected);
 
         ASSERT(isPrimarySelected);
@@ -1251,7 +1251,7 @@ namespace mongo_test {
 
         bool isPrimarySelected = false;
         HostAndPort host = selectNode(nodes,
-             mongo::ReadPreference_SecondaryPreferred, tags, 3,
+             mongo::ReadPreference::SecondaryPreferred, tags, 3,
              &isPrimarySelected);
 
         ASSERT(host.empty());
@@ -1262,7 +1262,7 @@ namespace mongo_test {
 
         bool isPrimarySelected = false;
         HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference_Nearest, getMatchesFirstTagSet(),
+            mongo::ReadPreference::Nearest, getMatchesFirstTagSet(),
             3, &isPrimarySelected);
 
         ASSERT(!isPrimarySelected);
@@ -1282,7 +1282,7 @@ namespace mongo_test {
 
         bool isPrimarySelected = false;
         HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference_Nearest, tags, 3,
+            mongo::ReadPreference::Nearest, tags, 3,
             &isPrimarySelected);
 
         ASSERT(isPrimarySelected);
@@ -1294,7 +1294,7 @@ namespace mongo_test {
 
         bool isPrimarySelected = false;
         HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference_Nearest, getMatchesSecondTagSet(), 3,
+            mongo::ReadPreference::Nearest, getMatchesSecondTagSet(), 3,
             &isPrimarySelected);
 
         ASSERT(!isPrimarySelected);
@@ -1315,7 +1315,7 @@ namespace mongo_test {
 
         bool isPrimarySelected = false;
         HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference_Nearest, tags, 3,
+            mongo::ReadPreference::Nearest, tags, 3,
             &isPrimarySelected);
 
         ASSERT(isPrimarySelected);
@@ -1327,7 +1327,7 @@ namespace mongo_test {
 
         bool isPrimarySelected = false;
         HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference_Nearest, getMatchesLastTagSet(), 3,
+            mongo::ReadPreference::Nearest, getMatchesLastTagSet(), 3,
             &isPrimarySelected);
 
         ASSERT(!isPrimarySelected);
@@ -1341,7 +1341,7 @@ namespace mongo_test {
 
         bool isPrimarySelected = false;
         HostAndPort host = selectNode(nodes,
-            mongo::ReadPreference_Nearest, getMatchesLastTagSet(), 3,
+            mongo::ReadPreference::Nearest, getMatchesLastTagSet(), 3,
             &isPrimarySelected);
 
         ASSERT(host.empty());
@@ -1353,7 +1353,7 @@ namespace mongo_test {
 
         bool isPrimarySelected = false;
         HostAndPort host = selectNode(nodes,
-             mongo::ReadPreference_Nearest, getMatchesPriTagSet(), 3,
+             mongo::ReadPreference::Nearest, getMatchesPriTagSet(), 3,
              &isPrimarySelected);
 
         ASSERT(isPrimarySelected);
@@ -1367,7 +1367,7 @@ namespace mongo_test {
 
         bool isPrimarySelected = false;
         HostAndPort host = selectNode(nodes,
-             mongo::ReadPreference_Nearest, tags, 3,
+             mongo::ReadPreference::Nearest, tags, 3,
              &isPrimarySelected);
 
         ASSERT(host.empty());
@@ -1598,7 +1598,7 @@ namespace {
         replSet->restore(secHost);
 
         HostAndPort node = monitor->getHostOrRefresh(
-            ReadPreferenceSetting(mongo::ReadPreference_SecondaryOnly, TagSet()));
+            ReadPreferenceSetting(mongo::ReadPreference::SecondaryOnly, TagSet()));
 
         ASSERT_FALSE(monitor->isPrimary(node));
         ASSERT_EQUALS(secHost, node.toString());
@@ -1625,7 +1625,7 @@ namespace {
 
         TagSet tags(BSON_ARRAY(BSON("dc" << "ny")));
         HostAndPort node = monitor->getHostOrRefresh(
-            ReadPreferenceSetting(mongo::ReadPreference_SecondaryOnly, tags));
+            ReadPreferenceSetting(mongo::ReadPreference::SecondaryOnly, tags));
 
         ASSERT_FALSE(monitor->isPrimary(node));
         ASSERT_EQUALS(secHost, node.toString());

@@ -166,38 +166,8 @@ namespace {
     }
 
     Query& Query::readPref(ReadPreference pref, const BSONArray& tags) {
-        string mode;
-
-        switch (pref) {
-        case ReadPreference_PrimaryOnly:
-            mode = "primary";
-            break;
-
-        case ReadPreference_PrimaryPreferred:
-            mode = "primaryPreferred";
-            break;
-
-        case ReadPreference_SecondaryOnly:
-            mode = "secondary";
-            break;
-
-        case ReadPreference_SecondaryPreferred:
-            mode = "secondaryPreferred";
-            break;
-
-        case ReadPreference_Nearest:
-            mode = "nearest";
-            break;
-        }
-
-        BSONObjBuilder readPrefDocBuilder;
-        readPrefDocBuilder << ReadPrefModeField(mode);
-
-        if (!tags.isEmpty()) {
-            readPrefDocBuilder << ReadPrefTagsField(tags);
-        }
-
-        appendComplex(ReadPrefField.name().c_str(), readPrefDocBuilder.done());
+        appendComplex(ReadPrefField.name().c_str(),
+                      ReadPreferenceSetting(pref, TagSet(tags)).toBSON());
         return *this;
     }
 

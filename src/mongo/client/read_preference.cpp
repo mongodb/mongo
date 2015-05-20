@@ -30,43 +30,158 @@
 
 #include "mongo/client/read_preference.h"
 
+#include <string>
+
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/util/bson_extract.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 namespace {
 
     const BSONArray tagsMatchesAll = BSON_ARRAY(BSONObj());
 
-    const char* readPreferenceName(ReadPreference pref) {
+    const char kModeFieldName[] = "mode";
+    const char kTagsFieldName[] = "tags";
+
+    const char kPrimaryOnly[] = "primary";
+    const char kPrimaryPreferred[] = "primaryPreferred";
+    const char kSecondaryOnly[] = "secondary";
+    const char kSecondaryPreferred[] = "secondaryPreferred";
+    const char kNearest[] = "nearest";
+
+    StringData toString(ReadPreference pref) {
         switch (pref) {
-        case ReadPreference_PrimaryOnly:
-            return "primary only";
-        case ReadPreference_PrimaryPreferred:
-            return "primary pref";
-        case ReadPreference_SecondaryOnly:
-            return "secondary only";
-        case ReadPreference_SecondaryPreferred:
-            return "secondary pref";
-        case ReadPreference_Nearest:
-            return "nearest";
+        case ReadPreference::PrimaryOnly:
+            return StringData(kPrimaryOnly);
+        case ReadPreference::PrimaryPreferred:
+            return StringData(kPrimaryPreferred);
+        case ReadPreference::SecondaryOnly:
+            return StringData(kSecondaryOnly);
+        case ReadPreference::SecondaryPreferred:
+            return StringData(kSecondaryPreferred);
+        case ReadPreference::Nearest:
+            return StringData(kNearest);
         default:
-            return "Unknown";
+            MONGO_UNREACHABLE;
         }
     }
 
-} // namespace
-
-
-    TagSet::TagSet() : _tags(tagsMatchesAll) {
-
+    StatusWith<ReadPreference> parseReadPreferenceMode(StringData prefStr) {
+        if (prefStr == kPrimaryOnly) {
+            return ReadPreference::PrimaryOnly;
+        }
+        else if (prefStr == kPrimaryPreferred) {
+            return ReadPreference::PrimaryPreferred;
+        }
+        else if (prefStr == kSecondaryOnly) {
+            return ReadPreference::SecondaryOnly;
+        }
+        else if (prefStr == kSecondaryPreferred) {
+            return ReadPreference::SecondaryPreferred;
+        }
+        else if (prefStr == kNearest) {
+            return ReadPreference::Nearest;
+        }
+        return Status(ErrorCodes::FailedToParse,
+                      str::stream() << "Could not parse $readPreference mode '"
+                      << prefStr << "'. Only the modes '"
+                      << kPrimaryOnly << "', '"
+                      << kPrimaryPreferred << "', "
+                      << kSecondaryOnly << "', '"
+                      << kSecondaryPreferred << "', and '"
+                      << kNearest << "' are supported.");
     }
 
+    // Slight kludge here: if we weren't passed a TagSet, we default to the empty
+    // TagSet if ReadPreference is Primary, or the default (wildcard) TagSet otherwise.
+    // This maintains compatibility with existing code, while preserving the ability to round
+    // trip.
+    TagSet defaultTagSetForMode(ReadPreference mode) {
+        switch (mode) {
+        case ReadPreference::PrimaryOnly:
+            return TagSet::primaryOnly();
+        default:
+            return TagSet();
+        }
+    }
+
+}  // namespace
+
+    TagSet::TagSet() : _tags(tagsMatchesAll) {}
+
+    TagSet TagSet::primaryOnly() {
+        return TagSet{BSONArray()};
+    }
+
+    ReadPreferenceSetting::ReadPreferenceSetting(ReadPreference pref, TagSet tags)
+        : pref(std::move(pref))
+        , tags(std::move(tags))
+    {}
+
+    StatusWith<ReadPreferenceSetting> ReadPreferenceSetting::fromBSON(const BSONObj& readPrefObj) {
+        std::string modeStr;
+        auto modeExtractStatus = bsonExtractStringField(readPrefObj,
+                                                        kModeFieldName,
+                                                        &modeStr);
+        if (!modeExtractStatus.isOK()) {
+            return modeExtractStatus;
+        }
+
+        ReadPreference mode;
+        auto swReadPrefMode = parseReadPreferenceMode(modeStr);
+        if (!swReadPrefMode.isOK()) {
+            return swReadPrefMode.getStatus();
+        }
+        mode = std::move(swReadPrefMode.getValue());
+
+        TagSet tags;
+        BSONElement tagsElem;
+        auto tagExtractStatus = bsonExtractTypedField(readPrefObj,
+                                                      kTagsFieldName,
+                                                      mongo::Array,
+                                                      &tagsElem);
+        if (tagExtractStatus.isOK()) {
+            tags = TagSet{BSONArray(tagsElem.Obj().getOwned())};
+
+            // In accordance with the read preference spec, passing the default wildcard tagset
+            // '[{}]' is the same as not passing a TagSet at all. Furthermore, passing an empty
+            // TagSet with a non-primary ReadPreference is equivalent to passing the wildcard
+            // ReadPreference.
+            if (tags == TagSet() || tags == TagSet::primaryOnly()) {
+                tags = defaultTagSetForMode(mode);
+            }
+
+            // If we are using a user supplied TagSet, check that it is compatible with
+            // the readPreference mode.
+            else if (ReadPreference::PrimaryOnly == mode && (tags != TagSet::primaryOnly())) {
+                return Status(ErrorCodes::BadValue,
+                              "Only empty tags are allowed with primary read preference");
+            }
+        }
+
+        else if (ErrorCodes::NoSuchKey == tagExtractStatus) {
+            tags = defaultTagSetForMode(mode);
+        }
+        else {
+            return tagExtractStatus;
+        }
+
+        return ReadPreferenceSetting(mode, tags);
+    }
 
     BSONObj ReadPreferenceSetting::toBSON() const {
         BSONObjBuilder bob;
-        bob.append("pref", readPreferenceName(pref));
-        bob.append("tags", tags.getTagBSON());
+        bob.append(kModeFieldName, toString(pref));
+        if (tags != defaultTagSetForMode(pref)) {
+            bob.append(kTagsFieldName, tags.getTagBSON());
+        }
         return bob.obj();
     }
 
-} // namespace mongo
+}  // namespace mongo

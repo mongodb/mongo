@@ -24,6 +24,30 @@ env.CppUnitTest(
     ]
 )
 
+env.Library(
+    target=[
+        'read_preference',
+    ],
+    source=[
+        'read_preference.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/bson/util/bson_extract',
+    ],
+)
+
+env.CppUnitTest(
+    target=[
+        'read_preference_test',
+    ],
+    source=[
+        'read_preference_test.cpp',
+    ],
+    LIBDEPS=[
+        'read_preference',
+    ],
+)
+
 env.Library('clientdriver', [
             "connection_string_connect.cpp",
             "connpool.cpp",
@@ -31,7 +55,6 @@ env.Library('clientdriver', [
             "dbclient_rs.cpp",
             "dbclientcursor.cpp",
             'native_sasl_client_session.cpp',
-            'read_preference.cpp',
             "replica_set_monitor.cpp",
             'sasl_client_authenticate.cpp',
             "sasl_client_authenticate_impl.cpp",
@@ -50,8 +73,9 @@ env.Library('clientdriver', [
                      '$BUILD_DIR/mongo/rpc/rpc',
                      '$BUILD_DIR/mongo/util/net/network',
                      'cyrus_sasl_client_session',
+                     'read_preference',
             ])
-            
+
 env.Library(
     target='connection_pool',
     source=[

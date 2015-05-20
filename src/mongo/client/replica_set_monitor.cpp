@@ -305,7 +305,7 @@ namespace {
     }
 
     HostAndPort ReplicaSetMonitor::getMasterOrUassert() {
-        const ReadPreferenceSetting masterOnly(ReadPreference_PrimaryOnly, TagSet());
+        const ReadPreferenceSetting masterOnly(ReadPreference::PrimaryOnly, TagSet());
         HostAndPort master = getHostOrRefresh(masterOnly);
         uassert(10009, str::stream() << "ReplicaSetMonitor no master found for set: " << getName(),
                 !master.empty());
@@ -839,11 +839,11 @@ namespace {
         if (!isUp)
             return false;
 
-        if (pref == ReadPreference_PrimaryOnly) {
+        if (pref == ReadPreference::PrimaryOnly) {
             return isMaster;
         }
 
-        if (pref == ReadPreference_SecondaryOnly) {
+        if (pref == ReadPreference::SecondaryOnly) {
             if (isMaster)
                 return false;
         }
@@ -917,28 +917,28 @@ namespace {
     HostAndPort SetState::getMatchingHost(const ReadPreferenceSetting& criteria) const {
         switch (criteria.pref) {
         // "Prefered" read preferences are defined in terms of other preferences
-        case ReadPreference_PrimaryPreferred: {
-            HostAndPort out = getMatchingHost(ReadPreferenceSetting(ReadPreference_PrimaryOnly,
+        case ReadPreference::PrimaryPreferred: {
+            HostAndPort out = getMatchingHost(ReadPreferenceSetting(ReadPreference::PrimaryOnly,
                                                                     criteria.tags));
             // NOTE: the spec says we should use the primary even if tags don't match
             if (!out.empty())
                 return out;
-            return getMatchingHost(ReadPreferenceSetting(ReadPreference_SecondaryOnly,
+            return getMatchingHost(ReadPreferenceSetting(ReadPreference::SecondaryOnly,
                                                          criteria.tags));
         }
 
-        case ReadPreference_SecondaryPreferred: {
+        case ReadPreference::SecondaryPreferred: {
             HostAndPort out =
-                getMatchingHost(ReadPreferenceSetting(ReadPreference_SecondaryOnly,
+                getMatchingHost(ReadPreferenceSetting(ReadPreference::SecondaryOnly,
                                                       criteria.tags));
             if (!out.empty())
                 return out;
             // NOTE: the spec says we should use the primary even if tags don't match
-            return getMatchingHost(ReadPreferenceSetting(ReadPreference_PrimaryOnly,
+            return getMatchingHost(ReadPreferenceSetting(ReadPreference::PrimaryOnly,
                                                          criteria.tags));
         }
 
-        case ReadPreference_PrimaryOnly: {
+        case ReadPreference::PrimaryOnly: {
             // NOTE: isMaster implies isUp
             Nodes::const_iterator it = std::find_if(nodes.begin(), nodes.end(), isMaster);
             if (it == nodes.end())
@@ -947,8 +947,8 @@ namespace {
         }
 
         // The difference between these is handled by Node::matches
-        case ReadPreference_SecondaryOnly:
-        case ReadPreference_Nearest: {
+        case ReadPreference::SecondaryOnly:
+        case ReadPreference::Nearest: {
             BSONForEach(tagElem, criteria.tags.getTagBSON()) {
                 uassert(16358, "Tags should be a BSON object", tagElem.isABSONObj());
                 BSONObj tag = tagElem.Obj();

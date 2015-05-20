@@ -28,40 +28,40 @@
 
 #pragma once
 
-#include "mongo/db/json.h"
+#include "mongo/db/jsobj.h"
 
 namespace mongo {
+    template <typename T> class StatusWith;
 
-    enum ReadPreference {
+    enum class ReadPreference {
         /**
          * Read from primary only. All operations produce an error (throw an exception where
          * applicable) if primary is unavailable. Cannot be combined with tags.
          */
-        ReadPreference_PrimaryOnly = 0,
+        PrimaryOnly = 0,
 
         /**
          * Read from primary if available, otherwise a secondary. Tags will only be applied in the
          * event that the primary is unavailable and a secondary is read from. In this event only
          * secondaries matching the tags provided would be read from.
          */
-        ReadPreference_PrimaryPreferred,
+        PrimaryPreferred,
 
         /**
          * Read from secondary if available, otherwise error.
          */
-        ReadPreference_SecondaryOnly,
+        SecondaryOnly,
 
         /**
          * Read from a secondary if available, otherwise read from the primary.
          */
-        ReadPreference_SecondaryPreferred,
+        SecondaryPreferred,
 
         /**
          * Read from any member.
          */
-        ReadPreference_Nearest,
+        Nearest,
     };
-
 
     /**
      * A simple object for representing the list of tags requested by a $readPreference.
@@ -69,11 +69,19 @@ namespace mongo {
     class TagSet {
     public:
         /**
-         * Creates a TagSet that matches any nodes.
+         * Creates a TagSet that matches any nodes. This is the TagSet represented by the BSON
+         * array containing a single empty document - [{}].
          *
          * Do not call during static init.
          */
         TagSet();
+
+        /**
+         * Returns an empty TagSet. This is the TagSet represented by the empty BSON array - [].
+         * This TagSet must be associated with ReadPreference::PrimaryOnly.
+         * ReadPreference::Primary.
+         */
+        static TagSet primaryOnly();
 
         /**
          * Creates a TagSet from a BSONArray of tags.
@@ -90,11 +98,11 @@ namespace mongo {
         const BSONArray& getTagBSON() const { return _tags; }
 
         bool operator==(const TagSet& other) const { return _tags == other._tags; }
+        bool operator!=(const TagSet& other) const { return !(*this == other); }
 
     private:
         BSONArray _tags;
     };
-
 
     struct ReadPreferenceSetting {
         /**
@@ -104,21 +112,32 @@ namespace mongo {
          *     object's copy of tag will have the iterator in the initial
          *     position).
          */
-        ReadPreferenceSetting(ReadPreference pref, const TagSet& tag)
-            : pref(pref),
-              tags(tag) {
+        ReadPreferenceSetting(ReadPreference pref, TagSet tags);
 
-        }
+        // TODO: remove when StatusWith supports non-default constructible types (SERVER-18007)
+        ReadPreferenceSetting() = default;
 
         inline bool equals(const ReadPreferenceSetting& other) const {
             return (pref == other.pref) && (tags == other.tags);
         }
 
+        /**
+         * Serializes this ReadPreferenceSetting as a BSON document.
+         */
         BSONObj toBSON() const;
 
+        /**
+         * Parses a ReadPreferenceSetting from a BSON document of the form:
+         * { mode: <mode>, tags: <array of tags> }. The 'mode' element must a string equal to either
+         * "primary", "primaryPreferred", "secondary", "secondaryPreferred", or "nearest". Although
+         * the tags array is intended to be an array of unique BSON documents, no further validation
+         * is performed on it other than checking that it is an array, and that it is empty if
+         * 'mode' is 'primary'.
+         */
+        static StatusWith<ReadPreferenceSetting> fromBSON(const BSONObj& readPrefSettingObj);
 
-        const ReadPreference pref;
-        const TagSet tags;
+        const ReadPreference pref{ReadPreference::PrimaryOnly};
+        const TagSet tags{TagSet::primaryOnly()};
     };
 
 } // namespace mongo

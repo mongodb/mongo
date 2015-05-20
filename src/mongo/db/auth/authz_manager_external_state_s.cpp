@@ -250,7 +250,7 @@ namespace {
             scoped_ptr<ScopedDbConnection> conn(getConfigServerConnection());
 
             Query query(queryDoc);
-            query.readPref(ReadPreference_PrimaryPreferred, BSONArray());
+            query.readPref(ReadPreference::PrimaryPreferred, BSONArray());
             *result = conn->get()->findOne(collectionName, query).getOwned();
             conn->done();
             if (result->isEmpty()) {
@@ -274,7 +274,7 @@ namespace {
             scoped_ptr<ScopedDbConnection> conn(getConfigServerConnection());
 
             Query query(queryDoc);
-            query.readPref(ReadPreference_PrimaryPreferred, BSONArray());
+            query.readPref(ReadPreference::PrimaryPreferred, BSONArray());
             conn->get()->query(resultProcessor, collectionName.ns(), query, &projection);
             return Status::OK();
         } catch (const DBException& e) {
