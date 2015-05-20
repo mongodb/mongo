@@ -26,9 +26,12 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
 
+#include "mongo/base/status_with.h"
 #include "mongo/s/client/multi_host_query.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/synchronization.h"
@@ -176,8 +179,8 @@ namespace {
         // This means a single thread pool with a single thread would hang.
         cbCheckA.blockUntil(&cbCheckB);
 
-        ConnectionString hostA = ConnectionString::mock(HostAndPort("$hostA:1000"));
-        ConnectionString hostB = ConnectionString::mock(HostAndPort("$hostB:1000"));
+        ConnectionString hostA = uassertStatusOK(ConnectionString::parse("$hostA:1000"));
+        ConnectionString hostB = uassertStatusOK(ConnectionString::parse("$hostB:1000"));
 
         threadPool.schedule(hostA, cbCheckA.getHostCallback(hostA));
         cbCheckA.waitForCallback();
@@ -233,7 +236,7 @@ namespace {
         void addMockTimestepAt(int timeMillis) {
 
             // Add a mock query to a host we aren't using at the provided time
-            ConnectionString host = ConnectionString::mock(HostAndPort("$timestepHost:1000"));
+            ConnectionString host = uassertStatusOK(ConnectionString::parse("$timestepHost:1000"));
             newMockHostResultAt(host, timeMillis, Status::OK(), NULL);
 
             // The query won't be scheduled by the multi op, so we need to do so ourselves
@@ -423,7 +426,7 @@ namespace {
         HostThreadPools threadPool(1, true);
         MockSystemEnv mockSystem(&threadPool);
 
-        ConnectionString host = ConnectionString::mock(HostAndPort("$host:1000"));
+        ConnectionString host = uassertStatusOK(ConnectionString::parse("$host:1000"));
         vector<ConnectionString> hosts;
         hosts.push_back(host);
 
@@ -445,7 +448,7 @@ namespace {
         HostThreadPools threadPool(1, true);
         MockSystemEnv mockSystem(&threadPool);
 
-        ConnectionString host = ConnectionString::mock(HostAndPort("$host:1000"));
+        ConnectionString host = uassertStatusOK(ConnectionString::parse("$host:1000"));
         vector<ConnectionString> hosts;
         hosts.push_back(host);
 
@@ -469,7 +472,7 @@ namespace {
         HostThreadPools threadPool(1, true);
         MockSystemEnv mockSystem(&threadPool);
 
-        ConnectionString host = ConnectionString::mock(HostAndPort("$host:1000"));
+        ConnectionString host = uassertStatusOK(ConnectionString::parse("$host:1000"));
         vector<ConnectionString> hosts;
         hosts.push_back(host);
 
@@ -490,8 +493,8 @@ namespace {
         HostThreadPools threadPool(1, true);
         MockSystemEnv mockSystem(&threadPool);
 
-        ConnectionString hostA = ConnectionString::mock(HostAndPort("$hostA:1000"));
-        ConnectionString hostB = ConnectionString::mock(HostAndPort("$hostB:1000"));
+        ConnectionString hostA = uassertStatusOK(ConnectionString::parse("$hostA:1000"));
+        ConnectionString hostB = uassertStatusOK(ConnectionString::parse("$hostB:1000"));
         vector<ConnectionString> hosts;
         hosts.push_back(hostA);
         hosts.push_back(hostB);
@@ -516,8 +519,8 @@ namespace {
         HostThreadPools threadPool(1, true);
         MockSystemEnv mockSystem(&threadPool);
 
-        ConnectionString hostA = ConnectionString::mock(HostAndPort("$hostA:1000"));
-        ConnectionString hostB = ConnectionString::mock(HostAndPort("$hostB:1000"));
+        ConnectionString hostA = uassertStatusOK(ConnectionString::parse("$hostA:1000"));
+        ConnectionString hostB = uassertStatusOK(ConnectionString::parse("$hostB:1000"));
         vector<ConnectionString> hosts;
         hosts.push_back(hostA);
         hosts.push_back(hostB);
@@ -543,8 +546,8 @@ namespace {
         HostThreadPools threadPool(1, true);
         MockSystemEnv mockSystem(&threadPool);
 
-        ConnectionString hostA = ConnectionString::mock(HostAndPort("$hostA:1000"));
-        ConnectionString hostB = ConnectionString::mock(HostAndPort("$hostB:1000"));
+        ConnectionString hostA = uassertStatusOK(ConnectionString::parse("$hostA:1000"));
+        ConnectionString hostB = uassertStatusOK(ConnectionString::parse("$hostB:1000"));
         vector<ConnectionString> hosts;
         hosts.push_back(hostA);
         hosts.push_back(hostB);
@@ -570,8 +573,8 @@ namespace {
         HostThreadPools threadPool(1, true);
         MockSystemEnv mockSystem(&threadPool);
 
-        ConnectionString hostA = ConnectionString::mock(HostAndPort("$hostA:1000"));
-        ConnectionString hostB = ConnectionString::mock(HostAndPort("$hostB:1000"));
+        ConnectionString hostA = uassertStatusOK(ConnectionString::parse("$hostA:1000"));
+        ConnectionString hostB = uassertStatusOK(ConnectionString::parse("$hostB:1000"));
         vector<ConnectionString> hosts;
         hosts.push_back(hostA);
         hosts.push_back(hostB);
@@ -601,8 +604,8 @@ namespace {
         HostThreadPools threadPool(1, true);
         MockSystemEnv mockSystem(&threadPool);
 
-        ConnectionString hostA = ConnectionString::mock(HostAndPort("$hostA:1000"));
-        ConnectionString hostB = ConnectionString::mock(HostAndPort("$hostB:1000"));
+        ConnectionString hostA = uassertStatusOK(ConnectionString::parse("$hostA:1000"));
+        ConnectionString hostB = uassertStatusOK(ConnectionString::parse("$hostB:1000"));
         vector<ConnectionString> hosts;
         hosts.push_back(hostA);
         hosts.push_back(hostB);
@@ -631,9 +634,9 @@ namespace {
         HostThreadPools threadPool(1, true);
         MockSystemEnv mockSystem(&threadPool);
 
-        ConnectionString hostA = ConnectionString::mock(HostAndPort("$hostA:1000"));
-        ConnectionString hostB = ConnectionString::mock(HostAndPort("$hostB:1000"));
-        ConnectionString hostC = ConnectionString::mock(HostAndPort("$hostC:1000"));
+        ConnectionString hostA = uassertStatusOK(ConnectionString::parse("$hostA:1000"));
+        ConnectionString hostB = uassertStatusOK(ConnectionString::parse("$hostB:1000"));
+        ConnectionString hostC = uassertStatusOK(ConnectionString::parse("$hostC:1000"));
         vector<ConnectionString> hosts;
         hosts.push_back(hostA);
         hosts.push_back(hostB);
@@ -665,9 +668,9 @@ namespace {
         HostThreadPools threadPool(1, true);
         MockSystemEnv mockSystem(&threadPool);
 
-        ConnectionString hostA = ConnectionString::mock(HostAndPort("$hostA:1000"));
-        ConnectionString hostB = ConnectionString::mock(HostAndPort("$hostB:1000"));
-        ConnectionString hostC = ConnectionString::mock(HostAndPort("$hostC:1000"));
+        ConnectionString hostA = uassertStatusOK(ConnectionString::parse("$hostA:1000"));
+        ConnectionString hostB = uassertStatusOK(ConnectionString::parse("$hostB:1000"));
+        ConnectionString hostC = uassertStatusOK(ConnectionString::parse("$hostC:1000"));
         vector<ConnectionString> hosts;
         hosts.push_back(hostA);
         hosts.push_back(hostB);
@@ -698,9 +701,9 @@ namespace {
         HostThreadPools threadPool(1, true);
         MockSystemEnv mockSystem(&threadPool);
 
-        ConnectionString hostA = ConnectionString::mock(HostAndPort("$hostA:1000"));
-        ConnectionString hostB = ConnectionString::mock(HostAndPort("$hostB:1000"));
-        ConnectionString hostC = ConnectionString::mock(HostAndPort("$hostC:1000"));
+        ConnectionString hostA = uassertStatusOK(ConnectionString::parse("$hostA:1000"));
+        ConnectionString hostB = uassertStatusOK(ConnectionString::parse("$hostB:1000"));
+        ConnectionString hostC = uassertStatusOK(ConnectionString::parse("$hostC:1000"));
         vector<ConnectionString> hosts;
         hosts.push_back(hostA);
         hosts.push_back(hostB);
@@ -734,8 +737,8 @@ namespace {
         scoped_ptr<HostThreadPools> threadPool(new HostThreadPools(1, false));
         MockSystemEnv mockSystem(threadPool.get());
 
-        ConnectionString hostA = ConnectionString::mock(HostAndPort("$hostA:1000"));
-        ConnectionString hostB = ConnectionString::mock(HostAndPort("$hostB:1000"));
+        ConnectionString hostA = uassertStatusOK(ConnectionString::parse("$hostA:1000"));
+        ConnectionString hostB = uassertStatusOK(ConnectionString::parse("$hostB:1000"));
         vector<ConnectionString> hosts;
         hosts.push_back(hostA);
         hosts.push_back(hostB);

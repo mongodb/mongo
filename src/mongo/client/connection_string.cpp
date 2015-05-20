@@ -1,4 +1,5 @@
-/*    Copyright 2009 10gen Inc.
+/**
+ *    Copyright (C) 2009-2015 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -16,13 +17,13 @@
  *    code of portions of this program with the OpenSSL library under certain
  *    conditions as described in each individual source file and distribute
  *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the GNU Affero General Public License in all respects
- *    for all of the code used other than as permitted herein. If you modify
- *    file(s) with this exception, you may extend this exception to your
- *    version of the file(s), but you are not obligated to do so. If you do not
- *    wish to do so, delete this exception statement from your version. If you
- *    delete this exception statement from all source files in the program,
- *    then also delete it in the license file.
+ *    must comply with the GNU Affero General Public License in all respects for
+ *    all of the code used other than as permitted herein. If you modify file(s)
+ *    with this exception, you may extend this exception to your version of the
+ *    file(s), but you are not obligated to do so. If you do not wish to do so,
+ *    delete this exception statement from your version. If you delete this
+ *    exception statement from all source files in the program, then also delete
+ *    it in the license file.
  */
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
@@ -31,9 +32,54 @@
 
 #include "mongo/client/connection_string.h"
 
+#include "mongo/base/status_with.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
+
+    ConnectionString::ConnectionString(const HostAndPort& server) : _type(MASTER) {
+        _servers.push_back(server);
+        _finishInit();
+    }
+
+    ConnectionString::ConnectionString(ConnectionType type,
+                                       const std::string& s,
+                                       const std::string& setName) {
+        _type = type;
+        _setName = setName;
+        _fillServers(s);
+
+        switch (_type) {
+        case MASTER:
+            verify(_servers.size() == 1);
+            break;
+        case SET:
+            verify(_setName.size());
+            verify(_servers.size() >= 1); // 1 is ok since we can derive
+            break;
+        default:
+            verify(_servers.size() > 0);
+        }
+
+        _finishInit();
+    }
+
+    ConnectionString::ConnectionString(const std::string& s, ConnectionType favoredMultipleType) {
+        _fillServers(s);
+
+        if (_type != INVALID) {
+            // set already
+        }
+        else if (_servers.size() == 1) {
+            _type = MASTER;
+        }
+        else {
+            _type = favoredMultipleType;
+            verify(_type == SET || _type == SYNC);
+        }
+
+        _finishInit();
+    }
 
     void ConnectionString::_fillServers( std::string s ) {
 
@@ -64,31 +110,37 @@ namespace mongo {
     }
 
     void ConnectionString::_finishInit() {
-
         // Needed here as well b/c the parsing logic isn't used in all constructors
         // TODO: Refactor so that the parsing logic *is* used in all constructors
-        if ( _type == MASTER && _servers.size() > 0 ){
-            if( _servers[0].host().find( '$' ) == 0 ){
+        if (_type == MASTER && _servers.size() > 0) {
+            if (_servers[0].host().find('$') == 0) {
                 _type = CUSTOM;
             }
         }
 
         std::stringstream ss;
-        if ( _type == SET )
+
+        if (_type == SET) {
             ss << _setName << "/";
-        for ( unsigned i=0; i<_servers.size(); i++ ) {
-            if ( i > 0 )
+        }
+
+        for (unsigned i = 0; i < _servers.size(); i++) {
+            if (i > 0) {
                 ss << ",";
+            }
+
             ss << _servers[i].toString();
         }
+
         _string = ss.str();
     }
 
-    bool ConnectionString::sameLogicalEndpoint( const ConnectionString& other ) const {
-        if ( _type != other._type )
+    bool ConnectionString::sameLogicalEndpoint(const ConnectionString& other) const {
+        if (_type != other._type) {
             return false;
+        }
 
-        switch ( _type ) {
+        switch (_type) {
         case INVALID:
             return true;
         case MASTER:
@@ -97,44 +149,68 @@ namespace mongo {
             return _setName == other._setName;
         case SYNC:
             // The servers all have to be the same in each, but not in the same order.
-            if ( _servers.size() != other._servers.size() )
+            if (_servers.size() != other._servers.size()) {
                 return false;
-            for ( unsigned i = 0; i < _servers.size(); i++ ) {
+            }
+
+            for (unsigned i = 0; i < _servers.size(); i++) {
                 bool found = false;
-                for ( unsigned j = 0; j < other._servers.size(); j++ ) {
-                    if ( _servers[i] == other._servers[j] ) {
+                for (unsigned j = 0; j < other._servers.size(); j++) {
+                    if (_servers[i] == other._servers[j]) {
                         found = true;
                         break;
                     }
                 }
-                if ( ! found )
-                    return false;
+
+                if (!found) return false;
             }
+
             return true;
         case CUSTOM:
             return _string == other._string;
         }
-        verify( false );
+
+        MONGO_UNREACHABLE;
     }
 
-    ConnectionString ConnectionString::parse( const std::string& host , std::string& errmsg ) {
-
-        std::string::size_type i = host.find( '/' );
-        if ( i != std::string::npos && i != 0) {
-            // replica set
-            return ConnectionString( SET , host.substr( i + 1 ) , host.substr( 0 , i ) );
+    ConnectionString ConnectionString::parse(const std::string& url, std::string& errmsg) {
+        auto status = parse(url);
+        if (status.isOK()) {
+            errmsg = "";
+            return status.getValue();
         }
 
-        int numCommas = str::count( host , ',' );
+        errmsg = status.getStatus().toString();
+        return ConnectionString();
+    }
 
-        if( numCommas == 0 )
-            return ConnectionString( HostAndPort( host ) );
+    StatusWith<ConnectionString> ConnectionString::parse(const std::string& url) {
+        const std::string::size_type i = url.find('/');
 
-        if ( numCommas == 2 )
-            return ConnectionString( SYNC , host );
+        // Replica set
+        if (i != std::string::npos && i != 0) {
+            return ConnectionString(SET, url.substr(i + 1), url.substr(0, i));
+        }
 
-        errmsg = (std::string)"invalid hostname [" + host + "]";
-        return ConnectionString(); // INVALID
+        const int numCommas = str::count(url, ',');
+
+        // Single host
+        if (numCommas == 0) {
+            HostAndPort singleHost;
+            Status status = singleHost.initialize(url);
+            if (!status.isOK()) {
+                return status;
+            }
+
+            return ConnectionString(singleHost);
+        }
+
+        // Sharding config server
+        if (numCommas == 2) {
+            return ConnectionString(SYNC, url, "");
+        }
+
+        return Status(ErrorCodes::FailedToParse, str::stream() << "invalid url [" << url << "]");
     }
 
     std::string ConnectionString::typeToString(ConnectionType type) {

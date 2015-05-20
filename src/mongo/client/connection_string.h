@@ -1,4 +1,5 @@
-/*    Copyright 2009 10gen Inc.
+/**
+ *    Copyright (C) 2009-2015 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -16,13 +17,13 @@
  *    code of portions of this program with the OpenSSL library under certain
  *    conditions as described in each individual source file and distribute
  *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the GNU Affero General Public License in all respects
- *    for all of the code used other than as permitted herein. If you modify
- *    file(s) with this exception, you may extend this exception to your
- *    version of the file(s), but you are not obligated to do so. If you do not
- *    wish to do so, delete this exception statement from your version. If you
- *    delete this exception statement from all source files in the program,
- *    then also delete it in the license file.
+ *    must comply with the GNU Affero General Public License in all respects for
+ *    all of the code used other than as permitted herein. If you modify file(s)
+ *    with this exception, you may extend this exception to your version of the
+ *    file(s), but you are not obligated to do so. If you do not wish to do so,
+ *    delete this exception statement from your version. If you delete this
+ *    exception statement from all source files in the program, then also delete
+ *    it in the license file.
  */
 
 #pragma once
@@ -38,6 +39,7 @@
 namespace mongo {
 
     class DBClientBase;
+    template <typename T> class StatusWith;
 
     /**
      * ConnectionString handles parsing different ways to connect to mongo and determining method
@@ -50,64 +52,23 @@ namespace mongo {
      *                                    for some special things such as sharding config servers.
      *                                    See syncclusterconnection.h for more info.
      *
-     * tyipcal use
-     * std::string errmsg,
-     * ConnectionString cs = ConnectionString::parse( url , errmsg );
-     * if ( ! cs.isValid() ) throw "bad: " + errmsg;
+     * Typical use:
+     *
+     * ConnectionString cs(uassertStatusOK(ConnectionString::parse(url)));
+     * std::string errmsg;
      * DBClientBase * conn = cs.connect( errmsg );
      */
     class ConnectionString {
     public:
         enum ConnectionType { INVALID, MASTER, SET, SYNC, CUSTOM };
 
-        ConnectionString() {
-            _type = INVALID;
-        }
+        ConnectionString() = default;
 
-        // Note: This should only be used for direct connections to a single server.  For replica
-        // set and SyncClusterConnections, use ConnectionString::parse.
-        ConnectionString( const HostAndPort& server ) {
-            _type = MASTER;
-            _servers.push_back( server );
-            _finishInit();
-        }
+        explicit ConnectionString(const HostAndPort& server);
 
-        ConnectionString( ConnectionType type , const std::string& s , const std::string& setName = "" ) {
-            _type = type;
-            _setName = setName;
-            _fillServers( s );
+        ConnectionString(ConnectionType type, const std::string& s, const std::string& setName);
 
-            switch ( _type ) {
-            case MASTER:
-                verify( _servers.size() == 1 );
-                break;
-            case SET:
-                verify( _setName.size() );
-                verify( _servers.size() >= 1 ); // 1 is ok since we can derive
-                break;
-            default:
-                verify( _servers.size() > 0 );
-            }
-
-            _finishInit();
-        }
-
-        ConnectionString( const std::string& s , ConnectionType favoredMultipleType ) {
-            _type = INVALID;
-
-            _fillServers( s );
-            if ( _type != INVALID ) {
-                // set already
-            }
-            else if ( _servers.size() == 1 ) {
-                _type = MASTER;
-            }
-            else {
-                _type = favoredMultipleType;
-                verify( _type == SET || _type == SYNC );
-            }
-            _finishInit();
-        }
+        ConnectionString(const std::string& s, ConnectionType favoredMultipleType);
 
         bool isValid() const { return _type != INVALID; }
 
@@ -129,7 +90,8 @@ namespace mongo {
 
         DBClientBase* connect(std::string& errmsg, double socketTimeout = 0) const;
 
-        static ConnectionString parse( const std::string& url , std::string& errmsg );
+        static ConnectionString parse(const std::string& url, std::string& errmsg);
+        static StatusWith<ConnectionString> parse(const std::string& url);
 
         static std::string typeToString( ConnectionType type );
 
@@ -164,24 +126,11 @@ namespace mongo {
             return _string < other._string;
         }
 
-        //
-        // FOR TESTING ONLY - useful to be able to directly mock a connection std::string without
-        // including the entire client library.
-        //
-
-        static ConnectionString mock( const HostAndPort& server ) {
-            ConnectionString connStr;
-            connStr._servers.push_back( server );
-            connStr._string = server.toString();
-            return connStr;
-        }
-
     private:
-
         void _fillServers( std::string s );
         void _finishInit();
 
-        ConnectionType _type;
+        ConnectionType _type{INVALID};
         std::vector<HostAndPort> _servers;
         std::string _string;
         std::string _setName;

@@ -3,11 +3,26 @@
 Import("env")
 
 # Contains only the core ConnectionString functionality, *not* the ability to call connect()
-# and return a DBClientBase* back.  For that you need to link against the 'clientdriver' library.
-env.Library('connectionstring',
-            ["connection_string.cpp"],
-            LIBDEPS=[])
+# and return a DBClientBase* back. For that you need to link against the 'clientdriver' library.
+env.Library(
+    target='connection_string',
+    source=[
+        'connection_string.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/util/net/hostandport',
+    ]
+)
 
+env.CppUnitTest(
+    target='connection_string_test',
+    source=[
+        'connection_string_test.cpp',
+    ],
+    LIBDEPS=[
+        'connection_string',
+    ]
+)
 
 env.Library('clientdriver', [
             "connection_string_connect.cpp",
@@ -27,7 +42,7 @@ env.Library('clientdriver', [
             "syncclusterconnection.cpp",
             "$BUILD_DIR/mongo/db/dbmessage.cpp"
             ],
-            LIBDEPS=['connectionstring',
+            LIBDEPS=['connection_string',
                      '$BUILD_DIR/mongo/bson/util/bson_extract',
                      '$BUILD_DIR/mongo/crypto/scramauth',
                      '$BUILD_DIR/mongo/db/auth/authcommon',

@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2008-2015 MongoDB Inc.
+ *    Copyright (C) 2015 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,31 +26,24 @@
  *    it in the license file.
  */
 
-#include "mongo/s/client/shard.h"
+#include "mongo/platform/basic.h"
+
+#include "mongo/client/connection_string.h"
+
 #include "mongo/unittest/unittest.h"
 
 namespace {
 
     using namespace mongo;
 
-    TEST( Shard, EqualityRs ) {
-        Shard a("foo", "bar/a,b", 0, false);
-        Shard b("foo", "bar/a,b", 0, false);
-        ASSERT_EQUALS( a, b );
+    TEST(ConnectionString, EqualitySync) {
+        ConnectionString cs(ConnectionString::SYNC, "a,b,c", "");
 
-        b = Shard("foo", "bar/b,a", 0, false);
-        ASSERT_EQUALS( a, b );
-    }
+        ASSERT(cs.sameLogicalEndpoint(ConnectionString(ConnectionString::SYNC, "a,b,c", "")));
+        ASSERT(cs.sameLogicalEndpoint(ConnectionString(ConnectionString::SYNC, "c,b,a", "")));
+        ASSERT(cs.sameLogicalEndpoint(ConnectionString(ConnectionString::SYNC, "c,a,b", "")));
 
-    TEST( Shard, EqualitySingle ) {
-        ASSERT_EQUALS(Shard("foo", "b.foo.com:123", 0, false),
-                      Shard("foo", "b.foo.com:123", 0, false));
-        ASSERT_NOT_EQUALS(Shard("foo", "b.foo.com:123", 0, false),
-                          Shard("foo", "a.foo.com:123", 0, false));
-        ASSERT_NOT_EQUALS(Shard("foo", "b.foo.com:123", 0, false),
-                          Shard("foo", "b.foo.com:124", 0, false));
-        ASSERT_NOT_EQUALS(Shard("foo", "b.foo.com:123", 0, false),
-                          Shard("foa", "b.foo.com:123", 0, false));
+        ASSERT(!cs.sameLogicalEndpoint(ConnectionString(ConnectionString::SYNC, "d,a,b", "")));
     }
 
 } // namespace

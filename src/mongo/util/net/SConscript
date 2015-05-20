@@ -9,7 +9,6 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/util/foundation',
-        '$BUILD_DIR/mongo/db/server_options_core',
     ],
 )
 
