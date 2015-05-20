@@ -373,6 +373,11 @@ namespace mongo {
             curop.setMaxTimeMicros(cc->getLeftoverMaxTimeMicros());
             txn->checkForInterrupt(); // May trigger maxTimeAlwaysTimeOut fail point.
 
+            // Ensure that the original query or command object is available in the slow query log,
+            // profiler, and currentOp.
+            curop.debug().query = cc->getQuery();
+            curop.setQuery(cc->getQuery());
+
             if (0 == pass) { 
                 cc->updateSlaveLocation(txn); 
             }

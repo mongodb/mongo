@@ -148,6 +148,7 @@ namespace mongo {
 
         PlanExecutor* getExecutor() const { return _exec.get(); }
         int queryOptions() const { return _queryOptions; }
+        const BSONObj& getQuery() const { return _query; }
 
         // Used by ops/query.cpp to stash how many results have been returned by a query.
         int pos() const { return _pos; }
@@ -230,7 +231,9 @@ namespace mongo {
         // How many objects have been returned by the find() so far?
         int _pos;
 
-        // The query that prompted this ClientCursor.  Only used for debugging.
+        // If this cursor was created by a find operation, '_query' holds the query predicate for
+        // the find. If this cursor was created by a command (e.g. the aggregate command), then
+        // '_query' holds the command specification received from the client.
         BSONObj _query;
 
         // See the QueryOptions enum in dbclient.h
