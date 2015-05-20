@@ -32,6 +32,7 @@
 
 #include "mongo/s/balance.h"
 
+#include <algorithm>
 #include <boost/scoped_ptr.hpp>
 
 #include "mongo/client/connpool.h"
@@ -49,13 +50,13 @@
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_settings.h"
+#include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/config.h"
 #include "mongo/s/catalog/dist_lock_manager.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/type_mongos.h"
-#include "mongo/s/type_tags.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
@@ -67,7 +68,6 @@ namespace mongo {
     using boost::scoped_ptr;
     using boost::shared_ptr;
     using std::auto_ptr;
-    using std::endl;
     using std::map;
     using std::set;
     using std::string;
@@ -83,27 +83,28 @@ namespace mongo {
 
     }
 
-    Balancer::~Balancer() {
+    Balancer::~Balancer() = default;
 
-    }
-
-    int Balancer::_moveChunks(const vector<shared_ptr<MigrateInfo>>* candidateChunks,
+    int Balancer::_moveChunks(const vector<shared_ptr<MigrateInfo>>& candidateChunks,
                               const WriteConcernOptions* writeConcern,
                               bool waitForDelete)
     {
         int movedCount = 0;
 
-        for ( vector<shared_ptr<MigrateInfo>>::const_iterator it = candidateChunks->begin(); it != candidateChunks->end(); ++it ) {
-
-            // If the balancer was disabled since we started this round, don't start new
-            // chunks moves.
-            auto balSettingsResult =
+        for (const auto& migrateInfo : candidateChunks) {
+            // If the balancer was disabled since we started this round, don't start new chunks
+            // moves.
+            const auto balSettingsResult =
                 grid.catalogManager()->getGlobalSettings(SettingsType::BalancerDocKey);
-            const bool isBalSettingsAbsent = balSettingsResult.getStatus() == ErrorCodes::NoSuchKey;
+
+            const bool isBalSettingsAbsent =
+                balSettingsResult.getStatus() == ErrorCodes::NoSuchKey;
+
             if (!balSettingsResult.isOK() && !isBalSettingsAbsent) {
                 warning() << balSettingsResult.getStatus();
                 return movedCount;
             }
+
             const SettingsType& balancerConfig = balSettingsResult.getValue();
 
             if ((!isBalSettingsAbsent && !grid.shouldBalance(balancerConfig)) ||
@@ -112,15 +113,17 @@ namespace mongo {
                 return movedCount;
             }
 
-            // Changes to metadata, borked metadata, and connectivity problems between shards should
-            // cause us to abort this chunk move, but shouldn't cause us to abort the entire round
-            // of chunks.
+            // Changes to metadata, borked metadata, and connectivity problems between shards
+            // should cause us to abort this chunk move, but shouldn't cause us to abort the entire
+            // round of chunks.
+            //
             // TODO(spencer): We probably *should* abort the whole round on issues communicating
             // with the config servers, but its impossible to distinguish those types of failures
             // at the moment.
+            //
             // TODO: Handle all these things more cleanly, since they're expected problems
-            const MigrateInfo& chunkInfo = *it->get();
-            const NamespaceString nss(chunkInfo.ns);
+
+            const NamespaceString nss(migrateInfo->ns);
 
             try {
                 auto status = grid.catalogCache()->getDatabase(nss.db().toString());
@@ -130,60 +133,73 @@ namespace mongo {
 
                 // NOTE: We purposely do not reload metadata here, since _doBalanceRound already
                 // tried to do so once.
-                ChunkManagerPtr cm = cfg->getChunkManager( chunkInfo.ns );
-                verify( cm );
+                shared_ptr<ChunkManager> cm = cfg->getChunkManager(migrateInfo->ns);
+                invariant(cm);
 
-                ChunkPtr c = cm->findIntersectingChunk( chunkInfo.chunk.min );
-                if ( c->getMin().woCompare( chunkInfo.chunk.min ) || c->getMax().woCompare( chunkInfo.chunk.max ) ) {
-                    // likely a split happened somewhere
-                    cm = cfg->getChunkManager( chunkInfo.ns , true /* reload */);
-                    verify( cm );
+                ChunkPtr c = cm->findIntersectingChunk(migrateInfo->chunk.min);
 
-                    c = cm->findIntersectingChunk( chunkInfo.chunk.min );
-                    if ( c->getMin().woCompare( chunkInfo.chunk.min ) || c->getMax().woCompare( chunkInfo.chunk.max ) ) {
-                        log() << "chunk mismatch after reload, ignoring will retry issue " << chunkInfo.chunk.toString() << endl;
+                if (c->getMin().woCompare(migrateInfo->chunk.min) ||
+                        c->getMax().woCompare(migrateInfo->chunk.max)) {
+
+                    // Likely a split happened somewhere, so force reload the chunk manager
+                    cm = cfg->getChunkManager(migrateInfo->ns, true);
+                    invariant(cm);
+
+                    c = cm->findIntersectingChunk(migrateInfo->chunk.min);
+
+                    if (c->getMin().woCompare(migrateInfo->chunk.min) ||
+                            c->getMax().woCompare(migrateInfo->chunk.max)) {
+
+                        log() << "chunk mismatch after reload, ignoring will retry issue "
+                              << migrateInfo->chunk.toString();
+
                         continue;
                     }
                 }
 
                 BSONObj res;
-                if (c->moveAndCommit(Shard::make(chunkInfo.to),
+                if (c->moveAndCommit(Shard::make(migrateInfo->to),
                                      Chunk::MaxChunkSize,
                                      writeConcern,
                                      waitForDelete,
                                      0, /* maxTimeMS */
                                      res)) {
+
                     movedCount++;
                     continue;
                 }
 
-                // the move requires acquiring the collection metadata's lock, which can fail
-                log() << "balancer move failed: " << res << " from: " << chunkInfo.from << " to: " << chunkInfo.to
-                      << " chunk: " << chunkInfo.chunk << endl;
+                // The move requires acquiring the collection metadata's lock, which can fail.
+                log() << "balancer move failed: " << res
+                      << " from: " << migrateInfo->from
+                      << " to: " << migrateInfo->to
+                      << " chunk: " << migrateInfo->chunk;
 
-                if ( res["chunkTooBig"].trueValue() ) {
-                    // reload just to be safe
-                    cm = cfg->getChunkManager( chunkInfo.ns );
-                    verify( cm );
-                    c = cm->findIntersectingChunk( chunkInfo.chunk.min );
+                if (res["chunkTooBig"].trueValue()) {
+                    // Reload just to be safe
+                    cm = cfg->getChunkManager(migrateInfo->ns);
+                    invariant(cm);
+
+                    c = cm->findIntersectingChunk(migrateInfo->chunk.min);
 
                     log() << "performing a split because migrate failed for size reasons";
 
                     Status status = c->split(Chunk::normal, NULL, NULL);
-                    log() << "split results: " << status << endl;
+                    log() << "split results: " << status;
 
-                    if ( !status.isOK() ) {
-                        log() << "marking chunk as jumbo: " << c->toString() << endl;
+                    if (!status.isOK()) {
+                        log() << "marking chunk as jumbo: " << c->toString();
+
                         c->markAsJumbo();
-                        // we increment moveCount so we do another round right away
+
+                        // We increment moveCount so we do another round right away
                         movedCount++;
                     }
-
                 }
             }
-            catch( const DBException& ex ) {
-                warning() << "could not move chunk " << chunkInfo.chunk.toString()
-                          << ", continuing balancing round" << causedBy( ex ) << endl;
+            catch (const DBException& ex) {
+                warning() << "could not move chunk " << migrateInfo->chunk.toString()
+                          << ", continuing balancing round" << causedBy(ex);
             }
         }
 
@@ -255,14 +271,14 @@ namespace mongo {
                     oids[x] = s;
                 }
                 else {
-                    log() << "error: 2 machines have " << x << " as oid machine piece " << s.toString() << " and " << oids[x].toString() << endl;
+                    log() << "error: 2 machines have " << x << " as oid machine piece " << s.toString() << " and " << oids[x].toString();
                     s.runCommand( "admin" , BSON( "features" << 1 << "oidReset" << 1 ) );
                     oids[x].runCommand( "admin" , BSON( "features" << 1 << "oidReset" << 1 ) );
                     return false;
                 }
             }
             else {
-                log() << "warning: oidMachine not set on: " << s.toString() << endl;
+                log() << "warning: oidMachine not set on: " << s.toString();
             }
         }
         return true;
@@ -285,9 +301,9 @@ namespace mongo {
         // If we're all the same version, don't message
         if ( !isMultiVersion ) return;
 
-        warning() << "multiVersion cluster detected, my version is " << versionString << endl;
+        warning() << "multiVersion cluster detected, my version is " << versionString;
         for ( ShardInfoMap::const_iterator i = shardInfo.begin(); i != shardInfo.end(); ++i ) {
-            log() << i->first << " is at version " << i->second.getMongoVersion() << endl;
+            log() << i->first << " is at version " << i->second.getMongoVersion();
         }        
     }
 
@@ -373,28 +389,29 @@ namespace mongo {
 
             DistributionStatus status(shardInfo, shardToChunksMap);
 
-            cursor = conn.query(TagsType::ConfigNS,
-                                QUERY(TagsType::ns(ns)).sort(TagsType::min()));
-
+            // TODO: TagRange contains all the information from TagsType except for the namespace,
+            //       so maybe the two can be merged at some point in order to avoid the
+            //       transformation below.
             vector<TagRange> ranges;
 
-            while ( cursor->more() ) {
-                BSONObj tag = cursor->nextSafe();
-                TagRange tr(tag[TagsType::min()].Obj().getOwned(),
-                            tag[TagsType::max()].Obj().getOwned(),
-                            tag[TagsType::tag()].String());
-                ranges.push_back(tr);
-                uassert(16356,
-                        str::stream() << "tag ranges not valid for: " << ns.toString(),
-                        status.addTagRange(tr) );
-
+            {
+                vector<TagsType> collectionTags;
+                uassertStatusOK(grid.catalogManager()->getTagsForCollection(ns.toString(),
+                                                                            &collectionTags));
+                for (const auto& tt : collectionTags) {
+                    ranges.push_back(TagRange(tt.getMinKey().getOwned(),
+                                              tt.getMaxKey().getOwned(),
+                                              tt.getTag()));
+                    uassert(16356,
+                            str::stream() << "tag ranges not valid for: " << ns.toString(),
+                            status.addTagRange(ranges.back()));
+                }
             }
-            cursor.reset();
 
             auto statusGetDb = grid.catalogCache()->getDatabase(ns.db().toString());
             if (!statusGetDb.isOK()) {
-                warning() << "could not load db config to balance " << ns
-                          << ", collection: " << statusGetDb.getStatus();
+                warning() << "could not load db config to balance collection [" << ns << "]: "
+                          << statusGetDb.getStatus();
                 continue;
             }
 
@@ -402,58 +419,59 @@ namespace mongo {
 
             // This line reloads the chunk manager once if this process doesn't know the collection
             // is sharded yet.
-            ChunkManagerPtr cm = cfg->getChunkManagerIfExists( ns, true );
-            if ( !cm ) {
-                warning() << "could not load chunks to balance " << ns << " collection" << endl;
+            shared_ptr<ChunkManager> cm = cfg->getChunkManagerIfExists(ns, true);
+            if (!cm) {
+                warning() << "could not load chunks to balance " << ns << " collection";
                 continue;
             }
 
-            // loop through tags to make sure no chunk spans tags; splits on tag min. for all chunks
+            // Loop through tags to make sure no chunk spans tags. Split on tag min for all chunks.
             bool didAnySplits = false;
-            for ( unsigned i = 0; i < ranges.size(); i++ ) {
-                BSONObj min = ranges[i].min;
 
-                min = cm->getShardKeyPattern().getKeyPattern().extendRangeBound( min, false );
+            for (const TagRange& range : ranges) {
+                BSONObj min =
+                    cm->getShardKeyPattern().getKeyPattern().extendRangeBound(range.min, false);
 
-                if ( allChunkMinimums.count( min ) > 0 )
+                if (allChunkMinimums.count(min) > 0) {
                     continue;
+                }
 
                 didAnySplits = true;
 
-                log() << "ns: " << ns << " need to split on "
-                      << min << " because there is a range there" << endl;
+                log() << "ns: " << ns << " need to split on " << min
+                      << " because there is a range there";
 
-                ChunkPtr c = cm->findIntersectingChunk( min );
+                ChunkPtr c = cm->findIntersectingChunk(min);
 
                 vector<BSONObj> splitPoints;
                 splitPoints.push_back( min );
 
                 Status status = c->multiSplit(splitPoints, NULL);
-                if ( !status.isOK() ) {
-                    error() << "split failed: " << status << endl;
+                if (!status.isOK()) {
+                    error() << "split failed: " << status;
                 }
                 else {
-                    LOG(1) << "split worked" << endl;
+                    LOG(1) << "split worked";
                 }
+
                 break;
             }
 
             if (didAnySplits) {
-                // state change, just wait till next round
+                // State change, just wait till next round
                 continue;
             }
 
-            MigrateInfo* p = _policy->balance(ns, status, _balancedLastTime);
-            if (p) {
-                candidateChunks->push_back(shared_ptr<MigrateInfo>(p));
+            shared_ptr<MigrateInfo> migrateInfo(_policy->balance(ns, status, _balancedLastTime));
+            if (migrateInfo) {
+                candidateChunks->push_back(migrateInfo);
             }
         }
     }
 
     bool Balancer::_init() {
         try {
-
-            log() << "about to contact config servers and shards" << endl;
+            log() << "about to contact config servers and shards";
 
             // contact the config server and refresh shard information
             // checks that each shard is indeed a different process (no hostname mixup)
@@ -462,7 +480,7 @@ namespace mongo {
             Shard::reloadShardInfo();
             _checkOIDs();
 
-            log() << "config servers and shards contacted successfully" << endl;
+            log() << "config servers and shards contacted successfully";
 
             StringBuilder buf;
             buf << getHostNameCached() << ":" << serverGlobalParams.port;
@@ -475,7 +493,7 @@ namespace mongo {
 
         }
         catch ( std::exception& e ) {
-            warning() << "could not initialize balancer, please check that all shards and config servers are up: " << e.what() << endl;
+            warning() << "could not initialize balancer, please check that all shards and config servers are up: " << e.what();
             return false;
 
         }
@@ -485,18 +503,18 @@ namespace mongo {
         Client::initThread("Balancer");
 
         // This is the body of a BackgroundJob so if we throw here we're basically ending the
-        // balancer thread prematurely
-        while ( ! inShutdown() ) {
-            if ( ! _init() ) {
-                log() << "will retry to initialize balancer in one minute" << endl;
-                sleepsecs( 60 );
+        // balancer thread prematurely.
+        while (!inShutdown()) {
+            if (!_init()) {
+                log() << "will retry to initialize balancer in one minute";
+                sleepsecs(60);
                 continue;
             }
 
             break;
         }
 
-        int sleepTime = 10;
+        const int sleepTime = 10;
 
         // getConnectioString and dist lock constructor does not throw, which is what we expect on while
         // on the balancer thread
@@ -539,7 +557,7 @@ namespace mongo {
                 if ((!isBalSettingsAbsent && !grid.shouldBalance(balancerConfig)) ||
                     MONGO_FAIL_POINT(skipBalanceRound)) {
 
-                    LOG(1) << "skipping balancing round because balancing is disabled" << endl;
+                    LOG(1) << "skipping balancing round because balancing is disabled";
 
                     // Ping again so scripts can determine if we're active without waiting
                     _ping( true );
@@ -581,50 +599,61 @@ namespace mongo {
                            << "waitForDelete: " << waitForDelete
                            << ", secondaryThrottle: "
                            << (writeConcern.get() ? writeConcern->toBSON().toString() : "default")
-                           << endl;
+                          ;
 
                     vector<shared_ptr<MigrateInfo>> candidateChunks;
-                    _doBalanceRound( conn.conn() , &candidateChunks );
-                    if ( candidateChunks.size() == 0 ) {
-                        LOG(1) << "no need to move any chunk" << endl;
+                    _doBalanceRound(conn.conn(), &candidateChunks);
+
+                    if (candidateChunks.size() == 0) {
+                        LOG(1) << "no need to move any chunk";
                         _balancedLastTime = 0;
                     }
                     else {
-                        _balancedLastTime = _moveChunks(&candidateChunks,
+                        _balancedLastTime = _moveChunks(candidateChunks,
                                                         writeConcern.get(),
-                                                        waitForDelete );
+                                                        waitForDelete);
                     }
 
-                    actionLog.setDetails( _buildDetails( false, balanceRoundTimer.millis(),
-                        static_cast<int>(candidateChunks.size()), _balancedLastTime, "") );
+                    actionLog.setDetails(
+                        _buildDetails(false,
+                                      balanceRoundTimer.millis(),
+                                      static_cast<int>(candidateChunks.size()),
+                                      _balancedLastTime,
+                                      ""));
                     actionLog.setTime(jsTime());
 
                     grid.catalogManager()->logAction(actionLog);
 
-                    LOG(1) << "*** end of balancing round" << endl;
+                    LOG(1) << "*** end of balancing round";
                 }
 
                 // Ping again so scripts can determine if we're active without waiting
-                _ping( true );
+                _ping(true);
                 
                 conn.done();
 
-                sleepsecs( _balancedLastTime ? sleepTime / 10 : sleepTime );
+                sleepsecs(_balancedLastTime ? sleepTime / 10 : sleepTime);
             }
             catch ( std::exception& e ) {
-                log() << "caught exception while doing balance: " << e.what() << endl;
+                log() << "caught exception while doing balance: " << e.what();
 
                 // Just to match the opening statement if in log level 1
-                LOG(1) << "*** End of balancing round" << endl;
+                LOG(1) << "*** End of balancing round";
 
                 // This round failed, tell the world!
-                actionLog.setDetails( _buildDetails( true, balanceRoundTimer.millis(),
-                    0, 0, e.what()) );
+                actionLog.setDetails(
+                    _buildDetails(true,
+                                  balanceRoundTimer.millis(),
+                                  0,
+                                  0,
+                                  e.what()));
                 actionLog.setTime(jsTime());
 
                 grid.catalogManager()->logAction(actionLog);
 
-                sleepsecs( sleepTime ); // sleep a fair amount b/c of error
+                // Sleep a fair amount before retrying because of the error
+                sleepsecs(sleepTime);
+
                 continue;
             }
         }

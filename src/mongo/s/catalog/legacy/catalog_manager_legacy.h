@@ -94,12 +94,18 @@ namespace mongo {
 
         virtual Status dropCollection(const std::string& collectionNs);
 
-        virtual void getDatabasesForShard(const std::string& shardName,
-                                          std::vector<std::string>* dbs);
+        Status getDatabasesForShard(const std::string& shardName,
+                                    std::vector<std::string>* dbs) final;
 
         virtual Status getChunks(const Query& query,
                                  int nToReturn,
                                  std::vector<ChunkType>* chunks);
+
+        Status getTagsForCollection(const std::string& collectionNs,
+                                    std::vector<TagsType>* tags) final;
+
+        StatusWith<std::string> getTagForChunk(const std::string& collectionNs,
+                                               const ChunkType& chunk) final;
 
         virtual Status getAllShards(std::vector<ShardType>* shards);
 

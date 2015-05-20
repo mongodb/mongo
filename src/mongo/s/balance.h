@@ -102,7 +102,7 @@ namespace mongo {
          * @param waitForDelete wait for deletes to complete after each chunk move
          * @return number of chunks effectively moved
          */
-        int _moveChunks(const std::vector<boost::shared_ptr<MigrateInfo>>* candidateChunks,
+        int _moveChunks(const std::vector<boost::shared_ptr<MigrateInfo>>& candidateChunks,
                         const WriteConcernOptions* writeConcern,
                         bool waitForDelete);
 
