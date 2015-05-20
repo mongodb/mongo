@@ -100,7 +100,7 @@ __wt_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize,
 	WT_CONNECTION_IMPL *conn;
 	WT_LOG *log;
 	WT_LOGSLOT *slot;
-	int64_t cur_state, new_state, old_state;
+	int64_t new_state, old_state;
 	uint32_t allocated_slot, slot_grow_attempts;
 
 	conn = S2C(session);
@@ -143,13 +143,11 @@ join_slot:
 		}
 		goto find_slot;
 	}
-	cur_state = WT_ATOMIC_CAS_VAL8(slot->slot_state, old_state, new_state);
 	/*
 	 * We lost a race to add our size into this slot.  Check the state
 	 * and try again.
 	 */
-	if (cur_state != old_state) {
-		old_state = cur_state;
+	if (!WT_ATOMIC_CAS8(slot->slot_state, old_state, new_state)) {
 		WT_STAT_FAST_CONN_INCR(session, log_slot_races);
 		goto join_slot;
 	}
@@ -364,14 +362,14 @@ __wt_log_slot_grow_buffers(WT_SESSION_IMPL *session, size_t newsize)
 		if (slot->slot_buf.memsize > (10 * newsize) &&
 		    !F_ISSET(slot, WT_SLOT_BUF_GROW))
 			continue;
-		orig_state = WT_ATOMIC_CAS_VAL8(
-		    slot->slot_state, WT_LOG_SLOT_FREE, WT_LOG_SLOT_PENDING);
-		if (orig_state != WT_LOG_SLOT_FREE) {
-			orig_state = WT_ATOMIC_CAS_VAL8(slot->slot_state,
-			    WT_LOG_SLOT_READY, WT_LOG_SLOT_PENDING);
-			if (orig_state != WT_LOG_SLOT_READY)
-				continue;
-		}
+		if (WT_ATOMIC_CAS8(
+		    slot->slot_state, WT_LOG_SLOT_FREE, WT_LOG_SLOT_PENDING))
+			orig_state = WT_LOG_SLOT_FREE;
+		else if (WT_ATOMIC_CAS8(
+		    slot->slot_state, WT_LOG_SLOT_READY, WT_LOG_SLOT_PENDING))
+			orig_state = WT_LOG_SLOT_READY;
+		else
+			continue;
 
 		/* We have a slot - now go ahead and grow the buffer. */
 		old_size = slot->slot_buf.memsize;
