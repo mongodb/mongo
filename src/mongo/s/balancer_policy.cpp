@@ -38,9 +38,9 @@
 #include "mongo/client/connpool.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/type_tags.h"
 #include "mongo/util/log.h"
 #include "mongo/util/stringutils.h"
 
@@ -303,6 +303,37 @@ namespace mongo {
 
             (*shardToChunksMap)[shardName].push_back(chunk);
         }
+    }
+
+    StatusWith<string> DistributionStatus::getTagForSingleChunk(const string& configServer,
+                                                                const string& ns,
+                                                                const ChunkType& chunk) {
+        BSONObj tagRangeDoc;
+
+        try {
+            ScopedDbConnection conn(configServer, 30);
+
+            Query query(QUERY(TagsType::ns(ns)
+                              << TagsType::min() << BSON("$lte" << chunk.getMin())
+                              << TagsType::max() << BSON("$gte" << chunk.getMax())));
+            tagRangeDoc = conn->findOne(TagsType::ConfigNS, query);
+            conn.done();
+        }
+        catch (const DBException& excep) {
+            return StatusWith<string>(excep.toStatus());
+        }
+
+        if (tagRangeDoc.isEmpty()) {
+            return StatusWith<string>("");
+        }
+
+        TagsType tagRange;
+        string errMsg;
+        if (!tagRange.parseBSON(tagRangeDoc, &errMsg)) {
+            return StatusWith<string>(ErrorCodes::FailedToParse, errMsg);
+        }
+
+        return StatusWith<string>(tagRange.getTag());
     }
 
     MigrateInfo* BalancerPolicy::balance( const string& ns,

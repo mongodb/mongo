@@ -202,6 +202,15 @@ namespace mongo {
                                              const ChunkManager& chunkMgr,
                                              ShardToChunksMap* shardToChunksMap);
 
+        /**
+         * Returns the tag of the given chunk by querying the config server.
+         *
+         * TODO: add a way to incrementally update chunk tags metadata so this is not needed.
+         */
+        static StatusWith<std::string> getTagForSingleChunk(const std::string& configServer,
+                                                            const std::string& ns,
+                                                            const ChunkType& chunk);
+
     private:
         const ShardInfoMap& _shardInfo;
         const ShardToChunksMap& _shardChunks;

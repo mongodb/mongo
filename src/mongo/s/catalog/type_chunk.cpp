@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2012-2015 MongoDB Inc.
+ *    Copyright (C) 2012 10gen Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -17,13 +17,13 @@
  *    code of portions of this program with the OpenSSL library under certain
  *    conditions as described in each individual source file and distribute
  *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the GNU Affero General Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
  */
 
 #include "mongo/platform/basic.h"
@@ -154,26 +154,28 @@ namespace mongo {
                           str::stream() << "missing " << shard.name() << " field");
         }
 
+        // NOTE: all the following semantic checks should eventually become the caller's
+        // responsibility, and should be moved out of this class completely
+
         // 'min' and 'max' must share the same fields.
         if (_min->nFields() != _max->nFields()) {
-            return Status(ErrorCodes::BadValue,
+            return Status(ErrorCodes::FailedToParse,
                           str::stream() << "min and max have a different number of keys");
         }
-
         BSONObjIterator minIt(getMin());
         BSONObjIterator maxIt(getMax());
         while (minIt.more() && maxIt.more()) {
             BSONElement minElem = minIt.next();
             BSONElement maxElem = maxIt.next();
             if (strcmp(minElem.fieldName(), maxElem.fieldName())) {
-                return Status(ErrorCodes::BadValue,
+                return Status(ErrorCodes::FailedToParse,
                               str::stream() << "min and max must have the same set of keys");
             }
         }
 
         // 'max' should be greater than 'min'.
         if (_min->woCompare(getMax()) >= 0) {
-            return Status(ErrorCodes::BadValue,
+            return Status(ErrorCodes::FailedToParse,
                           str::stream() << "max key must be greater than min key");
         }
 

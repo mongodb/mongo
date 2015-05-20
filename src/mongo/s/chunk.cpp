@@ -94,15 +94,19 @@ namespace {
         map<string, vector<ChunkType>> shardToChunkMap;
         DistributionStatus::populateShardToChunksMap(shardInfo, *chunkMgr, &shardToChunkMap);
 
-        StatusWith<string> tagStatus = grid.catalogManager()->getTagForChunk(manager.getns(),
-                                                                             chunk);
+        DistributionStatus chunkDistribution(shardInfo, shardToChunkMap);
+
+        const string configServerStr = configServer.getConnectionString().toString();
+        StatusWith<string> tagStatus =
+                DistributionStatus::getTagForSingleChunk(configServerStr,
+                                                         manager.getns(),
+                                                         chunk);
         if (!tagStatus.isOK()) {
             warning() << "Not auto-moving chunk because of an error encountered while "
                       << "checking tag for chunk: " << tagStatus.getStatus();
             return false;
         }
 
-        DistributionStatus chunkDistribution(shardInfo, shardToChunkMap);
         const string newLocation(
                 chunkDistribution.getBestReceieverShard(tagStatus.getValue()));
 
