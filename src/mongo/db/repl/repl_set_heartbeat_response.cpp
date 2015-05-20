@@ -236,13 +236,13 @@ namespace {
             Status status = bsonExtractTimestampField(opTime, kTimestampFieldName, &ts);
             if (!status.isOK())
                 return status;
-            long long term;
-            status = bsonExtractIntegerField(opTime, kTermFieldName, &term);
+            long long extractedTerm;
+            status = bsonExtractIntegerField(opTime, kTermFieldName, &extractedTerm);
             if (!status.isOK())
                 return status;
 
             _opTimeSet = true;
-            _opTime = OpTime(ts, term);
+            _opTime = OpTime(ts, extractedTerm);
             // since a v1 OpTime was in the response, the member must be part of a replset
             _isReplSet = true;
         }
