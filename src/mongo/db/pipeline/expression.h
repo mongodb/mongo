@@ -454,6 +454,15 @@ public:
 };
 
 
+class ExpressionArray final : public ExpressionVariadic<ExpressionArray> {
+public:
+    // virtuals from ExpressionNary
+    Value evaluateInternal(Variables* vars) const final;
+    Value serialize(bool explain) const final;
+    const char* getOpName() const final;
+};
+
+
 class ExpressionArrayElemAt final : public ExpressionFixedArity<ExpressionArrayElemAt, 2> {
 public:
     Value evaluateInternal(Variables* vars) const final;

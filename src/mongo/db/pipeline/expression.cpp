@@ -270,6 +270,10 @@ intrusive_ptr<Expression> Expression::parseObject(BSONObj obj,
                         fieldName, ExpressionFieldPath::parse(fieldElement.str(), vps));
                     break;
                 }
+                case Array:
+                    pExpressionObject->addField(fieldName,
+                                                ExpressionArray::parse(fieldElement, vps));
+                    break;
                 case Bool:
                 case NumberDouble:
                 case NumberLong:
@@ -345,6 +349,8 @@ intrusive_ptr<Expression> Expression::parseOperand(BSONElement exprElement,
     } else if (type == Object) {
         ObjectCtx oCtx(ObjectCtx::DOCUMENT_OK);
         return Expression::parseObject(exprElement.Obj(), &oCtx, vps);
+    } else if (type == Array) {
+        return ExpressionArray::parse(exprElement, vps);
     } else {
         return ExpressionConstant::parse(exprElement, vps);
     }
@@ -556,6 +562,32 @@ Value ExpressionAnyElementTrue::evaluateInternal(Variables* vars) const {
 REGISTER_EXPRESSION(anyElementTrue, ExpressionAnyElementTrue::parse);
 const char* ExpressionAnyElementTrue::getOpName() const {
     return "$anyElementTrue";
+}
+
+/* ---------------------- ExpressionArray --------------------------- */
+
+Value ExpressionArray::evaluateInternal(Variables* vars) const {
+    vector<Value> values;
+    values.reserve(vpOperand.size());
+    for (auto&& expr : vpOperand) {
+        Value elemVal = expr->evaluateInternal(vars);
+        values.push_back(elemVal.missing() ? Value(BSONNULL) : std::move(elemVal));
+    }
+    return Value(std::move(values));
+}
+
+Value ExpressionArray::serialize(bool explain) const {
+    vector<Value> expressions;
+    expressions.reserve(vpOperand.size());
+    for (auto&& expr : vpOperand) {
+        expressions.push_back(expr->serialize(explain));
+    }
+    return Value(std::move(expressions));
+}
+
+const char* ExpressionArray::getOpName() const {
+    // This should never be called, but is needed to inherit from ExpressionNary.
+    return "$array";
 }
 
 /* ------------------------- ExpressionArrayElemAt -------------------------- */
