@@ -140,6 +140,7 @@ __nsnap_drop_to(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *name)
 	WT_NAMED_SNAPSHOT *last, *nsnap;
 	WT_TXN_GLOBAL *txn_global;
 
+	last = nsnap = NULL;
 	txn_global = &S2C(session)->txn_global;
 
 	WT_RET(__wt_writelock(session, txn_global->nsnap_rwlock));
