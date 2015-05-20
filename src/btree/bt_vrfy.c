@@ -118,15 +118,22 @@ __verify_config_offsets(WT_SESSION_IMPL *session, const char *cfg[], int *quitp)
 static int
 __verify_tree_shape(WT_SESSION_IMPL *session, WT_VSTUFF *vs)
 {
+	uint32_t total;
 	size_t i;
 
-	WT_RET(__wt_msg(session, "Internal page tree-depth:"));
+	for (i = 0, total = 0; i < WT_ELEMENTS(vs->depth_internal); ++i)
+		total += vs->depth_internal[i];
+	WT_RET(__wt_msg(
+	    session, "Internal page tree-depth (total %" PRIu32 "):", total));
 	for (i = 0; i < WT_ELEMENTS(vs->depth_internal); ++i)
 		if (vs->depth_internal[i] != 0)
 			WT_RET(__wt_msg(session,
 			    "\t%03zu: %u", i, vs->depth_internal[i]));
 
-	WT_RET(__wt_msg(session, "Leaf page tree-depth:"));
+	for (i = 0, total = 0; i < WT_ELEMENTS(vs->depth_leaf); ++i)
+		total += vs->depth_leaf[i];
+	WT_RET(__wt_msg(
+	    session, "Leaf page tree-depth (total %" PRIu32 "):", total));
 	for (i = 0; i < WT_ELEMENTS(vs->depth_leaf); ++i)
 		if (vs->depth_leaf[i] != 0)
 			WT_RET(__wt_msg(session,
