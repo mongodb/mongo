@@ -56,7 +56,8 @@ main(void)
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
 	int i, record_count, ret;
-	char cmd_buf[256], *conf, k[16], v[16];
+	char cmd_buf[256], k[16], v[16];
+	const char *conf;
 
 	snprintf(cmd_buf, sizeof(cmd_buf), "rm -rf %s && mkdir %s",
 	    home, home);
