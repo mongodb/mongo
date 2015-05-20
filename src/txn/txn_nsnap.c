@@ -156,6 +156,9 @@ __wt_txn_nsnap_get(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *nameval)
 		    "Named snapshot '%.*s' not found",
 		    (int)nameval->len, nameval->str);
 
+	/* Flag that this transaction is opened on a named snapshot */
+	F_SET(txn, WT_TXN_NAMED_SNAPSHOT);
+
 	return (0);
 }
 

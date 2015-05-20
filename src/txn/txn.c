@@ -346,12 +346,13 @@ __wt_txn_config(WT_SESSION_IMPL *session, const char *cfg[])
 
 	WT_RET(__wt_config_gets_def(session, cfg, "snapshot", 0, &cval));
 	if (cval.len > 0)
+		/*
+		 * The layering here isn't ideal - the named snapshot get
+		 * function does both validation and setup. Otherwise we'd
+		 * need to walk the list of named snapshots twice during
+		 * transaction open.
+		 */
 		WT_RET(__wt_txn_nsnap_get(session, &cval));
-	else if (txn->isolation == WT_TXN_ISO_SNAPSHOT) {
-		if (session->ncursors > 0)
-			WT_RET(__wt_session_copy_values(session));
-		__wt_txn_get_snapshot(session);
-	}
 
 	return (0);
 }
