@@ -238,6 +238,8 @@ namespace {
             // If a time limit was set on the pipeline, remaining time is "rolled over" to the
             // cursor (for use by future getmore ops).
             cursor->setLeftoverMaxTimeMicros( cc().curop()->getRemainingMaxTimeMicros() );
+
+            cc().curop()->debug().cursorid = cursor->cursorid();
         }
 
         BSONObjBuilder cursorObj(result.subobjStart("cursor"));
@@ -333,7 +335,11 @@ namespace {
                 }
 
                 if (collection) {
-                    ClientCursor* cursor = new ClientCursor(collection, runnerHolder.release());
+                    ClientCursor* cursor = new ClientCursor(collection,
+                                                            runnerHolder.release(),
+                                                            0, /* queryOptions */
+                                                            cmdObj.getOwned());
+
                     cursor->isAggCursor = true; // enable special locking behavior
                     pin.reset(new ClientCursorPin(collection, cursor->cursorid()));
                     // Don't add any code between here and the start of the try block.
