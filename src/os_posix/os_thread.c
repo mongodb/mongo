@@ -49,12 +49,15 @@ __wt_thread_id(char *buf, size_t buflen)
 	pthread_t self;
 
 	/*
-	 * POSIX 1003.1 allows pthread_t to be an opaque type, but on systems
-	 * where it's a pointer, we'd rather print out the pointer and match
-	 * gdb output. Since we don't yet run on any systems where pthread_t
-	 * is not a pointer, do it that way for now.
+	 * POSIX 1003.1 allows pthread_t to be an opaque type; on systems where
+	 * it's a pointer, print the pointer to match gdb output.
 	 */
 	self = pthread_self();
+#ifdef __sun
 	(void)snprintf(buf, buflen,
-	    "%" PRIu64 ":%p", (uint64_t)getpid(), (void *)self);
+	    "%" PRIuMAX ":%u", (uintmax_t)getpid(), self);
+#else
+	(void)snprintf(buf, buflen,
+	    "%" PRIuMAX ":%p", (uintmax_t)getpid(), (void *)self);
+#endif
 }

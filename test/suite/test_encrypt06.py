@@ -130,7 +130,7 @@ class test_encrypt06(wttest.WiredTigerTestCase):
 
 
     def match_string_in_file(self, fname, match):
-        with open(fname, 'r') as f:
+        with open(fname, 'rb') as f:
             return (f.read().find(match) != -1)
 
     def match_string_in_rundir(self, match):

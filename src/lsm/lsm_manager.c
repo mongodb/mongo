@@ -652,8 +652,10 @@ int
 __wt_lsm_manager_push_entry(WT_SESSION_IMPL *session,
     uint32_t type, uint32_t flags, WT_LSM_TREE *lsm_tree)
 {
+	WT_DECL_RET;
 	WT_LSM_MANAGER *manager;
 	WT_LSM_WORK_UNIT *entry;
+	int pushed;
 
 	manager = &S2C(session)->lsm_manager;
 
@@ -672,13 +674,27 @@ __wt_lsm_manager_push_entry(WT_SESSION_IMPL *session,
 		break;
 	}
 
-	WT_RET(__wt_epoch(session, &lsm_tree->work_push_ts));
+	/*
+	 * Don't allow any work units unless a tree is active, this avoids
+	 * races on shutdown between clearing out queues and pushing new
+	 * work units.
+	 *
+	 * Increment the queue reference before checking the flag since
+	 * on close, the flag is cleared and then the queue reference count
+	 * is checked.
+	 */
+	(void)WT_ATOMIC_ADD4(lsm_tree->queue_ref, 1);
+	if (!F_ISSET(lsm_tree, WT_LSM_TREE_ACTIVE)) {
+		(void)WT_ATOMIC_SUB4(lsm_tree->queue_ref, 1);
+		return (0);
+	}
 
-	WT_RET(__wt_calloc_one(session, &entry));
+	pushed = 0;
+	WT_ERR(__wt_epoch(session, &lsm_tree->work_push_ts));
+	WT_ERR(__wt_calloc_one(session, &entry));
 	entry->type = type;
 	entry->flags = flags;
 	entry->lsm_tree = lsm_tree;
-	(void)WT_ATOMIC_ADD4(lsm_tree->queue_ref, 1);
 	WT_STAT_FAST_CONN_INCR(session, lsm_work_units_created);
 
 	if (type == WT_LSM_WORK_SWITCH)
@@ -690,8 +706,12 @@ __wt_lsm_manager_push_entry(WT_SESSION_IMPL *session,
 	else
 		LSM_PUSH_ENTRY(&manager->appqh,
 		    &manager->app_lock, lsm_work_queue_app);
+	pushed = 1;
 
-	WT_RET(__wt_cond_signal(session, manager->work_cond));
-
+	WT_ERR(__wt_cond_signal(session, manager->work_cond));
 	return (0);
+err:
+	if (!pushed)
+		(void)WT_ATOMIC_SUB4(lsm_tree->queue_ref, 1);
+	return (ret);
 }

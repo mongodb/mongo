@@ -273,7 +273,7 @@ __txn_log_recover(WT_SESSION_IMPL *session,
 
 	WT_UNUSED(next_lsnp);
 	r = cookie;
-	p = LOG_SKIP_HEADER(logrec->data);
+	p = WT_LOG_SKIP_HEADER(logrec->data);
 	end = (const uint8_t *)logrec->data + logrec->size;
 	WT_UNUSED(firstrecord);
 

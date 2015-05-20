@@ -123,7 +123,7 @@ fop(void *arg)
 			break;
 		case 3:
 			++s->drop;
-			obj_drop();
+			obj_drop(__wt_random(rnd) & 1);
 			break;
 		case 4:
 			++s->ckpt;
@@ -139,11 +139,11 @@ fop(void *arg)
 			break;
 		case 7:
 			++s->bulk_unique;
-			obj_bulk_unique();
+			obj_bulk_unique(__wt_random(rnd) & 1);
 			break;
 		case 8:
 			++s->create_unique;
-			obj_create_unique();
+			obj_create_unique(__wt_random(rnd) & 1);
 			break;
 		}
 

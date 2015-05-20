@@ -616,8 +616,7 @@ __extractor_confchk(
 	WT_CONNECTION_IMPL *conn;
 	WT_NAMED_EXTRACTOR *nextractor;
 
-	if (extractorp != NULL)
-		*extractorp = NULL;
+	*extractorp = NULL;
 
 	if (cname->len == 0 || WT_STRING_MATCH("none", cname->str, cname->len))
 		return (0);
@@ -625,22 +624,11 @@ __extractor_confchk(
 	conn = S2C(session);
 	TAILQ_FOREACH(nextractor, &conn->extractorqh, q)
 		if (WT_STRING_MATCH(nextractor->name, cname->str, cname->len)) {
-			if (extractorp != NULL)
-				*extractorp = nextractor->extractor;
+			*extractorp = nextractor->extractor;
 			return (0);
 		}
 	WT_RET_MSG(session, EINVAL,
 	    "unknown extractor '%.*s'", (int)cname->len, cname->str);
-}
-
-/*
- * __wt_extractor_confchk --
- *     Check for a valid custom extractor (public).
- */
-int
-__wt_extractor_confchk(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cname)
-{
-	return (__extractor_confchk(session, cname, NULL));
 }
 
 /*

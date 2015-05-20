@@ -44,7 +44,6 @@
 #include <unistd.h>
 #endif
 
-#include "wt_internal.h"			/* For __wt_XXX */
 #include "test_util.i"
 
 extern WT_CONNECTION *conn;			/* WiredTiger connection */
@@ -58,11 +57,11 @@ extern pthread_rwlock_t single;			/* Single-thread */
 
 int  fop_start(u_int);
 void obj_bulk(void);
-void obj_bulk_unique(void);
+void obj_bulk_unique(int);
 void obj_checkpoint(void);
 void obj_create(void);
-void obj_create_unique(void);
+void obj_create_unique(int);
 void obj_cursor(void);
-void obj_drop(void);
+void obj_drop(int);
 void obj_upgrade(void);
 void obj_verify(void);
