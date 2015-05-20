@@ -124,23 +124,23 @@ namespace mongo {
 
     DBClientBase* getVersionable(DBClientBase* conn) {
         switch (conn->type()) {
-        case ConnectionString::SET:
-            DBClientReplicaSet* set = static_cast<DBClientReplicaSet*>(conn);
-            return &(set->masterConn());
-        case ConnectionString::MASTER:
-            return conn;
         case ConnectionString::INVALID:
             massert(15904, str::stream() << "cannot set version on invalid connection "
                                          << conn->toString(), false);
-            return NULL;
+            return nullptr;
+        case ConnectionString::MASTER:
+            return conn;
         case ConnectionString::SYNC:
             massert(15906, str::stream() << "cannot set version or shard on sync connection "
                                          << conn->toString(), false);
-            return NULL;
+            return nullptr;
         case ConnectionString::CUSTOM:
             massert(16334, str::stream() << "cannot set version or shard on custom connection "
                                          << conn->toString(), false);
-            return NULL;
+            return nullptr;
+        case ConnectionString::SET:
+            DBClientReplicaSet* set = (DBClientReplicaSet*)conn;
+            return &(set->masterConn());
         }
 
         MONGO_UNREACHABLE;
