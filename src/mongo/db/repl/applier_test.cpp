@@ -28,11 +28,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <boost/thread/barrier.hpp>
-#include <boost/thread/condition.hpp>
-#include <boost/thread/lock_guard.hpp>
-#include <boost/thread/lock_types.hpp>
-#include <boost/thread/mutex.hpp>
 #include <memory>
 
 #include "mongo/db/jsobj.h"
@@ -41,6 +36,9 @@
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/replication_executor_test_fixture.h"
 #include "mongo/platform/compiler.h"
+#include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/unittest/barrier.h"
 
 namespace {
 
@@ -68,7 +66,7 @@ namespace {
         void _testApplyOperationFailed(size_t opIndex, stdx::function<Status ()> fail);
 
         std::unique_ptr<Applier> _applier;
-        std::unique_ptr<boost::barrier> _barrier;
+        std::unique_ptr<unittest::Barrier> _barrier;
     };
 
     Status ApplierTest::getDetectableErrorStatus() {
@@ -84,7 +82,7 @@ namespace {
                                    apply,
                                    [this](const StatusWith<Timestamp>&, const Operations&) {
             if (_barrier.get()) {
-                _barrier->count_down_and_wait();
+                _barrier->countDownAndWait();
             }
         }));
     }
@@ -132,22 +130,22 @@ namespace {
     TEST_F(ApplierTest, IsActiveAfterStart) {
         // Use a barrier to ensure that the callback blocks while
         // we check isActive().
-        _barrier.reset(new boost::barrier(2U));
+        _barrier.reset(new unittest::Barrier(2U));
         ASSERT_FALSE(getApplier()->isActive());
         ASSERT_OK(getApplier()->start());
         ASSERT_TRUE(getApplier()->isActive());
-        _barrier->count_down_and_wait();
+        _barrier->countDownAndWait();
     }
 
     TEST_F(ApplierTest, StartWhenActive) {
         // Use a barrier to ensure that the callback blocks while
         // we check isActive().
-        _barrier.reset(new boost::barrier(2U));
+        _barrier.reset(new unittest::Barrier(2U));
         ASSERT_OK(getApplier()->start());
         ASSERT_TRUE(getApplier()->isActive());
         ASSERT_NOT_OK(getApplier()->start());
         ASSERT_TRUE(getApplier()->isActive());
-        _barrier->count_down_and_wait();
+        _barrier->countDownAndWait();
     }
 
     TEST_F(ApplierTest, CancelWithoutStart) {
@@ -171,10 +169,10 @@ namespace {
     TEST_F(ApplierTest, CancelBeforeStartingDBWork) {
         // Schedule a blocking DB work item before the applier to allow us to cancel the applier
         // work item before the executor runs it.
-        boost::barrier barrier(2U);
+        unittest::Barrier barrier(2U);
         using CallbackData = ReplicationExecutor::CallbackData;
         getExecutor().scheduleDBWork([&](const CallbackData& cbd) {
-            barrier.count_down_and_wait(); // generation 0
+            barrier.countDownAndWait(); // generation 0
         });
         const BSONObj operation = BSON("ts" << Timestamp(Seconds(123), 0));
         boost::mutex mutex;
@@ -194,7 +192,7 @@ namespace {
         getApplier()->cancel();
         ASSERT_TRUE(getApplier()->isActive());
 
-        barrier.count_down_and_wait(); // generation 0
+        barrier.countDownAndWait(); // generation 0
 
         getApplier()->wait();
         ASSERT_FALSE(getApplier()->isActive());
@@ -208,10 +206,10 @@ namespace {
     TEST_F(ApplierTest, DestroyBeforeStartingDBWork) {
         // Schedule a blocking DB work item before the applier to allow us to destroy the applier
         // before the executor runs the work item.
-        boost::barrier barrier(2U);
+        unittest::Barrier barrier(2U);
         using CallbackData = ReplicationExecutor::CallbackData;
         getExecutor().scheduleDBWork([&](const CallbackData& cbd) {
-            barrier.count_down_and_wait(); // generation 0
+            barrier.countDownAndWait(); // generation 0
             // Give the main thread a head start in invoking the applier destructor.
             sleepmillis(1);
         });
@@ -232,7 +230,7 @@ namespace {
         getApplier()->start();
         ASSERT_TRUE(getApplier()->isActive());
 
-        barrier.count_down_and_wait(); // generation 0
+        barrier.countDownAndWait(); // generation 0
 
         // It is possible the executor may have invoked the callback before we
         // destroy the applier. Therefore both OK and CallbackCanceled are acceptable
@@ -277,7 +275,7 @@ namespace {
 
     TEST_F(ApplierTest, DestroyShouldBlockUntilInactive) {
         const Timestamp timestamp(Seconds(123), 0);
-        boost::barrier barrier(2U);
+        unittest::Barrier barrier(2U);
         boost::mutex mutex;
         StatusWith<Timestamp> result = getDetectableErrorStatus();
         Applier::Operations operations;
@@ -289,11 +287,11 @@ namespace {
             boost::lock_guard<boost::mutex> lock(mutex);
             result = theResult;
             operations = theOperations;
-            barrier.count_down_and_wait();
+            barrier.countDownAndWait();
         }));
 
         getApplier()->start();
-        barrier.count_down_and_wait();
+        barrier.countDownAndWait();
         _applier.reset();
 
         boost::lock_guard<boost::mutex> lock(mutex);

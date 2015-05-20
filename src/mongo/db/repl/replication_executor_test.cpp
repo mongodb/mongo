@@ -30,7 +30,6 @@
 
 #include <map>
 #include <boost/scoped_ptr.hpp>
-#include <boost/thread/barrier.hpp>
 #include <boost/thread/thread.hpp>
 
 #include "mongo/db/namespace_string.h"
@@ -39,6 +38,7 @@
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/replication_executor_test_fixture.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/unittest/barrier.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/map_util.h"
@@ -383,7 +383,7 @@ namespace {
     }
 
     TEST_F(ReplicationExecutorTest, ScheduleDBWorkAndExclusiveWorkConcurrently) {
-        boost::barrier barrier(2U);
+        unittest::Barrier barrier(2U);
         NamespaceString nss("mydb", "mycoll");
         ReplicationExecutor& executor = getExecutor();
         Status status1(ErrorCodes::InternalError, "Not mutated");
@@ -392,13 +392,13 @@ namespace {
         ASSERT_OK(executor.scheduleDBWork([&](const CallbackData& cbData) {
             status1 = cbData.status;
             txn = cbData.txn;
-            barrier.count_down_and_wait();
+            barrier.countDownAndWait();
             if (cbData.status != ErrorCodes::CallbackCanceled) {
                 cbData.executor->shutdown();
             }
         }).getStatus());
         ASSERT_OK(executor.scheduleWorkWithGlobalExclusiveLock([&](const CallbackData& cbData) {
-            barrier.count_down_and_wait();
+            barrier.countDownAndWait();
         }).getStatus());
         executor.run();
         ASSERT_OK(status1);

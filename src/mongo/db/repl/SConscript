@@ -62,6 +62,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'replication_executor_test_fixture',
+        '$BUILD_DIR/mongo/unittest/concurrency',
     ],
 )
 
@@ -466,6 +467,7 @@ env.Library(
     ],
     LIBDEPS=[
         'task_runner',
+        '$BUILD_DIR/mongo/unittest/concurrency',
         '$BUILD_DIR/mongo/util/decorable',
     ],
 )
@@ -539,5 +541,6 @@ env.CppUnitTest(
     LIBDEPS=[
         'applier',
         'replication_executor_test_fixture',
+        '$BUILD_DIR/mongo/unittest/concurrency',
     ],
 )
