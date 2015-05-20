@@ -33,6 +33,7 @@
 
 #include <boost/noncopyable.hpp>
 
+#include "mongo/base/disallow_copying.h"
 #include "mongo/db/client.h"
 #include "mongo/db/server_options.h"
 #include "mongo/platform/atomic_word.h"
@@ -193,10 +194,10 @@ namespace mongo {
     /* Current operation (for the current Client).
        an embedded member of Client class, and typically used from within the mutex there.
     */
-    class CurOp : boost::noncopyable {
+    class CurOp {
+        MONGO_DISALLOW_COPYING(CurOp);
     public:
-        static CurOp* get(const Client* client);
-        static CurOp* get(const Client& client);
+        static CurOp* getFromClient(const Client* client);
         static CurOp* get(const OperationContext* opCtx);
         static CurOp* get(const OperationContext& opCtx);
 

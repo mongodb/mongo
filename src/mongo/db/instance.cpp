@@ -242,7 +242,7 @@ namespace {
 
         rpc::LegacyRequest request{&message};
 
-        CurOp* op = CurOp::get(client);
+        CurOp* op = CurOp::get(txn);
 
         std::unique_ptr<Message> response(new Message());
 
@@ -398,7 +398,7 @@ namespace {
         QueryMessage q(d);
         auto_ptr< Message > resp( new Message() );
 
-        CurOp& op = *CurOp::get(c);
+        CurOp& op = *CurOp::get(txn);
 
         try {
             Client* client = txn->getClient();
@@ -517,11 +517,11 @@ namespace {
         }
 
         scoped_ptr<CurOp> nestedOp;
-        if (CurOp::get(c)->active()) {
+        if (CurOp::get(txn)->active()) {
             nestedOp.reset(new CurOp(&c));
         }
 
-        CurOp& currentOp = *CurOp::get(c);
+        CurOp& currentOp = *CurOp::get(txn);
         currentOp.reset(remote,op);
 
         OpDebug& debug = currentOp.debug();

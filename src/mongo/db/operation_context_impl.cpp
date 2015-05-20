@@ -160,14 +160,14 @@ namespace {
         // Helper function for checkForInterrupt fail point.  Decides whether the operation currently
         // being run by the given Client meet the (probabilistic) conditions for interruption as
         // specified in the fail point info.
-        bool opShouldFail(const Client& c, const BSONObj& failPointInfo) {
+        bool opShouldFail(const OperationContextImpl* opCtx, const BSONObj& failPointInfo) {
             // Only target the client with the specified connection number.
-            if (c.getConnectionId() != failPointInfo["conn"].safeNumberLong()) {
+            if (opCtx->getClient()->getConnectionId() != failPointInfo["conn"].safeNumberLong()) {
                 return false;
             }
 
             // Only target nested operations if requested.
-            if (!failPointInfo["allowNested"].trueValue() && CurOp::get(c)->parent() != NULL) {
+            if (!failPointInfo["allowNested"].trueValue() && CurOp::get(opCtx)->parent() != NULL) {
                 return false;
             }
 
@@ -196,22 +196,22 @@ namespace {
             return Status(ErrorCodes::InterruptedAtShutdown, "interrupted at shutdown");
         }
 
-        Client* c = getClient();
-        if (CurOp::get(c)->maxTimeHasExpired()) {
-            CurOp::get(c)->kill();
+        CurOp* curOp = CurOp::get(this);
+        if (curOp->maxTimeHasExpired()) {
+            curOp->kill();
             return Status(ErrorCodes::ExceededTimeLimit, "operation exceeded time limit");
         }
 
         MONGO_FAIL_POINT_BLOCK(checkForInterruptFail, scopedFailPoint) {
-            if (opShouldFail(*c, scopedFailPoint.getData())) {
+            if (opShouldFail(this, scopedFailPoint.getData())) {
                 log() << "set pending kill on "
-                      << (CurOp::get(c)->parent() ? "nested" : "top-level")
-                      << " op " << CurOp::get(c)->opNum() << ", for checkForInterruptFail";
-                CurOp::get(c)->kill();
+                      << (curOp->parent() ? "nested" : "top-level")
+                      << " op " << curOp->opNum() << ", for checkForInterruptFail";
+                curOp->kill();
             }
         }
 
-        if (CurOp::get(c)->killPending()) {
+        if (curOp->killPending()) {
             return Status(ErrorCodes::Interrupted, "operation was interrupted");
         }
 
