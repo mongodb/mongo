@@ -129,6 +129,8 @@ namespace mongo {
             // cursor (for use by future getmore ops).
             cursor->setLeftoverMaxTimeMicros( txn->getCurOp()->getRemainingMaxTimeMicros() );
 
+            txn->getCurOp()->debug().cursorid = cursor->cursorid();
+
             if (txn->getClient()->isInDirectClient()) {
                 cursor->setUnownedRecoveryUnit(txn->recoveryUnit());
             }
@@ -271,7 +273,7 @@ namespace mongo {
                                                             execHolder.release(),
                                                             nss.ns(),
                                                             0,
-                                                            BSONObj(),
+                                                            cmdObj.getOwned(),
                                                             isAggCursor);
                     pin.reset(new ClientCursorPin(collection->getCursorManager(),
                                                   cursor->cursorid()));
