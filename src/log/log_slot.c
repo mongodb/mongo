@@ -109,6 +109,7 @@ __wt_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize,
 find_slot:
 	allocated_slot = WT_SLOT_ACTIVE == 1 ? 0 :
 	    __wt_random(session->rnd) % WT_SLOT_ACTIVE;
+	WT_BARRIER();
 	slot = log->slot_array[allocated_slot];
 	old_state = slot->slot_state;
 join_slot:
