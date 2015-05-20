@@ -142,10 +142,10 @@ call that created the snapshot.
 
 Named snapshots keep data pinned in cache as if a real transaction were
 running for the time that the named transaction is active.  The resources
-associated with named snapshots are released by calling
+associated with named snapshots should be released by calling
 WT_SESSION::snapshot with a configuration that includes
-<code>"drop=(to=foo)"</code>. All snapshots older than and including the
-name passed to drop will be released and no longer available to read from.
+<code>"drop="</code>. See WT_SESSION::snapshot documentation for details of
+the semantics supported by the drop configuration.
 
 Named snapshots are not durable: they do not survive WT_CONNECTION::close.
  */

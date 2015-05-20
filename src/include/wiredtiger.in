@@ -1468,11 +1468,14 @@ struct __wt_session {
 	 * @snippet ex_all.c Snapshot example
 	 *
 	 * @param session the session handle
-	 * @configstart{session.snapshot, see dist/api_data.py}
+	 * @configstart{WT_SESSION.snapshot, see dist/api_data.py}
 	 * @config{drop = (, if non-empty\, specifies which snapshots to drop.,
 	 * a set of related configuration options defined below.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;to, all snapshots up to and including
-	 * the specified name should be dropped., a string; default \c true.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;names, drop specific named
+	 * snapshots., a list of strings; default empty.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;to, drop all snapshots up to and
+	 * including the specified name.  If the special "all" name is given all
+	 * snapshots will be dropped., a string; default \c true.}
 	 * @config{ ),,}
 	 * @config{name, specify a name for the snapshot., a string; default
 	 * empty.}

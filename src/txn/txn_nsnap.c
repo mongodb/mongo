@@ -25,9 +25,9 @@ __nsnap_destroy(WT_SESSION_IMPL *session, WT_NAMED_SNAPSHOT *nsnap)
  *	Begin an named in-memory snapshot.
  */
 int
-__wt_txn_named_snapshot_begin(WT_SESSION_IMPL *session,
-    WT_CONFIG_ITEM *nameval, const char *cfg[])
+__wt_txn_named_snapshot_begin(WT_SESSION_IMPL *session, const char *cfg[])
 {
+	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
 	WT_NAMED_SNAPSHOT *nsnap, *nsnap_new;
 	WT_TXN *txn;
@@ -36,15 +36,21 @@ __wt_txn_named_snapshot_begin(WT_SESSION_IMPL *session,
 	    { WT_CONFIG_BASE(session, WT_SESSION_begin_transaction),
 	      "isolation=snapshot", NULL };
 
-	WT_ASSERT(session, nameval->len > 0);
-
 	nsnap_new = NULL;
 	txn_global = &S2C(session)->txn_global;
 	txn = &session->txn;
 
 	WT_UNUSED(cfg);
 
-	WT_RET(__wt_name_check(session, nameval->str, nameval->len));
+	WT_RET(__wt_config_gets_def(session, cfg, "name", 0, &cval));
+	if (cval.len == 0)
+		return (0);
+
+	if (WT_STRING_MATCH("all", cval.str, cval.len))
+		WT_RET_MSG(session, EINVAL,
+		    "Can't create named snapshot with reserved \"all\" name");
+
+	WT_RET(__wt_name_check(session, cval.str, cval.len));
 
 	/*
 	 * TODO more config checking -- make sure no checkpoint config
@@ -58,7 +64,7 @@ __wt_txn_named_snapshot_begin(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_calloc_one(session, &nsnap_new));
 	nsnap = nsnap_new;
 	WT_ERR(__wt_strndup(
-	    session, nameval->str, nameval->len, &nsnap->name));
+	    session, cval.str, cval.len, &nsnap->name));
 	nsnap->snap_min = txn->snap_min;
 	nsnap->snap_max = txn->snap_max;
 	if (txn->snapshot_count > 0) {
@@ -88,12 +94,47 @@ err:	if (F_ISSET(txn, WT_TXN_RUNNING))
 }
 
 /*
- * __wt_txn_named_snapshot_drop --
+ * __nsnap_drop_one --
+ *	Drop a single named snapshot
+ */
+static int
+__nsnap_drop_one(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *name)
+{
+	WT_DECL_RET;
+	WT_NAMED_SNAPSHOT *found;
+	WT_TXN_GLOBAL *txn_global;
+
+	txn_global = &S2C(session)->txn_global;
+
+	WT_RET(__wt_writelock(session, txn_global->nsnap_rwlock));
+
+	STAILQ_FOREACH(found, &txn_global->nsnaph, q)
+		if (WT_STRING_MATCH(found->name, name->str, name->len))
+			break;
+
+	if (found == NULL)
+		WT_ERR_MSG(session, EINVAL,
+		    "Named snapshot '%.*s' for drop not found",
+		    (int)name->len, name->str);
+
+	/* Bump the global ID if we are removing the first entry */
+	if (found == STAILQ_FIRST(&txn_global->nsnaph))
+		txn_global->nsnap_oldest_id = (STAILQ_NEXT(found, q) != NULL) ?
+		    STAILQ_NEXT(found, q)->snap_min : WT_TXN_NONE;
+	STAILQ_REMOVE(&txn_global->nsnaph, found, __wt_named_snapshot, q);
+	__nsnap_destroy(session, found);
+
+err:	WT_TRET(__wt_writeunlock(session, txn_global->nsnap_rwlock));
+
+	return (ret);
+}
+
+/*
+ * __nsnap_drop_to --
  *	Drop named snapshots
  */
-int
-__wt_txn_named_snapshot_drop(WT_SESSION_IMPL *session,
-    WT_CONFIG_ITEM *dropval, const char *cfg[])
+static int
+__nsnap_drop_to(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *name)
 {
 	WT_DECL_RET;
 	WT_NAMED_SNAPSHOT *last, *nsnap;
@@ -101,32 +142,72 @@ __wt_txn_named_snapshot_drop(WT_SESSION_IMPL *session,
 
 	txn_global = &S2C(session)->txn_global;
 
-	WT_ASSERT(session, dropval->len != 0);
-	WT_UNUSED(cfg);
-
 	WT_RET(__wt_writelock(session, txn_global->nsnap_rwlock));
 
-	STAILQ_FOREACH(last, &txn_global->nsnaph, q)
-		if (WT_STRING_MATCH(
-		    last->name, dropval->str, dropval->len))
-			break;
+	if (STAILQ_EMPTY(&txn_global->nsnaph))
+		goto err;
 
-	if (last == NULL)
-		WT_ERR_MSG(session, EINVAL,
-		    "Named snapshot '%.*s' for drop not found",
-		    (int)dropval->len, dropval->str);
-
-	txn_global->nsnap_oldest_id = (STAILQ_NEXT(last, q) != NULL) ?
-	    STAILQ_NEXT(last, q)->snap_min : WT_TXN_NONE;
+	/*
+	 * TODO: We are in trouble if this drop exits on error. Maybe we
+	 * should only update the special oldest ID on success, but that's
+	 * likely to leave the state wrong as well (conservatively, rather than
+	 * aggressively though).
+	 */
+	if (WT_STRING_MATCH("all", name->str, name->len))
+		txn_global->nsnap_oldest_id = WT_TXN_NONE;
+	else {
+		STAILQ_FOREACH(last, &txn_global->nsnaph, q)
+			if (WT_STRING_MATCH(last->name, name->str, name->len))
+				break;
+		if (last == NULL)
+			WT_ERR_MSG(session, EINVAL,
+			    "Named snapshot '%.*s' for drop not found",
+			    (int)name->len, name->str);
+		txn_global->nsnap_oldest_id = (STAILQ_NEXT(last, q) != NULL) ?
+		    STAILQ_NEXT(last, q)->snap_min : WT_TXN_NONE;
+	}
 
 	do {
 		nsnap = STAILQ_FIRST(&txn_global->nsnaph);
 		WT_ASSERT(session, nsnap != NULL);
 		STAILQ_REMOVE_HEAD(&txn_global->nsnaph, q);
 		__nsnap_destroy(session, nsnap);
-	} while (nsnap != last);
+	/* Last will be NULL in the all case so it will never match */
+	} while (nsnap != last && !STAILQ_EMPTY(&txn_global->nsnaph));
 
 err:	WT_TRET(__wt_writeunlock(session, txn_global->nsnap_rwlock));
+
+	return (ret);
+}
+
+/*
+ * __wt_txn_named_snapshot_drop --
+ *	Drop named snapshots
+ */
+int
+__wt_txn_named_snapshot_drop(WT_SESSION_IMPL *session, const char *cfg[])
+{
+	WT_CONFIG objectconf;
+	WT_CONFIG_ITEM cval, k, v;
+	WT_DECL_RET;
+
+	WT_RET(__wt_config_gets_def(session, cfg, "drop.to", 0, &cval));
+	if (cval.len != 0)
+		WT_RET(__nsnap_drop_to(session, &cval));
+
+	WT_RET(__wt_config_gets_def(
+	    session, cfg, "drop.names", 0, &cval));
+
+	/* We are done if there are no named drops */
+	if (cval.val == 0)
+		return (0);
+
+	WT_RET(__wt_config_gets(session, cfg, "drop.names", &cval));
+	WT_RET(__wt_config_subinit(session, &objectconf, &cval));
+	while ((ret = __wt_config_next(&objectconf, &k, &v)) == 0)
+		WT_RET(__nsnap_drop_one(session, &k));
+	if (ret == WT_NOTFOUND)
+		ret = 0;
 
 	return (ret);
 }

@@ -865,8 +865,11 @@ methods = {
             if non-empty, specifies which snapshots to drop''',
         type='category', subconfig=[
         Config('to', 'true', r'''
-            all snapshots up to and including the specified name should
-            be dropped'''),
+            drop all snapshots up to and including the specified name.
+            If the special "all" name is given all snapshots will be
+            dropped.'''),
+        Config('names', '', r'''
+            drop specific named snapshots''', type='list'),
     ]),
     Config('name', '', r'''specify a name for the snapshot'''),
 ]),

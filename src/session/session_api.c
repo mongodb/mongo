@@ -927,7 +927,6 @@ err:	F_CLR(session, WT_SESSION_CAN_WAIT | WT_SESSION_NO_CACHE_CHECK);
 static int
 __session_snapshot(WT_SESSION *wt_session, const char *config)
 {
-	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	WT_TXN *txn;
@@ -964,14 +963,10 @@ __session_snapshot(WT_SESSION *wt_session, const char *config)
 	WT_ERR(__wt_session_reset_cursors(session));
 
 	/* Drop any snapshots to be removed first. */
-	WT_ERR(__wt_config_gets_def(session, cfg, "drop.to", 0, &cval));
-	if (cval.len > 0)
-		WT_ERR(__wt_txn_named_snapshot_drop(session, &cval, cfg));
+	WT_ERR(__wt_txn_named_snapshot_drop(session, cfg));
 
 	/* Start the named snapshot if requested. */
-	WT_ERR(__wt_config_gets_def(session, cfg, "name", 0, &cval));
-	if (cval.len > 0)
-		WT_ERR(__wt_txn_named_snapshot_begin(session, &cval, cfg));
+	WT_ERR(__wt_txn_named_snapshot_begin(session, cfg));
 
 err:	API_END_RET_NOTFOUND_MAP(session, ret);
 }
