@@ -437,7 +437,7 @@ __debug_tree_shape_worker(WT_DBG *ds, WT_PAGE *page, int level)
 
 	session = ds->session;
 
-	if (page->type == WT_PAGE_ROW_INT || page->type == WT_PAGE_COL_INT) {
+	if (WT_PAGE_IS_INTERNAL(page)) {
 		__dmsg(ds, "%*s" "I" "%d %s\n",
 		    level * 3, " ", level, __debug_tree_shape_info(page));
 		WT_INTL_FOREACH_BEGIN(session, page, ref) {
