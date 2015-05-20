@@ -4,6 +4,11 @@
         load('jstests/configs/plain_28.config.js');
     }
 
+    if (dump_targets == "archive") {
+        print('skipping test incompatable with archiving');
+        return assert(true);
+    }
+
     // Tests using mongorestore to restore data from a blank collection 
     // file, with both a missing and blank metadata file.
     
@@ -17,7 +22,8 @@
     var ret = toolTest.runTool.apply(
             toolTest,
             ['restore', '--db', 'test',
-            '--collection', 'blank', 'jstests/restore/testdata/blankcoll/blank.bson'].
+            '--collection', 'blank'].
+                concat(getRestoreTarget('jstests/restore/testdata/blankcoll/blank.bson')).
                 concat(commonToolArgs)
     );
     assert.eq(0, ret);
@@ -27,8 +33,8 @@
     // metadata file. it should succeed, but insert nothing.
     ret = toolTest.runTool.apply(
             toolTest,
-            ['restore', '--db', 'test', '--collection', 'blank', 
-            'jstests/restore/testdata/blankcoll/blank_metadata.bson'].
+            ['restore', '--db', 'test', '--collection', 'blank']. 
+                concat(getRestoreTarget('jstests/restore/testdata/blankcoll/blank_metadata.bson')).
                 concat(commonToolArgs)
     );
     assert.eq(0, ret);

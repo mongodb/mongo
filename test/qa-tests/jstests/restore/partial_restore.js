@@ -37,7 +37,8 @@
     // dump the data
     var ret = toolTest.runTool.apply(
             toolTest,
-            ['dump', '--out', dumpTarget].
+            ['dump'].
+                concat(getDumpTarget(dumpTarget)).
                 concat(commonToolArgs)
     );
     assert.eq(0, ret);
@@ -49,7 +50,8 @@
     // restore a single db
     ret = toolTest.runTool.apply(
             toolTest,
-            ['restore', '--db', 'dbOne', dumpTarget+'/dbOne'].
+            ['restore', '--db', 'dbOne'].
+                concat(getRestoreTarget(dumpTarget+'/dbOne')).
                 concat(commonToolArgs)
     );
     assert.eq(0, ret);
@@ -66,7 +68,8 @@
     ret = toolTest.runTool.apply(
             toolTest,
             ['restore', '--collection', 'collTwo', 
-            '--db', 'dbOne', dumpTarget+'/dbOne/collTwo.bson'].
+            '--db', 'dbOne'].
+                concat(getRestoreTarget(dumpTarget+'/dbOne/collTwo.bson')).
                 concat(commonToolArgs)
     );
     assert.eq(0, ret);

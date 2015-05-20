@@ -41,9 +41,10 @@
     // dump the data
     var ret = toolTest.runTool.apply(
             toolTest,
-            ['dump', '--out', dumpTarget].
+            ['dump'].
+                concat(getDumpTarget(dumpTarget).
                 concat(commonToolArgs)
-    );
+    ));
     assert.eq(0, ret);
 
     // drop the databases
@@ -53,7 +54,8 @@
     // restore the data
     ret = toolTest.runTool.apply(
             toolTest,
-            ['restore', dumpTarget].
+            ['restore'].
+                concat(getRestoreTarget(dumpTarget)).
                 concat(commonToolArgs)
     );
     assert.eq(0, ret);

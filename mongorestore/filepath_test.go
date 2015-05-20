@@ -164,8 +164,9 @@ func TestHandlingBSON(t *testing.T) {
 
 	Convey("With a test MongoRestore", t, func() {
 		mr = &MongoRestore{
-			manager:     intents.NewIntentManager(),
-			ToolOptions: &commonOpts.ToolOptions{Namespace: &commonOpts.Namespace{}},
+			manager:      intents.NewIntentManager(),
+			ToolOptions:  &commonOpts.ToolOptions{Namespace: &commonOpts.Namespace{}},
+			InputOptions: &InputOptions{},
 		}
 
 		Convey("with a target path to a bson file instead of a directory", func() {

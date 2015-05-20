@@ -18,7 +18,8 @@
     resetDbpath(dumpTarget);
     var ret = toolTest.runTool.apply(
         toolTest,
-        ['dump', '--out', dumpTarget].
+        ['dump'].
+            concat(getDumpTarget(dumpTarget)).
             concat(commonToolArgs)
     );
     assert.eq(0, ret);
@@ -29,7 +30,8 @@
     // restore it - database was just dropped, so this should work successfully
     ret = toolTest.runTool.apply(
         toolTest,    
-        ['restore', dumpTarget].
+        ['restore'].
+            concat(getRestoreTarget(dumpTarget)).
             concat(commonToolArgs)
     );
     assert.eq(0, ret, "restore to empty DB should have returned successfully");
@@ -37,7 +39,8 @@
     // restore it again with --stopOnError - this one should fail since there are dup keys
     ret = toolTest.runTool.apply(
         toolTest,    
-        ['restore', dumpTarget, '--stopOnError', '-vvvv'].
+        ['restore', '--stopOnError', '-vvvv'].
+            concat(getRestoreTarget(dumpTarget)).
             concat(commonToolArgs)
     );
     assert.neq(0, ret);
@@ -45,7 +48,8 @@
     // restore it one more time without --stopOnError - there are dup keys but they will be ignored
     ret = toolTest.runTool.apply(
         toolTest,    
-        ['restore', dumpTarget, '-vvvv'].
+        ['restore', '-vvvv'].
+            concat(getRestoreTarget(dumpTarget)).
             concat(commonToolArgs)
     );
     assert.eq(0, ret);

@@ -33,7 +33,9 @@ if (typeof getToolTest === 'undefined') {
   // Crash if parallel shell hasn't started inserting yet
   assert.gt(countBeforeMongodump, 1000);
 
-  var dumpArgs = ['dump', '--oplog'].concat(commonToolArgs);
+  var dumpArgs = ['dump', '--oplog'].
+      concat(getDumpTarget()).
+      concat(commonToolArgs);
 
   if (toolTest.isReplicaSet) {
     // If we're running in a replica set, --oplog should give a snapshot by
@@ -46,7 +48,9 @@ if (typeof getToolTest === 'undefined') {
     db.dropDatabase();
     assert.eq(0, db.bar.count());
 
-    var restoreArgs = ['restore'].concat(commonToolArgs);
+    var restoreArgs = ['restore'].
+        concat(getRestoreTarget()).
+        concat(commonToolArgs);
     assert.eq(toolTest.runTool.apply(toolTest, restoreArgs), 0,
       'mongorestore should succeed');
     assert.gte(db.bar.count(), countBeforeMongodump);
@@ -62,7 +66,9 @@ if (typeof getToolTest === 'undefined') {
     db.dropDatabase();
     assert.eq(0, db.bar.count());
 
-    var restoreArgs = ['restore'].concat(commonToolArgs);
+    var restoreArgs = ['restore'].
+        concat(getRestoreTarget()).
+        concat(commonToolArgs);
     assert.eq(toolTest.runTool.apply(toolTest, restoreArgs), 0,
       'mongorestore should succeed');
     // Shouldn't have dumped any documents

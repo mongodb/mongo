@@ -67,7 +67,8 @@
     // dump the data
     var ret = toolTest.runTool.apply(
             toolTest,
-            ['dump', '--out', dumpTarget].
+            ['dump'].
+                concat(getDumpTarget(dumpTarget)).
                 concat(commonToolArgs)
     ); 
     assert.eq(0, ret);
@@ -78,7 +79,8 @@
     // restore the data
     ret = toolTest.runTool.apply(
             toolTest,
-            ['restore', dumpTarget].
+            ['restore'].
+                concat(getRestoreTarget(dumpTarget)).
                 concat(commonToolArgs)
     );
     assert.eq(0, ret);
@@ -102,7 +104,8 @@
     // restore the data, without the options
     ret = toolTest.runTool.apply(
             toolTest,
-            ['restore', '--noOptionsRestore', dumpTarget].
+            ['restore', '--noOptionsRestore'].
+                concat(getRestoreTarget(dumpTarget)).
                 concat(commonToolArgs)
     );
     assert.eq(0, ret);

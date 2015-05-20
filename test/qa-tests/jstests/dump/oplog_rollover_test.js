@@ -1,5 +1,5 @@
 if (typeof getToolTest === 'undefined') {
-  load('jstests/configs/plain_28.config.js');
+  load('jstests/configs/replset_28.config.js');
 }
 
 (function() {
@@ -41,7 +41,9 @@ if (typeof getToolTest === 'undefined') {
   assert.gt(countBeforeMongodump, 0, 'Didn\'t successfully start inserting ' +
     'large documents before mongodump');
 
-  var dumpArgs = ['dump', '--oplog'].concat(commonToolArgs);
+  var dumpArgs = ['dump', '--oplog'].concat(getDumpTarget()).
+      concat(getDumpTarget()).
+      concat(commonToolArgs);
 
   assert(toolTest.runTool.apply(toolTest, dumpArgs) !== 0,
     'mongodump --oplog should crash sensibly on oplog rollover');

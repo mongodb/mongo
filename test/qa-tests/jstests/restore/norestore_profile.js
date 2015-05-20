@@ -25,7 +25,9 @@
     // dump it
     var dumpTarget = 'norestore_profile';
     resetDbpath(dumpTarget);
-    var ret = toolTest.runTool.apply( toolTest, ['dump', '--out', dumpTarget].concat(commonToolArgs));
+    var ret = toolTest.runTool.apply( toolTest, ['dump'].
+            concat(getDumpTarget(dumpTarget)).
+            concat(commonToolArgs));
     assert.eq(0, ret);
 
     // turn off profiling and remove the profiler collection
@@ -37,7 +39,9 @@
     dbOne.dropDatabase()
 
     // restore it, this should restore everything *except* the profile collection
-    ret = toolTest.runTool.apply( toolTest, ['restore', dumpTarget].concat(commonToolArgs));
+    ret = toolTest.runTool.apply( toolTest, ['restore'].
+            concat(getRestoreTarget(dumpTarget)).
+            concat(commonToolArgs));
     assert.eq(0, ret, "restore to empty DB should have returned successfully");
 
     // check that the data actually got restored

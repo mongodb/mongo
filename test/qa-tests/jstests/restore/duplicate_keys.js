@@ -29,9 +29,8 @@
     assert.eq(50, testColl.count());
 
     // dump the data
-    var ret = toolTest.runTool.apply(
-            toolTest,
-            ['dump', '--out', dumpTarget].
+    var ret = toolTest.runTool.apply( toolTest, ['dump'].
+                concat(getDumpTarget(dumpTarget)).
                 concat(commonToolArgs)
     );
     assert.eq(0, ret);
@@ -53,7 +52,9 @@
     removeDocs();
 
     // restore the db with default settings
-    ret = toolTest.runTool.apply( toolTest, ['restore', dumpTarget].concat(commonToolArgs));
+    ret = toolTest.runTool.apply( toolTest, ['restore'].
+            concat(getRestoreTarget(dumpTarget)).
+            concat(commonToolArgs) );
     assert.eq(0, ret);
 
     // make sure the restore worked, and all of the removed keys were restored
@@ -62,7 +63,10 @@
     // now check an array of batch sizes
     for (var i = 1; i < 100; i++) {
         removeDocs();
-        ret = toolTest.runTool.apply( toolTest, ['restore', dumpTarget, "--batchSize", String(i)].concat(commonToolArgs));
+        ret = toolTest.runTool.apply( toolTest, ['restore', "--batchSize", String(i)].
+                concat(getRestoreTarget(dumpTarget)).
+                concat(commonToolArgs)
+        );
         assert.eq(0, ret);
         assert.eq(50, testColl.count(), "some documents were not restored for batchSize="+i);
     }

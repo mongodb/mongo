@@ -20,7 +20,9 @@ load('jstests/common/check_version.js');
 
     // Running mongodump with '--repair' specified but no '--db' should fail
   var dumpArgs = ['dump', '--db', 'foo',
-    '--repair'].concat(commonToolArgs);
+    '--repair'].
+        concat(getDumpTarget()).
+        concat(commonToolArgs);
 
   if (isAtLeastVersion(db.version(), '2.7.8') && !toolTest.isSharded) {
     // Should succeed on >= 2.7.8
@@ -35,7 +37,9 @@ load('jstests/common/check_version.js');
 
     db.dropDatabase();
 
-    var restoreArgs = ['restore'].concat(commonToolArgs);
+    var restoreArgs = ['restore'].
+        concat(getRestoreTarget()).
+        concat(commonToolArgs);
     assert.eq(toolTest.runTool.apply(toolTest, restoreArgs), 0,
       'mongorestore should succeed');
     assert.eq(0, db.bar.count());

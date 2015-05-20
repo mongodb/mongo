@@ -59,7 +59,7 @@ func (mux *Multiplexer) Run() {
 				log.Logf(log.DebugLow, "Mux finish")
 				mux.Out.Close()
 				if len(mux.selectCases) != 1 {
-					mux.Completed <- fmt.Errorf("Mux ending but selectCases still open %v\n",
+					mux.Completed <- fmt.Errorf("Mux ending but selectCases still open %v",
 						len(mux.selectCases))
 					return
 				}

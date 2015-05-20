@@ -21,7 +21,9 @@ if (typeof getToolTest === 'undefined') {
 
     // Running mongodump with '--query' specified but no '--db' should fail
   var dumpArgs = ['dump', '--collection', 'bar',
-    '--query', '"{ x: { $gt:0 } }"'].concat(commonToolArgs);
+    '--query', '"{ x: { $gt:0 } }"'].
+        concat(getDumpTarget()).
+        concat(commonToolArgs);
   assert(toolTest.runTool.apply(toolTest, dumpArgs) !== 0,
     'mongodump should exit with a non-zero status when --query is ' +
     'specified but --db isn\'t');
@@ -29,6 +31,7 @@ if (typeof getToolTest === 'undefined') {
   // Running mongodump with '--query' specified but no '--collection' should
   // fail
   var dumpArgs = ['dump', '--db', 'foo', '--query', '"{ x: { $gt:0 } }"'].
+    concat(getDumpTarget()).
     concat(commonToolArgs);
   assert(toolTest.runTool.apply(toolTest, dumpArgs) !== 0,
     'mongodump should exit with a non-zero status when --query is ' +
@@ -37,7 +40,9 @@ if (typeof getToolTest === 'undefined') {
   // Running mongodump with '--query' should only get matching documents
   resetDbpath('dump');
   var dumpArgs = ['dump', '--query', '{ x: { $gt:0 } }', '--db', 'foo',
-    '--collection', 'bar'].concat(commonToolArgs);
+    '--collection', 'bar'].
+        concat(getDumpTarget()).
+        concat(commonToolArgs);
   assert.eq(toolTest.runTool.apply(toolTest, dumpArgs), 0,
     'mongodump should return exit status 0 when --db, --collection, and ' +
     '--query are all specified');
@@ -47,7 +52,9 @@ if (typeof getToolTest === 'undefined') {
   assert.eq(0, db.bar.count());
   assert.eq(0, db.getSiblingDB('baz').bar.count());
 
-  var restoreArgs = ['restore'].concat(commonToolArgs);
+  var restoreArgs = ['restore'].
+      concat(getRestoreTarget()).
+      concat(commonToolArgs);
   assert.eq(toolTest.runTool.apply(toolTest, restoreArgs), 0,
     'mongorestore should succeed');
   assert.eq(1, db.bar.count());

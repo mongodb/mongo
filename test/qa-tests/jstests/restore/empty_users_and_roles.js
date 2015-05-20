@@ -4,6 +4,11 @@
         load('jstests/configs/plain_28.config.js');
     }
 
+    if (dump_targets == "archive") {
+        print('skipping test incompatable with archiving');
+        return assert(true);
+    }
+
     // Tests running mongorestore with --restoreDbUsersAndRoles, with
     // no users or roles in the dump.
     
@@ -17,8 +22,8 @@
     // users or roles
     var ret = toolTest.runTool.apply(
         toolTest,
-        ['restore', '--db', 'test', '--restoreDbUsersAndRoles',
-        'jstests/restore/testdata/blankdb'].
+        ['restore', '--db', 'test', '--restoreDbUsersAndRoles'].
+            concat(getRestoreTarget('jstests/restore/testdata/blankdb')).
             concat(commonToolArgs)
     );
     assert.eq(0, ret);

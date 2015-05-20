@@ -1,5 +1,6 @@
 (function() {
 
+    load("jstests/configs/standard_dump_targets.config.js");
     // skip tests requiring wiredTiger storage engine on pre 2.8 mongod
     if (TestData && TestData.storageEngine === 'wiredTiger')
         return
@@ -61,8 +62,8 @@
     assert.eq(10, testDB.data.count());
 
     // dump the data
-    var ret = toolTest.runTool('dump', '--out', dumpTarget, '--db', 'test',
-                '--dumpDbUsersAndRoles');
+    var ret = toolTest.runTool.apply(toolTest,['dump', '--db', 'test', '--dumpDbUsersAndRoles'].
+            concat(getDumpTarget(dumpTarget)));
     assert.eq(0, ret);
 
     // drop the database, users, and roles
@@ -81,8 +82,8 @@
     testDB = toolTest.db.getSiblingDB('test');
 
     // restore the data, specifying --restoreDBUsersAndRoles
-    ret = toolTest.runTool('restore', '--db', 'test', '--restoreDbUsersAndRoles',
-                dumpTarget+'/test');
+    ret = toolTest.runTool.apply(toolTest,['restore', '--db', 'test', '--restoreDbUsersAndRoles'].
+            concat(getRestoreTarget(dumpTarget+'/test')));
     assert.eq(0, ret);
 
     // make sure the data was restored
@@ -103,8 +104,8 @@
     assert.eq('roleOne', roles[0].role);
 
     // dump the data again, to a slightly different target
-    ret = toolTest.runTool('dump', '--out', dumpTarget+'_second', '--db', 'test',
-                '--dumpDbUsersAndRoles');
+    ret = toolTest.runTool.apply(toolTest,['dump', '--db', 'test', '--dumpDbUsersAndRoles'].
+            concat(getDumpTarget(dumpTarget+'_second')));
     assert.eq(0, ret);
 
     // drop the database, users, and roles
@@ -124,8 +125,8 @@
     testDB = toolTest.db.getSiblingDB('test');
 
     // restore the data, specifying --restoreDBUsersAndRoles
-    ret = toolTest.runTool('restore', '--db', 'test', '--restoreDbUsersAndRoles',
-                dumpTarget+'_second'+'/test');
+    ret = toolTest.runTool.apply(toolTest,['restore', '--db', 'test', '--restoreDbUsersAndRoles'].
+            concat(getRestoreTarget( dumpTarget+'_second'+'/test')));
     assert.eq(0, ret);
 
     // make sure the data was restored

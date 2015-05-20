@@ -35,7 +35,8 @@
     // dump the data
     var ret = toolTest.runTool.apply(
             toolTest,
-            ['dump', '--out', dumpTarget].
+            ['dump'].
+                concat(getDumpTarget(dumpTarget)).
                 concat(commonToolArgs)
     );
     assert.eq(0, ret);
@@ -68,7 +69,8 @@
     ret = toolTest.runTool.apply(
             toolTest,
             ['restore', '--drop', '--db', 'source', 
-            '--collection', 'coll1', dumpTarget+'/source/coll1.bson'].
+            '--collection', 'coll1'].
+                concat(getRestoreTarget(dumpTarget+'/source/coll1.bson')).
                 concat(commonToolArgs)
     );
     assert.eq(0, ret);

@@ -2,9 +2,19 @@
 
     // Tests running mongorestore with  --restoreDbUsersAndRoles against 
     // a full dump.
+
     
     jsTest.log('Testing running mongorestore with --restoreDbUsersAndRoles against'+
         ' a full dump');
+
+    if (typeof getDumpTarget === 'undefined') {
+        load('jstests/configs/standard_dump_targets.config.js');
+    }
+
+    if (dump_targets == "archive") {
+        print('skipping test incompatable with archiving');
+        return assert(true);
+    }
 
     var runTest = function(sourceDBVersion, dumpVersion, restoreVersion, destDBVersion) {
 
@@ -89,7 +99,7 @@
 
         // dump the data
         var args = ['mongodump' + (dumpVersion ? ('-'+dumpVersion) : ''),
-                '--out', dumpTarget, '--port', toolTest.port];
+            '--port', toolTest.port].concat(getDumpTarget(dumpTarget));
         var ret = runMongoProgram.apply(this, args);
         assert.eq(0, ret);
 
@@ -107,7 +117,8 @@
 
         // do a full restore
         args = ['mongorestore' + (restoreVersion ? ('-'+restoreVersion) : ''),
-            dumpTarget, '--port', toolTest.port];
+            '--port', toolTest.port].
+            concat(getRestoreTarget(dumpTarget));
         ret = runMongoProgram.apply(this, args);
         assert.eq(0, ret);
 

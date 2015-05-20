@@ -1,3 +1,5 @@
+load("jstests/configs/standard_dump_targets.config.js");
+
 var getToolTest;
 
 (function() {

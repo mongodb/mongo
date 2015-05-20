@@ -41,7 +41,8 @@
     // dump the data
     var ret = toolTest.runTool.apply(
             toolTest,
-            ['dump', '--out', dumpTarget].
+            ['dump'].
+                concat(getDumpTarget(dumpTarget)).
                 concat(commonToolArgs)
     );
     assert.eq(0, ret);
@@ -57,7 +58,8 @@
     // restore the data, with --noIndexRestore
     ret = toolTest.runTool.apply(
             toolTest,
-            ['restore', '--noIndexRestore', dumpTarget].
+            ['restore', '--noIndexRestore'].
+                concat(getRestoreTarget(dumpTarget)).
                 concat(commonToolArgs)
     );
     assert.eq(0, ret);

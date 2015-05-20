@@ -35,7 +35,8 @@
     // dump the data
     var ret = toolTest.runTool.apply(
             toolTest,
-            ['dump', '--out', dumpTarget].
+            ['dump'].
+                concat(getDumpTarget(dumpTarget)).
                 concat(commonToolArgs)
     );
     assert.eq(0, ret);
@@ -57,7 +58,8 @@
     // be removed and replaced with the dumped data
     ret = toolTest.runTool.apply(
             toolTest,
-            ['restore', '--drop', dumpTarget].
+            ['restore', '--drop'].
+                concat(getRestoreTarget(dumpTarget)).
                 concat(commonToolArgs)
     );
     assert.eq(0, ret);

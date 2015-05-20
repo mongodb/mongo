@@ -30,7 +30,9 @@ if (typeof getToolTest === 'undefined') {
   // Crash if parallel shell hasn't started inserting yet
   assert.gt(countBeforeMongodump, 0);
 
-  var dumpArgs = ['dump', '--forceTableScan'].concat(commonToolArgs);
+  var dumpArgs = ['dump', '--forceTableScan'].
+      concat(getDumpTarget()).
+      concat(commonToolArgs);
   assert.eq(toolTest.runTool.apply(toolTest, dumpArgs), 0,
     'mongodump --forceTableScan should succeed');
 
@@ -43,7 +45,9 @@ if (typeof getToolTest === 'undefined') {
   // batch writes, so if you've dumped the config DB you should
   // be careful to set this.
   var restoreArgs = ['restore', '--batchSize', '1',
-    '--drop'].concat(commonToolArgs);
+    '--drop'].
+        concat(getRestoreTarget()).
+        concat(commonToolArgs);
   assert.eq(toolTest.runTool.apply(toolTest, restoreArgs), 0,
     'mongorestore should succeed');
   assert.gte(db.bar.count(), countBeforeMongodump);

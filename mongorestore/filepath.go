@@ -36,6 +36,8 @@ func (errorWriter) Write([]byte) (int, error) {
 // embedded os.File, the Write will return an error and not succeed
 type realBSONFile struct {
 	io.ReadCloser
+	// errorWrite adds a Write() method to this object allowing it to be an
+	// intent.file ( a ReadWriteOpenCloser )
 	errorWriter
 	intent *intents.Intent
 	gzip   bool
@@ -70,6 +72,8 @@ func (f *realBSONFile) Open() (err error) {
 // embedded os.File, the Write will return an error and not succeed
 type realMetadataFile struct {
 	io.ReadCloser
+	// errorWrite adds a Write() method to this object allowing it to be an
+	// intent.file ( a ReadWriteOpenCloser )
 	errorWriter
 	intent *intents.Intent
 	gzip   bool

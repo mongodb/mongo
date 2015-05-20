@@ -2,10 +2,18 @@
 
     // Tests using mongorestore on a dump directory containing symlinks
     
+    if (typeof getToolTest === 'undefined') {
+        load('jstests/configs/plain_28.config.js');
+    }
+
+    if (dump_targets == "archive") {
+        print('skipping test incompatable with archiving');
+        return assert(true);
+    }
+    
     jsTest.log('Testing restoration from a dump containing symlinks');
 
-    var toolTest = new ToolTest('symlinks');
-    toolTest.startDB('foo');
+    var toolTest = getToolTest('symlinks');
 
     // this test uses the testdata/dump_with_soft_link. within that directory,
     // the dbTwo directory is a soft link to testdata/soft_linked_db and the
@@ -19,7 +27,8 @@
     var notADir = toolTest.db.getSiblingDB('not_a_dir');
 
     // restore the data
-    var ret = toolTest.runTool('restore', 'jstests/restore/testdata/dump_with_soft_links');
+    var ret = toolTest.runTool.apply(toolTest, ['restore'].
+            concat(getRestoreTarget('jstests/restore/testdata/dump_with_soft_links')));
     assert.eq(0, ret);
 
     // make sure the data was restored properly

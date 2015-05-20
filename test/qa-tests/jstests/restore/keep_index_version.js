@@ -38,9 +38,9 @@
     // dump the data
     var ret = toolTest.runTool.apply(
             toolTest,
-            ['dump', '--out', dumpTarget].
-                concat(commonToolArgs)
-    );
+            ['dump'].
+            concat(getDumpTarget(dumpTarget)).
+                concat(commonToolArgs));
     assert.eq(0, ret);
 
     // drop the db
@@ -49,7 +49,8 @@
     // restore the data
     ret = toolTest.runTool.apply(
             toolTest,
-            ['restore', dumpTarget].
+            ['restore'].
+            concat(getRestoreTarget(dumpTarget)).
                 concat(commonToolArgs)
     );
     assert.eq(0, ret);
@@ -68,9 +69,9 @@
     // restore the data with --keepIndexVersion specified
     ret = toolTest.runTool.apply(
             toolTest,
-            ['restore', '--keepIndexVersion', dumpTarget].
-                concat(commonToolArgs)
-    );
+            ['restore', '--keepIndexVersion'].
+            concat(getRestoreTarget(dumpTarget)).
+                concat(commonToolArgs));
     assert.eq(0, ret);
 
     // make sure the data was restored correctly

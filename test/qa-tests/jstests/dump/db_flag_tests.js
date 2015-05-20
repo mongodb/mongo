@@ -21,7 +21,9 @@ if (typeof getToolTest === 'undefined') {
   // Running mongodump with `--db foo` should only dump the
   // 'foo' database, ignoring the 'baz' database
   resetDbpath('dump');
-  var dumpArgs = ['dump', '--db', 'foo'].concat(commonToolArgs);
+  var dumpArgs = ['dump', '--db', 'foo'].
+      concat(getDumpTarget()).
+      concat(commonToolArgs);
   assert.eq(toolTest.runTool.apply(toolTest, dumpArgs), 0,
     'mongodump should succeed with `--db foo`');
   db.dropDatabase();
@@ -29,7 +31,9 @@ if (typeof getToolTest === 'undefined') {
   assert.eq(0, db.bar.count());
   assert.eq(0, db.getSiblingDB('baz').bar.count());
 
-  var restoreArgs = ['restore'].concat(commonToolArgs);
+  var restoreArgs = ['restore'].
+      concat(getRestoreTarget()).
+      concat(commonToolArgs);
   assert.eq(toolTest.runTool.apply(toolTest, restoreArgs), 0,
     'mongorestore should succeed');
   assert.eq(1, db.bar.count());

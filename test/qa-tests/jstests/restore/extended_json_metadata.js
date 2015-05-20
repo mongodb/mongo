@@ -4,6 +4,11 @@
     load('jstests/configs/plain_28.config.js');
   }
 
+  if (dump_targets == "archive") {
+      print('skipping test incompatable with archiving');
+      return assert(true);
+  }
+
   // Tests that using mongorestore on a collection with extended json types
   // in the metadata (both indexes and options) is handled gracefully.
 
@@ -17,7 +22,8 @@
   // run a restore against the mongos
   var ret = toolTest.runTool.apply(
     toolTest,
-    ['restore', 'jstests/restore/testdata/dump_extended_json_options'].
+    ['restore'].
+    concat(getRestoreTarget('jstests/restore/testdata/dump_extended_json_options')).
     concat(commonToolArgs)
     );
   assert.eq(0, ret, "the restore does not crash");

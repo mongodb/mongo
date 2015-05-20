@@ -60,7 +60,8 @@
     // dump the data
     var ret = toolTest.runTool.apply(
         toolTest,    
-        ['dump', '--out', dumpTarget, '--db', 'test', '--dumpDbUsersAndRoles'].
+        ['dump', '--db', 'test', '--dumpDbUsersAndRoles'].
+            concat(getDumpTarget(dumpTarget)).
             concat(commonToolArgs)
     );
     assert.eq(0, ret);
@@ -73,7 +74,8 @@
     // restore the data, specifying --restoreDBUsersAndRoles
     ret = toolTest.runTool.apply(
         toolTest,
-        ['restore', '--db', 'test', '--restoreDbUsersAndRoles', dumpTarget+'/test'].
+        ['restore', '--db', 'test', '--restoreDbUsersAndRoles'].
+        concat(getRestoreTarget(dumpTarget+'/test')).
             concat(commonToolArgs)
     );
     assert.eq(0, ret);

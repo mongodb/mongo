@@ -63,6 +63,8 @@ func (bwc writeFlushCloser) Close() error {
 // ok disk via an embedded bufio.Writer
 type realBSONFile struct {
 	io.WriteCloser
+	// errorWrite adds a Read() method to this object allowing it to be an
+	// intent.file ( a ReadWriteOpenCloser )
 	errorReader
 	intent *intents.Intent
 	gzip   bool
@@ -86,13 +88,13 @@ func (f *realBSONFile) Open() (err error) {
 	if f.gzip {
 		fileName += ".gz"
 	}
-	inner, err := os.Create(fileName)
+	file, err := os.Create(fileName)
 	if err != nil {
 		return fmt.Errorf("error creating BSON file %v: %v", fileName, err)
 	}
 	var writeCloser io.WriteCloser
 	if f.gzip {
-		writeCloser = gzip.NewWriter(inner)
+		writeCloser = gzip.NewWriter(file)
 	} else {
 		// wrap writer in buffer to reduce load on disk
 		writeCloser = writeFlushCloser{
@@ -103,7 +105,7 @@ func (f *realBSONFile) Open() (err error) {
 	}
 	f.WriteCloser = &wrappedWriteCloser{
 		WriteCloser: writeCloser,
-		inner:       inner,
+		inner:       file,
 	}
 
 	return nil
@@ -124,13 +126,18 @@ func (f atomicFlusher) Write(buf []byte) (int, error) {
 	return f.availableWriteFlusher.Write(buf)
 }
 
+// realMetadataFile impelemnts intent.file, and corresponds to a Metadata file on disk
 type realMetadataFile struct {
 	io.WriteCloser
 	errorReader
+	// errorWrite adds a Read() method to this object allowing it to be an
+	// intent.file ( a ReadWriteOpenCloser )
 	intent *intents.Intent
 	gzip   bool
 }
 
+// Open opens the file on disk that the intent indicates. Any directories needed are created.
+// If compression is needed, the File gets wrapped in a gzip.Writer
 func (f *realMetadataFile) Open() (err error) {
 	if f.intent.MetadataPath == "" {
 		return fmt.Errorf("No MetadataPath for %v.%v", f.intent.DB, f.intent.C)
@@ -150,7 +157,10 @@ func (f *realMetadataFile) Open() (err error) {
 		return fmt.Errorf("error creating Metadata file %v: %v", fileName, err)
 	}
 	if f.gzip {
-		f.WriteCloser = gzip.NewWriter(f.WriteCloser)
+		f.WriteCloser = &wrappedWriteCloser{
+			WriteCloser: gzip.NewWriter(f.WriteCloser),
+			inner:       f.WriteCloser,
+		}
 	}
 	return nil
 }

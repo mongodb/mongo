@@ -10,7 +10,9 @@ if (typeof getToolTest === 'undefined') {
   var runDumpRestoreWithQuery = function(query) {
     resetDbpath('dump');
     var dumpArgs = ['dump', '--query', query, '--db', 'foo',
-      '--collection', 'bar'].concat(commonToolArgs);
+      '--collection', 'bar'].
+          concat(getDumpTarget()).
+          concat(commonToolArgs);
     assert.eq(toolTest.runTool.apply(toolTest, dumpArgs), 0,
       'mongodump should return exit status 0 when --db, --collection, and ' +
       '--query are all specified');
@@ -20,7 +22,9 @@ if (typeof getToolTest === 'undefined') {
     assert.eq(0, db.bar.count());
     assert.eq(0, db.getSiblingDB('baz').bar.count());
 
-    var restoreArgs = ['restore'].concat(commonToolArgs);
+    var restoreArgs = ['restore'].
+        concat(getRestoreTarget()).
+        concat(commonToolArgs);
     assert.eq(toolTest.runTool.apply(toolTest, restoreArgs), 0,
       'mongorestore should succeed');
     resetDbpath('dump');

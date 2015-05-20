@@ -34,7 +34,9 @@ if (typeof getToolTest === 'undefined') {
   }
 
   var dumpArgs = ['dump', '--db', 'foo', '--collection', 'bar',
-    '--query', '{ $where: "sleep(10); return true;" }'].concat(commonToolArgs);
+    '--query', '{ $where: "sleep(10); return true;" }'].
+        concat(getDumpTarget()).
+        concat(commonToolArgs);
 
   assert(toolTest.runTool.apply(toolTest, dumpArgs) !== 0,
     'mongodump should crash gracefully when remote server dies');

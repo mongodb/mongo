@@ -1,5 +1,6 @@
 (function() {
 
+    load("jstests/configs/standard_dump_targets.config.js");
     // Tests running mongorestore and restoring users with a nonempty temp 
     // users collection.
 
@@ -37,7 +38,8 @@
     adminDB.tempusers.insert({ _id: 'corruption' });
 
     // restore the data. it should fail
-    ret = toolTest.runTool('restore', dumpTarget);
+    ret = toolTest.runTool.apply(toolTest, ['restore'].
+            concat(getRestoreTarget(dumpTarget)));
     assert.neq(0, ret);
 
     // success

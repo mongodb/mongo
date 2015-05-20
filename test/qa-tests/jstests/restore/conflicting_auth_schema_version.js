@@ -1,11 +1,18 @@
 (function() {
 
+    load("jstests/configs/standard_dump_targets.config.js");
+
     // Tests using mongorestore to restore a dump containing users. If there is
     // conflicting authSchemaVersion in the admin.system.version document, it 
     // should be ignored, and the restore should complete successfully.
     
     jsTest.log('Testing restoring a dump with a potentially conflicting'+
             ' authSchemaVersion in the database');
+
+    if (dump_targets == "archive") {
+        print('skipping test incompatable with archiving');
+        return assert(true);
+    }
 
     var runTest = function(sourceDBVersion, dumpVersion, restoreVersion, destDBVersion, shouldSucceed) {
 
@@ -54,8 +61,9 @@
 
         // dump all the data
         args = ['mongodump' + (dumpVersion ? ('-'+dumpVersion) : ''),
-                '--out', dumpTarget, '--username', 'admin',
-                '--password', 'password', '--port', toolTest.port];
+                '--username', 'admin',
+                '--password', 'password', '--port', toolTest.port].
+                    concat(getDumpTarget(dumpTarget));
         if (sourceDBVersion == "2.6") {
           args.push("--authenticationMechanism=MONGODB-CR");
         }
@@ -96,7 +104,8 @@
         // do a full restore
         args = ['mongorestore' + (restoreVersion ? ('-'+restoreVersion) : ''),
             '--username', 'admin28', '--password', 
-            'password', '--port', toolTest.port, '--stopOnError', dumpTarget];
+            'password', '--port', toolTest.port, '--stopOnError'].
+                concat(getRestoreTarget(dumpTarget));
 
         ret = runMongoProgram.apply(this, args);
 

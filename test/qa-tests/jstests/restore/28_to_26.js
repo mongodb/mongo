@@ -1,5 +1,8 @@
 (function() {
 
+
+    load("jstests/configs/standard_dump_targets.config.js");
+
     // skip tests requiring wiredTiger storage engine on pre 2.8 mongod
     if (TestData && TestData.storageEngine === 'wiredTiger')
         return
@@ -28,7 +31,7 @@
     assert.eq(50, testColl.count());
 
     // dump the data 
-    var ret = toolTest.runTool('dump', '--out', dumpTarget);
+    var ret = toolTest.runTool.apply(toolTest,['dump'].concat(getDumpTarget(dumpTarget)));
     assert.eq(0, ret);
 
     // drop the database
@@ -47,7 +50,7 @@
     testColl = testDB.coll;
 
     // restore the data
-    ret = toolTest.runTool('restore', dumpTarget);
+    ret = toolTest.runTool.apply(toolTest,['restore'].concat(getRestoreTarget(dumpTarget)));
     assert.eq(0, ret);
 
     // make sure the data was restored

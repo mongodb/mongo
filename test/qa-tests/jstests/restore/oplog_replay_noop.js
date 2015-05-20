@@ -4,6 +4,11 @@
         load('jstests/configs/plain_28.config.js');
     }
 
+    if (dump_targets == "archive") {
+        print('skipping test incompatable with archiving');
+        return assert(true);
+    }
+  
     // Tests using mongorestore with --oplogReplay and noops in the oplog.bson,
     // making sure the noops are ignored.
 
@@ -19,8 +24,8 @@
     // restore the data, with --oplogReplay
     var ret = toolTest.runTool.apply(
         toolTest,
-        ['restore', '--oplogReplay', 
-        'jstests/restore/testdata/dump_with_noop_in_oplog'].
+        ['restore', '--oplogReplay'].
+            concat(getRestoreTarget('jstests/restore/testdata/dump_with_noop_in_oplog')).
             concat(commonToolArgs)
     );
     assert.eq(0, ret);

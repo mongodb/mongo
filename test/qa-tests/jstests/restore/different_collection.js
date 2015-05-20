@@ -29,7 +29,7 @@
     assert.eq(500, sourceDB[sourceCollName].count());
 
     // dump the data
-    var ret = toolTest.runTool('dump', '--out', dumpTarget);
+    var ret = toolTest.runTool.apply(toolTest,['dump'].concat(getDumpTarget(dumpTarget)));
     assert.eq(0, ret);
 
     // restore just the collection into a different collection 
@@ -37,10 +37,10 @@
     var destCollName = 'destColl';
     ret = toolTest.runTool.apply(
             toolTest,
-            ['restore', '--db', 'source', '--collection',
-            destCollName, dumpTarget+'/source/sourceColl.bson'].
+            ['restore', '--db', 'source', '--collection', destCollName].
+                concat(getRestoreTarget(dumpTarget+'/source/sourceColl.bson').
                 concat(commonToolArgs)
-    );
+    ));
     assert.eq(0, ret)
 
     // make sure the data was restored correctly
@@ -54,10 +54,10 @@
     var destDB = toolTest.db.getSiblingDB('dest');
     ret = toolTest.runTool.apply(
             toolTest,
-            ['restore', '--db', 'dest', '--collection',
-            sourceCollName, dumpTarget+'/source/sourceColl.bson'].
+            ['restore', '--db', 'dest', '--collection', sourceCollName].
+                concat(getRestoreTarget(dumpTarget+'/source/sourceColl.bson').
                 concat(commonToolArgs)
-    );
+    ));
     assert.eq(0, ret)
     
     // make sure the data was restored correctly
@@ -70,8 +70,8 @@
     // in a different database
     ret = toolTest.runTool.apply(
             toolTest,
-            ['restore', '--db', 'dest', '--collection',
-            destCollName, dumpTarget+'/source/sourceColl.bson'].
+            ['restore', '--db', 'dest', '--collection', destCollName].
+                concat(getRestoreTarget(dumpTarget+'/source/sourceColl.bson')).
                 concat(commonToolArgs)
     );
     assert.eq(0, ret)
