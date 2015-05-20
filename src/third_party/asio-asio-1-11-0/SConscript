@@ -1,0 +1,8 @@
+Import("env")
+
+env.Library(
+    target="asio",
+    source=[
+        "asio/src/asio.cpp",
+    ]
+)

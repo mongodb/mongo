@@ -51,6 +51,10 @@ if not use_system_version_of_library('yaml'):
     thirdPartyIncludePathList.append(
         ('yaml', '#/src/third_party/yaml-cpp-0.5.1/include'))
 
+if not use_system_version_of_library('asio'):
+    thirdPartyIncludePathList.append(
+        ('asio', '#/src/third_party/asio-asio-1-11-0/asio/include'))
+
 def injectAllThirdPartyIncludePaths(thisEnv):
     thisEnv.AppendUnique(CPPPATH=[entry[1] for entry in thirdPartyIncludePathList])
 
@@ -295,3 +299,22 @@ if wiredtiger:
             'shim_wiredtiger.cpp'
         ])
 
+if use_system_version_of_library("asio"):
+    asioEnv = env.Clone(
+        SYSLIBDEPS=[
+            env['LIBDEPS_ASIO_SYSLIBDEP'],
+        ])
+else:
+    asioEnv = env.Clone()
+    asioEnv.InjectThirdPartyIncludePaths(libraries=['asio'])
+    asioEnv.SConscript('asio-asio-1-11-0/SConscript', exports={ 'env' : asioEnv })
+    asioEnv = asioEnv.Clone(
+        LIBDEPS=[
+            'asio-asio-1-11-0/asio',
+        ])
+
+asioEnv.Library(
+    target="shim_asio",
+    source=[
+        'shim_asio.cpp'
+    ])

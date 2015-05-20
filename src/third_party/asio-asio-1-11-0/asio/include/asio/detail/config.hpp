@@ -11,6 +11,11 @@
 #ifndef ASIO_DETAIL_CONFIG_HPP
 #define ASIO_DETAIL_CONFIG_HPP
 
+// MongoDB modification. We want this standalone, and we want separate
+// compilation for what we can to cut down on compile times.
+# define ASIO_STANDALONE // MongoDB
+# define ASIO_SEPARATE_COMPILATION // MongoDB
+
 #if defined(ASIO_STANDALONE)
 # define ASIO_DISABLE_BOOST_ARRAY 1
 # define ASIO_DISABLE_BOOST_ASSERT 1

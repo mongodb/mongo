@@ -291,6 +291,8 @@ add_option( "use-system-stemmer", "use system version of stemmer", 0, True )
 
 add_option( "use-system-yaml", "use system version of yaml", 0, True )
 
+add_option( "use-system-asio", "use system version of ASIO", 0, True )
+
 add_option( "use-system-all" , "use all system libraries", 0 , True )
 
 # deprecated
