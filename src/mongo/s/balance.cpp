@@ -35,7 +35,6 @@
 #include <algorithm>
 #include <boost/scoped_ptr.hpp>
 
-#include "mongo/client/connpool.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/client.h"
 #include "mongo/db/jsobj.h"
@@ -307,7 +306,7 @@ namespace mongo {
         }        
     }
 
-    void Balancer::_doBalanceRound(DBClientBase& conn, vector<shared_ptr<MigrateInfo>>* candidateChunks) {
+    void Balancer::_doBalanceRound(vector<shared_ptr<MigrateInfo>>* candidateChunks) {
         invariant(candidateChunks);
 
         vector<CollectionType> collections;
@@ -352,30 +351,21 @@ namespace mongo {
                 continue;
             }
 
-            map<string, vector<ChunkType>> shardToChunksMap;
-            auto_ptr<DBClientCursor> cursor =
-                                    conn.query(ChunkType::ConfigNS,
-                                               QUERY(ChunkType::ns(ns)).sort(ChunkType::min()));
+            std::vector<ChunkType> allNsChunks;
+            grid.catalogManager()->getChunks(Query(BSON(ChunkType::ns(ns)))
+                                                .sort(ChunkType::min()),
+                                             0, // all chunks
+                                             &allNsChunks);
 
             set<BSONObj> allChunkMinimums;
+            map<string, vector<ChunkType>> shardToChunksMap;
 
-            while ( cursor->more() ) {
-                BSONObj chunkDoc = cursor->nextSafe().getOwned();
-
-                StatusWith<ChunkType> chunkRes = ChunkType::fromBSON(chunkDoc);
-                if (!chunkRes.isOK()) {
-                    error() << "bad chunk format for " << chunkDoc
-                            << ": " << chunkRes.getStatus().reason();
-                    return;
-                }
-
-                const ChunkType& chunk = chunkRes.getValue();
+            for (const ChunkType& chunk : allNsChunks) {
                 allChunkMinimums.insert(chunk.getMin().getOwned());
 
-                vector<ChunkType>& chunkList = shardToChunksMap[chunk.getShard()];
-                chunkList.push_back(chunk);
+                vector<ChunkType>& chunksList = shardToChunksMap[chunk.getShard()];
+                chunksList.push_back(chunk);
             }
-            cursor.reset();
 
             if (shardToChunksMap.empty()) {
                 LOG(1) << "skipping empty collection (" << ns << ")";
@@ -516,12 +506,7 @@ namespace mongo {
 
         const int sleepTime = 10;
 
-        // getConnectioString and dist lock constructor does not throw, which is what we expect on while
-        // on the balancer thread
-        ConnectionString config = configServer.getConnectionString();
-
-        while ( ! inShutdown() ) {
-
+        while (!inShutdown()) {
             Timer balanceRoundTimer;
             ActionLogType actionLog;
 
@@ -529,9 +514,6 @@ namespace mongo {
             actionLog.setWhat("balancer.round");
 
             try {
-
-                ScopedDbConnection conn(config.toString(), 30);
-
                 // ping has to be first so we keep things in the config server in sync
                 _ping();
 
@@ -562,8 +544,6 @@ namespace mongo {
                     // Ping again so scripts can determine if we're active without waiting
                     _ping( true );
 
-                    conn.done();
-
                     sleepsecs( sleepTime );
                     continue;
                 }
@@ -581,8 +561,6 @@ namespace mongo {
                         // Ping again so scripts can determine if we're active without waiting
                         _ping( true );
 
-                        conn.done();
-                        
                         sleepsecs( sleepTime ); // no need to wake up soon
                         continue;
                     }
@@ -602,9 +580,9 @@ namespace mongo {
                           ;
 
                     vector<shared_ptr<MigrateInfo>> candidateChunks;
-                    _doBalanceRound(conn.conn(), &candidateChunks);
+                    _doBalanceRound(&candidateChunks);
 
-                    if (candidateChunks.size() == 0) {
+                    if ( candidateChunks.size() == 0 ) {
                         LOG(1) << "no need to move any chunk";
                         _balancedLastTime = 0;
                     }
@@ -629,8 +607,6 @@ namespace mongo {
 
                 // Ping again so scripts can determine if we're active without waiting
                 _ping(true);
-                
-                conn.done();
 
                 sleepsecs(_balancedLastTime ? sleepTime / 10 : sleepTime);
             }
