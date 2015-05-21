@@ -62,13 +62,15 @@ def dump_yaml(value):
     return yaml.safe_dump(value, default_flow_style=False).rstrip()
 
 
-def new_mongo_client(port, read_preference=pymongo.ReadPreference.PRIMARY):
+def new_mongo_client(port, read_preference=pymongo.ReadPreference.PRIMARY, timeout_millis=30000):
     """
     Returns a pymongo.MongoClient connected on 'port' with a read
     preference of 'read_preference'.
+
+    The PyMongo driver will wait up to 'timeout_millis' milliseconds
+    before concluding that the server is unavailable.
     """
 
-    timeout_millis = 30000
     kwargs = {"connectTimeoutMS": timeout_millis}
     if pymongo.version_tuple[0] >= 3:
         kwargs["serverSelectionTimeoutMS"] = timeout_millis

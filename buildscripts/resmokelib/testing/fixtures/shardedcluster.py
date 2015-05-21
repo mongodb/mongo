@@ -282,7 +282,9 @@ class _MongoSFixture(interface.Fixture):
     def await_ready(self):
         deadline = time.time() + standalone.MongoDFixture.AWAIT_READY_TIMEOUT_SECS
 
-        # Wait until server is accepting connections.
+        # Wait until the mongos is accepting connections. The retry logic is necessary to support
+        # versions of PyMongo <3.0 that immediately raise a ConnectionFailure if a connection cannot
+        # be established.
         while True:
             # Check whether the mongos exited for some reason.
             if self.mongos.poll() is not None:
@@ -290,7 +292,9 @@ class _MongoSFixture(interface.Fixture):
                                            " unexpectedly." % (self.port))
 
             try:
-                utils.new_mongo_client(port=self.port).admin.command("ping")
+                # Use a shorter connection timeout to more closely satisfy the requested deadline.
+                client = utils.new_mongo_client(self.port, timeout_millis=500)
+                client.admin.command("ping")
                 break
             except pymongo.errors.ConnectionFailure:
                 remaining = deadline - time.time()
