@@ -28,29 +28,47 @@
 
 #pragma once
 
-#include "mongo/client/connection_pool.h"
-#include "mongo/client/remote_command_executor.h"
+#include "mongo/client/remote_command_runner.h"
+#include "mongo/stdx/functional.h"
 
 namespace mongo {
 
-    class RemoteCommandExecutorImpl : public RemoteCommandExecutor {
+    /**
+     * Note: This is NOT thread-safe.
+     *
+     * Example usage:
+     *
+     * RemoteCommandRunnerMock executor;
+     * executor.setNextExpectedCommand([](const RemoteCommandRequest& request) {
+     *     ASSERT_EQUALS("config", request.dbname);
+     * },
+     * RemoteCommandResponse(BSON("ok" << 1), Milliseconds(0)));
+     *
+     * auto response = executor.runCommand(RemoteCommandRequest()); // Assertion error!
+     */
+    class RemoteCommandRunnerMock : public RemoteCommandRunner {
     public:
-        RemoteCommandExecutorImpl(int messagingPortTags);
-        virtual ~RemoteCommandExecutorImpl();
+        RemoteCommandRunnerMock();
 
         /**
-         * Closes all underlying connections. Must be called before the destructor runs.
+         * Runs the function set by the last call to setNextExpectedCommand. Calling this more
+         * than once after a single call to setNextExpectedCommand will result in an assertion
+         * failure.
+         *
+         * Returns the value set on a previous call to setNextExpectedCommand.
          */
-        void shutdown();
+        StatusWith<RemoteCommandResponse> runCommand(const RemoteCommandRequest& request) override;
 
-        virtual StatusWith<RemoteCommandResponse> runCommand(const RemoteCommandRequest& request);
+        /**
+         * Sets the checker method to use and it's return value the next time runCommand is
+         * called.
+         */
+        void setNextExpectedCommand(
+                stdx::function<void (const RemoteCommandRequest& request)> checkerFunc,
+                StatusWith<RemoteCommandResponse> returnThis);
 
     private:
-        // The connection pool on which to send requests
-        ConnectionPool _connPool;
-
-        // Whether shutdown has been called
-        bool _shutDown;
+        stdx::function<void (const RemoteCommandRequest& request)> _runCommandChecker;
+        StatusWith<RemoteCommandResponse> _response;
     };
-
-} // namespace mongo
+}

@@ -26,34 +26,31 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include "mongo/client/remote_command_executor.h"
-
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/client/connection_pool.h"
+#include "mongo/client/remote_command_runner.h"
 
 namespace mongo {
 
-    const Milliseconds RemoteCommandRequest::kNoTimeout{-1};
-    const Date_t RemoteCommandRequest::kNoExpirationDate{Date_t::max()};
+    class RemoteCommandRunnerImpl : public RemoteCommandRunner {
+    public:
+        RemoteCommandRunnerImpl(int messagingPortTags);
+        virtual ~RemoteCommandRunnerImpl();
 
-    std::string RemoteCommandRequest::toString() const {
-        str::stream out;
-        out << "RemoteCommand -- target:" << target.toString() << " db:" << dbname;
+        /**
+         * Closes all underlying connections. Must be called before the destructor runs.
+         */
+        void shutdown();
 
-        if (expirationDate != kNoExpirationDate) {
-            out << " expDate:" << expirationDate.toString();
-        }
+        virtual StatusWith<RemoteCommandResponse> runCommand(const RemoteCommandRequest& request);
 
-        out << " cmd:" << cmdObj.toString();
-        return out;
-    }
+    private:
+        // The connection pool on which to send requests
+        ConnectionPool _connPool;
 
-    std::string RemoteCommandResponse::toString() const {
-        str::stream out;
-        out << "RemoteResponse -- " << " cmd:" << data.toString();
-
-        return out;
-    }
+        // Whether shutdown has been called
+        bool _shutDown;
+    };
 
 } // namespace mongo

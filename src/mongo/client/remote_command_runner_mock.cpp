@@ -28,7 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/client/remote_command_executor_mock.h"
+#include "mongo/client/remote_command_runner_mock.h"
 
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/mongoutils/str.h"
@@ -42,19 +42,19 @@ namespace {
     }
 }
 
-    RemoteCommandExecutorMock::RemoteCommandExecutorMock():
+    RemoteCommandRunnerMock::RemoteCommandRunnerMock():
             _runCommandChecker(noCheckerSet),
             _response(Status(ErrorCodes::InternalError, "response not set")) {
     }
 
-    StatusWith<RemoteCommandResponse> RemoteCommandExecutorMock::runCommand(
+    StatusWith<RemoteCommandResponse> RemoteCommandRunnerMock::runCommand(
             const RemoteCommandRequest& request) {
         _runCommandChecker(request);
         _runCommandChecker = noCheckerSet;
         return _response;
     }
 
-    void RemoteCommandExecutorMock::setNextExpectedCommand(
+    void RemoteCommandRunnerMock::setNextExpectedCommand(
             stdx::function<void (const RemoteCommandRequest& request)> checkerFunc,
             StatusWith<RemoteCommandResponse> returnThis) {
         _runCommandChecker = checkerFunc;

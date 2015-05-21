@@ -88,9 +88,9 @@ env.Library(
 )
 
 env.Library(
-    target='remote_command_executor',
+    target='remote_command_runner',
     source=[
-        'remote_command_executor.cpp',
+        'remote_command_runner.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/util/foundation',
@@ -99,25 +99,25 @@ env.Library(
 )
 
 env.Library(
-    target='remote_command_executor_impl',
+    target='remote_command_runner_impl',
     source=[
-        'remote_command_executor_impl.cpp',
+        'remote_command_runner_impl.cpp',
     ],
     LIBDEPS=[
         'connection_pool',
-        'remote_command_executor',
+        'remote_command_runner',
         '$BUILD_DIR/mongo/db/query/getmore_request',
         '$BUILD_DIR/mongo/db/query/lite_parsed_query',
     ]
 )
 
 env.Library(
-    target='remote_command_executor_mock',
+    target='remote_command_runner_mock',
     source=[
-        'remote_command_executor_mock.cpp',
+        'remote_command_runner_mock.cpp',
     ],
     LIBDEPS=[
-         'remote_command_executor',
+         'remote_command_runner',
     ]
 )
 

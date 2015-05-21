@@ -62,7 +62,7 @@ namespace {
         _lastFullUtilizationDate(),
         _isExecutorRunnable(false),
         _inShutdown(false),
-        _commandExec(kMessagingPortKeepOpen),
+        _commandRunner(kMessagingPortKeepOpen),
         _numActiveNetworkRequests(0) {
 
     }
@@ -128,7 +128,7 @@ namespace {
         ThreadList threadsToJoin;
         swap(threadsToJoin, _threads);
         lk.unlock();
-        _commandExec.shutdown();
+        _commandRunner.shutdown();
         std::for_each(threadsToJoin.begin(),
                       threadsToJoin.end(),
                       stdx::bind(&boost::thread::join, stdx::placeholders::_1));
@@ -200,7 +200,7 @@ namespace {
             ++_numActiveNetworkRequests;
             --_numIdleThreads;
             lk.unlock();
-            ResponseStatus result = _commandExec.runCommand(todo.request);
+            ResponseStatus result = _commandRunner.runCommand(todo.request);
             LOG(2) << "Network status of sending " << todo.request.cmdObj.firstElementFieldName() <<
                 " to " << todo.request.target << " was " << result.getStatus();
             todo.onFinish(result);

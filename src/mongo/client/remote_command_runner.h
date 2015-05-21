@@ -107,10 +107,10 @@ namespace mongo {
      * results. It abstracts the logic of managing connections and turns the remote instance into
      * a stateless request-response service.
      */
-    class RemoteCommandExecutor {
-        MONGO_DISALLOW_COPYING(RemoteCommandExecutor);
+    class RemoteCommandRunner {
+        MONGO_DISALLOW_COPYING(RemoteCommandRunner);
     public:
-        virtual ~RemoteCommandExecutor() = default;
+        virtual ~RemoteCommandRunner() = default;
 
         /**
          * Synchronously invokes the command described by "request" and returns the server's
@@ -120,7 +120,7 @@ namespace mongo {
                                                     const RemoteCommandRequest& request) = 0;
 
     protected:
-        RemoteCommandExecutor() = default;
+        RemoteCommandRunner() = default;
     };
 
 } // namespace mongo

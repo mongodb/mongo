@@ -35,7 +35,7 @@
 #include <boost/thread/mutex.hpp>
 #include <vector>
 
-#include "mongo/client/remote_command_executor_impl.h"
+#include "mongo/client/remote_command_runner_impl.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/stdx/list.h"
 
@@ -153,8 +153,8 @@ namespace repl {
         // Flag indicating when this interface is being shut down (because shutdown() has executed).
         bool _inShutdown;
 
-        // Interface for executing remote commands
-        RemoteCommandExecutorImpl _commandExec;
+        // Interface for running remote commands
+        RemoteCommandRunnerImpl _commandRunner;
 
         // Number of active network requests
         size_t _numActiveNetworkRequests;

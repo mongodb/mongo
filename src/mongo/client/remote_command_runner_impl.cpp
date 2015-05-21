@@ -28,7 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/client/remote_command_executor_impl.h"
+#include "mongo/client/remote_command_runner_impl.h"
 
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/cursor_responses.h"
@@ -189,17 +189,17 @@ namespace {
 
 } //namespace
 
-    RemoteCommandExecutorImpl::RemoteCommandExecutorImpl(int messagingPortTags)
+    RemoteCommandRunnerImpl::RemoteCommandRunnerImpl(int messagingPortTags)
         : _connPool(messagingPortTags),
           _shutDown(false) {
 
     }
 
-    RemoteCommandExecutorImpl::~RemoteCommandExecutorImpl() {
+    RemoteCommandRunnerImpl::~RemoteCommandRunnerImpl() {
         invariant(_shutDown);
     }
 
-    void RemoteCommandExecutorImpl::shutdown() {
+    void RemoteCommandRunnerImpl::shutdown() {
         if (_shutDown) {
             return;
         }
@@ -208,7 +208,7 @@ namespace {
         _connPool.closeAllInUseConnections();
     }
 
-    StatusWith<RemoteCommandResponse> RemoteCommandExecutorImpl::runCommand(
+    StatusWith<RemoteCommandResponse> RemoteCommandRunnerImpl::runCommand(
                                                         const RemoteCommandRequest& request) {
         try {
             BSONObj output;
