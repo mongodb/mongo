@@ -9,3 +9,4 @@ ext/compressors/zlib/zlib_compress.c
 ext/datasources/helium/helium.c
 ext/encryptors/nop/nop_encrypt.c
 ext/encryptors/rotn/rotn_encrypt.c
+ext/extractors/csv/csv_extractor.c

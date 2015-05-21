@@ -210,7 +210,7 @@ extern int __wt_conn_remove_compressor(WT_SESSION_IMPL *session);
 extern int __wt_conn_remove_data_source(WT_SESSION_IMPL *session);
 extern int __wt_encryptor_config(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval, WT_CONFIG_ITEM *keyid, WT_CONFIG_ARG *cfg_arg, WT_KEYED_ENCRYPTOR **kencryptorp);
 extern int __wt_conn_remove_encryptor(WT_SESSION_IMPL *session);
-extern int __wt_extractor_config(WT_SESSION_IMPL *session, const char *config, WT_EXTRACTOR **extractorp, int *ownp);
+extern int __wt_extractor_config(WT_SESSION_IMPL *session, const char *uri, const char *config, WT_EXTRACTOR **extractorp, int *ownp);
 extern int __wt_conn_remove_extractor(WT_SESSION_IMPL *session);
 extern int __wt_verbose_config(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_cache_config(WT_SESSION_IMPL *session, int reconfigure, const char *cfg[]);
