@@ -355,7 +355,7 @@ __wt_txn_checkpoint_log(
 			WT_ERR(__wt_log_ckpt(session, ckpt_lsn));
 
 		/* FALLTHROUGH */
-	case WT_TXN_LOG_CKPT_FAIL:
+	case WT_TXN_LOG_CKPT_CLEANUP:
 		/* Cleanup any allocated resources */
 		WT_INIT_LSN(ckpt_lsn);
 		txn->ckpt_nsnapshot = 0;
