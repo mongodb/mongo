@@ -119,27 +119,27 @@ namespace mongo {
 
         switch ( _type ) {
         case MASTER: {
-            DBClientConnection * c = new DBClientConnection(true);
+            auto_ptr<DBClientConnection> c(new DBClientConnection(true));
             c->setSoTimeout( socketTimeout );
             LOG(1) << "creating new connection to:" << _servers[0] << endl;
             if ( ! c->connect( _servers[0] , errmsg ) ) {
-                delete c;
                 return 0;
             }
             LOG(1) << "connected connection!" << endl;
-            return c;
+            return c.release();
         }
 
         case PAIR:
         case SET: {
-            DBClientReplicaSet * set = new DBClientReplicaSet( _setName , _servers , socketTimeout );
+            auto_ptr<DBClientReplicaSet> set(
+                new DBClientReplicaSet(_setName, _servers, socketTimeout));
+
             if( ! set->connect() ) {
-                delete set;
                 errmsg = "connect failed to replica set ";
                 errmsg += toString();
                 return 0;
             }
-            return set;
+            return set.release();
         }
 
         case SYNC: {
