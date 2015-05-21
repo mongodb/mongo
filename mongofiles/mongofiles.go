@@ -137,10 +137,10 @@ func (mf *MongoFiles) handleGet(gfs *mgo.GridFS) (string, error) {
 		return "", fmt.Errorf("error opening GridFS file '%s': %v", mf.FileName, err)
 	}
 	defer gFile.Close()
-	if err = mf.writeFileToDisk(gFile); err != nil {
+	if err = mf.writeFile(gFile); err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("finished writing to: %s\n", mf.getLocalFileName(gFile)), nil
+	return fmt.Sprintf("finished writing to %s\n", mf.getLocalFileName(gFile)), nil
 }
 
 // handle logic for 'get_id' command
@@ -156,7 +156,7 @@ func (mf *MongoFiles) handleGetID(gfs *mgo.GridFS) (string, error) {
 	}
 	log.Logf(log.Always, "found file '%v' with _id %v", gFile.Name(), mf.FileName)
 	defer gFile.Close()
-	if err = mf.writeFileToDisk(gFile); err != nil {
+	if err = mf.writeFile(gFile); err != nil {
 		return "", err
 	}
 	return fmt.Sprintf("finished writing to: %s\n", mf.getLocalFileName(gFile)), nil
@@ -190,18 +190,21 @@ func (mf *MongoFiles) parseID() (interface{}, error) {
 	return id, nil
 }
 
-// write a file from gridFS to the filesystem
-func (mf *MongoFiles) writeFileToDisk(gridFile *mgo.GridFile) error {
+// writeFile writes a file from gridFS to stdout or the filesystem.
+func (mf *MongoFiles) writeFile(gridFile *mgo.GridFile) (err error) {
 	localFileName := mf.getLocalFileName(gridFile)
-	localFile, err := os.Create(localFileName)
-	if err != nil {
-		return fmt.Errorf("error while opening local file '%v': %v\n", localFileName, err)
+	var localFile io.WriteCloser
+	if localFileName == "-" {
+		localFile = os.Stdout
+	} else {
+		if localFile, err = os.Create(localFileName); err != nil {
+			return fmt.Errorf("error while opening local file '%v': %v\n", localFileName, err)
+		}
+		defer localFile.Close()
+		log.Logf(log.DebugLow, "created local file '%v'", localFileName)
 	}
-	defer localFile.Close()
-	log.Logf(log.DebugLow, "created local file '%v'", localFileName)
 
-	_, err = io.Copy(localFile, gridFile)
-	if err != nil {
+	if _, err = io.Copy(localFile, gridFile); err != nil {
 		return fmt.Errorf("error while writing data into local file '%v': %v\n", localFileName, err)
 	}
 	return nil
@@ -222,12 +225,19 @@ func (mf *MongoFiles) handlePut(gfs *mgo.GridFS) (string, error) {
 		output = fmt.Sprintf("removed all instances of '%v' from GridFS\n", mf.FileName)
 	}
 
-	localFile, err := os.Open(localFileName)
-	if err != nil {
-		return "", fmt.Errorf("error while opening local file '%v' : %v\n", localFileName, err)
+	var err error
+	var localFile io.ReadCloser
+
+	if localFileName == "-" {
+		localFile = os.Stdin
+	} else {
+		localFile, err = os.Open(localFileName)
+		if err != nil {
+			return "", fmt.Errorf("error while opening local file '%v' : %v\n", localFileName, err)
+		}
+		defer localFile.Close()
+		log.Logf(log.DebugLow, "creating GridFS file '%v' from local file '%v'", mf.FileName, localFileName)
 	}
-	defer localFile.Close()
-	log.Logf(log.DebugLow, "creating GridFS file '%v' from local file '%v'", mf.FileName, localFileName)
 
 	gFile, err := gfs.Create(mf.FileName)
 	if err != nil {
