@@ -72,6 +72,13 @@ namespace mongo {
                              const BSONObj& projection, // Currently unused in mock
                              const stdx::function<void(const BSONObj&)>& resultProcessor);
 
+        /**
+         * Inserts the given user object into the "admin" database.
+         */
+        Status insertPrivilegeDocument(OperationContext* txn,
+                                       const BSONObj& userObj,
+                                       const BSONObj& writeConcern);
+
         // This implementation does not understand uniqueness constraints.
         virtual Status insert(OperationContext* txn,
                               const NamespaceString& collectionName,

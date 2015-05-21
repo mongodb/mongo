@@ -44,7 +44,6 @@
 #include "mongo/db/auth/authz_session_external_state_s.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
@@ -281,55 +280,6 @@ namespace {
         } catch (const DBException& e) {
             return e.toStatus();
         }
-    }
-
-    Status AuthzManagerExternalStateMongos::insert(
-            OperationContext* txn,
-            const NamespaceString& collectionName,
-            const BSONObj& document,
-            const BSONObj& writeConcern) {
-
-        return grid.catalogManager()->insert(collectionName, document, NULL);
-    }
-
-    Status AuthzManagerExternalStateMongos::update(OperationContext* txn,
-                                                   const NamespaceString& collectionName,
-                                                   const BSONObj& query,
-                                                   const BSONObj& updatePattern,
-                                                   bool upsert,
-                                                   bool multi,
-                                                   const BSONObj& writeConcern,
-                                                   int* nMatched) {
-
-        BatchedCommandResponse response;
-        Status res = grid.catalogManager()->update(collectionName,
-                                                   query,
-                                                   updatePattern,
-                                                   upsert,
-                                                   multi,
-                                                   &response);
-        if (res.isOK()) {
-            *nMatched = response.getN();
-        }
-
-        return res;
-    }
-
-    Status AuthzManagerExternalStateMongos::remove(
-            OperationContext* txn,
-            const NamespaceString& collectionName,
-            const BSONObj& query,
-            const BSONObj& writeConcern,
-            int* numRemoved) {
-
-        BatchedCommandResponse response;
-
-        Status res = grid.catalogManager()->remove(collectionName, query, 0, &response);
-        if (res.isOK()) {
-            *numRemoved = response.getN();
-        }
-
-        return res;
     }
 
 } // namespace mongo

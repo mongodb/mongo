@@ -35,7 +35,6 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/role_name.h"
 #include "mongo/db/auth/user_name.h"
-#include "mongo/platform/unordered_set.h"
 
 namespace mongo {
 
@@ -54,55 +53,6 @@ namespace auth {
      * command isn't exposed in the logs.
      */
     void redactPasswordData(mutablebson::Element parent);
-
-    BSONArray roleSetToBSONArray(const unordered_set<RoleName>& roles);
-
-    BSONArray rolesVectorToBSONArray(const std::vector<RoleName>& roles);
-
-    Status privilegeVectorToBSONArray(const PrivilegeVector& privileges, BSONArray* result);
-
-    /**
-     * Used to get all current roles of the user identified by 'userName'.
-     */
-    Status getCurrentUserRoles(OperationContext* txn,
-                               AuthorizationManager* authzManager,
-                               const UserName& userName,
-                               unordered_set<RoleName>* roles);
-
-    /**
-     * Checks that every role in "rolesToAdd" exists, that adding each of those roles to "role"
-     * will not result in a cycle to the role graph, and that every role being added comes from the
-     * same database as the role it is being added to (or that the role being added to is from the
-     * "admin" database.
-     */
-    Status checkOkayToGrantRolesToRole(const RoleName& role,
-                                       const std::vector<RoleName> rolesToAdd,
-                                       AuthorizationManager* authzManager);
-
-    /**
-     * Checks that every privilege being granted targets just the database the role is from, or that
-     * the role is from the "admin" db.
-     */
-    Status checkOkayToGrantPrivilegesToRole(const RoleName& role,
-                                            const PrivilegeVector& privileges);
-
-    /**
-     * Returns Status::OK() if the current Auth schema version is at least the auth schema version
-     * for the MongoDB 2.6 and 3.0 MongoDB-CR/SCRAM mixed auth mode.
-     * Returns an error otherwise.
-     */
-    Status requireAuthSchemaVersion26Final(OperationContext* txn,
-                                           AuthorizationManager* authzManager);
-
-    /**
-     * Returns Status::OK() if the current Auth schema version is at least the auth schema version
-     * for MongoDB 2.6 during the upgrade process.
-     * Returns an error otherwise.
-     */
-    Status requireAuthSchemaVersion26UpgradeOrFinal(OperationContext* txn,
-                                                    AuthorizationManager* authzManager);
-
-    void appendBSONObjToBSONArrayBuilder(BSONArrayBuilder* array, const BSONObj& obj);
 
     //
     // checkAuthorizedTo* methods

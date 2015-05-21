@@ -329,107 +329,6 @@ namespace mongo {
         return _privilegeDocsExist;
     }
 
-    Status AuthorizationManager::writeAuthSchemaVersionIfNeeded(OperationContext* txn,
-                                                                int foundSchemaVersion) {
-        Status status =  _externalState->updateOne(
-                txn,
-                AuthorizationManager::versionCollectionNamespace,
-                AuthorizationManager::versionDocumentQuery,
-                BSON("$set" << BSON(AuthorizationManager::schemaVersionFieldName <<
-                                    foundSchemaVersion)),
-                true,  // upsert
-                BSONObj());  // write concern
-        if (status == ErrorCodes::NoMatchingDocument) {    // SERVER-11492
-            status = Status::OK();
-        }
-        return status;
-    }
-
-    Status AuthorizationManager::insertPrivilegeDocument(OperationContext* txn,
-                                                         const std::string& dbname,
-                                                         const BSONObj& userObj,
-                                                         const BSONObj& writeConcern) const {
-        return _externalState->insertPrivilegeDocument(txn, dbname, userObj, writeConcern);
-    }
-
-    Status AuthorizationManager::updatePrivilegeDocument(OperationContext* txn,
-                                                         const UserName& user,
-                                                         const BSONObj& updateObj,
-                                                         const BSONObj& writeConcern) const {
-        return _externalState->updatePrivilegeDocument(txn, user, updateObj, writeConcern);
-    }
-
-    Status AuthorizationManager::removePrivilegeDocuments(OperationContext* txn,
-                                                          const BSONObj& query,
-                                                          const BSONObj& writeConcern,
-                                                          int* numRemoved) const {
-        return _externalState->removePrivilegeDocuments(txn, query, writeConcern, numRemoved);
-    }
-
-    Status AuthorizationManager::removeRoleDocuments(OperationContext* txn,
-                                                     const BSONObj& query,
-                                                     const BSONObj& writeConcern,
-                                                     int* numRemoved) const {
-        Status status = _externalState->remove(txn,
-                                               rolesCollectionNamespace,
-                                               query,
-                                               writeConcern,
-                                               numRemoved);
-        if (status.code() == ErrorCodes::UnknownError) {
-            return Status(ErrorCodes::RoleModificationFailed, status.reason());
-        }
-        return status;
-    }
-
-    Status AuthorizationManager::insertRoleDocument(OperationContext* txn,
-                                                    const BSONObj& roleObj,
-                                                    const BSONObj& writeConcern) const {
-        Status status = _externalState->insert(txn,
-                                               rolesCollectionNamespace,
-                                               roleObj,
-                                               writeConcern);
-        if (status.isOK()) {
-            return status;
-        }
-        if (status.code() == ErrorCodes::DuplicateKey) {
-            std::string name = roleObj[AuthorizationManager::ROLE_NAME_FIELD_NAME].String();
-            std::string source = roleObj[AuthorizationManager::ROLE_DB_FIELD_NAME].String();
-            return Status(ErrorCodes::DuplicateKey,
-                          mongoutils::str::stream() << "Role \"" << name << "@" << source <<
-                                  "\" already exists");
-        }
-        if (status.code() == ErrorCodes::UnknownError) {
-            return Status(ErrorCodes::RoleModificationFailed, status.reason());
-        }
-        return status;
-    }
-
-    Status AuthorizationManager::updateRoleDocument(OperationContext* txn,
-                                                    const RoleName& role,
-                                                    const BSONObj& updateObj,
-                                                    const BSONObj& writeConcern) const {
-        Status status = _externalState->updateOne(
-                txn,
-                rolesCollectionNamespace,
-                BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME << role.getRole() <<
-                     AuthorizationManager::ROLE_DB_FIELD_NAME << role.getDB()),
-                updateObj,
-                false,
-                writeConcern);
-        if (status.isOK()) {
-            return status;
-        }
-        if (status.code() == ErrorCodes::NoMatchingDocument) {
-            return Status(ErrorCodes::RoleNotFound,
-                          mongoutils::str::stream() << "Role " << role.getFullName() <<
-                                  " not found");
-        }
-        if (status.code() == ErrorCodes::UnknownError) {
-            return Status(ErrorCodes::RoleModificationFailed, status.reason());
-        }
-        return status;
-    }
-
     Status AuthorizationManager::queryAuthzDocument(
             OperationContext* txn,
             const NamespaceString& collectionName,
@@ -437,24 +336,6 @@ namespace mongo {
             const BSONObj& projection,
             const stdx::function<void(const BSONObj&)>& resultProcessor) {
         return _externalState->query(txn, collectionName, query, projection, resultProcessor);
-    }
-
-    Status AuthorizationManager::updateAuthzDocuments(OperationContext* txn,
-                                                      const NamespaceString& collectionName,
-                                                      const BSONObj& query,
-                                                      const BSONObj& updatePattern,
-                                                      bool upsert,
-                                                      bool multi,
-                                                      const BSONObj& writeConcern,
-                                                      int* nMatched) const {
-        return _externalState->update(txn,
-                                      collectionName,
-                                      query,
-                                      updatePattern,
-                                      upsert,
-                                      multi,
-                                      writeConcern,
-                                      nMatched);
     }
 
     Status AuthorizationManager::getBSONForPrivileges(const PrivilegeVector& privileges,

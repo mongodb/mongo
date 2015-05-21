@@ -174,6 +174,13 @@ namespace {
         return Status::OK();
     }
 
+    Status AuthzManagerExternalStateMock::insertPrivilegeDocument(
+            OperationContext* txn,
+            const BSONObj& userObj,
+            const BSONObj& writeConcern) {
+        return insert(txn, AuthorizationManager::usersCollectionNamespace, userObj, writeConcern);
+    }
+
     Status AuthzManagerExternalStateMock::updateOne(
             OperationContext* txn,
             const NamespaceString& collectionName,

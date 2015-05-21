@@ -178,7 +178,6 @@ namespace {
 
         ASSERT_OK(externalState->insertPrivilegeDocument(
                 &txn,
-                "admin",
                 BSON("_id" << "admin.v2read" <<
                      "user" << "v2read" <<
                      "db" << "test" <<
@@ -187,7 +186,6 @@ namespace {
                 BSONObj()));
         ASSERT_OK(externalState->insertPrivilegeDocument(
                 &txn,
-                "admin",
                 BSON("_id" << "admin.v2cluster" <<
                      "user" << "v2cluster" <<
                      "db" << "admin" <<
