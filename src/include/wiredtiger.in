@@ -1465,7 +1465,7 @@ struct __wt_session {
 	 * named snapshots. Named snapshot transactions can be accessed via
 	 * WT_CURSOR::open. See @ref transaction_named_snapshots.
 	 *
-	 * @snippet ex_all.c Snapshot example
+	 * @snippet ex_all.c Snapshot examples
 	 *
 	 * @param session the session handle
 	 * @configstart{WT_SESSION.snapshot, see dist/api_data.py}
