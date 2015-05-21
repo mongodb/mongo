@@ -69,19 +69,25 @@ assertSubstring( '$a', 'a$a', 1, 2 );
 
 // Multi byte utf-8.
 assertSubstring( '\u0080', '\u0080', 0, 2 );
-if ( 0 ) { // SERVER-6801
+
 assertException( '\u0080', 0, 1 );
 assertException( '\u0080', 1, 1 );
-}
+
 assertSubstring( '\u0080', '\u0080\u20ac', 0, 2 );
 assertSubstring( '\u20ac', '\u0080\u20ac', 2, 3 );
-if ( 0 ) { // SERVER-6801
+
 assertException( '\u0080\u20ac', 1, 3 );
 assertException( '\u0080\u20ac', 1, 4 );
 assertException( '\u0080\u20ac', 0, 3 );
-}
+
 assertSubstring( '\u0044\u20ac', '\u0080\u0044\u20ac', 2, 4 );
 assertSubstring( '\u0044', '\u0080\u0044\u20ac', 2, 1 );
+
+// The four byte utf-8 character 𝌆 (have to represent in surrogate halves).
+assertSubstring( '\uD834\uDF06', '\uD834\uDF06', 0, 4 );
+
+assertException( '\uD834\uDF06', '\uD834\uDF06', 1, 4 );
+assertException( '\uD834\uDF06', '\uD834\uDF06', 0, 3 );
 
 // Operands from document.
 t.drop();
