@@ -64,13 +64,15 @@ csv_extract(WT_EXTRACTOR *extractor, WT_SESSION *session,
 	const CSV_EXTRACTOR *cvs_extractor;
 	int i, ret;
 	size_t len;
+	WT_EXTENSION_API *wtapi;
 
 	(void)key;				/* Unused parameters */
 
 	cvs_extractor = (const CSV_EXTRACTOR *)extractor;
+	wtapi = cvs_extractor->wt_api;
 
 	/* Unpack the value. */
-	if ((ret = wiredtiger_struct_unpack(
+	if ((ret = wtapi->struct_unpack(wtapi,
 	    session, value->data, value->size, "S", &valstr)) != 0)
 		return (ret);
 
