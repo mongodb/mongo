@@ -138,7 +138,6 @@ namespace {
         ASSERT_TRUE(fetcher->isActive());
         getNet()->runReadyNetworkOperations();
         ASSERT_FALSE(getNet()->hasReadyRequests());
-        fetcher->wait();
         ASSERT_FALSE(fetcher->isActive());
     }
 
@@ -405,6 +404,24 @@ namespace {
         ASSERT_TRUE(Fetcher::NextAction::kNoAction == nextAction);
     }
 
+    TEST_F(FetcherTest, SetNextActionToContinueWhenNextBatchIsNotAvailable) {
+        ASSERT_OK(fetcher->schedule());
+        const BSONObj doc = BSON("_id" << 1);
+        callbackHook = [](const StatusWith<Fetcher::BatchData>& fetchResult,
+                          Fetcher::NextAction* nextAction) {
+            *nextAction = Fetcher::NextAction::kContinue;
+        };
+        processNetworkResponse(BSON("cursor" << BSON("id" << 0LL <<
+                                                     "ns" << "db.coll" <<
+                                                     "firstBatch" << BSON_ARRAY(doc)) <<
+                                    "ok" << 1));
+        ASSERT_OK(status);
+        ASSERT_EQUALS(0, cursorId);
+        ASSERT_EQUALS(1U, documents.size());
+        ASSERT_EQUALS(doc, documents.front());
+        ASSERT_TRUE(Fetcher::NextAction::kNoAction == nextAction);
+    }
+
     TEST_F(FetcherTest, FetchMultipleBatches) {
         ASSERT_OK(fetcher->schedule());
         const BSONObj doc = BSON("_id" << 1);
@@ -446,7 +463,6 @@ namespace {
         ASSERT_FALSE(fetcher->isActive());
 
         ASSERT_FALSE(getNet()->hasReadyRequests());
-        ASSERT_FALSE(fetcher->isActive());
     }
 
     TEST_F(FetcherTest, ScheduleGetMoreAndCancel) {

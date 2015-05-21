@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/thread/mutex.hpp>
 #include <string>
 #include <vector>
 
@@ -39,6 +38,8 @@
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
@@ -138,7 +139,7 @@ namespace repl {
         void cancel();
 
         /**
-         * Waits for active remote command request to complete.
+         * Waits for remote command requests to complete.
          * Returns immediately if fetcher is not active.
          */
         void wait();
@@ -156,6 +157,11 @@ namespace repl {
         void _callback(const ReplicationExecutor::RemoteCommandCallbackData& rcbd,
                        const char* batchFieldName);
 
+        /**
+         * Sets fetcher state to inactive and notifies waiters.
+         */
+        void _finishCallback();
+
         // Not owned by us.
         ReplicationExecutor* _executor;
 
@@ -165,7 +171,9 @@ namespace repl {
         CallbackFn _work;
 
         // Protects member data of this Fetcher.
-        mutable boost::mutex _mutex;
+        mutable stdx::mutex _mutex;
+
+        mutable stdx::condition_variable _condition;
 
         // _active is true when Fetcher is scheduled to be run by the executor.
         bool _active;

@@ -30,8 +30,6 @@
 
 #include "mongo/db/repl/fetcher.h"
 
-#include <boost/thread/lock_guard.hpp>
-
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/replication_executor.h"
@@ -161,10 +159,15 @@ namespace {
         uassert(ErrorCodes::BadValue, "callback function cannot be null", work);
     }
 
-    Fetcher::~Fetcher() { }
+    Fetcher::~Fetcher() {
+        DESTRUCTOR_GUARD(
+            cancel();
+            wait();
+        );
+    }
 
     std::string Fetcher::getDiagnosticString() const {
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         str::stream output;
         output << "Fetcher";
         output << " executor: " << _executor->getDiagnosticString();
@@ -176,19 +179,22 @@ namespace {
     }
 
     bool Fetcher::isActive() const {
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         return _active;
     }
 
     Status Fetcher::schedule() {
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        if (_active) {
+            return Status(ErrorCodes::IllegalOperation, "fetcher already scheduled");
+        }
         return _schedule_inlock(_cmdObj, kFirstBatchFieldName);
     }
 
     void Fetcher::cancel() {
         ReplicationExecutor::CallbackHandle remoteCommandCallbackHandle;
         {
-            boost::lock_guard<boost::mutex> lk(_mutex);
+            stdx::lock_guard<stdx::mutex> lk(_mutex);
 
             if (!_active) {
                 return;
@@ -202,26 +208,11 @@ namespace {
     }
 
     void Fetcher::wait() {
-        ReplicationExecutor::CallbackHandle remoteCommandCallbackHandle;
-        {
-            boost::lock_guard<boost::mutex> lk(_mutex);
-
-            if (!_active) {
-                return;
-            }
-
-            remoteCommandCallbackHandle = _remoteCommandCallbackHandle;
-        }
-
-        invariant(remoteCommandCallbackHandle.isValid());
-        _executor->wait(remoteCommandCallbackHandle);
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
+        _condition.wait(lk, [this]() { return !_active; });
     }
 
     Status Fetcher::_schedule_inlock(const BSONObj& cmdObj, const char* batchFieldName) {
-        if (_active) {
-            return Status(ErrorCodes::IllegalOperation, "fetcher already scheduled");
-        }
-
         StatusWith<ReplicationExecutor::CallbackHandle> scheduleResult =
             _executor->scheduleRemoteCommand(
                 RemoteCommandRequest(_source, _dbname, cmdObj),
@@ -238,13 +229,11 @@ namespace {
 
     void Fetcher::_callback(const ReplicationExecutor::RemoteCommandCallbackData& rcbd,
                             const char* batchFieldName) {
-        boost::lock_guard<boost::mutex> lk(_mutex);
-        _active = false;
-
         NextAction nextAction = NextAction::kNoAction;
 
         if (!rcbd.response.isOK()) {
             _work(StatusWith<Fetcher::BatchData>(rcbd.response.getStatus()), &nextAction);
+            _finishCallback();
             return;
         }
 
@@ -252,6 +241,7 @@ namespace {
         Status status = getStatusFromCommandResult(cursorReponseObj);
         if (!status.isOK()) {
             _work(StatusWith<Fetcher::BatchData>(status), &nextAction);
+            _finishCallback();
             return;
         }
 
@@ -261,6 +251,7 @@ namespace {
         status = parseCursorResponse(cursorReponseObj, batchFieldName, &batchData, &nss);
         if (!status.isOK()) {
             _work(StatusWith<Fetcher::BatchData>(status), &nextAction);
+            _finishCallback();
             return;
         }
 
@@ -272,21 +263,29 @@ namespace {
 
         // Callback function _work may modify nextAction to request the fetcher
         // not to schedule a getMore command.
-        if (nextAction != NextAction::kContinue) {
+        if (!batchData.cursorId || nextAction != NextAction::kContinue) {
+            _finishCallback();
             return;
         }
 
-        nextAction = NextAction::kNoAction;
-
-        if (batchData.cursorId) {
+        {
+            stdx::lock_guard<stdx::mutex> lk(_mutex);
             BSONObj getMoreCmdObj = BSON("getMore" << batchData.cursorId <<
                                          "collection" << nss.coll());
             status = _schedule_inlock(getMoreCmdObj, kNextBatchFieldName);
-            if (!status.isOK()) {
-                _work(StatusWith<Fetcher::BatchData>(status), &nextAction);
-                return;
-            }
         }
+        if (!status.isOK()) {
+            nextAction = NextAction::kNoAction;
+            _work(StatusWith<Fetcher::BatchData>(status), &nextAction);
+            _finishCallback();
+            return;
+        }
+    }
+
+    void Fetcher::_finishCallback() {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        _active = false;
+        _condition.notify_all();
     }
 
 } // namespace repl
