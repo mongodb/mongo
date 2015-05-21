@@ -2170,8 +2170,8 @@ main(int argc, char *argv[])
 			ret = enomem(cfg);
 			goto err;
 		}
-		snprintf(cfg->partial_config, req_len, "%s%s",
-		    cfg->table_config, LOG_PARTIAL_CONFIG);
+		snprintf((char *)cfg->partial_config, req_len, "%s%s",
+		    (char *)cfg->table_config, LOG_PARTIAL_CONFIG);
 	}
 
 	/* Sanity-check the configuration. */
