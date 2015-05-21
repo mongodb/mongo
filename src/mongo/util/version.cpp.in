@@ -49,88 +49,39 @@
 #include <openssl/crypto.h>
 #endif
 
+#include <pcrecpp.h>
+#include <cstdlib>
+
 namespace mongo {
 
     using std::string;
     using std::stringstream;
 
-    const char versionString[] = "@mongo_code_version@";
-    const char * gitVersion() { return "@buildinfo_git_version@"; }
+    const char versionString[] = "@mongo_version@";
+    const char * gitVersion() { return "@mongo_git_hash@"; }
     const char * compiledJSEngine() { return "@buildinfo_js_engine@"; }
     const char * allocator() { return "@buildinfo_allocator@"; }
+
+    const int kMongoVersionMajor = @mongo_version_major@;
+    const int kMongoVersionMinor = @mongo_version_minor@;
+    const int kMongoVersionPatch = @mongo_version_patch@;
+    const int kMongoVersionExtra = @mongo_version_extra@;
+    const char kMongoVersionExtraStr[] = "@mongo_version_extra_str@";
 
     std::vector<std::string> compiledModules() {
         const std::vector<string> modules_list = @buildinfo_modules@;
         return modules_list;
     }
 
-    // See unit test for example outputs
-    BSONArray toVersionArray(const char* version){
+    bool isSameMajorVersion(const char* version) {
+        int major = -1, minor = -1;
+        pcrecpp::RE ver_regex("^(\\d+)\\.(\\d+)\\.");
+        ver_regex.PartialMatch(version, &major, &minor);
 
-        /* Approved formats for version:
-         *      1.2.3
-         *      1.2.3-pre-
-         *      1.2.3-rc4 (rc0 up to rc49)
-         *      1.2.3-rc4-pre-
-         */
-
-        // this is inefficient, but cached so it doesn't matter
-        BSONArrayBuilder b;
-        string curPart;
-        const char* c = version;
-        int finalPart = 0; // 0 = final release, -100 = pre, -50 to -1 = -50 + X for rcX
-        do { //walks versionString including NUL byte
-            if (!(*c == '.' || *c == '-' || *c == '\0')){
-                curPart += *c;
-                continue;
-            }
-
-            int num;
-            if ( parseNumberFromString( curPart, &num ).isOK() ) {
-                b.append(num);
-            }
-            else if (curPart.empty()){
-                verify(*c == '\0');
-                break;
-            }
-            else if (str::startsWith(curPart, "rc")){
-                int rc;
-                invariantOK(parseNumberFromString( curPart.substr(2), &rc ));
-                invariant(rc >= 0);
-                invariant(rc < 50); // Need to adjust calculation if we pass this.
-                finalPart = -50 + rc;
-                break;
-            }
-            else if (curPart == "pre"){
-                finalPart = -100;
-                break;
-            }
-
-            curPart = "";
-        } while (*c++);
-
-        b.append(finalPart);
-        return b.arr();
+        if(major == -1 || minor == -1)
+            return false;
+        return (major == kMongoVersionMajor && minor == kMongoVersionMinor);
     }
-
-    bool isSameMajorVersion( const char* version ) {
-
-        BSONArray remoteVersionArray = toVersionArray( version );
-
-        BSONObjIterator remoteIt(remoteVersionArray);
-        BSONObjIterator myIt(versionArray);
-
-        // Compare only the first two fields of the version
-        int compareLen = 2;
-        while (compareLen > 0 && remoteIt.more() && myIt.more()) {
-            if (remoteIt.next().numberInt() != myIt.next().numberInt()) break;
-            compareLen--;
-        }
-
-        return compareLen == 0;
-    }
-
-    const BSONArray versionArray = toVersionArray(versionString);
 
     string mongodVersion() {
         stringstream ss;
@@ -181,8 +132,14 @@ namespace mongo {
                << "targetMinOS" << targetMinOS()
 #endif
                << "allocator" << allocator()
-               << "versionArray" << versionArray
                << "javascriptEngine" << compiledJSEngine();
+
+        BSONArrayBuilder versionArray(result.subarrayStart("versionArray"));
+        versionArray << kMongoVersionMajor
+                     << kMongoVersionMinor
+                     << kMongoVersionPatch
+                     << kMongoVersionExtra;
+        versionArray.done();
 
         BSONObjBuilder opensslInfo(result.subobjStart("openssl"));
 #ifdef MONGO_CONFIG_SSL

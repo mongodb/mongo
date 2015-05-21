@@ -39,7 +39,7 @@ namespace mongo {
 
     // mongo version
     extern const char versionString[];
-    extern const BSONArray versionArray;
+    extern const int versionNumber;
     std::string mongodVersion();
 
     // mongo git version
@@ -47,9 +47,6 @@ namespace mongo {
     const char* distName();
     void printGitVersion();
     std::vector<std::string> compiledModules();
-
-    // Convert a version std::string into a numeric array
-    BSONArray toVersionArray(const char* version);
 
     // Checks whether another version is the same major version as us
     bool isSameMajorVersion(const char* version);
@@ -66,6 +63,12 @@ namespace mongo {
     void printTargetMinOS();
     void printAllocator();
     void show_warnings();
+
+    extern const int kMongoVersionMajor;
+    extern const int kMongoVersionMinor;
+    extern const int kMongoVersionPatch;
+    extern const int kMongoVersionExtra;
+    extern const char kMongoVersionExtraStr[];
 
 }  // namespace mongo
 

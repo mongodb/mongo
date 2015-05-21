@@ -2,8 +2,9 @@
 
 # This SConscript describes build rules for the "mongo" project.
 
-import os
 import itertools
+import os
+import re
 import subprocess
 import sys
 from buildscripts import utils
@@ -86,11 +87,44 @@ if env.TargetOSIs('windows'):
 
 module_list = '{ %s }' % ', '.join([ '"{0}"'.format(x) for x in env['MONGO_MODULES'] ])
 
+# This generates a numeric representation of the version string so that
+# you can easily compare versions of MongoDB without having to parse
+# the version string.
+#
+# The rules for this are
+# {major}{minor}{release}{pre/rc/final}
+# If the version is pre-release and not an rc, the final number is 0
+# If the version is an RC, the final number of 1 + rc number
+# If the version is pre-release between RC's, the final number is 1 + rc number
+# If the version is a final release, the final number is 99
+#
+# Examples:
+# 3.1.1-123     = 3010100
+# 3.1.1-rc2     = 3010103
+# 3.1.1-rc2-123 = 3010103
+# 3.1.1         = 3010199
+#
+version_parts = [ x for x in re.match(r'^(\d+)\.(\d+)\.(\d+)-?((?:(rc)(\d+))?.*)?',
+    env['MONGO_VERSION']).groups() ]
+version_extra = version_parts[3] if version_parts[3] else ""
+if version_parts[4] == 'rc':
+    version_parts[3] = int(version_parts[5]) + -50
+elif version_parts[3]:
+    version_parts[3] = -100
+else:
+    version_parts[3] = 0
+version_parts = [ int(x) for x in version_parts[:4]]
+
 versionInfo = env.Substfile(
     'util/version.cpp.in',
     SUBST_DICT=[
-        ('@mongo_code_version@', env['MONGO_CODE_VERSION']),
-        ('@buildinfo_git_version@', env['MONGO_GIT_VERSION']),
+        ('@mongo_version@', env['MONGO_VERSION']),
+        ('@mongo_version_major@', version_parts[0]),
+        ('@mongo_version_minor@', version_parts[1]),
+        ('@mongo_version_patch@', version_parts[2]),
+        ('@mongo_version_extra@', version_parts[3]),
+        ('@mongo_version_extra_str@', version_extra),
+        ('@mongo_git_hash@', env['MONGO_GIT_HASH']),
         ('@buildinfo_js_engine@', js_engine_ver),
         ('@buildinfo_allocator@', GetOption('allocator')),
         ('@buildinfo_ccflags@', env['CCFLAGS']),
@@ -141,12 +175,6 @@ env.Library('version',
                 'bson/bson',
                 '$BUILD_DIR/mongo/base/base'
             ])
-
-env.CppUnitTest(
-    target="util/version_test",
-    source=["util/version_test.cpp"],
-    LIBDEPS=[]
-)
 
 mongod = env.Program(
     target="mongod",

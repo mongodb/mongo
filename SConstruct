@@ -15,6 +15,8 @@
 
 import copy
 import datetime
+import errno
+import json
 import os
 import re
 import shlex
@@ -353,6 +355,31 @@ add_option('modules',
            "Comma-separated list of modules to build. Empty means none. Default is all.",
            1, False)
 
+try:
+    with open("version.json", "r") as version_fp:
+        version_data = json.load(version_fp)
+
+    if 'version' not in version_data:
+        print "version.json does not contain a version string"
+        Exit(1)
+    if 'githash' not in version_data:
+        version_data['githash'] = utils.getGitVersion()
+
+except IOError as e:
+    # If the file error wasn't because the file is missing, error out
+    if e.errno != errno.ENOENT:
+        print "Error opening version.json: {0}".format(e.strerror)
+        Exit(1)
+
+    version_data = {
+        'version': utils.getGitDescribe()[1:],
+        'githash': utils.getGitVersion(),
+    }
+
+except ValueError as e:
+    print "Error decoding version.json: {0}".format(e)
+    Exit(1)
+
 # Setup the command-line variables
 def variable_shlex_converter(val):
     # If the argument is something other than a string, propogate
@@ -403,7 +430,14 @@ def decide_platform_tools():
 
 def variable_tools_converter(val):
     tool_list = shlex.split(val)
-    return tool_list + ["jsheader", "mergelib", "mongo_unittest", "textfile"]
+    return tool_list + [
+        "jsheader", "mergelib", "mongo_unittest", "textfile", "distsrc", "gziptool"
+    ]
+
+def variable_distsrc_converter(val):
+    if not val.endswith("/"):
+        return val + "/"
+    return val
 
 env_vars = Variables(
     files=variable_shlex_converter(get_option('variables-files')),
@@ -462,6 +496,19 @@ env_vars.Add('LIBS',
 env_vars.Add('LINKFLAGS',
     help='Sets flags for the linker',
     converter=variable_shlex_converter)
+
+env_vars.Add('MONGO_DIST_SRC_PREFIX',
+    help='Sets the prefix for files in the source distribution archive',
+    converter=variable_distsrc_converter,
+    default="mongodb-${MONGO_VERSION}")
+
+env_vars.Add('MONGO_VERSION',
+    help='Sets the version string for MongoDB',
+    default=version_data['version'])
+
+env_vars.Add('MONGO_GIT_HASH',
+    help='Sets the githash to store in the MongoDB version information',
+    default=version_data['githash'])
 
 env_vars.Add('MSVC_USE_SCRIPT',
     help='Sets the script used to setup Visual Studio.')
@@ -599,14 +646,6 @@ v8suffix = '' if v8version == '3.12' else '-' + v8version
 if not serverJs and not usev8:
     print("Warning: --server-js=off is not needed with --js-engine=none")
 
-def getMongoCodeVersion():
-    with open("version.txt") as version_txt:
-        content = version_txt.readlines()
-        if len(content) != 1:
-            print("Malformed version file")
-            Exit(1)
-        return content[0].strip()
-
 # We defer building the env until we have determined whether we want certain values. Some values
 # in the env actually have semantics for 'None' that differ from being absent, so it is better
 # to build it up via a dict, and then construct the Environment in one shot with kwargs.
@@ -631,8 +670,6 @@ envDict = dict(BUILD_ROOT=buildDir,
                CONFIGUREDIR=sconsDataDir.Dir('sconf_temp'),
                CONFIGURELOG=sconsDataDir.File('config.log'),
                INSTALL_DIR=installDir,
-               MONGO_GIT_VERSION=utils.getGitVersion(),
-               MONGO_CODE_VERSION=getMongoCodeVersion(),
                CONFIG_HEADER_DEFINES={},
                )
 
@@ -2058,17 +2095,31 @@ def getSystemInstallName():
 
     return n
 
-mongoCodeVersion = env['MONGO_CODE_VERSION']
-if mongoCodeVersion == None:
-    myenv.FatalError("Missing version information")
+# This function will add the version.txt file to the source tarball
+# so that versioning will work without having the git repo available.
+def add_version_to_distsrc(env, archive):
+    version_file_path = env.subst("$MONGO_DIST_SRC_PREFIX") + "version.json"
+    if version_file_path not in archive:
+        version_data = {
+            'version': env['MONGO_VERSION'],
+            'githash': env['MONGO_GIT_HASH'],
+        }
+        archive.append_file_contents(
+            version_file_path,
+            json.dumps(
+                version_data,
+                sort_keys=True,
+                indent=4,
+                separators=(',', ': ')
+            )
+        )
+
+env.AddDistSrcCallback(add_version_to_distsrc)
 
 if has_option('distname'):
     distName = GetOption( "distname" )
-elif mongoCodeVersion[-1] not in ("+", "-"):
-    distName = mongoCodeVersion
 else:
-    distName = utils.getGitBranchString("" , "-") + datetime.date.today().strftime("%Y-%m-%d")
-
+    distName = env['MONGO_VERSION']
 
 env['SERVER_DIST_BASENAME'] = 'mongodb-%s-%s' % (getSystemInstallName(), distName)
 
@@ -2098,6 +2149,13 @@ def injectMongoIncludePaths(thisEnv):
 env.AddMethod(injectMongoIncludePaths, 'InjectMongoIncludePaths')
 
 env.Alias("compiledb", env.CompilationDatabase('compile_commands.json'))
+env.Alias("distsrc-tar", env.DistSrc("mongodb-src-${MONGO_VERSION}.tar"))
+env.Alias("distsrc-tgz", env.GZip(
+    target="mongodb-src-${MONGO_VERSION}.tgz",
+    source=["mongodb-src-${MONGO_VERSION}.tar"])
+)
+env.Alias("distsrc-zip", env.DistSrc("mongodb-src-${MONGO_VERSION}.zip"))
+env.Alias("distsrc", "distsrc-tgz")
 
 env.SConscript('src/SConscript', variant_dir='$BUILD_DIR', duplicate=False)
 
