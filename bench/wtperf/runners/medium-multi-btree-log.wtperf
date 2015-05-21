@@ -4,8 +4,8 @@ table_config="type=file,os_cache_dirty_max=16MB"
 icount=5000000
 populate_threads=5
 populate_ops_per_txn=100
-#compact=true
 #threads=((count=8,read=1),(count=8,update=1))
-#run_time=180
+threads=((count=8,read=1)))
+run_time=120
 report_interval=5
 table_count=4
