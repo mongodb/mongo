@@ -89,13 +89,12 @@ __wt_txn_modify_ref(WT_SESSION_IMPL *session, WT_REF *ref)
 }
 
 /*
- * __wt_txn_visible_all --
- *	Check if a given transaction ID is "globally visible".	This is, if
- *	all sessions in the system will see the transaction ID including the
- *	ID that belongs to a running checkpoint.
+ * __wt_txn_oldest_id --
+ *	Return the oldest transaction ID that has to be kept for the current
+ *	tree.
  */
-static inline int
-__wt_txn_visible_all(WT_SESSION_IMPL *session, uint64_t id)
+static inline uint64_t
+__wt_txn_oldest_id(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
 	WT_TXN_GLOBAL *txn_global;
@@ -125,7 +124,23 @@ __wt_txn_visible_all(WT_SESSION_IMPL *session, uint64_t id)
 		 */
 		oldest_id = checkpoint_snap_min;
 
-	return (TXNID_LT(id, oldest_id));
+	return (oldest_id);
+}
+
+/*
+ * __wt_txn_visible_all --
+ *	Check if a given transaction ID is "globally visible".	This is, if
+ *	all sessions in the system will see the transaction ID including the
+ *	ID that belongs to a running checkpoint.
+ */
+static inline int
+__wt_txn_visible_all(WT_SESSION_IMPL *session, uint64_t id)
+{
+	uint64_t oldest_id;
+
+	oldest_id = __wt_txn_oldest_id(session);
+
+	return (WT_TXNID_LT(id, oldest_id));
 }
 
 /*
