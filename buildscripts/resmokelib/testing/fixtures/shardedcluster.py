@@ -312,7 +312,7 @@ class _MongoSFixture(interface.Fixture):
         running_at_start = self.is_running()
         success = True  # Still a success even if nothing is running.
 
-        if not running_at_start:
+        if not running_at_start and self.port is not None:
             self.logger.info("mongos on port %d was expected to be running in teardown(), but"
                              " wasn't." % (self.port))
 
