@@ -38,6 +38,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/client/find_and_modify_request.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
@@ -65,94 +66,6 @@
 namespace mongo {
 
 namespace {
-
-    /**
-     * Represents the user-supplied options to the findAndModify command.
-     *
-     * The BSONObj members contained within this struct are owned objects.
-     */
-    struct FindAndModifyRequest {
-    public:
-        /**
-         * Construct an empty request.
-         */
-        FindAndModifyRequest() { }
-
-        const NamespaceString& getNamespaceString() const { return _nsString; }
-        const BSONObj& getQuery() const { return _query; }
-        const BSONObj& getFields() const { return _fields; }
-        const BSONObj& getUpdateObj() const { return _updateObj; }
-        const BSONObj& getSort() const { return _sort; }
-        bool shouldReturnNew() const { return _shouldReturnNew; }
-        bool isUpsert() const { return _isUpsert; }
-        bool isRemove() const { return _isRemove; }
-
-        /**
-         * Construct a FindAndModifyRequest from the database name and the command specification.
-         */
-        static StatusWith<FindAndModifyRequest> parseFromBSON(const std::string& fullNs,
-                                                              const BSONObj& cmdObj) {
-            BSONObj query = cmdObj.getObjectField("query");
-            BSONObj fields = cmdObj.getObjectField("fields");
-            BSONObj updateObj = cmdObj.getObjectField("update");
-            BSONObj sort = cmdObj.getObjectField("sort");
-            bool shouldReturnNew = cmdObj["new"].trueValue();
-            bool isUpsert = cmdObj["upsert"].trueValue();
-            bool isRemove = cmdObj["remove"].trueValue();
-            bool isUpdate = cmdObj.hasField("update");
-
-            if (!isRemove && !isUpdate) {
-                return {ErrorCodes::BadValue, "Either an update or remove=true must be specified"};
-            }
-            if (isRemove) {
-                if (isUpdate) {
-                    return {ErrorCodes::BadValue, "Cannot specify both an update and remove=true"};
-                }
-                if (isUpsert) {
-                    return {ErrorCodes::BadValue,
-                        "Cannot specify both upsert=true and remove=true"};
-                }
-                if (shouldReturnNew) {
-                    return {ErrorCodes::BadValue,
-                        "Cannot specify both new=true and remove=true;"
-                        " 'remove' always returns the deleted document"};
-                }
-            }
-            FindAndModifyRequest request(fullNs, query, fields, updateObj, sort, shouldReturnNew,
-                                         isUpsert, isRemove);
-            return std::move(request);
-        }
-
-    private:
-        /**
-         * Construct a FindAndModifyRequest from parsed BSON.
-         */
-        FindAndModifyRequest(const std::string& fullNs,
-                             const BSONObj& query,
-                             const BSONObj& fields,
-                             const BSONObj& updateObj,
-                             const BSONObj& sort,
-                             bool shouldReturnNew,
-                             bool isUpsert,
-                             bool isRemove)
-            : _nsString(fullNs),
-              _query(query.getOwned()),
-              _fields(fields.getOwned()),
-              _updateObj(updateObj.getOwned()),
-              _sort(sort.getOwned()),
-              _shouldReturnNew(shouldReturnNew),
-              _isUpsert(isUpsert),
-              _isRemove(isRemove) { }
-
-        NamespaceString _nsString;
-        BSONObj _query;
-        BSONObj _fields;
-        BSONObj _updateObj;
-        BSONObj _sort;
-        bool _shouldReturnNew;
-        bool _isUpsert;
-        bool _isRemove;
-    };
 
     const UpdateStats* getUpdateStats(const PlanStageStats* stats) {
         // The stats may refer to an update stage, or a projection stage wrapping an update stage.
@@ -310,7 +223,7 @@ namespace {
             }
 
             StatusWith<FindAndModifyRequest> parseStatus =
-                FindAndModifyRequest::parseFromBSON(fullNs, cmdObj);
+                FindAndModifyRequest::parseFromBSON(NamespaceString(fullNs), cmdObj);
             if (!parseStatus.isOK()) {
                 return parseStatus.getStatus();
             }
@@ -412,7 +325,7 @@ namespace {
             }
 
             StatusWith<FindAndModifyRequest> parseStatus =
-                FindAndModifyRequest::parseFromBSON(fullNs, cmdObj);
+                FindAndModifyRequest::parseFromBSON(NamespaceString(fullNs), cmdObj);
             if (!parseStatus.isOK()) {
                 return appendCommandStatus(result, parseStatus.getStatus());
             }

@@ -90,11 +90,14 @@ env.Library(
 env.Library(
     target='remote_command_runner',
     source=[
+        'find_and_modify_request.cpp',
         'remote_command_runner.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/util/foundation',
         '$BUILD_DIR/mongo/bson/bson',
+        '$BUILD_DIR/mongo/db/common',
+        '$BUILD_DIR/mongo/util/foundation',
+        '$BUILD_DIR/mongo/util/net/hostandport',
     ]
 )
 
@@ -199,4 +202,14 @@ env.Library(
     ],
     LIBDEPS=[
     ],
+)
+
+env.CppUnitTest(
+    target="find_and_modify_request_test",
+    source=[
+        "find_and_modify_request_test.cpp",
+    ],
+    LIBDEPS=[
+        'remote_command_runner'
+    ]
 )
