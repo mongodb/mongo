@@ -37,8 +37,6 @@
 
 namespace mongo {
 
-    extern const BSONObj reverseNaturalObj; // {"$natural": -1 }
-
     class Collection;
     class Cursor;
     class OperationContext;

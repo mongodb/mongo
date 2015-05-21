@@ -58,6 +58,8 @@ namespace mongo {
 
 namespace repl {
 
+    const BSONObj reverseNaturalObj = BSON( "$natural" << -1 );
+
     //number of readers created;
     //  this happens when the source source changes, a reconfig/network-error or the cursor dies
     static Counter64 readersCreatedStats;
@@ -65,8 +67,6 @@ namespace repl {
                                                     "repl.network.readersCreated",
                                                     &readersCreatedStats );
 
-
-    static const BSONObj userReplQuery = fromjson("{\"user\":\"repl\"}");
 
     bool replAuthenticate(DBClientBase *conn) {
         if (!getGlobalAuthorizationManager()->isAuthEnabled())
@@ -123,18 +123,18 @@ namespace repl {
         );
     }
 
-    void OplogReader::tailingQuery(const char *ns, const BSONObj& query, const BSONObj* fields ) {
+    void OplogReader::tailingQuery(const char *ns, const BSONObj& query) {
         verify( !haveCursor() );
         LOG(2) << ns << ".find(" << query.toString() << ')' << endl;
-        cursor.reset( _conn->query( ns, query, 0, 0, fields, _tailingQueryOptions ).release() );
+        cursor.reset( _conn->query( ns, query, 0, 0, nullptr, _tailingQueryOptions ).release() );
     }
 
-    void OplogReader::tailingQueryGTE(const char *ns, Timestamp optime, const BSONObj* fields ) {
+    void OplogReader::tailingQueryGTE(const char *ns, Timestamp optime) {
         BSONObjBuilder gte;
         gte.append("$gte", optime);
         BSONObjBuilder query;
         query.append("ts", gte.done());
-        tailingQuery(ns, query.done(), fields);
+        tailingQuery(ns, query.done());
     }
 
     HostAndPort OplogReader::getHost() const {

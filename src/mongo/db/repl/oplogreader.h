@@ -38,10 +38,10 @@
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
-
-    extern const BSONObj reverseNaturalObj; // { $natural : -1 }
-
 namespace repl {
+
+    extern const BSONObj reverseNaturalObj; // {"$natural": -1 }
+
     class ReplicationCoordinator;
 
     /**
@@ -97,15 +97,9 @@ namespace repl {
                    int nToSkip,
                    const BSONObj* fields=0);
 
-        void tailingQuery(const char *ns, const BSONObj& query, const BSONObj* fields=0);
+        void tailingQuery(const char *ns, const BSONObj& query);
 
-        void tailingQueryGTE(const char *ns, Timestamp t, const BSONObj* fields=0);
-
-        /* Do a tailing query, but only send the ts field back. */
-        void ghostQueryGTE(const char *ns, Timestamp t) {
-            const BSONObj fields = BSON("ts" << 1 << "_id" << 0);
-            return tailingQueryGTE(ns, t, &fields);
-        }
+        void tailingQueryGTE(const char *ns, Timestamp t);
 
         bool more() {
             uassert( 15910, "Doesn't have cursor for reading oplog", cursor.get() );
@@ -123,15 +117,17 @@ namespace repl {
             return cursor->getMessage()->size();
         }
 
-        int getTailingQueryOptions() const { return _tailingQueryOptions; }
-        void setTailingQueryOptions( int tailingQueryOptions ) { _tailingQueryOptions = tailingQueryOptions; }
+        BSONObj nextSafe() { return cursor->nextSafe(); }
+        BSONObj next() { return cursor->next(); }
 
+
+        // master/slave only
         void peek(std::vector<BSONObj>& v, int n) {
             if( cursor.get() )
                 cursor->peek(v,n);
         }
-        BSONObj nextSafe() { return cursor->nextSafe(); }
-        BSONObj next() { return cursor->next(); }
+
+        // master/slave only
         void putBack(BSONObj op) { cursor->putBack(op); }
 
         HostAndPort getHost() const;

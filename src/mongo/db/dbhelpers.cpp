@@ -79,8 +79,6 @@ namespace mongo {
 
     using logger::LogComponent;
 
-    const BSONObj reverseNaturalObj = BSON( "$natural" << -1 );
-
     void Helpers::ensureIndex(OperationContext* txn,
                               Collection* collection,
                               BSONObj keyPattern,
