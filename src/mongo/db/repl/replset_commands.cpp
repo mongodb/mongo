@@ -719,7 +719,7 @@ namespace {
                     ReplSetHeartbeatResponse response;
                     status = getGlobalReplicationCoordinator()->processHeartbeatV1(args, &response);
                     if (status.isOK())
-                        response.addToBSON(&result);
+                        response.addToBSON(&result, true);
                     return appendCommandStatus(result, status);
                 }
                 // else: fall through to old heartbeat protocol as it is likely that
@@ -740,7 +740,7 @@ namespace {
             ReplSetHeartbeatResponse response;
             status = getGlobalReplicationCoordinator()->processHeartbeat(args, &response);
             if (status.isOK())
-                response.addToBSON(&result);
+                response.addToBSON(&result, false);
             return appendCommandStatus(result, status);
         }
     } cmdReplSetHeartbeat;

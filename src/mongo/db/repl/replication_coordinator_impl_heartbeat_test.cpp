@@ -114,7 +114,7 @@ namespace {
         hbResp.setConfig(rsConfig);
         BSONObjBuilder responseBuilder;
         responseBuilder << "ok" << 1;
-        hbResp.addToBSON(&responseBuilder);
+        hbResp.addToBSON(&responseBuilder, false);
         net->scheduleResponse(noi,
                               startDate + Milliseconds(200),
                               makeResponseStatus(responseBuilder.obj()));
@@ -175,7 +175,7 @@ namespace {
         hbResp.setConfig(rsConfig);
         BSONObjBuilder responseBuilder;
         responseBuilder << "ok" << 1;
-        hbResp.addToBSON(&responseBuilder);
+        hbResp.addToBSON(&responseBuilder, false);
         net->scheduleResponse(noi,
                               startDate + Milliseconds(200),
                               makeResponseStatus(responseBuilder.obj()));

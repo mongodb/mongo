@@ -750,7 +750,6 @@ namespace {
             const OpTime& lastOpApplied,
             ReplSetHeartbeatResponse* response) {
 
-        response->setProtocolVersion(1);
         // Verify that replica set names match
         const std::string rshb = args.getSetName();
         if (ourSetName != rshb) {

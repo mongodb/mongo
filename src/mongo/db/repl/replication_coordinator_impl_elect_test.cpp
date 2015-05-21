@@ -71,7 +71,7 @@ namespace {
                 hbResp.setConfigVersion(rsConfig.getConfigVersion());
                 BSONObjBuilder respObj;
                 respObj << "ok" << 1;
-                hbResp.addToBSON(&respObj);
+                hbResp.addToBSON(&respObj, false);
                 net->scheduleResponse(noi, net->now(), makeResponseStatus(respObj.obj()));
             }
             else {
@@ -354,7 +354,7 @@ namespace {
         hbResp2.setState(MemberState::RS_SECONDARY);
         BSONObjBuilder respObj2;
         respObj2 << "ok" << 1;
-        hbResp2.addToBSON(&respObj2);
+        hbResp2.addToBSON(&respObj2, false);
         net->runUntil(net->now() + Seconds(10)); // run until we've sent a heartbeat request
         const NetworkInterfaceMock::NetworkOperationIterator noi2 = net->getNextReadyRequest();
         net->scheduleResponse(noi2, net->now(), makeResponseStatus(respObj2.obj()));
@@ -388,7 +388,7 @@ namespace {
                 hbResp.setConfigVersion(rsConfig.getConfigVersion());
                 BSONObjBuilder respObj;
                 respObj << "ok" << 1;
-                hbResp.addToBSON(&respObj);
+                hbResp.addToBSON(&respObj, false);
                 net->scheduleResponse(noi, net->now(), makeResponseStatus(respObj.obj()));
             }
             else {

@@ -524,7 +524,7 @@ namespace {
                 _net->scheduleResponse(noi,
                                        startDate + Milliseconds(10),
                                        ResponseStatus(RemoteCommandResponse(
-                                                              hbResp.toBSON(),
+                                                              hbResp.toBSON(false),
                                                               Milliseconds(8))));
             }
             else {

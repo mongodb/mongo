@@ -184,7 +184,7 @@ namespace {
                 hbResp.setSetName(rsConfig.getReplSetName());
                 hbResp.setState(MemberState::RS_SECONDARY);
                 hbResp.setConfigVersion(rsConfig.getConfigVersion());
-                net->scheduleResponse(noi, net->now(), makeResponseStatus(hbResp.toBSON()));
+                net->scheduleResponse(noi, net->now(), makeResponseStatus(hbResp.toBSON(true)));
             }
             else if (request.cmdObj.firstElement().fieldNameStringData() == "replSetRequestVotes") {
 
@@ -246,7 +246,7 @@ namespace {
                 hbResp.setConfigVersion(rsConfig.getConfigVersion());
                 BSONObjBuilder respObj;
                 respObj << "ok" << 1;
-                hbResp.addToBSON(&respObj);
+                hbResp.addToBSON(&respObj, false);
                 net->scheduleResponse(noi, net->now(), makeResponseStatus(respObj.obj()));
             }
             else if (request.cmdObj.firstElement().fieldNameStringData() == "replSetFresh") {

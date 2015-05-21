@@ -70,7 +70,7 @@ namespace {
                 hbResp.setState(MemberState::RS_SECONDARY);
                 hbResp.setConfigVersion(rsConfig.getConfigVersion());
                 BSONObjBuilder respObj;
-                net->scheduleResponse(noi, net->now(), makeResponseStatus(hbResp.toBSON()));
+                net->scheduleResponse(noi, net->now(), makeResponseStatus(hbResp.toBSON(true)));
             }
             else {
                 error() << "Black holing unexpected request to " << request.target << ": " <<
@@ -316,7 +316,7 @@ namespace {
         hbResp2.setState(MemberState::RS_SECONDARY);
         net->runUntil(net->now() + Seconds(10)); // run until we've sent a heartbeat request
         const NetworkInterfaceMock::NetworkOperationIterator noi2 = net->getNextReadyRequest();
-        net->scheduleResponse(noi2, net->now(), makeResponseStatus(hbResp2.toBSON()));
+        net->scheduleResponse(noi2, net->now(), makeResponseStatus(hbResp2.toBSON(true)));
         net->runReadyNetworkOperations();
         getNet()->exitNetwork();
 
@@ -346,7 +346,7 @@ namespace {
                 hbResp.setState(MemberState::RS_SECONDARY);
                 hbResp.setConfigVersion(rsConfig.getConfigVersion());
                 BSONObjBuilder respObj;
-                net->scheduleResponse(noi, net->now(), makeResponseStatus(hbResp.toBSON()));
+                net->scheduleResponse(noi, net->now(), makeResponseStatus(hbResp.toBSON(true)));
             }
             else {
                 error() << "Black holing unexpected request to " << request.target << ": " <<

@@ -285,7 +285,7 @@ namespace {
         getNet()->scheduleResponse(
                 noi,
                 startDate + Milliseconds(10),
-                ResponseStatus(RemoteCommandResponse(hbResp.toBSON(), Milliseconds(8))));
+                ResponseStatus(RemoteCommandResponse(hbResp.toBSON(false), Milliseconds(8))));
         getNet()->runUntil(startDate + Milliseconds(10));
         getNet()->exitNetwork();
         ASSERT_EQUALS(startDate + Milliseconds(10), getNet()->now());
@@ -974,7 +974,7 @@ namespace {
             hbResp.setOpTime(optime1);
             BSONObjBuilder respObj;
             respObj << "ok" << 1;
-            hbResp.addToBSON(&respObj);
+            hbResp.addToBSON(&respObj, false);
             getNet()->scheduleResponse(noi, getNet()->now(), makeResponseStatus(respObj.obj()));
         }
         while (getNet()->hasReadyRequests()) {
@@ -1162,7 +1162,7 @@ namespace {
             hbResp.setOpTime(optime2);
             BSONObjBuilder respObj;
             respObj << "ok" << 1;
-            hbResp.addToBSON(&respObj);
+            hbResp.addToBSON(&respObj, false);
             getNet()->scheduleResponse(noi, getNet()->now(), makeResponseStatus(respObj.obj()));
         }
         while (getNet()->hasReadyRequests()) {
@@ -1683,7 +1683,7 @@ namespace {
         hbResp.setConfigVersion(2);
         BSONObjBuilder respObj;
         respObj << "ok" << 1;
-        hbResp.addToBSON(&respObj);
+        hbResp.addToBSON(&respObj, false);
         net->scheduleResponse(noi, net->now(), makeResponseStatus(respObj.obj()));
         net->runReadyNetworkOperations();
         getNet()->exitNetwork();
@@ -1753,7 +1753,7 @@ namespace {
         hbResp.setConfigVersion(2);
         BSONObjBuilder respObj;
         respObj << "ok" << 1;
-        hbResp.addToBSON(&respObj);
+        hbResp.addToBSON(&respObj, false);
         net->scheduleResponse(noi, net->now(), makeResponseStatus(respObj.obj()));
         net->runReadyNetworkOperations();
         getNet()->exitNetwork();
@@ -1821,7 +1821,7 @@ namespace {
         hbResp.setConfigVersion(2);
         BSONObjBuilder respObj;
         respObj << "ok" << 1;
-        hbResp.addToBSON(&respObj);
+        hbResp.addToBSON(&respObj, false);
         net->scheduleResponse(noi, net->now(), makeResponseStatus(respObj.obj()));
         net->runReadyNetworkOperations();
         getNet()->exitNetwork();

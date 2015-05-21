@@ -68,7 +68,8 @@ namespace {
 
 }  // namespace
 
-    void ReplSetHeartbeatResponse::addToBSON(BSONObjBuilder* builder) const {
+    void ReplSetHeartbeatResponse::addToBSON(BSONObjBuilder* builder,
+                                             bool isProtocolVersionV1) const {
         if (_mismatch) {
             *builder << kOkFieldName << 0.0;
             *builder << kMismatchFieldName << _mismatch;
@@ -118,23 +119,23 @@ namespace {
             builder->append(kPrimaryIdFieldName, _primaryId);
         }
         if (_opTimeSet) {
-            if (_protocolVersion == 0) {
-                builder->appendDate(kOpTimeFieldName,
-                                    Date_t::fromMillisSinceEpoch(_opTime.getTimestamp().asLL()));
-            }
-            else {
+            if (isProtocolVersionV1) {
                 BSONObjBuilder opTime(builder->subobjStart(kOpTimeFieldName));
                 opTime.append(kTimestampFieldName, _opTime.getTimestamp());
                 opTime.append(kTermFieldName, _opTime.getTerm());
                 opTime.done();
             }
+            else {
+                builder->appendDate(kOpTimeFieldName,
+                                    Date_t::fromMillisSinceEpoch(_opTime.getTimestamp().asLL()));
+            }
         }
 
     }
 
-    BSONObj ReplSetHeartbeatResponse::toBSON() const {
+    BSONObj ReplSetHeartbeatResponse::toBSON(bool isProtocolVersionV1) const {
         BSONObjBuilder builder;
-        addToBSON(&builder);
+        addToBSON(&builder, isProtocolVersionV1);
         return builder.obj();
     }
 

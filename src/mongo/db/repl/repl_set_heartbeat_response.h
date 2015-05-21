@@ -58,17 +58,17 @@ namespace repl {
         /**
          * Appends all non-default values to "builder".
          */
-        void addToBSON(BSONObjBuilder* builder) const;
+        void addToBSON(BSONObjBuilder* builder, bool isProtocolVersionV1) const;
 
         /**
          * Returns a BSONObj consisting of all non-default values to "builder".
          */
-        BSONObj toBSON() const;
+        BSONObj toBSON(bool isProtocolVersionV1) const;
 
         /**
          * Returns toBSON().toString()
          */
-        const std::string toString() const { return toBSON().toString(); }
+        const std::string toString() const { return toBSON(true).toString(); }
 
         bool hasDataSet() const { return _hasDataSet; }
         bool hasData() const { return _hasData; }
@@ -153,11 +153,6 @@ namespace repl {
         void setSyncingTo(const HostAndPort& syncingTo) { _syncingTo = syncingTo; }
 
         /**
-         * Sets _protocolVersion to "protocolVersion".
-         */
-        void setProtocolVersion(int protocolVersion) { _protocolVersion = protocolVersion; }
-
-        /**
          * Sets _configVersion to "configVersion".
          */
         void setConfigVersion(int configVersion) { _configVersion = configVersion; }
@@ -204,8 +199,6 @@ namespace repl {
         bool _primaryIdSet = false;
         long long _primaryId = -1;
         long long _term = -1;
-
-        long long _protocolVersion = 0;
     };
 
 } // namespace repl
