@@ -34,15 +34,14 @@
 #include "mongo/bson/bsonobj.h"
 
 namespace mongo {
-    struct BSONArray;
-
     // mongo version
     extern const char versionString[];
-    extern const BSONArray versionArray;
+    extern const int versionNumber;
     std::string mongodVersion();
 
-    // Convert a version std::string into a numeric array
-    BSONArray toVersionArray(const char* version);
+    // mongo git version
+    const char* gitVersion();
+    void printGitVersion();
 
     // Checks whether another version is the same major version as us
     bool isSameMajorVersion(const char* version);
@@ -52,8 +51,31 @@ namespace mongo {
     const char * allocator();
     const char * loaderFlags();
     const char * compilerFlags();
-    std::string sysInfo();
+    const char * sysInfo();
+    const std::string openSSLVersion(
+        const std::string& prefix = "",
+        const std::string& suffix = ""
+    );
 
+    void printAllocator();
+    void printGitVersion();
+    void printOpenSSLVersion();
+    void printSysInfo();
+    void printTargetMinOS();
+
+    extern const int kMongoVersionMajor;
+    extern const int kMongoVersionMinor;
+    extern const int kMongoVersionPatch;
+    extern const int kMongoVersionExtra;
+    extern const char kMongoVersionExtraStr[];
+
+    void appendBuildInfo(BSONObjBuilder& result);
+
+    extern const int kMongoVersionMajor;
+    extern const int kMongoVersionMinor;
+    extern const int kMongoVersionPatch;
+    extern const int kMongoVersionExtra;
+    extern const char kMongoVersionExtraStr[];
 }  // namespace mongo
 
 #endif  // UTIL_VERSION_HEADER

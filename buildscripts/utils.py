@@ -80,6 +80,15 @@ def getGitVersion():
         return version
     return open( f , 'r' ).read().strip()
 
+def getGitDescribe():
+    with open(os.devnull, "r+") as devnull:
+        proc = subprocess.Popen("git describe",
+            stdout=subprocess.PIPE,
+            stderr=devnull,
+            stdin=devnull,
+            shell=True)
+        return proc.communicate()[0].strip()
+
 def execsys( args ):
     import subprocess
     if isinstance( args , str ):

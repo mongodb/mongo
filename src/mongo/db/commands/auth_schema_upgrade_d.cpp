@@ -88,13 +88,13 @@ namespace {
             }
 
             if (!isSameMajorVersion(version)) {
-                BSONArray foundVersionArray = toVersionArray(version);
+                auto foundVersionArray = iter->result["versionArray"].Array();
                 return Status(ErrorCodes::RemoteValidationError, mongoutils::str::stream() <<
                               "To upgrade auth schema in a replica set, all members must be "
                               "running the same release series of mongod; found " <<
-                              foundVersionArray["0"] << '.' << foundVersionArray["1"] <<
+                              foundVersionArray[0].Int() << '.' << foundVersionArray[1].Int() <<
                               " on host  " << iter->toHost << " but expected " <<
-                              versionArray["0"] << '.' << versionArray["1"]);
+                              kMongoVersionMajor << '.' << kMongoVersionMinor);
             }
         }
         return Status::OK();

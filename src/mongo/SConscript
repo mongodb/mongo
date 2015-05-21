@@ -2,8 +2,11 @@
 
 # This SConscript describes build rules for the "mongo" project.
 
-import os
 import itertools
+import os
+import re
+import subprocess
+import sys
 from buildscripts import utils
 
 Import("env")
@@ -294,6 +297,58 @@ env.Library(
         'index_names',
     ])
 
+js_engine = "V8" if usev8 else "Unknown"
+
+# This generates a numeric representation of the version string so that
+# you can easily compare versions of MongoDB without having to parse
+# the version string.
+#
+# The rules for this are
+# {major}{minor}{release}{pre/rc/final}
+# If the version is pre-release and not an rc, the final number is 0
+# If the version is an RC, the final number of 1 + rc number
+# If the version is pre-release between RC's, the final number is 1 + rc number
+# If the version is a final release, the final number is 99
+#
+# Examples:
+# 3.1.1-123     = 3010100
+# 3.1.1-rc2     = 3010103
+# 3.1.1-rc2-123 = 3010103
+# 3.1.1         = 3010199
+#
+version_parts = [ x for x in re.match(r'^(\d+)\.(\d+)\.(\d+)-?((?:(rc)(\d+))?.*)?',
+    env['MONGO_VERSION']).groups() ]
+version_extra = version_parts[3] if version_parts[3] else ""
+if version_parts[4] == 'rc':
+    version_parts[3] = int(version_parts[5]) + -50
+elif version_parts[3]:
+    version_parts[3] = -100
+else:
+    version_parts[3] = 0
+version_parts = [ int(x) for x in version_parts[:4]]
+
+sysInfo = " ".join(os.uname()) if not windows else "windows {0}".format(sys.getwindowsversion())
+gitVersion = env['MONGO_GIT_HASH']
+if len(env['MONGO_MODULES']) > 0:
+    gitVersion += " modules: " + ", ".join(env['MONGO_MODULES'])
+
+versionInfo = env.Substfile(
+    'util/version.cpp.in',
+    SUBST_DICT=[
+        ('@mongo_version@', env['MONGO_VERSION']),
+        ('@mongo_version_major@', version_parts[0]),
+        ('@mongo_version_minor@', version_parts[1]),
+        ('@mongo_version_patch@', version_parts[2]),
+        ('@mongo_version_extra@', version_parts[3]),
+        ('@mongo_version_extra_str@', version_extra),
+        ('@mongo_git_version@', gitVersion),
+        ('@buildinfo_js_engine@', js_engine),
+        ('@buildinfo_allocator@', GetOption('allocator')),
+        ('@buildinfo_loader_flags@', env.subst("$LINKGFLAGS $LDFLAGS")),
+        ('@buildinfo_compiler_flags@', env.subst("$CXXFLAGS $CCFLAGS $CFLAGS")),
+        ('@buildinfo_sysinfo@', sysInfo),
+    ])
+
 env.Library('clientdriver', [
             "client/connpool.cpp",
             "client/dbclient.cpp",
@@ -328,7 +383,6 @@ env.Library('lasterror', [
 
 env.Library('version',
             [
-                'buildinfo.cpp',
                 'util/version.cpp'
             ],
             LIBDEPS=[
@@ -348,7 +402,6 @@ commonFiles = [ "shell/mongo.cpp",
                 "util/concurrency/rwlockimpl.cpp",
                 "util/text_startuptest.cpp",
                 'util/signal_win32.cpp',
-                "util/version_reporting.cpp",
                 ]
 
 extraCommonLibdeps = []
@@ -429,12 +482,6 @@ env.Library('mongocommon', commonFiles,
                      '$BUILD_DIR/mongo/util/options_parser/options_parser',
                      ] +
                      extraCommonLibdeps)
-
-env.CppUnitTest(
-    target="util/version_test",
-    source=["util/version_test.cpp"],
-    LIBDEPS=["mongocommon"]
-)
 
 env.Library('background_job', ["util/background.cpp"],
             LIBDEPS=['spin_lock'])

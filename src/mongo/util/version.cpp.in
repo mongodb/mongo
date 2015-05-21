@@ -31,70 +31,86 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/util/version_reporting.h"
-
+#include <initializer_list>
 #include <boost/version.hpp>
 #include <sstream>
 #include <string>
 
+#include "mongo/base/parse_number.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/log.h"
-#include "mongo/util/net/ssl_manager.h"
+#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/version.h"
 
+#ifdef MONGO_SSL
+#include <openssl/crypto.h>
+#endif
+
+#include <pcrecpp.h>
+#include <cstdlib>
 
 namespace mongo {
 
-    using std::endl;
     using std::string;
     using std::stringstream;
 
-    void printGitVersion() { log() << "git version: " << gitVersion() << endl; }
+    const char versionString[] = "@mongo_version@";
+    const char * gitVersion() { return "@mongo_git_version@"; }
+    const char * compiledJSEngine() { return "@buildinfo_js_engine@"; }
+    const char * allocator() { return "@buildinfo_allocator@"; }
+    const char * compilerFlags() { return "@buildinfo_compiler_flags@"; }
+    const char * loaderFlags() { return "@buildinfo_loader_flags@"; }
+    const char * sysInfo() { return "@buildinfo_sysinfo@ BOOST_LIB_VERSION=" BOOST_LIB_VERSION ; }
+
+    const int kMongoVersionMajor = @mongo_version_major@;
+    const int kMongoVersionMinor = @mongo_version_minor@;
+    const int kMongoVersionPatch = @mongo_version_patch@;
+    const int kMongoVersionExtra = @mongo_version_extra@;
+    const char kMongoVersionExtraStr[] = "@mongo_version_extra_str@";
+
+    bool isSameMajorVersion(const char* version) {
+        int major = -1, minor = -1;
+        pcrecpp::RE ver_regex("^(\\d+)\\.(\\d+)\\.");
+        ver_regex.PartialMatch(version, &major, &minor);
+
+        if(major == -1 || minor == -1)
+            return false;
+        return (major == kMongoVersionMajor && minor == kMongoVersionMinor);
+    }
+
+    string mongodVersion() {
+        stringstream ss;
+        ss << "db version v" << versionString;
+        return ss.str();
+    }
+
+    void printGitVersion() { log() << "git version: " << gitVersion(); }
 
     const std::string openSSLVersion(const std::string &prefix, const std::string &suffix) {
-        return getSSLVersion(prefix, suffix);
+#ifndef MONGO_SSL
+        return "";
+#else
+        return prefix + SSLeay_version(SSLEAY_VERSION) + suffix;
+#endif
     }
 
     void printOpenSSLVersion() {
-#ifdef MONGO_SSL
-        log() << openSSLVersion("OpenSSL version: ") << endl;
+#ifdef MONGO_CONFIG_SSL
+        log() << openSSLVersion("OpenSSL version: ");
 #endif
     }
 
-#ifndef _SCONS
 #if defined(_WIN32)
-    string sysInfo() {
-        stringstream ss;
-        ss << "not-scons win";
-        ss << " mscver:" << _MSC_FULL_VER << " built:" << __DATE__;
-        ss << " boostver:" << BOOST_VERSION;
-#if( !defined(_MT) )
-#error _MT is not defined
-#endif
-        ss << (sizeof(char *) == 8 ? " 64bit" : " 32bit");
-        return ss.str();
-    }
+    const char * targetMinOS() {
+#if (NTDDI_VERSION >= NTDDI_WIN7)
+        return "Windows 7/Windows Server 2008 R2";
+#elif (NTDDI_VERSION >= NTDDI_VISTA)
+        return "Windows Vista/Windows Server 2008";
 #else
-    string sysInfo() { return ""; }
-
-#endif
-#endif
-
-#if defined(_WIN32)
-    std::string targetMinOS() {
-        stringstream ss;
-#if (NTDDI_VERSION >= 0x06010000)
-        ss << "Windows 7/Windows Server 2008 R2";
-#elif (NTDDI_VERSION >= 0x05020200)
-        ss << "Windows Server 2003 SP2";
-#elif (NTDDI_VERSION >= 0x05010300)
-        ss << "Windows XP SP3";
-#else
-#error This targetted Windows version is not supported
+#error This targeted Windows version is not supported
 #endif // NTDDI_VERSION
-       return ss.str();
     }
 
     void printTargetMinOS() {
@@ -102,12 +118,12 @@ namespace mongo {
     }
 #endif // _WIN32
 
-    void printSysInfo() {
-        log() << "build info: " << sysInfo() << endl;
+    void printAllocator() {
+        log() << "allocator: " << allocator() << std::endl;
     }
 
-    void printAllocator() {
-        log() << "allocator: " << allocator() << endl;
+    void printSysInfo() {
+        log() << "build info: " << sysInfo() << std::endl;
     }
 
     void appendBuildInfo(BSONObjBuilder& result) {
@@ -117,14 +133,19 @@ namespace mongo {
               << "targetMinOS" << targetMinOS()
 #endif
               << "OpenSSLVersion" << openSSLVersion()
-              << "sysInfo" << sysInfo()
-              << "loaderFlags" << loaderFlags()
+              << "sysInfo" << sysInfo();
+
+       BSONArrayBuilder versionArray(result.subarrayStart("versionArray"));
+       versionArray << kMongoVersionMajor
+                    << kMongoVersionMinor
+                    << kMongoVersionPatch
+                    << kMongoVersionExtra;
+       versionArray.done();
+
+       result << "loaderFlags" << loaderFlags()
               << "compilerFlags" << compilerFlags()
               << "allocator" << allocator()
-              << "versionArray" << versionArray
               << "javascriptEngine" << compiledJSEngine()
-/*TODO: add this back once the module system is in place -- maybe once we do something like serverstatus with callbacks*/
-//              << "interpreterVersion" << globalScriptEngine->getInterpreterVersionString()
               << "bits" << ( sizeof( int* ) == 4 ? 32 : 64 );
        result.appendBool( "debug" , debug );
        result.appendNumber("maxBsonObjectSize", BSONObjMaxUserSize);

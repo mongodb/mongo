@@ -57,7 +57,6 @@
 #include "mongo/util/mongoutils/html.h"
 #include "mongo/util/ramlog.h"
 #include "mongo/util/version.h"
-#include "mongo/util/version_reporting.h"
 
 
 namespace mongo {

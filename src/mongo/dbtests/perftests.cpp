@@ -65,7 +65,6 @@
 #include "mongo/util/mmap.h"
 #include "mongo/util/timer.h"
 #include "mongo/util/version.h"
-#include "mongo/util/version_reporting.h"
 #include "mongo/db/concurrency/lock_state.h"
 
 #if (__cplusplus >= 201103L)

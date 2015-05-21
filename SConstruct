@@ -17,6 +17,8 @@ import buildscripts
 import copy
 import datetime
 import imp
+import errno
+import json
 import os
 import re
 import shlex
@@ -380,12 +382,43 @@ add_option('variable-parse-mode',
            type='choice', default=variable_parse_mode_choices[0],
            choices=variable_parse_mode_choices)
 
+try:
+    with open("version.json", "r") as version_fp:
+        version_data = json.load(version_fp)
+
+    if 'version' not in version_data:
+        print "version.json does not contain a version string"
+        Exit(1)
+    if 'githash' not in version_data:
+        version_data['githash'] = utils.getGitVersion()
+
+except IOError as e:
+    # If the file error wasn't because the file is missing, error out
+    if e.errno != errno.ENOENT:
+        print "Error opening version.json: {0}".format(e.strerror)
+        Exit(1)
+
+    version_data = {
+        'version': utils.getGitDescribe()[1:],
+        'githash': utils.getGitVersion(),
+    }
+
+except ValueError as e:
+    print "Error decoding version.json: {0}".format(e)
+    Exit(1)
+
+
 # Setup the command-line variables
 def variable_shlex_converter(val):
     parse_mode = get_option('variable-parse-mode')
     if parse_mode == 'auto':
         parse_mode = 'other' if windows else 'posix'
     return shlex.split(val, posix=(parse_mode == 'posix'))
+
+def variable_distsrc_converter(val):
+    if not val.endswith("/"):
+        return val + "/"
+    return val
 
 env_vars = Variables()
 
@@ -424,6 +457,19 @@ env_vars.Add('LIBS',
 env_vars.Add('LINKFLAGS',
     help='Sets flags for the linker',
     converter=variable_shlex_converter)
+
+env_vars.Add('MONGO_DIST_SRC_PREFIX',
+    help='Sets the prefix for files in the source distribution archive',
+    converter=variable_distsrc_converter,
+    default="mongodb-r${MONGO_VERSION}")
+
+env_vars.Add('MONGO_VERSION',
+    help='Sets the version string for MongoDB',
+    default=version_data['version'])
+
+env_vars.Add('MONGO_GIT_HASH',
+    help='Sets the githash to store in the MongoDB version information',
+    default=version_data['githash'])
 
 env_vars.Add('RPATH',
     help='Set the RPATH for dynamic libraries and executables',
@@ -555,7 +601,9 @@ def decide_platform_tools():
     else:
         return ["default"]
 
-tools = decide_platform_tools() + ["gch", "jsheader", "mergelib", "mongo_unittest", "textfile"]
+tools = decide_platform_tools() + [
+    "gch", "jsheader", "mergelib", "mongo_unittest", "textfile", "distsrc", "gziptool"
+]
 
 # We defer building the env until we have determined whether we want certain values. Some values
 # in the env actually have semantics for 'None' that differ from being absent, so it is better
@@ -2318,27 +2366,31 @@ def getSystemInstallName():
 
     return n
 
-def getCodeVersion():
-    fullSource = open( "src/mongo/util/version.cpp" , "r" ).read()
-    allMatches = re.findall( r"versionString.. = \"(.*?)\"" , fullSource );
-    if len(allMatches) != 1:
-        print( "can't find version # in code" )
-        return None
-    return allMatches[0]
+# This function will add the version.txt file to the source tarball
+# so that versioning will work without having the git repo available.
+def add_version_to_distsrc(env, archive):
+    version_file_path = env.subst("$MONGO_DIST_SRC_PREFIX") + "version.json"
+    if version_file_path not in archive:
+        version_data = {
+            'version': env['MONGO_VERSION'],
+            'githash': env['MONGO_GIT_HASH'],
+        }
+        archive.append_file_contents(
+            version_file_path,
+            json.dumps(
+                version_data,
+                sort_keys=True,
+                indent=4,
+                separators=(',', ': ')
+            )
+        )
 
-mongoCodeVersion = getCodeVersion()
-if mongoCodeVersion == None:
-    Exit(-1)
+env.AddDistSrcCallback(add_version_to_distsrc)
 
 if has_option('distname'):
     distName = GetOption( "distname" )
-elif mongoCodeVersion[-1] not in ("+", "-"):
-    dontReplacePackage = True
-    distName = mongoCodeVersion
 else:
-    isBuildingLatest = True
-    distName = utils.getGitBranchString("" , "-") + datetime.date.today().strftime("%Y-%m-%d")
-
+    distName = env['MONGO_VERSION']
 
 env['SERVER_DIST_BASENAME'] = 'mongodb-%s-%s' % (getSystemInstallName(), distName)
 
@@ -2438,7 +2490,6 @@ module_sconscripts = moduleconfig.get_module_sconscripts(mongo_modules)
 Export("env")
 Export("get_option")
 Export("has_option use_system_version_of_library")
-Export("mongoCodeVersion")
 Export("usev8")
 Export("v8version v8suffix")
 Export("boostSuffix")
@@ -2453,8 +2504,15 @@ def injectMongoIncludePaths(thisEnv):
     thisEnv.AppendUnique(CPPPATH=['$BUILD_DIR'])
 env.AddMethod(injectMongoIncludePaths, 'InjectMongoIncludePaths')
 
+env.Alias("distsrc-tar", env.DistSrc("mongodb-src-${MONGO_VERSION}.tar"))
+env.Alias("distsrc-tgz", env.GZip(
+    target="mongodb-src-${MONGO_VERSION}.tgz",
+    source=["mongodb-src-${MONGO_VERSION}.tar"])
+)
+env.Alias("distsrc-zip", env.DistSrc("mongodb-src-${MONGO_VERSION}.zip"))
+env.Alias("distsrc", "distsrc-tgz")
+
 env.SConscript('src/SConscript', variant_dir='$BUILD_DIR', duplicate=False)
-env.SConscript(['SConscript.buildinfo', 'SConscript.smoke'])
 
 def clean_old_dist_builds(env, target, source):
     prefix = "mongodb-%s-%s" % (platform, processor)

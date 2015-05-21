@@ -41,7 +41,6 @@
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/version.h"
-#include "mongo/util/version_reporting.h"
 
 namespace mongo {
 

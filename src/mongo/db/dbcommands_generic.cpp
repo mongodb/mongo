@@ -62,7 +62,7 @@
 #include "mongo/util/ntservice.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/ramlog.h"
-#include "mongo/util/version_reporting.h"
+#include "mongo/util/version.h"
 
 namespace mongo {
 
