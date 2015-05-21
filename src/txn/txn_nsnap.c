@@ -126,9 +126,9 @@ __wt_txn_named_snapshot_begin(WT_SESSION_IMPL *session, const char *cfg[])
 	const char *txn_cfg[] =
 	    { WT_CONFIG_BASE(session, WT_SESSION_begin_transaction),
 	      "isolation=snapshot", NULL };
-	int locked;
+	int locked, started_txn;
 
-	locked = 0;
+	locked = started_txn = 0;
 	nsnap_new = NULL;
 	txn_global = &S2C(session)->txn_global;
 	txn = &session->txn;
@@ -145,9 +145,10 @@ __wt_txn_named_snapshot_begin(WT_SESSION_IMPL *session, const char *cfg[])
 
 	WT_RET(__wt_name_check(session, cval.str, cval.len));
 
-	if (!F_ISSET(txn, WT_TXN_RUNNING))
+	if (!F_ISSET(txn, WT_TXN_RUNNING)) {
 		WT_RET(__wt_txn_begin(session, txn_cfg));
-	else if (txn->isolation != WT_ISO_SNAPSHOT)
+		started_txn = 1;
+	} else if (txn->isolation != WT_ISO_SNAPSHOT)
 		WT_RET_MSG(session, EINVAL,
 		    "Can't create a named snapshot from a running transaction "
 		    "that isn't a snapshot transaction");
@@ -185,8 +186,11 @@ __wt_txn_named_snapshot_begin(WT_SESSION_IMPL *session, const char *cfg[])
 err:	if (locked)
 		WT_TRET(__wt_writeunlock(session, txn_global->nsnap_rwlock));
 
-	if (F_ISSET(txn, WT_TXN_RUNNING))
+	if (started_txn)
 		WT_TRET(__wt_txn_rollback(session, NULL));
+	else if (ret != 0)
+		F_SET(txn, WT_TXN_NAMED_SNAPSHOT);
+
 	if (nsnap_new != NULL)
 		__nsnap_destroy(session, nsnap_new);
 
