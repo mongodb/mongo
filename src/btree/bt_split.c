@@ -419,7 +419,7 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 	 * of the page: if 80% of the splits are at the end of the page, assume
 	 * an append-style workload. Of course, the plan eventually fails: when
 	 * repeatedly deepening this page for an append-only workload, we will
-	 * progressively ignore more and more of the slots. When ignoring 80% of
+	 * progressively ignore more and more of the slots. When ignoring 90% of
 	 * the slots, deepen the entire page again.
 	 *
 	 * Figure out how many slots we're leaving at this level and how many
@@ -431,7 +431,7 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 	new_entries = pindex->entries - parent->pg_intl_deepen_split_last;
 	if (parent->pg_intl_deepen_split_append > (new_entries * 8) / 10)
 		skip_leading = parent->pg_intl_deepen_split_last;
-	if (skip_leading > (pindex->entries * 8) * 10)
+	if (skip_leading > (pindex->entries * 9) * 10)
 		skip_leading = 1;
 
 	/*
@@ -439,10 +439,13 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 	 * those cases we keep it simple, 10 children, skip only first and last
 	 * entries. Otherwise, split into a lot of child pages.
 	 */
-	children = pindex->entries / btree->split_deepen_per_child;
+	moved_entries = pindex->entries - (skip_leading + skip_trailing);
+	children = moved_entries / btree->split_deepen_per_child;
 	if (children < 10) {
-		skip_leading = 1;
 		children = 10;
+		skip_leading = 1;
+		moved_entries =
+		    pindex->entries - (skip_leading + skip_trailing);
 	}
 
 	WT_ERR(__wt_verbose(session, WT_VERB_SPLIT,
@@ -471,7 +474,6 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 	    pindex->index[pindex->entries - 1];
 
 	/* Allocate child pages, and connect them into the new page index. */
-	moved_entries = pindex->entries - (skip_leading + skip_trailing);
 	chunk = moved_entries / children;
 	remain = moved_entries - chunk * (children - 1);
 	for (parent_refp = pindex->index + skip_leading,
