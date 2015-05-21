@@ -60,9 +60,10 @@ static int
 csv_extract(WT_EXTRACTOR *extractor, WT_SESSION *session,
     const WT_ITEM *key, const WT_ITEM *value, WT_CURSOR *result_cursor)
 {
-	char ch, *p, *pend, *valstr;
+	char *copy, *p, *pend, *valstr;
 	const CSV_EXTRACTOR *cvs_extractor;
 	int i, ret;
+	size_t len;
 
 	(void)key;				/* Unused parameters */
 
@@ -84,15 +85,17 @@ csv_extract(WT_EXTRACTOR *extractor, WT_SESSION *session,
 			pend = p + strlen(p);
 		/*
 		 * The key we must return is a null terminated string, but p
-		 * is not NULL-terminated. Make it so, for the duration of
-		 * the insert operation. This is ugly. There are
-		 * alternatives, but they aren't pretty either.
+		 * is not necessarily NULL-terminated.  So make a copy, just
+		 * for the duration of the insert.
 		 */
-		ch = *pend;
-		*pend = '\0';
-		result_cursor->set_key(result_cursor, p);
+		len = pend - p;
+		if ((copy = malloc(len + 1)) == NULL)
+			return (errno);
+		strncpy(copy, p, len);
+		copy[len] = '\0';
+		result_cursor->set_key(result_cursor, copy);
 		ret = result_cursor->insert(result_cursor);
-		*pend = ch;
+		free(copy);
 		if (ret != 0)
 			return (ret);
 	}
