@@ -1476,6 +1476,8 @@ struct __wt_session {
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;to, drop all snapshots up to and
 	 * including the specified name.  If the special "all" name is given all
 	 * snapshots will be dropped., a string; default \c true.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;until, drop all snapshots up to but
+	 * not including the specified name., a string; default \c true.}
 	 * @config{ ),,}
 	 * @config{name, specify a name for the snapshot., a string; default
 	 * empty.}

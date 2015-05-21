@@ -292,13 +292,14 @@ static const WT_CONFIG_CHECK
     confchk_WT_SESSION_snapshot_drop_subconfigs[] = {
 	{ "names", "list", NULL, NULL, NULL, 0 },
 	{ "to", "string", NULL, NULL, NULL, 0 },
+	{ "until", "string", NULL, NULL, NULL, 0 },
 	{ NULL, NULL, NULL, NULL, NULL, 0 }
 };
 
 static const WT_CONFIG_CHECK confchk_WT_SESSION_snapshot[] = {
 	{ "drop", "category",
 	    NULL, NULL,
-	    confchk_WT_SESSION_snapshot_drop_subconfigs, 2 },
+	    confchk_WT_SESSION_snapshot_drop_subconfigs, 3 },
 	{ "name", "string", NULL, NULL, NULL, 0 },
 	{ NULL, NULL, NULL, NULL, NULL, 0 }
 };
@@ -841,7 +842,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  confchk_WT_SESSION_salvage, 1
 	},
 	{ "WT_SESSION.snapshot",
-	  "drop=(names=,to=),name=",
+	  "drop=(names=,to=,until=),name=",
 	  confchk_WT_SESSION_snapshot, 2
 	},
 	{ "WT_SESSION.strerror",

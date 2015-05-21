@@ -55,17 +55,19 @@ __nsnap_drop_one(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *name)
  *	Drop named snapshots
  */
 static int
-__nsnap_drop_to(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *name)
+__nsnap_drop_to(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *name, int inclusive)
 {
 	WT_DECL_RET;
-	WT_NAMED_SNAPSHOT *last, *nsnap;
+	WT_NAMED_SNAPSHOT *last, *nsnap, *prev;
 	WT_TXN_GLOBAL *txn_global;
 
-	last = nsnap = NULL;
+	last = nsnap = prev = NULL;
 	txn_global = &S2C(session)->txn_global;
 
-	/* TODO: Should this be an error? */
 	if (STAILQ_EMPTY(&txn_global->nsnaph))
+		WT_RET_MSG(session, EINVAL,
+		    "Named snapshot '%.*s' for drop not found",
+		    (int)name->len, name->str);
 		return (0);
 
 	/*
@@ -77,13 +79,23 @@ __nsnap_drop_to(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *name)
 	if (WT_STRING_MATCH("all", name->str, name->len))
 		txn_global->nsnap_oldest_id = WT_TXN_NONE;
 	else {
-		STAILQ_FOREACH(last, &txn_global->nsnaph, q)
+		STAILQ_FOREACH(last, &txn_global->nsnaph, q) {
 			if (WT_STRING_MATCH(last->name, name->str, name->len))
 				break;
+			prev = last;
+		}
 		if (last == NULL)
 			WT_RET_MSG(session, EINVAL,
 			    "Named snapshot '%.*s' for drop not found",
 			    (int)name->len, name->str);
+
+		if (!inclusive) {
+			/* We are done if a drop until points to the head */
+			if (prev == 0)
+				return (0);
+			last = prev;
+		}
+
 		txn_global->nsnap_oldest_id = (STAILQ_NEXT(last, q) != NULL) ?
 		    STAILQ_NEXT(last, q)->snap_min : WT_TXN_NONE;
 	}
@@ -133,13 +145,12 @@ __wt_txn_named_snapshot_begin(WT_SESSION_IMPL *session, const char *cfg[])
 
 	WT_RET(__wt_name_check(session, cval.str, cval.len));
 
-	/*
-	 * TODO more config checking -- make sure no checkpoint config
-	 * is supplied.
-	 *
-	 * TODO what if a snapshot with that name exists?
-	 */
-	WT_RET(__wt_txn_begin(session, txn_cfg));
+	if (!F_ISSET(txn, WT_TXN_RUNNING))
+		WT_RET(__wt_txn_begin(session, txn_cfg));
+	else if (txn->isolation != WT_ISO_SNAPSHOT)
+		WT_RET_MSG(session, EINVAL,
+		    "Can't create a named snapshot from a running transaction "
+		    "that isn't a snapshot transaction");
 
 	/* Save a copy of the transaction's snapshot. */
 	WT_ERR(__wt_calloc_one(session, &nsnap_new));
@@ -162,7 +173,7 @@ __wt_txn_named_snapshot_begin(WT_SESSION_IMPL *session, const char *cfg[])
 
 	/*
 	 * The semantic is that a new snapshot with the same name as an
-	 * existing snapshot will replace it.
+	 * existing snapshot will replace the old one.
 	 */
 	WT_ERR_NOTFOUND_OK(__nsnap_drop_one(session, &cval));
 
@@ -190,21 +201,35 @@ int
 __wt_txn_named_snapshot_drop(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_CONFIG objectconf;
-	WT_CONFIG_ITEM k, names_config, to_config, v;
+	WT_CONFIG_ITEM k, names_config, to_config, until_config, v;
 	WT_DECL_RET;
 	WT_TXN_GLOBAL *txn_global;
 
 	txn_global = &S2C(session)->txn_global;
 
-	WT_ERR(__wt_config_gets_def(session, cfg, "drop.to", 0, &to_config));
 	WT_ERR(__wt_config_gets_def(
 	    session, cfg, "drop.names", 0, &names_config));
-	if (to_config.len == 0 && names_config.len == 0)
+	WT_ERR(__wt_config_gets_def(session, cfg, "drop.to", 0, &to_config));
+	WT_ERR(__wt_config_gets_def(
+	    session, cfg, "drop.until", 0, &until_config));
+
+	/* Avoid more work if no drops are requested. */
+	if (names_config.len == 0 &&
+	    to_config.len == 0 && until_config.len == 0)
 		return (0);
 
+	if (to_config.len != 0 && until_config.len != 0)
+		WT_RET_MSG(session, EINVAL,
+		    "Illegal configuration; named snapshot drop can't specify "
+		    "both to and until options");
+
 	WT_RET(__wt_writelock(session, txn_global->nsnap_rwlock));
+
 	if (to_config.len != 0)
-		WT_ERR(__nsnap_drop_to(session, &to_config));
+		WT_ERR(__nsnap_drop_to(session, &to_config, 1));
+
+	if (until_config.len != 0)
+		WT_ERR(__nsnap_drop_to(session, &until_config, 0));
 
 	/* We are done if there are no named drops */
 
