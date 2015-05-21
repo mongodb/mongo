@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_nsnap01.py
+# test_nsnap03.py
 #   Named snapshots: Access and create from multiple sessions
 
 from suite_subprocess import suite_subprocess
@@ -34,8 +34,8 @@ from wtscenario import multiply_scenarios, number_scenarios
 from helper import simple_populate
 import wiredtiger, wttest
 
-class test_nsnap01(wttest.WiredTigerTestCase, suite_subprocess):
-    tablename = 'test_nsnap01'
+class test_nsnap03(wttest.WiredTigerTestCase, suite_subprocess):
+    tablename = 'test_nsnap03'
     uri = 'table:' + tablename
     nrows = 300
     nrows_per_snap = 10

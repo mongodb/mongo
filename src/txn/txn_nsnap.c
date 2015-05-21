@@ -22,7 +22,8 @@ __nsnap_destroy(WT_SESSION_IMPL *session, WT_NAMED_SNAPSHOT *nsnap)
 
 /*
  * __nsnap_drop_one --
- *	Drop a single named snapshot
+ *	Drop a single named snapshot. The named snapshot lock must be held
+ *	write locked.
  */
 static int
 __nsnap_drop_one(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *name)
@@ -52,7 +53,7 @@ __nsnap_drop_one(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *name)
 
 /*
  * __nsnap_drop_to --
- *	Drop named snapshots
+ *	Drop named snapshots. The named snapshot lock must be held write locked.
  */
 static int
 __nsnap_drop_to(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *name, int inclusive)
@@ -60,6 +61,7 @@ __nsnap_drop_to(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *name, int inclusive)
 	WT_DECL_RET;
 	WT_NAMED_SNAPSHOT *last, *nsnap, *prev;
 	WT_TXN_GLOBAL *txn_global;
+	uint64_t new_nsnap_oldest;
 
 	last = nsnap = prev = NULL;
 	txn_global = &S2C(session)->txn_global;
@@ -70,14 +72,11 @@ __nsnap_drop_to(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *name, int inclusive)
 		    (int)name->len, name->str);
 
 	/*
-	 * TODO: We are in trouble if this drop exits on error. Maybe we
-	 * should only update the special oldest ID on success, but that's
-	 * likely to leave the state wrong as well (conservatively, rather than
-	 * aggressively though).
+	 * The new ID will be none if we are removing all named snapshots
+	 * which is the default behavior of this loop.
 	 */
-	if (WT_STRING_MATCH("all", name->str, name->len))
-		txn_global->nsnap_oldest_id = WT_TXN_NONE;
-	else {
+	new_nsnap_oldest = WT_TXN_NONE;
+	if (!WT_STRING_MATCH("all", name->str, name->len)) {
 		STAILQ_FOREACH(last, &txn_global->nsnaph, q) {
 			if (WT_STRING_MATCH(last->name, name->str, name->len))
 				break;
@@ -95,8 +94,8 @@ __nsnap_drop_to(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *name, int inclusive)
 			last = prev;
 		}
 
-		txn_global->nsnap_oldest_id = (STAILQ_NEXT(last, q) != NULL) ?
-		    STAILQ_NEXT(last, q)->snap_min : WT_TXN_NONE;
+		if (STAILQ_NEXT(last, q) != NULL)
+			new_nsnap_oldest = STAILQ_NEXT(last, q)->snap_min;
 	}
 
 	do {
@@ -106,6 +105,9 @@ __nsnap_drop_to(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *name, int inclusive)
 		__nsnap_destroy(session, nsnap);
 	/* Last will be NULL in the all case so it will never match */
 	} while (nsnap != last && !STAILQ_EMPTY(&txn_global->nsnaph));
+
+	/* Now that the queue of named snapshots is updated, update the ID */
+	txn_global->nsnap_oldest_id = new_nsnap_oldest;
 
 	return (ret);
 }
@@ -210,10 +212,10 @@ __wt_txn_named_snapshot_drop(WT_SESSION_IMPL *session, const char *cfg[])
 
 	txn_global = &S2C(session)->txn_global;
 
-	WT_ERR(__wt_config_gets_def(
+	WT_RET(__wt_config_gets_def(
 	    session, cfg, "drop.names", 0, &names_config));
-	WT_ERR(__wt_config_gets_def(session, cfg, "drop.to", 0, &to_config));
-	WT_ERR(__wt_config_gets_def(
+	WT_RET(__wt_config_gets_def(session, cfg, "drop.to", 0, &to_config));
+	WT_RET(__wt_config_gets_def(
 	    session, cfg, "drop.until", 0, &until_config));
 
 	/* Avoid more work if no drops are requested. */
