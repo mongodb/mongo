@@ -1467,8 +1467,6 @@ err:	WT_STAT_FAST_CONN_INCR(session, log_scans);
 	 */
 	if (LF_ISSET(WT_LOGSCAN_ONE) && eol && ret == 0)
 		ret = WT_NOTFOUND;
-	if (ret == ENOENT)
-		ret = 0;
 	WT_TRET(__wt_close(session, &log_fh));
 	return (ret);
 }
