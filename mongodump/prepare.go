@@ -233,25 +233,25 @@ func (dump *MongoDump) CreateOplogIntents() error {
 }
 
 // CreateUsersRolesVersionIntentsForDB create intents to be written in to the specific
-// collection folder, for the users, roles and version admin database collections
+// database folder, for the users, roles and version admin database collections
 // And then it adds the intents in to the manager
 func (dump *MongoDump) CreateUsersRolesVersionIntentsForDB(db string) error {
 
 	outDir := dump.outputPath(db, "")
 
 	usersIntent := &intents.Intent{
-		DB:       "admin",
-		C:        "system.users",
+		DB:       db,
+		C:        "$admin.system.users",
 		BSONPath: filepath.Join(outDir, "$admin.system.users.bson"),
 	}
 	rolesIntent := &intents.Intent{
-		DB:       "admin",
-		C:        "system.roles",
+		DB:       db,
+		C:        "$admin.system.roles",
 		BSONPath: filepath.Join(outDir, "$admin.system.roles.bson"),
 	}
 	versionIntent := &intents.Intent{
-		DB:       "admin",
-		C:        "system.version",
+		DB:       db,
+		C:        "$admin.system.version",
 		BSONPath: filepath.Join(outDir, "$admin.system.version.bson"),
 	}
 	if dump.OutputOptions.Archive != "" {

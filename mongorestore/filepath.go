@@ -124,7 +124,6 @@ func (restore *MongoRestore) CreateAllIntents(dir archive.DirLike, filterDB stri
 	if err != nil {
 		return fmt.Errorf("error reading root dump folder: %v", err)
 	}
-	log.Logf(log.Always, "%v", entries)
 	for _, entry := range entries {
 		if entry.IsDir() {
 			if err = util.ValidateDBName(entry.Name()); err != nil {
@@ -198,7 +197,6 @@ func (restore *MongoRestore) CreateIntentsForDB(db string, filterCollection stri
 	if err != nil {
 		return fmt.Errorf("error reading db folder %v: %v", db, err)
 	}
-	log.Logf(log.Always, "%v", entries)
 	usesMetadataFiles := hasMetadataFiles(entries)
 	for _, entry := range entries {
 		if entry.IsDir() {

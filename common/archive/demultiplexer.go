@@ -21,9 +21,11 @@ type DemuxOut interface {
 
 // Demultiplexer implements Parser.
 type Demultiplexer struct {
-	In                 io.Reader
+	In io.Reader
+	//TODO wrap up these three into a structure
 	outs               map[string]DemuxOut
 	hashes             map[string]hash.Hash64
+	lengths            map[string]int64
 	currentNamespace   string
 	buf                [db.MaxBSONSize]byte
 	NamespaceChan      chan string
@@ -97,6 +99,7 @@ func (demux *Demultiplexer) HeaderBSON(buf []byte) error {
 	}
 	if colHeader.EOF {
 		crc := int64(demux.hashes[demux.currentNamespace].Sum64())
+		length := int64(demux.lengths[demux.currentNamespace])
 		if crc != colHeader.CRC {
 			return fmt.Errorf("CRC mismatch for namespace %v, %v!=%v",
 				demux.currentNamespace,
@@ -104,11 +107,15 @@ func (demux *Demultiplexer) HeaderBSON(buf []byte) error {
 				colHeader.CRC,
 			)
 		}
-		log.Logf(log.DebugHigh, "demux checksum for namespace %v is correct (%v)", demux.currentNamespace, demux.hashes[demux.currentNamespace].Sum64())
+		log.Logf(log.DebugHigh,
+			"demux checksum for namespace %v is correct (%v), %v bytes",
+			demux.currentNamespace, crc, length)
 		demux.outs[demux.currentNamespace].Close()
 		delete(demux.outs, demux.currentNamespace)
 		delete(demux.hashes, demux.currentNamespace)
-		// in case we get a BSONBody with this block, we want to ensure that that causes an error
+		delete(demux.lengths, demux.currentNamespace)
+		// in case we get a BSONBody with this block,
+		// we want to ensure that that causes an error
 		demux.currentNamespace = ""
 	}
 	return nil
@@ -143,6 +150,8 @@ func (demux *Demultiplexer) BodyBSON(buf []byte) error {
 	}
 	hash.Write(buf)
 
+	demux.lengths[demux.currentNamespace] += int64(len(buf))
+
 	out, ok := demux.outs[demux.currentNamespace]
 	if !ok {
 		return newError("no demux consumer currently consuming namespace " + demux.currentNamespace)
@@ -161,9 +170,11 @@ func (demux *Demultiplexer) Open(ns string, out DemuxOut) {
 	if demux.outs == nil {
 		demux.outs = make(map[string]DemuxOut)
 		demux.hashes = make(map[string]hash.Hash64)
+		demux.lengths = make(map[string]int64)
 	}
 	demux.outs[ns] = out
 	demux.hashes[ns] = crc64.New(crc64.MakeTable(crc64.ECMA))
+	demux.lengths[ns] = 0
 }
 
 // RegularCollectionReceiver implements the intents.file interface.
@@ -298,6 +309,7 @@ func (cache *SpecialCollectionCache) Open() error {
 
 // Close is part of the both interfaces, and it does nothing
 func (cache *SpecialCollectionCache) Close() error {
+	cache.Intent.Size = int64(cache.Buffer.Len())
 	return nil
 }
 
