@@ -395,37 +395,6 @@ namespace mongo {
         Status _initializeUserFromPrivilegeDocument(User* user, const BSONObj& privDoc);
 
         /**
-         * Performs one step in the process of upgrading the stored authorization data to the
-         * newest schema.
-         *
-         * On success, returns Status::OK(), and *isDone will indicate whether there are more
-         * steps to perform.
-         *
-         * If the authorization data is already fully upgraded, returns Status::OK and sets *isDone
-         * to true, so this is safe to call on a fully upgraded system.
-         *
-         * On failure, returns a status other than Status::OK().  In this case, is is typically safe
-         * to try again.
-         */
-        Status upgradeSchemaStep(
-                        OperationContext* txn, const BSONObj& writeConcern, bool* isDone);
-
-        /**
-         * Performs up to maxSteps steps in the process of upgrading the stored authorization data
-         * to the newest schema.  Behaves as if by repeatedly calling upgradeSchemaStep up to
-         * maxSteps times until either it completes the upgrade or returns a non-OK status.
-         *
-         * Invalidates the user cache before the first step and after each attempted step.
-         *
-         * Returns Status::OK() to indicate that the upgrade process has completed successfully.
-         * Returns ErrorCodes::OperationIncomplete to indicate that progress was made, but that more
-         * steps must be taken to complete the process.  Other returns indicate a failure to make
-         * progress performing the upgrade, and the specific code and message in the returned status
-         * may provide additional information.
-         */
-        Status upgradeSchema(OperationContext* txn, int maxSteps, const BSONObj& writeConcern);
-
-        /**
          * Hook called by replication code to let the AuthorizationManager observe changes
          * to relevant collections.
          */
