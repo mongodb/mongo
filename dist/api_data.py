@@ -236,6 +236,11 @@ file_config = format_meta + [
     Config('leaf_item_max', '0', r'''
         historic term for leaf_key_max and leaf_value_max''',
         min=0, undoc=True),
+    Config('logging', 'true', r'''
+        the logging setting for this table.  Only valid if logging is
+        enabled on the connection.  If logging is disabled this table
+        has checkpoint-level durability.''',
+        type='boolean'),
     Config('memory_page_max', '5MB', r'''
         the maximum size a page can grow to in memory before being
         reconciled to disk.  The specified size will be adjusted to a lower

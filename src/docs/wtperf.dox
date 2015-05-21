@@ -179,6 +179,8 @@ Whether to create an index on the value field.
 execute a read prior to each insert in workload phase
 @par key_sz (unsigned int, default=20)
 key size
+@par log_partial (boolean, default=false)
+perform partial logging on first table only.
 @par min_throughput (unsigned int, default=0)
 abort if any throughput measured is less than this amount.  Requires
 sample_interval to be configured

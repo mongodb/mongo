@@ -1104,6 +1104,10 @@ struct __wt_session {
 	 * temporarily ignored when large values are written.  The default is
 	 * one-half the size of a newly split leaf page., an integer greater
 	 * than or equal to 0; default \c 0.}
+	 * @config{logging, the logging setting for this table.  Only valid if
+	 * logging is enabled on the connection.  If logging is disabled this
+	 * table has checkpoint-level durability., a boolean flag; default \c
+	 * true.}
 	 * @config{lsm = (, options only relevant for LSM data sources., a set
 	 * of related configuration options defined below.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;auto_throttle, Throttle inserts into
