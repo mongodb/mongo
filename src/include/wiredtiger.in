@@ -1469,8 +1469,10 @@ struct __wt_session {
 	 *
 	 * @param session the session handle
 	 * @configstart{WT_SESSION.snapshot, see dist/api_data.py}
-	 * @config{drop = (, if non-empty\, specifies which snapshots to drop.,
-	 * a set of related configuration options defined below.}
+	 * @config{drop = (, if non-empty\, specifies which snapshots to drop.
+	 * Where a group of snapshots are being dropped\, the order is based on
+	 * snapshot creation order not alphanumeric name order., a set of
+	 * related configuration options defined below.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;names, drop specific named
 	 * snapshots., a list of strings; default empty.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;to, drop all snapshots up to and

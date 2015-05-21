@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 # test_nsnap01.py
-#   Named snapshots: basic API
+#   Named snapshots: Access and create from multiple sessions
 
 from suite_subprocess import suite_subprocess
 from wtscenario import multiply_scenarios, number_scenarios
@@ -41,15 +41,17 @@ class test_nsnap01(wttest.WiredTigerTestCase, suite_subprocess):
     nrows_per_snap = 10
     nsnapshots = 10
 
-    def check_named_snapshot(self, c, snapshot, expected):
-        c.reset()
-        self.session.begin_transaction("snapshot=" + str(snapshot))
+    def check_named_snapshot(self, snapshot, expected):
+        new_session = self.conn.open_session()
+        new_session.begin_transaction("snapshot=" + str(snapshot))
+        c = new_session.open_cursor(self.uri)
         count = 0
         for row in c:
             count += 1
-        self.session.commit_transaction()
+        new_session.commit_transaction()
         # print "Checking snapshot %d, expect %d, found %d" % (snapshot, expected, count)
         self.assertEqual(count, expected)
+        new_session.close()
 
     def test_named_snapshots(self):
         # Populate a table
@@ -72,6 +74,12 @@ class test_nsnap01(wttest.WiredTigerTestCase, suite_subprocess):
             else:
                 dropcfg = ""
 
+            # Close and start a new session every three snapshots
+            if n % 3 == 0:
+                self.session.close()
+                self.session = self.conn.open_session()
+                c = self.session.open_cursor(self.uri)
+
             self.session.snapshot("name=%d%s" % (n, dropcfg))
             snapshots.append((n, end - start))
             for i in xrange(2 * self.nrows_per_snap):
@@ -82,7 +90,7 @@ class test_nsnap01(wttest.WiredTigerTestCase, suite_subprocess):
             start += self.nrows_per_snap
 
             for snapshot, expected in snapshots:
-                self.check_named_snapshot(c, snapshot, expected)
+                self.check_named_snapshot(snapshot, expected)
 
 if __name__ == '__main__':
     wttest.run()

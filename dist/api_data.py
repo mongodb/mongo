@@ -862,7 +862,9 @@ methods = {
 
 'WT_SESSION.snapshot' : Method([
     Config('drop', '', r'''
-            if non-empty, specifies which snapshots to drop''',
+            if non-empty, specifies which snapshots to drop. Where a group
+            of snapshots are being dropped, the order is based on snapshot
+            creation order not alphanumeric name order''',
         type='category', subconfig=[
         Config('names', '', r'''
             drop specific named snapshots''', type='list'),

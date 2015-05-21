@@ -68,7 +68,6 @@ __nsnap_drop_to(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *name, int inclusive)
 		WT_RET_MSG(session, EINVAL,
 		    "Named snapshot '%.*s' for drop not found",
 		    (int)name->len, name->str);
-		return (0);
 
 	/*
 	 * TODO: We are in trouble if this drop exits on error. Maybe we
