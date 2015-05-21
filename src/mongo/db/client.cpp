@@ -108,6 +108,10 @@ namespace mongo {
         if (_connectionId) {
             builder.appendNumber("connectionId", _connectionId);
         }
+
+        if (hasRemote()) {
+            builder.append("client", getRemote().toString());
+        }
     }
 
     void Client::setOperationContext(OperationContext* txn) {

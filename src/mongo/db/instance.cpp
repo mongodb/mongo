@@ -522,7 +522,7 @@ namespace {
         }
 
         CurOp& currentOp = *CurOp::get(txn);
-        currentOp.reset(remote,op);
+        currentOp.reset(op);
 
         OpDebug& debug = currentOp.debug();
         debug.op = op;

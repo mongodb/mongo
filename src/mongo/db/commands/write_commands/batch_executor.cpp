@@ -503,7 +503,6 @@ namespace mongo {
             client->hasRemote() ? client->getRemote() : HostAndPort( "0.0.0.0", 0 );
         // TODO Modify CurOp "wrapped" constructor to take an opcode, so calling .reset()
         // is unneeded
-        currentOp->reset( remote, getOpCode( currWrite.getRequest()->getBatchType() ) );
         currentOp->ensureStarted();
         currentOp->setNS( currWrite.getRequest()->getNS() );
 
@@ -897,7 +896,7 @@ namespace mongo {
                                          WriteErrorDetail** error ) {
 
         // BEGIN CURRENT OP
-        CurOp currentOp(_txn->getClient());
+        CurOp currentOp(_txn->getClient(), dbUpdate);
         beginCurrentOp( &currentOp, _txn->getClient(), updateItem );
         incOpStats( updateItem );
 
@@ -941,7 +940,7 @@ namespace mongo {
         // Removes are similar to updates, but page faults are handled externally
 
         // BEGIN CURRENT OP
-        CurOp currentOp(_txn->getClient());
+        CurOp currentOp(_txn->getClient(), dbDelete);
         beginCurrentOp( &currentOp, _txn->getClient(), removeItem );
         incOpStats( removeItem );
 
@@ -1136,7 +1135,7 @@ namespace mongo {
 
     void WriteBatchExecutor::execOneInsert(ExecInsertsState* state, WriteErrorDetail** error) {
         BatchItemRef currInsertItem(state->request, state->currIndex);
-        CurOp currentOp(_txn->getClient());
+        CurOp currentOp(_txn->getClient(), dbInsert);
         beginCurrentOp( &currentOp, _txn->getClient(), currInsertItem );
         incOpStats(currInsertItem);
 

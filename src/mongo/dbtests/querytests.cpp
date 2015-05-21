@@ -1463,8 +1463,7 @@ namespace QueryTests {
         void run() {
             BSONObj result;
             _client.runCommand( "admin", BSON( "whatsmyuri" << 1 ), result );
-            SockAddr unknownAddress("0.0.0.0", 0);
-            ASSERT_EQUALS( unknownAddress.toString(), result[ "you" ].str() );
+            ASSERT_EQUALS("", result[ "you" ].str());
         }
     };
     

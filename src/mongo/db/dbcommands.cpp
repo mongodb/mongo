@@ -1082,7 +1082,7 @@ namespace mongo {
                          int,
                          string& errmsg,
                          BSONObjBuilder& result) {
-            result << "you" << CurOp::get(txn)->getRemoteString();
+            result << "you" << txn->getClient()->clientAddress(true /*includePort*/);
             return true;
         }
     } cmdWhatsMyUri;

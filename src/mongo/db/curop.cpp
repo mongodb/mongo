@@ -171,6 +171,11 @@ namespace mongo {
         _command = NULL;
     }
 
+    CurOp::CurOp(Client* client, int op) : CurOp(client, &_curopStack(client)) {
+        _op = op;
+        _active = true;
+    }
+
     void CurOp::_reset() {
         _isCommand = false;
         _dbprofile = 0;
@@ -194,12 +199,8 @@ namespace mongo {
         _active = true; // this should be last for ui clarity
     }
 
-    void CurOp::reset( const HostAndPort& remote, int op ) {
+    void CurOp::reset(int op) {
         reset();
-        if( _remote != remote ) {
-            // todo : _remote is not thread safe yet is used as such!
-            _remote = remote;
-        }
         _op = op;
     }
 
@@ -281,10 +282,6 @@ namespace mongo {
 
         if ( !debug().planSummary.empty() ) {
             builder->append( "planSummary" , debug().planSummary.toString() );
-        }
-
-        if( !_remote.empty() ) {
-            builder->append("client", _remote.toString());
         }
 
         if ( ! _message.empty() ) {

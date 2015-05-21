@@ -132,7 +132,7 @@ namespace {
                     tablecell(ss, "");
                 }
 
-                tablecell(ss, curOp->getRemoteString());
+                tablecell(ss, client->clientAddress(true /*includePort*/));
 
                 tablecell(ss, curOp->getMessage());
                 tablecell(ss, curOp->getProgressMeter().toString());

@@ -202,15 +202,16 @@ namespace mongo {
         static CurOp* get(const OperationContext& opCtx);
 
         explicit CurOp(Client* client);
+        CurOp(Client* client, int op);
         ~CurOp();
 
         bool haveQuery() const { return _query.have(); }
         BSONObj query() const { return _query.get();  }
         void appendQuery( BSONObjBuilder& b , StringData name ) const { _query.append( b , name ); }
-        
+
         void enter(const char* ns, int dbProfileLevel);
         void reset();
-        void reset( const HostAndPort& remote, int op );
+        void reset(int op);
         void markCommand() { _isCommand = true; }
         OpDebug& debug()           { return _debug; }
         std::string getNS() const { return _ns.toString(); }
@@ -297,12 +298,6 @@ namespace mongo {
 
         void reportState(BSONObjBuilder* builder);
 
-        std::string getRemoteString( bool includePort = true ) {
-            if (includePort)
-                return _remote.toString();
-            return _remote.host();
-        }
-
         ProgressMeter& setMessage(const char * msg,
                                   std::string name = "Progress",
                                   unsigned long long progressMeterTotal = 0,
@@ -349,7 +344,6 @@ namespace mongo {
         int _dbprofile;                  // 0=off, 1=slow, 2=all
         unsigned int _opNum;
         ThreadSafeString _ns;
-        HostAndPort _remote;             // CAREFUL here with thread safety
         CachedBSONObj<512> _query;       // CachedBSONObj is thread safe
         OpDebug _debug;
         ThreadSafeString _message;
