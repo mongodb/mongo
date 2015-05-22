@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2014 MongoDB Inc.
+ *    Copyright (C) 2015 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -25,48 +25,22 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#pragma once
 
-#include <boost/scoped_ptr.hpp>
-#include <string>
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/operation_context.h"
 
+#include "mongo/util/assert_util.h"
+
 namespace mongo {
 
-    class OperationContextImpl : public OperationContext  {
-    public:
-        OperationContextImpl();
+    OperationContext::OperationContext(Client* client, unsigned int opId, Locker* locker) :
+        _client(client), _opId(opId), _locker(locker) {
+    }
 
-        virtual ~OperationContextImpl();
-
-        virtual RecoveryUnit* recoveryUnit() const override;
-
-        virtual RecoveryUnit* releaseRecoveryUnit() override;
-
-        virtual RecoveryUnitState setRecoveryUnit(RecoveryUnit* unit,
-                                                  RecoveryUnitState state) override;
-
-        virtual ProgressMeter* setMessage(const char* msg,
-                                          const std::string& name,
-                                          unsigned long long progressMeterTotal,
-                                          int secondsBetween) override;
-
-        virtual std::string getNS() const override;
-
-        virtual uint64_t getRemainingMaxTimeMicros() const override;
-
-        virtual void checkForInterrupt() const override;
-        virtual Status checkForInterruptNoAssert() const override;
-
-        virtual bool isPrimaryFor( StringData ns ) override;
-
-        virtual void setReplicatedWrites(bool writesAreReplicated = true) override;
-        virtual bool writesAreReplicated() const override;
-
-    private:
-        std::auto_ptr<RecoveryUnit> _recovery;
-        bool _writesAreReplicated;
-    };
+    Client* OperationContext::getClient() const {
+        invariant(_client);
+        return _client;
+    }
 
 }  // namespace mongo

@@ -126,6 +126,7 @@ namespace mongo {
         LastError::get(_txn->getClient()).startRequest();
 
         DbResponse dbResponse;
+        CurOp curOp(_txn);
         assembleResponse(_txn, toSend, dbResponse, dummyHost);
         verify(dbResponse.response);
 
@@ -141,6 +142,7 @@ namespace mongo {
         LastError::get(_txn->getClient()).startRequest();
 
         DbResponse dbResponse;
+        CurOp curOp(_txn);
         assembleResponse(_txn, toSend, dbResponse, dummyHost);
     }
 

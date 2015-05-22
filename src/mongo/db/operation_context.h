@@ -31,7 +31,6 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/db/storage/recovery_unit.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/util/decorable.h"
@@ -40,6 +39,7 @@ namespace mongo {
 
     class Client;
     class CurOp;
+    class Locker;
     class ProgressMeter;
     class StringData;
     class WriteUnitOfWork;
@@ -68,7 +68,7 @@ namespace mongo {
             kFailedUnitOfWork  // in a unit of work that has failed and must be aborted
         };
 
-        virtual ~OperationContext() { }
+        virtual ~OperationContext() = default;
 
         /**
          * Interface for durability.  Caller DOES NOT own pointer.
@@ -101,7 +101,7 @@ namespace mongo {
         /**
          * Interface for locking.  Caller DOES NOT own pointer.
          */
-        virtual Locker* lockState() const = 0;
+        Locker* lockState() const { return _locker; }
 
         // --- operation level info? ---
 
@@ -132,16 +132,14 @@ namespace mongo {
         /**
          * Returns the client under which this context runs.
          */
-        virtual Client* getClient() const = 0;
+        Client* getClient() const;
 
         virtual uint64_t getRemainingMaxTimeMicros() const = 0;
 
         /**
          * Returns the operation ID associated with this operation.
-         * WARNING: Due to SERVER-14995, this OpID is not guaranteed to stay the same for the
-         * lifetime of this OperationContext.
          */
-        virtual unsigned int getOpID() const = 0;
+        unsigned int getOpID() const { return _opId; }
 
         /**
          * @return true if this instance is primary for this namespace
@@ -170,12 +168,21 @@ namespace mongo {
         virtual bool writesAreReplicated() const = 0;
 
     protected:
-        OperationContext() { }
+        OperationContext(Client* client,
+                         unsigned int opId,
+                         Locker* locker);
 
         RecoveryUnitState _ruState = kNotInUnitOfWork;
 
     private:
         friend class WriteUnitOfWork;
+        Client* const _client;
+        const unsigned int _opId;
+
+        // The lifetime of locker is managed by subclasses of OperationContext, so it is not
+        // safe to access _locker in the destructor of OperationContext.
+        Locker* const _locker;
+
         WriteConcernOptions _writeConcern;
     };
 

@@ -136,7 +136,7 @@ namespace repl {
         }
 
         // Count each log op application as a separate operation, for reporting purposes
-        CurOp::get(txn)->reset();
+        CurOp individualOp(txn);
 
         const char *ns = op.getStringField("ns");
         verify(ns);

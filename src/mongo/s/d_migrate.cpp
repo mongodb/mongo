@@ -2657,9 +2657,6 @@ namespace mongo {
             AuthorizationSession::get(txn.getClient())->grantInternalAuthorization();
         }
 
-        // Make curop active so this will show up in currOp.
-        CurOp::get(txn)->reset();
-
         migrateStatus.go(&txn, ns, min, max, shardKeyPattern, fromShard, epoch, writeConcern);
     }
 

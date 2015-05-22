@@ -482,8 +482,6 @@ namespace IndexUpdateTests {
                 }
                 wunit.commit();
             }
-            // Initialize curop.
-            CurOp::get(_txn)->reset();
             // Request an interrupt.
             getGlobalServiceContext()->setKillAllOperations();
             BSONObj indexInfo = BSON( "key" << BSON( "a" << 1 ) << "ns" << _ns << "name" << "a_1" );
@@ -515,8 +513,6 @@ namespace IndexUpdateTests {
                 }
                 wunit.commit();
             }
-            // Initialize curop.
-            CurOp::get(_txn)->reset();
             // Request an interrupt.
             getGlobalServiceContext()->setKillAllOperations();
             BSONObj indexInfo = BSON( "key" << BSON( "a" << 1 ) << "ns" << _ns << "name" << "a_1" );
@@ -551,8 +547,6 @@ namespace IndexUpdateTests {
                 }
                 wunit.commit();
             }
-            // Initialize curop.
-            CurOp::get(_txn)->reset();
             // Request an interrupt.
             getGlobalServiceContext()->setKillAllOperations();
             BSONObj indexInfo = BSON( "key" << BSON( "_id" << 1 ) <<
@@ -589,8 +583,6 @@ namespace IndexUpdateTests {
                 }
                 wunit.commit();
             }
-            // Initialize curop.
-            CurOp::get(_txn)->reset();
             // Request an interrupt.
             getGlobalServiceContext()->setKillAllOperations();
             BSONObj indexInfo = BSON( "key" << BSON( "_id" << 1 ) <<
@@ -616,8 +608,6 @@ namespace IndexUpdateTests {
             }
             // Start with just _id
             ASSERT_EQUALS( 1U, _client.getIndexSpecs(_ns).size());
-            // Initialize curop.
-            CurOp::get(_txn)->reset();
             // Request an interrupt.
             getGlobalServiceContext()->setKillAllOperations();
             // The call is not interrupted.

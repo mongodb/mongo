@@ -42,6 +42,7 @@
 #include "mongo/db/audit.h"
 #include "mongo/db/background.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
@@ -228,7 +229,7 @@ namespace mongo {
         invariant(_indexes.size() == 1);
         invariant(_buildInBackground);
         IndexDescriptor* descriptor = _indexes[0].block->getEntry()->descriptor();
-        _collection->getIndexCatalog()->registerIndexBuild(descriptor, CurOp::get(_txn)->opNum());
+        _collection->getIndexCatalog()->registerIndexBuild(descriptor, _txn->getOpID());
         return descriptor;
     }
 

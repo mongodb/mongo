@@ -293,9 +293,11 @@ namespace mongo {
             Timer t;
             const int Secs = 4;
             while (!inShutdown()) {
-                OperationContextImpl txn;
-                cursorStatsTimedOut.increment(
-                    CursorManager::timeoutCursorsGlobal(&txn, t.millisReset()));
+                {
+                    OperationContextImpl txn;
+                    cursorStatsTimedOut.increment(
+                            CursorManager::timeoutCursorsGlobal(&txn, t.millisReset()));
+                }
                 sleepsecs(Secs);
             }
         }

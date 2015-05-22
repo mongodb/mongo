@@ -39,24 +39,31 @@ namespace mongo {
 
     class OperationContextNoop : public OperationContext {
     public:
-        OperationContextNoop(RecoveryUnit* ru)
-            : _recoveryUnit(ru),
-              _locker(new LockerNoop()) {
 
+        OperationContextNoop() : OperationContextNoop(new RecoveryUnitNoop()) {}
+
+        OperationContextNoop(RecoveryUnit* ru) : OperationContextNoop(nullptr, 0, ru) {}
+
+        OperationContextNoop(Client* client, unsigned int opId)
+            : OperationContextNoop(client, opId, new RecoveryUnitNoop()) {
         }
 
-        OperationContextNoop()
-            : _recoveryUnit(new RecoveryUnitNoop()),
-              _locker(new LockerNoop()) {
-
+        OperationContextNoop(Client* client, unsigned int opId, RecoveryUnit* ru)
+            : OperationContextNoop(client, opId, new LockerNoop(), ru) {
         }
 
-        virtual ~OperationContextNoop() { }
-
-        virtual Client* getClient() const override {
-            invariant(false);
-            return NULL;
+        OperationContextNoop(Client* client, unsigned int opId, Locker* locker)
+            : OperationContextNoop(client, opId, locker, new RecoveryUnitNoop()) {
         }
+
+        OperationContextNoop(Client* client, unsigned int opId, Locker* locker, RecoveryUnit* ru)
+            : OperationContext(client, opId, locker),
+              _recoveryUnit(ru) {
+
+            _locker.reset(lockState());
+        }
+
+        virtual ~OperationContextNoop() = default;
 
         virtual RecoveryUnit* recoveryUnit() const override {
             return _recoveryUnit.get();
@@ -72,10 +79,6 @@ namespace mongo {
             _recoveryUnit.reset(unit);
             _ruState = state;
             return oldState;
-        }
-
-        virtual Locker* lockState() const override {
-            return _locker.get();
         }
 
         virtual ProgressMeter* setMessage(const char * msg,
@@ -97,10 +100,6 @@ namespace mongo {
         virtual std::string getNS() const override {
             return std::string();
         };
-
-        virtual unsigned int getOpID() const override {
-            return 0;
-        }
 
         void setReplicatedWrites(bool writesAreReplicated = true) override {}
 

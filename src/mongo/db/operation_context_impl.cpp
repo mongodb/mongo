@@ -69,28 +69,30 @@ namespace {
 
     const auto clientOperationInfoDecoration = Client::declareDecoration<ClientOperationInfo>();
 
+    AtomicUInt32 nextOpId{1};
 }  // namespace
 
     using std::string;
 
     OperationContextImpl::OperationContextImpl()
-        : _client(&cc()),
-          _locker(clientOperationInfoDecoration(_client).getLocker()),
+        : OperationContext(&cc(),
+                           nextOpId.fetchAndAdd(1),
+                           clientOperationInfoDecoration(cc()).getLocker()),
           _writesAreReplicated(true) {
-
-        invariant(_locker);
 
         StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
         _recovery.reset(storageEngine->newRecoveryUnit());
 
-        stdx::lock_guard<Client> lk(*_client);
-        _client->setOperationContext(this);
+        auto client = getClient();
+        stdx::lock_guard<Client> lk(*client);
+        client->setOperationContext(this);
     }
 
     OperationContextImpl::~OperationContextImpl() {
-        _locker->assertEmptyAndReset();
-        stdx::lock_guard<Client> lk(*_client);
-        _client->resetOperationContext();
+        lockState()->assertEmptyAndReset();
+        auto client = getClient();
+        stdx::lock_guard<Client> lk(*client);
+        client->resetOperationContext();
     }
 
     RecoveryUnit* OperationContextImpl::recoveryUnit() const {
@@ -113,10 +115,6 @@ namespace {
         return oldState;
     }
 
-    Locker* OperationContextImpl::lockState() const {
-        return _locker;
-    }
-
     ProgressMeter* OperationContextImpl::setMessage(const char * msg,
                                                     const std::string &name,
                                                     unsigned long long progressMeterTotal,
@@ -126,14 +124,6 @@ namespace {
 
     string OperationContextImpl::getNS() const {
         return CurOp::get(this)->getNS();
-    }
-
-    Client* OperationContextImpl::getClient() const {
-        return _client;
-    }
-
-    unsigned int OperationContextImpl::getOpID() const {
-        return CurOp::get(this)->opNum();
     }
 
     uint64_t OperationContextImpl::getRemainingMaxTimeMicros() const {
@@ -208,7 +198,7 @@ namespace {
             if (opShouldFail(this, scopedFailPoint.getData())) {
                 log() << "set pending kill on "
                       << (curOp->parent() ? "nested" : "top-level")
-                      << " op " << curOp->opNum() << ", for checkForInterruptFail";
+                      << " op " << getOpID() << ", for checkForInterruptFail";
                 curOp->kill();
             }
         }

@@ -34,7 +34,7 @@
 #include <boost/noncopyable.hpp>
 
 #include "mongo/base/disallow_copying.h"
-#include "mongo/db/client.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/concurrency/spin_lock.h"
@@ -198,8 +198,7 @@ namespace mongo {
         static CurOp* get(const OperationContext* opCtx);
         static CurOp* get(const OperationContext& opCtx);
 
-        explicit CurOp(Client* client);
-        CurOp(Client* client, int op);
+        explicit CurOp(OperationContext* client);
         ~CurOp();
 
         bool haveQuery() const { return _query.have(); }
@@ -207,8 +206,11 @@ namespace mongo {
         void appendQuery( BSONObjBuilder& b , StringData name ) const { _query.append( b , name ); }
 
         void enter(const char* ns, int dbProfileLevel);
-        void reset();
-        void reset(int op);
+
+        /**
+         * Sets the type of the current operation to "op".
+         */
+        void setOp(int op);
         void markCommand() { _isCommand = true; }
         OpDebug& debug()           { return _debug; }
         std::string getNS() const { return _ns.toString(); }
@@ -219,11 +221,6 @@ namespace mongo {
 
             return _dbprofile >= 2 || ms >= serverGlobalParams.slowMS;
         }
-
-        unsigned int opNum() const { return _opNum; }
-
-        /** if this op is running */
-        bool active() const { return _active; }
 
         int getOp() const { return _op; }
 
@@ -271,12 +268,11 @@ namespace mongo {
             return _start;
         }
         void done() {
-            _active = false;
             _end = curTimeMicros64();
         }
 
         long long totalTimeMicros() {
-            massert( 12601 , "CurOp not marked done yet" , ! _active );
+            massert( 12601 , "CurOp not marked done yet" , _end );
             return _end - startTime();
         }
         int totalTimeMillis() { return (int) (totalTimeMicros() / 1000); }
@@ -321,25 +317,20 @@ namespace mongo {
         void setNS( StringData ns );
 
     private:
-        class ClientCuropStack;
+        class CurOpStack;
 
-        static const Client::Decoration<ClientCuropStack> _curopStack;
+        static const OperationContext::Decoration<CurOpStack> _curopStack;
 
-        CurOp(Client*, ClientCuropStack*);
+        CurOp(OperationContext*, CurOpStack*);
 
-        void _reset();
-
-        static AtomicUInt32 _nextOpNum;
-        ClientCuropStack* _stack;
+        CurOpStack* _stack;
         CurOp* _parent = nullptr;
         Command * _command;
         long long _start;
         long long _end;
-        bool _active;
         int _op;
         bool _isCommand;
         int _dbprofile;                  // 0=off, 1=slow, 2=all
-        unsigned int _opNum;
         ThreadSafeString _ns;
         CachedBSONObj<512> _query;       // CachedBSONObj is thread safe
         OpDebug _debug;
