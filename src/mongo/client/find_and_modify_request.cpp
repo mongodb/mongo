@@ -55,15 +55,15 @@ namespace {
                                                BSONObj query,
                                                BSONObj updateObj):
         _ns(std::move(fullNs)),
-        _query(std::move(query)),
-        _updateObj(std::move(updateObj)),
+        _query(query.getOwned()),
+        _updateObj(updateObj.getOwned()),
         _isRemove(false) {
     }
 
     FindAndModifyRequest FindAndModifyRequest::makeUpdate(NamespaceString fullNs,
                                                           BSONObj query,
                                                           BSONObj updateObj) {
-        return FindAndModifyRequest(fullNs, query, updateObj.getOwned());
+        return FindAndModifyRequest(fullNs, query, updateObj);
     }
 
     FindAndModifyRequest FindAndModifyRequest::makeRemove(NamespaceString fullNs,
@@ -85,24 +85,24 @@ namespace {
         else {
             builder.append(kUpdateField, _updateObj);
 
-            if (_isUpsert.is_initialized()) {
+            if (_isUpsert) {
                 builder.append(kUpsertField, _isUpsert.get());
             }
         }
 
-        if (_fieldProjection.is_initialized()) {
+        if (_fieldProjection) {
             builder.append(kFieldProjectionField, _fieldProjection.get());
         }
 
-        if (_sort.is_initialized()) {
+        if (_sort) {
             builder.append(kSortField, _sort.get());
         }
 
-        if (_shouldReturnNew.is_initialized()) {
+        if (_shouldReturnNew) {
             builder.append(kNewField, _shouldReturnNew.get());
         }
 
-        if (_writeConcern.is_initialized()) {
+        if (_writeConcern) {
             builder.append(kWriteConcernField, _writeConcern->toBSON());
         }
 
@@ -157,11 +157,11 @@ namespace {
     }
 
     void FindAndModifyRequest::setFieldProjection(BSONObj fields) {
-        _fieldProjection = std::move(fields.getOwned());
+        _fieldProjection = fields.getOwned();
     }
 
     void FindAndModifyRequest::setSort(BSONObj sort) {
-        _sort = std::move(sort.getOwned());
+        _sort = sort.getOwned();
     }
 
     void FindAndModifyRequest::setShouldReturnNew(bool shouldReturnNew) {

@@ -434,5 +434,6 @@ namespace {
         auto parseStatus = FindAndModifyRequest::parseFromBSON(NamespaceString("a.b"), cmdObj);
         ASSERT_NOT_OK(parseStatus.getStatus());
     }
-}
-}
+
+} // unnamed namespace
+} // namespace mongo
