@@ -129,29 +129,7 @@ namespace mongo {
         /**
          * Returns true if there exists at least one privilege document in the system.
          */
-        bool hasAnyPrivilegeDocuments(OperationContext* txn);
-
-        /**
-         * Finds a document matching "query" in "collectionName", and store a shared-ownership
-         * copy into "result".
-         *
-         * Returns Status::OK() on success.  If no match is found, returns
-         * ErrorCodes::NoMatchingDocument.  Other errors returned as appropriate.
-         */
-        virtual Status findOne(OperationContext* txn,
-                               const NamespaceString& collectionName,
-                               const BSONObj& query,
-                               BSONObj* result) = 0;
-
-        /**
-         * Finds all documents matching "query" in "collectionName".  For each document returned,
-         * calls the function resultProcessor on it.
-         */
-        virtual Status query(OperationContext* txn,
-                             const NamespaceString& collectionName,
-                             const BSONObj& query,
-                             const BSONObj& projection,
-                             const stdx::function<void(const BSONObj&)>& resultProcessor) = 0;
+        virtual bool hasAnyPrivilegeDocuments(OperationContext* txn) = 0;
 
         virtual void logOp(
                 OperationContext* txn,

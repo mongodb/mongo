@@ -32,19 +32,16 @@
 
 #include "mongo/db/auth/authz_manager_external_state_s.h"
 
-#include <boost/scoped_ptr.hpp>
-#include <boost/shared_ptr.hpp>
-#include <boost/thread/mutex.hpp>
 #include <string>
+#include <vector>
 
-#include "mongo/client/connpool.h"
-#include "mongo/client/dbclientinterface.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authz_session_external_state_s.h"
 #include "mongo/db/auth/user_name.h"
+#include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/s/client/shard_registry.h"
+#include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/write_ops/batched_command_response.h"
@@ -54,55 +51,6 @@
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
-
-    using boost::scoped_ptr;
-    using boost::shared_ptr;
-    using std::endl;
-    using std::vector;
-
-namespace {
-
-    ScopedDbConnection* getConfigServerConnection() {
-        // Note: The connection mechanism here is *not* ideal, and should not be used elsewhere.
-        // If the primary for the collection moves, this approach may throw rather than handle
-        // version exceptions.
-        auto shard = grid.shardRegistry()->find("config");
-
-        return new ScopedDbConnection(shard->getConnString(), 30.0);
-    }
-
-    Status getRemoteStoredAuthorizationVersion(DBClientBase* conn, int* outVersion) {
-        try {
-            BSONObj cmdResult;
-            conn->runCommand(
-                    "admin",
-                    BSON("getParameter" << 1 << authSchemaVersionServerParameter << 1),
-                    cmdResult);
-            if (!cmdResult["ok"].trueValue()) {
-                std::string errmsg = cmdResult["errmsg"].str();
-                if (errmsg == "no option found to get" ||
-                    StringData(errmsg).startsWith("no such cmd")) {
-
-                    *outVersion = 1;
-                    return Status::OK();
-                }
-                int code = cmdResult["code"].numberInt();
-                if (code == 0) {
-                    code = ErrorCodes::UnknownError;
-                }
-                return Status(ErrorCodes::Error(code), errmsg);
-            }
-            BSONElement versionElement = cmdResult[authSchemaVersionServerParameter];
-            if (versionElement.eoo())
-                return Status(ErrorCodes::UnknownError, "getParameter misbehaved.");
-            *outVersion = versionElement.numberInt();
-            return Status::OK();
-        } catch (const DBException& e) {
-            return e.toStatus();
-        }
-    }
-
-} // namespace
 
     AuthzManagerExternalStateMongos::AuthzManagerExternalStateMongos() {}
 
@@ -121,165 +69,136 @@ namespace {
 
     Status AuthzManagerExternalStateMongos::getStoredAuthorizationVersion(
                                                 OperationContext* txn, int* outVersion) {
-        try {
-            scoped_ptr<ScopedDbConnection> conn(getConfigServerConnection());
-            Status status = getRemoteStoredAuthorizationVersion(conn->get(), outVersion);
-            conn->done();
-            return status;
+        // Note: we are treating
+        // { 'getParameter' : 1, <authSchemaVersionServerParameter> : 1 }
+        // as a user management command since this is the *only* part of mongos
+        // that runs this command
+        BSONObj getParameterCmd = BSON("getParameter" << 1 <<
+                                       authSchemaVersionServerParameter << 1);
+        BSONObjBuilder builder;
+        const bool ok = grid.catalogManager()->runUserManagementReadCommand("admin",
+                                                                            getParameterCmd,
+                                                                            &builder);
+        BSONObj cmdResult = builder.obj();
+        if (!ok) {
+            return Command::getStatusFromCommandResult(cmdResult);
         }
-        catch (const DBException& ex) {
-            return ex.toStatus();
+
+        BSONElement versionElement = cmdResult[authSchemaVersionServerParameter];
+        if (versionElement.eoo()) {
+            return Status(ErrorCodes::UnknownError, "getParameter misbehaved.");
         }
+        *outVersion = versionElement.numberInt();
+
+        return Status::OK();
     }
 
     Status AuthzManagerExternalStateMongos::getUserDescription(
                     OperationContext* txn, const UserName& userName, BSONObj* result) {
-        try {
-            scoped_ptr<ScopedDbConnection> conn(getConfigServerConnection());
-            BSONObj cmdResult;
-            conn->get()->runCommand(
-                    "admin",
-                    BSON("usersInfo" <<
-                         BSON_ARRAY(BSON(AuthorizationManager::USER_NAME_FIELD_NAME <<
-                                         userName.getUser() <<
-                                         AuthorizationManager::USER_DB_FIELD_NAME <<
-                                         userName.getDB())) <<
-                         "showPrivileges" << true <<
-                         "showCredentials" << true),
-                    cmdResult);
-            if (!cmdResult["ok"].trueValue()) {
-                int code = cmdResult["code"].numberInt();
-                if (code == 0) code = ErrorCodes::UnknownError;
-                return Status(ErrorCodes::Error(code), cmdResult["errmsg"].str());
-            }
-
-            std::vector<BSONElement> foundUsers = cmdResult["users"].Array();
-            if (foundUsers.size() == 0) {
-                return Status(ErrorCodes::UserNotFound,
-                              "User \"" + userName.toString() + "\" not found");
-            }
-            if (foundUsers.size() > 1) {
-                return Status(ErrorCodes::UserDataInconsistent,
-                              mongoutils::str::stream() << "Found multiple users on the \"" <<
-                                      userName.getDB() << "\" database with name \"" <<
-                                      userName.getUser() << "\"");
-            }
-            *result = foundUsers[0].Obj().getOwned();
-            conn->done();
-            return Status::OK();
-        } catch (const DBException& e) {
-            return e.toStatus();
+        BSONObj usersInfoCmd = BSON("usersInfo" <<
+                                    BSON_ARRAY(BSON(AuthorizationManager::USER_NAME_FIELD_NAME <<
+                                                    userName.getUser() <<
+                                                    AuthorizationManager::USER_DB_FIELD_NAME <<
+                                                    userName.getDB())) <<
+                                    "showPrivileges" << true <<
+                                    "showCredentials" << true);
+        BSONObjBuilder builder;
+        const bool ok = grid.catalogManager()->runUserManagementReadCommand("admin",
+                                                                            usersInfoCmd,
+                                                                            &builder);
+        BSONObj cmdResult = builder.obj();
+        if (!ok) {
+            return Command::getStatusFromCommandResult(cmdResult);
         }
+
+        std::vector<BSONElement> foundUsers = cmdResult["users"].Array();
+        if (foundUsers.size() == 0) {
+            return Status(ErrorCodes::UserNotFound,
+                          "User \"" + userName.toString() + "\" not found");
+        }
+
+        if (foundUsers.size() > 1) {
+            return Status(ErrorCodes::UserDataInconsistent,
+                          str::stream() << "Found multiple users on the \""
+                                        << userName.getDB() << "\" database with name \""
+                                        << userName.getUser() << "\"");
+        }
+        *result = foundUsers[0].Obj().getOwned();
+        return Status::OK();
     }
 
     Status AuthzManagerExternalStateMongos::getRoleDescription(const RoleName& roleName,
                                                                bool showPrivileges,
                                                                BSONObj* result) {
-        try {
-            scoped_ptr<ScopedDbConnection> conn(getConfigServerConnection());
-            BSONObj cmdResult;
-            conn->get()->runCommand(
-                    "admin",
-                    BSON("rolesInfo" <<
-                         BSON_ARRAY(BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME <<
-                                         roleName.getRole() <<
-                                         AuthorizationManager::ROLE_DB_FIELD_NAME <<
-                                         roleName.getDB())) <<
-                         "showPrivileges" << showPrivileges),
-                    cmdResult);
-            if (!cmdResult["ok"].trueValue()) {
-                int code = cmdResult["code"].numberInt();
-                if (code == 0) code = ErrorCodes::UnknownError;
-                return Status(ErrorCodes::Error(code), cmdResult["errmsg"].str());
-            }
-
-            std::vector<BSONElement> foundRoles = cmdResult["roles"].Array();
-            if (foundRoles.size() == 0) {
-                return Status(ErrorCodes::RoleNotFound,
-                              "Role \"" + roleName.toString() + "\" not found");
-            }
-            if (foundRoles.size() > 1) {
-                return Status(ErrorCodes::RoleDataInconsistent,
-                              mongoutils::str::stream() << "Found multiple roles on the \"" <<
-                                      roleName.getDB() << "\" database with name \"" <<
-                                      roleName.getRole() << "\"");
-            }
-            *result = foundRoles[0].Obj().getOwned();
-            conn->done();
-            return Status::OK();
-        } catch (const DBException& e) {
-            return e.toStatus();
+        BSONObj rolesInfoCmd = BSON("rolesInfo" <<
+                                    BSON_ARRAY(BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME <<
+                                                    roleName.getRole() <<
+                                                    AuthorizationManager::ROLE_DB_FIELD_NAME <<
+                                                    roleName.getDB())) <<
+                                    "showPrivileges" << showPrivileges);
+        BSONObjBuilder builder;
+        const bool ok = grid.catalogManager()->runUserManagementReadCommand("admin",
+                                                                           rolesInfoCmd,
+                                                                           &builder);
+        BSONObj cmdResult = builder.obj();
+        if (!ok) {
+            return Command::getStatusFromCommandResult(cmdResult);
         }
+
+        std::vector<BSONElement> foundRoles = cmdResult["roles"].Array();
+        if (foundRoles.size() == 0) {
+            return Status(ErrorCodes::RoleNotFound,
+                          "Role \"" + roleName.toString() + "\" not found");
+        }
+
+        if (foundRoles.size() > 1) {
+            return Status(ErrorCodes::RoleDataInconsistent,
+                          str::stream() << "Found multiple roles on the \""
+                                        << roleName.getDB() << "\" database with name \""
+                                        << roleName.getRole() << "\"");
+        }
+        *result = foundRoles[0].Obj().getOwned();
+        return Status::OK();
     }
 
     Status AuthzManagerExternalStateMongos::getRoleDescriptionsForDB(const std::string dbname,
                                                                      bool showPrivileges,
                                                                      bool showBuiltinRoles,
-                                                                     vector<BSONObj>* result) {
-        try {
-            scoped_ptr<ScopedDbConnection> conn(getConfigServerConnection());
-            BSONObj cmdResult;
-            conn->get()->runCommand(
-                    dbname,
-                    BSON("rolesInfo" << 1 <<
-                         "showPrivileges" << showPrivileges <<
-                         "showBuiltinRoles" << showBuiltinRoles),
-                    cmdResult);
-            if (!cmdResult["ok"].trueValue()) {
-                int code = cmdResult["code"].numberInt();
-                if (code == 0) code = ErrorCodes::UnknownError;
-                return Status(ErrorCodes::Error(code), cmdResult["errmsg"].str());
-            }
-            for (BSONObjIterator it(cmdResult["roles"].Obj()); it.more(); it.next()) {
-                result->push_back((*it).Obj().getOwned());
-            }
-            conn->done();
-            return Status::OK();
-        } catch (const DBException& e) {
-            return e.toStatus();
+                                                                     std::vector<BSONObj>* result) {
+        BSONObj rolesInfoCmd = BSON("rolesInfo" << 1 <<
+                                    "showPrivileges" << showPrivileges <<
+                                    "showBuiltinRoles" << showBuiltinRoles);
+        BSONObjBuilder builder;
+        const bool ok = grid.catalogManager()->runUserManagementReadCommand(dbname,
+                                                                            rolesInfoCmd,
+                                                                            &builder);
+        BSONObj cmdResult = builder.obj();
+        if (!ok) {
+            return Command::getStatusFromCommandResult(cmdResult);
         }
+        for (BSONObjIterator it(cmdResult["roles"].Obj()); it.more(); it.next()) {
+            result->push_back((*it).Obj().getOwned());
+        }
+        return Status::OK();
     }
 
-    Status AuthzManagerExternalStateMongos::findOne(
-            OperationContext* txn,
-            const NamespaceString& collectionName,
-            const BSONObj& queryDoc,
-            BSONObj* result) {
-        try {
-            invariant(collectionName.db() == "admin");
-            scoped_ptr<ScopedDbConnection> conn(getConfigServerConnection());
-
-            Query query(queryDoc);
-            query.readPref(ReadPreference::PrimaryPreferred, BSONArray());
-            *result = conn->get()->findOne(collectionName, query).getOwned();
-            conn->done();
-            if (result->isEmpty()) {
-                return Status(ErrorCodes::NoMatchingDocument, mongoutils::str::stream() <<
-                              "No document in " << collectionName.ns() << " matches " << queryDoc);
-            }
-            return Status::OK();
-        } catch (const DBException& e) {
-            return e.toStatus();
+    bool AuthzManagerExternalStateMongos::hasAnyPrivilegeDocuments(OperationContext* txn) {
+        BSONObj usersInfoCmd = BSON("usersInfo" << 1);
+        BSONObjBuilder builder;
+        const bool ok = grid.catalogManager()->runUserManagementReadCommand("admin",
+                                                                            usersInfoCmd,
+                                                                            &builder);
+        if (!ok) {
+            // If we were unable to complete the query,
+            // it's best to assume that there _are_ privilege documents.  This might happen
+            // if the node contaning the users collection becomes transiently unavailable.
+            // See SERVER-12616, for example.
+            return true;
         }
-    }
 
-    Status AuthzManagerExternalStateMongos::query(
-            OperationContext* txn,
-            const NamespaceString& collectionName,
-            const BSONObj& queryDoc,
-            const BSONObj& projection,
-            const stdx::function<void(const BSONObj&)>& resultProcessor) {
-        try {
-            invariant(collectionName.db() == "admin");
-            scoped_ptr<ScopedDbConnection> conn(getConfigServerConnection());
-
-            Query query(queryDoc);
-            query.readPref(ReadPreference::PrimaryPreferred, BSONArray());
-            conn->get()->query(resultProcessor, collectionName.ns(), query, &projection);
-            return Status::OK();
-        } catch (const DBException& e) {
-            return e.toStatus();
-        }
+        BSONObj cmdResult = builder.obj();
+        std::vector<BSONElement> foundUsers = cmdResult["users"].Array();
+        return foundUsers.size() > 0;
     }
 
 } // namespace mongo

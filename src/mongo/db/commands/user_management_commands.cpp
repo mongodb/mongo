@@ -235,6 +235,26 @@ namespace {
     }
 
     /**
+     * Finds all documents matching "query" in "collectionName".  For each document returned,
+     * calls the function resultProcessor on it.
+     * Should only be called on collections with authorization documents in them
+     * (ie admin.system.users and admin.system.roles).
+     */
+    Status queryAuthzDocument(OperationContext* txn,
+                              const NamespaceString& collectionName,
+                              const BSONObj& query,
+                              const BSONObj& projection,
+                              const stdx::function<void(const BSONObj&)>& resultProcessor) {
+        try {
+            DBDirectClient client(txn);
+            client.query(resultProcessor, collectionName.ns(), query, &projection);
+            return Status::OK();
+        } catch (const DBException& e) {
+            return e.toStatus();
+        }
+    }
+
+    /**
      * Inserts "document" into "collectionName".
      * If there is a duplicate key error, returns a Status with code DuplicateKey.
      *
@@ -1316,7 +1336,6 @@ namespace {
 
                 }
 
-                AuthorizationManager* authzManager = getGlobalAuthorizationManager();
                 BSONObjBuilder projection;
                 if (!args.showCredentials) {
                     projection.append("credentials", 0);
@@ -1325,11 +1344,11 @@ namespace {
                         appendBSONObjToBSONArrayBuilder,
                         &usersArrayBuilder,
                         stdx::placeholders::_1);
-                authzManager->queryAuthzDocument(txn,
-                                                 AuthorizationManager::usersCollectionNamespace,
-                                                 queryBuilder.done(),
-                                                 projection.done(),
-                                                 function);
+                queryAuthzDocument(txn,
+                                   AuthorizationManager::usersCollectionNamespace,
+                                   queryBuilder.done(),
+                                   projection.done(),
+                                   function);
             }
             result.append("users", usersArrayBuilder.arr());
             return true;
@@ -2720,7 +2739,7 @@ namespace {
                 BSONObj fields = BSON(AuthorizationManager::USER_NAME_FIELD_NAME << 1 <<
                                       AuthorizationManager::USER_DB_FIELD_NAME << 1);
 
-                Status status = authzManager->queryAuthzDocument(
+                Status status = queryAuthzDocument(
                         txn,
                         AuthorizationManager::usersCollectionNamespace,
                         query,
@@ -2733,7 +2752,7 @@ namespace {
                 }
             }
 
-            Status status = authzManager->queryAuthzDocument(
+            Status status = queryAuthzDocument(
                     txn,
                     NamespaceString(usersCollName),
                     db.empty() ? BSONObj() : BSON(AuthorizationManager::USER_DB_FIELD_NAME << db),
@@ -2802,7 +2821,7 @@ namespace {
                 BSONObj fields = BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME << 1 <<
                                       AuthorizationManager::ROLE_DB_FIELD_NAME << 1);
 
-                Status status = authzManager->queryAuthzDocument(
+                Status status = queryAuthzDocument(
                         txn,
                         AuthorizationManager::rolesCollectionNamespace,
                         query,
@@ -2815,7 +2834,7 @@ namespace {
                 }
             }
 
-            Status status = authzManager->queryAuthzDocument(
+            Status status = queryAuthzDocument(
                     txn,
                     NamespaceString(rolesCollName),
                     db.empty() ?

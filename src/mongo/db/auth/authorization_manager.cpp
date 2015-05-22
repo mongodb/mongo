@@ -329,15 +329,6 @@ namespace mongo {
         return _privilegeDocsExist;
     }
 
-    Status AuthorizationManager::queryAuthzDocument(
-            OperationContext* txn,
-            const NamespaceString& collectionName,
-            const BSONObj& query,
-            const BSONObj& projection,
-            const stdx::function<void(const BSONObj&)>& resultProcessor) {
-        return _externalState->query(txn, collectionName, query, projection, resultProcessor);
-    }
-
     Status AuthorizationManager::getBSONForPrivileges(const PrivilegeVector& privileges,
                                                       mutablebson::Element resultArray) {
         for (PrivilegeVector::const_iterator it = privileges.begin();

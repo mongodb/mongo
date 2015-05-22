@@ -65,28 +65,7 @@ namespace mongo {
                                                 bool showBuiltinRoles,
                                                 std::vector<BSONObj>* result);
 
-        /**
-         * Implements findOne of the AuthzManagerExternalState interface
-         *
-         * NOTE: The data returned from this helper may be from any config server or replica set
-         * node.  The first config server or primary node is preferred, when available.
-         */
-        virtual Status findOne(OperationContext* txn,
-                               const NamespaceString& collectionName,
-                               const BSONObj& query,
-                               BSONObj* result);
-
-        /**
-         * Implements query of the AuthzManagerExternalState interface
-         *
-         * NOTE: The data returned from this helper may be from any config server or replica set
-         * node.  The first config server or primary node is preferred, when available.
-         */
-        virtual Status query(OperationContext* txn,
-                             const NamespaceString& collectionName,
-                             const BSONObj& query,
-                             const BSONObj& projection,
-                             const stdx::function<void(const BSONObj&)>& resultProcessor);
+        bool hasAnyPrivilegeDocuments(OperationContext* txn) override;
     };
 
 } // namespace mongo

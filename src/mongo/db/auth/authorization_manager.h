@@ -198,18 +198,6 @@ namespace mongo {
          */
         bool hasAnyPrivilegeDocuments(OperationContext* txn);
 
-        /**
-         * Finds all documents matching "query" in "collectionName".  For each document returned,
-         * calls the function resultProcessor on it.
-         * Should only be called on collections with authorization documents in them
-         * (ie admin.system.users and admin.system.roles).
-         */
-        Status queryAuthzDocument(OperationContext* txn,
-                                  const NamespaceString& collectionName,
-                                  const BSONObj& query,
-                                  const BSONObj& projection,
-                                  const stdx::function<void(const BSONObj&)>& resultProcessor);
-
         // Checks to see if "doc" is a valid privilege document, assuming it is stored in the
         // "system.users" collection of database "dbname".
         //
