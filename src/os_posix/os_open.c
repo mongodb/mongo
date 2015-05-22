@@ -16,16 +16,9 @@ static int
 __open_directory(WT_SESSION_IMPL *session, char *path, int *fd)
 {
 	WT_DECL_RET;
-	char *dir;
 
-	if ((dir = strrchr(path, '/')) == NULL)
-		path = (char *)".";
-	else
-		*dir = '\0';
 	WT_SYSCALL_RETRY(((*fd =
 	    open(path, O_RDONLY, 0444)) == -1 ? 1 : 0), ret);
-	if (dir != NULL)
-		*dir = '/';
 	if (ret != 0)
 		WT_RET_MSG(session, ret, "%s: open_directory", path);
 	return (ret);
