@@ -90,7 +90,7 @@ csv_extract(WT_EXTRACTOR *extractor, WT_SESSION *session,
 		 * is not necessarily NULL-terminated.  So make a copy, just
 		 * for the duration of the insert.
 		 */
-		len = pend - p;
+		len = (size_t)(pend - p);
 		if ((copy = malloc(len + 1)) == NULL)
 			return (errno);
 		strncpy(copy, p, len);
