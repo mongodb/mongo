@@ -938,7 +938,7 @@ __session_snapshot(WT_SESSION *wt_session, const char *config)
 
 	SESSION_API_CALL(session, snapshot, config, cfg);
 
-	WT_RET(__wt_txn_named_snapshot_config(
+	WT_ERR(__wt_txn_named_snapshot_config(
 	    session, cfg, &has_create, &has_drop));
 
 	WT_ERR(__wt_writelock(session, txn_global->nsnap_rwlock));

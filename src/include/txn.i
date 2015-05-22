@@ -64,6 +64,13 @@ __wt_txn_modify(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 {
 	WT_DECL_RET;
 	WT_TXN_OP *op;
+	WT_TXN *txn;
+
+	txn = &session->txn;
+
+	if (F_ISSET(txn, WT_TXN_READONLY))
+		WT_RET_MSG(session, WT_ROLLBACK,
+		    "Attempt to update in a read only transaction");
 
 	WT_RET(__txn_next_op(session, &op));
 	op->type = F_ISSET(session, WT_SESSION_LOGGING_INMEM) ?

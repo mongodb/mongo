@@ -96,7 +96,7 @@ __nsnap_drop_to(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *name, int inclusive)
 			    (int)name->len, name->str);
 
 		if (!inclusive) {
-			/* We are done if a drop upto points to the head */
+			/* We are done if a drop before points to the head */
 			if (prev == 0)
 				return (0);
 			last = prev;
@@ -198,7 +198,7 @@ int
 __wt_txn_named_snapshot_drop(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_CONFIG objectconf;
-	WT_CONFIG_ITEM all_config, k, names_config, to_config, upto_config, v;
+	WT_CONFIG_ITEM all_config, k, names_config, to_config, before_config, v;
 	WT_DECL_RET;
 
 	WT_RET(__wt_config_gets_def(
@@ -207,14 +207,14 @@ __wt_txn_named_snapshot_drop(WT_SESSION_IMPL *session, const char *cfg[])
 	    session, cfg, "drop.names", 0, &names_config));
 	WT_RET(__wt_config_gets_def(session, cfg, "drop.to", 0, &to_config));
 	WT_RET(__wt_config_gets_def(
-	    session, cfg, "drop.upto", 0, &upto_config));
+	    session, cfg, "drop.before", 0, &before_config));
 
 	if (all_config.val != 0)
 		WT_RET(__nsnap_drop_to(session, NULL, 1));
+	else if (before_config.len != 0)
+		WT_RET(__nsnap_drop_to(session, &before_config, 0));
 	else if (to_config.len != 0)
 		WT_RET(__nsnap_drop_to(session, &to_config, 1));
-	else if (upto_config.len != 0)
-		WT_RET(__nsnap_drop_to(session, &upto_config, 0));
 
 	/* We are done if there are no named drops */
 
@@ -289,7 +289,8 @@ int
 __wt_txn_named_snapshot_config(WT_SESSION_IMPL *session,
     const char *cfg[], int *has_create, int *has_drops)
 {
-	WT_CONFIG_ITEM all_config, cval, names_config, to_config, upto_config;
+	WT_CONFIG_ITEM cval;
+	WT_CONFIG_ITEM all_config, names_config, to_config, before_config;
 	WT_TXN *txn;
 
 	txn = &session->txn;
@@ -323,17 +324,17 @@ __wt_txn_named_snapshot_config(WT_SESSION_IMPL *session,
 	    session, cfg, "drop.names", 0, &names_config));
 	WT_RET(__wt_config_gets_def(session, cfg, "drop.to", 0, &to_config));
 	WT_RET(__wt_config_gets_def(
-	    session, cfg, "drop.upto", 0, &upto_config));
+	    session, cfg, "drop.before", 0, &before_config));
 
 	/* Avoid more work if no drops are configured. */
 	if (all_config.val != 0 || names_config.len != 0 ||
-	    to_config.len != 0 || upto_config.len != 0) {
-		if (to_config.len != 0 && upto_config.len != 0)
+	    before_config.len != 0 || to_config.len != 0) {
+		if (before_config.len != 0 && to_config.len != 0)
 			WT_RET_MSG(session, EINVAL,
 			    "Illegal configuration; named snapshot drop can't "
-			    "specify both to and upto options");
+			    "specify both before and to options");
 		if (all_config.val != 0 && (names_config.len != 0 ||
-		    to_config.len != 0 || upto_config.len != 0))
+		    to_config.len != 0 || before_config.len != 0))
 			WT_RET_MSG(session, EINVAL,
 			    "Illegal configuration; named snapshot drop can't "
 			    "specify all and any other options");

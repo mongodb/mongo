@@ -1475,13 +1475,14 @@ struct __wt_session {
 	 * related configuration options defined below.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;all, drop all named snapshots., a
 	 * boolean flag; default \c false.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;before, drop all snapshots up to but
+	 * not including the specified name., a string; default \c true.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;names, drop specific named
 	 * snapshots., a list of strings; default empty.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;to, drop all snapshots up to and
 	 * including the specified name., a string; default \c true.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;upto, drop all snapshots up to but
-	 * not including the specified name., a string; default \c true.}
-	 * @config{ ),,}
+	 * @config{
+	 * ),,}
 	 * @config{name, specify a name for the snapshot., a string; default
 	 * empty.}
 	 * @configend
