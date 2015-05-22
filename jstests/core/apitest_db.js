@@ -58,18 +58,12 @@ var validStorageEngineOptions = {}
 validStorageEngineOptions[storageEngineName] = {};
 db.getCollection('test').drop();
 assert.commandWorked(db.createCollection('test', {storageEngine: validStorageEngineOptions}));
-var collections = db.getCollectionInfos();
-found  = false;
-for (var i = 0; i < collections.length; ++i) {
-    var collection = collections[i];
-    if (collection.name != 'test') {
-        continue;
-    }
-    found = true;
-    assert.docEq(validStorageEngineOptions, collection.options.storageEngine,
-                 'storage engine options not found in listCommands result');
-}
-assert(found, "'test' collection not created");
+
+var collectionInfos = db.getCollectionInfos({name: 'test'});
+assert.eq(1, collectionInfos.length, "'test' collection not created");
+assert.eq('test', collectionInfos[0].name, "'test' collection not created");
+assert.docEq(validStorageEngineOptions, collectionInfos[0].options.storageEngine,
+             'storage engine options not found in listCommands result');
 
 dd( "e" );
 

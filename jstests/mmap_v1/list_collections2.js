@@ -29,4 +29,9 @@ assert.eq( mydb._getCollectionInfosSystemNamespaces().map(getCollectionName),
 assert.eq( mydb.getCollectionInfos().map(getCollectionName),
            mydb._getCollectionInfosCommand().map(getCollectionName) );
 
+// Test the listCollections command and querying system.namespaces when a filter is specified.
+assert.eq(mydb._getCollectionInfosSystemNamespaces({name: "foo"}).map(getCollectionName),
+          mydb._getCollectionInfosCommand({name: "foo"}).map(getCollectionName),
+          "listCollections command and querying system.namespaces returned different results");
+
 mydb.dropDatabase();
