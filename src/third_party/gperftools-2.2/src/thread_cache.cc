@@ -437,6 +437,16 @@ void ThreadCache::BecomeIdle() {
   DeleteCache(heap);
 }
 
+void ThreadCache::ShrinkCacheIfAboveSize(size_t min_size) {
+  if (!tsd_inited_) return;              // No caches yet
+  ThreadCache* heap = GetThreadHeap();
+  if (heap == NULL) return;             // No thread cache to remove
+  if (heap->in_setspecific_) return;    // Do not disturb the active caller
+
+  if (heap->Size() > min_size)
+    heap->Cleanup();
+}
+
 void ThreadCache::DestroyThreadCache(void* ptr) {
   // Note that "ptr" cannot be NULL since pthread promises not
   // to invoke the destructor on NULL values, but for safety,

@@ -244,7 +244,7 @@ if get_option('allocator') == 'tcmalloc':
         # level configure check, though its effects should still be scoped just to these files.
         tcmspEnv.Append(
             CPPDEFINES=[
-                'MONGO_HAVE_GPERFTOOLS_GET_THREAD_CACHE_SIZE'
+                'MONGO_HAVE_GPERFTOOLS_SHRINK_CACHE_SIZE'
             ]
         )
 

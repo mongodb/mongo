@@ -116,6 +116,7 @@ class ThreadCache {
   static ThreadCache* GetCacheWhichMustBePresent();
   static ThreadCache* CreateCacheIfNecessary();
   static void         BecomeIdle();
+  static void         ShrinkCacheIfAboveSize(size_t min_size);
   static size_t       MinSizeForSlowPath();
   static void         SetMinSizeForSlowPath(size_t size);
 

@@ -147,12 +147,12 @@ void MallocExtension::MarkThreadIdle() {
   // Default implementation does nothing
 }
 
-void MallocExtension::MarkThreadBusy() {
+void MallocExtension::ShrinkCacheIfAboveSize(size_t min_size) {
   // Default implementation does nothing
 }
 
-size_t MallocExtension::GetThreadCacheSize() {
-  return 0;
+void MallocExtension::MarkThreadBusy() {
+  // Default implementation does nothing
 }
 
 SysAllocator* MallocExtension::GetSystemAllocator() {

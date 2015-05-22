@@ -240,10 +240,6 @@ class PERFTOOLS_DLL_DECL MallocExtension {
   // Most malloc implementations ignore this routine.
   virtual void MarkThreadBusy();
 
-  // Gets the size of this thread's cache in bytes.
-  // MONGODB ADDITION
-  virtual size_t GetThreadCacheSize();
-
   // Gets the system allocator used by the malloc extension instance. Returns
   // NULL for malloc implementations that do not support pluggable system
   // allocators.
@@ -395,6 +391,9 @@ class PERFTOOLS_DLL_DECL MallocExtension {
   // Like ReadStackTraces(), but returns stack traces that caused growth
   // in the address space size.
   virtual void** ReadHeapGrowthStackTraces();
+
+  // Shrink per-thread cache size if above a min_size in bytes.
+  virtual void ShrinkCacheIfAboveSize(size_t min_size);
 };
 
 namespace base {
