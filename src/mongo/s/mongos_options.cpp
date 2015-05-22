@@ -37,6 +37,7 @@
 #include <vector>
 
 #include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/config.h"
 #include "mongo/db/server_options.h"
@@ -255,18 +256,17 @@ namespace mongo {
             return Status(ErrorCodes::BadValue, "error: no args for --configdb");
         }
 
-        std::string configdbString = params["sharding.configDB"].as<std::string>();
-        try {
-            std::string errmsg;
-            mongosGlobalParams.configdbs = ConnectionString::parse(configdbString, errmsg);
+        {
+            std::string configdbString = params["sharding.configDB"].as<std::string>();
 
-            if (!mongosGlobalParams.configdbs.isValid()) {
+            auto configdbConnectionString = ConnectionString::parse(configdbString);
+            if (!configdbConnectionString.isOK()) {
                 return Status(ErrorCodes::BadValue,
-                              str::stream() << "Invalid configdb connection string: " << errmsg);
+                              str::stream() << "Invalid configdb connection string: "
+                                            << configdbConnectionString.getStatus().toString());
             }
-        } catch (const DBException& e) {
-            return Status(ErrorCodes::BadValue,
-                          str::stream() << "Invalid configdb connection string: " << e.what());
+
+            mongosGlobalParams.configdbs = configdbConnectionString.getValue();
         }
 
         std::vector<HostAndPort> configServers = mongosGlobalParams.configdbs.getServers();

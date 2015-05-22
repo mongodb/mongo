@@ -254,13 +254,7 @@ static ExitCode runMongosServer( bool doUpgrade ) {
     VersionType initVersionInfo;
     VersionType versionInfo;
     string errMsg;
-    string configServerURL = configServer.getPrimary().getConnString();
-    ConnectionString configServerConnString = ConnectionString::parse(configServerURL, errMsg);
-    if (!configServerConnString.isValid()) {
-        error(LogComponent::kDefault) << "Invalid connection string for config servers: " << configServerURL << endl;
-        return EXIT_SHARDING_ERROR;
-    }
-    bool upgraded = checkAndUpgradeConfigVersion(configServerConnString,
+    bool upgraded = checkAndUpgradeConfigVersion(configServer.getPrimary().getAddress(),
                                                  doUpgrade,
                                                  &initVersionInfo,
                                                  &versionInfo,
