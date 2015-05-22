@@ -668,7 +668,7 @@ extern int __wt_txn_init(WT_SESSION_IMPL *session);
 extern void __wt_txn_stats_update(WT_SESSION_IMPL *session);
 extern void __wt_txn_destroy(WT_SESSION_IMPL *session);
 extern int __wt_txn_global_init(WT_SESSION_IMPL *session, const char *cfg[]);
-extern void __wt_txn_global_destroy(WT_SESSION_IMPL *session);
+extern int __wt_txn_global_destroy(WT_SESSION_IMPL *session);
 extern int __wt_checkpoint_name_ok(WT_SESSION_IMPL *session, const char *name, size_t len);
 extern int __wt_checkpoint_list(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[]);
@@ -688,4 +688,9 @@ extern int __wt_txn_checkpoint_log( WT_SESSION_IMPL *session, int full, uint32_t
 extern int __wt_txn_truncate_log( WT_SESSION_IMPL *session, WT_CURSOR_BTREE *start, WT_CURSOR_BTREE *stop);
 extern int __wt_txn_truncate_end(WT_SESSION_IMPL *session);
 extern int __wt_txn_printlog(WT_SESSION *wt_session, FILE *out);
+extern int __wt_txn_named_snapshot_begin(WT_SESSION_IMPL *session, const char *cfg[]);
+extern int __wt_txn_named_snapshot_drop(WT_SESSION_IMPL *session, const char *cfg[]);
+extern int __wt_txn_named_snapshot_get(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *nameval);
+extern int __wt_txn_named_snapshot_config(WT_SESSION_IMPL *session, const char *cfg[], int *has_create, int *has_drops);
+extern int __wt_txn_named_snapshot_destroy(WT_SESSION_IMPL *session);
 extern int __wt_txn_recover(WT_SESSION_IMPL *session);

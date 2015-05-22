@@ -64,6 +64,13 @@ __wt_txn_modify(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 {
 	WT_DECL_RET;
 	WT_TXN_OP *op;
+	WT_TXN *txn;
+
+	txn = &session->txn;
+
+	if (F_ISSET(txn, WT_TXN_READONLY))
+		WT_RET_MSG(session, WT_ROLLBACK,
+		    "Attempt to update in a read only transaction");
 
 	WT_RET(__txn_next_op(session, &op));
 	op->type = F_ISSET(session, WT_SESSION_LOGGING_INMEM) ?
@@ -234,7 +241,12 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 	if (cfg != NULL)
 		WT_RET(__wt_txn_config(session, cfg));
 
-	if (txn->isolation == WT_ISO_SNAPSHOT) {
+	/*
+	 * Allocate a snapshot if required. Named snapshot transactions already
+	 * have an ID setup.
+	 */
+	if (txn->isolation == WT_ISO_SNAPSHOT &&
+	    !F_ISSET(txn, WT_TXN_NAMED_SNAPSHOT)) {
 		if (session->ncursors > 0)
 			WT_RET(__wt_session_copy_values(session));
 

@@ -148,6 +148,7 @@ static const WT_CONFIG_CHECK confchk_WT_SESSION_begin_transaction[] = {
 	    NULL, 0 },
 	{ "name", "string", NULL, NULL, NULL, 0 },
 	{ "priority", "int", NULL, "min=-100,max=100", NULL, 0 },
+	{ "snapshot", "string", NULL, NULL, NULL, 0 },
 	{ "sync", "boolean", NULL, NULL, NULL, 0 },
 	{ NULL, NULL, NULL, NULL, NULL, 0 }
 };
@@ -284,6 +285,23 @@ static const WT_CONFIG_CHECK confchk_WT_SESSION_reconfigure[] = {
 
 static const WT_CONFIG_CHECK confchk_WT_SESSION_salvage[] = {
 	{ "force", "boolean", NULL, NULL, NULL, 0 },
+	{ NULL, NULL, NULL, NULL, NULL, 0 }
+};
+
+static const WT_CONFIG_CHECK
+    confchk_WT_SESSION_snapshot_drop_subconfigs[] = {
+	{ "all", "boolean", NULL, NULL, NULL, 0 },
+	{ "before", "string", NULL, NULL, NULL, 0 },
+	{ "names", "list", NULL, NULL, NULL, 0 },
+	{ "to", "string", NULL, NULL, NULL, 0 },
+	{ NULL, NULL, NULL, NULL, NULL, 0 }
+};
+
+static const WT_CONFIG_CHECK confchk_WT_SESSION_snapshot[] = {
+	{ "drop", "category",
+	    NULL, NULL,
+	    confchk_WT_SESSION_snapshot_drop_subconfigs, 4 },
+	{ "name", "string", NULL, NULL, NULL, 0 },
 	{ NULL, NULL, NULL, NULL, NULL, 0 }
 };
 
@@ -759,8 +777,8 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  confchk_WT_CURSOR_reconfigure, 2
 	},
 	{ "WT_SESSION.begin_transaction",
-	  "isolation=,name=,priority=0,sync=",
-	  confchk_WT_SESSION_begin_transaction, 4
+	  "isolation=,name=,priority=0,snapshot=,sync=",
+	  confchk_WT_SESSION_begin_transaction, 5
 	},
 	{ "WT_SESSION.checkpoint",
 	  "drop=,force=0,name=,target=",
@@ -823,6 +841,10 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	{ "WT_SESSION.salvage",
 	  "force=0",
 	  confchk_WT_SESSION_salvage, 1
+	},
+	{ "WT_SESSION.snapshot",
+	  "drop=(all=0,before=,names=,to=),name=",
+	  confchk_WT_SESSION_snapshot, 2
 	},
 	{ "WT_SESSION.strerror",
 	  "",

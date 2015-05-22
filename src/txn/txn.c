@@ -258,6 +258,11 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, int force)
 	if (WT_TXNID_LT(snap_min, oldest_id))
 		oldest_id = snap_min;
 
+	/* The oldest ID can't move past any named snapshots. */
+	if ((id = txn_global->nsnap_oldest_id) != WT_TXN_NONE &&
+	    WT_TXNID_LT(id, oldest_id))
+		oldest_id = id;
+
 	/* Update the last running ID. */
 	if (WT_TXNID_LT(txn_global->last_running, snap_min)) {
 		txn_global->last_running = snap_min;
@@ -339,6 +344,16 @@ __wt_txn_config(WT_SESSION_IMPL *session, const char *cfg[])
 	if (!cval.val)
 		txn->txn_logsync = 0;
 
+	WT_RET(__wt_config_gets_def(session, cfg, "snapshot", 0, &cval));
+	if (cval.len > 0)
+		/*
+		 * The layering here isn't ideal - the named snapshot get
+		 * function does both validation and setup. Otherwise we'd
+		 * need to walk the list of named snapshots twice during
+		 * transaction open.
+		 */
+		WT_RET(__wt_txn_named_snapshot_get(session, &cval));
+
 	return (0);
 }
 
@@ -381,7 +396,8 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 	 */
 	__wt_txn_release_snapshot(session);
 	txn->isolation = session->isolation;
-	F_CLR(txn, WT_TXN_ERROR | WT_TXN_HAS_ID | WT_TXN_RUNNING);
+	F_CLR(txn, WT_TXN_ERROR | WT_TXN_HAS_ID |
+	    WT_TXN_NAMED_SNAPSHOT | WT_TXN_READONLY | WT_TXN_RUNNING);
 }
 
 /*
@@ -596,8 +612,14 @@ __wt_txn_global_init(WT_SESSION_IMPL *session, const char *cfg[])
 	txn_global->current = txn_global->last_running =
 	    txn_global->oldest_id = WT_TXN_FIRST;
 
+	WT_RET(__wt_rwlock_alloc(session,
+	    &txn_global->nsnap_rwlock, "named snapshot lock"));
+	txn_global->nsnap_oldest_id = WT_TXN_NONE;
+	STAILQ_INIT(&txn_global->nsnaph);
+
 	WT_RET(__wt_calloc_def(
 	    session, conn->session_size, &txn_global->states));
+
 	for (i = 0, s = txn_global->states; i < conn->session_size; i++, s++)
 		s->id = s->snap_min = WT_TXN_NONE;
 
@@ -608,15 +630,21 @@ __wt_txn_global_init(WT_SESSION_IMPL *session, const char *cfg[])
  * __wt_txn_global_destroy --
  *	Destroy the global transaction state.
  */
-void
+int
 __wt_txn_global_destroy(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
 	WT_TXN_GLOBAL *txn_global;
 
 	conn = S2C(session);
 	txn_global = &conn->txn_global;
 
-	if (txn_global != NULL)
-		__wt_free(session, txn_global->states);
+	if (txn_global == NULL)
+		return (0);
+
+	WT_TRET(__wt_rwlock_destroy(session, &txn_global->nsnap_rwlock));
+	__wt_free(session, txn_global->states);
+
+	return (ret);
 }
