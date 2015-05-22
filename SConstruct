@@ -232,7 +232,6 @@ add_option( "extralib", "comma separated list of libraries  (--extralib js_stati
 # experimental features
 add_option( "mm", "use main memory instead of memory mapped files" , 0 , True )
 add_option( "ssl" , "Enable SSL" , 0 , True )
-add_option( "ssl-fips-capability", "Enable the ability to activate FIPS 140-2 mode", 0, True );
 add_option( "rocksdb" , "Enable RocksDB" , 0 , False )
 add_option( "wiredtiger", "Enable wiredtiger", "?", True, "wiredtiger",
             type="choice", choices=["on", "off"], const="on", default="on")
@@ -1158,8 +1157,6 @@ if has_option( "ssl" ):
     else:
         env.Append( LIBS=["ssl"] )
         env.Append( LIBS=["crypto"] )
-    if has_option("ssl-fips-capability"):
-        env.Append( CPPDEFINES=["MONGO_SSL_FIPS"] )
 else:
     env.Append( MONGO_CRYPTO=["tom"] )
 
@@ -2278,6 +2275,41 @@ def doConfigure(myenv):
 
     # ask each module to configure itself and the build environment.
     moduleconfig.configure_modules(mongo_modules, conf)
+
+    def CheckLinkSSL(context):
+        test_body = """
+        #include <openssl/err.h>
+        #include <openssl/ssl.h>
+        #include <stdlib.h>
+
+        int main() {
+            SSL_library_init();
+            SSL_load_error_strings();
+            ERR_load_crypto_strings();
+
+            OpenSSL_add_all_algorithms();
+            ERR_free_strings();
+            return EXIT_SUCCESS;
+        }
+        """
+        context.Message("Checking if OpenSSL is available...")
+        ret = context.TryLink(textwrap.dedent(test_body), ".c")
+        context.Result(ret)
+        return ret
+    conf.AddTest("CheckLinkSSL", CheckLinkSSL)
+
+    if has_option("ssl"):
+        if not conf.CheckLinkSSL():
+            print "SSL is enabled, but is unavailable"
+            Exit(1)
+
+        if conf.CheckDeclaration(
+            "FIPS_mode_set",
+            includes="""
+                #include <openssl/crypto.h>
+                #include <openssl/evp.h>
+            """):
+            conf.env.Append(CPPDEFINES=['MONGO_HAVE_FIPS_MODE_SET'])
 
     return conf.Finish()
 
