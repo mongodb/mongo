@@ -32,7 +32,7 @@
 
 namespace mongo {
 
-    class ConnectionString;
+    class CatalogManager;
     class Status;
     class VersionType;
 
@@ -131,7 +131,7 @@ namespace mongo {
      *
      * @return OK if version found successfully, error status if something bad happened.
      */
-    Status getConfigVersion(const ConnectionString& configLoc, VersionType* versionInfo);
+    Status getConfigVersion(CatalogManager* catalogManager, VersionType* versionInfo);
 
     /**
      * Checks the config version and ensures it's the latest version, otherwise tries to update.
@@ -140,7 +140,7 @@ namespace mongo {
      * @return initial and finalVersionInfo indicating the start and end versions of the upgrade.
      *         These are the same if no upgrade occurred.
      */
-    bool checkAndUpgradeConfigVersion(const ConnectionString& configLoc,
+    bool checkAndUpgradeConfigVersion(CatalogManager* catalogManager,
                                       bool upgrade,
                                       VersionType* initialVersionInfo,
                                       VersionType* finalVersionInfo,

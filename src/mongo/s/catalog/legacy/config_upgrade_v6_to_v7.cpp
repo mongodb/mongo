@@ -32,6 +32,7 @@
 
 #include "mongo/s/catalog/legacy/config_upgrade.h"
 
+#include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/legacy/cluster_client_internal.h"
 #include "mongo/s/catalog/legacy/config_upgrade_helpers.h"
 #include "mongo/s/type_config_version.h"
@@ -56,16 +57,16 @@ namespace mongo {
     /**
      * Upgrades v6 to v7.
      */
-    bool doUpgradeV6ToV7(const ConnectionString& configLoc,
+    bool doUpgradeV6ToV7(CatalogManager* catalogManager,
                          const VersionType& lastVersionInfo,
-                         string* errMsg)
-    {
+                         string* errMsg) {
+
         string dummy;
         if (!errMsg) errMsg = &dummy;
 
-        verify(lastVersionInfo.getCurrentVersion() == UpgradeHistory_DummyBumpPre2_8);
-        Status result = preUpgradeCheck(configLoc, lastVersionInfo, minMongoProcessVersion);
+        invariant(lastVersionInfo.getCurrentVersion() == UpgradeHistory_DummyBumpPre2_8);
 
+        Status result = preUpgradeCheck(catalogManager, lastVersionInfo, minMongoProcessVersion);
         if (!result.isOK()) {
             if (result.code() == ErrorCodes::ManualInterventionRequired) {
                 *errMsg = cannotCleanupMessage;
@@ -97,7 +98,7 @@ namespace mongo {
 
         // We're only after the version bump in commitConfigUpgrade here since we never
         // get into the critical section.
-        Status commitStatus = commitConfigUpgrade(configLoc.toString(),
+        Status commitStatus = commitConfigUpgrade(catalogManager,
                                                   lastVersionInfo.getCurrentVersion(),
                                                   MIN_COMPATIBLE_CONFIG_VERSION,
                                                   CURRENT_CONFIG_VERSION);

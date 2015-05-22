@@ -26,25 +26,17 @@
  *    then also delete it in the license file.
  */
 
-/**
- * Useful utilities for clients working on a cluster.  Safe wrapping of operations useful in
- * general for clients using cluster metadata.
- *
- * TODO: See if this stuff is more generally useful, distribute if so.
- */
-
 #pragma once
 
-#include "mongo/base/owned_pointer_map.h"
-#include "mongo/base/owned_pointer_vector.h"
-#include "mongo/client/dbclientinterface.h"
-#include "mongo/s/catalog/type_chunk.h"
+#include <string>
+
+#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
-    //
-    // Helper methods for querying information about a cluster
-    //
+    class CatalogManager;
+    class DBClientCursor;
+    class Status;
 
     /**
      * Tries to check the versions of all active hosts in a cluster.  Not 100% accurate, but pretty
@@ -53,7 +45,7 @@ namespace mongo {
      * Returns OK if hosts are compatible as far as we know, RemoteValidationError if hosts are not
      * compatible, and an error Status if anything else goes wrong.
      */
-    Status checkClusterMongoVersions(const ConnectionString& configLoc,
+    Status checkClusterMongoVersions(CatalogManager* catalogManager,
                                      const std::string& minMongoVersion);
 
     //

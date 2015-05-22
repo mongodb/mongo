@@ -44,7 +44,6 @@
 #include "mongo/s/catalog/type_settings.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog/dist_lock_manager.h"
-#include "mongo/s/grid.h"
 #include "mongo/s/mongo_version_range.h"
 #include "mongo/s/type_config_version.h"
 #include "mongo/stdx/functional.h"
@@ -62,11 +61,11 @@ namespace mongo {
     using str::stream;
 
     // Implemented in the respective steps' .cpp file
-    bool doUpgradeV0ToV7(const ConnectionString& configLoc,
+    bool doUpgradeV0ToV7(CatalogManager* catalogManager,
                          const VersionType& lastVersionInfo,
                          std::string* errMsg);
 
-    bool doUpgradeV6ToV7(const ConnectionString& configLoc,
+    bool doUpgradeV6ToV7(CatalogManager* catalogManager,
                          const VersionType& lastVersionInfo,
                          std::string* errMsg);
 
@@ -107,8 +106,7 @@ namespace {
      * Encapsulates the information needed to register a config upgrade.
      */
     struct UpgradeStep {
-        typedef stdx::function<bool(const ConnectionString&, const VersionType&, string*)>
-                UpgradeCallback;
+        typedef stdx::function<bool(CatalogManager*, const VersionType&, string*)> UpgradeCallback;
 
         UpgradeStep(int _fromVersion,
                     const VersionRange& _toVersionRange,
@@ -264,21 +262,8 @@ namespace {
         return VersionStatus_NeedUpgrade;
     }
 
-    // Returns true if we can confirm the balancer is stopped
-    bool isBalancerStopped() {
-        auto balSettingsResult =
-            grid.catalogManager()->getGlobalSettings(SettingsType::BalancerDocKey);
-        if (!balSettingsResult.isOK()) {
-            return false;
-        }
-
-        SettingsType balSettings = balSettingsResult.getValue();
-        return balSettings.getBalancerStopped();
-    }
-
     // Checks that all config servers are online
     bool _checkConfigServersAlive(const ConnectionString& configLoc, string* errMsg) {
-        
         bool resultOk;
         BSONObj result;
         try {
@@ -309,7 +294,7 @@ namespace {
     }
 
     // Dispatches upgrades based on version to the upgrades registered in the upgrade registry
-    bool _nextUpgrade(const ConnectionString& configLoc,
+    bool _nextUpgrade(CatalogManager* catalogManager,
                       const ConfigUpgradeRegistry& registry,
                       const VersionType& lastVersionInfo,
                       VersionType* upgradedVersionInfo,
@@ -335,21 +320,19 @@ namespace {
         log() << "starting next upgrade step from v" << fromVersion << " to v" << toVersion;
 
         // Log begin to config.changelog
-        grid.catalogManager()->logChange(NULL,
-                                         "starting upgrade of config database",
-                                         VersionType::ConfigNS,
-                                         BSON("from" << fromVersion << "to" << toVersion));
+        catalogManager->logChange(NULL,
+                                  "starting upgrade of config database",
+                                  VersionType::ConfigNS,
+                                  BSON("from" << fromVersion << "to" << toVersion));
 
-        if (!upgrade.upgradeCallback(configLoc, lastVersionInfo, errMsg)) {
-
-            *errMsg = stream() << "error upgrading config database from v" << fromVersion << " to v"
-                               << toVersion << causedBy(errMsg);
-
+        if (!upgrade.upgradeCallback(catalogManager, lastVersionInfo, errMsg)) {
+            *errMsg = stream() << "error upgrading config database from v"
+                               << fromVersion << " to v" << toVersion << causedBy(errMsg);
             return false;
         }
 
         // Get the config version we've upgraded to and make sure it's sane
-        Status verifyConfigStatus = getConfigVersion(configLoc, upgradedVersionInfo);
+        Status verifyConfigStatus = getConfigVersion(catalogManager, upgradedVersionInfo);
 
         if (!verifyConfigStatus.isOK()) {
             *errMsg = stream() << "failed to validate v" << fromVersion << " config version upgrade"
@@ -358,10 +341,10 @@ namespace {
             return false;
         }
 
-        grid.catalogManager()->logChange(NULL,
-                                         "finished upgrade of config database",
-                                         VersionType::ConfigNS,
-                                         BSON("from" << fromVersion << "to" << toVersion));
+        catalogManager->logChange(NULL,
+                                  "finished upgrade of config database",
+                                  VersionType::ConfigNS,
+                                  BSON("from" << fromVersion << "to" << toVersion));
         return true;
     }
 
@@ -373,11 +356,11 @@ namespace {
      *
      * @return OK if version found successfully, error status if something bad happened.
      */
-    Status getConfigVersion(const ConnectionString& configLoc, VersionType* versionInfo) {
+    Status getConfigVersion(CatalogManager* catalogManager, VersionType* versionInfo) {
         try {
             versionInfo->clear();
 
-            ScopedDbConnection conn(configLoc, 30);
+            ScopedDbConnection conn(catalogManager->connectionString(), 30);
 
             scoped_ptr<DBClientCursor> cursor(_safeCursor(conn->query("config.version",
                                                                       BSONObj())));
@@ -429,7 +412,7 @@ namespace {
         return Status::OK();
     }
 
-    bool checkAndUpgradeConfigVersion(const ConnectionString& configLoc,
+    bool checkAndUpgradeConfigVersion(CatalogManager* catalogManager,
                                       bool upgrade,
                                       VersionType* initialVersionInfo,
                                       VersionType* versionInfo,
@@ -440,7 +423,7 @@ namespace {
             errMsg = &dummy;
         }
 
-        Status getConfigStatus = getConfigVersion(configLoc, versionInfo);
+        Status getConfigStatus = getConfigVersion(catalogManager, versionInfo);
         if (!getConfigStatus.isOK()) {
             *errMsg = stream() << "could not load config version for upgrade"
                                << causedBy(getConfigStatus);
@@ -476,7 +459,7 @@ namespace {
 
         // Contact the config servers to make sure all are online - otherwise we wait a long time
         // for locks.
-        if (!_checkConfigServersAlive(configLoc, errMsg)) {
+        if (!_checkConfigServersAlive(catalogManager->connectionString(), errMsg)) {
 
             if (isEmptyVersion) {
                 *errMsg = stream() << "all config servers must be reachable for initial"
@@ -492,12 +475,16 @@ namespace {
 
         // Check whether or not the balancer is online, if it is online we will not upgrade
         // (but we will initialize the config server)
-        if (!isEmptyVersion && !isBalancerStopped()) {
-            
-            *errMsg = stream() << "balancer must be stopped for config upgrade"
-                               << causedBy(errMsg);
-            
-            return false;
+        if (!isEmptyVersion) {
+            auto balSettingsResult =
+                catalogManager->getGlobalSettings(SettingsType::BalancerDocKey);
+            if (balSettingsResult.isOK()) {
+                SettingsType balSettings = balSettingsResult.getValue();
+                if (!balSettings.getBalancerStopped()) {
+                    *errMsg = stream() << "balancer must be stopped for config upgrade"
+                                       << causedBy(errMsg);
+                }
+            }
         }
 
         //
@@ -510,9 +497,9 @@ namespace {
         string whyMessage(stream() << "upgrading config database to new format v"
                                    << CURRENT_CONFIG_VERSION);
         auto lockTimeout = stdx::chrono::milliseconds(20 * 60 * 1000);
-        auto scopedDistLock = grid.catalogManager()->getDistLockManager()->lock(
-                "configUpgrade", whyMessage, lockTimeout);
-
+        auto scopedDistLock = catalogManager->getDistLockManager()->lock("configUpgrade",
+                                                                         whyMessage,
+                                                                         lockTimeout);
         if (!scopedDistLock.isOK()) {
             *errMsg = scopedDistLock.getStatus().toString();
             return false;
@@ -524,7 +511,7 @@ namespace {
         // if this is the case.
         //
 
-        getConfigStatus = getConfigVersion(configLoc, versionInfo);
+        getConfigStatus = getConfigVersion(catalogManager, versionInfo);
         if (!getConfigStatus.isOK()) {
             *errMsg = stream() << "could not reload config version for upgrade"
                                << causedBy(getConfigStatus);
@@ -558,7 +545,7 @@ namespace {
             // upgrade.
             //
 
-            if (!_nextUpgrade(configLoc, registry, *versionInfo, versionInfo, errMsg)) {
+            if (!_nextUpgrade(catalogManager, registry, *versionInfo, versionInfo, errMsg)) {
                 return false;
             }
 

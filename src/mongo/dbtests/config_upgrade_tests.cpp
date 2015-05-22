@@ -33,6 +33,7 @@
 #include "mongo/s/catalog/type_settings.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/chunk_version.h"
+#include "mongo/s/grid.h"
 #include "mongo/s/type_mongos.h"
 #include "mongo/s/type_config_version.h"
 #include "mongo/unittest/unittest.h"
@@ -165,7 +166,7 @@ namespace mongo {
 
         // Zero version (no version doc)
         VersionType oldVersion;
-        Status status = getConfigVersion(configSvr(), &oldVersion);
+        Status status = getConfigVersion(grid.catalogManager(), &oldVersion);
         ASSERT(status.isOK());
 
         ASSERT_EQUALS(oldVersion.getMinCompatibleVersion(), 0);
@@ -186,7 +187,7 @@ namespace mongo {
         newVersion.clear();
 
         // Current Version w/o clusterId (invalid!)
-        Status status = getConfigVersion(configSvr(), &newVersion);
+        Status status = getConfigVersion(grid.catalogManager(), &newVersion);
         ASSERT(!status.isOK());
 
         newVersion.clear();
@@ -202,7 +203,7 @@ namespace mongo {
         newVersion.clear();
 
         // Current version w/ clusterId (valid!)
-        status = getConfigVersion(configSvr(), &newVersion);
+        status = getConfigVersion(grid.catalogManager(), &newVersion);
         ASSERT(status.isOK());
 
         ASSERT_EQUALS(newVersion.getMinCompatibleVersion(), MIN_COMPATIBLE_CONFIG_VERSION);
@@ -220,7 +221,7 @@ namespace mongo {
         VersionType versionOld;
         VersionType version;
         string errMsg;
-        bool result = checkAndUpgradeConfigVersion(configSvr(),
+        bool result = checkAndUpgradeConfigVersion(grid.catalogManager(),
                                                    false,
                                                    &versionOld,
                                                    &version,
@@ -247,7 +248,7 @@ namespace mongo {
         VersionType versionOld;
         VersionType version;
         string errMsg;
-        bool result = checkAndUpgradeConfigVersion(configSvr(),
+        bool result = checkAndUpgradeConfigVersion(grid.catalogManager(),
                                                    false,
                                                    &versionOld,
                                                    &version,
@@ -267,11 +268,11 @@ namespace mongo {
         storeShardsAndPings(5, 10); // 5 shards, 10 pings
 
         // Our version is >= 2.2, so this works
-        Status status = checkClusterMongoVersions(configSvr(), "2.2");
+        Status status = checkClusterMongoVersions(grid.catalogManager(), "2.2");
         ASSERT(status.isOK());
 
         // Our version is < 9.9, so this doesn't work (until we hit v99.99)
-        status = checkClusterMongoVersions(configSvr(), "99.99");
+        status = checkClusterMongoVersions(grid.catalogManager(), "99.99");
         ASSERT(status.code() == ErrorCodes::RemoteValidationError);
     }
 

@@ -33,14 +33,12 @@
 #include "mongo/s/catalog/legacy/cluster_client_internal.h"
 
 #include <boost/scoped_ptr.hpp>
-#include <string>
 #include <vector>
 
 #include "mongo/client/connpool.h"
 #include "mongo/db/field_parser.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/grid.h"
 #include "mongo/s/type_mongos.h"
 #include "mongo/util/log.h"
 #include "mongo/util/stringutils.h"
@@ -54,9 +52,9 @@ namespace mongo {
     using std::vector;
     using mongoutils::str::stream;
 
-    Status checkClusterMongoVersions(const ConnectionString& configLoc,
-                                     const string& minMongoVersion)
-    {
+    Status checkClusterMongoVersions(CatalogManager* catalogManager,
+                                     const string& minMongoVersion) {
+
         scoped_ptr<ScopedDbConnection> connPtr;
 
         //
@@ -64,7 +62,7 @@ namespace mongo {
         //
 
         try {
-            connPtr.reset(new ScopedDbConnection(configLoc, 30));
+            connPtr.reset(new ScopedDbConnection(catalogManager->connectionString(), 30));
             ScopedDbConnection& conn = *connPtr;
             scoped_ptr<DBClientCursor> cursor(_safeCursor(conn->query(MongosType::ConfigNS,
                                                                       Query())));
@@ -131,7 +129,7 @@ namespace mongo {
 
         try {
             vector<ShardType> shards;
-            Status status = grid.catalogManager()->getAllShards(&shards);
+            Status status = catalogManager->getAllShards(&shards);
             if (!status.isOK()) {
                 return status;
             }
@@ -161,7 +159,7 @@ namespace mongo {
         }
 
         // Add config servers to list of servers to check version against
-        vector<HostAndPort> configServers = configLoc.getServers();
+        vector<HostAndPort> configServers = catalogManager->connectionString().getServers();
         servers.insert(servers.end(), configServers.begin(), configServers.end());
 
         //
@@ -169,10 +167,9 @@ namespace mongo {
         // and config servers and verifying their versions.
         //
 
-
         for (vector<HostAndPort>::iterator serverIt = servers.begin();
-                serverIt != servers.end(); ++serverIt)
-        {
+                serverIt != servers.end(); ++serverIt) {
+
             // Note: This will *always* be a single-host connection
             ConnectionString serverLoc(*serverIt);
             dassert(serverLoc.type() == ConnectionString::MASTER || 

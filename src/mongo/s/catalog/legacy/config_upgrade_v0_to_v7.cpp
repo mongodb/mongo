@@ -33,7 +33,6 @@
 #include "mongo/s/catalog/legacy/config_upgrade.h"
 
 #include "mongo/s/catalog/catalog_manager.h"
-#include "mongo/s/grid.h"
 #include "mongo/s/type_config_version.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -49,7 +48,7 @@ namespace mongo {
      *
      * This upgrade takes the config server from empty to an initial version.
      */
-    bool doUpgradeV0ToV7(const ConnectionString& configLoc,
+    bool doUpgradeV0ToV7(CatalogManager* catalogManager,
                          const VersionType& lastVersionInfo,
                          string* errMsg) {
 
@@ -80,14 +79,12 @@ namespace mongo {
         // If the cluster has not previously been initialized, we need to set the version before
         // using so subsequent mongoses use the config data the same way.  This requires all three
         // config servers online initially.
-        Status result = grid.catalogManager()->update(
-                                VersionType::ConfigNS,
-                                BSON("_id" << 1),
-                                versionInfo.toBSON(),
-                                true,   // upsert
-                                false,  // multi
-                                NULL);
-
+        Status result = catalogManager->update(VersionType::ConfigNS,
+                                               BSON("_id" << 1),
+                                               versionInfo.toBSON(),
+                                               true,   // upsert
+                                               false,  // multi
+                                               NULL);
         if (!result.isOK()) {
             *errMsg = stream() << "error writing initial config version: "
                                << result.reason();

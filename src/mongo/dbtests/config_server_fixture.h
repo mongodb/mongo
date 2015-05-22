@@ -95,13 +95,7 @@ namespace mongo {
      */
     class ConfigServerFixture: public mongo::unittest::Test {
     public:
-
         ConfigServerFixture();
-
-        /**
-         * Returns a uniform config server connection string to use throughout the tests.
-         */
-        static ConnectionString configSvr();
 
         /**
          * Returns a uniform shard name to use throughout the tests.

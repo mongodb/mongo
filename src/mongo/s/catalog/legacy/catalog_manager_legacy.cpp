@@ -49,6 +49,7 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/s/catalog/legacy/cluster_client_internal.h"
 #include "mongo/s/catalog/legacy/config_coordinator.h"
+#include "mongo/s/catalog/legacy/config_upgrade.h"
 #include "mongo/s/catalog/type_actionlog.h"
 #include "mongo/s/catalog/type_changelog.h"
 #include "mongo/s/catalog/type_chunk.h"
@@ -65,6 +66,7 @@
 #include "mongo/s/catalog/dist_lock_manager.h"
 #include "mongo/s/catalog/legacy/legacy_dist_lock_manager.h"
 #include "mongo/s/shard_key_pattern.h"
+#include "mongo/s/type_config_version.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/stdx/memory.h"
@@ -380,6 +382,25 @@ namespace {
         return Status::OK();
     }
 
+    Status CatalogManagerLegacy::checkAndUpgradeConfigMetadata(bool doUpgrade) {
+        VersionType initVersionInfo;
+        VersionType versionInfo;
+        string errMsg;
+
+        bool upgraded = checkAndUpgradeConfigVersion(this,
+                                                     doUpgrade,
+                                                     &initVersionInfo,
+                                                     &versionInfo,
+                                                     &errMsg);
+        if (!upgraded) {
+            return Status(ErrorCodes::IncompatibleShardingMetadata,
+                          str::stream() << "error upgrading config database to v"
+                                        << CURRENT_CONFIG_VERSION << causedBy(errMsg));
+        }
+
+        return Status::OK();
+    }
+
     Status CatalogManagerLegacy::startConfigServerChecker() {
         if (!_checkConfigServersConsistent()) {
             return Status(ErrorCodes::IncompatibleShardingMetadata,
@@ -390,6 +411,10 @@ namespace {
         _consistencyCheckerThread.swap(t);
 
         return Status::OK();
+    }
+
+    ConnectionString CatalogManagerLegacy::connectionString() const {
+        return _configServerConnectionString;
     }
 
     void CatalogManagerLegacy::shutDown() {

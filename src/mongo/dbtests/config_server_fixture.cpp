@@ -56,10 +56,6 @@ namespace mongo {
 
     }
 
-    ConnectionString ConfigServerFixture::configSvr() {
-        return ConnectionString(HostAndPort("$dummy:10000"));
-    }
-
     string ConfigServerFixture::shardName() {
         return "TestShardName";
     }
@@ -82,7 +78,8 @@ namespace mongo {
                                        BSON( ChunkType::ns() << 1 <<
                                              ChunkType::DEPRECATED_lastmod() << 1 )));
 
-        shardingState.initialize(configSvr().toString());
+        ConnectionString connStr(uassertStatusOK(ConnectionString::parse("$dummy:10000")));
+        shardingState.initialize(connStr.toString());
         shardingState.gotShardName(shardName());
     }
 

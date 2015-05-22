@@ -80,6 +80,11 @@ namespace mongo {
         virtual ~CatalogManager() = default;
 
         /**
+         * Retrieves the connection string for the catalog manager's backing server.
+         */
+        virtual ConnectionString connectionString() const = 0;
+
+        /**
          * Performs necessary cleanup when shutting down cleanly.
          */
         virtual void shutDown() = 0;

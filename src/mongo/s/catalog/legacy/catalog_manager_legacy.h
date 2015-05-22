@@ -57,12 +57,19 @@ namespace mongo {
         Status init(const ConnectionString& configCS);
 
         /**
+         * Updates the config server's metadata to the current version.
+         */
+        Status checkAndUpgradeConfigMetadata(bool doUpgrade);
+
+        /**
          * Starts the thread that periodically checks data consistency amongst the config servers.
          * Note: this is not thread safe and can only be called once for the lifetime.
          */
         Status startConfigServerChecker();
 
-        virtual void shutDown() override;
+        ConnectionString connectionString() const final;
+
+        void shutDown() final;
 
         virtual Status enableSharding(const std::string& dbName);
 

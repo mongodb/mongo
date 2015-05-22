@@ -35,51 +35,15 @@
 
 #pragma once
 
-#include "mongo/client/dbclientinterface.h"
+#include <string>
 
 namespace mongo {
 
+    class CatalogManager;
+    class ConnectionString;
+    class OID;
+    class Status;
     class VersionType;
-
-    /**
-     * Verifies that two collections contain documents with the same _ids.
-     *
-     * @return OK if they do, RemoteValidationError if they do not, and an error Status if
-     * anything else went wrong.
-     */
-    Status checkIdsTheSame(const ConnectionString& configLoc,
-                           const std::string& nsA,
-                           const std::string& nsB);
-
-    /**
-     * Verifies that two collections hash to the same values.
-     *
-     * @return OK if they do, RemoteValidationError if they do not, and an error Status if
-     * anything else went wrong.
-     */
-    Status checkHashesTheSame(const ConnectionString& configLoc,
-                              const std::string& nsA,
-                              const std::string& nsB);
-
-    /**
-     * Atomically overwrites a collection with another collection (only atomic if configLoc is a
-     * single server).
-     *
-     * @return OK if overwrite was successful, and an error Status if anything else went wrong.
-     */
-    Status overwriteCollection(const ConnectionString& configLoc,
-                               const std::string& fromNS,
-                               const std::string& overwriteNS);
-
-    /**
-     * Creates a suffix for an upgrade's working collection
-     */
-    std::string genWorkingSuffix(const OID& lastUpgradeId);
-
-    /**
-     * Creates a suffix for an upgrade's backup collection
-     */
-    std::string genBackupSuffix(const OID& lastUpgradeId);
 
     /**
      * Checks whether an unsuccessful upgrade was performed last time and also checks whether
@@ -89,31 +53,18 @@ namespace mongo {
      * Note: There is also a special case for ManualInterventionRequired error where the
      * message will be empty.
      */
-    Status preUpgradeCheck(const ConnectionString& configServer,
+    Status preUpgradeCheck(CatalogManager* catalogManager,
                            const VersionType& lastVersionInfo,
                            std::string minMongosVersion);
-
-    /**
-     * Sets a new upgradeID and empties upgrade state to the config server.
-     */
-    Status startConfigUpgrade(const std::string& configServer,
-                              int currentVersion,
-                              const OID& upgradeID);
-
-    /**
-     * Informs the config server that we are about to enter to the critical section of
-     * the upgrade.
-     */
-    Status enterConfigUpgradeCriticalSection(const std::string& configServer, int currentVersion);
 
     /**
      * Informs the config server that the upgrade task was completed by bumping the version.
      * This also clears all upgrade state effectively leaving the critical section if the
      * upgrade process did enter it.
      */
-    Status commitConfigUpgrade(const std::string& configServer,
+    Status commitConfigUpgrade(CatalogManager* catalogManager,
                                int currentVersion,
                                int minCompatibleVersion,
                                int newVersion);
 
-}
+} // namespace mongo
