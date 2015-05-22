@@ -354,21 +354,18 @@ __wt_log_slot_grow_buffers(WT_SESSION_IMPL *session, size_t newsize)
 	__wt_spin_lock(session, &log->log_slot_lock);
 	for (i = 0; i < WT_SLOT_POOL; i++) {
 		slot = &log->slot_pool[i];
-		/* Avoid atomic operations if they won't succeed. */
-		if (slot->slot_state != WT_LOG_SLOT_FREE &&
-		    slot->slot_state != WT_LOG_SLOT_READY)
-			continue;
+
 		/* Don't keep growing unrelated buffers. */
 		if (slot->slot_buf.memsize > (10 * newsize) &&
 		    !F_ISSET(slot, WT_SLOT_BUF_GROW))
 			continue;
-		if (WT_ATOMIC_CAS8(
-		    slot->slot_state, WT_LOG_SLOT_FREE, WT_LOG_SLOT_PENDING))
-			orig_state = WT_LOG_SLOT_FREE;
-		else if (WT_ATOMIC_CAS8(
-		    slot->slot_state, WT_LOG_SLOT_READY, WT_LOG_SLOT_PENDING))
-			orig_state = WT_LOG_SLOT_READY;
-		else
+
+		/* Avoid atomic operations if they won't succeed. */
+		orig_state = slot->slot_state;
+		if ((orig_state != WT_LOG_SLOT_FREE &&
+		    orig_state != WT_LOG_SLOT_READY) ||
+		    WT_ATOMIC_CAS8(
+		    slot->slot_state, orig_state, WT_LOG_SLOT_PENDING))
 			continue;
 
 		/* We have a slot - now go ahead and grow the buffer. */
