@@ -533,7 +533,7 @@ named_snapshot_ops(WT_SESSION *session)
 	ret = session->begin_transaction(session, "snapshot=June01");
 
 	/* Drop all named snapshots */
-	ret = session->snapshot(session, "drop=(to=all)");
+	ret = session->snapshot(session, "drop=(all)");
 	/*! [Snapshot examples] */
 
 	return (ret);

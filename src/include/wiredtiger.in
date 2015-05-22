@@ -1473,11 +1473,12 @@ struct __wt_session {
 	 * Where a group of snapshots are being dropped\, the order is based on
 	 * snapshot creation order not alphanumeric name order., a set of
 	 * related configuration options defined below.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;names, drop specific named
-	 * snapshots., a list of strings; default empty.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;all, drop all named snapshots., a
+	 * boolean flag; default empty.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;names,
+	 * drop specific named snapshots., a list of strings; default empty.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;to, drop all snapshots up to and
-	 * including the specified name.  If the special "all" name is given all
-	 * snapshots will be dropped., a string; default \c true.}
+	 * including the specified name., a string; default \c true.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;until, drop all snapshots up to but
 	 * not including the specified name., a string; default \c true.}
 	 * @config{ ),,}

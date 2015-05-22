@@ -53,7 +53,8 @@ __nsnap_drop_one(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *name)
 
 /*
  * __nsnap_drop_to --
- *	Drop named snapshots. The named snapshot lock must be held write locked.
+ *	Drop named snapshots, if the name is NULL all snapshots will be
+ *	dropped. The named snapshot lock must be held write locked.
  */
 static int
 __nsnap_drop_to(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *name, int inclusive)
@@ -66,17 +67,24 @@ __nsnap_drop_to(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *name, int inclusive)
 	last = nsnap = prev = NULL;
 	txn_global = &S2C(session)->txn_global;
 
-	if (STAILQ_EMPTY(&txn_global->nsnaph))
+	if (STAILQ_EMPTY(&txn_global->nsnaph)) {
+		if (name == NULL)
+			return (0);
+		/*
+		 * Dropping specific snapshots when there aren't any it's an
+		 * error.
+		 */
 		WT_RET_MSG(session, EINVAL,
 		    "Named snapshot '%.*s' for drop not found",
 		    (int)name->len, name->str);
+	}
 
 	/*
 	 * The new ID will be none if we are removing all named snapshots
 	 * which is the default behavior of this loop.
 	 */
 	new_nsnap_oldest = WT_TXN_NONE;
-	if (!WT_STRING_MATCH("all", name->str, name->len)) {
+	if (name != NULL) {
 		STAILQ_FOREACH(last, &txn_global->nsnaph, q) {
 			if (WT_STRING_MATCH(last->name, name->str, name->len))
 				break;
@@ -206,12 +214,14 @@ int
 __wt_txn_named_snapshot_drop(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_CONFIG objectconf;
-	WT_CONFIG_ITEM k, names_config, to_config, until_config, v;
+	WT_CONFIG_ITEM all_config, k, names_config, to_config, until_config, v;
 	WT_DECL_RET;
 	WT_TXN_GLOBAL *txn_global;
 
 	txn_global = &S2C(session)->txn_global;
 
+	WT_RET(__wt_config_gets_def(
+	    session, cfg, "drop.all", 0, &names_config));
 	WT_RET(__wt_config_gets_def(
 	    session, cfg, "drop.names", 0, &names_config));
 	WT_RET(__wt_config_gets_def(session, cfg, "drop.to", 0, &to_config));
@@ -219,7 +229,7 @@ __wt_txn_named_snapshot_drop(WT_SESSION_IMPL *session, const char *cfg[])
 	    session, cfg, "drop.until", 0, &until_config));
 
 	/* Avoid more work if no drops are requested. */
-	if (names_config.len == 0 &&
+	if (all_config.len == 0 && names_config.len == 0 &&
 	    to_config.len == 0 && until_config.len == 0)
 		return (0);
 
@@ -230,10 +240,11 @@ __wt_txn_named_snapshot_drop(WT_SESSION_IMPL *session, const char *cfg[])
 
 	WT_RET(__wt_writelock(session, txn_global->nsnap_rwlock));
 
-	if (to_config.len != 0)
+	if (all_config.len != 0)
+		WT_ERR(__nsnap_drop_to(session, NULL, 1));
+	else if (to_config.len != 0)
 		WT_ERR(__nsnap_drop_to(session, &to_config, 1));
-
-	if (until_config.len != 0)
+	else if (until_config.len != 0)
 		WT_ERR(__nsnap_drop_to(session, &until_config, 0));
 
 	/* We are done if there are no named drops */

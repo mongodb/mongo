@@ -87,7 +87,7 @@ class test_nsnap02(wttest.WiredTigerTestCase, suite_subprocess):
 
         self.check_named_snapshots(snapshots)
 
-        self.session.snapshot("drop=(to=all)")
+        self.session.snapshot("drop=(all)")
 
         new_snapshots = []
         for snap_name, expected, dropped in snapshots:
