@@ -99,12 +99,14 @@ myprint("paritions: [0-1-2-0] [3] [4]")
 myprint("test1");
 myprint("2 should be primary");
 master = replTest.getMaster();
+replTest.awaitReplication();
 
 printjson(master.getDB("admin").runCommand({replSetGetStatus:1}));
 
-var timeout = 15 * 1000;
+var timeout = 30 * 1000;
 
 var options = { writeConcern: { w: "3 or 4", wtimeout: timeout }};
+assert.writeOK(master.getDB("foo").bar.insert({ x: 1 }));
 var result = master.getDB("foo").bar.insert({ x: 1 }, options);
 assert.neq(null, result.getWriteConcernError());
 assert(result.getWriteConcernError().errInfo.wtimeout);
@@ -114,11 +116,13 @@ replTest.unPartition(1,4);
 myprint("partitions: [1-4] [0-1-2-0] [3]");
 myprint("test2");
 options = { writeConcern: { w: "3 or 4", wtimeout: timeout }};
+assert.writeOK(master.getDB("foo").bar.insert({ x: 1 }));
 assert.writeOK(master.getDB("foo").bar.insert({ x: 1 }, options));
 
 myprint("partitions: [1-4] [0-1-2-0] [3]");
 myprint("test3");
 options = { writeConcern: { w: "3 and 4", wtimeout: timeout }};
+assert.writeOK(master.getDB("foo").bar.insert({ x: 1 }));
 result = assert.writeError(master.getDB("foo").bar.insert({ x: 1 }, options));
 assert.neq(null, result.getWriteConcernError());
 assert(result.getWriteConcernError().errInfo.wtimeout, tojson(result.getWriteConcernError()));
@@ -130,24 +134,29 @@ myprint("31004 should sync from 31001 (31026)");
 myprint("31003 should sync from 31004 (31024)");
 myprint("test4");
 options = { writeConcern: { w: "3 and 4", wtimeout: timeout }};
+assert.writeOK(master.getDB("foo").bar.insert({ x: 1 }));
 assert.writeOK(master.getDB("foo").bar.insert({ x: 1 }, options));
 
 myprint("non-existent w");
 options = { writeConcern: { w: "blahblah", wtimeout: timeout }};
+assert.writeOK(master.getDB("foo").bar.insert({ x: 1 }));
 result = assert.writeError(master.getDB("foo").bar.insert({ x: 1 }, options));
 assert.neq(null, result.getWriteConcernError());
 assert.eq(79, result.getWriteConcernError().code, tojson(result.getWriteConcernError()));
 
 myprint("test mode 2");
 options = { writeConcern: { w: "2", wtimeout: 0 }};
+assert.writeOK(master.getDB("foo").bar.insert({ x: 1 }));
 assert.writeOK(master.getDB("foo").bar.insert({ x: 1 }, options));
 
 myprint("test two on the primary");
 options = { writeConcern: { w: "1 and 2", wtimeout: 0 }};
+assert.writeOK(master.getDB("foo").bar.insert({ x: 1 }));
 assert.writeOK(master.getDB("foo").bar.insert({ x: 1 }, options));
 
 myprint("test5");
 options = { writeConcern: { w: "2 dc and 3 server", wtimeout: timeout }};
+assert.writeOK(master.getDB("foo").bar.insert({ x: 1 }));
 assert.writeOK(master.getDB("foo").bar.insert({ x: 1 }, options));
 
 replTest.unPartition(1,3);
@@ -162,10 +171,12 @@ master = replTest.getMaster();
 
 myprint("test6");
 options = { writeConcern: { w: "3 and 4", wtimeout: timeout }};
+assert.writeOK(master.getDB("foo").bar.insert({ x: 1 }));
 assert.writeOK(master.getDB("foo").bar.insert({ x: 1 }, options));
 
 myprint("test mode 2");
 options = { writeConcern: { w: "2", wtimeout: timeout }};
+assert.writeOK(master.getDB("foo").bar.insert({ x: 1 }));
 result = assert.writeError(master.getDB("foo").bar.insert({ x: 1 }, options));
 assert.neq(null, result.getWriteConcernError());
 assert(result.getWriteConcernError().errInfo.wtimeout);

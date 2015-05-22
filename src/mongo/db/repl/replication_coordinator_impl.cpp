@@ -563,8 +563,10 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* txn) {
     //     _isWaitingForDrainToComplete, set the flag allowing non-local database writes and
     //     drop the mutex.  At this point, no writes can occur from other threads, due to the
     //     global exclusive lock.
-    // 4.) Drop all temp collections.
-    // 5.) Drop the global exclusive lock.
+    // 4.) Drop the global exclusive lock.
+    // 5.) Drop all temp collections.
+    // 6.) Log transition to primary in the oplog and set that OpTime as the floor for what we will
+    //     consider to be committed.
     //
     // Because replicatable writes are forbidden while in drain mode, and we don't exit drain
     // mode until we have the global exclusive lock, which forbids all other threads from making
@@ -587,7 +589,14 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* txn) {
     _isWaitingForDrainToComplete = false;
     _canAcceptNonLocalWrites = true;
     lk.unlock();
+
     _externalState->dropAllTempCollections(txn);
+
+    _externalState->logTransitionToPrimaryToOplog(txn);
+    StatusWith<OpTime> lastOpTime = _externalState->loadLastOpTime(txn);
+    fassert(28665, lastOpTime.getStatus().isOK());
+    _setFirstOpTimeOfMyTerm(lastOpTime.getValue());
+
     log() << "transition to primary complete; database writes are now permitted" << rsLog;
 }
 
@@ -2557,8 +2566,13 @@ void ReplicationCoordinatorImpl::_updateLastCommittedOpTime_inlock() {
     std::sort(votingNodesOpTimes.begin(), votingNodesOpTimes.end());
 
     // need the majority to have this OpTime
-    _setLastCommittedOpTime_inlock(
-        votingNodesOpTimes[votingNodesOpTimes.size() - _rsConfig.getMajorityVoteCount()]);
+    OpTime committedOpTime =
+        votingNodesOpTimes[votingNodesOpTimes.size() - _rsConfig.getMajorityVoteCount()];
+
+    // This check is performed to ensure we do not commit an OpTime from a previous term.
+    if (committedOpTime >= _firstOpTimeOfMyTerm) {
+        _setLastCommittedOpTime_inlock(committedOpTime);
+    }
 }
 
 void ReplicationCoordinatorImpl::_setLastCommittedOpTime(const OpTime& committedOpTime) {
@@ -2590,6 +2604,11 @@ void ReplicationCoordinatorImpl::_setLastCommittedOpTime_inlock(const OpTime& co
         // committed snapshot need to be woken up.
         _updateCommittedSnapshot_inlock(newSnapshot);
     }
+}
+
+void ReplicationCoordinatorImpl::_setFirstOpTimeOfMyTerm(const OpTime& newOpTime) {
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    _firstOpTimeOfMyTerm = newOpTime;
 }
 
 OpTime ReplicationCoordinatorImpl::getLastCommittedOpTime() const {

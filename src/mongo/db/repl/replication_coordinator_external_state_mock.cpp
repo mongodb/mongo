@@ -193,5 +193,10 @@ void ReplicationCoordinatorExternalStateMock::forceSnapshotCreation() {}
 bool ReplicationCoordinatorExternalStateMock::snapshotsEnabled() const {
     return true;
 }
+
+void ReplicationCoordinatorExternalStateMock::logTransitionToPrimaryToOplog(OperationContext* txn) {
+    _lastOpTime = OpTime(Timestamp(1, 0), 1);
+}
+
 }  // namespace repl
 }  // namespace mongo

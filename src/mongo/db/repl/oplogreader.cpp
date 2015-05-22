@@ -190,7 +190,7 @@ void OplogReader::connectToSyncSource(OperationContext* txn,
             lastOpTimeFetched.getTimestamp() < remoteOldOpTime.getTimestamp()) {
             // We're too stale to use this sync source.
             resetConnection();
-            replCoord->blacklistSyncSource(candidate, Date_t::now() + Minutes(10));
+            replCoord->blacklistSyncSource(candidate, Date_t::now() + Minutes(1));
             if (oldestOpTimeSeen.getTimestamp() > remoteOldOpTime.getTimestamp()) {
                 warning() << "we are too stale to use " << candidate.toString()
                           << " as a sync source";

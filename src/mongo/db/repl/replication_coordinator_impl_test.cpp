@@ -610,11 +610,11 @@ TEST_F(ReplCoordTest, AwaitReplicationNamedModesNonBlocking) {
                                                            << BSON("dc" << 2 << "rack" << 3)))),
         HostAndPort("node0"));
     ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-    getReplCoord()->setMyLastOptime(OpTimeWithTermZero(100, 0));
+    getReplCoord()->setMyLastOptime(OpTime(Timestamp(100, 0), 0));
     simulateSuccessfulElection();
 
-    OpTimeWithTermZero time1(100, 1);
-    OpTimeWithTermZero time2(100, 2);
+    OpTime time1(Timestamp(100, 1), 1);
+    OpTime time2(Timestamp(100, 2), 1);
 
     // Test invalid write concern
     WriteConcernOptions invalidWriteConcern;
@@ -1903,10 +1903,10 @@ TEST_F(ReplCoordTest, AwaitReplicationReconfigToSmallerMajority) {
                                                                          << "_id" << 4))),
                        HostAndPort("node1", 12345));
     ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-    getReplCoord()->setMyLastOptime(OpTimeWithTermZero(100, 1));
+    getReplCoord()->setMyLastOptime(OpTime(Timestamp(100, 1), 0));
     simulateSuccessfulElection();
 
-    OpTimeWithTermZero time(100, 2);
+    OpTime time(Timestamp(100, 2), 1);
 
     getReplCoord()->setMyLastOptime(time);
     getReplCoord()->onSnapshotCreate(time);
@@ -1982,7 +1982,7 @@ TEST_F(ReplCoordTest, AwaitReplicationMajority) {
                                                   << "_id" << 4 << "arbiterOnly" << true))),
                        HostAndPort("node1", 12345));
     ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-    OpTimeWithTermZero time(100, 0);
+    OpTime time(Timestamp(100, 0), 1);
     getReplCoord()->setMyLastOptime(time);
     simulateSuccessfulElection();
 

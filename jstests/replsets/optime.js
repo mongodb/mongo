@@ -20,8 +20,7 @@ function optimesAreEqual(replTest) {
     var prevStatus = replTest.nodes[0].getDB('admin').serverStatus({oplog:true}).oplog;
     for (var i = 1; i < replTest.nodes.length; i++) {
         var status = replTest.nodes[i].getDB('admin').serverStatus({oplog:true}).oplog;
-        if (timestampCompare(prevStatus.latestOptime, status.latestOptime) != 0 ||
-            timestampCompare(prevStatus.earliestOptime, status.earliestOptime) != 0) {
+        if (timestampCompare(prevStatus.latestOptime, status.latestOptime) != 0) {
             return false;
         }
         prevStatus = status;

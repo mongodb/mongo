@@ -888,6 +888,12 @@ private:
      */
     void _getTerm_helper(const ReplicationExecutor::CallbackArgs& cbData, long long* term);
 
+    /**
+     * This is used to set a floor of "newOpTime" on the OpTimes we will consider committed.
+     * This prevents entries from before our election from counting as committed in our view,
+     * until our election (the "newOpTime" op) has been committed.
+     */
+    void _setFirstOpTimeOfMyTerm(const OpTime& newOpTime);
 
     /**
      * Callback that attempts to set the current term in topology coordinator and
@@ -1058,6 +1064,10 @@ private:
 
     // OpTime of the latest committed operation. Matches the concurrency level of _slaveInfo.
     OpTime _lastCommittedOpTime;  // (M)
+
+    // OpTime representing our transition to PRIMARY and the start of our term.
+    // _lastCommittedOpTime cannot be set to an earlier OpTime.
+    OpTime _firstOpTimeOfMyTerm;  // (M)
 
     // Data Replicator used to replicate data
     DataReplicator _dr;  // (S)

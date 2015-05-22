@@ -56,6 +56,7 @@ public:
     virtual void startMasterSlave(OperationContext*);
     virtual void shutdown();
     virtual void initiateOplog(OperationContext* txn);
+    virtual void logTransitionToPrimaryToOplog(OperationContext* txn);
     virtual void forwardSlaveProgress();
     virtual OID ensureMe(OperationContext*);
     virtual bool isSelf(const HostAndPort& host);

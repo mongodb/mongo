@@ -29,6 +29,11 @@ var doTest = function( signal ) {
     // elected master.
     var master = replTest.getMaster();
 
+    // Ensure the primary logs an n-op to the oplog upon transitioning to primary.
+    var oplog_entry = master.getDB("local").oplog.rs.find().sort({$natural: -1})[0];
+    assert.eq("new primary", oplog_entry["o"]["msg"]);
+    assert.eq("n", oplog_entry["op"]);
+
     // Calling getMaster also makes available the liveNodes structure,
     // which looks like this:
     // liveNodes = {master: masterNode,

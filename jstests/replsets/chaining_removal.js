@@ -20,11 +20,15 @@
             });
     var primary = replTest.getPrimary();
     // force node 4 to chain through node 1
+    replTest.awaitReplication();
     assert.commandWorked(nodes[4].getDB("admin").runCommand({"replSetSyncFrom": nodes[1].host}));
+    assert.commandWorked(nodes[1].getDB("admin").runCommand({"replSetSyncFrom": nodes[0].host}));
     var res;
+    var res2;
     assert.soon(function() {
         res = nodes[4].getDB("admin").runCommand({"replSetGetStatus": 1});
-        return res.syncingTo === nodes[1].host;
+        res2 = nodes[1].getDB("admin").runCommand({"replSetGetStatus": 1});
+        return res.syncingTo === nodes[1].host && res2.syncingTo === nodes[0].host;
     }, "node 4 failed to start chaining: "+ tojson(res));
 
     // write that should reach all nodes
@@ -46,6 +50,7 @@
 
     // ensure writing to all four nodes still works
     primary = replTest.getPrimary();
+    replTest.awaitReplication();
     options.writeConcern.w = 4;
     assert.writeOK(primary.getDB(name).foo.insert({x: 2}, options));
     

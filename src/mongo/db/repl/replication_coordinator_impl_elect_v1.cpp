@@ -232,6 +232,9 @@ void ReplicationCoordinatorImpl::_onVoteRequestComplete(long long originalTerm) 
     }
 
     log() << "election succeeded, assuming primary role";
+    // Prevent last committed optime from updating until we finish draining.
+    _setFirstOpTimeOfMyTerm(
+        OpTime(Timestamp(std::numeric_limits<int>::max(), 0), std::numeric_limits<int>::max()));
     _performPostMemberStateUpdateAction(kActionWinElection);
 
     _voteRequester.reset(nullptr);

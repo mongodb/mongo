@@ -92,6 +92,11 @@ public:
     virtual void initiateOplog(OperationContext* txn) = 0;
 
     /**
+     * Writes a message about our transition to primary to the oplog.
+     */
+    virtual void logTransitionToPrimaryToOplog(OperationContext* txn) = 0;
+
+    /**
      * Simple wrapper around SyncSourceFeedback::forwardSlaveProgress.  Signals to the
      * SyncSourceFeedback thread that it needs to wake up and send a replSetUpdatePosition
      * command upstream.

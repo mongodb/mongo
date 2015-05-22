@@ -34,6 +34,7 @@ assert.soon(function() {
     return master === conns[0];
 }, 60 * 1000, "node 0 did not become primary quickly enough");
 
+replTest.awaitReplication();
 jsTestLog("Checking that ops still replicate correctly");
 var option = { writeConcern: { w: 5, wtimeout: 30000 }};
 assert.writeOK(master.getDB("foo").bar.insert({ x: 1 }, option));

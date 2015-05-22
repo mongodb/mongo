@@ -66,10 +66,10 @@ assert.writeOK(a_conn.getDB(name).foo.insert({x: 2}, options));
 replTest.restart(BID);
 assert.soon(function() {
     try {
-        var logb = b_conn.getDB("local").oplog.rs.find().toArray();
-        var loga = a_conn.getDB("local").oplog.rs.find().toArray();
-        for (var i = 0; i < loga.length; i++) {
-            if (tojson(loga[i]) !== tojson(logb[i])) {
+        var collb = b_conn.getDB(name).foo.find().toArray();
+        var colla = a_conn.getDB(name).foo.find().toArray();
+        for (var i = 0; i < colla.length; i++) {
+            if (tojson(colla[i]) !== tojson(collb[i])) {
                 return false;
             }
         }
@@ -78,6 +78,6 @@ assert.soon(function() {
     catch (e) {
         return false;
     }
-}, "oplogs from A and B did not match after rollback");
+}, "collection on A and B did not match after rollback");
 
 replTest.stopSet();

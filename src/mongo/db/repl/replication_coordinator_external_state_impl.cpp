@@ -144,6 +144,20 @@ void ReplicationCoordinatorExternalStateImpl::initiateOplog(OperationContext* tx
     MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "initiate oplog entry", "local.oplog.rs");
 }
 
+void ReplicationCoordinatorExternalStateImpl::logTransitionToPrimaryToOplog(OperationContext* txn) {
+    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+        ScopedTransaction scopedXact(txn, MODE_X);
+
+        WriteUnitOfWork wuow(txn);
+        txn->getClient()->getServiceContext()->getOpObserver()->onOpMessage(txn,
+                                                                            BSON("msg"
+                                                                                 << "new primary"));
+        wuow.commit();
+    }
+    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(
+        txn, "logging transition to primary to oplog", "local.oplog.rs");
+}
+
 void ReplicationCoordinatorExternalStateImpl::forwardSlaveProgress() {
     _syncSourceFeedback.forwardSlaveProgress();
 }

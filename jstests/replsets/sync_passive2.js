@@ -109,9 +109,11 @@ wait(function() {
 print("bring master back up, make sure everything's okay");
 replTest.restart(0);
 
+master = replTest.getMaster();
+
 print("wait for sync");
 wait(function() {
-        var status = replTest.liveNodes.slaves[0].getDB("admin").runCommand({replSetGetStatus:1});
+        var status = replTest.nodes[3].getDB("admin").runCommand({replSetGetStatus:1});
         occasionally(function() {
                 printjson(status);
             });
@@ -119,13 +121,12 @@ wait(function() {
             status.members[2].state == 2 &&
             status.members[3].state == 2 &&
             status.members[4].state == 2 &&
+            friendlyEqual(status.members[0].optime, status.members[4].optime) &&
             friendlyEqual(status.members[3].optime, status.members[4].optime) &&
             friendlyEqual(status.members[2].optime, status.members[4].optime);
   });
 
-
 print("force sync from various members");
-master = replTest.getMaster();
 
 print("sync from self: error");
 var result = replTest.nodes[3].getDB("admin").runCommand({replSetSyncFrom: replTest.host+":"+replTest.ports[3]});
@@ -164,6 +165,21 @@ assert.soon(function() {
     return checkSyncingFrom(nodes[3], replTest.host+":"+replTest.ports[0])
 });
 
+print("wait for sync again");
+wait(function() {
+        var status = replTest.nodes[3].getDB("admin").runCommand({replSetGetStatus:1});
+        occasionally(function() {
+                printjson(status);
+            });
+        return status.members &&
+            status.members[2].state == 2 &&
+            status.members[3].state == 2 &&
+            status.members[4].state == 2 &&
+            friendlyEqual(status.members[0].optime, status.members[4].optime) &&
+            friendlyEqual(status.members[3].optime, status.members[4].optime) &&
+            friendlyEqual(status.members[2].optime, status.members[4].optime);
+  });
+
 print("sync from another passive");
 result = replTest.nodes[3].getDB("admin").runCommand({replSetSyncFrom: replTest.host+":"+replTest.ports[2]});
 printjson(result)
@@ -195,8 +211,9 @@ config = master.getDB("local").system.replset.findOne();
 config.members[3].slaveDelay = 40;
 config.members[3].priority = 0;
 config.version++;
+replTest.awaitReplication(60000);
 try {
-    replTest.getMaster().getDB("admin").runCommand({replSetReconfig:config});
+    assert.commandWorked(replTest.getMaster().getDB("admin").runCommand({replSetReconfig:config}));
 } catch (x) { /* expected */ }
 
 replTest.awaitReplication(60000);
