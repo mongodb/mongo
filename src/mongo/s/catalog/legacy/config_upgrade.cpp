@@ -28,11 +28,12 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/s/catalog/legacy/config_upgrade.h"
 
 #include <boost/scoped_ptr.hpp>
 
-#include "mongo/base/init.h"
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/client/syncclusterconnection.h"
@@ -54,28 +55,33 @@
 namespace mongo {
 
     using boost::scoped_ptr;
-    using std::endl;
     using std::make_pair;
     using std::map;
     using std::string;
     using std::vector;
+    using str::stream;
 
-    using mongoutils::str::stream;
+    // Implemented in the respective steps' .cpp file
+    bool doUpgradeV0ToV7(const ConnectionString& configLoc,
+                         const VersionType& lastVersionInfo,
+                         std::string* errMsg);
 
-    //
-    // BEGIN CONFIG UPGRADE REGISTRATION
-    //
+    bool doUpgradeV6ToV7(const ConnectionString& configLoc,
+                         const VersionType& lastVersionInfo,
+                         std::string* errMsg);
+
+namespace {
 
     struct VersionRange {
+        VersionRange(int _minCompatibleVersion, int _currentVersion)
+            : minCompatibleVersion(_minCompatibleVersion),
+              currentVersion(_currentVersion) {
 
-        VersionRange(int _minCompatibleVersion, int _currentVersion) :
-                minCompatibleVersion(_minCompatibleVersion), currentVersion(_currentVersion)
-        {
         }
 
         bool operator==(const VersionRange& other) const {
             return (other.minCompatibleVersion == minCompatibleVersion)
-                   && (other.currentVersion == currentVersion);
+                        && (other.currentVersion == currentVersion);
         }
 
         bool operator!=(const VersionRange& other) const {
@@ -86,32 +92,83 @@ namespace mongo {
         int currentVersion;
     };
 
+    enum VersionStatus {
+        // No way to upgrade the test version to be compatible with current version
+        VersionStatus_Incompatible,
+
+        // Current version is compatible with test version
+        VersionStatus_Compatible,
+
+        // Test version must be upgraded to be compatible with current version
+        VersionStatus_NeedUpgrade
+    };
+
     /**
      * Encapsulates the information needed to register a config upgrade.
      */
-    struct Upgrade {
+    struct UpgradeStep {
+        typedef stdx::function<bool(const ConnectionString&, const VersionType&, string*)>
+                UpgradeCallback;
 
-        typedef stdx::function<bool(const ConnectionString&, const VersionType&, string*)> UpgradeCallback;
+        UpgradeStep(int _fromVersion,
+                    const VersionRange& _toVersionRange,
+                    UpgradeCallback _upgradeCallback)
+            : fromVersion(_fromVersion),
+              toVersionRange(_toVersionRange),
+              upgradeCallback(_upgradeCallback) {
 
-        Upgrade(int _fromVersion,
-                const VersionRange& _toVersionRange,
-                UpgradeCallback _upgradeCallback) :
-                fromVersion(_fromVersion),
-                toVersionRange(_toVersionRange),
-                upgradeCallback(_upgradeCallback)
-        {
         }
 
         // The config version we're upgrading from
         int fromVersion;
+
         // The config version we're upgrading to and the min compatible config version (min, to)
         VersionRange toVersionRange;
+
         // The upgrade callback which performs the actual upgrade
         UpgradeCallback upgradeCallback;
     };
 
-    typedef map<int, Upgrade> ConfigUpgradeRegistry;
-    void validateRegistry(const ConfigUpgradeRegistry& registry);
+    typedef map<int, UpgradeStep> ConfigUpgradeRegistry;
+
+    /**
+     * Does a sanity-check validation of the registry ensuring three things:
+     * 1. All upgrade paths lead to the same minCompatible/currentVersion
+     * 2. Our constants match this final version pair
+     * 3. There is a zero-version upgrade path
+     */
+    void validateRegistry(const ConfigUpgradeRegistry& registry) {
+        VersionRange maxCompatibleConfigVersionRange(-1, -1);
+        bool hasZeroVersionUpgrade = false;
+
+        for (const auto& upgradeStep : registry) {
+            const UpgradeStep& upgrade = upgradeStep.second;
+
+            if (upgrade.fromVersion == 0) {
+                hasZeroVersionUpgrade = true;
+            }
+
+            if (maxCompatibleConfigVersionRange.currentVersion
+                        < upgrade.toVersionRange.currentVersion) {
+
+                maxCompatibleConfigVersionRange = upgrade.toVersionRange;
+            }
+            else if (maxCompatibleConfigVersionRange.currentVersion
+                        == upgrade.toVersionRange.currentVersion) {
+
+                // Make sure all max upgrade paths end up with same version and compatibility
+                fassert(16621, maxCompatibleConfigVersionRange == upgrade.toVersionRange);
+            }
+        }
+
+        // Make sure we have a zero-version upgrade
+        fassert(16622, hasZeroVersionUpgrade);
+
+        // Make sure our max registered range is the same as our constants
+        fassert(16623,
+                maxCompatibleConfigVersionRange
+                    == VersionRange(MIN_COMPATIBLE_CONFIG_VERSION, CURRENT_CONFIG_VERSION));
+    }
 
     /**
      * Creates a registry of config upgrades used by the code below.
@@ -130,15 +187,14 @@ namespace mongo {
      * If any of the above is false, we fassert and fail to start.
      */
     ConfigUpgradeRegistry createRegistry() {
-
         ConfigUpgradeRegistry registry;
 
         // v0 to v7
-        Upgrade v0ToV7(0, VersionRange(6, 7), doUpgradeV0ToV7);
+        UpgradeStep v0ToV7(0, VersionRange(6, 7), doUpgradeV0ToV7);
         registry.insert(make_pair(v0ToV7.fromVersion, v0ToV7));
 
         // v6 to v7
-        Upgrade v6ToV7(6, VersionRange(6, 7), doUpgradeV6ToV7);
+        UpgradeStep v6ToV7(6, VersionRange(6, 7), doUpgradeV6ToV7);
         registry.insert(make_pair(v6ToV7.fromVersion, v6ToV7));
 
         validateRegistry(registry);
@@ -147,111 +203,17 @@ namespace mongo {
     }
 
     /**
-     * Does a sanity-check validation of the registry ensuring three things:
-     * 1. All upgrade paths lead to the same minCompatible/currentVersion
-     * 2. Our constants match this final version pair
-     * 3. There is a zero-version upgrade path
+     * Checks whether or not a particular cluster version is compatible with our current
+     * version and mongodb version.  The version is compatible if it falls between the
+     * MIN_COMPATIBLE_CONFIG_VERSION and CURRENT_CONFIG_VERSION and is not explicitly excluded.
+     *
+     * @return a VersionStatus enum indicating compatibility
      */
-    void validateRegistry(const ConfigUpgradeRegistry& registry) {
-
-        VersionRange maxCompatibleConfigVersionRange(-1, -1);
-        bool hasZeroVersionUpgrade = false;
-
-        for (ConfigUpgradeRegistry::const_iterator it = registry.begin(); it != registry.end();
-                ++it)
-        {
-            const Upgrade& upgrade = it->second;
-
-            if (upgrade.fromVersion == 0) hasZeroVersionUpgrade = true;
-
-            if (maxCompatibleConfigVersionRange.currentVersion
-                < upgrade.toVersionRange.currentVersion)
-            {
-                maxCompatibleConfigVersionRange = upgrade.toVersionRange;
-            }
-            else if (maxCompatibleConfigVersionRange.currentVersion
-                     == upgrade.toVersionRange.currentVersion)
-            {
-                // Make sure all max upgrade paths end up with same version and compatibility
-                fassert(16621, maxCompatibleConfigVersionRange == upgrade.toVersionRange);
-            }
-        }
-
-        // Make sure we have a zero-version upgrade
-        fassert(16622, hasZeroVersionUpgrade);
-
-        // Make sure our max registered range is the same as our constants
-        fassert(16623,
-                maxCompatibleConfigVersionRange
-                == VersionRange(MIN_COMPATIBLE_CONFIG_VERSION, CURRENT_CONFIG_VERSION));
-    }
-
-    //
-    // END CONFIG UPGRADE REGISTRATION
-    //
-
-    // Gets the config version information from the config server
-    Status getConfigVersion(const ConnectionString& configLoc, VersionType* versionInfo) {
-        try {
-            versionInfo->clear();
-
-            ScopedDbConnection conn(configLoc, 30);
-
-            scoped_ptr<DBClientCursor> cursor(_safeCursor(conn->query("config.version",
-                                                                      BSONObj())));
-
-            bool hasConfigData = conn->count(ShardType::ConfigNS)
-                                 || conn->count(DatabaseType::ConfigNS)
-                                 || conn->count(CollectionType::ConfigNS);
-
-            if (!cursor->more()) {
-
-                // Version is 1 if we have data, 0 if we're completely empty
-                if (hasConfigData) {
-                    versionInfo->setMinCompatibleVersion(UpgradeHistory_UnreportedVersion);
-                    versionInfo->setCurrentVersion(UpgradeHistory_UnreportedVersion);
-                }
-                else {
-                    versionInfo->setMinCompatibleVersion(UpgradeHistory_EmptyVersion);
-                    versionInfo->setCurrentVersion(UpgradeHistory_EmptyVersion);
-                }
-
-                conn.done();
-                return Status::OK();
-            }
-
-            BSONObj versionDoc = cursor->next();
-            string errMsg;
-
-            if (!versionInfo->parseBSON(versionDoc, &errMsg) || !versionInfo->isValid(&errMsg)) {
-                conn.done();
-
-                return Status(ErrorCodes::UnsupportedFormat,
-                              stream() << "invalid config version document " << versionDoc
-                                       << causedBy(errMsg));
-            }
-
-            if (cursor->more()) {
-                conn.done();
-
-                return Status(ErrorCodes::RemoteValidationError,
-                              stream() << "should only have 1 document "
-                                       << "in config.version collection");
-            }
-            conn.done();
-        }
-        catch (const DBException& e) {
-            return e.toStatus();
-        }
-
-        return Status::OK();
-    }
-
-    // Checks version compatibility with our version
     VersionStatus isConfigVersionCompatible(const VersionType& versionInfo, string* whyNot) {
-
         string dummy;
-        if (!whyNot) whyNot = &dummy;
+        if (!whyNot) {
+            whyNot = &dummy;
+        }
 
         // Check if we're empty
         if (versionInfo.getCurrentVersion() == UpgradeHistory_EmptyVersion) {
@@ -303,12 +265,13 @@ namespace mongo {
     }
 
     // Returns true if we can confirm the balancer is stopped
-    bool _isBalancerStopped() {
+    bool isBalancerStopped() {
         auto balSettingsResult =
             grid.catalogManager()->getGlobalSettings(SettingsType::BalancerDocKey);
         if (!balSettingsResult.isOK()) {
             return false;
         }
+
         SettingsType balSettings = balSettingsResult.getValue();
         return balSettings.getBalancerStopped();
     }
@@ -366,10 +329,10 @@ namespace mongo {
             return false;
         }
 
-        const Upgrade& upgrade = foundIt->second;
+        const UpgradeStep& upgrade = foundIt->second;
         int toVersion = upgrade.toVersionRange.currentVersion;
 
-        log() << "starting next upgrade step from v" << fromVersion << " to v" << toVersion << endl;
+        log() << "starting next upgrade step from v" << fromVersion << " to v" << toVersion;
 
         // Log begin to config.changelog
         grid.catalogManager()->logChange(NULL,
@@ -402,27 +365,85 @@ namespace mongo {
         return true;
     }
 
-    // Upgrades the config server
+} // namespace
+
+
+    /**
+     * Returns the config version of the cluster pointed at by the connection string.
+     *
+     * @return OK if version found successfully, error status if something bad happened.
+     */
+    Status getConfigVersion(const ConnectionString& configLoc, VersionType* versionInfo) {
+        try {
+            versionInfo->clear();
+
+            ScopedDbConnection conn(configLoc, 30);
+
+            scoped_ptr<DBClientCursor> cursor(_safeCursor(conn->query("config.version",
+                                                                      BSONObj())));
+
+            bool hasConfigData = conn->count(ShardType::ConfigNS)
+                                 || conn->count(DatabaseType::ConfigNS)
+                                 || conn->count(CollectionType::ConfigNS);
+
+            if (!cursor->more()) {
+
+                // Version is 1 if we have data, 0 if we're completely empty
+                if (hasConfigData) {
+                    versionInfo->setMinCompatibleVersion(UpgradeHistory_UnreportedVersion);
+                    versionInfo->setCurrentVersion(UpgradeHistory_UnreportedVersion);
+                }
+                else {
+                    versionInfo->setMinCompatibleVersion(UpgradeHistory_EmptyVersion);
+                    versionInfo->setCurrentVersion(UpgradeHistory_EmptyVersion);
+                }
+
+                conn.done();
+                return Status::OK();
+            }
+
+            BSONObj versionDoc = cursor->next();
+            string errMsg;
+
+            if (!versionInfo->parseBSON(versionDoc, &errMsg) || !versionInfo->isValid(&errMsg)) {
+                conn.done();
+
+                return Status(ErrorCodes::UnsupportedFormat,
+                              stream() << "invalid config version document " << versionDoc
+                                       << causedBy(errMsg));
+            }
+
+            if (cursor->more()) {
+                conn.done();
+
+                return Status(ErrorCodes::RemoteValidationError,
+                              stream() << "should only have 1 document "
+                                       << "in config.version collection");
+            }
+            conn.done();
+        }
+        catch (const DBException& e) {
+            return e.toStatus();
+        }
+
+        return Status::OK();
+    }
+
     bool checkAndUpgradeConfigVersion(const ConnectionString& configLoc,
                                       bool upgrade,
                                       VersionType* initialVersionInfo,
                                       VersionType* versionInfo,
-                                      string* errMsg)
-    {
-        string dummy;
-        if (!errMsg) errMsg = &dummy;
+                                      string* errMsg) {
 
-        //
-        // Check compatibility of config version
-        //
+        string dummy;
+        if (!errMsg) {
+            errMsg = &dummy;
+        }
 
         Status getConfigStatus = getConfigVersion(configLoc, versionInfo);
-
         if (!getConfigStatus.isOK()) {
-
             *errMsg = stream() << "could not load config version for upgrade"
                                << causedBy(getConfigStatus);
-
             return false;
         }
 
@@ -432,7 +453,8 @@ namespace mongo {
 
         if (comp == VersionStatus_Incompatible) return false;
         if (comp == VersionStatus_Compatible) return true;
-        verify(comp == VersionStatus_NeedUpgrade);
+
+        invariant(comp == VersionStatus_NeedUpgrade);
 
         //
         // Our current config version is now greater than the current version, so we should upgrade
@@ -444,7 +466,6 @@ namespace mongo {
 
         // First check for the upgrade flag (but no flag is needed if we're upgrading from empty)
         if (!isEmptyVersion && !upgrade) {
-
             *errMsg = stream() << "newer version " << CURRENT_CONFIG_VERSION
                                << " of mongo config metadata is required, " << "current version is "
                                << versionInfo->getCurrentVersion() << ", "
@@ -471,7 +492,7 @@ namespace mongo {
 
         // Check whether or not the balancer is online, if it is online we will not upgrade
         // (but we will initialize the config server)
-        if (!isEmptyVersion && !_isBalancerStopped()) {
+        if (!isEmptyVersion && !isBalancerStopped()) {
             
             *errMsg = stream() << "balancer must be stopped for config upgrade"
                                << causedBy(errMsg);
@@ -504,12 +525,9 @@ namespace mongo {
         //
 
         getConfigStatus = getConfigVersion(configLoc, versionInfo);
-
         if (!getConfigStatus.isOK()) {
-
             *errMsg = stream() << "could not reload config version for upgrade"
                                << causedBy(getConfigStatus);
-
             return false;
         }
 
@@ -519,7 +537,8 @@ namespace mongo {
 
         if (comp == VersionStatus_Incompatible) return false;
         if (comp == VersionStatus_Compatible) return true;
-        verify(comp == VersionStatus_NeedUpgrade);
+
+        invariant(comp == VersionStatus_NeedUpgrade);
 
         //
         // Run through the upgrade steps necessary to bring our config version to the current
@@ -527,12 +546,11 @@ namespace mongo {
         //
 
         log() << "starting upgrade of config server from v" << versionInfo->getCurrentVersion()
-              << " to v" << CURRENT_CONFIG_VERSION << endl;
+              << " to v" << CURRENT_CONFIG_VERSION;
 
         ConfigUpgradeRegistry registry(createRegistry());
 
         while (versionInfo->getCurrentVersion() < CURRENT_CONFIG_VERSION) {
-
             int fromVersion = versionInfo->getCurrentVersion();
 
             //
@@ -555,12 +573,12 @@ namespace mongo {
             }
         }
 
-        verify(versionInfo->getCurrentVersion() == CURRENT_CONFIG_VERSION);
+        invariant(versionInfo->getCurrentVersion() == CURRENT_CONFIG_VERSION);
 
         log() << "upgrade of config server to v" << versionInfo->getCurrentVersion()
-              << " successful" << endl;
+              << " successful";
 
         return true;
     }
 
-}
+} // namespace mongo
