@@ -929,18 +929,31 @@ __session_snapshot(WT_SESSION *wt_session, const char *config)
 {
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
+	WT_TXN_GLOBAL *txn_global;
+	int has_create, has_drop;
 
+	has_create = has_drop = 0;
 	session = (WT_SESSION_IMPL *)wt_session;
+	txn_global = &S2C(session)->txn_global;
 
 	SESSION_API_CALL(session, snapshot, config, cfg);
 
+	WT_RET(__wt_txn_named_snapshot_config(
+	    session, cfg, &has_create, &has_drop));
+
+	WT_ERR(__wt_writelock(session, txn_global->nsnap_rwlock));
+
 	/* Drop any snapshots to be removed first. */
-	WT_ERR(__wt_txn_named_snapshot_drop(session, cfg));
+	if (has_drop)
+		WT_ERR(__wt_txn_named_snapshot_drop(session, cfg));
 
 	/* Start the named snapshot if requested. */
-	WT_ERR(__wt_txn_named_snapshot_begin(session, cfg));
+	if (has_create)
+		WT_ERR(__wt_txn_named_snapshot_begin(session, cfg));
 
-err:	API_END_RET_NOTFOUND_MAP(session, ret);
+err:	WT_TRET(__wt_writeunlock(session, txn_global->nsnap_rwlock));
+
+	API_END_RET_NOTFOUND_MAP(session, ret);
 }
 
 /*

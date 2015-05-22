@@ -39,13 +39,14 @@ class test_nsnap04(wttest.WiredTigerTestCase, suite_subprocess):
     uri = 'table:' + tablename
     nrows_per_itr = 10
 
-    def check_named_snapshot(self, session, snapshot, expected):
-        c = session.open_cursor(self.uri)
-        session.begin_transaction("snapshot=" + str(snapshot))
+    def check_named_snapshot(self, snapshot, expected):
+        new_session = self.conn.open_session()
+        c = new_session.open_cursor(self.uri)
+        new_session.begin_transaction("snapshot=" + str(snapshot))
         count = 0
         for row in c:
             count += 1
-        self.session.commit_transaction()
+        new_session.commit_transaction()
         # print "Checking snapshot %d, expect %d, found %d" % (snapshot, expected, count)
         self.assertEqual(count, expected)
 
@@ -58,29 +59,27 @@ class test_nsnap04(wttest.WiredTigerTestCase, suite_subprocess):
         c = self.session.open_cursor(self.uri)
         for i in xrange(self.nrows_per_itr):
             c[i] = "some value"
-        self.session.begin_transaction("isolation=snapshot")
-        # Insert some more content.
-        for i in xrange(self.nrows_per_itr):
-            c[self.nrows_per_itr + i] = "some value"
 
+        # Start a new transaction in a different session
+        new_session = self.conn.open_session()
+        new_session.begin_transaction("isolation=snapshot")
+        new_c = new_session.open_cursor(self.uri)
+        count = 0
+        for row in new_c:
+            count += 1
+        new_session.snapshot("name=0")
+
+        self.check_named_snapshot(0, self.nrows_per_itr)
+
+        # Insert some more content using the original session.
+        for i in xrange(self.nrows_per_itr):
+            c[2 * self.nrows_per_itr + i] = "some value"
+
+        self.check_named_snapshot(0, self.nrows_per_itr)
+        new_session.close()
+        # Update the named snapshot
         self.session.snapshot("name=0")
-        # Insert some more content.
-        for i in xrange(self.nrows_per_itr):
-            c[2 * self.nrows_per_itr + i] = "some value"
-
-        new_session = self.conn.open_session()
-        self.check_named_snapshot(new_session, 0, 3 * self.nrows_per_itr)
-        new_session.close()
-
-        # Insert some more content. Should this be an error?
-        for i in xrange(self.nrows_per_itr):
-            c[2 * self.nrows_per_itr + i] = "some value"
-
-        self.session.commit_transaction()
-
-        new_session = self.conn.open_session()
-        self.check_named_snapshot(new_session, 0, 4 * self.nrows_per_itr)
-        new_session.close()
+        self.check_named_snapshot(0, 2 * self.nrows_per_itr)
 
 if __name__ == '__main__':
     wttest.run()

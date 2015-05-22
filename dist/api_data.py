@@ -866,7 +866,7 @@ methods = {
             of snapshots are being dropped, the order is based on snapshot
             creation order not alphanumeric name order''',
         type='category', subconfig=[
-        Config('all', '', r'''
+        Config('all', 'false', r'''
             drop all named snapshots''', type='boolean'),
         Config('names', '', r'''
             drop specific named snapshots''', type='list'),

@@ -155,11 +155,15 @@ __wt_txn_log_op(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 	WT_TXN *txn;
 	WT_TXN_OP *op;
 
+	txn = &session->txn;
+
+	if (F_ISSET(txn, WT_TXN_RUNNING) && F_ISSET(txn, WT_TXN_READONLY))
+		WT_RET_MSG(session, WT_ROLLBACK,
+		    "Attempt to update in a read only transaction");
+
 	if (!FLD_ISSET(S2C(session)->log_flags, WT_CONN_LOG_ENABLED) ||
 	    F_ISSET(session, WT_SESSION_NO_LOGGING))
 		return (0);
-
-	txn = &session->txn;
 
 	/* We'd better have a transaction. */
 	WT_ASSERT(session,

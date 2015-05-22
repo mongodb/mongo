@@ -160,6 +160,7 @@ struct __wt_txn {
 #define	WT_TXN_HAS_ID	        0x04
 #define	WT_TXN_HAS_SNAPSHOT	0x08
 #define	WT_TXN_NAMED_SNAPSHOT	0x10
-#define	WT_TXN_RUNNING		0x20
+#define	WT_TXN_READONLY		0x20
+#define	WT_TXN_RUNNING		0x40
 	uint32_t flags;
 };
