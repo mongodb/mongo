@@ -31,12 +31,17 @@
 
 #include <boost/thread/tss.hpp>
 
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/mongoutils/str.h"
+
 namespace mongo {
 
     using std::string;
 
 namespace {
     boost::thread_specific_ptr<std::string> _threadName;
+
+    AtomicInt64 nextUnnamedThreadId{1};
 }  // namespace
 
     void setThreadName(StringData name) {
@@ -46,7 +51,8 @@ namespace {
     const std::string& getThreadName() {
         std::string* s;
         while (!(s = _threadName.get())) {
-            setThreadName("");
+            setThreadName(
+                    std::string(str::stream() << "thread" << nextUnnamedThreadId.fetchAndAdd(1)));
         }
         return *s;
     }
