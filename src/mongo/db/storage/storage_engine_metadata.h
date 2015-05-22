@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
 #include <memory>
 #include <string>
 
@@ -49,23 +50,16 @@ namespace mongo {
     public:
 
         /**
-         * Validates metadata in data directory against current storage engine.
-         * 1) If the metadata file exists, ensure that the information in the file
-         *    is consistent with the current storage engine. Otherwise, raise an error.
-         *    Returns the metadata object on successful validation.
-         * 2) If the metadata file exists but is not readable (eg. corrupted),
-         *    return NULL. This allows the startup process to overwrite the corrupted
-         *    metadata file with a valid copy.
-         * 3) If the metadata file does not exist, look for local.ns or local/local.ns
-         *    in the data directory. If we detect either file, raise an error
-         *    only if the current storage engine is not 'mmapv1'.
-         *    This makes validation more forgiving of situations where
-         *    application data is placed in the data directory prior
-         *    to server start up.
-         *    Returns NULL on successful validation.
+         * Returns a metadata object describing the storage engine that backs the data files
+         * contained in 'dbpath', and nullptr otherwise.
          */
-        static std::auto_ptr<StorageEngineMetadata> validate(const std::string& dbpath,
-                                                             const std::string& storageEngine);
+        static std::unique_ptr<StorageEngineMetadata> forPath(const std::string& dbpath);
+
+        /**
+         * Returns the name of the storage engine that backs the data files contained in 'dbpath',
+         * and none otherwise.
+         */
+        static boost::optional<std::string> getStorageEngineForPath(const std::string& dbpath);
 
         /**
          * Sets fields to defaults.

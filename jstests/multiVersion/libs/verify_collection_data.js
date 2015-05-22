@@ -68,83 +68,47 @@ createCollectionWithData = function (db, collectionName, dataGenerator) {
 // the saved state
 function CollectionDataValidator() {
 
-    var initialized = false;
-    var collectionStats = {};
-    var indexData = [];
-    var collectionData = [];
+    var _initialized = false;
+    var _collectionInfo = {};
+    var _indexData = [];
+    var _collectionData = [];
+
+    // Returns the options of the specified collection.
+    this.getCollectionInfo = function(collection) {
+        var infoObj = collection.getDB().getCollectionInfos({name: collection.getName()});
+        assert.eq(1, infoObj.length, "expected collection '" + collection.getName() + "'to exist");
+        return infoObj[0];
+    };
 
     // Saves the current state of the collection passed in
     this.recordCollectionData = function (collection) {
+        // Save the metadata for this collection for later comparison.
+        _collectionInfo = this.getCollectionInfo(collection);
 
         // Save the indexes for this collection for later comparison
-        indexData = collection.getIndexes().sort(function(a,b) {
+        _indexData = collection.getIndexes().sort(function(a,b) {
             if (a.name > b.name) return 1;
             else return -1;
         });
 
         // Save the data for this collection for later comparison
-        collectionData = collection.find().sort({"_id":1}).toArray();
+        _collectionData = collection.find().sort({"_id":1}).toArray();
 
-        // Save the metadata for this collection for later comparison.
-        // NOTE: We do this last since the data and indexes affect this output
-        collectionStats = collection.stats();
-
-        // XXX: in 2.4 avgObjSize was a double, but in 2.6 it is an int
-        collectionStats['avgObjSize'] = Math.floor(collectionStats['avgObjSize']);
-
-        // Delete keys that appear just because we shard
-        delete collectionStats["primary"];
-        delete collectionStats["sharded"];
-
-        initialized = true;
+        _initialized = true;
 
         return collection;
     }
 
     this.validateCollectionData = function (collection) {
 
-        if (!initialized) {
+        if (!_initialized) {
             throw Error("validateCollectionWithAllData called, but data is not initialized");
         }
 
         // Get the metadata for this collection
-        var newCollectionStats = collection.stats();
+        var newCollectionInfo = this.getCollectionInfo(collection);
 
-        // XXX: in 2.4 avgObjSize was a double, but in 2.6 it is an int
-        newCollectionStats['avgObjSize'] = Math.floor(newCollectionStats['avgObjSize']);
-
-        // as of 2.7.1, we no longer use systemFlags
-        delete collectionStats.systemFlags;
-        delete newCollectionStats.systemFlags;
-
-        // as of 2.7.7, we no longer use paddingFactor and introduced paddingFactorNote
-        delete collectionStats.paddingFactor;
-        delete collectionStats.paddingFactorNote;
-        delete newCollectionStats.paddingFactor;
-        delete newCollectionStats.paddingFactorNote;
-
-        // Delete keys that appear just because we shard
-        delete newCollectionStats["primary"];
-        delete newCollectionStats["sharded"];
-
-        // as of 2.7.8, we added maxSize
-        // TODO: when 2.6 is no longer tested, remove following two lines
-        delete newCollectionStats["maxSize"];
-        delete collectionStats["maxSize"];
-
-        // Delete key added in 2.8-rc3
-        delete collectionStats["indexDetails"];
-        delete newCollectionStats["indexDetails"];
-
-        // Delete capped:false added in 2.8.0-rc5
-        if (newCollectionStats["capped"] == false) {
-            delete newCollectionStats["capped"];
-        }
-        if (collectionStats["capped"] == false) {
-            delete collectionStats["capped"];
-        }
-
-        assert.docEq(collectionStats, newCollectionStats, "collection metadata not equal");
+        assert.docEq(_collectionInfo, newCollectionInfo, "collection metadata not equal");
 
         // Get the indexes for this collection
         var newIndexData = collection.getIndexes().sort(function(a,b) {
@@ -152,13 +116,13 @@ function CollectionDataValidator() {
             else return -1;
         });
         for (var i = 0; i < newIndexData.length; i++) {
-            assert.docEq(indexData[i], newIndexData[i], "indexes not equal");
+            assert.docEq(_indexData[i], newIndexData[i], "indexes not equal");
         }
 
         // Save the data for this collection for later comparison
         var newCollectionData = collection.find().sort({"_id":1}).toArray();
         for (var i = 0; i < newCollectionData.length; i++) {
-            assert.docEq(collectionData[i], newCollectionData[i], "data not equal");
+            assert.docEq(_collectionData[i], newCollectionData[i], "data not equal");
         }
         return true;
     }
