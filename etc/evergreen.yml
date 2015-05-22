@@ -2800,7 +2800,7 @@ buildvariants:
   - name: jsCore_WT
   - name: jsCore_compatibility
   - name: jsCore_compatibility_WT
-  - name: jsCore_small_oplog
+  #- name: jsCore_small_oplog
   - name: jsCore_small_oplog_WT
   - name: mmap
   - name: mongosTest
@@ -2866,7 +2866,7 @@ buildvariants:
   - name: jsCore_WT
   - name: jsCore_compatibility
   - name: jsCore_compatibility_WT
-  - name: jsCore_small_oplog
+  #- name: jsCore_small_oplog
   - name: jsCore_small_oplog_WT
   - name: mmap
   - name: mongosTest
@@ -2931,7 +2931,7 @@ buildvariants:
   - name: jsCore_WT
   - name: jsCore_compatibility
   - name: jsCore_compatibility_WT
-  - name: jsCore_small_oplog
+  #- name: jsCore_small_oplog
   - name: jsCore_small_oplog_WT
   - name: mmap
   - name: mongosTest
@@ -3030,7 +3030,7 @@ buildvariants:
   - name: jsCore_WT
   - name: jsCore_compatibility
   - name: jsCore_compatibility_WT
-  - name: jsCore_small_oplog
+  #- name: jsCore_small_oplog
   - name: jsCore_small_oplog_WT
   - name: mmap
   - name: mongosTest
