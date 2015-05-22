@@ -29,7 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "gperftools/malloc_extension.h"
+#include <gperftools/malloc_extension.h>
 
 #include "mongo/base/init.h"
 #include "mongo/db/commands/server_status.h"
@@ -66,7 +66,7 @@ namespace {
         registerThreadIdleCallback(&threadStateChange);
         MallocExtension::instance()->GetNumericProperty("tcmalloc.max_total_thread_cache_bytes", 
                                                         &tcmallocPoolSize);
-        log(1) << "tcmallocPoolSize: " << tcmallocPoolSize << "\n";
+        LOG(1) << "tcmallocPoolSize: " << tcmallocPoolSize << "\n";
         return Status::OK();
     }
 
