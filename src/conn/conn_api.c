@@ -637,7 +637,7 @@ __extractor_confchk(
  */
 int
 __wt_extractor_config(WT_SESSION_IMPL *session,
-    const char *config, WT_EXTRACTOR **extractorp, int *ownp)
+    const char *uri, const char *config, WT_EXTRACTOR **extractorp, int *ownp)
 {
 	WT_CONFIG_ITEM cname;
 	WT_EXTRACTOR *extractor;
@@ -658,7 +658,7 @@ __wt_extractor_config(WT_SESSION_IMPL *session,
 		WT_RET(__wt_config_getones(session,
 		    config, "app_metadata", &cname));
 		WT_RET(extractor->customize(extractor, &session->iface,
-		   session->dhandle->name, &cname, extractorp));
+		    uri, &cname, extractorp));
 	}
 
 	if (*extractorp == NULL)

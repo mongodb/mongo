@@ -14,6 +14,7 @@ ext/compressors/zlib ZLIB
 ext/datasources/helium HAVE_HELIUM
 ext/encryptors/nop
 ext/encryptors/rotn
+ext/extractors/csv
 ext/test/kvs_bdb HAVE_BERKELEY_DB
 .
 api/leveldb LEVELDB
