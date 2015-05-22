@@ -972,12 +972,12 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 			 * done by tracking if we're splitting after the slots
 			 * created by the last split to deepen this parent.
 			 *
-			 * Note the calculation: either or both i and split-last
-			 * might be an unsigned 0, don't decrement either one.
-			 * Because i is a 0-based array offset and split-last is
-			 * an count of entries, compare (i + 1) to split-last.
+			 * Note the calculation: i is a 0-based array offset and
+			 * split-last is a count of entries, also either or both
+			 * i and split-last might be unsigned 0, don't decrement
+			 * either one.
 			 */
-			if (i + 1 >= parent->pg_intl_deepen_split_last)
+			if (i > parent->pg_intl_deepen_split_last) 
 				parent->
 				    pg_intl_deepen_split_append += new_entries;
 		} else if (next_ref->state != WT_REF_SPLIT)
