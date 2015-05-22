@@ -154,8 +154,7 @@ __wt_txn_named_snapshot_begin(WT_SESSION_IMPL *session, const char *cfg[])
 	/* Save a copy of the transaction's snapshot. */
 	WT_ERR(__wt_calloc_one(session, &nsnap_new));
 	nsnap = nsnap_new;
-	WT_ERR(__wt_strndup(
-	    session, cval.str, cval.len, &nsnap->name));
+	WT_ERR(__wt_strndup(session, cval.str, cval.len, &nsnap->name));
 	nsnap->snap_min = txn->snap_min;
 	nsnap->snap_max = txn->snap_max;
 	if (txn->snapshot_count > 0) {
@@ -201,8 +200,7 @@ __wt_txn_named_snapshot_drop(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_CONFIG_ITEM all_config, k, names_config, to_config, before_config, v;
 	WT_DECL_RET;
 
-	WT_RET(__wt_config_gets_def(
-	    session, cfg, "drop.all", 0, &all_config));
+	WT_RET(__wt_config_gets_def(session, cfg, "drop.all", 0, &all_config));
 	WT_RET(__wt_config_gets_def(
 	    session, cfg, "drop.names", 0, &names_config));
 	WT_RET(__wt_config_gets_def(session, cfg, "drop.to", 0, &to_config));
@@ -257,8 +255,7 @@ __wt_txn_named_snapshot_get(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *nameval)
 
 	WT_RET(__wt_readlock(session, txn_global->nsnap_rwlock));
 	STAILQ_FOREACH(nsnap, &txn_global->nsnaph, q)
-		if (WT_STRING_MATCH(
-		    nsnap->name, nameval->str, nameval->len)) {
+		if (WT_STRING_MATCH(nsnap->name, nameval->str, nameval->len)) {
 			txn->snap_min = txn_state->snap_min = nsnap->snap_min;
 			txn->snap_max = nsnap->snap_max;
 			if ((txn->snapshot_count = nsnap->snapshot_count) != 0)
@@ -318,8 +315,7 @@ __wt_txn_named_snapshot_config(WT_SESSION_IMPL *session,
 	}
 
 	/* Verify that the drop configuration is sane. */
-	WT_RET(__wt_config_gets_def(
-	    session, cfg, "drop.all", 0, &all_config));
+	WT_RET(__wt_config_gets_def(session, cfg, "drop.all", 0, &all_config));
 	WT_RET(__wt_config_gets_def(
 	    session, cfg, "drop.names", 0, &names_config));
 	WT_RET(__wt_config_gets_def(session, cfg, "drop.to", 0, &to_config));
