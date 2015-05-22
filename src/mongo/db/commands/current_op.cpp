@@ -106,7 +106,7 @@ namespace mongo {
 
                 invariant(client);
 
-                boost::unique_lock<Client> uniqueLock(*client);
+                stdx::lock_guard<Client> lk(*client);
                 const OperationContext* opCtx = client->getOperationContext();
 
                 if (!includeAll) {
@@ -132,7 +132,7 @@ namespace mongo {
 
                     // LockState
                     Locker::LockerInfo lockerInfo;
-                    client->getOperationContext()->lockState()->getLockerInfo(&lockerInfo);
+                    opCtx->lockState()->getLockerInfo(&lockerInfo);
                     fillLockerInfo(lockerInfo, infoBuilder);
                 }
                 else {

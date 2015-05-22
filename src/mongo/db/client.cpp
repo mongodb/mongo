@@ -117,14 +117,11 @@ namespace mongo {
     void Client::setOperationContext(OperationContext* txn) {
         // We can only set the OperationContext once before resetting it.
         invariant(txn != NULL && _txn == NULL);
-
-        boost::unique_lock<SpinLock> uniqueLock(_lock);
         _txn = txn;
     }
 
     void Client::resetOperationContext() {
         invariant(_txn != NULL);
-        boost::unique_lock<SpinLock> uniqueLock(_lock);
         _txn = NULL;
     }
 
