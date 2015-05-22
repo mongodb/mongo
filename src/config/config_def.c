@@ -843,7 +843,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  confchk_WT_SESSION_salvage, 1
 	},
 	{ "WT_SESSION.snapshot",
-	  "drop=(all=,names=,to=,until=),name=",
+	  "drop=(all=0,names=,to=,until=),name=",
 	  confchk_WT_SESSION_snapshot, 2
 	},
 	{ "WT_SESSION.strerror",

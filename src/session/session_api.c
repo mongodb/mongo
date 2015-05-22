@@ -929,46 +929,31 @@ __session_snapshot(WT_SESSION *wt_session, const char *config)
 {
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	WT_TXN *txn;
+	WT_TXN_GLOBAL *txn_global;
+	int has_create, has_drop;
 
+	has_create = has_drop = 0;
 	session = (WT_SESSION_IMPL *)wt_session;
-
-	txn = &session->txn;
+	txn_global = &S2C(session)->txn_global;
 
 	SESSION_API_CALL(session, snapshot, config, cfg);
 
-	/*
-	 * Checkpoints require a snapshot to write a transactionally consistent
-	 * snapshot of the data.
-	 *
-	 * We can't use an application's transaction: if it has uncommitted
-	 * changes, they will be written in the checkpoint and may appear after
-	 * a crash.
-	 *
-	 * Use a real snapshot transaction: we don't want any chance of the
-	 * snapshot being updated during the checkpoint.  Eviction is prevented
-	 * from evicting anything newer than this because we track the oldest
-	 * transaction ID in the system that is not visible to all readers.
-	 */
-	if (F_ISSET(txn, WT_TXN_RUNNING))
-		WT_ERR_MSG(session, EINVAL,
-		    "Snapshot not permitted in a transaction");
+	WT_RET(__wt_txn_named_snapshot_config(
+	    session, cfg, &has_create, &has_drop));
 
-	/*
-	 * Reset open cursors.  Do this explicitly, even though it will happen
-	 * implicitly in the call to begin_transaction for the checkpoint, the
-	 * checkpoint code will acquire the schema lock before we do that, and
-	 * some implementation of WT_CURSOR::reset might need the schema lock.
-	 */
-	WT_ERR(__wt_session_reset_cursors(session));
+	WT_ERR(__wt_writelock(session, txn_global->nsnap_rwlock));
 
 	/* Drop any snapshots to be removed first. */
-	WT_ERR(__wt_txn_named_snapshot_drop(session, cfg));
+	if (has_drop)
+		WT_ERR(__wt_txn_named_snapshot_drop(session, cfg));
 
 	/* Start the named snapshot if requested. */
-	WT_ERR(__wt_txn_named_snapshot_begin(session, cfg));
+	if (has_create)
+		WT_ERR(__wt_txn_named_snapshot_begin(session, cfg));
 
-err:	API_END_RET_NOTFOUND_MAP(session, ret);
+err:	WT_TRET(__wt_writeunlock(session, txn_global->nsnap_rwlock));
+
+	API_END_RET_NOTFOUND_MAP(session, ret);
 }
 
 /*

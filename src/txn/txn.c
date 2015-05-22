@@ -352,7 +352,7 @@ __wt_txn_config(WT_SESSION_IMPL *session, const char *cfg[])
 		 * need to walk the list of named snapshots twice during
 		 * transaction open.
 		 */
-		WT_RET(__wt_txn_nsnap_get(session, &cval));
+		WT_RET(__wt_txn_named_snapshot_get(session, &cval));
 
 	return (0);
 }
@@ -397,7 +397,7 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 	__wt_txn_release_snapshot(session);
 	txn->isolation = session->isolation;
 	F_CLR(txn, WT_TXN_ERROR | WT_TXN_HAS_ID |
-	    WT_TXN_NAMED_SNAPSHOT | WT_TXN_RUNNING);
+	    WT_TXN_NAMED_SNAPSHOT | WT_TXN_READONLY | WT_TXN_RUNNING);
 }
 
 /*

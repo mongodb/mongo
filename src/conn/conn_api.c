@@ -988,7 +988,7 @@ err:	/*
 		}
 
 	/* Release all named snapshots. */
-	WT_TRET(__wt_txn_nsnap_destroy(session));
+	WT_TRET(__wt_txn_named_snapshot_destroy(session));
 
 	/* Close open, external sessions. */
 	for (s = conn->sessions, i = 0; i < conn->session_cnt; ++s, ++i)

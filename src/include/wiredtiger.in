@@ -1474,9 +1474,9 @@ struct __wt_session {
 	 * snapshot creation order not alphanumeric name order., a set of
 	 * related configuration options defined below.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;all, drop all named snapshots., a
-	 * boolean flag; default empty.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;names,
-	 * drop specific named snapshots., a list of strings; default empty.}
+	 * boolean flag; default \c false.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;names, drop specific named
+	 * snapshots., a list of strings; default empty.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;to, drop all snapshots up to and
 	 * including the specified name., a string; default \c true.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;until, drop all snapshots up to but
