@@ -43,6 +43,9 @@
 // Defined if execinfo.h and backtrace are available
 @mongo_config_have_execinfo_backtrace@
 
+// Defined if OpenSSL has the FIPS_mode_set function
+@mongo_config_have_fips_mode_set@
+
 // Defined if unitstd.h is available
 @mongo_config_have_header_unistd_h@
 
@@ -60,9 +63,6 @@
 
 // Defined if SSL support is enabled
 @mongo_config_ssl@
-
-// Defined if SSL FIPS mode is enabled
-@mongo_config_ssl_fips@
 
 // Defined if gdbserver support is enabled
 @mongo_config_use_gdbserver@

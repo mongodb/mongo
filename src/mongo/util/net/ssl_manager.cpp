@@ -518,7 +518,7 @@ namespace mongo {
         // Turn on FIPS mode if requested.
         // OPENSSL_FIPS must be defined by the OpenSSL headers, plus MONGO_CONFIG_SSL_FIPS
         // must be defined via a MongoDB build flag.
-#if defined(OPENSSL_FIPS) && defined(MONGO_CONFIG_SSL_FIPS)
+#if defined(MONGO_CONFIG_HAVE_FIPS_MODE_SET)
         int status = FIPS_mode_set(1);
         if (!status) {
             severe() << "can't activate FIPS mode: " << 
