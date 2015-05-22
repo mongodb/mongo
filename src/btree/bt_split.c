@@ -977,7 +977,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 			 * i and split-last might be unsigned 0, don't decrement
 			 * either one.
 			 */
-			if (i > parent->pg_intl_deepen_split_last) 
+			if (i > parent->pg_intl_deepen_split_last)
 				parent->
 				    pg_intl_deepen_split_append += new_entries;
 		} else if (next_ref->state != WT_REF_SPLIT)
