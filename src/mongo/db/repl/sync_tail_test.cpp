@@ -103,9 +103,7 @@ namespace {
             // go away after the global storage engine is initialized.
             unittest::TempDir tempDir("sync_tail_test");
             mongo::storageGlobalParams.dbpath = tempDir.path();
-            mongo::storageGlobalParams.engine = "devnull";
-            mongo::storageGlobalParams.engineSetByUser = true;
-            serviceContext->initializeGlobalStorageEngine();
+            serviceContext->setGlobalStorageEngine("devnull");
         }
         _prevCoordinator = getGlobalReplicationCoordinator();
         ReplSettings replSettings;

@@ -624,7 +624,15 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: -j8 --suites=core_auth
+      resmoke_args: -j8 --suites=core_auth --storageEngine=mmapv1
+
+- <<: *task_template
+  name: jsCore_auth_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: -j8 --suites=core_auth --storageEngine=wiredTiger
 
 - <<: *task_template
   name: jsCore_op_command

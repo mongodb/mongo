@@ -88,7 +88,7 @@ namespace mongo {
 
         options->addOptionChaining("storage.engine", "storageEngine", moe::String,
                                    "what storage engine to use")
-               .setDefault(moe::Value(std::string("wiredTiger")));
+               .setDefault(moe::Value(std::string("mmapv1")));
 
         options->addOptionChaining("suites", "suites", moe::StringVector, "test suites to run")
                                   .hidden()

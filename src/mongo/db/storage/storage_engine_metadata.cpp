@@ -34,7 +34,6 @@
 
 #include <cstdio>
 #include <boost/filesystem.hpp>
-#include <boost/optional.hpp>
 #include <fstream>
 #include <limits>
 #include <ostream>
@@ -63,33 +62,42 @@ namespace {
 }  // namespace
 
     // static
-    std::unique_ptr<StorageEngineMetadata> StorageEngineMetadata::forPath(
-            const std::string& dbpath) {
-        std::unique_ptr<StorageEngineMetadata> metadata;
+    std::auto_ptr<StorageEngineMetadata> StorageEngineMetadata::validate(
+        const std::string& dbpath,
+        const std::string& storageEngine) {
+
+        std::auto_ptr<StorageEngineMetadata> metadata;
+        std::string previousStorageEngine;
         if (boost::filesystem::exists(boost::filesystem::path(dbpath) / kMetadataBasename)) {
             metadata.reset(new StorageEngineMetadata(dbpath));
             Status status = metadata->read();
-            if (!status.isOK()) {
-                error() << "Unable to read the storage engine metadata file: " << status;
-                fassertFailed(28660);
+            if (status.isOK()) {
+                previousStorageEngine = metadata->getStorageEngine();
+            }
+            else {
+                // The storage metadata file is present but there was an issue
+                // reading its contents.
+                warning() << "Unable to read the existing storage engine metadata: "
+                          << status.toString();
+                return std::auto_ptr<StorageEngineMetadata>();
             }
         }
+        else if (containsMMapV1LocalNsFile(dbpath)) {
+            previousStorageEngine = "mmapv1";
+        }
+        else {
+            // Directory contains neither metadata nor mmapv1 files.
+            // Allow validation to succeed.
+            return metadata;
+        }
+
+        uassert(28574, str::stream()
+            << "Cannot start server. Detected data files in " << dbpath
+            << " created by storage engine '" << previousStorageEngine
+            << "'. The configured storage engine is '" << storageEngine << "'.",
+            previousStorageEngine == storageEngine);
+
         return metadata;
-    }
-
-    // static
-    boost::optional<std::string> StorageEngineMetadata::getStorageEngineForPath(
-            const std::string& dbpath) {
-        if (auto metadata = StorageEngineMetadata::forPath(dbpath)) {
-            return {metadata->getStorageEngine()};
-        }
-
-        // Fallback to checking for MMAPv1-specific files to handle upgrades from before the
-        // storage.bson metadata file was introduced in 3.0.
-        if (containsMMapV1LocalNsFile(dbpath)) {
-            return {std::string("mmapv1")};
-        }
-        return {};
     }
 
     StorageEngineMetadata::StorageEngineMetadata(const std::string& dbpath)

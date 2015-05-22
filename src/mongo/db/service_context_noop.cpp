@@ -39,7 +39,7 @@ namespace mongo {
         return NULL;
     }
 
-    void ServiceContextNoop::initializeGlobalStorageEngine() {
+    void ServiceContextNoop::setGlobalStorageEngine(const std::string& name) {
     }
 
     void ServiceContextNoop::shutdownGlobalStorageEngineCleanly() {

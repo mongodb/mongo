@@ -34,7 +34,6 @@
 
 #include <boost/thread/thread.hpp>
 #include <boost/filesystem/operations.hpp>
-#include <boost/optional.hpp>
 #include <boost/shared_ptr.hpp>
 #include <fstream>
 #include <iostream>
@@ -418,8 +417,6 @@ namespace mongo {
             dbWebServer->setupSockets();
         }
 
-        getGlobalServiceContext()->initializeGlobalStorageEngine();
-
         // Warn if we detect configurations for multiple registered storage engines in
         // the same configuration file/environment.
         if (serverGlobalParams.parsedOpts.hasField("storage")) {
@@ -444,6 +441,7 @@ namespace mongo {
             }
         }
 
+        getGlobalServiceContext()->setGlobalStorageEngine(storageGlobalParams.engine);
         getGlobalServiceContext()->setOpObserver(stdx::make_unique<OpObserver>());
 
         const repl::ReplSettings& replSettings =

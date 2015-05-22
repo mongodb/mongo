@@ -49,7 +49,7 @@ namespace mongo {
 
         StorageEngine* getGlobalStorageEngine();
 
-        void initializeGlobalStorageEngine();
+        void setGlobalStorageEngine(const std::string& name);
 
         void shutdownGlobalStorageEngineCleanly();
 

@@ -121,7 +121,7 @@ namespace mongo {
             printGitVersion();
             printOpenSSLVersion();
 
-            getGlobalServiceContext()->initializeGlobalStorageEngine();
+            getGlobalServiceContext()->setGlobalStorageEngine(storageGlobalParams.engine);
 
             // Initialize the sharding state so we can run starding tests in isolation
             shardingState.initialize("$dummy:10000");
