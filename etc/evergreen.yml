@@ -1747,6 +1747,7 @@ tasks:
         remote_file: mongodb-mongo-master/${build_variant}/${revision}/sources/mongo-src-${build_id}.${ext|tgz}
         bucket: mciuploads
         local_file: src/distsrc.${ext|tgz}
+        build_variants: [ linux-64, windows-64-2k8 ]
     - command: expansions.update
       params:
         file: src/compile_expansions.yml
