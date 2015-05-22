@@ -311,9 +311,16 @@ namespace mongo {
 
                     // Add a CachedPlanStage on top of the previous root. Takes ownership of
                     // '*rootOut', 'backupRoot', 'qs', and 'backupQs'.
-                    *rootOut = new CachedPlanStage(collection, canonicalQuery,
-                                                   *rootOut, qs,
-                                                   backupRoot, backupQs);
+                    *rootOut = new CachedPlanStage(opCtx,
+                                                   collection,
+                                                   ws,
+                                                   canonicalQuery,
+                                                   plannerParams,
+                                                   cs->decisionWorks,
+                                                   *rootOut,
+                                                   qs,
+                                                   backupRoot,
+                                                   backupQs);
                     return Status::OK();
                 }
             }

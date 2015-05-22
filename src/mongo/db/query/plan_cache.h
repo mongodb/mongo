@@ -196,6 +196,10 @@ namespace mongo {
         BSONObj query;
         BSONObj sort;
         BSONObj projection;
+
+        // The number of work cycles taken to decide on a winning plan when the plan was first
+        // cached.
+        size_t decisionWorks;
     };
 
     /**
@@ -334,10 +338,12 @@ namespace mongo {
          * If the entry corresponding to 'cq' still exists, 'feedback' is added to the run
          * statistics about the plan.  Status::OK() is returned.
          *
-         * May cause the cache entry to be removed if it is determined that the cached plan
-         * is badly performing.
+         * If 'allowedToEvict' is true, may cause the cache entry to be removed if it is determined
+         * that the cached plan is badly performing.
          */
-        Status feedback(const CanonicalQuery& cq, PlanCacheEntryFeedback* feedback);
+        Status feedback(const CanonicalQuery& cq,
+                        PlanCacheEntryFeedback* feedback,
+                        bool allowedToEvict);
 
         /**
          * Remove the entry corresponding to 'ck' from the cache.  Returns Status::OK() if the plan

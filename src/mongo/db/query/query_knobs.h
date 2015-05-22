@@ -72,6 +72,13 @@ namespace mongo {
     // How many write ops should we allow in a collection before tossing all cache entries?
     extern int internalQueryCacheWriteOpsBetweenFlush;
 
+    // Whether or not CachedPlanStage replanning is enabled.
+    extern bool internalQueryCacheReplanningEnabled;
+
+    // How many times more works must we perform in order to justify plan cache eviction and
+    // replanning?
+    extern double internalQueryCacheEvictionRatio;
+
     //
     // Planning and enumeration.
     //

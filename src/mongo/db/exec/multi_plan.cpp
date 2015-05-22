@@ -61,9 +61,11 @@ namespace mongo {
 
     MultiPlanStage::MultiPlanStage(OperationContext* txn,
                                    const Collection* collection,
-                                   CanonicalQuery* cq)
+                                   CanonicalQuery* cq,
+                                   bool shouldCache)
         : _txn(txn),
           _collection(collection),
+          _shouldCache(shouldCache),
           _query(cq),
           _bestPlanIdx(kNoSuchPlan),
           _backupPlanIdx(kNoSuchPlan),
@@ -183,6 +185,24 @@ namespace mongo {
         return Status::OK();
     }
 
+    // static
+    size_t MultiPlanStage::getTrialPeriodNumToReturn(const CanonicalQuery& query) {
+        // We treat ntoreturn as though it is a limit during plan ranking.
+        // This means that ranking might not be great for sort + batchSize.
+        // But it also means that we don't buffer too much data for sort + limit.
+        // See SERVER-14174 for details.
+        size_t numToReturn = query.getParsed().getNumToReturn();
+
+        // Determine the number of results which we will produce during the plan
+        // ranking phase before stopping.
+        size_t numResults = static_cast<size_t>(internalQueryPlanEvaluationMaxResults);
+        if (numToReturn > 0) {
+            numResults = std::min(numToReturn, numResults);
+        }
+
+        return numResults;
+    }
+
     Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
         // Adds the amount of time taken by pickBestPlan() to executionTimeMillis. There's lots of
         // execution work that happens here, so this is needed for the time accounting to
@@ -205,14 +225,7 @@ namespace mongo {
         // This means that ranking might not be great for sort + batchSize.
         // But it also means that we don't buffer too much data for sort + limit.
         // See SERVER-14174 for details.
-        size_t numToReturn = _query->getParsed().getNumToReturn();
-
-        // Determine the number of results which we will produce during the plan
-        // ranking phase before stopping.
-        size_t numResults = (size_t)internalQueryPlanEvaluationMaxResults;
-        if (numToReturn > 0) {
-            numResults = std::min(numToReturn, numResults);
-        }
+        size_t numResults = getTrialPeriodNumToReturn(*_query);
 
         // Work the plans, stopping when a plan hits EOF or returns some
         // fixed number of results.
@@ -311,13 +324,16 @@ namespace mongo {
         //   1) the query must be of a type that is safe to cache,
         //   2) two or more plans cannot have tied for the win. Caching in the case of ties can
         //   cause successive queries of the same shape to use a bad index.
-        //   3) Furthermore, the winning plan must have returned at least one result. Plans which
+        //   3) The caller must have indicated that it is willing to allow a plan to be cached via
+        //   the '_shouldCache' argument to the constructor.
+        //   4) Furthermore, the winning plan must have returned at least one result. Plans which
         //   return zero results cannot be reliably ranked. Such query shapes are generally
         //   existence type queries, and a winning plan should get cached once the query finds a
         //   result.
         if (PlanCache::shouldCacheQuery(*_query)
-            && !ranking->tieForBest
-            && !alreadyProduced.empty()) {
+                && !ranking->tieForBest
+                && !alreadyProduced.empty()
+                && _shouldCache) {
             // Create list of candidate solutions for the cache with
             // the best solution at the front.
             std::vector<QuerySolution*> solutions;

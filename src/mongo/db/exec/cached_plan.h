@@ -28,14 +28,20 @@
 
 #pragma once
 
+#include <boost/scoped_ptr.hpp>
+#include <list>
+
 #include "mongo/db/jsobj.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/storage/record_fetcher.h"
 
 namespace mongo {
+
+    class PlanYieldPolicy;
 
     /**
      * This stage outputs its mainChild, and possibly its backup child
@@ -49,8 +55,12 @@ namespace mongo {
         /**
          * Takes ownership of 'mainChild', 'mainQs', 'backupChild', and 'backupQs'.
          */
-        CachedPlanStage(const Collection* collection,
+        CachedPlanStage(OperationContext* txn,
+                        Collection* collection,
+                        WorkingSet* ws,
                         CanonicalQuery* cq,
+                        const QueryPlannerParams& params,
+                        size_t decisionWorks,
                         PlanStage* mainChild,
                         QuerySolution* mainQs,
                         PlanStage* backupChild = NULL,
@@ -80,15 +90,59 @@ namespace mongo {
 
         void kill();
 
+        /**
+         * Runs the cached plan for a trial period, yielding during the trial period according to
+         * 'yieldPolicy'.
+         *
+         * If the performance is lower than expected, the old plan is evicted and a new plan is
+         * selected from scratch (again yielding according to 'yieldPolicy'). Otherwise, the cached
+         * plan is run.
+         */
+        Status pickBestPlan(PlanYieldPolicy* yieldPolicy);
+
     private:
         PlanStage* getActiveChild() const;
         void updateCache();
 
-        // not owned
-        const Collection* _collection;
+        /**
+         * May yield during the cached plan stage's trial period or replanning phases.
+         *
+         * Returns a non-OK status if the plan was killed during a yield.
+         */
+        Status tryYield(PlanYieldPolicy* yieldPolicy);
 
-        // not owned
+        /**
+         * Uses the QueryPlanner and the MultiPlanStage to re-generate candidate plans for this
+         * query and select a new winner.
+         *
+         * We fallback to a new plan if, based on the number of works during the trial period that
+         * put the plan in the cache, the performance was worse than anticipated during the trial
+         * period.
+         *
+         * We only write the result of re-planning to the plan cache if 'shouldCache' is true.
+         */
+        Status replan(PlanYieldPolicy* yieldPolicy, bool shouldCache);
+
+        // Not owned here.
+        OperationContext* _txn;
+
+        // Not owned here.
+        Collection* _collection;
+
+        // Not owned here.
+        WorkingSet* _ws;
+
+        // Not owned here.
         CanonicalQuery* _canonicalQuery;
+
+        QueryPlannerParams _plannerParams;
+
+        // Whether or not the cached plan trial period and replanning is enabled.
+        const bool _replanningEnabled;
+
+        // The number of work cycles taken to decide on a winning plan when the plan was first
+        // cached.
+        size_t _decisionWorks;
 
         // Owned by us. Must be deleted after the corresponding PlanStage trees, as
         // those trees point into the query solutions.
@@ -112,6 +166,15 @@ namespace mongo {
 
         // Has this query been killed?
         bool _killed;
+
+        // Any results produced during trial period execution are kept here.
+        std::list<WorkingSetID> _results;
+
+        // When a stage requests a yield for document fetch, it gives us back a RecordFetcher*
+        // to use to pull the record into memory. We take ownership of the RecordFetcher here,
+        // deleting it after we've had a chance to do the fetch. For timing-based yields, we
+        // just pass a NULL fetcher.
+        boost::scoped_ptr<RecordFetcher> _fetcher;
 
         // Stats
         CommonStats _commonStats;

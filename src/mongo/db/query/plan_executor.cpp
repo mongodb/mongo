@@ -41,6 +41,7 @@
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/query/query_knobs.h"
 #include "mongo/db/storage/record_fetcher.h"
 
 #include "mongo/util/stacktrace.h"
@@ -183,11 +184,19 @@ namespace mongo {
         }
 
         // If we didn't have to do subplanning, we might still have to do regular
-        // multi plan selection.
+        // multi plan selection...
         foundStage = getStageByType(_root.get(), STAGE_MULTI_PLAN);
         if (foundStage) {
             MultiPlanStage* mps = static_cast<MultiPlanStage*>(foundStage);
             return mps->pickBestPlan(_yieldPolicy.get());
+        }
+
+        // ...or, we might have run a plan from the cache for a trial period, falling back on
+        // regular planning if the cached plan performs poorly.
+        foundStage = getStageByType(_root.get(), STAGE_CACHED_PLAN);
+        if (foundStage) {
+            CachedPlanStage* cachedPlan = static_cast<CachedPlanStage*>(foundStage);
+            return cachedPlan->pickBestPlan(_yieldPolicy.get());
         }
 
         // Either we chose a plan, or no plan selection was required. In both cases,

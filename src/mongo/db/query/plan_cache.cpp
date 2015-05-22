@@ -114,7 +114,8 @@ namespace mongo {
           key(key),
           query(entry.query.getOwned()),
           sort(entry.sort.getOwned()),
-          projection(entry.projection.getOwned()) {
+          projection(entry.projection.getOwned()),
+          decisionWorks(entry.decision->stats[0]->common.works) {
         // CachedSolution should not having any references into
         // cache entry. All relevant data should be cloned/copied.
         for (size_t i = 0; i < entry.plannerData.size(); ++i) {
@@ -423,7 +424,9 @@ namespace mongo {
         return false;
     }
 
-    Status PlanCache::feedback(const CanonicalQuery& cq, PlanCacheEntryFeedback* feedback) {
+    Status PlanCache::feedback(const CanonicalQuery& cq,
+                               PlanCacheEntryFeedback* feedback,
+                               bool allowedToEvict) {
         if (NULL == feedback) {
             return Status(ErrorCodes::BadValue, "feedback is NULL");
         }
@@ -439,9 +442,10 @@ namespace mongo {
         invariant(entry);
 
         if (entry->feedback.size() >= size_t(internalQueryCacheFeedbacksStored)) {
-            // If we have enough feedback, then use it to determine whether
-            // we should get rid of the cached solution.
-            if (hasCachedPlanPerformanceDegraded(entry, autoFeedback.get())) {
+            // If we have enough feedback, then use it to determine whether we should get rid of the
+            // cached solution. We do not use the feedback-based eviction policy if replanning is
+            // enabled.
+            if (hasCachedPlanPerformanceDegraded(entry, autoFeedback.get()) && allowedToEvict) {
                 LOG(1) << _ns << ": removing plan cache entry " << entry->toString()
                        << " - detected degradation in performance of cached solution.";
                 _cache.remove(ck);
