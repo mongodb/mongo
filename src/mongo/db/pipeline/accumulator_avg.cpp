@@ -72,7 +72,7 @@ intrusive_ptr<Accumulator> AccumulatorAvg::create() {
 Value AccumulatorAvg::getValue(bool toBeMerged) const {
     if (!toBeMerged) {
         if (_count == 0)
-            return Value(0.0);
+            return Value(BSONNULL);
 
         return Value(_total / static_cast<double>(_count));
     } else {

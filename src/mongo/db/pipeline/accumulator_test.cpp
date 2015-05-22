@@ -84,7 +84,7 @@ class None : public Base {
 public:
     void run() {
         createAccumulator();
-        ASSERT_EQUALS(0, accumulator()->getValue(false).getDouble());
+        ASSERT_EQUALS(Value(BSONNULL), accumulator()->getValue(false));
     }
 };
 
