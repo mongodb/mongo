@@ -1056,6 +1056,7 @@ tasks:
         remote_file: mongodb-mongo-master/${build_variant}/${revision}/sources/mongodb-src-${build_id}.${ext|tgz}
         bucket: mciuploads
         local_file: src/distsrc.${ext|tgz}
+        build_variants: [ linux-64, windows-64-2k8 ]
     - command: expansions.update
       params:
         file: src/compile_expansions.yml
@@ -1077,7 +1078,7 @@ tasks:
           mv mongo-debugsymbols.tgz debugsymbols-*.${ext|tgz} || true
           cp mongodb-*.${ext|tgz} mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}
           cp debugsymbols-*.${ext|tgz} mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz} || true
-          mv distsrc.${ext|tgz} mongodb-src-${src_suffix}.${ext|tgz}
+          mv distsrc.${ext|tgz} mongodb-src-${src_suffix}.${ext|tgz} || true
           /usr/bin/find build/ -type f | grep msi$ | xargs -I original_filename cp original_filename mongodb-win32-${push_arch}-${suffix}.msi || true
 
           notary-client.py --key-name "server-2.8" --auth-token-file ./signing_auth_token --comment "MCI Automatic Signing ${revision} - ${build_variant} - ${branch_name}" --notary-url http://notary-service.build.10gen.cc:5000 --skip-missing mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz} mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz} mongodb-win32-${push_arch}-${suffix}.msi mongodb-src-${src_suffix}.${ext|tgz}
