@@ -293,7 +293,7 @@ static const WT_CONFIG_CHECK
 	{ "all", "boolean", NULL, NULL, NULL, 0 },
 	{ "names", "list", NULL, NULL, NULL, 0 },
 	{ "to", "string", NULL, NULL, NULL, 0 },
-	{ "until", "string", NULL, NULL, NULL, 0 },
+	{ "upto", "string", NULL, NULL, NULL, 0 },
 	{ NULL, NULL, NULL, NULL, NULL, 0 }
 };
 
@@ -843,7 +843,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  confchk_WT_SESSION_salvage, 1
 	},
 	{ "WT_SESSION.snapshot",
-	  "drop=(all=0,names=,to=,until=),name=",
+	  "drop=(all=0,names=,to=,upto=),name=",
 	  confchk_WT_SESSION_snapshot, 2
 	},
 	{ "WT_SESSION.strerror",

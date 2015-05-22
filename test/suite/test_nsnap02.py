@@ -136,14 +136,14 @@ class test_nsnap02(wttest.WiredTigerTestCase, suite_subprocess):
         # Make sure all the snapshots are gone.
         self.check_named_snapshots(new_snapshots)
 
-    def test_drop_until_first_snapshot(self):
+    def test_drop_upto_first_snapshot(self):
         snapshots = self.create_snapshots()
 
         c = self.session.open_cursor(self.uri)
         for snap_name, expected, dropped in snapshots:
             self.check_named_snapshot(c, snap_name, expected)
 
-        self.session.snapshot("drop=(until=0)")
+        self.session.snapshot("drop=(upto=0)")
 
         # Make sure no snapshots are gone
         self.check_named_snapshots(snapshots)
@@ -168,14 +168,14 @@ class test_nsnap02(wttest.WiredTigerTestCase, suite_subprocess):
         # Make sure all the snapshots are gone.
         self.check_named_snapshots(new_snapshots)
 
-    def test_drop_until_third_snapshot(self):
+    def test_drop_upto_third_snapshot(self):
         snapshots = self.create_snapshots()
 
         c = self.session.open_cursor(self.uri)
         for snap_name, expected, dropped in snapshots:
             self.check_named_snapshot(c, snap_name, expected)
 
-        self.session.snapshot("drop=(until=3)")
+        self.session.snapshot("drop=(upto=3)")
 
         # Construct a snapshot array matching the expected state.
         new_snapshots = []
@@ -205,14 +205,14 @@ class test_nsnap02(wttest.WiredTigerTestCase, suite_subprocess):
         # Make sure all the snapshots are gone.
         self.check_named_snapshots(new_snapshots)
 
-    def test_drop_until_last_snapshot(self):
+    def test_drop_upto_last_snapshot(self):
         snapshots = self.create_snapshots()
 
         c = self.session.open_cursor(self.uri)
         for snap_name, expected, dropped in snapshots:
             self.check_named_snapshot(c, snap_name, expected)
 
-        self.session.snapshot("drop=(until=%d)" % (self.nsnapshots - 1))
+        self.session.snapshot("drop=(upto=%d)" % (self.nsnapshots - 1))
 
         # Construct a snapshot array matching the expected state.
         new_snapshots = []
