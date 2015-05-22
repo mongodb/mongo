@@ -872,7 +872,7 @@ methods = {
             drop specific named snapshots''', type='list'),
         Config('to', 'true', r'''
             drop all snapshots up to and including the specified name.'''),
-        Config('until', 'true', r'''
+        Config('upto', 'true', r'''
             drop all snapshots up to but not including the specified name'''),
     ]),
     Config('name', '', r'''specify a name for the snapshot'''),
