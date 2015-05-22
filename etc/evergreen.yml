@@ -1504,7 +1504,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-amzn64
-    compile_flags: --ssl --ssl-fips-capability --distmod=amzn64 --release -j$(grep -c ^processor /proc/cpuinfo)
+    compile_flags: --ssl --distmod=amzn64 --release -j$(grep -c ^processor /proc/cpuinfo)
     test_flags: --authMechanism=CRAM-MD5 --continue-on-failure
     has_debugsymbols: true
   tasks:
@@ -1814,7 +1814,7 @@ buildvariants:
     push_arch: x86_64-enterprise-windows-64
     msi_target: msi
     content_type: application/zip
-    compile_flags: --release --64 --ssl --ssl-fips-capability --distmod=windows-64 --extrapath="c:\openssl,c:\sasl,c:\snmp" -j$(grep -c ^processor /proc/cpuinfo) --dynamic-windows --win-version-min=ws08r2
+    compile_flags: --release --64 --ssl --distmod=windows-64 --extrapath="c:\openssl,c:\sasl,c:\snmp" -j$(grep -c ^processor /proc/cpuinfo) --dynamic-windows --win-version-min=ws08r2
     test_flags: --continue-on-failure
     ext: zip
   tasks:
@@ -2025,7 +2025,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-rhel57
-    compile_flags: --ssl --ssl-fips-capability --distmod=rhel57 -j$(grep -c ^processor /proc/cpuinfo) --release
+    compile_flags: --ssl --distmod=rhel57 -j$(grep -c ^processor /proc/cpuinfo) --release
     test_flags: --continue-on-failure
     has_debugsymbols: true
   tasks:
@@ -2055,7 +2055,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-rhel62
-    compile_flags: --ssl --ssl-fips-capability --distmod=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --release
+    compile_flags: --ssl --distmod=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --release
     test_flags: --continue-on-failure
     has_debugsymbols: true
   tasks:
@@ -2085,7 +2085,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-rhel70
-    compile_flags: --ssl --ssl-fips-capability --distmod=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --release
+    compile_flags: --ssl --distmod=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --release
     test_flags: --continue-on-failure
     has_debugsymbols: true
   tasks:
@@ -2167,7 +2167,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-ubuntu1204
-    compile_flags: --no-glibc-check --ssl --ssl-fips-capability --distmod=ubuntu1204 --release -j$(grep -c ^processor /proc/cpuinfo)
+    compile_flags: --no-glibc-check --ssl --distmod=ubuntu1204 --release -j$(grep -c ^processor /proc/cpuinfo)
     test_flags: --authMechanism=CRAM-MD5 --continue-on-failure
     has_debugsymbols: true
   tasks:
@@ -2197,7 +2197,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-ubuntu1404
-    compile_flags: --no-glibc-check --ssl --ssl-fips-capability --distmod=ubuntu1404 --release -j$(grep -c ^processor /proc/cpuinfo)
+    compile_flags: --no-glibc-check --ssl --distmod=ubuntu1404 --release -j$(grep -c ^processor /proc/cpuinfo)
     test_flags: --authMechanism=CRAM-MD5 --continue-on-failure
     has_debugsymbols: true
   tasks:
@@ -2275,7 +2275,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-suse10
-    compile_flags: --no-glibc-check --ssl --ssl-fips-capability --distmod=suse10 --release -j$(grep -c ^processor /proc/cpuinfo) --disable-warnings-as-errors
+    compile_flags: --no-glibc-check --ssl --distmod=suse10 --release -j$(grep -c ^processor /proc/cpuinfo) --disable-warnings-as-errors
     test_flags: --authMechanism=CRAM-MD5 --continue-on-failure
     has_debugsymbols: true
   tasks:
@@ -2305,7 +2305,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-suse11
-    compile_flags: --no-glibc-check --ssl --ssl-fips-capability --distmod=suse11 --release -j$(grep -c ^processor /proc/cpuinfo)
+    compile_flags: --no-glibc-check --ssl --distmod=suse11 --release -j$(grep -c ^processor /proc/cpuinfo)
     test_flags: --authMechanism=CRAM-MD5 --continue-on-failure
     has_debugsymbols: true
   tasks:
@@ -2382,7 +2382,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-debian71
-    compile_flags: --no-glibc-check --ssl --ssl-fips-capability --distmod=debian71 --release -j$(grep -c ^processor /proc/cpuinfo)
+    compile_flags: --no-glibc-check --ssl --distmod=debian71 --release -j$(grep -c ^processor /proc/cpuinfo)
     test_flags: --authMechanism=CRAM-MD5 --continue-on-failure
     has_debugsymbols: true
   tasks:
