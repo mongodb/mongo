@@ -7,6 +7,7 @@ selector:
   js_test:
     roots:
     - jstests/aggregation/*.js
+    - jstests/aggregation/bugs/*.js
     exclude_files:
     # Skip any tests that run with auth explicitly.
     - jstests/aggregation/*[aA]uth*.js

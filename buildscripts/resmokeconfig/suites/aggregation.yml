@@ -2,6 +2,7 @@ selector:
   js_test:
     roots:
     - jstests/aggregation/*.js
+    - jstests/aggregation/bugs/*.js
 
 executor:
   js_test:
