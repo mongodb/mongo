@@ -1679,13 +1679,13 @@ __conn_write_base_config(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_RET(__wt_fopen(session,
 	    WT_BASECONFIG_SET, WT_FHANDLE_WRITE, 0, &fp));
 
-	fprintf(fp, "%s\n\n",
+	WT_ERR(__wt_fprintf(fp, "%s\n\n",
 	    "# Do not modify this file.\n"
 	    "#\n"
 	    "# WiredTiger created this file when the database was created,\n"
 	    "# to store persistent database settings.  Instead of changing\n"
 	    "# these settings, set a WIREDTIGER_CONFIG environment variable\n"
-	    "# or create a WiredTiger.config file to override them.");
+	    "# or create a WiredTiger.config file to override them."));
 
 	/*
 	 * The base configuration file contains all changes to default settings
@@ -1718,8 +1718,8 @@ __conn_write_base_config(WT_SESSION_IMPL *session, const char *cfg[])
 			--v.str;
 			v.len += 2;
 		}
-		fprintf(fp,
-		    "%.*s=%.*s\n", (int)k.len, k.str, (int)v.len, v.str);
+		WT_ERR(fprintf(fp,
+		    "%.*s=%.*s\n", (int)k.len, k.str, (int)v.len, v.str));
 	}
 	WT_ERR_NOTFOUND_OK(ret);
 
