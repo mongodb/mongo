@@ -406,13 +406,14 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 	 * Recheck whether the handle is dead after grabbing the locks.  If so,
 	 * discard the handle and retry.
 	 */
-retry:	WT_WITH_SCHEMA_LOCK(session,
+retry:	is_dead = 0;
+	WT_WITH_SCHEMA_LOCK(session,
 	    WT_WITH_DHANDLE_LOCK(session, ret =
-		(dhandle != NULL && F_ISSET(dhandle, WT_DHANDLE_DEAD)) ?
-		WT_NOTFOUND :
-		__wt_conn_btree_get(session, uri, checkpoint, cfg, flags)));
+		(is_dead = (dhandle != NULL &&
+		    F_ISSET(dhandle, WT_DHANDLE_DEAD))) ?
+		0 : __wt_conn_btree_get(session, uri, checkpoint, cfg, flags)));
 
-	if (ret == WT_NOTFOUND) {
+	if (is_dead) {
 		if (dhandle_cache != NULL)
 			__session_discard_btree(session, dhandle_cache);
 		dhandle_cache = NULL;
