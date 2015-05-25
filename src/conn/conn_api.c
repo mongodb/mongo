@@ -1375,7 +1375,7 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_FH *fh;
 	size_t len;
 	wt_off_t size;
-	int is_create;
+	int exist, is_create;
 	char buf[256];
 
 	conn = S2C(session);
@@ -1448,17 +1448,19 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
 		    "process");
 
 	/*
-	 * If the size of the lock file is 0, we created it (or we won a locking
-	 * race with the thread that created it, it doesn't matter).
+	 * If the size of the lock file is non-zero, we created it (or won a
+	 * locking race with the thread that created it, it doesn't matter).
 	 *
 	 * Write something into the file, zero-length files make me nervous.
+	 *
+	 * The test against the expected length is sheer paranoia (the length
+	 * should be 0 or correct), but it shouldn't hurt.
 	 */
-	WT_ERR(__wt_filesize(session, conn->lock_fh, &size));
-	if (size == 0) {
 #define	WT_SINGLETHREAD_STRING	"WiredTiger lock file\n"
+	WT_ERR(__wt_filesize(session, conn->lock_fh, &size));
+	if (size != strlen(WT_SINGLETHREAD_STRING))
 		WT_ERR(__wt_write(session, conn->lock_fh, (wt_off_t)0,
 		    strlen(WT_SINGLETHREAD_STRING), WT_SINGLETHREAD_STRING));
-	}
 
 	/* We own the lock file, optionally create the WiredTiger file. */
 	WT_ERR(__wt_open(session, WT_WIREDTIGER, is_create, 0, 0, &fh));
@@ -1475,25 +1477,27 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_ERR(__wt_bytelock(fh, (wt_off_t)0, 0));
 
 	/*
-	 * If the size of the file is zero, we created it, fill it in. If the
-	 * size of the file is non-zero, fail if configured for exclusivity.
+	 * We own the database home, figure out if we're creating it. There are
+	 * a few files created when initializing the database home and we could
+	 * crash in-between any of them, so there's no simple test. The last
+	 * thing we do during initialization is rename a turtle file into place,
+	 * and there's never a database home after that point without a turtle
+	 * file. If the turtle file doesn't exist, it's a create.
 	 */
-	WT_ERR(__wt_filesize(session, fh, &size));
-	if (size == 0) {
+	WT_ERR(__wt_exist(session, WT_METADATA_TURTLE, &exist));
+	conn->is_new = exist ? 1 : 0;
+
+	if (conn->is_new) {
 		len = (size_t)snprintf(buf, sizeof(buf),
 		    "%s\n%s\n", WT_WIREDTIGER, WIREDTIGER_VERSION_STRING);
 		WT_ERR(__wt_write(session, fh, (wt_off_t)0, len, buf));
 		WT_ERR(__wt_fsync(session, fh));
-
-		conn->is_new = 1;
 	} else {
 		WT_ERR(__wt_config_gets(session, cfg, "exclusive", &cval));
 		if (cval.val != 0)
 			WT_ERR_MSG(session, EEXIST,
 			    "WiredTiger database already exists and exclusive "
 			    "option configured");
-
-		conn->is_new = 0;
 	}
 
 err:	/*
@@ -2003,6 +2007,9 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	 * (which avoids application threads racing to create the metadata file
 	 * later).  Once the metadata file exists, get a reference to it in
 	 * the connection's session.
+	 *
+	 * THE TURTLE FILE MUST BE THE LAST FILE CREATED WHEN INITIALIZING THE
+	 * DATABASE HOME, IT'S WHAT WE USE TO DECIDE IF WE'RE CREATING OR NOT.
 	 */
 	WT_ERR(__wt_turtle_init(session));
 	WT_ERR(__wt_metadata_open(session));
