@@ -1975,15 +1975,6 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	    (WT_CONFIG_ARG *)enc_cfg, &conn->kencryptor));
 
 	/*
-	 * Check on the turtle and metadata files, creating them if necessary
-	 * (which avoids application threads racing to create the metadata file
-	 * later).  Once the metadata file exists, get a reference to it in
-	 * the connection's session.
-	 */
-	WT_ERR(__wt_turtle_init(session));
-	WT_ERR(__wt_metadata_open(session));
-
-	/*
 	 * Configuration completed; optionally write the base configuration file
 	 * if it doesn't already exist.
 	 *
@@ -1996,6 +1987,15 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_ERR(__wt_config_merge(session,
 	    cfg + 1, "create=,encryption=(secretkey=)", &base_merge));
 	WT_ERR(__conn_write_base_config(session, cfg, base_merge));
+
+	/*
+	 * Check on the turtle and metadata files, creating them if necessary
+	 * (which avoids application threads racing to create the metadata file
+	 * later).  Once the metadata file exists, get a reference to it in
+	 * the connection's session.
+	 */
+	WT_ERR(__wt_turtle_init(session));
+	WT_ERR(__wt_metadata_open(session));
 
 	/*
 	 * Start the worker threads last.
