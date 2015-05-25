@@ -187,23 +187,23 @@ __wt_turtle_init(WT_SESSION_IMPL *session)
 			WT_RET_MSG(session, EINVAL,
 			    "Incremental backup after running recovery "
 			    "is not allowed.");
-		return (0);
+	} else {
+		if (exist_incr)
+			F_SET(S2C(session), WT_CONN_WAS_BACKUP);
+
+		/* Create the metadata file. */
+		WT_RET(__metadata_init(session));
+
+		/* Load any hot-backup information. */
+		WT_RET(__metadata_load_hot_backup(session));
+
+		/* Create any bulk-loaded file stubs. */
+		WT_RET(__metadata_load_bulk(session));
+
+		/* Create the turtle file. */
+		WT_RET(__metadata_config(session, &metaconf));
+		WT_ERR(__wt_turtle_update(session, WT_METAFILE_URI, metaconf));
 	}
-	if (exist_incr)
-		F_SET(S2C(session), WT_CONN_WAS_BACKUP);
-
-	/* Create the metadata file. */
-	WT_RET(__metadata_init(session));
-
-	/* Load any hot-backup information. */
-	WT_RET(__metadata_load_hot_backup(session));
-
-	/* Create any bulk-loaded file stubs. */
-	WT_RET(__metadata_load_bulk(session));
-
-	/* Create the turtle file. */
-	WT_RET(__metadata_config(session, &metaconf));
-	WT_ERR(__wt_turtle_update(session, WT_METAFILE_URI, metaconf));
 
 	/* Remove the backup files, we'll never read them again. */
 	WT_ERR(__wt_backup_file_remove(session));
