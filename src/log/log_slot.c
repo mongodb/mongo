@@ -365,7 +365,7 @@ __wt_log_slot_grow_buffers(WT_SESSION_IMPL *session, size_t newsize)
 		orig_state = slot->slot_state;
 		if ((orig_state != WT_LOG_SLOT_FREE &&
 		    orig_state != WT_LOG_SLOT_READY) ||
-		    WT_ATOMIC_CAS8(
+		    !WT_ATOMIC_CAS8(
 		    slot->slot_state, orig_state, WT_LOG_SLOT_PENDING))
 			continue;
 
