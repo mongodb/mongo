@@ -1718,7 +1718,7 @@ __conn_write_base_config(WT_SESSION_IMPL *session, const char *cfg[])
 			--v.str;
 			v.len += 2;
 		}
-		WT_ERR(fprintf(fp,
+		WT_ERR(__wt_fprintf(fp,
 		    "%.*s=%.*s\n", (int)k.len, k.str, (int)v.len, v.str));
 	}
 	WT_ERR_NOTFOUND_OK(ret);
