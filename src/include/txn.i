@@ -140,7 +140,7 @@ __wt_txn_visible_all(WT_SESSION_IMPL *session, uint64_t id)
 
 	oldest_id = __wt_txn_oldest_id(session);
 
-	return (WT_TXNID_LT(id, oldest_id));
+	return (TXNID_LT(id, oldest_id));
 }
 
 /*

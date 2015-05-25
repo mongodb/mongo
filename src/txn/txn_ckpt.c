@@ -1018,7 +1018,7 @@ fake:	/*
 	 */
 	if (F_ISSET(conn, WT_CONN_CKPT_SYNC) &&
 	    (WT_IS_METADATA(dhandle) ||
-	    !F_ISSET(&session->txn, WT_TXN_RUNNING)))
+	    !F_ISSET(&session->txn, TXN_RUNNING)))
 		WT_ERR(__wt_checkpoint_sync(session, NULL));
 
 	WT_ERR(__wt_meta_ckptlist_set(
