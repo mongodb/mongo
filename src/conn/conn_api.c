@@ -1485,7 +1485,7 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
 	 * file. If the turtle file doesn't exist, it's a create.
 	 */
 	WT_ERR(__wt_exist(session, WT_METADATA_TURTLE, &exist));
-	conn->is_new = exist ? 1 : 0;
+	conn->is_new = exist ? 0 : 1;
 
 	if (conn->is_new) {
 		len = (size_t)snprintf(buf, sizeof(buf),
