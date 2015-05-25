@@ -1375,10 +1375,14 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_FH *fh;
 	size_t len;
 	wt_off_t size;
+	int is_create;
 	char buf[256];
 
 	conn = S2C(session);
 	fh = NULL;
+
+	WT_RET(__wt_config_gets(session, cfg, "create", &cval));
+	is_create = cval.val == 0 ? 0 : 1;
 
 	__wt_spin_lock(session, &__wt_process.spinlock);
 
@@ -1427,12 +1431,11 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
 	 * then successfully lock the WiredTiger file, but I can't think of any
 	 * way to fix that.)
 	 *
-	 * Open the WiredTiger lock file, creating it if it doesn't exist. (I'm
-	 * not removing the lock file if we create it and subsequently fail, it
-	 * isn't simple to detect that case, and there's no risk other than a
-	 * useless file being left in the directory.)
+	 * Open the WiredTiger lock file, optionally creating it if it doesn't
+	 * exist.
 	 */
-	WT_ERR(__wt_open(session, WT_SINGLETHREAD, 1, 0, 0, &conn->lock_fh));
+	WT_ERR(__wt_open(
+	    session, WT_SINGLETHREAD, is_create, 0, 0, &conn->lock_fh));
 
 	/*
 	 * Lock a byte of the file: if we don't get the lock, some other process
@@ -1458,9 +1461,7 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
 	}
 
 	/* We own the lock file, optionally create the WiredTiger file. */
-	WT_ERR(__wt_config_gets(session, cfg, "create", &cval));
-	WT_ERR(__wt_open(session,
-	    WT_WIREDTIGER, cval.val == 0 ? 0 : 1, 0, 0, &fh));
+	WT_ERR(__wt_open(session, WT_WIREDTIGER, is_create, 0, 0, &fh));
 
 	/*
 	 * Lock the WiredTiger file (for backward compatibility reasons as
