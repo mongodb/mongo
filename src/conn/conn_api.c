@@ -1635,16 +1635,17 @@ __wt_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
  *	Save the base configuration used to create a database.
  */
 static int
-__conn_write_base_config(
-    WT_SESSION_IMPL *session, const char *cfg[], const char *base_config)
+__conn_write_base_config(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	FILE *fp;
 	WT_CONFIG parser;
 	WT_CONFIG_ITEM cval, k, v;
 	WT_DECL_RET;
 	int exist;
+	const char *base_config;
 
 	fp = NULL;
+	base_config = NULL;
 
 	/*
 	 * Discard any base configuration setup file left-over from previous
@@ -1653,7 +1654,12 @@ __conn_write_base_config(
 	 */
 	WT_RET(__wt_remove_if_exists(session, WT_BASECONFIG_SET));
 
-	/* The base configuration file is optional, check the configuration. */
+	/*
+	 * The base configuration file is only written if creating the database,
+	 * and even then, a base configuration file is optional.
+	 */
+	if (!S2C(session)->is_new)
+		return (0);
 	WT_RET(__wt_config_gets(session, cfg, "config_base", &cval));
 	if (!cval.val)
 		return (0);
@@ -1693,10 +1699,18 @@ __conn_write_base_config(
 	 * file in that protection.
 	 *
 	 * We were passed the configuration items specified by the application.
-	 * That list includes configuring the default setting, presumably if
+	 * That list includes configuring the default settings, presumably if
 	 * the application configured it explicitly, that setting should survive
 	 * even if the default changes.
+	 *
+	 * When writing the base configuration file, we write the version and
+	 * any configuration information set by the application (in other words,
+	 * the stack except for cfg[0]). However, some configuration values need
+	 * to be stripped out from the base configuration file; do that now, and
+	 * merge the rest to be written.
 	 */
+	WT_ERR(__wt_config_merge(session,
+	    cfg + 1, "create=,encryption=(secretkey=)", &base_config));
 	WT_ERR(__wt_config_init(session, &parser, base_config));
 	while ((ret = __wt_config_next(&parser, &k, &v)) == 0) {
 		/* Fix quoting for non-trivial settings. */
@@ -1710,12 +1724,17 @@ __conn_write_base_config(
 	WT_ERR_NOTFOUND_OK(ret);
 
 	/* Flush the handle and rename the file into place. */
-	return (__wt_sync_and_rename_fp(
-	    session, &fp, WT_BASECONFIG_SET, WT_BASECONFIG));
+	ret = __wt_sync_and_rename_fp(
+	    session, &fp, WT_BASECONFIG_SET, WT_BASECONFIG);
 
-	/* Close any file handle left open, remove any temporary file. */
-err:	WT_TRET(__wt_fclose(&fp, WT_FHANDLE_WRITE));
-	WT_TRET(__wt_remove_if_exists(session, WT_BASECONFIG_SET));
+	if (0) {
+		/* Close open file handle, remove any temporary file. */
+err:		if (fp != NULL)
+			WT_TRET(__wt_fclose(&fp, WT_FHANDLE_WRITE));
+		WT_TRET(__wt_remove_if_exists(session, WT_BASECONFIG_SET));
+	}
+
+	__wt_free(session, base_config);
 
 	return (ret);
 }
@@ -1762,7 +1781,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_DECL_RET;
 	const WT_NAME_FLAG *ft;
 	WT_SESSION_IMPL *session;
-	const char *base_merge, *enc_cfg[] = { NULL, NULL };
+	const char *enc_cfg[] = { NULL, NULL };
 	char version[64];
 
 	/* Leave lots of space for optional additional configuration. */
@@ -1773,7 +1792,6 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 
 	conn = NULL;
 	session = NULL;
-	base_merge = NULL;
 
 	WT_RET(__wt_library_init());
 
@@ -1975,18 +1993,9 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	    (WT_CONFIG_ARG *)enc_cfg, &conn->kencryptor));
 
 	/*
-	 * Configuration completed; optionally write the base configuration file
-	 * if it doesn't already exist.
-	 *
-	 * When writing the base configuration file, we write the version and
-	 * any configuration information set by the application (in other words,
-	 * the stack except for cfg[0]). However, some configuration values need
-	 * to be stripped out from the base configuration file; do that now, and
-	 * merge the rest to be written.
+	 * Configuration completed; optionally write a base configuration file.
 	 */
-	WT_ERR(__wt_config_merge(session,
-	    cfg + 1, "create=,encryption=(secretkey=)", &base_merge));
-	WT_ERR(__conn_write_base_config(session, cfg, base_merge));
+	WT_ERR(__conn_write_base_config(session, cfg));
 
 	/*
 	 * Check on the turtle and metadata files, creating them if necessary
@@ -2010,8 +2019,6 @@ err:	/* Discard the scratch buffers. */
 	__wt_scr_free(session, &i1);
 	__wt_scr_free(session, &i2);
 	__wt_scr_free(session, &i3);
-
-	__wt_free(session, base_merge);
 
 	/*
 	 * We may have allocated scratch memory when using the dummy session or
