@@ -109,10 +109,19 @@ __wt_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize,
 find_slot:
 	allocated_slot = WT_SLOT_ACTIVE == 1 ? 0 :
 	    __wt_random(session->rnd) % WT_SLOT_ACTIVE;
+	/*
+	 * Get the selected slot.  Use a barrier to prevent the compiler from
+	 * caching this read.
+	 */
 	WT_BARRIER();
 	slot = log->slot_array[allocated_slot];
-	old_state = slot->slot_state;
 join_slot:
+	/*
+	 * Read the current slot state.  Use a barrier to prevent the compiler
+	 * from caching this read.
+	 */
+	WT_BARRIER();
+	old_state = slot->slot_state;
 	/*
 	 * WT_LOG_SLOT_READY and higher means the slot is available for
 	 * joining.  Any other state means it is in use and transitioning
