@@ -175,10 +175,10 @@ __wt_turtle_init(WT_SESSION_IMPL *session)
 	 * creation doesn't fully complete, we won't have a turtle file and we
 	 * will repeat the process until we succeed.
 	 *
-	 * Incremental backups can occur only run recovery is run and it becomes
-	 * live.  So if there is a turtle file and an incremental backup file
-	 * that is an error.  Otherwise, if there's already a turtle file,
-	 * we're done.
+	 * Incremental backups can occur only if recovery is run and it becomes
+	 * live. So, if there is a turtle file and an incremental backup file,
+	 * that is an error.  Otherwise, if there's already a turtle file, we're
+	 * done.
 	 */
 	WT_RET(__wt_exist(session, WT_INCREMENTAL_BACKUP, &exist_incr));
 	WT_RET(__wt_exist(session, WT_METADATA_TURTLE, &exist));
