@@ -14,7 +14,11 @@ import (
 	"time"
 )
 
-const oplogMaxCommandSize = 1024 * 1024 * 16.5
+// oplogMaxCommandSize sets the maximum size for multiple buffered ops in the
+// applyOps command. This is to prevent pathological cases where the array overhead
+// of many small operations can overflow the maximum command size.
+// Note that ops > 8MB will still be buffered, just as single elements.
+const oplogMaxCommandSize = 1024 * 1024 * 8
 
 // RestoreOplog attempts to restore a MongoDB oplog.
 func (restore *MongoRestore) RestoreOplog() error {
