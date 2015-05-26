@@ -342,5 +342,7 @@ namespace repl {
 
     long long ReplicationCoordinatorMock::getTerm() { return OpTime::kDefaultTerm; }
 
+    bool ReplicationCoordinatorMock::updateTerm(long long term) { return false; }
+
 } // namespace repl
 } // namespace mongo

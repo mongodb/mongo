@@ -161,6 +161,8 @@ namespace {
             hbStatusResponse = StatusWith<ReplSetHeartbeatResponse>(responseStatus);
         }
 
+        _updateTerm_incallback(hbStatusResponse.getValue().getTerm(), nullptr);
+
         HeartbeatResponseAction action =
             _topCoord->processHeartbeatResponse(
                     now,

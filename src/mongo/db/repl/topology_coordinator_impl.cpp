@@ -2169,6 +2169,14 @@ namespace {
         return _maintenanceModeCalls;
     }
 
+    bool TopologyCoordinatorImpl::updateTerm(long long term) {
+        if (term <= _term) {
+            return false;
+        }
+        _term = term;
+        return true;
+    }
+
     long long TopologyCoordinatorImpl::getTerm() const {
         return _term;
     }
@@ -2245,10 +2253,6 @@ namespace {
             const ReplSetRequestVotesArgs& args,
             ReplSetRequestVotesResponse* response,
             const OpTime& lastAppliedOpTime) {
-        if (args.getTerm() > _term) {
-            _term = args.getTerm();
-        }
-
         response->setOk(true);
         response->setTerm(_term);
 
@@ -2290,14 +2294,9 @@ namespace {
         else if (args.getTerm() < _term) {
             return {ErrorCodes::BadValue, "term has already passed"};
         }
-        else if (args.getTerm() == _term &&
+        else if (args.getTerm() == _term && _currentPrimaryIndex > -1 && 
                  args.getWinnerId() != _rsConfig.getMemberAt(_currentPrimaryIndex).getId()) {
             return {ErrorCodes::BadValue, "term already has a primary"};
-        }
-
-        if (args.getTerm() > _term) {
-            _term = args.getTerm();
-            *responseTerm = _term;
         }
 
         _currentPrimaryIndex = _rsConfig.findMemberIndexByConfigId(args.getWinnerId());

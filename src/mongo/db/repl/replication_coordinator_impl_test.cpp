@@ -918,6 +918,45 @@ namespace {
         }
     };
 
+    TEST_F(ReplCoordTest, UpdateTerm) {
+        ReplCoordTest::setUp();
+        init("mySet/test1:1234,test2:1234,test3:1234");
+
+        assertStartSuccess(
+                BSON("_id" << "mySet" <<
+                     "version" << 1 <<
+                     "members" << BSON_ARRAY(BSON("_id" << 0 << "host" << "test1:1234") <<
+                                             BSON("_id" << 1 << "host" << "test2:1234") <<
+                                             BSON("_id" << 2 << "host" << "test3:1234")) <<
+                     "protocolVersion" << 1),
+                HostAndPort("test1", 1234));
+        getReplCoord()->setMyLastOptime(OpTime(Timestamp (100, 1), 0));
+        ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+        ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
+
+        simulateSuccessfulV1Election();
+
+        ASSERT_EQUALS(1, getReplCoord()->getTerm());
+        ASSERT_TRUE(getReplCoord()->getMemberState().primary());
+
+        // lower term, no change
+        getReplCoord()->updateTerm(0);
+        ASSERT_EQUALS(1, getReplCoord()->getTerm());
+        ASSERT_TRUE(getReplCoord()->getMemberState().primary());
+
+        // same term, no change
+        getReplCoord()->updateTerm(1);
+        ASSERT_EQUALS(1, getReplCoord()->getTerm());
+        ASSERT_TRUE(getReplCoord()->getMemberState().primary());
+
+        // higher term, step down and change term
+        Handle cbHandle;
+        getReplCoord()->updateTerm_forTest(2);
+        ASSERT_EQUALS(2, getReplCoord()->getTerm());
+        ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
+
+    }
+
     TEST_F(StepDownTest, StepDownNotPrimary) {
         OperationContextReplMock txn;
         OpTimeWithTermZero optime1(100, 1);

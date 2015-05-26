@@ -4648,6 +4648,7 @@ namespace {
                                 << "term" << 2
                                 << "winnerId" << 30));
         long long responseTerm;
+        ASSERT(getTopoCoord().updateTerm(winnerArgs.getTerm()));
         ASSERT_OK(getTopoCoord().processReplSetDeclareElectionWinner(winnerArgs, &responseTerm));
         ASSERT_EQUALS(2, responseTerm);
 
@@ -4701,6 +4702,7 @@ namespace {
                                 << "term" << 2
                                 << "winnerId" << 30));
         long long responseTerm = -1;
+        ASSERT(getTopoCoord().updateTerm(winnerArgs.getTerm()));
         ASSERT_OK(getTopoCoord().processReplSetDeclareElectionWinner(winnerArgs, &responseTerm));
         ASSERT_EQUALS(2, responseTerm);
 

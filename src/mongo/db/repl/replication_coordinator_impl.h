@@ -267,7 +267,9 @@ namespace repl {
         /**
          * Get current term from topology coordinator
          */
-        long long getTerm() override;
+        virtual long long getTerm() override;
+
+        virtual bool updateTerm(long long term) override;
 
         // ================== Test support API ===================
 
@@ -286,6 +288,8 @@ namespace repl {
          * Simple wrapper around _setLastOptime_inlock to make it easier to test.
          */
         Status setLastOptime_forTest(long long cfgVer, long long memberId, const OpTime& opTime);
+
+        bool updateTerm_forTest(long long term);
 
     private:
         ReplicationCoordinatorImpl(const ReplSettings& settings,
@@ -862,6 +866,16 @@ namespace repl {
          */
         void _getTerm_helper(const ReplicationExecutor::CallbackData& cbData, long long* term);
 
+
+        /**
+         * Callback that attempts to set the current term in topology coordinator and
+         * relinquishes primary if the term actually changes and we are primary.
+         */
+        void _updateTerm_helper(const ReplicationExecutor::CallbackData& cbData,
+                                long long term,
+                                bool* updated,
+                                Handle* cbHandle);
+        bool _updateTerm_incallback(long long term, Handle* cbHandle);
 
         //
         // All member variables are labeled with one of the following codes indicating the

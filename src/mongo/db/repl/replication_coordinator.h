@@ -621,9 +621,17 @@ namespace repl {
         virtual void summarizeAsHtml(ReplSetHtmlSummary* output) = 0;
 
         /**
-         * Return the current term.
+         * Returns the current term.
          */
         virtual long long getTerm() = 0;
+
+        /**
+         * Attempts to update the current term for the V1 election protocol. If the term changes and
+         * this node is primary, relinquishes primary.
+         * Returns true if the term was updated (that is, when "term" was higher than the previously
+         * recorded term) and false otherwise.
+         */
+        virtual bool updateTerm(long long term) = 0;
 
     protected:
 
