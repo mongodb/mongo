@@ -187,17 +187,18 @@ namespace {
                                                         const OpTime& lastOpTimeSender,
                                                         const OpTime& lastOpTimeReceiver,
                                                         Milliseconds roundTripTime) {
+
+            ReplSetHeartbeatResponse hb;
+            hb.setConfigVersion(1);
+            hb.setState(memberState);
+            hb.setOpTime(lastOpTimeSender);
+            hb.setElectionTime(electionTime);
+
             StatusWith<ReplSetHeartbeatResponse> hbResponse =
+                responseStatus.isOK() ?
+                    StatusWith<ReplSetHeartbeatResponse>(hb) :
                     StatusWith<ReplSetHeartbeatResponse>(responseStatus);
 
-            if (responseStatus.isOK()) {
-                ReplSetHeartbeatResponse hb;
-                hb.setConfigVersion(1);
-                hb.setState(memberState);
-                hb.setOpTime(lastOpTimeSender);
-                hb.setElectionTime(electionTime);
-                hbResponse = StatusWith<ReplSetHeartbeatResponse>(hb);
-            }
             getTopoCoord().prepareHeartbeatRequest(now(),
                                                    setName,
                                                    member);
@@ -1250,7 +1251,7 @@ namespace {
                         _upRequestDate,
                         Milliseconds(0),
                         _target,
-                        StatusWith<ReplSetHeartbeatResponse>(Status::OK()),
+                        makeStatusWith<ReplSetHeartbeatResponse>(),
                         OpTime(Timestamp(0, 0), 0));  // We've never applied anything.
             ASSERT_EQUALS(HeartbeatResponseAction::NoAction, upAction.getAction());
             ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());

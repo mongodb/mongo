@@ -104,7 +104,8 @@ namespace mongo {
                 return movedCount;
             }
 
-            const SettingsType& balancerConfig = balSettingsResult.getValue();
+            const SettingsType& balancerConfig = isBalSettingsAbsent ?
+                SettingsType{} : balSettingsResult.getValue();
 
             if ((!isBalSettingsAbsent && !grid.shouldBalance(balancerConfig)) ||
                  MONGO_FAIL_POINT(skipBalanceRound)) {

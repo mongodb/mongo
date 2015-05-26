@@ -107,10 +107,9 @@ namespace {
         auto_ptr<LiteParsedQuery> lpq(lpqRaw);
 
         auto_ptr<MatchExpression> me;
-        StatusWithMatchExpression swme(Status::OK());
 
         // Valid: regular TEXT.
-        swme = parseNormalize("{$text: {$search: 's'}}");
+        auto swme = parseNormalize("{$text: {$search: 's'}}");
         ASSERT_OK(swme.getStatus());
         me.reset(swme.getValue());
         ASSERT_OK(CanonicalQuery::isValid(me.get(), *lpq));
@@ -194,10 +193,9 @@ namespace {
         auto_ptr<LiteParsedQuery> lpq(lpqRaw);
 
         auto_ptr<MatchExpression> me;
-        StatusWithMatchExpression swme(Status::OK());
 
         // Valid: regular GEO_NEAR.
-        swme = parseNormalize("{a: {$near: [0, 0]}}");
+        auto swme = parseNormalize("{a: {$near: [0, 0]}}");
         ASSERT_OK(swme.getStatus());
         me.reset(swme.getValue());
         ASSERT_OK(CanonicalQuery::isValid(me.get(), *lpq));
@@ -291,10 +289,9 @@ namespace {
         auto_ptr<LiteParsedQuery> lpq(lpqRaw);
 
         auto_ptr<MatchExpression> me;
-        StatusWithMatchExpression swme(Status::OK());
 
         // Invalid: TEXT and GEO_NEAR.
-        swme = parseNormalize("{$text: {$search: 's'}, a: {$near: [0, 0]}}");
+        auto swme = parseNormalize("{$text: {$search: 's'}, a: {$near: [0, 0]}}");
         ASSERT_OK(swme.getStatus());
         me.reset(swme.getValue());
         ASSERT_NOT_OK(CanonicalQuery::isValid(me.get(), *lpq));
@@ -332,10 +329,9 @@ namespace {
         auto_ptr<LiteParsedQuery> lpq(lpqRaw);
 
         auto_ptr<MatchExpression> me;
-        StatusWithMatchExpression swme(Status::OK());
 
         // Invalid: TEXT and {$natural: 1} sort order.
-        swme = parseNormalize("{$text: {$search: 's'}}");
+        auto swme = parseNormalize("{$text: {$search: 's'}}");
         ASSERT_OK(swme.getStatus());
         me.reset(swme.getValue());
         ASSERT_NOT_OK(CanonicalQuery::isValid(me.get(), *lpq));
@@ -355,10 +351,9 @@ namespace {
         auto_ptr<LiteParsedQuery> lpq(lpqRaw);
 
         auto_ptr<MatchExpression> me;
-        StatusWithMatchExpression swme(Status::OK());
 
         // Invalid: TEXT and {$natural: -1} sort order.
-        swme = parseNormalize("{$text: {$search: 's'}}");
+        auto swme = parseNormalize("{$text: {$search: 's'}}");
         ASSERT_OK(swme.getStatus());
         me.reset(swme.getValue());
         ASSERT_NOT_OK(CanonicalQuery::isValid(me.get(), *lpq));
@@ -378,10 +373,9 @@ namespace {
         auto_ptr<LiteParsedQuery> lpq(lpqRaw);
 
         auto_ptr<MatchExpression> me;
-        StatusWithMatchExpression swme(Status::OK());
 
         // Invalid: TEXT and {$natural: -1} sort order.
-        swme = parseNormalize("{$text: {$search: 's'}}");
+        auto swme = parseNormalize("{$text: {$search: 's'}}");
         ASSERT_OK(swme.getStatus());
         me.reset(swme.getValue());
         ASSERT_NOT_OK(CanonicalQuery::isValid(me.get(), *lpq));
@@ -402,10 +396,9 @@ namespace {
         auto_ptr<LiteParsedQuery> lpq(lpqRaw);
 
         auto_ptr<MatchExpression> me;
-        StatusWithMatchExpression swme(Status::OK());
 
         // Invalid: GEO_NEAR and {$natural: 1} sort order.
-        swme = parseNormalize("{a: {$near: {$geometry: {type: 'Point', coordinates: [0, 0]}}}}");
+        auto swme = parseNormalize("{a: {$near: {$geometry: {type: 'Point', coordinates: [0, 0]}}}}");
         ASSERT_OK(swme.getStatus());
         me.reset(swme.getValue());
         ASSERT_NOT_OK(CanonicalQuery::isValid(me.get(), *lpq));
@@ -426,10 +419,9 @@ namespace {
         auto_ptr<LiteParsedQuery> lpq(lpqRaw);
 
         auto_ptr<MatchExpression> me;
-        StatusWithMatchExpression swme(Status::OK());
 
         // Invalid: GEO_NEAR and {$natural: 1} hint.
-        swme = parseNormalize("{a: {$near: {$geometry: {type: 'Point', coordinates: [0, 0]}}}}");
+        auto swme = parseNormalize("{a: {$near: {$geometry: {type: 'Point', coordinates: [0, 0]}}}}");
         ASSERT_OK(swme.getStatus());
         me.reset(swme.getValue());
         ASSERT_NOT_OK(CanonicalQuery::isValid(me.get(), *lpq));
@@ -449,10 +441,9 @@ namespace {
         auto_ptr<LiteParsedQuery> lpq(lpqRaw);
 
         auto_ptr<MatchExpression> me;
-        StatusWithMatchExpression swme(Status::OK());
 
         // Invalid: TEXT and snapshot.
-        swme = parseNormalize("{$text: {$search: 's'}}");
+        auto swme = parseNormalize("{$text: {$search: 's'}}");
         ASSERT_OK(swme.getStatus());
         me.reset(swme.getValue());
         ASSERT_NOT_OK(CanonicalQuery::isValid(me.get(), *lpq));

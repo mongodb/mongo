@@ -715,12 +715,10 @@ namespace {
             // already checked that it's not the roles or version collection.
             invariant(ns == AuthorizationManager::usersCollectionNamespace.ns());
 
-            StatusWith<UserName> userName(Status::OK());
-            if (*op == 'u') {
-                userName = extractUserNameFromIdString((*o2)["_id"].str());
-            } else {
-                userName = extractUserNameFromIdString(o["_id"].str());
-            }
+            StatusWith<UserName> userName = (*op == 'u') ?
+                extractUserNameFromIdString((*o2)["_id"].str()) :
+                extractUserNameFromIdString(o["_id"].str());
+
             if (!userName.isOK()) {
                 warning() << "Invalidating user cache based on user being updated failed, will "
                         "invalidate the entire cache instead: " << userName.getStatus() << endl;

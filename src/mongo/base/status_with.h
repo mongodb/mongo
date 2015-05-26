@@ -29,11 +29,16 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
 #include <iosfwd>
 #include <type_traits>
 #include <utility>
 
 #include "mongo/base/status.h"
+
+#define MONGO_INCLUDE_INVARIANT_H_WHITELISTED
+#include "mongo/util/invariant.h"
+#undef MONGO_INCLUDE_INVARIANT_H_WHITELISTED
 
 namespace mongo {
 
@@ -45,7 +50,7 @@ namespace mongo {
      * Example:
      * StatusWith<int> fib( int n ) {
      *   if ( n < 0 ) 
-     *       return StatusWith<int>( ErrorCodes::BadValue, "paramter to fib has to be >= 0" );
+     *       return StatusWith<int>( ErrorCodes::BadValue, "parameter to fib has to be >= 0" );
      *   if ( n <= 1 ) return StatusWith<int>( 1 );
      *   StatusWith<int> a = fib( n - 1 );
      *   StatusWith<int> b = fib( n - 2 );
@@ -71,6 +76,7 @@ namespace mongo {
          */
         StatusWith( Status status )
             : _status( std::move( status ) ) {
+            dassert(!isOK());
         }
 
         /**
@@ -103,13 +109,13 @@ namespace mongo {
 #endif
 
         const T& getValue() const {
-            // TODO dassert( isOK() );
-            return _t;
+            dassert(isOK());
+            return *_t;
         }
 
         T& getValue() {
-            // TODO dassert( isOK() );
-            return _t;
+            dassert(isOK());
+            return *_t;
         }
 
         const Status& getStatus() const {
@@ -122,7 +128,7 @@ namespace mongo {
 
     private:
         Status _status;
-        T _t;
+        boost::optional<T> _t;
     };
 
     template<typename T, typename... Args>

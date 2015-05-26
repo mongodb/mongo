@@ -190,14 +190,12 @@ namespace {
                           SettingsType::balancerActiveWindow(BSON("start" << 1)));
         result = SettingsType::fromBSON(w6);
         ASSERT_FALSE(result.isOK());
-        ASSERT(result.getValue().inBalancingWindow(now));
 
         // missing start
         BSONObj w7 = BSON(SettingsType::key(SettingsType::BalancerDocKey) <<
                           SettingsType::balancerActiveWindow(BSON("stop" << 1)));
         result = SettingsType::fromBSON(w7);
         ASSERT_FALSE(result.isOK());
-        ASSERT(result.getValue().inBalancingWindow(now));
 
         // active window marker missing
         BSONObj w8 = BSON(SettingsType::key(SettingsType::BalancerDocKey) <<
@@ -210,8 +208,6 @@ namespace {
         BSONObj w9 = BSON(SettingsType::balancerActiveWindow(BSON("start" << T3 << "stop" << E)));
         result = SettingsType::fromBSON(w9);
         ASSERT_FALSE(result.isOK());
-        ASSERT(result.getValue().inBalancingWindow(now));
-
     }
 
 } // unnamed namespace
