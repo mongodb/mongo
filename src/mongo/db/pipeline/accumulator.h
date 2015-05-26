@@ -190,12 +190,12 @@ namespace mongo {
     };
 
 
-    class AccumulatorStdDev : public Accumulator {
+    class AccumulatorStdDev final : public Accumulator {
     public:
-        virtual void processInternal(const Value& input, bool merging);
-        virtual Value getValue(bool toBeMerged) const;
-        virtual const char* getOpName() const;
-        virtual void reset();
+        void processInternal(const Value& input, bool merging) final;
+        Value getValue(bool toBeMerged) const final;
+        const char* getOpName() const final;
+        void reset() final;
 
         static boost::intrusive_ptr<Accumulator> createSamp();
         static boost::intrusive_ptr<Accumulator> createPop();
