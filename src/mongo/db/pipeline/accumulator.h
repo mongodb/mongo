@@ -73,12 +73,12 @@ namespace mongo {
     };
 
 
-    class AccumulatorAddToSet : public Accumulator {
+    class AccumulatorAddToSet final : public Accumulator {
     public:
-        virtual void processInternal(const Value& input, bool merging);
-        virtual Value getValue(bool toBeMerged) const;
-        virtual const char* getOpName() const;
-        virtual void reset();
+        void processInternal(const Value& input, bool merging) final;
+        Value getValue(bool toBeMerged) const final;
+        const char* getOpName() const final;
+        void reset() final;
 
         static boost::intrusive_ptr<Accumulator> create();
 
@@ -89,12 +89,12 @@ namespace mongo {
     };
 
 
-    class AccumulatorFirst : public Accumulator {
+    class AccumulatorFirst final : public Accumulator {
     public:
-        virtual void processInternal(const Value& input, bool merging);
-        virtual Value getValue(bool toBeMerged) const;
-        virtual const char* getOpName() const;
-        virtual void reset();
+        void processInternal(const Value& input, bool merging) final;
+        Value getValue(bool toBeMerged) const final;
+        const char* getOpName() const final;
+        void reset() final;
 
         static boost::intrusive_ptr<Accumulator> create();
 
@@ -106,12 +106,12 @@ namespace mongo {
     };
 
 
-    class AccumulatorLast : public Accumulator {
+    class AccumulatorLast final : public Accumulator {
     public:
-        virtual void processInternal(const Value& input, bool merging);
-        virtual Value getValue(bool toBeMerged) const;
-        virtual const char* getOpName() const;
-        virtual void reset();
+        void processInternal(const Value& input, bool merging) final;
+        Value getValue(bool toBeMerged) const final;
+        const char* getOpName() const final;
+        void reset() final;
 
         static boost::intrusive_ptr<Accumulator> create();
 
@@ -121,12 +121,12 @@ namespace mongo {
     };
 
 
-    class AccumulatorSum : public Accumulator {
+    class AccumulatorSum final : public Accumulator {
     public:
-        virtual void processInternal(const Value& input, bool merging);
-        virtual Value getValue(bool toBeMerged) const;
-        virtual const char* getOpName() const;
-        virtual void reset();
+        void processInternal(const Value& input, bool merging) final;
+        Value getValue(bool toBeMerged) const final;
+        const char* getOpName() const final;
+        void reset() final;
 
         static boost::intrusive_ptr<Accumulator> create();
 
@@ -139,12 +139,12 @@ namespace mongo {
     };
 
 
-    class AccumulatorMinMax : public Accumulator {
+    class AccumulatorMinMax final : public Accumulator {
     public:
-        virtual void processInternal(const Value& input, bool merging);
-        virtual Value getValue(bool toBeMerged) const;
-        virtual const char* getOpName() const;
-        virtual void reset();
+        void processInternal(const Value& input, bool merging) final;
+        Value getValue(bool toBeMerged) const final;
+        const char* getOpName() const final;
+        void reset() final;
 
         static boost::intrusive_ptr<Accumulator> createMin();
         static boost::intrusive_ptr<Accumulator> createMax();
@@ -157,12 +157,12 @@ namespace mongo {
     };
 
 
-    class AccumulatorPush : public Accumulator {
+    class AccumulatorPush final : public Accumulator {
     public:
-        virtual void processInternal(const Value& input, bool merging);
-        virtual Value getValue(bool toBeMerged) const;
-        virtual const char* getOpName() const;
-        virtual void reset();
+        void processInternal(const Value& input, bool merging) final;
+        Value getValue(bool toBeMerged) const final;
+        const char* getOpName() const final;
+        void reset() final;
 
         static boost::intrusive_ptr<Accumulator> create();
 
@@ -173,12 +173,12 @@ namespace mongo {
     };
 
 
-    class AccumulatorAvg : public Accumulator {
+    class AccumulatorAvg final : public Accumulator {
     public:
-        virtual void processInternal(const Value& input, bool merging);
-        virtual Value getValue(bool toBeMerged) const;
-        virtual const char* getOpName() const;
-        virtual void reset();
+        void processInternal(const Value& input, bool merging) final;
+        Value getValue(bool toBeMerged) const final;
+        const char* getOpName() const final;
+        void reset() final;
 
         static boost::intrusive_ptr<Accumulator> create();
 
