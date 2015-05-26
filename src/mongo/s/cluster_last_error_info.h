@@ -30,7 +30,6 @@
 #include <set>
 
 #include "mongo/db/client_basic.h"
-#include "mongo/s/chunk.h"
 #include "mongo/s/write_ops/batch_write_exec.h"
 
 namespace mongo {
@@ -77,11 +76,6 @@ namespace mongo {
 
         void disableForCommand();
 
-        /** @return if its ok to auto split from this client */
-        bool autoSplitOk() const { return _autoSplitOk && Chunk::ShouldAutoSplit; }
-
-        void noAutoSplit() { _autoSplitOk = false; }
-
     private:
         struct RequestInfo {
 
@@ -98,9 +92,6 @@ namespace mongo {
         RequestInfo _infos[2];
         RequestInfo* _cur = &_infos[0];
         RequestInfo* _prev = &_infos[1];
-
-        bool _autoSplitOk = true;
-
     };
 
     /**

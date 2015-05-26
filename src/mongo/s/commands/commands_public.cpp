@@ -917,7 +917,7 @@ namespace mongo {
 
                 if (ok) {
                     // check whether split is necessary (using update object for size heuristic)
-                    if (haveClient() && ClusterLastErrorInfo::get(cc()).autoSplitOk()) {
+                    if (Chunk::ShouldAutoSplit) {
                         chunk->splitIfShould(cmdObj.getObjectField("update").objsize());
                     }
                 }
