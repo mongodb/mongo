@@ -867,22 +867,6 @@ tasks:
       resmoke_args: --suites=concurrency --storageEngine=wiredTiger
 
 - <<: *task_template
-  name: concurrency_compatibility
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=concurrency --shellWriteMode=compatibility --storageEngine=mmapv1
-
-- <<: *task_template
-  name: concurrency_compatibility_WT
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=concurrency --shellWriteMode=compatibility --storageEngine=wiredTiger
-
-- <<: *task_template
   name: rlp
   commands:
   - func: "do setup"
@@ -1605,8 +1589,6 @@ buildvariants:
   - name: parallel_compatibility_WT
   - name: concurrency
   - name: concurrency_WT
-  - name: concurrency_compatibility
-  - name: concurrency_compatibility_WT
   - name: replicasets
   - name: replicasets_WT
   - name: replicasets_auth
@@ -1683,8 +1665,6 @@ buildvariants:
   - name: parallel_compatibility_WT
   - name: concurrency
   - name: concurrency_WT
-  - name: concurrency_compatibility
-  - name: concurrency_compatibility_WT
   - name: replicasets
   - name: replicasets_WT
   - name: replicasets_auth
@@ -1746,7 +1726,6 @@ buildvariants:
   - name: parallel
   - name: parallel_compatibility
   - name: concurrency
-  - name: concurrency_compatibility
   - name: replicasets
   - name: replicasets_auth
   - name: replication
@@ -1793,7 +1772,6 @@ buildvariants:
   - name: parallel_WT
   - name: parallel_compatibility_WT
   - name: concurrency_WT
-  - name: concurrency_compatibility_WT
   - name: replicasets_WT
   - name: replication_WT
   - name: sharding_WT
@@ -1869,8 +1847,6 @@ buildvariants:
   - name: parallel_compatibility_WT
   - name: concurrency
   - name: concurrency_WT
-  - name: concurrency_compatibility
-  - name: concurrency_compatibility_WT
   - name: replicasets
   - name: replicasets_WT
   - name: replicasets_auth
@@ -1961,8 +1937,6 @@ buildvariants:
   - name: parallel_compatibility_WT
   - name: concurrency
   - name: concurrency_WT
-  - name: concurrency_compatibility
-  - name: concurrency_compatibility_WT
   - name: replicasets
   - name: replicasets_WT
   - name: replicasets_auth
@@ -2107,8 +2081,6 @@ buildvariants:
   - name: parallel_compatibility_WT
   - name: concurrency
   - name: concurrency_WT
-  - name: concurrency_compatibility
-  - name: concurrency_compatibility_WT
   - name: replicasets
   - name: replicasets_WT
   - name: replicasets_auth
@@ -2275,8 +2247,6 @@ buildvariants:
   - name: parallel_compatibility_WT
   - name: concurrency
   - name: concurrency_WT
-  - name: concurrency_compatibility
-  - name: concurrency_compatibility_WT
   - name: replicasets
   - name: replicasets_WT
   - name: replication
@@ -2349,8 +2319,6 @@ buildvariants:
   - name: parallel_compatibility_WT
   - name: concurrency
   - name: concurrency_WT
-  - name: concurrency_compatibility
-  - name: concurrency_compatibility_WT
   - name: replicasets
   - name: replicasets_WT
   - name: replication
@@ -2422,8 +2390,6 @@ buildvariants:
   - name: parallel_compatibility_WT
   - name: concurrency
   - name: concurrency_WT
-  - name: concurrency_compatibility
-  - name: concurrency_compatibility_WT
   - name: replicasets
   - name: replicasets_WT
   - name: replication
@@ -2532,8 +2498,6 @@ buildvariants:
   - name: parallel_compatibility_WT
   - name: concurrency
   - name: concurrency_WT
-  - name: concurrency_compatibility
-  - name: concurrency_compatibility_WT
   - name: replicasets
   - name: replicasets_WT
   - name: replication
@@ -2658,8 +2622,6 @@ buildvariants:
   - name: parallel_compatibility_WT
   - name: concurrency
   - name: concurrency_WT
-  - name: concurrency_compatibility
-  - name: concurrency_compatibility_WT
   - name: replicasets
   - name: replicasets_WT
   - name: replication
@@ -2737,8 +2699,6 @@ buildvariants:
   - name: parallel_compatibility_WT
   - name: concurrency
   - name: concurrency_WT
-  - name: concurrency_compatibility
-  - name: concurrency_compatibility_WT
   - name: replicasets
   - name: replicasets_WT
   - name: replication
@@ -2987,8 +2947,6 @@ buildvariants:
   - name: parallel_compatibility_WT
   - name: concurrency
   - name: concurrency_WT
-  - name: concurrency_compatibility
-  - name: concurrency_compatibility_WT
   - name: replicasets
   - name: replicasets_WT
   - name: replicasets_auth
@@ -3080,8 +3038,6 @@ buildvariants:
   - name: parallel_compatibility_WT
   - name: concurrency
   - name: concurrency_WT
-  - name: concurrency_compatibility
-  - name: concurrency_compatibility_WT
   - name: replicasets
   - name: replicasets_WT
   - name: replicasets_auth
@@ -3173,8 +3129,6 @@ buildvariants:
   - name: parallel_compatibility_WT
   - name: concurrency
   - name: concurrency_WT
-  - name: concurrency_compatibility
-  - name: concurrency_compatibility_WT
   - name: replicasets
   - name: replicasets_WT
   - name: replicasets_auth
@@ -3392,8 +3346,6 @@ buildvariants:
   - name: parallel_compatibility_WT
   - name: concurrency
   - name: concurrency_WT
-  - name: concurrency_compatibility
-  - name: concurrency_compatibility_WT
   - name: replicasets
   - name: replicasets_WT
   - name: replicasets_auth
@@ -3455,7 +3407,6 @@ buildvariants:
   - name: parallel
   - name: parallel_compatibility
   - name: concurrency
-  - name: concurrency_compatibility
   - name: replicasets
   - name: replication
   - name: sharding
@@ -3577,8 +3528,6 @@ buildvariants:
   - name: parallel_compatibility_WT
   - name: concurrency
   - name: concurrency_WT
-  - name: concurrency_compatibility
-  - name: concurrency_compatibility_WT
   - name: replicasets
   - name: replicasets_WT
   - name: replicasets_auth
@@ -3648,7 +3597,6 @@ buildvariants:
   - name: parallel
   - name: parallel_compatibility
   - name: concurrency
-  - name: concurrency_compatibility
   - name: replicasets
   - name: replicasets_auth
   - name: replication
@@ -3725,8 +3673,6 @@ buildvariants:
   - name: parallel_compatibility_WT
   - name: concurrency
   - name: concurrency_WT
-  - name: concurrency_compatibility
-  - name: concurrency_compatibility_WT
   - name: replicasets
   - name: replicasets_WT
   - name: replicasets_auth
@@ -3813,8 +3759,6 @@ buildvariants:
   - name: parallel_compatibility_WT
   - name: concurrency
   - name: concurrency_WT
-  - name: concurrency_compatibility
-  - name: concurrency_compatibility_WT
   - name: replicasets
   - name: replicasets_WT
   - name: replicasets_auth
