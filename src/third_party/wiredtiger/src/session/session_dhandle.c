@@ -402,10 +402,25 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 	 * We need the schema lock for this call so that if we lock a handle in
 	 * order to open it, that doesn't race with a schema-changing operation
 	 * such as drop.
+	 *
+	 * Recheck whether the handle is dead after grabbing the locks.  If so,
+	 * discard the handle and retry.
 	 */
+retry:	is_dead = 0;
 	WT_WITH_SCHEMA_LOCK(session,
 	    WT_WITH_DHANDLE_LOCK(session, ret =
-		__wt_conn_btree_get(session, uri, checkpoint, cfg, flags)));
+		(is_dead = (dhandle != NULL &&
+		    F_ISSET(dhandle, WT_DHANDLE_DEAD))) ?
+		0 : __wt_conn_btree_get(session, uri, checkpoint, cfg, flags)));
+
+	if (is_dead) {
+		if (dhandle_cache != NULL)
+			__session_discard_btree(session, dhandle_cache);
+		dhandle_cache = NULL;
+		session->dhandle = dhandle = NULL;
+		LF_CLR(WT_DHANDLE_HAVE_REF);
+		goto retry;
+	}
 	WT_RET(ret);
 
 	if (!LF_ISSET(WT_DHANDLE_HAVE_REF))

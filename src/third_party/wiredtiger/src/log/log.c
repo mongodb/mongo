@@ -500,20 +500,50 @@ static int
 __log_openfile(WT_SESSION_IMPL *session,
     int ok_create, WT_FH **fh, const char *file_prefix, uint32_t id)
 {
-	WT_DECL_ITEM(path);
+	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
+	WT_LOG *log;
+	WT_LOG_DESC *desc;
+	WT_LOG_RECORD *logrec;
+	uint32_t allocsize;
 
-	WT_RET(__wt_scr_alloc(session, 0, &path));
-	WT_ERR(__log_filename(session, id, file_prefix, path));
+	log = S2C(session)->log;
+	if (log == NULL)
+		allocsize = LOG_ALIGN;
+	else
+		allocsize = log->allocsize;
+	WT_RET(__wt_scr_alloc(session, 0, &buf));
+	WT_ERR(__log_filename(session, id, file_prefix, buf));
 	WT_ERR(__wt_verbose(session, WT_VERB_LOG,
-	    "opening log %s", (const char *)path->data));
+	    "opening log %s", (const char *)buf->data));
 	WT_ERR(__wt_open(
-	    session, path->data, ok_create, 0, WT_FILE_TYPE_LOG, fh));
+	    session, buf->data, ok_create, 0, WT_FILE_TYPE_LOG, fh));
 	/*
 	 * XXX - if we are not creating the file, we should verify the
 	 * log file header record for the magic number and versions here.
 	 */
-err:	__wt_scr_free(session, &path);
+	if (!ok_create) {
+		__wt_scr_free(session, &buf);
+		WT_ERR(__wt_scr_alloc(session, allocsize, &buf));
+		memset(buf->mem, 0, allocsize);
+		WT_ERR(__wt_read(session, *fh, 0, allocsize, buf->mem));
+		logrec = (WT_LOG_RECORD *)buf->mem;
+		desc = (WT_LOG_DESC *)logrec->record;
+		if (desc->log_magic != WT_LOG_MAGIC)
+			WT_PANIC_RET(session, WT_ERROR,
+			   "log file %s corrupted: Bad magic number %" PRIu32,
+			   (*fh)->name, desc->log_magic);
+		if (desc->majorv > WT_LOG_MAJOR_VERSION ||
+		    (desc->majorv == WT_LOG_MAJOR_VERSION &&
+		    desc->minorv > WT_LOG_MINOR_VERSION))
+			WT_ERR_MSG(session, WT_ERROR,
+			    "unsupported WiredTiger file version: this build "
+			    " only supports major/minor versions up to %d/%d, "
+			    " and the file is version %d/%d",
+			    WT_LOG_MAJOR_VERSION, WT_LOG_MINOR_VERSION,
+			    desc->majorv, desc->minorv);
+	}
+err:	__wt_scr_free(session, &buf);
 	return (ret);
 }
 
@@ -1501,8 +1531,6 @@ err:	WT_STAT_FAST_CONN_INCR(session, log_scans);
 	 */
 	if (LF_ISSET(WT_LOGSCAN_ONE) && eol && ret == 0)
 		ret = WT_NOTFOUND;
-	if (ret == ENOENT)
-		ret = 0;
 	WT_TRET(__wt_close(session, &log_fh));
 	return (ret);
 }

@@ -1050,10 +1050,10 @@ __wt_page_release_evict(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * between.
 	 */
 	locked = WT_ATOMIC_CAS4(ref->state, WT_REF_MEM, WT_REF_LOCKED);
-	WT_TRET(__wt_hazard_clear(session, page));
-	if (!locked) {
-		WT_TRET(EBUSY);
-		return (ret);
+	if ((ret = __wt_hazard_clear(session, page)) != 0 || !locked) {
+		if (locked)
+			ref->state = WT_REF_MEM;
+		return (ret == 0 ? EBUSY : ret);
 	}
 
 	(void)WT_ATOMIC_ADD4(btree->evict_busy, 1);
@@ -1068,9 +1068,9 @@ __wt_page_release_evict(WT_SESSION_IMPL *session, WT_REF *ref)
 			 */
 			WT_STAT_FAST_CONN_INCR(
 			    session, cache_eviction_force_delete);
-	} else {
+	} else
 		WT_STAT_FAST_CONN_INCR(session, cache_eviction_force_fail);
-	}
+
 	(void)WT_ATOMIC_SUB4(btree->evict_busy, 1);
 
 	return (ret);
@@ -1092,7 +1092,7 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 	 * Discard our hazard pointer.  Ignore pages we don't have and the root
 	 * page, which sticks in memory, regardless.
 	 */
-	if (ref == NULL || __wt_ref_is_root(ref))
+	if (ref == NULL || ref->page == NULL || __wt_ref_is_root(ref))
 		return (0);
 	page = ref->page;
 

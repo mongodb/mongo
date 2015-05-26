@@ -105,6 +105,7 @@ __curfile_enter(WT_CURSOR_BTREE *cbt)
 static inline int
 __curfile_leave(WT_CURSOR_BTREE *cbt)
 {
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
@@ -125,13 +126,16 @@ __curfile_leave(WT_CURSOR_BTREE *cbt)
 	cbt->page_deleted_count = 0;
 
 	/*
-	 * Release any page references we're holding.  This can trigger
-	 * eviction (e.g., forced eviction of big pages), so it is important to
-	 * do it after releasing our snapshot above.
+	 * Release any page references we're holding. This can trigger eviction
+	 * (e.g., forced eviction of big pages), so it's important to do after
+	 * releasing our snapshot above.
+	 *
+	 * Clear the reference regardless, so we don't try the release twice.
 	 */
-	WT_RET(__wt_page_release(session, cbt->ref, 0));
+	ret = __wt_page_release(session, cbt->ref, 0);
 	cbt->ref = NULL;
-	return (0);
+
+	return (ret);
 }
 
 /*

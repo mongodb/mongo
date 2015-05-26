@@ -648,6 +648,9 @@ __debug_page_metadata(WT_DBG *ds, WT_PAGE *page)
 		case WT_PM_REC_REPLACE:
 			__dmsg(ds, ", replaced");
 			break;
+		case WT_PM_REC_REWRITE:
+			__dmsg(ds, ", rewrite");
+			break;
 		case 0:
 			break;
 		WT_ILLEGAL_VALUE(session);

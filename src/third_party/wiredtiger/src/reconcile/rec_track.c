@@ -711,7 +711,7 @@ __ovfl_txnc_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * visibility check could give different results as the global ID moves
 	 * forward.
 	 */
-	oldest_txn = S2C(session)->txn_global.oldest_id;
+	oldest_txn = __wt_txn_oldest_id(session);
 
 	/*
 	 * Discard any transaction-cache records with transaction IDs earlier

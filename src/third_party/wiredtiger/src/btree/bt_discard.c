@@ -150,6 +150,7 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	switch (F_ISSET(mod, WT_PM_REC_MASK)) {
 	case WT_PM_REC_MULTIBLOCK:
+	case WT_PM_REC_REWRITE:
 		/* Free list of replacement blocks. */
 		for (multi = mod->mod_multi,
 		    i = 0; i < mod->mod_multi_entries; ++multi, ++i) {

@@ -51,6 +51,62 @@ __sweep_mark(WT_SESSION_IMPL *session, int *dead_handlesp)
 }
 
 /*
+ * __sweep_expire_handle --
+ *	Mark a single handle dead.
+ */
+static int
+__sweep_expire_handle(WT_SESSION_IMPL *session)
+{
+	WT_BTREE *btree;
+	WT_DATA_HANDLE *dhandle;
+	WT_DECL_RET;
+	int evict_reset;
+
+	btree = S2BT(session);
+	dhandle = session->dhandle;
+	evict_reset = 0;
+
+	/*
+	 * Acquire an exclusive lock on the handle and mark it dead.
+	 *
+	 * The close would require I/O if an update cannot be written
+	 * (updates in a no-longer-referenced file might not yet be
+	 * globally visible if sessions have disjoint sets of files
+	 * open).  In that case, skip it: we'll retry the close the
+	 * next time, after the transaction state has progressed.
+	 *
+	 * We don't set WT_DHANDLE_EXCLUSIVE deliberately, we want
+	 * opens to block on us and then retry rather than returning an
+	 * EBUSY error to the application.  This is done holding the
+	 * handle list lock so that connection-level handle searches
+	 * never need to retry.
+	 */
+	WT_RET(__wt_try_writelock(session, dhandle->rwlock));
+
+	/* Only sweep clean trees where all updates are visible. */
+	if (btree->modified ||
+	    !__wt_txn_visible_all(session, btree->rec_max_txn))
+		goto err;
+
+	/* Ensure that we aren't racing with the eviction server */
+	WT_ERR(__wt_evict_file_exclusive_on(session, &evict_reset));
+
+	/*
+	 * Mark the handle as dead and close the underlying file
+	 * handle. Closing the handle decrements the open file count,
+	 * meaning the close loop won't overrun the configured minimum.
+	 */
+	ret = __wt_conn_btree_sync_and_close(session, 0, 1);
+
+	if (evict_reset)
+		__wt_evict_file_exclusive_off(session);
+
+err:	WT_TRET(__wt_writeunlock(session, dhandle->rwlock));
+
+	return (ret);
+}
+
+/*
  * __sweep_expire --
  *	Mark trees dead if they are clean and haven't been accessed recently,
  *	until we have reached the configured minimum number of handles.
@@ -58,7 +114,6 @@ __sweep_mark(WT_SESSION_IMPL *session, int *dead_handlesp)
 static int
 __sweep_expire(WT_SESSION_IMPL *session)
 {
-	WT_BTREE *btree;
 	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
@@ -87,47 +142,14 @@ __sweep_expire(WT_SESSION_IMPL *session)
 		    now <= dhandle->timeofdeath + conn->sweep_idle_time)
 			continue;
 
-		/*
-		 * We have a candidate for closing; if it's open, acquire an
-		 * exclusive lock on the handle and mark it dead.
-		 *
-		 * The close would require I/O if an update cannot be written
-		 * (updates in a no-longer-referenced file might not yet be
-		 * globally visible if sessions have disjoint sets of files
-		 * open).  In that case, skip it: we'll retry the close the
-		 * next time, after the transaction state has progressed.
-		 *
-		 * We don't set WT_DHANDLE_EXCLUSIVE deliberately, we want
-		 * opens to block on us and then retry rather than returning an
-		 * EBUSY error to the application.  This is done holding the
-		 * handle list lock so that connection-level handle searches
-		 * never need to retry.
-		 */
-		if ((ret =
-		    __wt_try_writelock(session, dhandle->rwlock)) == EBUSY)
-			continue;
-		WT_RET(ret);
-
-		/* Only sweep clean trees where all updates are visible. */
-		btree = dhandle->handle;
-		if (btree->modified ||
-		    !__wt_txn_visible_all(session, btree->rec_max_txn))
-			goto unlock;
-
-		/*
-		 * Mark the handle as dead and close the underlying file
-		 * handle. Closing the handle decrements the open file count,
-		 * meaning the close loop won't overrun the configured minimum.
-		 */
-		WT_WITH_DHANDLE(session, dhandle, ret =
-		    __wt_conn_btree_sync_and_close(session, 0, 1));
-
-unlock:		WT_TRET(__wt_writeunlock(session, dhandle->rwlock));
+		WT_WITH_DHANDLE(session, dhandle,
+		    ret = __sweep_expire_handle(session));
 		WT_RET_BUSY_OK(ret);
 	}
 
 	return (0);
 }
+
 /*
  * __sweep_flush --
  *	Flush pages from dead trees.

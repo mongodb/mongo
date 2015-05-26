@@ -471,8 +471,8 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 */
 	session->dhandle = NULL;
 
-	/* Commit the transaction before syncing the file(s). */
-	WT_ERR(__wt_txn_commit(session, NULL));
+	/* Release the snapshot so we aren't pinning pages in cache. */
+	__wt_txn_release_snapshot(session);
 
 	/* Clear the global checkpoint transaction IDs */
 	txn_global->checkpoint_id = WT_TXN_NONE;
@@ -492,6 +492,14 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	    "sync completed", &verb_timer));
 
 	/*
+	 * Commit the transaction now that we are sure that all files in the
+	 * checkpoint have been flushed to disk. It's OK to commit before
+	 * checkpointing the metadata since we know that all files in the
+	 * checkpoint are now in a consistent state.
+	 */
+	WT_ERR(__wt_txn_commit(session, NULL));
+
+	/*
 	 * Disable metadata tracking during the metadata checkpoint.
 	 *
 	 * We don't lock old checkpoints in the metadata file: there is no way
@@ -505,11 +513,6 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	    session->meta_dhandle, ret = __wt_checkpoint(session, cfg));
 	session->meta_track_next = saved_meta_next;
 	WT_ERR(ret);
-	if (F_ISSET(conn, WT_CONN_CKPT_SYNC)) {
-		WT_WITH_DHANDLE(session, session->meta_dhandle,
-		    ret = __wt_checkpoint_sync(session, NULL));
-		WT_ERR(ret);
-	}
 
 	WT_ERR(__checkpoint_verbose_track(session,
 	    "metadata sync completed", &verb_timer));
@@ -999,7 +1002,25 @@ fake:	/*
 	if (fake_ckpt && FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED))
 		WT_INIT_LSN(&ckptlsn);
 
-	/* Update the object's metadata. */
+	/*
+	 * Update the object's metadata.
+	 *
+	 * If the object is the metadata, the call to __wt_meta_ckptlist_set
+	 * will update the turtle file and swap the new one into place.  We
+	 * need to make sure the metadata is on disk before the turtle file is
+	 * updated.
+	 *
+	 * If we are doing a checkpoint in a file without a transaction (e.g.,
+	 * closing a dirty tree before an exclusive operation like verify),
+	 * the metadata update will be auto-committed.  In that case, we need to
+	 * sync the file here or we could roll forward the metadata in
+	 * recovery and open a checkpoint that isn't yet durable.
+	 */
+	if (F_ISSET(conn, WT_CONN_CKPT_SYNC) &&
+	    (WT_IS_METADATA(dhandle) ||
+	    !F_ISSET(&session->txn, TXN_RUNNING)))
+		WT_ERR(__wt_checkpoint_sync(session, NULL));
+
 	WT_ERR(__wt_meta_ckptlist_set(
 	    session, dhandle->name, ckptbase, &ckptlsn));
 
