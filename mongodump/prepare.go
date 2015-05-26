@@ -148,6 +148,15 @@ func (dump *MongoDump) outputPath(dbName, colName string) string {
 	return filepath.Join(root, dbName, colName)
 }
 
+func checkStringForPathSeparator(s string, c *rune) bool {
+	for _, *c = range s {
+		if os.IsPathSeparator(uint8(*c)) {
+			return true
+		}
+	}
+	return false
+}
+
 // NewIntent creates a bare intent without populating the options.
 func (dump *MongoDump) NewIntent(dbName, colName string, stdout bool) (*intents.Intent, error) {
 	intent := &intents.Intent{
@@ -165,6 +174,11 @@ func (dump *MongoDump) NewIntent(dbName, colName string, stdout bool) (*intents.
 	if dump.OutputOptions.Archive != "" {
 		intent.BSONFile = &archive.MuxIn{Intent: intent, Mux: dump.archive.Mux}
 	} else {
+		var c rune
+		if checkStringForPathSeparator(colName, &c) || checkStringForPathSeparator(dbName, &c) {
+			return nil, fmt.Errorf(`"%v.%v" contains a path separator '%c' `+
+				`and can't be dumped to the filesystem`, dbName, colName, c)
+		}
 		intent.BSONFile = &realBSONFile{intent: intent}
 	}
 
