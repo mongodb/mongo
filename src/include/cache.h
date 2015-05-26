@@ -100,12 +100,6 @@ struct __wt_cache {
 		*evict_file_next;	/* LRU next file to search */
 
 	/*
-	 * Sync/flush request information.
-	 */
-	volatile uint64_t sync_request;	/* File sync requests */
-	volatile uint64_t sync_complete;/* File sync requests completed */
-
-	/*
 	 * Cache pool information.
 	 */
 	uint64_t cp_saved_read;		/* Read count from last pass */
