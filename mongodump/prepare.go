@@ -12,7 +12,6 @@ import (
 	"gopkg.in/mgo.v2/bson"
 	"io"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 )
@@ -39,9 +38,10 @@ func (f *realBSONFile) Open() (err error) {
 		return fmt.Errorf("error creating BSON file without a path, namespace: %v",
 			f.intent.Namespace())
 	}
-	err = os.MkdirAll(path.Dir(f.intent.BSONPath), os.ModeDir|os.ModePerm)
+	err = os.MkdirAll(filepath.Dir(f.intent.BSONPath), os.ModeDir|os.ModePerm)
 	if err != nil {
-		return fmt.Errorf("error creating BSON file %v: %v", f.intent.BSONPath, err)
+		return fmt.Errorf("error creating directory for BSON file %v: %v",
+			filepath.Dir(f.intent.BSONPath), err)
 	}
 	f.file, err = os.Create(f.intent.BSONPath)
 	if err != nil {
@@ -78,13 +78,15 @@ func (f *realMetadataFile) Open() (err error) {
 	if f.intent.MetadataPath == "" {
 		return fmt.Errorf("No MetadataPath for %v.%v", f.intent.DB, f.intent.C)
 	}
-	err = os.MkdirAll(path.Dir(f.intent.BSONPath), os.ModeDir|os.ModePerm)
+	err = os.MkdirAll(filepath.Dir(f.intent.MetadataPath), os.ModeDir|os.ModePerm)
 	if err != nil {
-		return fmt.Errorf("error creating Metadata file %v: %v", f.intent.BSONPath, err)
+		return fmt.Errorf("error creating directory for Metadata file %v: %v",
+			filepath.Dir(f.intent.MetadataPath), err)
 	}
 	f.File, err = os.Create(f.intent.MetadataPath)
 	if err != nil {
-		return fmt.Errorf("error creating Metadata file %v: %v", f.intent.MetadataPath, err)
+		return fmt.Errorf("error creating Metadata file %v: %v",
+			f.intent.MetadataPath, err)
 	}
 	return nil
 }
