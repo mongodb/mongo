@@ -53,7 +53,6 @@ func (restore *MongoRestore) RestoreOplog() error {
 	if err != nil {
 		return fmt.Errorf("error establishing connection: %v", err)
 	}
-	session.SetSocketTimeout(0)
 	defer session.Close()
 
 	// To restore the oplog, we iterate over the oplog entries,

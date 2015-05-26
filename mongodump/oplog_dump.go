@@ -73,7 +73,6 @@ func (dump *MongoDump) DumpOplogAfterTimestamp(ts bson.MongoTimestamp) error {
 		return err
 	}
 	defer session.Close()
-	session.SetSocketTimeout(0)
 	session.SetPrefetch(1.0) // mimic exhaust cursor
 	queryObj := bson.M{"ts": bson.M{"$gt": ts}}
 	oplogQuery := session.DB("local").C(dump.oplogCollection).Find(queryObj).LogReplay()
