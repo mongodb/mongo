@@ -1211,7 +1211,7 @@ tasks:
     - command: s3.put
       params:
         aws_secret: ${aws_secret}
-        local_file: src/mongodb-src-${src_suffix}.tgz.sha256
+        local_file: src/mongodb-src-${src_suffix}.${ext|tgz}.sha256
         permissions: public-read
         aws_key: ${aws_key}
         bucket: build-push-testing
@@ -1258,7 +1258,7 @@ tasks:
     - command: s3.put
       params:
         aws_secret: ${aws_secret}
-        local_file: src/mongodb-src-${src_suffix}.tgz.md5
+        local_file: src/mongodb-src-${src_suffix}.${ext|tgz}.md5
         aws_key: ${aws_key}
         bucket: build-push-testing
         permissions: public-read
