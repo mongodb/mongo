@@ -665,7 +665,7 @@ namespace {
         }
         catch (const DBException& e) {
             if (shardConnectionString.type() == ConnectionString::SET) {
-                ReplicaSetMonitor::remove(shardConnectionString.getSetName(), false);
+                ReplicaSetMonitor::remove(shardConnectionString.getSetName());
             }
 
             return Status(ErrorCodes::OperationFailed,
@@ -823,7 +823,7 @@ namespace {
 
             Shard::removeShard(name);
             shardConnectionPool.removeHost(name);
-            ReplicaSetMonitor::remove(name, true);
+            ReplicaSetMonitor::remove(name);
 
             Shard::reloadShardInfo();
             conn.done();

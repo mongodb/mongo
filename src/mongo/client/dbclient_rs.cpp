@@ -147,7 +147,8 @@ namespace {
     }
 
     ReplicaSetMonitorPtr DBClientReplicaSet::_getMonitor() const {
-        ReplicaSetMonitorPtr rsm = ReplicaSetMonitor::get( _setName, true );
+        ReplicaSetMonitorPtr rsm = ReplicaSetMonitor::get(_setName);
+
         // If you can't get a ReplicaSetMonitor then this connection isn't valid
         uassert( 16340, str::stream() << "No replica set monitor active and no cached seed "
                  "found for set: " << _setName, rsm );
@@ -156,10 +157,10 @@ namespace {
 
     // This can't throw an exception because it is called in the destructor of ScopedDbConnection
     string DBClientReplicaSet::getServerAddress() const {
-        ReplicaSetMonitorPtr rsm = ReplicaSetMonitor::get( _setName, true );
+        ReplicaSetMonitorPtr rsm = ReplicaSetMonitor::get(_setName);
         if ( !rsm ) {
             warning() << "Trying to get server address for DBClientReplicaSet, but no "
-                "ReplicaSetMonitor exists for " << _setName << endl;
+                         "ReplicaSetMonitor exists for " << _setName;
             return str::stream() << _setName << "/" ;
         }
         return rsm->getServerAddress();

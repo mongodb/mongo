@@ -145,8 +145,7 @@ namespace mongo {
          * it will return none. If createFromSeed is true, it will try to look up the last known
          * servers list for this set and will create a new monitor using that as the seed list.
          */
-        static boost::shared_ptr<ReplicaSetMonitor> get(const std::string& name,
-                                                        bool createFromSeed = false);
+        static boost::shared_ptr<ReplicaSetMonitor> get(const std::string& name);
 
         /**
          * Returns all the currently tracked replica set names.
@@ -158,7 +157,7 @@ namespace mongo {
          * If clearSeedCache is true, then the cached seed std::string for this Replica Set will be
          * removed from _seedServers.
          */
-        static void remove(const std::string& name, bool clearSeedCache = false);
+        static void remove(const std::string& name);
 
         /**
          * Sets the hook to be called whenever the config of any replica set changes.

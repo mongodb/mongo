@@ -196,10 +196,11 @@ namespace mongo {
             uassert(17134, "replMonitorStats requires a single string argument (the ReplSet name)",
                     a.nFields() == 1 && a.firstElement().type() == String);
 
-            ReplicaSetMonitorPtr rsm = ReplicaSetMonitor::get(a.firstElement().valuestrsafe(),true);
+            ReplicaSetMonitorPtr rsm = ReplicaSetMonitor::get(a.firstElement().valuestrsafe());
             if (!rsm) {
                 return BSON("" << "no ReplSetMonitor exists by that name");
             }
+
             BSONObjBuilder result;
             rsm->appendInfo(result);
             return result.obj();

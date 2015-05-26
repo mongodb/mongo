@@ -128,8 +128,7 @@ namespace {
         }
 
         if ( _cs.type() == ConnectionString::SET ) {
-            ReplicaSetMonitorPtr rs = ReplicaSetMonitor::get( _cs.getSetName(), true );
-
+            ReplicaSetMonitorPtr rs = ReplicaSetMonitor::get(_cs.getSetName());
             if (!rs) {
                 // Possibly still yet to be initialized. See SERVER-8194.
                 warning() << "Monitor not found for a known shard: " << _cs.getSetName();

@@ -80,8 +80,7 @@ namespace {
      *
      *      The order chosen below is intended to allow safe destruction in reverse order from
      *      construction order:
-     *          setsLock                 -- mutex protecting _seedServers and _sets, destroyed last
-     *          seedServers              -- list (map) of servers
+     *          setsLock                 -- mutex protecting sets, destroyed last
      *          sets                     -- list (map) of ReplicaSetMonitors
      *          replicaSetMonitorWatcher -- background job to check Replica Set members
      *          staticObserver           -- sentinel to detect process termination
@@ -95,7 +94,6 @@ namespace {
      *          release the SetState::mutex.
      */
     mongo::mutex setsLock;
-    StringMap<set<HostAndPort> > seedServers;
     StringMap<ReplicaSetMonitorPtr> sets;
 
     // global background job responsible for checking every X amount of time
@@ -202,7 +200,7 @@ namespace {
                           << " checks in a row. Stopping polled monitoring of the set.";
 
                     // locks setsLock
-                    ReplicaSetMonitor::remove(m->getName(), false);
+                    ReplicaSetMonitor::remove(m->getName());
                 }
             }
         }
@@ -368,26 +366,13 @@ namespace {
         replicaSetMonitorWatcher.safeGo();
     }
 
-    shared_ptr<ReplicaSetMonitor> ReplicaSetMonitor::get(const std::string& name,
-                                                         const bool createFromSeed) {
-        LOG(3) << "ReplicaSetMonitor::get " << name;
+    shared_ptr<ReplicaSetMonitor> ReplicaSetMonitor::get(const std::string& name) {
+        LOG(2) << "ReplicaSetMonitor::get " << name;
 
         boost::lock_guard<boost::mutex> lk( setsLock );
         StringMap<ReplicaSetMonitorPtr>::const_iterator i = sets.find( name );
         if ( i != sets.end() ) {
             return i->second;
-        }
-
-        if ( createFromSeed ) {
-            StringMap<set<HostAndPort> >::const_iterator j = seedServers.find( name );
-            if ( j != seedServers.end() ) {
-                LOG(4) << "Creating ReplicaSetMonitor from cached address";
-                ReplicaSetMonitorPtr& m = sets[name];
-                invariant( !m );
-                m.reset( new ReplicaSetMonitor( name, j->second ) );
-                replicaSetMonitorWatcher.safeGo();
-                return m;
-            }
         }
 
         return ReplicaSetMonitorPtr();
@@ -404,29 +389,17 @@ namespace {
         return activeSets;
     }
 
-    void ReplicaSetMonitor::remove(const string& name, bool clearSeedCache) {
-        LOG(2) << "Removing ReplicaSetMonitor for " << name << " from replica set table"
-               << (clearSeedCache ? " and the seed cache" : "");
+    void ReplicaSetMonitor::remove(const string& name) {
+        LOG(2) << "Removing ReplicaSetMonitor for " << name << " from replica set table";
 
-        boost::lock_guard<boost::mutex> lk( setsLock );
-        const StringMap<ReplicaSetMonitorPtr>::const_iterator setIt = sets.find(name);
+        boost::lock_guard<boost::mutex> lk(setsLock);
+        StringMap<ReplicaSetMonitorPtr>::const_iterator setIt = sets.find(name);
         if (setIt != sets.end()) {
-            if (!clearSeedCache) {
-                // Save list of current set members so that the monitor can be rebuilt if needed.
-                const ReplicaSetMonitorPtr& rsm = setIt->second;
-                boost::lock_guard<boost::mutex> lk(rsm->_state->mutex);
-                seedServers[name] = rsm->_state->seedNodes;
-            }
             sets.erase(setIt);
-        }
-
-        if ( clearSeedCache ) {
-            seedServers.erase( name );
         }
 
         // Kill all pooled ReplicaSetConnections for this set. They will not function correctly
         // after we kill the ReplicaSetMonitor.
-        // TODO we may only need to do this if clearSeedCache is true.
         pool.removeHost(name);
     }
 
@@ -477,7 +450,6 @@ namespace {
         replicaSetMonitorWatcher.wait();
         boost::lock_guard<boost::mutex> lock(setsLock);
         sets = StringMap<ReplicaSetMonitorPtr>();
-        seedServers = StringMap<set<HostAndPort> >();
     }
 
     Refresher::Refresher(const SetStatePtr& setState)

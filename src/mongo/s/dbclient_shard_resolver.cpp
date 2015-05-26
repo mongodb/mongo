@@ -83,14 +83,14 @@ namespace mongo {
         //
 
         // Don't create the monitor unless we need to - fast path
-        ReplicaSetMonitorPtr replMonitor = ReplicaSetMonitor::get(rawHost.getSetName(), false);
+        ReplicaSetMonitorPtr replMonitor = ReplicaSetMonitor::get(rawHost.getSetName());
 
         if (!replMonitor) {
             // Slow path
             std::set<HostAndPort> seedServers(rawHost.getServers().begin(),
                                               rawHost.getServers().end());
             ReplicaSetMonitor::createIfNeeded(rawHost.getSetName(), seedServers);
-            replMonitor = ReplicaSetMonitor::get(rawHost.getSetName(), true);
+            replMonitor = ReplicaSetMonitor::get(rawHost.getSetName());
         }
 
         if (!replMonitor) {
