@@ -150,7 +150,6 @@ func (restore *MongoRestore) CollectionExists(intent *intents.Intent) (bool, err
 		if err != nil {
 			return false, fmt.Errorf("error establishing connection: %v", err)
 		}
-		session.SetSocketTimeout(0)
 		defer session.Close()
 		collections, err := session.DB(intent.DB).CollectionNames()
 		if err != nil {
@@ -194,7 +193,6 @@ func (restore *MongoRestore) CreateIndexes(intent *intents.Intent, indexes []Ind
 		return fmt.Errorf("error establishing connection: %v", err)
 	}
 	session.SetSafe(&mgo.Safe{})
-	session.SetSocketTimeout(0)
 	defer session.Close()
 
 	// then attempt the createIndexes command
@@ -230,7 +228,6 @@ func (restore *MongoRestore) LegacyInsertIndex(intent *intents.Intent, index Ind
 	if err != nil {
 		return fmt.Errorf("error establishing connection: %v", err)
 	}
-	session.SetSocketTimeout(0)
 	defer session.Close()
 
 	// overwrite safety to make sure we catch errors
@@ -258,7 +255,6 @@ func (restore *MongoRestore) CreateCollection(intent *intents.Intent, options bs
 	if err != nil {
 		return fmt.Errorf("error establishing connection: %v", err)
 	}
-	session.SetSocketTimeout(0)
 	defer session.Close()
 
 	res := bson.M{}
@@ -328,7 +324,6 @@ func (restore *MongoRestore) RestoreUsersOrRoles(collectionType string, intent *
 			log.Logf(log.Always, "error establishing connection to drop temporary collection %v: %v", tempCol, err)
 			return
 		}
-		session.SetSocketTimeout(0)
 		defer session.Close()
 		log.Logf(log.DebugHigh, "dropping temporary collection %v", tempCol)
 		err = session.DB("admin").C(tempCol).DropCollection()
@@ -372,7 +367,6 @@ func (restore *MongoRestore) RestoreUsersOrRoles(collectionType string, intent *
 		return fmt.Errorf("error establishing connection: %v", err)
 	}
 	defer session.Close()
-	session.SetSocketTimeout(0)
 
 	log.Logf(log.DebugLow, "merging %v from temp collection '%v'", collectionType, tempCol)
 	res := bson.M{}
@@ -502,7 +496,6 @@ func (restore *MongoRestore) DropCollection(intent *intents.Intent) error {
 		return fmt.Errorf("error establishing connection: %v", err)
 	}
 	defer session.Close()
-	session.SetSocketTimeout(0)
 	err = session.DB(intent.DB).C(intent.C).DropCollection()
 	if err != nil {
 		return fmt.Errorf("error dropping collection: %v", err)

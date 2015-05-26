@@ -24,6 +24,7 @@ type (
 const (
 	None      sessionFlag = 0
 	Monotonic sessionFlag = 1 << iota
+	DisableSocketTimeout
 )
 
 // MongoDB enforced limits.
@@ -102,6 +103,9 @@ func (self *SessionProvider) GetSession() (*mgo.Session, error) {
 	// handle session flags
 	if (self.flags & Monotonic) > 0 {
 		self.masterSession.SetMode(mgo.Monotonic, true)
+	}
+	if (self.flags & DisableSocketTimeout) > 0 {
+		self.masterSession.SetSocketTimeout(0)
 	}
 	// copy the provider's master session, for connection pooling
 	return self.masterSession.Copy(), nil

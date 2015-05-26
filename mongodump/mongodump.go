@@ -90,8 +90,8 @@ func (dump *MongoDump) Init() error {
 	if err != nil {
 		return fmt.Errorf("can't create session: %v", err)
 	}
-	// ensure we allow secondary reads
-	dump.sessionProvider.SetFlags(db.Monotonic)
+	// ensure we allow secondary reads and disable TCP timeouts
+	dump.sessionProvider.SetFlags(db.Monotonic | db.DisableSocketTimeout)
 	dump.isMongos, err = dump.sessionProvider.IsMongos()
 	if err != nil {
 		return err
@@ -309,7 +309,6 @@ func (dump *MongoDump) DumpIntent(intent *intents.Intent) error {
 	if err != nil {
 		return err
 	}
-	session.SetSocketTimeout(0)
 	defer session.Close()
 	// in mgo, setting prefetch = 1.0 causes the driver to make requests for
 	// more results as soon as results are returned. This effectively
@@ -467,7 +466,6 @@ func (dump *MongoDump) DumpUsersAndRolesForDB(db string) error {
 	if err != nil {
 		return err
 	}
-	session.SetSocketTimeout(0)
 	defer session.Close()
 
 	dbQuery := bson.M{"db": db}
