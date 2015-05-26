@@ -3,13 +3,17 @@ db.createCollection("storageDetailsCommand");
 
 t = db.storageDetailsCommand;
 
+var COMMAND_NOT_FOUND_CODE = 59;
+
 for (var i = 0; i < 3000; ++i) {
     t.insert({i: i, d: i % 13});
 }
 
 function test() {
     var result = t.diskStorageStats({numberOfSlices: 100});
-    if (result["bad cmd"]) {
+
+
+    if (result["code"] === COMMAND_NOT_FOUND_CODE) {
         print("storageDetails command not available: skipping");
         return;
     }
