@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/thread/mutex.hpp>
 #include <string>
 
 #include "mongo/base/disallow_copying.h"

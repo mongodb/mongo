@@ -26,22 +26,15 @@
 *    it in the license file.
 */
 
-#include "mongo/db/auth/authz_manager_external_state.h"
+#include "mongo/platform/basic.h"
 
-#include "mongo/base/status.h"
-#include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/security_key.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/db/auth/authz_manager_external_state.h"
 
 namespace mongo {
 
-    using std::string;
-
     stdx::function<std::unique_ptr<AuthzManagerExternalState>()> AuthzManagerExternalState::create;
 
-    AuthzManagerExternalState::AuthzManagerExternalState() {}
-    AuthzManagerExternalState::~AuthzManagerExternalState() {}
+    AuthzManagerExternalState::AuthzManagerExternalState() = default;
+    AuthzManagerExternalState::~AuthzManagerExternalState() = default;
 
 }  // namespace mongo

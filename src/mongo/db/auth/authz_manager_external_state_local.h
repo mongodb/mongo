@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/thread/mutex.hpp>
 #include <string>
 
 #include "mongo/base/disallow_copying.h"
@@ -140,8 +139,6 @@ namespace mongo {
          * Guards _roleGraphState and _roleGraph.
          */
         boost::mutex _roleGraphMutex;
-
-        boost::timed_mutex _authzDataUpdateLock;
     };
 
 } // namespace mongo

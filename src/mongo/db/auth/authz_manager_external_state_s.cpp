@@ -44,17 +44,14 @@
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/stdx/memory.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
-    AuthzManagerExternalStateMongos::AuthzManagerExternalStateMongos() {}
+    AuthzManagerExternalStateMongos::AuthzManagerExternalStateMongos() = default;
 
-    AuthzManagerExternalStateMongos::~AuthzManagerExternalStateMongos() {}
+    AuthzManagerExternalStateMongos::~AuthzManagerExternalStateMongos() = default;
 
     Status AuthzManagerExternalStateMongos::initialize(OperationContext* txn) {
         return Status::OK();

@@ -32,8 +32,6 @@
 
 #include "mongo/db/auth/authz_manager_external_state_d.h"
 
-#include <string>
-
 #include "mongo/base/status.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authz_session_external_state_d.h"
@@ -53,11 +51,8 @@
 
 namespace mongo {
 
-    using std::endl;
-    using std::string;
-
-    AuthzManagerExternalStateMongod::AuthzManagerExternalStateMongod() {}
-    AuthzManagerExternalStateMongod::~AuthzManagerExternalStateMongod() {}
+    AuthzManagerExternalStateMongod::AuthzManagerExternalStateMongod() = default;
+    AuthzManagerExternalStateMongod::~AuthzManagerExternalStateMongod() = default;
 
     std::unique_ptr<AuthzSessionExternalState>
     AuthzManagerExternalStateMongod::makeAuthzSessionExternalState(
