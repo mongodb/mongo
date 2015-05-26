@@ -446,11 +446,11 @@ err:	if (bloom != NULL)
 }
 
 /*
- * __lsm_discard_handle --
- *	Try to discard a handle from cache.
+ * __lsm_discard_handle_internal --
+ *	Try to discard a handle from cache (locked version).
  */
 static int
-__lsm_discard_handle(
+__lsm_discard_handle_internal(
     WT_SESSION_IMPL *session, const char *uri, const char *checkpoint)
 {
 	/* This will fail with EBUSY if the file is still in use. */
@@ -459,6 +459,23 @@ __lsm_discard_handle(
 
 	F_SET(session->dhandle, WT_DHANDLE_DISCARD_FORCE);
 	return (__wt_session_release_btree(session));
+}
+
+/*
+ * __lsm_discard_handle --
+ *	Try to discard a handle from cache.
+ */
+static int
+__lsm_discard_handle(
+    WT_SESSION_IMPL *session, const char *uri, const char *checkpoint)
+{
+	WT_DECL_RET;
+
+	WT_WITH_SCHEMA_LOCK(session,
+	    WT_WITH_DHANDLE_LOCK(session,
+		ret = __lsm_discard_handle_internal(session, uri, checkpoint)));
+
+	return (ret);
 }
 
 /*
