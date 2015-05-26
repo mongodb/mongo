@@ -48,7 +48,7 @@
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authz_manager_external_state_s.h"
 #include "mongo/db/auth/user_cache_invalidator_job.h"
-#include "mongo/db/client_basic.h"
+#include "mongo/db/client.h"
 #include "mongo/db/dbwebserver.h"
 #include "mongo/db/initialize_server_global_state.h"
 #include "mongo/db/instance.h"
@@ -61,18 +61,15 @@
 #include "mongo/s/balance.h"
 #include "mongo/s/catalog/legacy/catalog_manager_legacy.h"
 #include "mongo/s/client/sharding_connection_hook.h"
-#include "mongo/s/chunk_manager.h"
 #include "mongo/s/config.h"
 #include "mongo/s/cursors.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/mongos_options.h"
 #include "mongo/s/request.h"
 #include "mongo/s/version_mongos.h"
-#include "mongo/scripting/engine.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/admin_access.h"
 #include "mongo/util/cmdline_utils/censor_cmdline.h"
-#include "mongo/util/concurrency/task.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/exception_filter_win32.h"
 #include "mongo/util/exit.h"
@@ -84,8 +81,6 @@
 #include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/quick_exit.h"
-#include "mongo/util/ramlog.h"
-#include "mongo/util/scopeguard.h"
 #include "mongo/util/signal_handlers.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/stringutils.h"
@@ -108,7 +103,6 @@ namespace mongo {
     static ExitCode initService();
 #endif
 
-    string mongosCommand;
     bool dbexitCalled = false;
 
     bool inShutdown() {
@@ -407,8 +401,6 @@ int mongoSMain(int argc, char* argv[], char** envp) {
         return EXIT_FAILURE;
 
     setupSignalHandlers(false);
-
-    mongosCommand = argv[0];
 
     Status status = mongo::runGlobalInitializers(argc, argv, envp);
     if (!status.isOK()) {

@@ -145,9 +145,17 @@ env.Library(
     ]
 )
 
-env.CppUnitTest("replica_set_monitor_test",
-                ["replica_set_monitor_test.cpp"],
-                LIBDEPS=["clientdriver"])
+env.CppUnitTest(
+    target='replica_set_monitor_test',
+    source=[
+        'replica_set_monitor_node_test.cpp',
+        'replica_set_monitor_read_preference_test.cpp',
+        'replica_set_monitor_test.cpp',
+    ],
+    LIBDEPS=[
+        'clientdriver'
+    ]
+)
 
 env.CppUnitTest("dbclient_rs_test",
                 ["dbclient_rs_test.cpp"],

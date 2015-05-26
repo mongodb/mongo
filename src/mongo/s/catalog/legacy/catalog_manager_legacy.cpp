@@ -665,8 +665,9 @@ namespace {
         }
         catch (const DBException& e) {
             if (shardConnectionString.type() == ConnectionString::SET) {
-                ReplicaSetMonitor::remove(shardConnectionString.getSetName());
+                ReplicaSetMonitor::remove(shardConnectionString.getSetName(), false);
             }
+
             return Status(ErrorCodes::OperationFailed,
                           str::stream() << "couldn't connect to new shard "
                                         << e.what());

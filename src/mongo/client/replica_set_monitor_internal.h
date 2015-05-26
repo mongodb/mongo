@@ -40,7 +40,7 @@
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
-#include "mongo/client/dbclient_rs.h" // for TagSet and ReadPreferenceSettings
+#include "mongo/client/read_preference.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/cstdint.h"
@@ -48,6 +48,7 @@
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
+
     struct ReplicaSetMonitor::IsMasterReply {
         IsMasterReply() : ok(false) {}
         IsMasterReply(const HostAndPort& host, int64_t latencyMicros, const BSONObj& reply)
@@ -94,7 +95,7 @@ namespace mongo {
                 isMaster = false;
             }
 
-            bool matches(const ReadPreference& pref) const;
+            bool matches(const ReadPreference pref) const;
 
             /**
              * Checks if the given tag matches the tag attached to this node.
@@ -125,6 +126,7 @@ namespace mongo {
             int64_t latencyMicros; // unknownLatency if unknown
             BSONObj tags; // owned
         };
+
         typedef std::vector<Node> Nodes;
 
         /**
@@ -207,4 +209,5 @@ namespace mongo {
         typedef std::vector<IsMasterReply> UnconfirmedReplies;
         UnconfirmedReplies unconfirmedReplies;
     };
-}
+
+} // namespace mongo

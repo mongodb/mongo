@@ -48,21 +48,15 @@
 #include "mongo/util/string_map.h"
 #include "mongo/util/timer.h"
 
-#if 0 // enable this to ease debugging of this file.
-#undef DEV
-#define DEV if (true)
-
-#undef LOG
-#define LOG(x) log()
-#endif
-
 namespace mongo {
 
+    using boost::shared_ptr;
     using std::numeric_limits;
     using std::set;
     using std::string;
 
 namespace {
+
     // Pull nested types to top-level scope
     typedef ReplicaSetMonitor::IsMasterReply IsMasterReply;
     typedef ReplicaSetMonitor::ScanState ScanState;
@@ -196,6 +190,7 @@ namespace {
 
             for (StringMap<ReplicaSetMonitorPtr>::const_iterator it = setsCopy.begin();
                     it != setsCopy.end(); ++it) {
+
                 LOG(1) << "checking replica set: " << it->first;
                 ReplicaSetMonitorPtr m = it->second;
 
@@ -246,18 +241,18 @@ namespace {
     } compareHosts; // like an overloaded function, but able to pass to stl algorithms
 
     // The following structs should be treated as functions returning a UnaryPredicate.
-    // Usage example: std::find_if(nodes.begin(), nodes.end(), hostIs(someHost));
+    // Usage example: std::find_if(nodes.begin(), nodes.end(), HostIs(someHost));
     // They all hold their constructor argument by reference.
 
-    struct hostIs {
-        explicit hostIs(const HostAndPort& host) :_host(host) {}
+    struct HostIs {
+        explicit HostIs(const HostAndPort& host) :_host(host) {}
         bool operator() (const HostAndPort& host) { return host == _host; }
         bool operator() (const Node& node) { return node.host == _host; }
         const HostAndPort& _host;
     };
 
-    struct hostNotIn {
-        explicit hostNotIn(const std::set<HostAndPort>& hosts) :_hosts(hosts) {}
+    struct HostNotIn {
+        explicit HostNotIn(const std::set<HostAndPort>& hosts) :_hosts(hosts) {}
         bool operator() (const HostAndPort& host) { return !_hosts.count(host); }
         bool operator() (const Node& node) { return !_hosts.count(node.host); }
         const std::set<HostAndPort>& _hosts;
@@ -272,13 +267,15 @@ namespace {
 
     ReplicaSetMonitor::ReplicaSetMonitor(StringData name, const std::set<HostAndPort>& seeds)
             : _state(boost::make_shared<SetState>(name, seeds)) {
-        LogstreamBuilder lsb = log();
-        lsb << "starting new replica set monitor for replica set " << name << " with seeds ";
-        for (std::set<HostAndPort>::const_iterator it = seeds.begin();
-                it != seeds.end(); ++it) {
-            if (it != seeds.begin())
-                lsb << ',';
-            lsb << *it;
+
+        log() << "starting new replica set monitor for replica set " << name << " with seeds ";
+
+        for (std::set<HostAndPort>::const_iterator it = seeds.begin(); it != seeds.end(); ++it) {
+            if (it != seeds.begin()) {
+                log() << ',';
+            }
+
+            log() << *it;
         }
     }
 
@@ -364,20 +361,23 @@ namespace {
         LOG(3) << "ReplicaSetMonitor::createIfNeeded " << name;
         boost::lock_guard<boost::mutex> lk(setsLock);
         ReplicaSetMonitorPtr& m = sets[name];
-        if ( ! m )
-            m = boost::make_shared<ReplicaSetMonitor>( name , servers );
+        if (!m) {
+            m = boost::make_shared<ReplicaSetMonitor>(name, servers);
+        }
 
         replicaSetMonitorWatcher.safeGo();
     }
 
-    ReplicaSetMonitorPtr ReplicaSetMonitor::get(const std::string& name,
-                                                const bool createFromSeed) {
+    shared_ptr<ReplicaSetMonitor> ReplicaSetMonitor::get(const std::string& name,
+                                                         const bool createFromSeed) {
         LOG(3) << "ReplicaSetMonitor::get " << name;
+
         boost::lock_guard<boost::mutex> lk( setsLock );
         StringMap<ReplicaSetMonitorPtr>::const_iterator i = sets.find( name );
         if ( i != sets.end() ) {
             return i->second;
         }
+
         if ( createFromSeed ) {
             StringMap<set<HostAndPort> >::const_iterator j = seedServers.find( name );
             if ( j != seedServers.end() ) {
@@ -389,6 +389,7 @@ namespace {
                 return m;
             }
         }
+
         return ReplicaSetMonitorPtr();
     }
 
@@ -643,7 +644,7 @@ namespace {
             // move lastSeenMaster to front of queue
             std::stable_partition(scan->hostsToScan.begin(),
                                   scan->hostsToScan.end(),
-                                  hostIs(set->lastSeenMaster));
+                                  HostIs(set->lastSeenMaster));
         }
 
         return scan;
@@ -671,7 +672,7 @@ namespace {
             // remove non-members from _set->nodes
             _set->nodes.erase(std::remove_if(_set->nodes.begin(),
                                              _set->nodes.end(),
-                                             hostNotIn(reply.normalHosts)),
+                                             HostNotIn(reply.normalHosts)),
                               _set->nodes.end());
 
             // add new members to _set->nodes
@@ -736,7 +737,7 @@ namespace {
             std::deque<HostAndPort>::iterator it =
                 std::stable_partition(_scan->hostsToScan.begin(),
                                       _scan->hostsToScan.end(),
-                                      hostIs(reply.primary));
+                                      HostIs(reply.primary));
 
             if (it == _scan->hostsToScan.begin()) {
                 // reply.primary wasn't in hostsToScan
@@ -835,7 +836,7 @@ namespace {
 
     const int64_t Node::unknownLatency = numeric_limits<int64_t>::max();
 
-    bool Node::matches(const ReadPreference& pref) const {
+    bool Node::matches(const ReadPreference pref) const {
         if (!isUp)
             return false;
 

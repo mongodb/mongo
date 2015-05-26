@@ -28,8 +28,8 @@
 #pragma once
 
 #include <boost/shared_ptr.hpp>
-#include <string>
 #include <set>
+#include <string>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
@@ -37,9 +37,9 @@
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
+
     class BSONObj;
     class ReplicaSetMonitor;
-    class TagSet;
     struct ReadPreferenceSetting;
     typedef boost::shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorPtr;
 
@@ -145,7 +145,8 @@ namespace mongo {
          * it will return none. If createFromSeed is true, it will try to look up the last known
          * servers list for this set and will create a new monitor using that as the seed list.
          */
-        static ReplicaSetMonitorPtr get(const std::string& name, bool createFromSeed = false);
+        static boost::shared_ptr<ReplicaSetMonitor> get(const std::string& name,
+                                                        bool createFromSeed = false);
 
         /**
          * Returns all the currently tracked replica set names.
@@ -215,6 +216,7 @@ namespace mongo {
     private:
         const SetStatePtr _state; // never NULL
     };
+
 
     /**
      * Refreshes the local view of a replica set.
@@ -331,4 +333,5 @@ namespace mongo {
         ScanStatePtr _scan; // May differ from _set->currentScan if a new scan has started.
         bool _startedNewScan;
     };
-}
+
+} // namespace mongo
