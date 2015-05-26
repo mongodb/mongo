@@ -202,13 +202,14 @@ __wt_debug_addr_print(
     WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_size)
 {
 	WT_DECL_ITEM(buf);
+	WT_DECL_RET;
 
 	WT_RET(__wt_scr_alloc(session, 128, &buf));
-	WT_RET(__wt_fprintf(stderr, "%s\n",
-	    __wt_addr_string(session, addr, addr_size, buf)));
+	ret = __wt_fprintf(stderr,
+	    "%s\n", __wt_addr_string(session, addr, addr_size, buf));
 	__wt_scr_free(session, &buf);
 
-	return (0);
+	return (ret);
 }
 
 /*
