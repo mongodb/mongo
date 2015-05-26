@@ -306,7 +306,7 @@ namespace {
 
             set<Shard> shards;
             set<string> servers;
-            vector<Strategy::CommandResult> results;
+            vector<Strategy::CommandResult> mrCommandResults;
 
             BSONObjBuilder shardResultsB;
             BSONObjBuilder shardCountsB;
@@ -319,7 +319,7 @@ namespace {
                 // TODO: take distributed lock to prevent split / migration?
 
                 try {
-                    STRATEGY->commandOp(dbname, shardedCommand, 0, fullns, q, &results);
+                    STRATEGY->commandOp(dbname, shardedCommand, 0, fullns, q, &mrCommandResults);
                 }
                 catch (DBException& e){
                     e.addContext(str::stream() << "could not run map command on all shards for ns "
@@ -327,16 +327,16 @@ namespace {
                     throw;
                 }
 
-                for (const auto& result : results) {
+                for (const auto& mrResult : mrCommandResults) {
                     // Need to gather list of all servers even if an error happened
-                    const string server = result.shardTarget.getConnString().toString();
+                    const string server = mrResult.shardTarget.getConnString().toString();
                     servers.insert(server);
 
                     if (!ok) {
                         continue;
                     }
 
-                    BSONObj singleResult = result.result;
+                    BSONObj singleResult = mrResult.result;
                     ok = singleResult["ok"].trueValue();
 
                     if (!ok) {
@@ -373,7 +373,7 @@ namespace {
 
                     // Add "code" to the top-level response, if the failure of the sharded command
                     // can be accounted to a single error.
-                    int code = getUniqueCodeFromCommandResults(results);
+                    int code = getUniqueCodeFromCommandResults(mrCommandResults);
                     if (code != 0) {
                         result.append("code", code);
                     }
@@ -482,10 +482,10 @@ namespace {
                     }
 
                     BSONObj finalCmdObj = finalCmd.obj();
-                    results.clear();
+                    mrCommandResults.clear();
 
                     try {
-                        STRATEGY->commandOp(outDB, finalCmdObj, 0, finalColLong, BSONObj(), &results);
+                        STRATEGY->commandOp(outDB, finalCmdObj, 0, finalColLong, BSONObj(), &mrCommandResults);
                         ok = true;
                     }
                     catch (DBException& e){
@@ -494,13 +494,14 @@ namespace {
                         throw;
                     }
 
-                    for (vector<Strategy::CommandResult>::iterator i = results.begin();
-                        i != results.end(); ++i) {
+                    for (const auto& mrResult : mrCommandResults) {
+                        const string server = mrResult.shardTarget.getConnString().toString();
+                        singleResult = mrResult.result;
 
-                        const string server = i->shardTarget.getConnString().toString();
-                        singleResult = i->result;
                         ok = singleResult["ok"].trueValue();
-                        if (!ok) break;
+                        if (!ok) {
+                            break;
+                        }
 
                         BSONObj counts = singleResult.getObjectField("counts");
                         reduceCount += counts.getIntField("reduce");
