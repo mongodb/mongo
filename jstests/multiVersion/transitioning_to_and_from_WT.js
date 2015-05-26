@@ -1,19 +1,18 @@
-// Test dump/restore upgrade/downgrade/transition process for:
-//      2.6 -> 2.8 wiredTiger
-//      2.8 wiredTiger -> 2.6
-//      2.6 -> 2.8
-//      2.8 -> 2.8 wiredTiger
-//      2.8 wiredTiger -> 2.8
-// then back to 2.6 and rerun each transition with directoryperdb on all non-wiredTiger instances
-
+/**
+ * Test the upgrade/downgrade process for the last stable release <~~> the latest release with both
+ * the mmapv1 and wiredTiger storage engines. Repeat the process with --directoryperdb set.
+ */
 (function() {
-
     "use strict";
 
-    jsTestLog('Setting up initial data set with a 2.6 mongod');
+    jsTestLog("Setting up initial data set with the last stable version of mongod");
 
-    var toolTest = new ToolTest('transitioning_to_and_from_WT', { binVersion: '2.6' });
-    toolTest.dbpath = toolTest.root + "/original26/";
+    var toolTest = new ToolTest('transitioning_to_and_from_WT', {
+        binVersion: MongoRunner.getBinVersionFor("last-stable"),
+        storageEngine: "mmapv1",
+    });
+
+    toolTest.dbpath = toolTest.root + "/original/";
     resetDbpath(toolTest.dbpath);
     assert(mkdir(toolTest.dbpath));
     toolTest.startDB('foo');
@@ -27,7 +26,7 @@
     var testColl = testDB.coll;
     testDB.createCollection("capped", {capped: true, size: 10000});
     var testCapped = testDB.capped;
-    // test database and collection lengths to make sure they work correctly in 2.8 and with WT
+    // test database and collection lengths to make sure they work correctly in latest and with WT
     var longDB = toolTest.db.getSiblingDB(longName);
     var longColl = longDB.collection_name_is_lengthed_to_reach_namespace_max_of_123;
     longColl.insert({x: 1});
@@ -51,86 +50,72 @@
     assert(testCapped.isCapped());
     assert.eq(1, longColl.count());
 
-    // modes contains the descriptions of the assorted mongod configurations will we dump/restore
-    // between in the order they will be used
-
-    // version is either "2.6" or null which indicates latest
-    // storageEngine is either "wiredTiger" or null which indicates mmapv1
-    // directoryperdb is either "" which indicates it will be used or null which indicates it won't
+    // Transition from the last stable version with mmapv1...
     var modes = [
-        // to 2.8 wired tiger
+        // to the latest version with wiredTiger
         {
-            version: null,
+            binVersion: "latest",
             storageEngine: "wiredTiger",
-            directoryperdb: null,
         },
-        // back to 2.6
+        // back to the last stable version with mmapv1
         {
-            version: "2.6",
-            storageEngine: null,
-            directoryperdb: null,
+            binVersion: "last-stable",
+            storageEngine: "mmapv1",
         },
-        // to 2.8 mmapv1
+        // to the latest version with mmapv1
         {
-            version: null,
-            storageEngine: null,
-            directoryperdb: null,
+            binVersion: "latest",
+            storageEngine: "mmapv1",
         },
-        // to 2.8 wired tiger
+        // to latest version with wiredTiger
         {
-            version: null,
+            binVersion: "latest",
             storageEngine: "wiredTiger",
-            directoryperdb: null,
         },
-        // back to 2.8 mmapv1
+        // back to the latest version with mmapv1
         {
-            version: null,
-            storageEngine: null,
-            directoryperdb: null,
+            binVersion: "latest",
+            storageEngine: "mmapv1",
         },
-        // to 2.6 dir per db
+        // to the last stable version with mmapv1 and directory per db
         {
-            version: "2.6",
-            storageEngine: null,
+            binVersion: "last-stable",
+            storageEngine: "mmapv1",
             directoryperdb: "",
         },
-        // to 2.8 wired tiger
+        // to the latest version with wiredTiger
         {
-            version: null,
+            binVersion: "latest",
             storageEngine: "wiredTiger",
-            directoryperdb: null,
         },
-        // back to 2.6 dir per db
+        // back to the last stable version with mmapv1 and directory per db
         {
-            version: "2.6",
-            storageEngine: null,
+            binVersion: "last-stable",
+            storageEngine: "mmapv1",
             directoryperdb: "",
         },
-        // to 2.8 mmapv1 dir per db
+        // to latest version with mmapv1 and directory per db
         {
-            version: null,
-            storageEngine: null,
+            binVersion: "latest",
+            storageEngine: "mmapv1",
             directoryperdb: "",
         },
-        // to 2.8 wired tiger
+        // to the latest with wiredTiger
         {
-            version: null,
+            binVersion: "latest",
             storageEngine: "wiredTiger",
-            directoryperdb: null,
         },
-        // back to 2.8 mmapv1 dir per db
+        // back to latest version with mmapv1 and directory per db
         {
-            version: null,
-            storageEngine: null,
+            binVersion: "latest",
+            storageEngine: "mmapv1",
             directoryperdb: "",
         },
     ];
 
-    for (var idx = 0; idx < modes.length; idx++) {
-        var entry = modes[idx];
-
+    modes.forEach(function(entry, idx) {
         jsTestLog("moving to: " + tojson(entry));
-        // dump the data 
+        // dump the data
         resetDbpath(dumpTarget);
         var ret = toolTest.runTool('dump', '--out', dumpTarget);
         assert.eq(0, ret);
@@ -141,11 +126,19 @@
         // clear old node configuration info
         toolTest.m = null;
         toolTest.db = null;
-        /// set up new node configuration info
-        toolTest.options.binVersion = entry.version;
-        toolTest.dbpath = toolTest.root + "/" + idx + entry.version + entry.storageEngine + "/";
-        toolTest.options.storageEngine = entry.storageEngine;
-        toolTest.options.directoryperdb = entry.directoryperdb;
+
+        // set up new node configuration info
+        toolTest.options.binVersion = MongoRunner.getBinVersionFor(entry.binVersion);
+        toolTest.dbpath = toolTest.root + "/" + idx + "-" + entry.binVersion + "-"
+                          + entry.storageEngine + "/";
+
+        if (entry.hasOwnProperty("storageEngine")) {
+            toolTest.options.storageEngine = entry.storageEngine;
+        }
+
+        if (entry.hasOwnProperty("directoryperdb")) {
+            toolTest.options.directoryperdb = entry.directoryperdb;
+        }
 
         // create the unique dbpath for this instance and start the mongod
         resetDbpath(toolTest.dbpath);
@@ -179,12 +172,11 @@
             if (i < 10) {
                 assert.eq(1, testCapped.count({x: i}));
             }
-            assert.eq(1, testColl.count({x: i})); 
+            assert.eq(1, testColl.count({x: i}));
         }
         assert.eq(1, longColl.count());
-    }
+    });
 
     // success
     toolTest.stop();
-
 }());
