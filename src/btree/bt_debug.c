@@ -188,7 +188,7 @@ __dmsg(WT_DBG *ds, const char *fmt, ...)
 		}
 	} else {
 		va_start(ap, fmt);
-		(void)vfprintf(ds->fp, fmt, ap);
+		(void)__wt_vfprintf(ds->fp, fmt, ap);
 		va_end(ap);
 	}
 }
@@ -204,8 +204,8 @@ __wt_debug_addr_print(
 	WT_DECL_ITEM(buf);
 
 	WT_RET(__wt_scr_alloc(session, 128, &buf));
-	fprintf(stderr, "%s\n",
-	    __wt_addr_string(session, addr, addr_size, buf));
+	WT_RET(__wt_fprintf(stderr, "%s\n",
+	    __wt_addr_string(session, addr, addr_size, buf)));
 	__wt_scr_free(session, &buf);
 
 	return (0);
