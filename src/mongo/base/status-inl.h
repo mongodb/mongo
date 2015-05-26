@@ -30,12 +30,16 @@
 namespace mongo {
 
     inline Status Status::OK() {
-        return Status();
+        return Status(nullptr);
     }
 
     inline Status::Status(const Status& other)
         : _error(other._error) {
         ref(_error);
+    }
+
+    inline Status::Status(ErrorInfo* ei) :
+        _error(ei) {
     }
 
     inline Status& Status::operator=(const Status& other) {
@@ -47,13 +51,13 @@ namespace mongo {
 
     inline Status::Status(Status&& other) BOOST_NOEXCEPT
         : _error(other._error) {
-        other._error = nullptr;
+        other._error = &Status::kUninitialized;
     }
 
     inline Status& Status::operator=(Status&& other) BOOST_NOEXCEPT {
         unref(_error);
         _error = other._error;
-        other._error = nullptr;
+        other._error = &Status::kUninitialized;
         return *this;
     }
 
@@ -86,7 +90,7 @@ namespace mongo {
     }
 
     inline Status::Status()
-        : _error(NULL) {
+        : _error(&kUninitialized) {
     }
 
     inline void Status::ref(ErrorInfo* error) {
