@@ -249,7 +249,7 @@ assert(db.getCollection( "test_db" ).getIndexes().length == 0,24);
     assert.neq(undefined, t.totalIndexSize(),
                'db.collection.totalIndexSize() cannot be undefined on a non-empty collection');
 
-    if (db.serverStatus()storageEngine.name === 'mmapv1') {
+    if (db.serverStatus().storageEngine.name === 'mmapv1') {
         // Only in MMAPv1 do we guarantee that storageSize only changes when you write to a
         // collection.
         assert.eq(stats.storageSize, t.storageSize());
