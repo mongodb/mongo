@@ -434,19 +434,24 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 		if (!FLD_ISSET(txn->txn_logsync, WT_LOG_FLUSH) &&
 		    !F_ISSET(txn, WT_TXN_SYNC_SET))
 			txn->txn_logsync = 0;
-	} else if (WT_STRING_MATCH("background", cval.str, cval.len))
-		txn->txn_logsync = WT_LOG_BACKGROUND;
-	else if (WT_STRING_MATCH("off", cval.str, cval.len))
-		txn->txn_logsync = 0;
-	/*
-	 * This conditional checking for the "on" setting can go away
-	 * once the begin_transaction setting is deprecated and the field
-	 * is initialized to the connection setting unconditionally.
-	 * Now, the "on" setting overrides anything that may have been
-	 * set in begin_transaction, so we explicitly check it.
-	 */
-	else if (WT_STRING_MATCH("on", cval.str, cval.len))
-		txn->txn_logsync = conn->txn_logsync;
+	} else {
+		/*
+		 * If the caller already set sync on begin_transaction then
+		 * they should not be using sync on commit_transaction.
+		 * Flag that as an error.
+		 */
+		if (F_ISSET(txn, WT_TXN_SYNC_SET))
+			WT_RET_MSG(session, EINVAL,
+			    "Sync already set during begin_transaction.");
+		if (WT_STRING_MATCH("background", cval.str, cval.len))
+			txn->txn_logsync = WT_LOG_BACKGROUND;
+		else if (WT_STRING_MATCH("off", cval.str, cval.len))
+			txn->txn_logsync = 0;
+		/*
+		 * We don't need to check for "on" here because that is the
+		 * default to inherit from the connection setting.
+		 */
+	}
 
 	/* Commit notification. */
 	if (txn->notify != NULL)
