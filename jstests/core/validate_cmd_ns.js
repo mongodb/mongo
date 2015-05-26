@@ -6,20 +6,20 @@
 
 // Note: _exec gives you the raw response from the server.
 var res = db.$cmd.find({ whatsmyuri: 1 })._exec().next();
-assert(res.$err != null);
-assert(res.$err.indexOf('bad numberToReturn') > -1);
+assert.commandFailed(res);
+assert(res.errmsg.indexOf('bad numberToReturn') > -1);
 
 res = db.$cmd.find({ whatsmyuri: 1 }).limit(0)._exec().next();
-assert(res.$err != null);
-assert(res.$err.indexOf('bad numberToReturn') > -1);
+assert.commandFailed(res);
+assert(res.errmsg.indexOf('bad numberToReturn') > -1);
 
 res = db.$cmd.find({ whatsmyuri: 1 }).limit(-2)._exec().next();
-assert(res.$err != null);
-assert(res.$err.indexOf('bad numberToReturn') > -1);
+assert.commandFailed(res);
+assert(res.errmsg.indexOf('bad numberToReturn') > -1);
 
-var res = db.$cmd.find({ whatsmyuri: 1 }).limit(1).next();
-assert(res.ok);
+res = db.$cmd.find({ whatsmyuri: 1 }).limit(1).next();
+assert.commandWorked(res);
 
 res = db.$cmd.find({ whatsmyuri: 1 }).limit(-1).next();
-assert(res.ok);
+assert.commandWorked(res);
 

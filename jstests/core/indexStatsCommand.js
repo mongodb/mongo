@@ -3,6 +3,8 @@ db.createCollection("indexStatsCommand");
 
 t = db.indexStatsCommand;
 
+var COMMAND_NOT_FOUND_CODE = 59;
+
 for (var i = 0; i < 3000; ++i) {
     t.insert({i: i, d: i % 13});
 }
@@ -12,7 +14,7 @@ function textWithIndexVersion(version) {
     t.ensureIndex({d: 1}, {v: version, name: indexName});
 
     var result = t.indexStats({index: indexName});
-    if (result["bad cmd"]) {
+    if (result["code"] === COMMAND_NOT_FOUND_CODE) {
         print("storageDetails command not available: skipping");
         return;
     }

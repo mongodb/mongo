@@ -1113,34 +1113,6 @@ namespace mongo {
         }
     } availableQueryOptionsCmd;
 
-    bool _execCommand(OperationContext* txn,
-                      Command *c,
-                      const BSONObj& interposedCmd,
-                      const rpc::RequestInterface& request,
-                      rpc::ReplyBuilderInterface* replyBuilder) {
-
-        // This dassert and other similar ones are intended for readability as
-        // a ReplyBuilder will always verify it is in a correct state.
-        dassert(replyBuilder->getState() == rpc::ReplyBuilderInterface::State::kMetadata);
-
-        try {
-            bool res = c->run(txn, interposedCmd, request, replyBuilder);
-            dassert(replyBuilder->getState() == rpc::ReplyBuilderInterface::State::kOutputDocs);
-            return res;
-        }
-        catch (const SendStaleConfigException& e) {
-            LOG(1) << "command failed because of stale config, can retry" << causedBy(e);
-            throw;
-        }
-        catch (const DBException& e) {
-            // TODO: Rethrown errors have issues here, should divorce SendStaleConfigException from the DBException tree
-            replyBuilder
-                ->setMetadata(rpc::metadata::empty())
-                .setCommandReply(e.toStatus());
-            return false;
-        }
-    }
-
     /**
      * Guard object for making a good-faith effort to enter maintenance mode and leave it when it
      * goes out of scope.
@@ -1355,7 +1327,7 @@ namespace {
             LOG(2) << "command: " << request.getCommandName();
         }
 
-        CurOp::get(txn)->setCommand(command);
+
 
         if (command->maintenanceMode()) {
             mmSetter.reset(new MaintenanceModeSetter);
@@ -1385,16 +1357,9 @@ namespace {
 
         CurOp::get(txn)->setMaxTimeMicros(static_cast<unsigned long long>(maxTimeMS.getValue())
                                           * 1000);
-        try {
-            txn->checkForInterrupt(); // May trigger maxTimeAlwaysTimeOut fail point.
-        }
-        catch (UserException& e) {
 
-            replyBuilder
-                ->setMetadata(rpc::metadata::empty())
-                .setCommandReply(e.toStatus());
-            return;
-        }
+        // Can throw
+        txn->checkForInterrupt(); // May trigger maxTimeAlwaysTimeOut fail point.
 
         std::string errmsg;
         bool retval = false;
@@ -1403,15 +1368,13 @@ namespace {
 
         command->_commandsExecuted.increment();
 
-        retval = _execCommand(txn, command, interposedCmd, request, replyBuilder);
+        retval = command->run(txn, interposedCmd, request, replyBuilder);
 
         dassert(replyBuilder->getState() == rpc::ReplyBuilderInterface::State::kOutputDocs);
 
         if (!retval) {
             command->_commandsFailed.increment();
         }
-
-        return;
     }
 
     // This really belongs in commands.cpp, but we need to move it here so we can
@@ -1491,8 +1454,6 @@ namespace {
         return result;
     }
 
-namespace {
-
     /* TODO make these all command objects -- legacy stuff here
 
        usage:
@@ -1500,95 +1461,136 @@ namespace {
 
        returns true if ran a cmd
     */
-    bool _runCommands(OperationContext* txn,
-                      const rpc::RequestInterface& request,
-                      rpc::ReplyBuilderInterface* replyBuilder) {
+    void runCommands(OperationContext* txn,
+                     const rpc::RequestInterface& request,
+                     rpc::ReplyBuilderInterface* replyBuilder) {
 
-        dassert(replyBuilder->getState() == rpc::ReplyBuilderInterface::State::kMetadata);
+        try {
 
-        string dbname = request.getDatabase().toString();
+            dassert(replyBuilder->getState() == rpc::ReplyBuilderInterface::State::kMetadata);
 
-        // right now our metadata handling depends on mutating the command
-        // the "interposedCmd" parameters will go away when SERVER-18236
-        // is resolved
-        BSONObj interposedCmd;
-        {
-            BSONElement e = request.getCommandArgs().firstElement();
-            if ( e.type() == Object && (e.fieldName()[0] == '$'
-                                        ? str::equals("query", e.fieldName()+1)
-                                        : str::equals("query", e.fieldName())))
-                {
-                    interposedCmd = e.embeddedObject();
-                    if (request.getCommandArgs().hasField("$maxTimeMS")) {
-                        replyBuilder
-                            ->setMetadata(rpc::metadata::empty())
-                            .setCommandReply(Status(ErrorCodes::BadValue,
-                                                    "cannot use $maxTimeMS query option with "
-                                                    "commands; use maxTimeMS command option "
-                                                    "instead"));
-                        return true;
+            string dbname = request.getDatabase().toString();
+
+            // right now our metadata handling depends on mutating the command
+            // the "interposedCmd" parameters will go away when SERVER-18236
+            // is resolved
+            BSONObj interposedCmd;
+            {
+                BSONElement e = request.getCommandArgs().firstElement();
+                if ( e.type() == Object && (e.fieldName()[0] == '$'
+                                            ? str::equals("query", e.fieldName()+1)
+                                            : str::equals("query", e.fieldName())))
+                    {
+                        interposedCmd = e.embeddedObject();
+                        if (request.getCommandArgs().hasField("$maxTimeMS")) {
+                            replyBuilder
+                                ->setMetadata(rpc::metadata::empty())
+                                .setCommandReply(Status(ErrorCodes::BadValue,
+                                                        "cannot use $maxTimeMS query option with "
+                                                        "commands; use maxTimeMS command option "
+                                                        "instead"));
+                            return;
+                        }
                     }
+                else {
+                    interposedCmd = request.getCommandArgs();
                 }
-            else {
-                interposedCmd = request.getCommandArgs();
             }
+
+            BSONElement e = interposedCmd.firstElement();
+
+            Command* c = e.type() ? Command::findCommand( e.fieldNameStringData() ) : nullptr;
+
+            CurOp::get(txn)->setCommand(c);
+
+            if (c) {
+                LOG(2) << "run command " << request.getDatabase() << ".$cmd" << ' '
+                       << c->getRedactedCopyForLogging(request.getCommandArgs());
+
+                Command::execCommand(txn, c, interposedCmd, request, replyBuilder);
+                // We use a nested try block here so we can call the overload of
+                // generateErrorResponse that prints the redacted command arguments.
+                dassert(replyBuilder->getState() == rpc::ReplyBuilderInterface::State::kOutputDocs);
+            }
+            else {
+                // In the absence of a Command object, no redaction is possible. Therefore
+                // to avoid displaying potentially sensitive information in the logs,
+                // we restrict the log message to the name of the unrecognized command.
+                // However, the complete command object will still be echoed to the client.
+                string msg = str::stream() << "no such command: " << request.getCommandName();
+
+                LOG(2) << msg;
+                replyBuilder
+                    ->setMetadata(rpc::metadata::empty())
+                    .setCommandReply(Status(ErrorCodes::CommandNotFound, std::move(msg)),
+                                     BSON("bad cmd" << request.getCommandArgs()));
+
+                Command::unknownCommands.increment();
+            }
+
         }
 
-        BSONElement e = interposedCmd.firstElement();
+        catch (const DBException& ex) {
+            Command::generateErrorResponse(txn, replyBuilder, ex, request);
+        }
+    }
 
-        Command * c = e.type() ? Command::findCommand( e.fieldNameStringData() ) : 0;
+namespace {
 
-        if (c) {
-            LOG(2) << "run command " << request.getDatabase() << ".$cmd" << ' '
-                   << c->getRedactedCopyForLogging(request.getCommandArgs());
-            Command::execCommand(txn, c, interposedCmd, request, replyBuilder);
+    void _generateErrorResponse(OperationContext* txn,
+                                rpc::ReplyBuilderInterface* replyBuilder,
+                                const DBException& exception) {
+        CurOp::get(txn)->debug().exceptionInfo = exception.getInfo();
 
-            dassert(replyBuilder->getState() == rpc::ReplyBuilderInterface::State::kOutputDocs);
+        // No metadata is needed for an error reply.
+        replyBuilder->setMetadata(rpc::metadata::empty());
+
+        // We need to include some extra information for SendStaleConfig.
+        if (exception.getCode() == ErrorCodes::SendStaleConfig) {
+            const SendStaleConfigException& scex =
+                static_cast<const SendStaleConfigException&>(exception);
+            replyBuilder->setCommandReply(scex.toStatus(),
+                                          BSON("ns" << scex.getns() <<
+                                               "vReceived" << scex.getVersionReceived().toBSON() <<
+                                               "vWanted" << scex.getVersionWanted().toBSON()));
         }
         else {
-            // In the absence of a Command object, no redaction is possible. Therefore
-            // to avoid displaying potentially sensitive information in the logs,
-            // we restrict the log message to the name of the unrecognized command.
-            // However, the complete command object will still be echoed to the client.
-            string msg = str::stream() << "no such command: " << request.getCommandName();
-
-            LOG(2) << msg;
-            replyBuilder
-                ->setMetadata(rpc::metadata::empty())
-                .setCommandReply(Status(ErrorCodes::CommandNotFound, std::move(msg)),
-                                 BSON("bad cmd" << request.getCommandArgs()));
-
-            Command::unknownCommands.increment();
+            replyBuilder->setCommandReply(exception.toStatus());
         }
-
-        return true;
     }
 
 }  // namespace
 
-    bool runCommands(OperationContext* txn,
-                     const rpc::RequestInterface& request,
-                     rpc::ReplyBuilderInterface* replyBuilder) {
-        try {
-            bool result = _runCommands(txn, request, replyBuilder);
-            dassert(replyBuilder->getState() == rpc::ReplyBuilderInterface::State::kOutputDocs);
-            return result;
-        }
-        catch (const SendStaleConfigException&) {
-            throw;
-        }
-        catch (const AssertionException& e) {
-            verify( e.getCode() != SendStaleConfigCode && e.getCode() != RecvStaleConfigCode );
+    void Command::generateErrorResponse(OperationContext* txn,
+                                        rpc::ReplyBuilderInterface* replyBuilder,
+                                        const DBException& exception,
+                                        const rpc::RequestInterface& request) {
 
-            dassert(replyBuilder->getState() == rpc::ReplyBuilderInterface::State::kMetadata);
+        str::stream ss;
+        ss << "assertion while executing command '"
+           << request.getCommandName() << "' "
+           << "on database '"
+           << request.getDatabase() << "' ";
 
-            replyBuilder
-                ->setMetadata(rpc::metadata::empty())
-                .setCommandReply(e.toStatus());
-
-            CurOp::get(txn)->debug().exceptionInfo = e.getInfo();
+        Command* command = CurOp::get(txn)->getCommand();
+        // If we have a pointer to the command object, we can use it to redact the arguments.
+        if (command) {
+            ss << "with arguments '"
+               << command->getRedactedCopyForLogging(request.getCommandArgs()) << "' "
+               << "and metadata '"
+               << request.getMetadata() << "' ";
         }
-        return true;
+
+        ss << ":" << exception.toString();
+        log() << std::string(ss);
+        _generateErrorResponse(txn, replyBuilder, exception);
+    }
+
+    void Command::generateErrorResponse(OperationContext* txn,
+                                        rpc::ReplyBuilderInterface* replyBuilder,
+                                        const DBException& exception) {
+        log() << "assertion while executing command: " << exception.toString();
+        _generateErrorResponse(txn, replyBuilder, exception);
     }
 
 } // namespace mongo

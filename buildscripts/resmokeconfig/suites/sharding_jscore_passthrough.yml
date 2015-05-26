@@ -49,6 +49,9 @@ selector:
     - jstests/core/read_after_optime.js
     - jstests/core/find_getmore_bsonsize.js
     - jstests/core/find_getmore_cmd.js
+    # TODO: SERVER-18292 remove once OP_COMMAND is implemented in mongos
+    - jstests/core/invalid_db_name.js
+    - jstests/core/validate_cmd_ns.js
 
 executor:
   js_test:
