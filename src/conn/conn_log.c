@@ -272,7 +272,7 @@ err:
 /*
  * __log_file_server --
  *	The log file server thread.  This worker thread manages
- *	log file operations such as closing and syncing. 
+ *	log file operations such as closing and syncing.
  */
 static WT_THREAD_RET
 __log_file_server(void *arg)
