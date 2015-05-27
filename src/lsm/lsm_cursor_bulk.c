@@ -20,7 +20,7 @@ __clsm_close_bulk(WT_CURSOR *cursor)
 	WT_LSM_CHUNK *chunk;
 	WT_LSM_TREE *lsm_tree;
 	WT_SESSION_IMPL *session;
-	uint64_t avg_chunks, last_size;
+	uint64_t avg_chunks, total_chunks;
 
 	clsm = (WT_CURSOR_LSM *)cursor;
 	lsm_tree = clsm->lsm_tree;
@@ -36,13 +36,15 @@ __clsm_close_bulk(WT_CURSOR *cursor)
 	/* Set ondisk, and flush the metadata */
 	F_SET(chunk, WT_LSM_CHUNK_ONDISK);
 	/*
-	 * Setup a generation in our chunk, so that future LSM merges choose
-	 * reasonable sets of chunks.
+	 * Setup a generation in our chunk based on how many chunk_size
+	 * pieces fit into a chunk of a given generation.  This allows future
+	 * LSM merges choose reasonable sets of chunks.
 	 */
 	avg_chunks = (lsm_tree->merge_min + lsm_tree->merge_max) / 2;
-	for (last_size = avg_chunks * lsm_tree->chunk_size;
-	    last_size < chunk->size;
-	    last_size *= avg_chunks, ++chunk->generation) {}
+	for (total_chunks = chunk->size / lsm_tree->chunk_size;
+	    total_chunks > 1;
+	    total_chunks /= avg_chunks)
+		++chunk->generation;
 
 	WT_RET(__wt_lsm_meta_write(session, lsm_tree));
 	++lsm_tree->dsk_gen;
