@@ -107,8 +107,7 @@ func (dump *MongoDump) Init() error {
 }
 
 // Dump handles some final options checking and executes MongoDump.
-func (dump *MongoDump) Dump() error {
-	var err error
+func (dump *MongoDump) Dump() (err error) {
 	if dump.InputOptions.Query != "" {
 		// parse JSON then convert extended JSON values
 		var asJSON interface{}
@@ -143,7 +142,8 @@ func (dump *MongoDump) Dump() error {
 
 	if dump.OutputOptions.Archive != "" {
 		//getArchiveOut gives us a WriteCloser to which we should write the archive
-		archiveOut, err := dump.getArchiveOut()
+		var archiveOut io.WriteCloser
+		archiveOut, err = dump.getArchiveOut()
 		if err != nil {
 			return err
 		}
@@ -165,6 +165,7 @@ func (dump *MongoDump) Dump() error {
 				} else {
 					err = muxErr
 				}
+				log.Logf(log.DebugLow, "mux returned an error: %v", err)
 			} else {
 				log.Logf(log.DebugLow, "mux completed successfully")
 			}

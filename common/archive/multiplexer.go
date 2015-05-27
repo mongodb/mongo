@@ -80,6 +80,14 @@ func (mux *Multiplexer) Run() {
 			mux.ins = append(mux.ins, muxIn)
 		} else {
 			if EOF {
+				// We need to let the MuxIn know that we've
+				// noticed this close. This fixes a race where
+				// the intent processing threads finish, then the main
+				// thread closes the mux's control chan and the mux
+				// processes the close on the control chan before it processes
+				// the close on the MuxIn chan
+				mux.ins[index].writeCloseFinishedChan <- struct{}{}
+
 				err = mux.formatEOF(index, mux.ins[index])
 				if err != nil {
 					mux.Completed <- err
@@ -189,12 +197,13 @@ func (mux *Multiplexer) formatEOF(index int, in *MuxIn) error {
 // the thread owning the Multiplexer.
 // They are out the intents write data to the multiplexer
 type MuxIn struct {
-	writeChan    chan []byte
-	writeLenChan chan int
-	buf          []byte
-	hash         hash.Hash64
-	Intent       *intents.Intent
-	Mux          *Multiplexer
+	writeChan              chan []byte
+	writeLenChan           chan int
+	writeCloseFinishedChan chan struct{}
+	buf                    []byte
+	hash                   hash.Hash64
+	Intent                 *intents.Intent
+	Mux                    *Multiplexer
 }
 
 // Read does nothing for MuxIns
@@ -218,6 +227,10 @@ func (muxIn *MuxIn) Close() error {
 	}
 	close(muxIn.writeChan)
 	close(muxIn.writeLenChan)
+	// We need to wait for the close on the writeChan to be processed before proceeding
+	// Otherwise we might assume that all work is finished and exit the program before
+	// the mux finishes writing the end of the archive
+	<-muxIn.writeCloseFinishedChan
 	return nil
 }
 
@@ -227,6 +240,7 @@ func (muxIn *MuxIn) Open() error {
 	log.Logf(log.DebugHigh, "MuxIn open %v", muxIn.Intent.Namespace())
 	muxIn.writeChan = make(chan []byte)
 	muxIn.writeLenChan = make(chan int)
+	muxIn.writeCloseFinishedChan = make(chan struct{})
 	muxIn.buf = make([]byte, 0, bufferSize)
 	muxIn.hash = crc64.New(crc64.MakeTable(crc64.ECMA))
 	if bufferWrites {
