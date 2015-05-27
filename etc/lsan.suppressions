@@ -8,6 +8,7 @@ leak:mongo::mutex::mutex
 
 # Thread names leak from threads that are never terminated.
 leak:mongo::setThreadName
+leak:mongo::getThreadName
 
 # lets just ignore v8 for now. If we upgrade to newer v8
 # try removing this suppression
