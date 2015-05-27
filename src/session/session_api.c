@@ -904,7 +904,8 @@ __session_transaction_sync(WT_SESSION *wt_session, const char *config)
 	 * Our LSN is not yet stable.  Wait and check again depending on the
 	 * timeout.
 	 */
-	WT_ERR(__wt_config_gets_def(session, cfg, "timeout_ms", UINT_MAX, &cval));
+	WT_ERR(__wt_config_gets_def(
+	    session, cfg, "timeout_ms", UINT_MAX, &cval));
 	if ((unsigned int)cval.len != UINT_MAX) {
 		timeout_ms = (uint64_t)cval.val;
 		forever = 0;
