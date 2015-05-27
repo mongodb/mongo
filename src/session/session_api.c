@@ -1119,7 +1119,7 @@ __wt_open_session(WT_CONNECTION_IMPL *conn,
 		__session_rollback_transaction,
 		__session_checkpoint,
 		__session_snapshot,
-		__session_transaction_pinned_range
+		__session_transaction_pinned_range,
 		__session_transaction_sync
 	};
 	WT_DECL_RET;
