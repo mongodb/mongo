@@ -28,6 +28,9 @@
 
 #pragma once
 
+#include <memory>
+#include <vector>
+
 #include "mongo/db/storage/recovery_unit.h"
 
 namespace mongo {
@@ -36,10 +39,29 @@ namespace mongo {
 
     class RecoveryUnitNoop : public RecoveryUnit {
     public:
-        // TODO implement rollback
         void beginUnitOfWork(OperationContext* opCtx) final {}
-        void commitUnitOfWork() final {}
-        void abortUnitOfWork() final {}
+        void commitUnitOfWork() final {
+            for (auto& change : _changes) {
+                try {
+                    change->commit();
+                }
+                catch (...) {
+                    std::terminate();
+                }
+            }
+            _changes.clear();
+        }
+        void abortUnitOfWork() final {
+            for (auto it = _changes.rbegin(); it != _changes.rend(); ++it) {
+                try {
+                    (*it)->rollback();
+                }
+                catch (...) {
+                    std::terminate();
+                }
+            }
+            _changes.clear();
+        }
 
         virtual void abandonSnapshot() {}
 
@@ -48,13 +70,7 @@ namespace mongo {
         }
 
         virtual void registerChange(Change* change) {
-            try {
-                change->commit();
-                delete change;
-            }
-            catch (...) {
-                std::terminate();
-            }
+            _changes.push_back(std::unique_ptr<Change>(change));
         }
 
         virtual void* writingPtr(void* data, size_t len) {
@@ -63,6 +79,9 @@ namespace mongo {
         virtual void setRollbackWritesDisabled() {}
 
         virtual SnapshotId getSnapshotId() const { return SnapshotId(); }
+
+    private:
+        std::vector<std::unique_ptr<Change>> _changes;
     };
 
 }  // namespace mongo
