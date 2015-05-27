@@ -337,13 +337,13 @@ __wt_txn_config(WT_SESSION_IMPL *session, const char *cfg[])
 	 */
 	F_CLR(txn, WT_TXN_SYNC_SET);
 	WT_RET(__wt_config_gets_def(session, cfg, "sync", UINT_MAX, &cval));
-	if (cval.val != UINT_MAX)
+	if (cval.val == 0 || cval.val == 1)
 		/*
 		 * This is an explicit setting of sync.  Set the flag so
 		 * that we know not to overwrite it in commit_transaction.
 		 */
 		F_SET(txn, WT_TXN_SYNC_SET);
-	if (cval.val == 0 || (cval.val == UINT_MAX &&
+	if (cval.val == 0 || (!F_ISSET(txn, WT_TXN_SYNC_SET) &&
 	    !FLD_ISSET(txn->txn_logsync, WT_LOG_FLUSH)))
 		/*
 		 * Only reset the value if the setting was turned off.
