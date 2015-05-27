@@ -1491,7 +1491,8 @@ struct __wt_session {
 	 * @configstart{WT_SESSION.transaction_sync, see dist/api_data.py}
 	 * @config{timeout_ms, maximum amount of time to wait for background
 	 * sync to complete in milliseconds.  A value of zero disables the
-	 * timeout and returns immediately., an integer; default \c 0.}
+	 * timeout and returns immediately.  The default waits forever., an
+	 * integer; default \c .}
 	 * @configend
 	 * @errors
 	 */

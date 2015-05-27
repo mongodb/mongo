@@ -1,4 +1,4 @@
-/*-
+/*
  * Public Domain 2014-2015 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
@@ -105,11 +105,8 @@ main(void)
 		ret = cursor->insert(cursor);
 	}
 	ret = session->commit_transaction(session, "sync=background");
-	while ((ret = session->transaction_sync(
-	    session, "timeout_ms=1000")) == ETIMEDOUT) {
-		printf("Transactions not yet stable\n");
-		sleep(1);
-	}
+	printf("Wait forever until stable\n");
+	ret = session->transaction_sync(session, NULL);
 	printf("Transactions now stable\n");
 	ret = session->begin_transaction(session, NULL);
 	/*
