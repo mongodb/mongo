@@ -28,8 +28,7 @@
 
 #pragma once
 
-#include <boost/thread/mutex.hpp>
-#include <boost/thread/condition_variable.hpp>
+#include <memory>
 #include <vector>
 
 #include "mongo/base/status.h"
@@ -39,6 +38,8 @@
 #include "mongo/db/repl/collection_cloner.h"
 #include "mongo/db/repl/network_interface_mock.h"
 #include "mongo/db/repl/replication_executor_test_fixture.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
@@ -49,6 +50,7 @@ namespace mongo {
 namespace repl {
 
     class BaseCloner;
+    class StorageInterfaceMock;
 
     class BaseClonerTest : public ReplicationExecutorTest {
     public:
@@ -124,12 +126,16 @@ namespace repl {
         virtual BaseCloner* getCloner() const = 0;
         void testLifeCycle();
 
+    protected:
+
+        std::unique_ptr<StorageInterfaceMock> storageInterface;
+
     private:
 
         // Protects member data of this base cloner fixture.
-        mutable boost::mutex _mutex;
+        mutable stdx::mutex _mutex;
 
-        boost::condition_variable _setStatusCondition;
+        stdx::condition_variable _setStatusCondition;
 
         Status _status;
 
@@ -145,6 +151,9 @@ namespace repl {
         Status insertDocuments(OperationContext* txn,
                                const NamespaceString& nss,
                                const std::vector<BSONObj>& docs) override;
+
+        Status commitCollection(OperationContext* txn,
+                                const NamespaceString& nss) override;
 
         stdx::function<Status (OperationContext*,
                                const NamespaceString&,

@@ -32,7 +32,6 @@
 
 #include "mongo/db/repl/database_cloner.h"
 
-#include <boost/thread/lock_guard.hpp>
 #include <algorithm>
 #include <iterator>
 #include <set>
@@ -77,17 +76,17 @@ namespace {
                                    const std::string& dbname,
                                    const BSONObj& listCollectionsFilter,
                                    const ListCollectionsPredicateFn& listCollectionsPred,
-                                   const CreateStorageInterfaceFn& csi,
+                                   CollectionCloner::StorageInterface* si,
                                    const CollectionCallbackFn& collWork,
-                                   const CallbackFn& work)
+                                   const CallbackFn& onCompletion)
         : _executor(executor),
           _source(source),
           _dbname(dbname),
           _listCollectionsFilter(listCollectionsFilter),
           _listCollectionsPredicate(listCollectionsPred ? listCollectionsPred : acceptAllPred),
-          _createStorageInterface(csi),
+          _storageInterface(si),
           _collectionWork(collWork),
-          _work(work),
+          _onCompletion(onCompletion),
           _active(false),
           _listCollectionsFetcher(_executor,
                                   _source,
@@ -98,26 +97,32 @@ namespace {
                                              stdx::placeholders::_1,
                                              stdx::placeholders::_2,
                                              stdx::placeholders::_3)),
-          // TODO: replace with executor database worker when it is available.
-          _scheduleDbWorkFn(stdx::bind(&ReplicationExecutor::scheduleWorkWithGlobalExclusiveLock,
-                                       _executor,
-                                       stdx::placeholders::_1)),
+          _scheduleDbWorkFn([this](const ReplicationExecutor::CallbackFn& work) {
+              return _executor->scheduleDBWork(work);
+          }),
           _startCollectionCloner([](CollectionCloner& cloner) { return cloner.start(); }) {
 
         uassert(ErrorCodes::BadValue, "null replication executor", executor);
         uassert(ErrorCodes::BadValue, "empty database name", !dbname.empty());
-        uassert(ErrorCodes::BadValue, "storage interface creation function cannot be null", csi);
+        uassert(ErrorCodes::BadValue, "storage interface cannot be null", si);
         uassert(ErrorCodes::BadValue, "collection callback function cannot be null", collWork);
-        uassert(ErrorCodes::BadValue, "callback function cannot be null", work);
+        uassert(ErrorCodes::BadValue, "callback function cannot be null", onCompletion);
+    }
+
+    DatabaseCloner::~DatabaseCloner() {
+        DESTRUCTOR_GUARD(
+            cancel();
+            wait();
+        );
     }
 
     const std::vector<BSONObj>& DatabaseCloner::getCollectionInfos() const {
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         return _collectionInfos;
     }
 
     std::string DatabaseCloner::getDiagnosticString() const {
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         str::stream output;
         output << "DatabaseCloner";
         output << " executor: " << _executor->getDiagnosticString();
@@ -131,12 +136,12 @@ namespace {
     }
 
     bool DatabaseCloner::isActive() const {
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         return _active;
     }
 
     Status DatabaseCloner::start() {
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
 
         if (_active) {
             return Status(ErrorCodes::IllegalOperation, "database cloner already started");
@@ -154,7 +159,7 @@ namespace {
 
     void DatabaseCloner::cancel() {
         {
-            boost::lock_guard<boost::mutex> lk(_mutex);
+            stdx::lock_guard<stdx::mutex> lk(_mutex);
 
             if (!_active) {
                 return;
@@ -165,10 +170,12 @@ namespace {
     }
 
     void DatabaseCloner::wait() {
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
+        _condition.wait(lk, [this]() { return !_active; });
     }
 
     void DatabaseCloner::setScheduleDbWorkFn(const CollectionCloner::ScheduleDbWorkFn& work) {
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
 
         _scheduleDbWorkFn = work;
     }
@@ -183,12 +190,8 @@ namespace {
                                                   Fetcher::NextAction* nextAction,
                                                   BSONObjBuilder* getMoreBob) {
 
-        boost::lock_guard<boost::mutex> lk(_mutex);
-
-        _active = false;
-
         if (!result.isOK()) {
-            _work(result.getStatus());
+            _finishCallback(result.getStatus());
             return;
         }
 
@@ -206,14 +209,12 @@ namespace {
             invariant(getMoreBob);
             getMoreBob->append("getMore", batchData.cursorId);
             getMoreBob->append("collection", batchData.nss.coll());
-
-            _active = true;
             return;
         }
 
         // Nothing to do for an empty database.
         if (_collectionInfos.empty()) {
-            _work(Status::OK());
+            _finishCallback(Status::OK());
             return;
         }
 
@@ -222,41 +223,42 @@ namespace {
         for (auto&& info : _collectionInfos) {
             BSONElement nameElement = info.getField(kNameFieldName);
             if (nameElement.eoo()) {
-                _work(Status(ErrorCodes::FailedToParse, str::stream() <<
+                _finishCallback(Status(ErrorCodes::FailedToParse, str::stream() <<
                              "collection info must contain '" << kNameFieldName << "' " <<
                              "field : " << info));
                 return;
             }
             if (nameElement.type() != mongo::String) {
-                _work(Status(ErrorCodes::TypeMismatch, str::stream() <<
-                             "'" << kNameFieldName << "' field must be a string: " << info));
+                _finishCallback(Status(ErrorCodes::TypeMismatch, str::stream() <<
+                                "'" << kNameFieldName << "' field must be a string: " << info));
                 return;
             }
             const std::string collectionName = nameElement.String();
             if (seen.find(collectionName) != seen.end()) {
-                _work(Status(ErrorCodes::DuplicateKey, str::stream() <<
-                             "collection info contains duplicate collection name " <<
-                             "'" << collectionName << "': " << info));
+                _finishCallback(Status(ErrorCodes::DuplicateKey, str::stream() <<
+                                "collection info contains duplicate collection name " <<
+                                "'" << collectionName << "': " << info));
                 return;
             }
 
             BSONElement optionsElement = info.getField(kOptionsFieldName);
             if (optionsElement.eoo()) {
-                _work(Status(ErrorCodes::FailedToParse, str::stream() <<
-                             "collection info must contain '" << kOptionsFieldName << "' " <<
-                             "field : " << info));
+                _finishCallback(Status(ErrorCodes::FailedToParse, str::stream() <<
+                                "collection info must contain '" << kOptionsFieldName << "' " <<
+                                "field : " << info));
                 return;
             }
             if (!optionsElement.isABSONObj()) {
-                _work(Status(ErrorCodes::TypeMismatch, str::stream() <<
-                             "'" << kOptionsFieldName << "' field must be an object: " << info));
+                _finishCallback(Status(ErrorCodes::TypeMismatch, str::stream() <<
+                                "'" << kOptionsFieldName << "' field must be an object: " <<
+                                info));
                 return;
             }
             const BSONObj optionsObj = optionsElement.Obj();
             CollectionOptions options;
             Status parseStatus = options.parse(optionsObj);
             if (!parseStatus.isOK()) {
-                _work(parseStatus);
+                _finishCallback(parseStatus);
                 return;
             }
             seen.insert(collectionName);
@@ -274,10 +276,10 @@ namespace {
                                this,
                                stdx::placeholders::_1,
                                nss),
-                    _createStorageInterface());
+                    _storageInterface);
             }
             catch (const UserException& ex) {
-                _work(ex.toStatus());
+                _finishCallback(ex.toStatus());
                 return;
             }
         }
@@ -296,19 +298,13 @@ namespace {
             LOG(1) << "    failed to start collection cloning on "
                    << _currentCollectionClonerIter->getSourceNamespace()
                    << ": " << startStatus;
-            _work(startStatus);
+            _finishCallback(startStatus);
             return;
         }
-
-        _active = true;
     }
 
     void DatabaseCloner::_collectionClonerCallback(const Status& status,
                                                    const NamespaceString& nss) {
-        boost::lock_guard<boost::mutex> lk(_mutex);
-
-        _active = false;
-
         // Forward collection cloner result to caller.
         // Failure to clone a collection does not stop the database cloner
         // from cloning the rest of the collections in the listCollections result.
@@ -324,14 +320,20 @@ namespace {
                 LOG(1) << "    failed to start collection cloning on "
                        << _currentCollectionClonerIter->getSourceNamespace()
                        << ": " << startStatus;
-                _work(startStatus);
+                _finishCallback(startStatus);
                 return;
             }
-            _active = true;
             return;
         }
 
-        _work(Status::OK());
+        _finishCallback(Status::OK());
+    }
+
+    void DatabaseCloner::_finishCallback(const Status& status) {
+        _onCompletion(status);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        _active = false;
+        _condition.notify_all();
     }
 
 } // namespace repl

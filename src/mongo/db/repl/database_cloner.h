@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/thread/mutex.hpp>
 #include <list>
 #include <string>
 #include <vector>
@@ -41,6 +40,8 @@
 #include "mongo/db/repl/base_cloner.h"
 #include "mongo/db/repl/fetcher.h"
 #include "mongo/db/repl/replication_executor.h"
+#include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
@@ -64,14 +65,8 @@ namespace repl {
         using ListCollectionsPredicateFn = stdx::function<bool (const BSONObj&)>;
 
         /**
-         * Type of function to create a storage interface instance for
-         * the collection cloner.
-         */
-        using CreateStorageInterfaceFn = stdx::function<CollectionCloner::StorageInterface* ()>;
-
-        /**
          * Callback function to report progress of collection cloning. Arguments are:
-         *     - status from the collection cloner's 'work' callback.
+         *     - status from the collection cloner's 'onCompletion' callback.
          *     - source namespace of the collection cloner that completed (or failed).
          *
          * Called exactly once for every collection cloner started by the the database cloner.
@@ -86,9 +81,9 @@ namespace repl {
         /**
          * Creates DatabaseCloner task in inactive state. Use start() to activate cloner.
          *
-         * The cloner calls 'work' when the database cloning has completed or failed.
+         * The cloner calls 'onCompletion' when the database cloning has completed or failed.
          *
-         * 'work' will be called exactly once.
+         * 'onCompletion' will be called exactly once.
          *
          * Takes ownership of the passed StorageInterface object.
          */
@@ -97,11 +92,11 @@ namespace repl {
                        const std::string& dbname,
                        const BSONObj& listCollectionsFilter,
                        const ListCollectionsPredicateFn& listCollectionsPredicate,
-                       const CreateStorageInterfaceFn& createStorageInterface,
+                       CollectionCloner::StorageInterface* storageInterface,
                        const CollectionCallbackFn& collectionWork,
-                       const CallbackFn& work);
+                       const CallbackFn& onCompletion);
 
-        virtual ~DatabaseCloner() = default;
+        virtual ~DatabaseCloner();
 
         /**
          * Returns collection info objects read from listCollections result.
@@ -118,11 +113,11 @@ namespace repl {
 
         void cancel() override;
 
+        void wait() override;
+
         //
         // Testing only functions below.
         //
-
-        void wait() override;
 
         /**
          * Overrides how executor schedules database work.
@@ -153,6 +148,12 @@ namespace repl {
          */
         void _collectionClonerCallback(const Status& status, const NamespaceString& nss);
 
+        /**
+         * Reports completion status.
+         * Sets cloner to inactive.
+         */
+        void _finishCallback(const Status& status);
+
         // Not owned by us.
         ReplicationExecutor* _executor;
 
@@ -160,16 +161,18 @@ namespace repl {
         std::string _dbname;
         BSONObj _listCollectionsFilter;
         ListCollectionsPredicateFn _listCollectionsPredicate;
-        CreateStorageInterfaceFn _createStorageInterface;
+        CollectionCloner::StorageInterface* _storageInterface;
 
         // Invoked once for every successfully started collection cloner.
         CollectionCallbackFn _collectionWork;
 
         // Invoked once when cloning completes or fails.
-        CallbackFn _work;
+        CallbackFn _onCompletion;
 
         // Protects member data of this database cloner.
-        mutable boost::mutex _mutex;
+        mutable stdx::mutex _mutex;
+
+        mutable stdx::condition_variable _condition;
 
         // _active is true when database cloner is started.
         bool _active;

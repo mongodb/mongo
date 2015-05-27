@@ -72,17 +72,9 @@ namespace repl {
          */
         virtual void cancel() = 0;
 
-        //
-        // Testing only functions below.
-        //
-
         /**
          * Waits for active remote commands and database worker to complete.
-         * Returns immediately if collection cloner is not active.
-         *
-         * TODO: Internal state not sufficiently protected for production use.
-         *
-         * For testing only.
+         * Returns immediately if cloner is not active.
          */
         virtual void wait() = 0;
 

@@ -28,12 +28,11 @@
 
 #include "mongo/platform/basic.h"
 
-#include <boost/thread/lock_types.hpp>
-
 #include "mongo/db/repl/database_task.h"
 #include "mongo/db/repl/operation_context_repl_mock.h"
 #include "mongo/db/repl/task_runner.h"
 #include "mongo/db/repl/task_runner_test_fixture.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/thread_pool.h"
 
 namespace {
@@ -71,14 +70,14 @@ namespace {
     }
 
     TEST_F(DatabaseTaskTest, RunGlobalExclusiveLockTask) {
-        boost::mutex mutex;
+        stdx::mutex mutex;
         bool called = false;
         OperationContext* txn = nullptr;
         bool lockIsW = false;
         Status status = getDetectableErrorStatus();
         // Task returning 'void' implies NextAction::NoAction.
         auto task = [&](OperationContext* theTxn, const Status& theStatus) {
-            boost::lock_guard<boost::mutex> lk(mutex);
+            stdx::lock_guard<stdx::mutex> lk(mutex);
             called = true;
             txn = theTxn;
             lockIsW = txn->lockState()->isW();
@@ -89,7 +88,7 @@ namespace {
         getThreadPool().join();
         ASSERT_FALSE(getTaskRunner().isActive());
 
-        boost::lock_guard<boost::mutex> lk(mutex);
+        stdx::lock_guard<stdx::mutex> lk(mutex);
         ASSERT_TRUE(called);
         ASSERT(txn);
         ASSERT_TRUE(lockIsW);
@@ -97,14 +96,14 @@ namespace {
     }
 
     void _testRunDatabaseLockTask(DatabaseTaskTest& test, LockMode mode) {
-        boost::mutex mutex;
+        stdx::mutex mutex;
         bool called = false;
         OperationContext* txn = nullptr;
         bool isDatabaseLockedForMode = false;
         Status status = test.getDetectableErrorStatus();
         // Task returning 'void' implies NextAction::NoAction.
         auto task = [&](OperationContext* theTxn, const Status& theStatus) {
-            boost::lock_guard<boost::mutex> lk(mutex);
+            stdx::lock_guard<stdx::mutex> lk(mutex);
             called = true;
             txn = theTxn;
             isDatabaseLockedForMode = txn->lockState()->isDbLockedForMode(databaseName, mode);
@@ -116,7 +115,7 @@ namespace {
         test.getThreadPool().join();
         ASSERT_FALSE(test.getTaskRunner().isActive());
 
-        boost::lock_guard<boost::mutex> lk(mutex);
+        stdx::lock_guard<stdx::mutex> lk(mutex);
         ASSERT_TRUE(called);
         ASSERT(txn);
         ASSERT_TRUE(isDatabaseLockedForMode);
@@ -140,14 +139,14 @@ namespace {
     }
 
     void _testRunCollectionLockTask(DatabaseTaskTest& test, LockMode mode) {
-        boost::mutex mutex;
+        stdx::mutex mutex;
         bool called = false;
         OperationContext* txn = nullptr;
         bool isCollectionLockedForMode = false;
         Status status = test.getDetectableErrorStatus();
         // Task returning 'void' implies NextAction::NoAction.
         auto task = [&](OperationContext* theTxn, const Status& theStatus) {
-            boost::lock_guard<boost::mutex> lk(mutex);
+            stdx::lock_guard<stdx::mutex> lk(mutex);
             called = true;
             txn = theTxn;
             isCollectionLockedForMode =
@@ -160,7 +159,7 @@ namespace {
         test.getThreadPool().join();
         ASSERT_FALSE(test.getTaskRunner().isActive());
 
-        boost::lock_guard<boost::mutex> lk(mutex);
+        stdx::lock_guard<stdx::mutex> lk(mutex);
         ASSERT_TRUE(called);
         ASSERT(txn);
         ASSERT_TRUE(isCollectionLockedForMode);

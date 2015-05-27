@@ -106,10 +106,12 @@ namespace repl {
         ReplicationExecutorTest::setUp();
         clear();
         launchExecutorThread();
+        storageInterface.reset(new StorageInterfaceMock());
     }
 
     void BaseClonerTest::tearDown() {
         ReplicationExecutorTest::tearDown();
+        storageInterface.reset();
     }
 
     void BaseClonerTest::clear() {
@@ -117,18 +119,18 @@ namespace repl {
     }
 
     void BaseClonerTest::setStatus(const Status& status) {
-        boost::unique_lock<boost::mutex> lk(_mutex);
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
         _status = status;
         _setStatusCondition.notify_all();
     }
 
     const Status& BaseClonerTest::getStatus() const {
-        boost::unique_lock<boost::mutex> lk(_mutex);
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
         return _status;
     }
 
     void BaseClonerTest::waitForStatus() {
-        boost::unique_lock<boost::mutex> lk(_mutex);
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
         if (_status == getDetectableErrorStatus()) {
             try {
                 _setStatusCondition.wait_for(lk, Milliseconds(1000));
@@ -254,6 +256,11 @@ namespace repl {
                                                  const NamespaceString& nss,
                                                  const std::vector<BSONObj>& docs) {
         return insertDocumentsFn ? insertDocumentsFn(txn, nss, docs) : Status::OK();
+    }
+
+    Status StorageInterfaceMock::commitCollection(OperationContext* txn,
+                                                  const NamespaceString& nss) {
+        return Status::OK();
     }
 
 } // namespace repl
