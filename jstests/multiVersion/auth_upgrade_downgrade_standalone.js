@@ -85,7 +85,12 @@ var testUpgrade28WithSchemaUpgrade = function(){
     conn = MongoRunner.runMongod({restart: conn.runId, binVersion: newVersion});
     var adminDB = conn.getDB('admin');
     verifyAuth(adminDB, 'user1', 'newpass', true, true);
-    adminDB.runCommand('authSchemaUpgrade');
+
+    // Add $external no-op user to verify that it does not affect
+    // authSchemaUpgrade SERVER-18475
+    adminDB.getSiblingDB('$external').createUser({user: "evil", roles: []});
+
+    assert.commandWorked(adminDB.runCommand('authSchemaUpgrade'));
 
     // After authSchemaUpgrade MONGODB-CR no longer works.
     verifyAuth(adminDB, 'user1', 'newpass', false, true);

@@ -772,6 +772,11 @@ namespace {
                                const StringData& sourceDB,
                                const BSONObj& userDoc,
                                const BSONObj& writeConcern) {
+        // Skip users in $external, SERVER-18475
+        if (userDoc["db"].String() == "$external") {
+            return;
+        }
+
         BSONElement credentialsElement = userDoc["credentials"];
         uassert(18806,
                 mongoutils::str::stream() << "While preparing to upgrade user doc from "
