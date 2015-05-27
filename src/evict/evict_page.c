@@ -55,7 +55,7 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_PAGE_MODIFY *mod;
-	int forced_eviction, inmem_split;
+	int evict, forced_eviction, inmem_split;
 
 	conn = S2C(session);
 
@@ -81,6 +81,17 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 	 */
 	if (inmem_split)
 		goto done;
+
+	/*
+	 * If the cache is small enough, don't evict the page, cleaning it is
+	 * sufficient.
+	 */
+	__wt_cache_status(session, &evict, NULL);
+	if (!evict) {
+		if (!LF_ISSET(WT_EVICT_EXCLUSIVE))
+			__evict_exclusive_clear(session, ref);
+		return (0);
+	}
 
 	/*
 	 * Update the page's modification reference, reconciliation might have

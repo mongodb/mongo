@@ -91,6 +91,40 @@ __wt_cache_dirty_inuse(WT_CACHE *cache)
 }
 
 /*
+ * __wt_cache_status --
+ *	Return if the cache usage exceeds the eviction or dirty targets.
+ */
+static inline void
+__wt_cache_status(WT_SESSION_IMPL *session, int *evictp, int *dirtyp)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_CACHE *cache;
+	uint64_t bytes_inuse, bytes_max, dirty_inuse;
+
+	conn = S2C(session);
+	cache = conn->cache;
+
+	/*
+	 * Avoid division by zero if the cache size has not yet been set in a
+	 * shared cache.
+	 */
+	bytes_max = conn->cache_size + 1;
+	if (evictp != NULL) {
+		bytes_inuse = __wt_cache_bytes_inuse(cache);
+		if (bytes_inuse > (cache->eviction_target * bytes_max) / 100) {
+			*evictp = 1;
+			return;
+		}
+	}
+	if (dirtyp != NULL) {
+		dirty_inuse = __wt_cache_dirty_inuse(cache);
+		if (dirty_inuse >
+		    (cache->eviction_dirty_target * bytes_max) / 100)
+			*dirtyp = 1;
+	}
+}
+
+/*
  * __wt_eviction_check --
  *	Wake the eviction server if necessary.
  */
