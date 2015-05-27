@@ -197,7 +197,10 @@ namespace mongo {
          */
         virtual StorageFactoriesIterator* makeStorageFactoriesIterator() = 0;
 
-        virtual void initializeGlobalStorageEngine() = 0;
+        /**
+         * Set the storage engine.  The engine must have been registered via registerStorageEngine.
+         */
+        virtual void setGlobalStorageEngine(const std::string& name) = 0;
 
         /**
          * Shuts down storage engine cleanly and releases any locks on mongod.lock.

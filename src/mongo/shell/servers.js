@@ -882,7 +882,6 @@ startMongoProgram = function(){
 
 runMongoProgram = function() {
     var args = argumentsToArray( arguments );
-    args = appendSetParameterArgs(args);
     var progName = args[0];
 
     if ( jsTestOptions().auth ) {
@@ -908,7 +907,6 @@ runMongoProgram = function() {
 // command line arguments to the program.  Returns pid of the spawned program.
 startMongoProgramNoConnect = function() {
     var args = argumentsToArray( arguments );
-    args = appendSetParameterArgs(args);
     var progName = args[0];
 
     if ( jsTestOptions().auth ) {

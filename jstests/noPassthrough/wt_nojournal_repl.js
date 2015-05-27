@@ -26,7 +26,9 @@ var contains = function(logLines, func) {
 }
 
 // This test can only be run if the storageEngine is wiredTiger
-if (jsTest.options().storageEngine && jsTest.options().storageEngine !== "wiredTiger") {
+if ( typeof(TestData) != "object" || 
+     !TestData.storageEngine ||
+     TestData.storageEngine != "wiredTiger" ) {
     jsTestLog("Skipping test because storageEngine is not wiredTiger");
 }
 else {

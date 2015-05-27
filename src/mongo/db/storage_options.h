@@ -49,8 +49,7 @@ namespace mongo {
         static const char* kDefaultConfigDbPath;
 
         StorageGlobalParams() :
-            engine("wiredTiger"),
-            engineSetByUser(false),
+            engine("mmapv1"),
             dbpath(kDefaultDbPath),
             upgrade(false),
             repair(false),
@@ -65,9 +64,6 @@ namespace mongo {
         // --storageEngine
         // storage engine for this instance of mongod.
         std::string engine;
-
-        // True if --storageEngine was passed on the command line, and false otherwise.
-        bool engineSetByUser;
 
         // The directory where the mongod instance stores its data.
         std::string dbpath;

@@ -12,7 +12,7 @@ var nodes = {n1: {binVersion: newVersion},
              n2: {binVersion: newVersion},
              n3: {binVersion: newVersion}};
 
-var rst = new ReplSetTest({name: name, nodes: nodes, nodeOptions: {storageEngine: 'mmapv1'}});
+var rst = new ReplSetTest({name: name, nodes: 3});
 rst.startSet();
 rst.initiate();
 

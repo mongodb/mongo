@@ -165,7 +165,8 @@ namespace mongo {
         // Storage Options
 
         storage_options.addOptionChaining("storage.engine", "storageEngine", moe::String,
-                "what storage engine to use - defaults to wiredTiger if no data files present");
+                                          "what storage engine to use")
+            .setDefault(moe::Value(std::string("mmapv1")));
 
 
 #ifdef _WIN32
@@ -893,10 +894,7 @@ namespace mongo {
                           "files");
         }
 
-        if (params.count("storage.engine")) {
-            storageGlobalParams.engine = params["storage.engine"].as<string>();
-            storageGlobalParams.engineSetByUser = true;
-        }
+        storageGlobalParams.engine = params["storage.engine"].as<string>();
 
         if (params.count("storage.dbPath")) {
             storageGlobalParams.dbpath = params["storage.dbPath"].as<string>();

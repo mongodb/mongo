@@ -32,8 +32,6 @@
 
 #include "mongo/db/service_context_d.h"
 
-#include <boost/optional.hpp>
-
 #include "mongo/base/init.h"
 #include "mongo/base/initializer.h"
 #include "mongo/db/client.h"
@@ -47,7 +45,6 @@
 #include "mongo/scripting/engine.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
-#include "mongo/util/map_util.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/scopeguard.h"
 
@@ -75,52 +72,21 @@ namespace mongo {
 
     extern bool _supportsDocLocking;
 
-    void ServiceContextMongoD::initializeGlobalStorageEngine() {
+    void ServiceContextMongoD::setGlobalStorageEngine(const std::string& name) {
         // This should be set once.
         invariant(!_storageEngine);
 
-        const std::string dbpath = storageGlobalParams.dbpath;
-        if (auto existingStorageEngine = StorageEngineMetadata::getStorageEngineForPath(dbpath)) {
-            if (storageGlobalParams.engineSetByUser) {
-                // Verify that the name of the user-supplied storage engine matches the contents of
-                // the metadata file.
-                const StorageEngine::Factory* factory = mapFindWithDefault(
-                    _storageFactories,
-                    storageGlobalParams.engine,
-                    static_cast<const StorageEngine::Factory*>(nullptr));
-
-                if (factory) {
-                    uassert(28662, str::stream()
-                        << "Cannot start server. Detected data files in " << dbpath << " created by"
-                        << " the '" << *existingStorageEngine << "' storage engine, but the"
-                        << " specified storage engine was '" << factory->getCanonicalName() << "'.",
-                        factory->getCanonicalName() == *existingStorageEngine);
-                }
-            }
-            else {
-                // Otherwise set the active storage engine as the contents of the metadata file.
-                log() << "Detected data files in " << dbpath << " created by the '"
-                      << *existingStorageEngine << "' storage engine, so setting the active"
-                      << " storage engine to '" << *existingStorageEngine << "'.";
-                storageGlobalParams.engine = *existingStorageEngine;
-            }
-        }
-        else if (!storageGlobalParams.engineSetByUser) {
-            // Ensure the default storage engine is available with this build of mongod.
-            uassert(28663, str::stream()
-                << "Cannot start server. The default storage engine '" << storageGlobalParams.engine
-                << "' is not available with this build of mongod. Please specify a different"
-                << " storage engine explicitly, e.g. --storageEngine=mmapv1.",
-                isRegisteredStorageEngine(storageGlobalParams.engine));
-        }
-
-        const StorageEngine::Factory* factory = _storageFactories[storageGlobalParams.engine];
+        const StorageEngine::Factory* factory = _storageFactories[name];
 
         uassert(18656, str::stream()
-            << "Cannot start server with an unknown storage engine: " << storageGlobalParams.engine,
+            << "Cannot start server with an unknown storage engine: " << name,
             factory);
 
-        std::unique_ptr<StorageEngineMetadata> metadata = StorageEngineMetadata::forPath(dbpath);
+        std::string canonicalName = factory->getCanonicalName().toString();
+
+        // Do not proceed if data directory has been used by a different storage engine previously.
+        std::auto_ptr<StorageEngineMetadata> metadata =
+            StorageEngineMetadata::validate(storageGlobalParams.dbpath, canonicalName);
 
         // Validate options in metadata against current startup options.
         if (metadata.get()) {
@@ -150,7 +116,7 @@ namespace mongo {
         // Write a new metadata file if it is not present.
         if (!metadata.get()) {
             metadata.reset(new StorageEngineMetadata(storageGlobalParams.dbpath));
-            metadata->setStorageEngine(factory->getCanonicalName().toString());
+            metadata->setStorageEngine(canonicalName);
             metadata->setStorageEngineOptions(factory->createMetadataOptions(storageGlobalParams));
             uassertStatusOK(metadata->write());
         }

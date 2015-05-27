@@ -135,7 +135,7 @@ function doIt( indexVersion ) {
 for( var z = 0; z < 5; ++z ) {
     var indexVersion = z % 2;
     var storageEngine = jsTest.options().storageEngine;
-    if (storageEngine === 'mmapv1' || indexVersion !== 0) {
+    if (!storageEngine || storageEngine === 'mmapv1' || indexVersion !== 0) {
         doIt(indexVersion);
     }
 }

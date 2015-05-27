@@ -6,7 +6,7 @@
     'use strict';
 
     var storageEngine = jsTest.options().storageEngine;
-    if (storageEngine !== 'mmapv1') {
+    if (storageEngine && storageEngine !== 'mmapv1') {
         return;
     }
 

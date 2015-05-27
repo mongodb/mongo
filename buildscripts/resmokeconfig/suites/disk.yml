@@ -7,11 +7,6 @@ selector:
 
 executor:
   js_test:
-    config:
-      shell_options:
-        global_vars:
-          TestData:
-            storageEngine: mmapv1
     hooks:
     - class: CleanEveryN
       n: 20
@@ -21,4 +16,3 @@ executor:
         nopreallocj: ''
         set_parameters:
           enableTestCommands: 1
-        storageEngine: mmapv1

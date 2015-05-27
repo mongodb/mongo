@@ -30,7 +30,10 @@ function writeDataAndRestart(doFsync) {
 }
 
 // This test can only be run if the storageEngine is wiredTiger
-if (jsTest.options().storageEngine && jsTest.options().storageEngine !== "wiredTiger") {
+// This check will have to change when we change the default storageEngine
+if ( typeof(TestData) != "object" ||
+     !TestData.storageEngine || 
+     TestData.storageEngine != "wiredTiger" ) {
     jsTestLog("Skipping test because storageEngine is not wiredTiger");
 }
 else {
