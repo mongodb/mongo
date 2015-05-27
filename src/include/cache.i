@@ -105,6 +105,10 @@ __wt_cache_status(WT_SESSION_IMPL *session, int *evictp, int *dirtyp)
 	cache = conn->cache;
 
 	/*
+	 * There's an assumption "evict" overrides "dirty", that is, if eviction
+	 * is required, we no longer care where we are with respect to the dirty
+	 * target.
+	 *
 	 * Avoid division by zero if the cache size has not yet been set in a
 	 * shared cache.
 	 */
@@ -115,12 +119,16 @@ __wt_cache_status(WT_SESSION_IMPL *session, int *evictp, int *dirtyp)
 			*evictp = 1;
 			return;
 		}
+		*evictp = 0;
 	}
 	if (dirtyp != NULL) {
 		dirty_inuse = __wt_cache_dirty_inuse(cache);
 		if (dirty_inuse >
-		    (cache->eviction_dirty_target * bytes_max) / 100)
+		    (cache->eviction_dirty_target * bytes_max) / 100) {
 			*dirtyp = 1;
+			return;
+		}
+		*dirtyp = 0;
 	}
 }
 
