@@ -46,7 +46,6 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/delete.h"
 #include "mongo/db/exec/update.h"
-#include "mongo/db/service_context.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/introspect.h"
 #include "mongo/db/lasterror.h"
@@ -66,6 +65,7 @@
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/server_parameters.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/s/collection_metadata.h"
@@ -74,6 +74,7 @@
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/write_ops/batched_upsert_detail.h"
 #include "mongo/s/write_ops/write_error_detail.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/elapsed_tracker.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -498,11 +499,6 @@ namespace mongo {
         // Execute the write item as a child operation of the current operation.
         // This is not done by out callers
 
-        // Set up the child op with more info
-        HostAndPort remote =
-            client->hasRemote() ? client->getRemote() : HostAndPort( "0.0.0.0", 0 );
-        // TODO Modify CurOp "wrapped" constructor to take an opcode, so calling .reset()
-        // is unneeded
         currentOp->ensureStarted();
         currentOp->setNS( currWrite.getRequest()->getNS() );
 
@@ -591,14 +587,7 @@ namespace mongo {
         currentOp->done();
         int executionTime = currentOp->debug().executionTime = currentOp->totalTimeMillis();
         currentOp->debug().recordStats();
-        if (currentOp->getOp() == dbInsert) {
-            // This is a wrapped operation, so make sure to count this part of the op
-            // SERVER-13339: Properly fix the handling of context in the insert path.
-            // Right now it caches client contexts in ExecInsertsState, unlike the
-            // update and remove operations.
-            currentOp->recordGlobalTime(txn->lockState()->isWriteLocked(),
-                                        currentOp->totalTimeMicros());
-        }
+        currentOp->recordGlobalTime(true, currentOp->totalTimeMicros());
 
         if ( opError ) {
             currentOp->debug().exceptionInfo = ExceptionInfo( opError->getErrMessage(),
@@ -689,12 +678,7 @@ namespace mongo {
         /**
          * Returns true if this executor has the lock on the target database.
          */
-        bool hasLock() { return _writeLock.get(); }
-
-        /**
-         * Gets the lock-holding object.  Only valid if hasLock().
-         */
-        Lock::DBLock& getLock() { return *_writeLock; }
+        bool hasLock() { return _dbLock.get(); }
 
         /**
          * Gets the target collection for the batch operation.  Value is undefined
@@ -708,7 +692,7 @@ namespace mongo {
         const BatchedCommandRequest* request;
 
         // Index of the current insert operation to perform.
-        size_t currIndex;
+        size_t currIndex = 0;
 
         // Translation of insert documents in "request" into insert-ready forms.  This vector has a
         // correspondence with elements of the "request", and "currIndex" is used to
@@ -720,15 +704,11 @@ namespace mongo {
 
         ScopedTransaction _transaction;
         // Guard object for the write lock on the target database.
-        scoped_ptr<Lock::DBLock> _writeLock;
-        scoped_ptr<Lock::CollectionLock> _collLock;
+        std::unique_ptr<Lock::DBLock> _dbLock;
+        std::unique_ptr<Lock::CollectionLock> _collLock;
 
-        // Context object on the target database.  Must appear after writeLock, so that it is
-        // destroyed in proper order.
-        scoped_ptr<OldClientContext> _context;
-
-        // Target collection.
-        Collection* _collection;
+        Database* _database = nullptr;
+        Collection* _collection = nullptr;
     };
 
     void WriteBatchExecutor::bulkExecute( const BatchedCommandRequest& request,
@@ -985,41 +965,35 @@ namespace mongo {
                                                            const BatchedCommandRequest* aRequest) :
         txn(txn),
         request(aRequest),
-        currIndex(0),
-        _transaction(txn, MODE_IX),
-        _collection(NULL) {
+        _transaction(txn, MODE_IX) {
     }
 
     bool WriteBatchExecutor::ExecInsertsState::_lockAndCheckImpl(WriteOpResult* result,
                                                                  bool intentLock) {
         if (hasLock()) {
-            // TODO: OldClientContext legacy, needs to be removed
-            CurOp::get(txn)->enter(_context->ns(),
-                                   _context->db() ? _context->db()->getProfilingLevel() : 0);
+            CurOp::get(txn)->raiseDbProfileLevel(_database->getProfilingLevel());
             return true;
         }
 
         if (request->isInsertIndexRequest())
             intentLock = false; // can't build indexes in intent mode
 
-        invariant(!_context.get());
         const NamespaceString& nss = request->getNSS();
-        _collLock.reset(); // give up locks if any
-        _writeLock.reset();
-        _writeLock.reset(new Lock::DBLock(txn->lockState(),
-                                          nss.db(),
-                                          intentLock ? MODE_IX : MODE_X));
-        if (intentLock && dbHolder().get(txn, nss.db()) == NULL) {
+        invariant(!_collLock);
+        invariant(!_dbLock);
+        _dbLock = stdx::make_unique<Lock::DBLock>(txn->lockState(),
+                                                  nss.db(),
+                                                  intentLock ? MODE_IX : MODE_X);
+        _database = dbHolder().get(txn, nss.ns());
+        if (intentLock && !_database) {
             // Ensure exclusive lock in case the database doesn't yet exist
-            _writeLock.reset();
-            _writeLock.reset(new Lock::DBLock(txn->lockState(),
-                                              nss.db(),
-                                              MODE_X));
+            _dbLock.reset();
+            _dbLock = stdx::make_unique<Lock::DBLock>(txn->lockState(), nss.db(), MODE_X);
             intentLock = false;
         }
-        _collLock.reset(new Lock::CollectionLock(txn->lockState(),
-                                                 nss.ns(),
-                                                 intentLock ? MODE_IX : MODE_X));
+        _collLock = stdx::make_unique<Lock::CollectionLock>(txn->lockState(),
+                                                            nss.ns(),
+                                                            intentLock ? MODE_IX : MODE_X);
         if (!checkIsMasterForDatabase(nss, result)) {
             return false;
         }
@@ -1030,12 +1004,12 @@ namespace mongo {
             return false;
         }
 
-        _context.reset();
-        _context.reset(new OldClientContext(txn, nss, false));
-
-        Database* database = _context->db();
-        dassert(database);
-        _collection = database->getCollection(request->getTargetingNS());
+        if (!_database) {
+            invariant(!intentLock);
+            _database = dbHolder().openDb(txn, nss.ns());
+        }
+        CurOp::get(txn)->raiseDbProfileLevel(_database->getProfilingLevel());
+        _collection = _database->getCollection(request->getTargetingNS());
         if (!_collection) {
             if (intentLock) {
                 // try again with full X lock.
@@ -1045,7 +1019,7 @@ namespace mongo {
 
             WriteUnitOfWork wunit (txn);
             // Implicitly create if it doesn't exist
-            _collection = database->createCollection(txn, request->getTargetingNS());
+            _collection = _database->createCollection(txn, request->getTargetingNS());
             if (!_collection) {
                 result->setError(
                         toWriteError(Status(ErrorCodes::InternalError,
@@ -1066,10 +1040,10 @@ namespace mongo {
     }
 
     void WriteBatchExecutor::ExecInsertsState::unlock() {
-        _collection = NULL;
-        _context.reset();
+        _collection = nullptr;
+        _database = nullptr;
         _collLock.reset();
-        _writeLock.reset();
+        _dbLock.reset();
     }
 
     static void insertOne(WriteBatchExecutor::ExecInsertsState* state, WriteOpResult* result) {
@@ -1253,15 +1227,13 @@ namespace mongo {
 
             if ( createCollection ) {
                 MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-                    ScopedTransaction transaction(txn, MODE_IX);
-                    Lock::DBLock lk(txn->lockState(), nsString.db(), MODE_X);
-                    OldClientContext ctx(txn, nsString.ns(), false /* don't check version */);
+                    const AutoGetOrCreateDb adb{txn, nsString.db(), MODE_X};
 
                     if (!checkIsMasterForDatabase(nsString, result)) {
                         return;
                     }
 
-                    Database* db = ctx.db();
+                    Database* const db = adb.getDb();
                     if ( db->getCollection( nsString.ns() ) ) {
                         // someone else beat us to it
                     }
@@ -1312,7 +1284,7 @@ namespace mongo {
                 continue;
             }
 
-            OldClientContext ctx(txn, nsString.ns(), false /* don't check version */);
+            CurOp::get(txn)->raiseDbProfileLevel(db->getProfilingLevel());
             Collection* collection = db->getCollection(nsString.ns());
 
             if ( collection == NULL ) {
@@ -1425,6 +1397,7 @@ namespace mongo {
                     break;
                 }
 
+                CurOp::get(txn)->raiseDbProfileLevel(autoDb.getDb()->getProfilingLevel());
                 Lock::CollectionLock collLock(txn->lockState(),
                                               nss.ns(),
                                               parsedDelete.isIsolated() ? MODE_X : MODE_IX);
@@ -1440,13 +1413,9 @@ namespace mongo {
                     return;
                 }
 
-                // Context once we're locked, to set more details in currentOp()
-                // TODO: better constructor?
-                OldClientContext ctx(txn, nss.ns(), false /* don't check version */);
-
                 PlanExecutor* rawExec;
                 uassertStatusOK(getExecutorDelete(txn,
-                                                  ctx.db()->getCollection(nss),
+                                                  autoDb.getDb()->getCollection(nss),
                                                   &parsedDelete,
                                                   &rawExec));
                 boost::scoped_ptr<PlanExecutor> exec(rawExec);

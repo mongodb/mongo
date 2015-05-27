@@ -222,6 +222,12 @@ namespace mongo {
             return _dbprofile >= 2 || ms >= serverGlobalParams.slowMS;
         }
 
+        /**
+         * Raises the profiling level for this operation to "dbProfileLevel" if it was previously
+         * less than "dbProfileLevel".
+         */
+        void raiseDbProfileLevel(int dbProfileLevel);
+
         int getOp() const { return _op; }
 
         //

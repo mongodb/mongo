@@ -225,10 +225,6 @@ namespace mongo {
             AutoGetDb autoDb( txn, nsString.db(), MODE_IX );
             Lock::CollectionLock colLock( txn->lockState(), nsString.ns(), MODE_IX );
 
-            // We check the shard version explicitly here rather than using OldClientContext,
-            // as Context can do implicit database creation if the db does not exist. We want
-            // explain to be a no-op that reports a trivial EOF plan against non-existent dbs
-            // or collections.
             ensureShardVersionOKOrThrow( nsString.ns() );
 
             // Get a pointer to the (possibly NULL) collection.
@@ -269,10 +265,6 @@ namespace mongo {
             AutoGetDb autoDb(txn, nsString.db(), MODE_IX);
             Lock::CollectionLock colLock(txn->lockState(), nsString.ns(), MODE_IX);
 
-            // We check the shard version explicitly here rather than using OldClientContext,
-            // as Context can do implicit database creation if the db does not exist. We want
-            // explain to be a no-op that reports a trivial EOF plan against non-existent dbs
-            // or collections.
             ensureShardVersionOKOrThrow( nsString.ns() );
 
             // Get a pointer to the (possibly NULL) collection.

@@ -219,6 +219,10 @@ namespace mongo {
     void CurOp::enter(const char* ns, int dbProfileLevel) {
         ensureStarted();
         _ns = ns;
+        raiseDbProfileLevel(dbProfileLevel);
+    }
+
+    void CurOp::raiseDbProfileLevel(int dbProfileLevel) {
         _dbprofile = std::max(dbProfileLevel, _dbprofile);
     }
 
