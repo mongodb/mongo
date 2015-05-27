@@ -1417,10 +1417,6 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
 	 * WiredTiger file and system utilities on Windows can't copy locked
 	 * files.
 	 *
-	 * For this reason, we don't use the lock file's existence to decide if
-	 * we're creating the database or not, use the WiredTiger file instead,
-	 * it has existed in every version of WiredTiger.
-	 *
 	 * Additionally, avoid an upgrade race: a 2.3.1 release process might
 	 * have the WiredTiger file locked, and we're going to create the lock
 	 * file and lock it instead. For this reason, first acquire a lock on
