@@ -263,7 +263,6 @@ __backup_start(
 			WT_ERR(__backup_list_append(
 			    session, cb, WT_USERCONFIG));
 		WT_ERR(__backup_list_append(session, cb, WT_WIREDTIGER));
-		WT_ERR(__backup_list_append(session, cb, WT_SINGLETHREAD));
 	}
 
 err:	/* Close the hot backup file. */

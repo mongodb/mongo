@@ -1428,10 +1428,21 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
 	 * way to fix that.)
 	 *
 	 * Open the WiredTiger lock file, optionally creating it if it doesn't
-	 * exist.
+	 * exist. The "optional" part of that statement is tricky: we don't want
+	 * to create the lock file in random directories when users mistype the
+	 * database home directory path, so we only create the lock file in two
+	 * cases: First, applications creating databases will configure create,
+	 * create the lock file. Second, after a hot backup, all of the standard
+	 * files will have been copied into place except for the lock file (see
+	 * above, locked files cannot be copied on Windows). If the WiredTiger
+	 * file exists in the directory, create the lock file, covering the case
+	 * of a hot backup.
 	 */
-	WT_ERR(__wt_open(
-	    session, WT_SINGLETHREAD, is_create, 0, 0, &conn->lock_fh));
+	exist = 0;
+	if (!is_create)
+		WT_ERR(__wt_exist(session, WT_WIREDTIGER, &exist));
+	WT_ERR(__wt_open(session,
+	    WT_SINGLETHREAD, is_create || exist, 0, 0, &conn->lock_fh));
 
 	/*
 	 * Lock a byte of the file: if we don't get the lock, some other process
