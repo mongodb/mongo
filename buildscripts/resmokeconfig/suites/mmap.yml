@@ -5,6 +5,11 @@ selector:
 
 executor:
   js_test:
+    config:
+      shell_options:
+        global_vars:
+          TestData:
+            storageEngine: mmapv1
     hooks:
     - class: CleanEveryN
       n: 20

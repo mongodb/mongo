@@ -1,9 +1,7 @@
 // Test that when user flags are set on a collection,
 // then collection is sharded, flags get carried over.
 
-if ( typeof(TestData) != "object" ||
-     !TestData.storageEngine ||
-     TestData.storageEngine == "mmapv1" ) {
+if (jsTest.options().storageEngine === "mmapv1") {
 
     // the dbname and collection we'll be working with
     var dbname = "testDB";

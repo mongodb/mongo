@@ -29,6 +29,8 @@
 #include "mongo/platform/basic.h"
 
 #include <boost/filesystem.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional_io.hpp>
 #include <fstream>
 #include <ios>
 #include <ostream>
@@ -197,140 +199,6 @@ namespace {
         }
     }
 
-    TEST(StorageEngineMetadataTest, ValidateEmptyDirectory) {
-        TempDir tempDir("StorageEngineMetadataTest_ValidateEmptyDirectory");
-        std::auto_ptr<StorageEngineMetadata> metadata =
-            StorageEngineMetadata::validate(tempDir.path(), "storageEngine1");
-        ASSERT_FALSE(metadata.get());
-    }
-
-    // Data directory is not empty but metadata is missing.
-    // Data directory contains local.ns.
-    // Current storage engine is 'mmapv1'.
-    TEST(StorageEngineMetadataTest, ValidateMissingMetadataStorageEngineMMapV1) {
-        TempDir tempDir("StorageEngineMetadataTest_ValidateMissingMetadataStorageEngineMMapV1");
-        {
-            std::string filename(tempDir.path() + "/local.ns");
-            std::ofstream ofs(filename.c_str());
-            ofs << "unused data" << std::endl;
-        }
-        std::auto_ptr<StorageEngineMetadata> metadata =
-            StorageEngineMetadata::validate(tempDir.path(), "mmapv1");
-        ASSERT_FALSE(metadata.get());
-    }
-
-    // Data directory is not empty but metadata is missing.
-    // Data directory contains local.ns.
-    // Current storage engine is not 'mmapv1'.
-    TEST(StorageEngineMetadataTest, ValidateMissingMetadataStorageEngineNotMMapV1) {
-        TempDir tempDir("StorageEngineMetadataTest_ValidateMissingMetadataStorageEngineNotMMapV1");
-        {
-            std::string filename(tempDir.path() + "/local.ns");
-            std::ofstream ofs(filename.c_str());
-            ofs << "unused data" << std::endl;
-        }
-        ASSERT_THROWS(StorageEngineMetadata::validate(tempDir.path(), "engine1"), UserException);
-    }
-
-    // Data directory is not empty but metadata is missing.
-    // Data directory contains local/local.ns.
-    // Current storage engine is 'mmapv1'.
-    TEST(StorageEngineMetadataTest, ValidateMissingMetadataDirectoryPerDb1) {
-        TempDir tempDir("StorageEngineMetadataTest_ValidateMissingMetadataDirectoryPerDb1");
-        {
-            boost::filesystem::create_directory(tempDir.path() + "/local");
-            std::string filename(tempDir.path() + "/local/local.ns");
-            std::ofstream ofs(filename.c_str());
-            ofs << "unused data" << std::endl;
-        }
-        std::auto_ptr<StorageEngineMetadata> metadata =
-            StorageEngineMetadata::validate(tempDir.path(), "mmapv1");
-        ASSERT_FALSE(metadata.get());
-    }
-
-    // Data directory is not empty but metadata is missing.
-    // Data directory contains local.ns.
-    // Current storage engine is not 'mmapv1'.
-    TEST(StorageEngineMetadataTest, ValidateMissingMetadataDirectoryPerDb2) {
-        TempDir tempDir("StorageEngineMetadataTest_ValidateMissingMetadataDirectoryPerDb2");
-        {
-            boost::filesystem::create_directory(tempDir.path() + "/local");
-            std::string filename(tempDir.path() + "/local/local.ns");
-            std::ofstream ofs(filename.c_str());
-            ofs << "unused data" << std::endl;
-        }
-        ASSERT_THROWS(StorageEngineMetadata::validate(tempDir.path(), "engine1"), UserException);
-    }
-
-    // Data directory is not empty but metadata is missing.
-    // Data directory does not contain either local.ns or local/local.ns.
-    // Current storage engine is 'mmapv1'.
-    TEST(StorageEngineMetadataTest, ValidateMissingMetadataMissingMMapV1Files1) {
-        TempDir tempDir("StorageEngineMetadataTest_ValidateMissingMetadataMissingMMapV1Files1");
-        {
-            std::string filename(tempDir.path() + "/user_data.txt");
-            std::ofstream ofs(filename.c_str());
-            ofs << "unused data" << std::endl;
-        }
-        std::auto_ptr<StorageEngineMetadata> metadata =
-            StorageEngineMetadata::validate(tempDir.path(), "mmapv1");
-        ASSERT_FALSE(metadata.get());
-    }
-
-    // Data directory is not empty but metadata is missing.
-    // Data directory does not contain either local.ns or local/local.ns.
-    // Current storage engine is not 'mmapv1'.
-    TEST(StorageEngineMetadataTest, ValidateMissingMetadataMissingMMapV1Files2) {
-        TempDir tempDir("StorageEngineMetadataTest_ValidateMissingMetadataMissingMMapV1Files2");
-        {
-            std::string filename(tempDir.path() + "/user_data.txt");
-            std::ofstream ofs(filename.c_str());
-            ofs << "unused data" << std::endl;
-        }
-        std::auto_ptr<StorageEngineMetadata> metadata =
-            StorageEngineMetadata::validate(tempDir.path(), "engine1");
-        ASSERT_FALSE(metadata.get());
-    }
-
-    TEST(StorageEngineMetadataTest, ValidateMetadataMatchesStorageEngine) {
-        TempDir tempDir("StorageEngineMetadataTest_ValidateMetadataMatchesStorageEngine");
-        {
-            StorageEngineMetadata metadata(tempDir.path());
-            metadata.setStorageEngine("storageEngine1");
-            ASSERT_OK(metadata.write());
-        }
-        std::auto_ptr<StorageEngineMetadata> metadata =
-            StorageEngineMetadata::validate(tempDir.path(), "storageEngine1");
-        ASSERT_TRUE(metadata.get());
-        ASSERT_EQUALS("storageEngine1", metadata->getStorageEngine());
-    }
-
-    TEST(StorageEngineMetadataTest, ValidateMetadataDifferentFromStorageEngine) {
-        TempDir tempDir("StorageEngineMetadataTest_ValidateMetadataDifferentFromStorageEngine");
-        {
-            StorageEngineMetadata metadata(tempDir.path());
-            metadata.setStorageEngine("storageEngine1");
-            ASSERT_OK(metadata.write());
-        }
-        ASSERT_THROWS(StorageEngineMetadata::validate(tempDir.path(), "engine2"), UserException);
-    }
-
-    TEST(StorageEngineMetadataTest, ValidateMetadataReadFailed) {
-        TempDir tempDir("StorageEngineMetadataTest_ValidateMetadataReadFailed");
-        {
-            std::string filename(tempDir.path() + "/storage.bson");
-            std::ofstream ofs(filename.c_str());
-            // BSON document of size -1 and EOO as first element.
-            BSONObj obj = fromjson("{x: 1}");
-            ofs.write("\xff\xff\xff\xff", 4);
-            ofs.write(obj.objdata()+4, obj.objsize()-4);
-            ofs.flush();
-        }
-        std::auto_ptr<StorageEngineMetadata> metadata =
-            StorageEngineMetadata::validate(tempDir.path(), "engine2");
-        ASSERT_FALSE(metadata.get());
-    }
-
     TEST(StorageEngineMetadataTest, ValidateStorageEngineOption) {
         // It is fine to provide an invalid data directory as long as we do not
         // call read() or write().
@@ -360,6 +228,76 @@ namespace {
         status = metadata.validateStorageEngineOption("y", true);
         ASSERT_NOT_OK(status);
         ASSERT_EQUALS(ErrorCodes::InvalidOptions, status.code());
+    }
+
+    // Do not override the active storage engine when the data directory is empty.
+    TEST(StorageEngineMetadataTest, StorageEngineForPath_EmptyDirectory) {
+        TempDir tempDir("StorageEngineMetadataTest_StorageEngineForPath_EmptyDirectory");
+        auto storageEngine = StorageEngineMetadata::getStorageEngineForPath(tempDir.path());
+        ASSERT_FALSE(storageEngine);
+    }
+
+    // Override the active storage engine with "mmapv1" when the data directory contains local.ns.
+    TEST(StorageEngineMetadataTest, StorageEngineForPath_DataFilesExist) {
+        TempDir tempDir("StorageEngineMetadataTest_StorageEngineForPath_DataFilesExist");
+        {
+            std::string filename(tempDir.path() + "/local.ns");
+            std::ofstream ofs(filename.c_str());
+            ofs << "unused data" << std::endl;
+        }
+        ASSERT_EQUALS(std::string("mmapv1"),
+                      StorageEngineMetadata::getStorageEngineForPath(tempDir.path()));
+    }
+
+    // Override the active storage engine with "mmapv1" when the data directory contains
+    // local/local.ns.
+    TEST(StorageEngineMetadataTest, StorageEngineForPath_DataFilesExist_DirPerDB) {
+        TempDir tempDir("StorageEngineMetadataTest_StorageEngineForPath_DataFilesExist_DirPerDB");
+        {
+            boost::filesystem::create_directory(tempDir.path() + "/local");
+            std::string filename(tempDir.path() + "/local/local.ns");
+            std::ofstream ofs(filename.c_str());
+            ofs << "unused data" << std::endl;
+        }
+        ASSERT_EQUALS(std::string("mmapv1"),
+                      StorageEngineMetadata::getStorageEngineForPath(tempDir.path()));
+    }
+
+    // Do not override the active storage engine when the data directory is nonempty, but does not
+    // contain either local.ns or local/local.ns.
+    TEST(StorageEngineMetadataTest, StorageEngineForPath_NoDataFilesExist) {
+        TempDir tempDir("StorageEngineMetadataTest_StorageEngineForPath_NoDataFilesExist");
+        {
+            std::string filename(tempDir.path() + "/user_data.txt");
+            std::ofstream ofs(filename.c_str());
+            ofs << "unused data" << std::endl;
+        }
+        auto storageEngine = StorageEngineMetadata::getStorageEngineForPath(tempDir.path());
+        ASSERT_FALSE(storageEngine);
+    }
+
+    // Override the active storage engine with "mmapv1" when the metadata file specifies "mmapv1".
+    TEST(StorageEngineMetadataTest, StorageEngineForPath_MetadataFile_mmapv1) {
+        TempDir tempDir("StorageEngineMetadataTest_StorageEngineForPath_MetadataFile_mmapv1");
+        {
+            StorageEngineMetadata metadata(tempDir.path());
+            metadata.setStorageEngine("mmapv1");
+            ASSERT_OK(metadata.write());
+        }
+        ASSERT_EQUALS(std::string("mmapv1"),
+                      StorageEngineMetadata::getStorageEngineForPath(tempDir.path()));
+    }
+
+    // Override the active storage engine whatever the metadata file specifies.
+    TEST(StorageEngineMetadataTest, StorageEngineForPath_MetadataFile_someEngine) {
+        TempDir tempDir("StorageEngineMetadataTest_StorageEngineForPath_MetadataFile_someEngine");
+        {
+            StorageEngineMetadata metadata(tempDir.path());
+            metadata.setStorageEngine("someEngine");
+            ASSERT_OK(metadata.write());
+        }
+        ASSERT_EQUALS(std::string("someEngine"),
+                      StorageEngineMetadata::getStorageEngineForPath(tempDir.path()));
     }
 
 }  // namespace

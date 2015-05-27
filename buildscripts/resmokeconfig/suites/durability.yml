@@ -11,4 +11,7 @@ executor:
   js_test:
     config:
       shell_options:
+        global_vars:
+          TestData:
+            storageEngine: mmapv1
         nodb: ''
