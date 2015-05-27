@@ -36,6 +36,7 @@
 
 #include "mongo/base/counter.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/client.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/storage/mmap_v1/extent.h"
@@ -466,9 +467,11 @@ namespace mongo {
             wunit.commit();
         }
 
-        ProgressMeterHolder pm(*txn->setMessage("compact extent",
-                                                "Extent Compacting Progress",
-                                                extents.size()));
+        stdx::unique_lock<Client> lk(*txn->getClient());
+        ProgressMeterHolder pm(*txn->setMessage_inlock("compact extent",
+                                                       "Extent Compacting Progress",
+                                                       extents.size()));
+        lk.unlock();
 
         // Go through all old extents and move each record to a new set of extents.
         int extentNumber = 0;

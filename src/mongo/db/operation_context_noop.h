@@ -81,10 +81,10 @@ namespace mongo {
             return oldState;
         }
 
-        virtual ProgressMeter* setMessage(const char * msg,
-                                          const std::string &name,
-                                          unsigned long long progressMeterTotal,
-                                          int secondsBetween) override {
+        virtual ProgressMeter* setMessage_inlock(const char * msg,
+                                                 const std::string &name,
+                                                 unsigned long long progressMeterTotal,
+                                                 int secondsBetween) override {
             return &_pm;
         }
 

@@ -148,7 +148,7 @@ namespace mongo {
         // basic options
         int op;
         bool iscommand;
-        ThreadSafeString ns;
+        std::string ns;
         BSONObj query;
         BSONObj updateobj;
         
@@ -189,31 +189,65 @@ namespace mongo {
         int responseLength;
     };
 
-    /* Current operation (for the current Client).
-       an embedded member of Client class, and typically used from within the mutex there.
-    */
+    /**
+     * Container for data used to report information about an OperationContext.
+     *
+     * Every OperationContext in a server with CurOp support has a stack of CurOp
+     * objects. The entry at the top of the stack is used to record timing and
+     * resource statistics for the executing operation or suboperation.
+     *
+     * All of the accessor methods on CurOp may be called by the thread executing
+     * the associated OperationContext at any time, or by other threads that have
+     * locked the context's owning Client object.
+     *
+     * The mutator methods on CurOp whose names end _inlock may only be called by the thread
+     * executing the associated OperationContext and Client, and only when that thread has also
+     * locked the Client object.  All other mutators may only be called by the thread executing
+     * CurOp, but do not require holding the Client lock.  The exception to this is the kill()
+     * method, which is self-synchronizing.
+     *
+     * The OpDebug member of a CurOp, accessed via the debug() accessor should *only* be accessed
+     * from the thread executing an operation, and as a result its fields may be accessed without
+     * any synchronization.
+     */
     class CurOp {
         MONGO_DISALLOW_COPYING(CurOp);
     public:
         static CurOp* get(const OperationContext* opCtx);
         static CurOp* get(const OperationContext& opCtx);
 
-        explicit CurOp(OperationContext* client);
+        /**
+         * Constructs a nested CurOp at the top of the given "opCtx"'s CurOp stack.
+         */
+        explicit CurOp(OperationContext* opCtx);
         ~CurOp();
 
         bool haveQuery() const { return _query.have(); }
         BSONObj query() const { return _query.get();  }
         void appendQuery( BSONObjBuilder& b , StringData name ) const { _query.append( b , name ); }
 
-        void enter(const char* ns, int dbProfileLevel);
+        void enter_inlock(const char* ns, int dbProfileLevel);
 
         /**
          * Sets the type of the current operation to "op".
          */
-        void setOp(int op);
-        void markCommand() { _isCommand = true; }
+        void setOp_inlock(int op);
+
+        /**
+         * Marks the current operation as being a command.
+         */
+        void markCommand_inlock() { _isCommand = true; }
+
+        /**
+         * Returns a structure containing data used for profiling, accessed only by a thread
+         * currently executing the operation context associated with this CurOp.
+         */
         OpDebug& debug()           { return _debug; }
-        std::string getNS() const { return _ns.toString(); }
+
+        /**
+         * Gets the name of the namespace on which the current operation operates.
+         */
+        std::string getNS() const { return _ns; }
 
         bool shouldDBProfile( int ms ) const {
             if ( _dbprofile <= 0 )
@@ -225,9 +259,14 @@ namespace mongo {
         /**
          * Raises the profiling level for this operation to "dbProfileLevel" if it was previously
          * less than "dbProfileLevel".
+         *
+         * This belongs on OpDebug, and so does not have the _inlock suffix.
          */
         void raiseDbProfileLevel(int dbProfileLevel);
 
+        /**
+         * Gets the type of the current operation.
+         */
         int getOp() const { return _op; }
 
         //
@@ -287,21 +326,43 @@ namespace mongo {
         }
         int elapsedSeconds() { return elapsedMillis() / 1000; }
 
-        void setQuery(const BSONObj& query) { _query.set( query ); }
+        void setQuery_inlock(const BSONObj& query) { _query.set( query ); }
 
         Command * getCommand() const { return _command; }
-        void setCommand(Command* command) { _command = command; }
+        void setCommand_inlock(Command* command) { _command = command; }
 
+        /**
+         * Appends information about this CurOp to "builder".
+         *
+         * If called from a thread other than the one executing the operation associated with this
+         * CurOp, it is necessary to lock the associated Client object before executing this method.
+         */
         void reportState(BSONObjBuilder* builder);
 
-        ProgressMeter& setMessage(const char * msg,
+        /**
+         * Sets the message and the progress meter for this CurOp.
+         *
+         * While it is necessary to hold the lock while this method executes, the
+         * "hit" and "finished" methods of ProgressMeter may be called safely from
+         * the thread executing the operation without locking the Client.
+         */
+        ProgressMeter& setMessage_inlock(const char * msg,
                                   std::string name = "Progress",
                                   unsigned long long progressMeterTotal = 0,
                                   int secondsBetween = 3);
-        std::string getMessage() const { return _message.toString(); }
-        ProgressMeter& getProgressMeter() { return _progressMeter; }
+
+        /**
+         * Gets the message for this CurOp.
+         */
+        const std::string& getMessage() const { return _message; }
+        const ProgressMeter& getProgressMeter() { return _progressMeter; }
         CurOp *parent() const { return _parent; }
-        void yielded() { _numYields++; }
+        void yielded() { _numYields++; }  // Should be _inlock()?
+
+        /**
+         * Returns the number of times yielded() was called.  Callers on threads other
+         * than the one executing the operation must lock the client.
+         */
         int numYields() const { return _numYields; }
 
         long long getExpectedLatencyMs() const { return _expectedLatencyMs; }
@@ -314,7 +375,7 @@ namespace mongo {
          * generally the Context should set this up
          * but sometimes you want to do it ahead of time
          */
-        void setNS( StringData ns );
+        void setNS_inlock( StringData ns );
 
     private:
         class CurOpStack;
@@ -331,10 +392,10 @@ namespace mongo {
         int _op;
         bool _isCommand;
         int _dbprofile;                  // 0=off, 1=slow, 2=all
-        ThreadSafeString _ns;
+        std::string _ns;
         CachedBSONObj<512> _query;       // CachedBSONObj is thread safe
         OpDebug _debug;
-        ThreadSafeString _message;
+        std::string _message;
         ProgressMeter _progressMeter;
         int _numYields;
         

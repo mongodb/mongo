@@ -31,6 +31,7 @@
 #pragma once
 
 #include "mongo/db/operation_context_noop.h"
+#include "mongo/db/service_context_noop.h"
 
 namespace mongo {
 
@@ -39,15 +40,19 @@ namespace mongo {
 
     class HarnessHelper {
     public:
-        HarnessHelper(){}
+        HarnessHelper() : _serviceContext(), _client(_serviceContext.makeClient("hh")) {}
         virtual ~HarnessHelper(){}
 
         virtual RecordStore* newNonCappedRecordStore() = 0;
         virtual RecoveryUnit* newRecoveryUnit() = 0;
 
         virtual OperationContext* newOperationContext() {
-            return new OperationContextNoop( newRecoveryUnit() );
+            return new OperationContextNoop(_client.get(), 1, newRecoveryUnit());
         }
+
+    private:
+        ServiceContextNoop _serviceContext;
+        ServiceContext::UniqueClient _client;
     };
 
     HarnessHelper* newHarnessHelper();

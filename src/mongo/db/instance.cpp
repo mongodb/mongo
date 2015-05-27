@@ -254,8 +254,11 @@ namespace {
 
             // Auth checking for Commands happens later.
             int nToReturn = queryMessage.ntoreturn;
-            beginQueryOp(nss, queryMessage.query, nToReturn, queryMessage.ntoskip, op);
-            op->markCommand();
+            beginQueryOp(txn, nss, queryMessage.query, nToReturn, queryMessage.ntoskip);
+            {
+                stdx::lock_guard<Client> lk(*txn->getClient());
+                op->markCommand_inlock();
+            }
 
             uassert(16979, str::stream() << "bad numberToReturn (" << nToReturn
                                          << ") for $cmd type ns - can only be 1 or -1",
@@ -301,8 +304,11 @@ namespace {
             // We construct a legacy $cmd namespace so we can fill in curOp using
             // the existing logic that existed for OP_QUERY commands
             NamespaceString nss(request.getDatabase(), "$cmd");
-            beginQueryOp(nss, request.getCommandArgs(), 1, 0, curOp);
-            curOp->markCommand();
+            beginQueryOp(txn, nss, request.getCommandArgs(), 1, 0);
+            {
+                stdx::lock_guard<Client> lk(*txn->getClient());
+                curOp->markCommand_inlock();
+            }
 
             runCommands(txn, request, &replyBuilder);
 
@@ -393,7 +399,7 @@ namespace {
             audit::logQueryAuthzCheck(client, nss, q.query, status.code());
             uassertStatusOK(status);
 
-            dbResponse.exhaustNS = runQuery(txn, q, nss, op, *resp);
+            dbResponse.exhaustNS = runQuery(txn, q, nss, *resp);
             verify( !resp->empty() );
         }
         catch (const AssertionException& exception) {
@@ -504,7 +510,10 @@ namespace {
         }
 
         CurOp& currentOp = *CurOp::get(txn);
-        currentOp.setOp(op);
+        {
+            stdx::lock_guard<Client> lk(*txn->getClient());
+            currentOp.setOp_inlock(op);
+        }
 
         OpDebug& debug = currentOp.debug();
         debug.op = op;
@@ -700,7 +709,10 @@ namespace {
         uassertStatusOK(status);
 
         op.debug().query = query;
-        op.setQuery(query);
+        {
+            stdx::lock_guard<Client> lk(*txn->getClient());
+            op.setQuery_inlock(query);
+        }
 
         UpdateRequest request(nsString);
         request.setUpsert(upsert);
@@ -823,7 +835,10 @@ namespace {
         uassertStatusOK(status);
 
         op.debug().query = pattern;
-        op.setQuery(pattern);
+        {
+            stdx::lock_guard<Client> lk(*txn->getClient());
+            op.setQuery_inlock(pattern);
+        }
 
         DeleteRequest request(nsString);
         request.setQuery(pattern);
@@ -922,7 +937,6 @@ namespace {
                                   ns,
                                   ntoreturn,
                                   cursorid,
-                                  curop,
                                   pass,
                                   exhaust,
                                   &isCursorAuthorized);

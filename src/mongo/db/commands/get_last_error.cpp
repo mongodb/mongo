@@ -251,7 +251,10 @@ namespace mongo {
             }
 
             txn->setWriteConcern(writeConcern);
-            txn->setMessage( "waiting for write concern" );
+            {
+                stdx::lock_guard<Client> lk(*txn->getClient());
+                txn->setMessage_inlock( "waiting for write concern" );
+            }
 
             WriteConcernResult wcResult;
             status = waitForWriteConcern( txn, lastOpTime, &wcResult );

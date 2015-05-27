@@ -36,6 +36,7 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
+#include "mongo/db/client.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/jsobj.h"
@@ -375,10 +376,12 @@ namespace mongo {
 
         std::unique_ptr<BulkBuilder::Sorter::Iterator> i(bulk->_sorter->done());
 
-        ProgressMeterHolder pm(*txn->setMessage("Index Bulk Build: (2/3) btree bottom up",
-                                                "Index: (2/3) BTree Bottom Up Progress",
-                                                bulk->_keysInserted,
-                                                10));
+        stdx::unique_lock<Client> lk(*txn->getClient());
+        ProgressMeterHolder pm(*txn->setMessage_inlock("Index Bulk Build: (2/3) btree bottom up",
+                                                       "Index: (2/3) BTree Bottom Up Progress",
+                                                       bulk->_keysInserted,
+                                                       10));
+        lk.unlock();
 
         std::unique_ptr<SortedDataBuilderInterface> builder;
 
@@ -436,8 +439,11 @@ namespace mongo {
 
         pm.finished();
 
-        CurOp::get(txn)->setMessage("Index Bulk Build: (3/3) btree-middle",
-                                     "Index: (3/3) BTree Middle Progress");
+        {
+            stdx::lock_guard<Client> lk(*txn->getClient());
+            CurOp::get(txn)->setMessage_inlock("Index Bulk Build: (3/3) btree-middle",
+                                               "Index: (3/3) BTree Middle Progress");
+        }
 
         LOG(timer.seconds() > 10 ? 0 : 1 ) << "\t done building bottom layer, going to commit";
 

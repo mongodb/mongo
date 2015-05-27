@@ -202,7 +202,7 @@ namespace mongo {
 
             // Fill out curop information.
             int ntoreturn = lpq->getBatchSize().value_or(0);
-            beginQueryOp(nss, cmdObj, ntoreturn, lpq->getSkip(), CurOp::get(txn));
+            beginQueryOp(txn, nss, cmdObj, ntoreturn, lpq->getSkip());
 
             // 1b) Finish the parsing step by using the LiteParsedQuery to create a CanonicalQuery.
             std::unique_ptr<CanonicalQuery> cq;
@@ -263,8 +263,7 @@ namespace mongo {
                 // there is no ClientCursor id, and then return.
                 const int numResults = 0;
                 const CursorId cursorId = 0;
-                endQueryOp(execHolder.get(), dbProfilingLevel, numResults, cursorId,
-                           CurOp::get(txn));
+                endQueryOp(txn, execHolder.get(), dbProfilingLevel, numResults, cursorId);
                 appendCursorResponseObject(cursorId, nss.ns(), BSONArray(), &result);
                 return true;
             }
@@ -348,7 +347,7 @@ namespace mongo {
             }
 
             // Fill out curop based on the results.
-            endQueryOp(exec, dbProfilingLevel, numResults, cursorId, CurOp::get(txn));
+            endQueryOp(txn, exec, dbProfilingLevel, numResults, cursorId);
 
             // 7) Generate the response object to send to the client.
             appendCursorResponseObject(cursorId, nss.ns(), firstBatch.arr(), &result);

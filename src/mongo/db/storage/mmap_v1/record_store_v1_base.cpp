@@ -35,6 +35,7 @@
 #include <boost/scoped_ptr.hpp>
 
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/mmap_v1/extent.h"
 #include "mongo/db/storage/mmap_v1/extent_manager.h"
@@ -900,9 +901,11 @@ namespace mongo {
         }
 
         std::string progress_msg = "touch " + std::string(txn->getNS()) + " extents";
-        ProgressMeterHolder pm(*txn->setMessage(progress_msg.c_str(),
-                                                "Touch Progress",
-                                                ranges.size()));
+        stdx::unique_lock<Client> lk(*txn->getClient());
+        ProgressMeterHolder pm(*txn->setMessage_inlock(progress_msg.c_str(),
+                                                       "Touch Progress",
+                                                       ranges.size()));
+        lk.unlock();
 
         for ( std::vector<touch_location>::iterator it = ranges.begin(); it != ranges.end(); ++it ) {
             touch_pages( it->root, it->length );

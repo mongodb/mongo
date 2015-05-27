@@ -66,6 +66,7 @@
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/scripting/engine.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
@@ -615,9 +616,13 @@ namespace mongo {
             }
             else if ( _config.outputOptions.outType == Config::MERGE ) {
                 // merge: upsert new docs into old collection
-                op->setMessage("m/r: merge post processing",
-                               "M/R Merge Post Processing Progress",
-                               _safeCount(_db, _config.tempNamespace, BSONObj()));
+                {
+                    const auto count = _safeCount(_db, _config.tempNamespace, BSONObj());
+                    stdx::lock_guard<Client> lk(*txn->getClient());
+                    op->setMessage_inlock("m/r: merge post processing",
+                                          "M/R Merge Post Processing Progress",
+                                          count);
+                }
                 auto_ptr<DBClientCursor> cursor = _db.query(_config.tempNamespace , BSONObj());
                 while (cursor->more()) {
                     ScopedTransaction scopedXact(_txn, MODE_IX);
@@ -635,9 +640,13 @@ namespace mongo {
                 // reduce: apply reduce op on new result and existing one
                 BSONList values;
 
-                op->setMessage("m/r: reduce post processing",
-                               "M/R Reduce Post Processing Progress",
-                               _safeCount(_db, _config.tempNamespace, BSONObj()));
+                {
+                    const auto count = _safeCount(_db, _config.tempNamespace, BSONObj());
+                    stdx::lock_guard<Client> lk(*txn->getClient());
+                    op->setMessage_inlock("m/r: reduce post processing",
+                                          "M/R Reduce Post Processing Progress",
+                                          count);
+                }
                 auto_ptr<DBClientCursor> cursor = _db.query( _config.tempNamespace , BSONObj() );
                 while ( cursor->more() ) {
                     ScopedTransaction transaction(txn, MODE_X);
@@ -1018,9 +1027,13 @@ namespace mongo {
             BSONObj prev;
             BSONList all;
 
-            verify(pm == op->setMessage("m/r: (3/3) final reduce to collection",
-                                        "M/R: (3/3) Final Reduce Progress",
-                                        _db.count(_config.incLong, BSONObj(), QueryOption_SlaveOk)));
+            {
+                const auto count = _db.count(_config.incLong, BSONObj(), QueryOption_SlaveOk);
+                stdx::lock_guard<Client> lk(*_txn->getClient());
+                verify(pm == op->setMessage_inlock("m/r: (3/3) final reduce to collection",
+                                                   "M/R: (3/3) Final Reduce Progress",
+                                                   count));
+            }
 
             const NamespaceString nss(_config.incLong);
             const WhereCallbackReal whereCallback(_txn, nss.db());
@@ -1361,10 +1374,12 @@ namespace mongo {
                         progressTotal = 1;
                     }
 
-                    ProgressMeter& progress( op->setMessage("m/r: (1/3) emit phase",
-                                             "M/R: (1/3) Emit Progress",
-                                             progressTotal ));
+                    stdx::unique_lock<Client> lk(*txn->getClient());
+                    ProgressMeter& progress( op->setMessage_inlock("m/r: (1/3) emit phase",
+                                                                   "M/R: (1/3) Emit Progress",
+                                                                   progressTotal ));
                     progress.showTotal(showTotal);
+                    lk.unlock();
                     ProgressMeterHolder pm(progress);
 
                     // See cast on next line to 32 bit unsigned
@@ -1494,8 +1509,11 @@ namespace mongo {
                     timingBuilder.appendNumber( "mapTime" , mapTime / 1000 );
                     timingBuilder.append( "emitLoop" , t.millis() );
 
-                    op->setMessage("m/r: (2/3) final reduce in memory",
-                                   "M/R: (2/3) Final In-Memory Reduce Progress");
+                    {
+                        stdx::lock_guard<Client> lk(*txn->getClient());
+                        op->setMessage_inlock("m/r: (2/3) final reduce in memory",
+                                              "M/R: (2/3) Final In-Memory Reduce Progress");
+                    }
                     Timer rt;
                     // do reduce in memory
                     // this will be the last reduce needed for inline mode
@@ -1603,8 +1621,10 @@ namespace mongo {
                 BSONObj shardCounts = cmdObj["shardCounts"].embeddedObjectUserCheck();
                 BSONObj counts = cmdObj["counts"].embeddedObjectUserCheck();
 
-                ProgressMeterHolder pm(op->setMessage("m/r: merge sort and reduce",
-                                                      "M/R Merge Sort and Reduce Progress"));
+                stdx::unique_lock<Client> lk(*txn->getClient());
+                ProgressMeterHolder pm(op->setMessage_inlock("m/r: merge sort and reduce",
+                                                             "M/R Merge Sort and Reduce Progress"));
+                lk.unlock();
                 set<string> servers;
 
                 {

@@ -87,7 +87,10 @@ namespace {
 
         AuthorizationSession::get(txn.getClient())->grantInternalAuthorization();
 
-        CurOp::get(txn)->setOp(dbInsert);
+        {
+            stdx::lock_guard<Client> lk(*txn.getClient());
+            CurOp::get(txn)->setOp_inlock(dbInsert);
+        }
         NamespaceString ns(_index["ns"].String());
 
         ScopedTransaction transaction(&txn, MODE_IX);
@@ -141,8 +144,11 @@ namespace {
             }
         }
 
-        // Show which index we're building in the curop display.
-        CurOp::get(txn)->setQuery(_index);
+        {
+            stdx::lock_guard<Client> lk(*txn->getClient());
+            // Show which index we're building in the curop display.
+            CurOp::get(txn)->setQuery_inlock(_index);
+        }
 
         bool haveSetBgIndexStarting = false;
         while (true) {

@@ -38,7 +38,6 @@
 
 namespace mongo {
 
-    class CurOp;
     class NamespaceString;
     class OperationContext;
 
@@ -111,27 +110,27 @@ namespace mongo {
                                  bool isTailable);
 
     /**
-     * Fills out CurOp with information about this query.
+     * Fills out the CurOp for "txn" with information about this query.
      */
-    void beginQueryOp(const NamespaceString& nss,
+    void beginQueryOp(OperationContext* txn,
+                      const NamespaceString& nss,
                       const BSONObj& queryObj,
                       int ntoreturn,
-                      int ntoskip,
-                      CurOp* curop);
+                      int ntoskip);
 
     /**
-     * Fills out CurOp with information regarding this query's execution.
+     * Fills out CurOp for "txn" with information regarding this query's execution.
      *
      * Uses explain functionality to extract stats from 'exec'.
      *
      * The database profiling level, 'dbProfilingLevel', is used to conditionalize whether or not we
      * do expensive stats gathering.
      */
-    void endQueryOp(PlanExecutor* exec,
+    void endQueryOp(OperationContext* txn,
+                    PlanExecutor* exec,
                     int dbProfilingLevel,
                     int numResults,
-                    CursorId cursorId,
-                    CurOp* curop);
+                    CursorId cursorId);
 
     /**
      * Constructs a PlanExecutor for a query with the oplogReplay option set to true,
@@ -155,7 +154,6 @@ namespace mongo {
                               const char* ns,
                               int ntoreturn,
                               long long cursorid,
-                              CurOp& curop,
                               int pass,
                               bool& exhaust,
                               bool* isCursorAuthorized);
@@ -166,7 +164,6 @@ namespace mongo {
     std::string runQuery(OperationContext* txn,
                          QueryMessage& q,
                          const NamespaceString& ns,
-                         CurOp& curop,
                          Message &result);
 
 }  // namespace mongo

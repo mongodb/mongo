@@ -181,25 +181,27 @@ namespace mongo {
         return !exec->isEOF();
     }
 
-    void beginQueryOp(const NamespaceString& nss,
+    void beginQueryOp(OperationContext* txn,
+                      const NamespaceString& nss,
                       const BSONObj& queryObj,
                       int ntoreturn,
-                      int ntoskip,
-                      CurOp* curop) {
+                      int ntoskip) {
+        auto curop = CurOp::get(txn);
         curop->debug().ns = nss.ns();
         curop->debug().query = queryObj;
         curop->debug().ntoreturn = ntoreturn;
         curop->debug().ntoskip = ntoskip;
-        curop->setQuery(queryObj);
+        stdx::lock_guard<Client> lk(*txn->getClient());
+        curop->setQuery_inlock(queryObj);
     }
 
-    void endQueryOp(PlanExecutor* exec,
+    void endQueryOp(OperationContext* txn,
+                    PlanExecutor* exec,
                     int dbProfilingLevel,
                     int numResults,
-                    CursorId cursorId,
-                    CurOp* curop) {
+                    CursorId cursorId) {
+        auto curop = CurOp::get(txn);
         invariant(exec);
-        invariant(curop);
 
         // Fill out basic curop query exec properties.
         curop->debug().nreturned = numResults;
@@ -253,10 +255,11 @@ namespace mongo {
                               const char* ns,
                               int ntoreturn,
                               long long cursorid,
-                              CurOp& curop,
                               int pass,
                               bool& exhaust,
                               bool* isCursorAuthorized) {
+
+        CurOp& curop = *CurOp::get(txn);
 
         // For testing, we may want to fail if we receive a getmore.
         if (MONGO_FAIL_POINT(failReceivedGetmore)) {
@@ -378,7 +381,10 @@ namespace mongo {
             // Ensure that the original query or command object is available in the slow query log,
             // profiler, and currentOp.
             curop.debug().query = cc->getQuery();
-            curop.setQuery(cc->getQuery());
+            {
+                stdx::lock_guard<Client> lk(*txn->getClient());
+                curop.setQuery_inlock(cc->getQuery());
+            }
 
             if (0 == pass) { 
                 cc->updateSlaveLocation(txn); 
@@ -526,14 +532,14 @@ namespace mongo {
     std::string runQuery(OperationContext* txn,
                          QueryMessage& q,
                          const NamespaceString& nss,
-                         CurOp& curop,
                          Message &result) {
+        CurOp& curop = *CurOp::get(txn);
         // Validate the namespace.
         uassert(16256, str::stream() << "Invalid ns [" << nss.ns() << "]", nss.isValid());
         invariant(!nss.isCommand());
 
         // Set curop information.
-        beginQueryOp(nss, q.query, q.ntoreturn, q.ntoskip, &curop);
+        beginQueryOp(txn, nss, q.query, q.ntoreturn, q.ntoskip);
 
         // Parse the qm into a CanonicalQuery.
         std::auto_ptr<CanonicalQuery> cq;
@@ -745,11 +751,11 @@ namespace mongo {
             // use by future getmore ops).
             cc->setLeftoverMaxTimeMicros(curop.getRemainingMaxTimeMicros());
 
-            endQueryOp(cc->getExecutor(), dbProfilingLevel, numResults, ccId, &curop);
+            endQueryOp(txn, cc->getExecutor(), dbProfilingLevel, numResults, ccId);
         }
         else {
             LOG(5) << "Not caching executor but returning " << numResults << " results.\n";
-            endQueryOp(exec.get(), dbProfilingLevel, numResults, ccId, &curop);
+            endQueryOp(txn, exec.get(), dbProfilingLevel, numResults, ccId);
         }
 
         // Add the results from the query into the output buffer.

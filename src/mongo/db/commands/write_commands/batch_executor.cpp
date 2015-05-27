@@ -75,6 +75,7 @@
 #include "mongo/s/write_ops/batched_upsert_detail.h"
 #include "mongo/s/write_ops/write_error_detail.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/elapsed_tracker.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -250,8 +251,10 @@ namespace mongo {
                                     && writeErrors.size() < request.sizeWriteOps() );
 
         if ( needToEnforceWC ) {
-
-            CurOp::get(_txn)->setMessage( "waiting for write concern" );
+            {
+                stdx::lock_guard<Client> lk(*_txn->getClient());
+                CurOp::get(_txn)->setMessage_inlock( "waiting for write concern" );
+            }
 
             WriteConcernResult res;
             Status status = waitForWriteConcern(
@@ -375,17 +378,17 @@ namespace mongo {
 
     // Translates write item type to wire protocol op code.
     // Helper for WriteBatchExecutor::applyWriteItem().
-    static int getOpCode( BatchedCommandRequest::BatchType writeType ) {
-        switch ( writeType ) {
+    static int getOpCode(const BatchItemRef& currWrite) {
+        switch (currWrite.getRequest()->getBatchType()) {
         case BatchedCommandRequest::BatchType_Insert:
             return dbInsert;
         case BatchedCommandRequest::BatchType_Update:
             return dbUpdate;
-        default:
-            dassert( writeType == BatchedCommandRequest::BatchType_Delete );
+        case BatchedCommandRequest::BatchType_Delete:
             return dbDelete;
+        default:
+            MONGO_UNREACHABLE;
         }
-        return 0;
     }
 
     static void buildStaleError( const ChunkVersion& shardVersionRecvd,
@@ -494,31 +497,31 @@ namespace mongo {
     // HELPERS FOR CUROP MANAGEMENT AND GLOBAL STATS
     //
 
-    static void beginCurrentOp( CurOp* currentOp, Client* client, const BatchItemRef& currWrite ) {
+    static void beginCurrentOp(OperationContext* txn, const BatchItemRef& currWrite) {
 
-        // Execute the write item as a child operation of the current operation.
-        // This is not done by out callers
-
+        stdx::lock_guard<Client> lk(*txn->getClient());
+        CurOp* const currentOp = CurOp::get(txn);
+        currentOp->setOp_inlock(getOpCode(currWrite));
         currentOp->ensureStarted();
-        currentOp->setNS( currWrite.getRequest()->getNS() );
+        currentOp->setNS_inlock( currWrite.getRequest()->getNS() );
 
         currentOp->debug().ns = currentOp->getNS();
         currentOp->debug().op = currentOp->getOp();
 
         if ( currWrite.getOpType() == BatchedCommandRequest::BatchType_Insert ) {
-            currentOp->setQuery( currWrite.getDocument() );
+            currentOp->setQuery_inlock( currWrite.getDocument() );
             currentOp->debug().query = currWrite.getDocument();
             currentOp->debug().ninserted = 0;
         }
         else if ( currWrite.getOpType() == BatchedCommandRequest::BatchType_Update ) {
-            currentOp->setQuery( currWrite.getUpdate()->getQuery() );
+            currentOp->setQuery_inlock( currWrite.getUpdate()->getQuery() );
             currentOp->debug().query = currWrite.getUpdate()->getQuery();
             currentOp->debug().updateobj = currWrite.getUpdate()->getUpdateExpr();
             // Note: debug().nMatched, nModified and nmoved are set internally in update
         }
         else {
             dassert( currWrite.getOpType() == BatchedCommandRequest::BatchType_Delete );
-            currentOp->setQuery( currWrite.getDelete()->getQuery() );
+            currentOp->setQuery_inlock( currWrite.getDelete()->getQuery() );
             currentOp->debug().query = currWrite.getDelete()->getQuery();
             currentOp->debug().ndeleted = 0;
         }
@@ -580,10 +583,9 @@ namespace mongo {
         }
     }
 
-    static void finishCurrentOp( OperationContext* txn,
-                                 CurOp* currentOp,
-                                 WriteErrorDetail* opError ) {
+    static void finishCurrentOp(OperationContext* txn, WriteErrorDetail* opError) {
 
+        CurOp* currentOp = CurOp::get(txn);
         currentOp->done();
         int executionTime = currentOp->debug().executionTime = currentOp->totalTimeMillis();
         currentOp->debug().recordStats();
@@ -877,8 +879,7 @@ namespace mongo {
 
         // BEGIN CURRENT OP
         CurOp currentOp(_txn);
-        currentOp.setOp(dbUpdate);
-        beginCurrentOp( &currentOp, _txn->getClient(), updateItem );
+        beginCurrentOp(_txn, updateItem);
         incOpStats( updateItem );
 
         ShardedConnectionInfo* info = ShardedConnectionInfo::get(false);
@@ -904,7 +905,7 @@ namespace mongo {
         }
         // END CURRENT OP
         incWriteStats( updateItem, result.getStats(), result.getError(), &currentOp );
-        finishCurrentOp( _txn, &currentOp, result.getError() );
+        finishCurrentOp(_txn, result.getError());
 
         // End current transaction and release snapshot.
         _txn->recoveryUnit()->abandonSnapshot();
@@ -922,8 +923,7 @@ namespace mongo {
 
         // BEGIN CURRENT OP
         CurOp currentOp(_txn);
-        currentOp.setOp(dbDelete);
-        beginCurrentOp( &currentOp, _txn->getClient(), removeItem );
+        beginCurrentOp(_txn, removeItem);
         incOpStats( removeItem );
 
         ShardedConnectionInfo* info = ShardedConnectionInfo::get(false);
@@ -946,7 +946,7 @@ namespace mongo {
 
         // END CURRENT OP
         incWriteStats( removeItem, result.getStats(), result.getError(), &currentOp );
-        finishCurrentOp( _txn, &currentOp, result.getError() );
+        finishCurrentOp(_txn, result.getError());
 
         // End current transaction and release snapshot.
         _txn->recoveryUnit()->abandonSnapshot();
@@ -1112,8 +1112,7 @@ namespace mongo {
     void WriteBatchExecutor::execOneInsert(ExecInsertsState* state, WriteErrorDetail** error) {
         BatchItemRef currInsertItem(state->request, state->currIndex);
         CurOp currentOp(_txn);
-        currentOp.setOp(dbInsert);
-        beginCurrentOp( &currentOp, _txn->getClient(), currInsertItem );
+        beginCurrentOp(_txn, currInsertItem);
         incOpStats(currInsertItem);
 
         WriteOpResult result;
@@ -1123,7 +1122,7 @@ namespace mongo {
                       result.getStats(),
                       result.getError(),
                       &currentOp);
-        finishCurrentOp(_txn, &currentOp, result.getError());
+        finishCurrentOp(_txn, result.getError());
 
         if (result.getError()) {
             *error = result.releaseError();

@@ -31,6 +31,7 @@
 #include "mongo/db/db_raii.h"
 
 #include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/client.h"
 #include "mongo/db/curop.h"
 #include "mongo/s/d_state.h"
 
@@ -85,19 +86,21 @@ namespace mongo {
     void AutoGetCollectionForRead::_init(const std::string& ns, StringData coll) {
         massert(28535, "need a non-empty collection name", !coll.empty());
 
-        // TODO: OldClientContext legacy, needs to be removed
-        CurOp::get(_txn)->ensureStarted();
-        CurOp::get(_txn)->setNS(ns);
-
         // We have both the DB and collection locked, which the prerequisite to do a stable shard
         // version check.
         ensureShardVersionOKOrThrow(ns);
+
+        auto curOp = CurOp::get(_txn);
+        stdx::lock_guard<Client> lk(*_txn->getClient());
+        // TODO: OldClientContext legacy, needs to be removed
+        curOp->ensureStarted();
+        curOp->setNS_inlock(ns);
 
         // At this point, we are locked in shared mode for the database by the DB lock in the
         // constructor, so it is safe to load the DB pointer.
         if (_db.getDb()) {
             // TODO: OldClientContext legacy, needs to be removed
-            CurOp::get(_txn)->enter(ns.c_str(), _db.getDb()->getProfilingLevel());
+            curOp->enter_inlock(ns.c_str(), _db.getDb()->getProfilingLevel());
 
             _coll = _db.getDb()->getCollection(ns);
         }
@@ -156,7 +159,8 @@ namespace mongo {
             _checkNotStale();
         }
 
-        CurOp::get(_txn)->enter(_ns.c_str(), _db->getProfilingLevel());
+        stdx::lock_guard<Client> lk(*_txn->getClient());
+        CurOp::get(_txn)->enter_inlock(_ns.c_str(), _db->getProfilingLevel());
     }
 
     void OldClientContext::_checkNotStale() const {

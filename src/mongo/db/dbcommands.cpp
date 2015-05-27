@@ -1000,7 +1000,10 @@ namespace mongo {
 
             // TODO: OldClientContext legacy, needs to be removed
             CurOp::get(txn)->ensureStarted();
-            CurOp::get(txn)->setNS(dbname);
+            {
+                stdx::lock_guard<Client> lk(*txn->getClient());
+                CurOp::get(txn)->setNS_inlock(dbname);
+            }
 
             // We lock the entire database in S-mode in order to ensure that the contents will not
             // change for the stats snapshot. This might be unnecessary and if it becomes a
@@ -1028,8 +1031,11 @@ namespace mongo {
                 result.appendNumber("fileSize", 0);
             }
             else {
-                // TODO: OldClientContext legacy, needs to be removed
-                CurOp::get(txn)->enter(dbname.c_str(), db->getProfilingLevel());
+                {
+                    stdx::lock_guard<Client> lk(*txn->getClient());
+                    // TODO: OldClientContext legacy, needs to be removed
+                    CurOp::get(txn)->enter_inlock(dbname.c_str(), db->getProfilingLevel());
+                }
 
                 db->getStats(txn, &result, scale);
             }
@@ -1298,8 +1304,6 @@ namespace {
         if (command->adminOnly()) {
             LOG(2) << "command: " << request.getCommandName();
         }
-
-
 
         if (command->maintenanceMode()) {
             mmSetter.reset(new MaintenanceModeSetter);

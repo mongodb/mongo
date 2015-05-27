@@ -191,10 +191,10 @@ namespace {
             const string s = str::stream() << "step " << step << " of " << _total;
 
             CurOp * op = CurOp::get(_txn);
-            if (op)
-                op->setMessage(s.c_str());
-            else
-                warning() << "op is null in MoveTimingHelper::done" << migrateLog;
+            {
+                stdx::lock_guard<Client> lk(*_txn->getClient());
+                op->setMessage_inlock(s.c_str());
+            }
 
             _b.appendNumber(s, _t.millis());
             _t.reset();

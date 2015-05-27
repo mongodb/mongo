@@ -47,10 +47,10 @@ namespace mongo {
         virtual RecoveryUnitState setRecoveryUnit(RecoveryUnit* unit,
                                                   RecoveryUnitState state) override;
 
-        virtual ProgressMeter* setMessage(const char* msg,
-                                          const std::string& name,
-                                          unsigned long long progressMeterTotal,
-                                          int secondsBetween) override;
+        virtual ProgressMeter* setMessage_inlock(const char* msg,
+                                                 const std::string& name,
+                                                 unsigned long long progressMeterTotal,
+                                                 int secondsBetween) override;
 
         virtual std::string getNS() const override;
 

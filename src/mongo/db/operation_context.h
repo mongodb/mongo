@@ -119,11 +119,13 @@ namespace mongo {
         /**
          * Delegates to CurOp, but is included here to break dependencies.
          * Caller does not own the pointer.
+         *
+         * Caller must have locked the "Client" associated with this context.
          */
-        virtual ProgressMeter* setMessage(const char* msg,
-                                          const std::string& name = "Progress",
-                                          unsigned long long progressMeterTotal = 0,
-                                          int secondsBetween = 3) = 0;
+        virtual ProgressMeter* setMessage_inlock(const char* msg,
+                                                 const std::string& name = "Progress",
+                                                 unsigned long long progressMeterTotal = 0,
+                                                 int secondsBetween = 3) = 0;
 
         /**
          * Delegates to CurOp, but is included here to break dependencies.

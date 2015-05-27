@@ -115,11 +115,11 @@ namespace {
         return oldState;
     }
 
-    ProgressMeter* OperationContextImpl::setMessage(const char * msg,
-                                                    const std::string &name,
-                                                    unsigned long long progressMeterTotal,
-                                                    int secondsBetween) {
-        return &CurOp::get(this)->setMessage(msg, name, progressMeterTotal, secondsBetween);
+    ProgressMeter* OperationContextImpl::setMessage_inlock(const char * msg,
+                                                           const std::string &name,
+                                                           unsigned long long progressMeterTotal,
+                                                           int secondsBetween) {
+        return &CurOp::get(this)->setMessage_inlock(msg, name, progressMeterTotal, secondsBetween);
     }
 
     string OperationContextImpl::getNS() const {

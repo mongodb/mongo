@@ -171,14 +171,14 @@ namespace mongo {
         _command = NULL;
     }
 
-    void CurOp::setOp(int op) {
+    void CurOp::setOp_inlock(int op) {
         _op = op;
     }
 
-    ProgressMeter& CurOp::setMessage(const char * msg,
-                                     std::string name,
-                                     unsigned long long progressMeterTotal,
-                                     int secondsBetween) {
+    ProgressMeter& CurOp::setMessage_inlock(const char * msg,
+                                            std::string name,
+                                            unsigned long long progressMeterTotal,
+                                            int secondsBetween) {
         if ( progressMeterTotal ) {
             if ( _progressMeter.isActive() ) {
                 error() << "old _message: " << _message << " new message:" << msg;
@@ -198,9 +198,8 @@ namespace mongo {
         invariant(this == _stack->pop());
     }
 
-    void CurOp::setNS( StringData ns ) {
-        // _ns copies the data in the null-terminated ptr it's given
-        _ns = ns;
+    void CurOp::setNS_inlock(StringData ns) {
+        _ns = ns.toString();
     }
 
     void CurOp::ensureStarted() {
@@ -216,7 +215,7 @@ namespace mongo {
         }
     }
 
-    void CurOp::enter(const char* ns, int dbProfileLevel) {
+    void CurOp::enter_inlock(const char* ns, int dbProfileLevel) {
         ensureStarted();
         _ns = ns;
         raiseDbProfileLevel(dbProfileLevel);
@@ -227,9 +226,8 @@ namespace mongo {
     }
 
     void CurOp::recordGlobalTime(bool isWriteLocked, long long micros) const {
-        string nsStr = _ns.toString();
         int lockType = isWriteLocked ? 1 : -1;
-        Top::get(getGlobalServiceContext()).record(nsStr, _op, lockType, micros, _isCommand);
+        Top::get(getGlobalServiceContext()).record(_ns, _op, lockType, micros, _isCommand);
     }
 
     void CurOp::reportState(BSONObjBuilder* builder) {
@@ -239,11 +237,13 @@ namespace mongo {
             builder->append("microsecs_running", static_cast<long long int>(elapsedMicros()) );
         }
 
-        builder->append( "op" , opToString( _op ) );
+        builder->append("op", opToString(_op));
 
         // Fill out "ns" from our namespace member (and if it's not available, fall back to the
-        // OpDebug namespace member).
-        builder->append("ns", !_ns.empty() ? _ns.toString() : _debug.ns.toString());
+        // OpDebug namespace member). We prefer our ns when set because it changes to match each
+        // accessed namespace, while _debug.ns is set once at the start of the operation. However,
+        // sometimes _ns is not yet set.
+        builder->append("ns", !_ns.empty() ? _ns : _debug.ns);
 
         if (_op == dbInsert) {
             _query.append(*builder, "insert");
@@ -259,7 +259,7 @@ namespace mongo {
         if ( ! _message.empty() ) {
             if ( _progressMeter.isActive() ) {
                 StringBuilder buf;
-                buf << _message.toString() << " " << _progressMeter.toString();
+                buf << _message << " " << _progressMeter.toString();
                 builder->append( "msg" , buf.str() );
                 BSONObjBuilder sub( builder->subobjStart( "progress" ) );
                 sub.appendNumber( "done" , (long long)_progressMeter.done() );
@@ -267,7 +267,7 @@ namespace mongo {
                 sub.done();
             }
             else {
-                builder->append( "msg" , _message.toString() );
+                builder->append("msg" , _message);
             }
         }
 
