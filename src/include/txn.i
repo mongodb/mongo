@@ -240,8 +240,8 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 
 	if (cfg != NULL)
 		WT_RET(__wt_txn_config(session, cfg));
-        else if (!FLD_ISSET(txn->txn_logsync, WT_LOG_FLUSH))
-                txn->txn_logsync = 0;
+	else if (!FLD_ISSET(txn->txn_logsync, WT_LOG_FLUSH))
+		txn->txn_logsync = 0;
 
 	/*
 	 * Allocate a snapshot if required. Named snapshot transactions already
