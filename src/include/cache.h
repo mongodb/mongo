@@ -28,8 +28,8 @@
  *	Encapsulation of an eviction candidate.
  */
 struct __wt_evict_entry {
-	WT_BTREE *btree;			/* Enclosing btree object */
-	WT_REF	 *ref;				/* Page to flush/evict */
+	WT_BTREE *btree;		/* Enclosing btree object */
+	WT_REF	 *ref;			/* Page to flush/evict */
 };
 
 /*
