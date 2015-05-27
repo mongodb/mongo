@@ -31,8 +31,8 @@ assert.doesNotThrow(function() { cursor.itcount(); },
 //
 // Simple positive test for getmore:
 // - Issue a find() that returns 2 batches: a fast batch, then a slow batch.
-// - The find() has a 2-second time limit; the first batch should run "instantly", but the second
-//   batch takes ~6 seconds, so the getmore should be aborted.
+// - The find() has a 1-second time limit; the first batch should run "instantly", but the second
+//   batch takes ~15 seconds, so the getmore should be aborted.
 //
 
 t.drop();
@@ -40,12 +40,12 @@ t.insert([{},{},{}]); // fast batch
 t.insert([{slow: true},{slow: true},{slow: true}]); // slow batch
 cursor = t.find({$where: function() {
     if (this.slow) {
-        sleep(2*1000);
+        sleep(5*1000);
     }
     return true;
 }});
 cursor.batchSize(3);
-cursor.maxTimeMS(2*1000);
+cursor.maxTimeMS(1000);
 assert.doesNotThrow(function() { cursor.next(); cursor.next(); cursor.next(); },
                     [],
                     "expected batch 1 (query) to not hit the time limit");
