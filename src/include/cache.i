@@ -108,23 +108,30 @@ __wt_eviction_check(WT_SESSION_IMPL *session, int *fullp, int wake)
 	 * If we're over the maximum cache, shut out reads (which include page
 	 * allocations) until we evict to back under the maximum cache.
 	 * Eviction will keep pushing out pages so we don't run on the edge all
-	 * the time.  Avoid division by zero if the cache size has not yet been
-	 * in a shared cache.
+	 * the time.
+	 *
+	 * Avoid division by zero if the cache size has not yet been set in a
+	 * shared cache.
 	 */
 	bytes_inuse = __wt_cache_bytes_inuse(cache);
-	dirty_inuse = __wt_cache_dirty_inuse(cache);
 	bytes_max = conn->cache_size + 1;
 
-	/* Calculate the cache full percentage. */
+	/* Return the cache full percentage. */
 	*fullp = (int)((100 * bytes_inuse) / bytes_max);
+	if (!wake)
+		return (0);
 
-	/* Wake eviction when we're over the trigger cache size. */
-	if (wake &&
-	    (bytes_inuse > (cache->eviction_trigger * bytes_max) / 100 ||
-	    dirty_inuse > (cache->eviction_dirty_target * bytes_max) / 100))
-		WT_RET(__wt_evict_server_wake(session));
-
-	return (0);
+	/*
+	 * Wake eviction if we're over the trigger cache size or there are too
+	 * many dirty pages.
+	 */
+	if (bytes_inuse <= (cache->eviction_trigger * bytes_max) / 100) {
+		dirty_inuse = __wt_cache_dirty_inuse(cache);
+		if (dirty_inuse <=
+		    (cache->eviction_dirty_target * bytes_max) / 100)
+			return (0);
+	}
+	return (__wt_evict_server_wake(session));
 }
 
 /*
