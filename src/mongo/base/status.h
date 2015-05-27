@@ -118,6 +118,10 @@ namespace mongo {
         inline AtomicUInt32::WordType refCount() const;
 
     private:
+
+        /**
+         * Returns an uninitialized non-OK status.
+         */
         inline Status();
 
         struct ErrorInfo {
@@ -131,7 +135,15 @@ namespace mongo {
             ErrorInfo(ErrorCodes::Error code, std::string reason, int location);
         };
 
+        explicit inline Status(ErrorInfo* ei);
+
         ErrorInfo* _error;
+
+        /**
+         * A special ErrorInfo representing an uninitialized or moved-from Status.
+         * This is intentionally non-OK().
+         */
+        static ErrorInfo kUninitialized;
 
         /**
          * Increment/Decrement the reference counter inside an ErrorInfo
@@ -140,6 +152,9 @@ namespace mongo {
          */
         static inline void ref(ErrorInfo* error);
         static inline void unref(ErrorInfo* error);
+
+        // StatusWith needs access to the default constructor of Status.
+        template<typename T> friend class StatusWith;
     };
 
     inline bool operator==(const ErrorCodes::Error lhs, const Status& rhs);

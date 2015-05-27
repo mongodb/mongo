@@ -36,10 +36,11 @@
 
 namespace {
 
+    using mongo::makeStatusWith;
     using mongo::StatusWith;
 
     TEST(StatusWith, makeStatusWith) {
-        using mongo::makeStatusWith;
+
         using mongo::StringData;
 
         auto s1 = makeStatusWith<int>(3);
@@ -73,6 +74,22 @@ namespace {
         // Check that we use T(...) and not T{...}
         // ASSERT_EQUALS requires an ostream overload for vector<int>
         ASSERT_TRUE(makeStatusWith<std::vector<int>>(1, 2) == std::vector<int>{2});
+    }
+
+    TEST(StatusWith, nonDefaultConstructible) {
+
+        class NoDefault {
+            NoDefault() = delete;
+        public:
+            NoDefault(int x) : _x{x} {};
+            int _x{0};
+        };
+
+        auto swND = makeStatusWith<NoDefault>(1);
+        ASSERT_TRUE(swND.getValue()._x = 1);
+
+        auto swNDerror = StatusWith<NoDefault>(mongo::ErrorCodes::BadValue, "foo");
+        ASSERT_FALSE(swNDerror.isOK());
     }
 
 }  // namespace

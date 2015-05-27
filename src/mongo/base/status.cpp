@@ -43,6 +43,10 @@ namespace mongo {
         return needRep ? new ErrorInfo(c, std::move(r), l) : NULL;
     }
 
+    Status::ErrorInfo Status::kUninitialized(ErrorCodes::NotYetInitialized,
+                                             "Not initialized!",
+                                             0);
+
     Status::Status(ErrorCodes::Error code, std::string reason, int location)
         : _error(ErrorInfo::create(code, std::move(reason), location)) {
         ref(_error);

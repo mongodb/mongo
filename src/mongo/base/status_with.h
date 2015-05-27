@@ -29,11 +29,16 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
 #include <iosfwd>
 #include <type_traits>
 #include <utility>
 
 #include "mongo/base/status.h"
+
+#define MONGO_INCLUDE_INVARIANT_H_WHITELISTED
+#include "mongo/util/invariant.h"
+#undef MONGO_INCLUDE_INVARIANT_H_WHITELISTED
 
 namespace mongo {
 
@@ -45,7 +50,7 @@ namespace mongo {
      * Example:
      * StatusWith<int> fib( int n ) {
      *   if ( n < 0 ) 
-     *       return StatusWith<int>( ErrorCodes::BadValue, "paramter to fib has to be >= 0" );
+     *       return StatusWith<int>( ErrorCodes::BadValue, "parameter to fib has to be >= 0" );
      *   if ( n <= 1 ) return StatusWith<int>( 1 );
      *   StatusWith<int> a = fib( n - 1 );
      *   StatusWith<int> b = fib( n - 2 );
@@ -71,45 +76,68 @@ namespace mongo {
          */
         StatusWith( Status status )
             : _status( std::move( status ) ) {
+            invariant(!isOK());
         }
 
         /**
          * for the OK case
          */
         StatusWith(T t)
-            : _status(Status::OK()), _t(std::move(t)) {
+            : _status(Status::OK()) {
+            new(&_data) T(std::move(t));
         }
 
-#if defined(_MSC_VER) && _MSC_VER < 1900
+        ~StatusWith() {
+            if (isOK()) {
+                getValue().~T();
+            }
+        }
+
         StatusWith(const StatusWith& s)
-            : _status(s._status), _t(s._t) {
+            : _status(s._status) {
+            if (isOK()) {
+                new(&_data) T(s.getValue());
+            }
         }
 
-        StatusWith(StatusWith&& s)
-            : _status(std::move(s._status)), _t(std::move(s._t)) {
+        StatusWith(StatusWith&& s) {
+            if (s.isOK()) {
+                new(&_data) T(std::move(s.getValue()));
+                // We leave the status of s as OK so it's destructor runs, as it should on a moved
+                // from object.
+                _status = Status::OK();
+            } else {
+                _status = std::move(s._status);
+            }
         }
 
         StatusWith& operator=(const StatusWith& other) {
+            if (other.isOK()) {
+                new(&_data) T(other.getValue());
+            }
             _status = other._status;
-            _t = other._t;
             return *this;
         }
 
         StatusWith& operator=(StatusWith&& other) {
-            _status = std::move(other._status);
-            _t = std::move(other._t);
+            // Similar logic to the move constructor here.
+            if (other.isOK()) {
+                new(&_data) T(std::move(other.getValue()));
+                _status = Status::OK();
+            } else {
+                _status = std::move(other._status);
+            }
             return *this;
         }
-#endif
 
         const T& getValue() const {
-            // TODO dassert( isOK() );
-            return _t;
+            invariant(isOK());
+            return *reinterpret_cast<const T*>(&_data);
         }
 
         T& getValue() {
-            // TODO dassert( isOK() );
-            return _t;
+            invariant(isOK());
+            return *reinterpret_cast<T*>(&_data);
         }
 
         const Status& getStatus() const {
@@ -122,7 +150,7 @@ namespace mongo {
 
     private:
         Status _status;
-        T _t;
+        typename std::aligned_storage<sizeof(T), alignof(T)>::type _data;
     };
 
     template<typename T, typename... Args>

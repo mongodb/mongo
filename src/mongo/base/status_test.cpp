@@ -74,15 +74,14 @@ namespace {
         ASSERT_EQUALS(orig.refCount(), 2U);
     }
 
-    TEST(Cloning, MoveCopyOK) {
+    TEST(Cloning, MoveCopyNotOK) {
         Status orig = Status::OK();
         ASSERT_TRUE(orig.isOK());
         ASSERT_EQUALS(orig.refCount(), 0U);
 
         Status dest(std::move(orig));
 
-        ASSERT_TRUE(orig.isOK());
-        ASSERT_EQUALS(orig.refCount(), 0U);
+        ASSERT_FALSE(orig.isOK());
 
         ASSERT_TRUE(dest.isOK());
         ASSERT_EQUALS(dest.refCount(), 0U);
@@ -95,8 +94,7 @@ namespace {
 
         Status dest(std::move(orig));
 
-        ASSERT_TRUE(orig.isOK());
-        ASSERT_EQUALS(orig.refCount(), 0U);
+        ASSERT_FALSE(orig.isOK());
 
         ASSERT_FALSE(dest.isOK());
         ASSERT_EQUALS(dest.refCount(), 1U);
@@ -115,8 +113,7 @@ namespace {
 
         dest = std::move(orig);
 
-        ASSERT_TRUE(orig.isOK());
-        ASSERT_EQUALS(orig.refCount(), 0U);
+        ASSERT_FALSE(orig.isOK());
 
         ASSERT_TRUE(dest.isOK());
         ASSERT_EQUALS(dest.refCount(), 0U);
@@ -137,8 +134,7 @@ namespace {
 
         dest = std::move(orig);
 
-        ASSERT_TRUE(orig.isOK());
-        ASSERT_EQUALS(orig.refCount(), 0U);
+        ASSERT_FALSE(orig.isOK());
 
         ASSERT_FALSE(dest.isOK());
         ASSERT_EQUALS(dest.refCount(), 1U);
@@ -159,8 +155,7 @@ namespace {
 
         dest = std::move(orig);
 
-        ASSERT_TRUE(orig.isOK());
-        ASSERT_EQUALS(orig.refCount(), 0U);
+        ASSERT_FALSE(orig.isOK());
 
         ASSERT_FALSE(dest.isOK());
         ASSERT_EQUALS(dest.refCount(), 1U);
@@ -186,8 +181,7 @@ namespace {
         ASSERT_EQUALS(orig.code(), ErrorCodes::MaxError);
         ASSERT_EQUALS(orig.reason(), "error");
 
-        ASSERT_TRUE(dest.isOK());
-        ASSERT_EQUALS(dest.refCount(), 0U);
+        ASSERT_FALSE(dest.isOK());
     }
 
     TEST(Cloning, OKIsNotRefCounted) {
