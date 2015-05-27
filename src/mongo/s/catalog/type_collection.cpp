@@ -101,7 +101,7 @@ namespace mongo {
                     return Status(ErrorCodes::ShardKeyNotFound, "invalid shard key");
                 }
 
-                coll._keyPattern = obj.getOwned();
+                coll._keyPattern = KeyPattern(obj.getOwned());
             }
             else if ((status == ErrorCodes::NoSuchKey) && coll.getDropped()) {
                 // Sharding key can be missing if the collection is dropped
@@ -169,7 +169,7 @@ namespace mongo {
                 return Status(ErrorCodes::NoSuchKey, "missing key pattern");
             }
             else {
-                invariant(!_keyPattern->isEmpty());
+                invariant(!_keyPattern->toBSON().isEmpty());
             }
         }
 
@@ -193,7 +193,7 @@ namespace mongo {
         }
 
         if (_keyPattern.is_initialized()) {
-            builder.append(keyPattern.name(), _keyPattern.get());
+            builder.append(keyPattern.name(), _keyPattern->toBSON());
         }
 
         if (_unique.is_initialized()) {
@@ -234,8 +234,8 @@ namespace mongo {
         _updatedAt = updatedAt;
     }
 
-    void CollectionType::setKeyPattern(const BSONObj& keyPattern) {
-        invariant(!keyPattern.isEmpty());
+    void CollectionType::setKeyPattern(const KeyPattern& keyPattern) {
+        invariant(!keyPattern.toBSON().isEmpty());
         _keyPattern = keyPattern;
     }
 

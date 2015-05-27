@@ -131,35 +131,6 @@ namespace mongo {
         return _findUsingLookUp(shardName);
     }
 
-    shared_ptr<Shard> ShardRegistry::find(const string& ident) {
-        string errmsg;
-        ConnectionString connStr = ConnectionString::parse(ident, errmsg);
-        uassert(18642,
-                str::stream() << "Error parsing connection string: " << ident,
-                errmsg.empty());
-
-        if (connStr.type() == ConnectionString::SET) {
-            boost::lock_guard<boost::mutex> lk(_rsMutex);
-            ShardMap::iterator iter = _rsLookup.find(connStr.getSetName());
-
-            if (iter == _rsLookup.end()) {
-                return nullptr;
-            }
-
-            return iter->second;
-        }
-        else {
-            boost::lock_guard<boost::mutex> lk(_mutex);
-            ShardMap::iterator iter = _lookup.find(ident);
-
-            if (iter == _lookup.end()) {
-                return nullptr;
-            }
-
-            return iter->second;
-        }
-    }
-
     Shard ShardRegistry::lookupRSName(const string& name) {
         boost::lock_guard<boost::mutex> lk(_rsMutex);
         ShardMap::iterator i = _rsLookup.find(name);
@@ -250,21 +221,6 @@ namespace mongo {
         }
 
         result->append("map", b.obj());
-    }
-
-    shared_ptr<Shard> ShardRegistry::_findWithRetry(const string& ident) {
-        shared_ptr<Shard> shard(find(ident));
-        if (shard != nullptr) {
-            return shard;
-        }
-
-        // Not in our maps, re-load all
-        reload();
-
-        shard = find(ident);
-        massert(13129, str::stream() << "can't find shard for: " << ident, shard != NULL);
-
-        return shard;
     }
 
     shared_ptr<Shard> ShardRegistry::_findUsingLookUp(const string& shardName) {

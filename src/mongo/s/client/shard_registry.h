@@ -51,7 +51,6 @@ namespace mongo {
         void reload();
 
         boost::shared_ptr<Shard> findIfExists(const std::string& shardName);
-        boost::shared_ptr<Shard> find(const std::string& ident);
 
         /**
          * Lookup shard by replica set name. Returns Shard::EMTPY if the name can't be found.
@@ -70,12 +69,9 @@ namespace mongo {
 
         void toBSON(BSONObjBuilder* result) const;
 
-
     private:
         typedef std::map<std::string, boost::shared_ptr<Shard>> ShardMap;
 
-
-        boost::shared_ptr<Shard> _findWithRetry(const std::string& ident);
 
         boost::shared_ptr<Shard> _findUsingLookUp(const std::string& shardName);
 

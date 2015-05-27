@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/next_prior.hpp>
 #include <boost/shared_ptr.hpp>
 #include <map>
 #include <string>
@@ -46,7 +45,7 @@ namespace mongo {
     typedef boost::shared_ptr<ChunkManager> ChunkManagerPtr;
 
     // The key for the map is max for each Chunk or ChunkRange
-    typedef std::map<BSONObj, boost::shared_ptr<const Chunk>, BSONObjCmp> ChunkMap;
+    typedef std::map<BSONObj, boost::shared_ptr<Chunk>, BSONObjCmp> ChunkMap;
 
 
     class ChunkRange {
@@ -120,10 +119,8 @@ namespace mongo {
         // Creates an empty chunk manager for the namespace
         ChunkManager( const std::string& ns, const ShardKeyPattern& pattern, bool unique );
 
-        std::string getns() const { return _ns; }
-
+        const std::string& getns() const { return _ns; }
         const ShardKeyPattern& getShardKeyPattern() const { return _keyPattern; }
-
         bool isUnique() const { return _unique; }
 
         /**
@@ -207,48 +204,40 @@ namespace mongo {
 
         int getCurrentDesiredChunkSize() const;
 
-        ChunkManagerPtr reload(bool force=true) const; // doesn't modify self!
-
-        void markMinorForReload( ChunkVersion majorVersion ) const;
-        void getMarkedMinorVersions( std::set<ChunkVersion>& minorVersions ) const;
+        boost::shared_ptr<ChunkManager> reload(bool force = true) const; // doesn't modify self!
 
     private:
-
-        // helpers for loading
-
         // returns true if load was consistent
         bool _load(ChunkMap& chunks,
                    std::set<Shard>& shards,
                    ShardVersionMap* shardVersions,
                    const ChunkManager* oldManager);
-        static bool _isValid(const ChunkMap& chunks);
 
-        // end helpers
 
         // All members should be const for thread-safety
         const std::string _ns;
         const ShardKeyPattern _keyPattern;
         const bool _unique;
 
-        const ChunkMap _chunkMap;
-        const ChunkRangeManager _chunkRanges;
-
-        const std::set<Shard> _shards;
-
-        const ShardVersionMap _shardVersions; // max version per shard
-
-        // max version of any chunk
-        ChunkVersion _version;
-
-        mutable mutex _mutex; // only used with _nsLock
-
+        // The shard versioning mechanism hinges on keeping track of the number of times we reload
+        // ChunkManagers. Increasing this number here will prompt checkShardVersion to refresh the
+        // connection-level versions to the most up to date value.
         const unsigned long long _sequenceNumber;
+
+        ChunkMap _chunkMap;
+        ChunkRangeManager _chunkRanges;
+
+        std::set<Shard> _shards;
+
+        // Max known version per shard
+        ShardVersionMap _shardVersions;
+
+        // Max version across all chunks
+        ChunkVersion _version;
 
         //
         // Split Heuristic info
         //
-
-
         class SplitHeuristics {
         public:
 

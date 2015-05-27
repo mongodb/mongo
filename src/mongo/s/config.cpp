@@ -271,16 +271,18 @@ namespace mongo {
     }
 
 
-    ChunkManagerPtr DBConfig::getChunkManagerIfExists( const string& ns, bool shouldReload, bool forceReload ){
-	
+    ChunkManagerPtr DBConfig::getChunkManagerIfExists(const string& ns,
+                                                      bool shouldReload,
+                                                      bool forceReload) {
+
         // Don't report exceptions here as errors in GetLastError
         LastError::Disabled ignoreForGLE(&LastError::get(cc()));
          
         try{
-            return getChunkManager( ns, shouldReload, forceReload );
+            return getChunkManager(ns, shouldReload, forceReload);
         }
-        catch( AssertionException& e ){
-            warning() << "chunk manager not found for " << ns << causedBy( e ) << endl;
+        catch (AssertionException& e) {
+            warning() << "chunk manager not found for " << ns << causedBy(e);
             return ChunkManagerPtr();
         }
     }
@@ -293,29 +295,32 @@ namespace mongo {
         ChunkManagerPtr oldManager;
 
         {
-            boost::lock_guard<boost::mutex> lk( _lock );
-            
-            bool earlyReload = ! _collections[ns].isSharded() && ( shouldReload || forceReload );
-            if ( earlyReload ) {
-                // this is to catch cases where there this is a new sharded collection
+            boost::lock_guard<boost::mutex> lk(_lock);
+
+            bool earlyReload = !_collections[ns].isSharded() && (shouldReload || forceReload);
+            if (earlyReload) {
+                // This is to catch cases where there this is a new sharded collection
                 _reload();
             }
 
             CollectionInfo& ci = _collections[ns];
-            uassert( 10181 ,  (string)"not sharded:" + ns , ci.isSharded() );
-            verify( ! ci.key().isEmpty() );
-            
-            if ( ! ( shouldReload || forceReload ) || earlyReload )
+            uassert(10181, str::stream() << "not sharded:" << ns, ci.isSharded());
+
+            invariant(!ci.key().isEmpty());
+
+            if (!(shouldReload || forceReload) || earlyReload) {
                 return ci.getCM();
+            }
 
             key = ci.key().copy();
-            if ( ci.getCM() ){
+
+            if (ci.getCM()){
                 oldManager = ci.getCM();
                 oldVersion = ci.getCM()->getVersion();
             }
         }
         
-        verify( ! key.isEmpty() );
+        invariant(!key.isEmpty());
         
         // TODO: We need to keep this first one-chunk check in until we have a more efficient way of
         // creating/reusing a chunk manager, as doing so requires copying the full set of chunks currently
@@ -348,78 +353,84 @@ namespace mongo {
 
         // we are not locked now, and want to load a new ChunkManager
         
-        auto_ptr<ChunkManager> temp;
+        auto_ptr<ChunkManager> tempChunkManager;
 
         {
             boost::lock_guard<boost::mutex> lll ( _hitConfigServerLock );
             
             if (!newestChunk.empty() && !forceReload) {
-                // if we have a target we're going for
-                // see if we've hit already
-                
+                // If we have a target we're going for see if we've hit already
                 boost::lock_guard<boost::mutex> lk( _lock );
-                CollectionInfo& ci = _collections[ns];
-                if ( ci.isSharded() && ci.getCM() ) {
 
+                CollectionInfo& ci = _collections[ns];
+
+                if ( ci.isSharded() && ci.getCM() ) {
                     ChunkVersion currentVersion = newestChunk[0].getVersion();
 
-                    // Only reload if the version we found is newer than our own in the same
-                    // epoch
+                    // Only reload if the version we found is newer than our own in the same epoch
                     if (currentVersion <= ci.getCM()->getVersion() &&
                             ci.getCM()->getVersion().hasEqualEpoch(currentVersion)) {
+
                         return ci.getCM();
                     }
                 }
             }
             
-            temp.reset(new ChunkManager(oldManager->getns(),
-                                        oldManager->getShardKeyPattern(),
-                                        oldManager->isUnique()));
-            temp->loadExistingRanges(oldManager.get());
+            tempChunkManager.reset(new ChunkManager(oldManager->getns(),
+                                                    oldManager->getShardKeyPattern(),
+                                                    oldManager->isUnique()));
+            tempChunkManager->loadExistingRanges(oldManager.get());
 
-            if ( temp->numChunks() == 0 ) {
-                // maybe we're not sharded any more
-                reload(); // this is a full reload
-                return getChunkManager( ns , false );
+            if (tempChunkManager->numChunks() == 0) {
+                // Maybe we're not sharded any more, so do a full reload
+                reload();
+
+                return getChunkManager(ns, false);
             }
         }
 
         boost::lock_guard<boost::mutex> lk( _lock );
         
         CollectionInfo& ci = _collections[ns];
-        uassert( 14822 ,  (string)"state changed in the middle: " + ns , ci.isSharded() );
+        uassert(14822, (string)"state changed in the middle: " + ns, ci.isSharded());
 
         // Reset if our versions aren't the same
-        bool shouldReset = ! temp->getVersion().equals( ci.getCM()->getVersion() );
+        bool shouldReset = !tempChunkManager->getVersion().equals(ci.getCM()->getVersion());
         
         // Also reset if we're forced to do so
-        if( ! shouldReset && forceReload ){
+        if (!shouldReset && forceReload) {
             shouldReset = true;
             warning() << "chunk manager reload forced for collection '" << ns
-                      << "', config version is " << temp->getVersion() << endl;
+                      << "', config version is " << tempChunkManager->getVersion();
         }
 
         //
         // LEGACY BEHAVIOR
-        // It's possible to get into a state when dropping collections when our new version is less than our prev
-        // version.  Behave identically to legacy mongos, for now, and warn to draw attention to the problem.
+        //
+        // It's possible to get into a state when dropping collections when our new version is
+        // less than our prev version. Behave identically to legacy mongos, for now, and warn to
+        // draw attention to the problem.
+        //
         // TODO: Assert in next version, to allow smooth upgrades
         //
 
-        if( shouldReset && temp->getVersion() < ci.getCM()->getVersion() ){
+        if (shouldReset && tempChunkManager->getVersion() < ci.getCM()->getVersion()) {
             shouldReset = false;
+
             warning() << "not resetting chunk manager for collection '" << ns
-                      << "', config version is " << temp->getVersion() << " and "
-                      << "old version is " << ci.getCM()->getVersion() << endl;
+                      << "', config version is " << tempChunkManager->getVersion() << " and "
+                      << "old version is " << ci.getCM()->getVersion();
         }
 
         // end legacy behavior
 
-        if ( shouldReset ){
-            ci.resetCM( temp.release() );
+        if (shouldReset) {
+            ci.resetCM(tempChunkManager.release());
         }
-        
-        uassert( 15883 , str::stream() << "not sharded after chunk manager reset : " << ns , ci.isSharded() );
+
+        uassert(15883, str::stream() << "not sharded after chunk manager reset : "
+                                     << ns, ci.isSharded());
+
         return ci.getCM();
     }
 

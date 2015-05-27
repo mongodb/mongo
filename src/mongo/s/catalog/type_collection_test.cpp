@@ -59,7 +59,7 @@ namespace {
         ASSERT(coll.getNs() == NamespaceString{"db.coll"});
         ASSERT_EQUALS(coll.getEpoch(), oid);
         ASSERT_EQUALS(coll.getUpdatedAt(), Date_t::fromMillisSinceEpoch(1));
-        ASSERT_EQUALS(coll.getKeyPattern(), BSON("a" << 1));
+        ASSERT_EQUALS(coll.getKeyPattern().toBSON(), BSON("a" << 1));
         ASSERT_EQUALS(coll.getUnique(), true);
         ASSERT_EQUALS(coll.getAllowBalance(), true);
         ASSERT_EQUALS(coll.getDropped(), false);

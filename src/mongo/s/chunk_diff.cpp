@@ -260,6 +260,6 @@ namespace mongo {
 
     // Ensures that these instances of the template are compiled
     template class ConfigDiffTracker<BSONObj, std::string>;
-    template class ConfigDiffTracker<boost::shared_ptr<const Chunk>, std::string>;
+    template class ConfigDiffTracker<boost::shared_ptr<Chunk>, std::string>;
 
 } // namespace mongo

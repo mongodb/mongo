@@ -34,7 +34,7 @@
 #include <vector>
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/client/dbclientinterface.h"
+#include "mongo/client/connection_string.h"
 #include "mongo/s/catalog/catalog_manager.h"
 
 namespace mongo {

@@ -48,28 +48,27 @@ namespace mongo {
         }
 
         void setSingleChunkForShards( const vector<BSONObj> &splitPoints ) {
-            ChunkMap &chunkMap = const_cast<ChunkMap&>( _chunkMap );
-            ChunkRangeManager &chunkRanges = const_cast<ChunkRangeManager&>( _chunkRanges );
-            set<Shard> &shards = const_cast<set<Shard>&>( _shards );
-            
             vector<BSONObj> mySplitPoints( splitPoints );
             mySplitPoints.insert( mySplitPoints.begin(), _keyPattern.getKeyPattern().globalMin() );
             mySplitPoints.push_back( _keyPattern.getKeyPattern().globalMax() );
             
-            for( unsigned i = 1; i < mySplitPoints.size(); ++i ) {
-                string name = str::stream() << (i-1);
+            for (unsigned i = 1; i < mySplitPoints.size(); ++i) {
+                const string name = str::stream() << (i - 1);
+
                 Shard shard(name,
                             ConnectionString(HostAndPort(name)),
                             0 /* maxSize */,
                             false /* draining */);
-                shards.insert( shard );
-                
-                ChunkPtr chunk( new Chunk( this, mySplitPoints[ i-1 ], mySplitPoints[ i ],
-                                          shard ) );
-                chunkMap[ mySplitPoints[ i ] ] = chunk;
+                _shards.insert(shard);
+
+                boost::shared_ptr<Chunk> chunk(new Chunk(this,
+                                                         mySplitPoints[i - 1],
+                                                         mySplitPoints[i],
+                                                         shard));
+                _chunkMap[mySplitPoints[i]] = chunk;
             }
             
-            chunkRanges.reloadAll( chunkMap );
+            _chunkRanges.reloadAll(_chunkMap);
         }
     };
     
