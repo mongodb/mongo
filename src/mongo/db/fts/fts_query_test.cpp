@@ -48,6 +48,20 @@ namespace mongo {
             ASSERT_TRUE( q.getTermsForBounds() == q.getPositiveTerms() );
         }
 
+        TEST( FTSQuery, ParsePunctuation ) {
+            FTSQuery q;
+            ASSERT( q.parse( "hello.world", "english", false, TEXT_INDEX_VERSION_2 ).isOK() );
+
+            ASSERT_EQUALS( false, q.getCaseSensitive() );
+            ASSERT_EQUALS( 2U, q.getPositiveTerms().size() );
+            ASSERT_EQUALS( "hello", *q.getPositiveTerms().begin() );
+            ASSERT_EQUALS( "world", *(--q.getPositiveTerms().end()) );
+            ASSERT_EQUALS( 0U, q.getNegatedTerms().size() );
+            ASSERT_EQUALS( 0U, q.getPositivePhr().size() );
+            ASSERT_EQUALS( 0U, q.getNegatedPhr().size() );
+            ASSERT_TRUE( q.getTermsForBounds() == q.getPositiveTerms() );
+        }
+
         TEST( FTSQuery, Neg1 ) {
             FTSQuery q;
             ASSERT( q.parse( "this is -really fun", "english", false, TEXT_INDEX_VERSION_2 ).isOK() );

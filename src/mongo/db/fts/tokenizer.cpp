@@ -38,11 +38,10 @@ namespace mongo {
 
     namespace fts {
 
-        Tokenizer::Tokenizer( const FTSLanguage* language, StringData str )
+        Tokenizer::Tokenizer(const FTSLanguage* language, StringData str)
             : _pos(0), _raw( str ) {
             _english = ( language->str() == "english" );
             _skipWhitespace();
-            _previousWhiteSpace = true;
         }
 
         bool Tokenizer::more() const {
@@ -51,7 +50,7 @@ namespace mongo {
 
         Token Tokenizer::next() {
             if ( _pos >= _raw.size() )
-                return Token( Token::INVALID, "", 0, false );
+                return Token(Token::INVALID, "", 0);
 
             unsigned start = _pos++;
             Token::Type type = _type( _raw[start] );
@@ -62,9 +61,8 @@ namespace mongo {
                     _pos++;
 
             StringData ret = _raw.substr( start, _pos - start );
-            bool old = _previousWhiteSpace;
-            _previousWhiteSpace = _skipWhitespace();
-            return Token( type, ret, start, old );
+            _skipWhitespace();
+            return Token( type, ret, start );
         }
 
 

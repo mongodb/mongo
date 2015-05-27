@@ -30,6 +30,7 @@ baseEnv.Library('base', [
         'fts_index_format.cpp',
         'fts_matcher.cpp',
         'fts_query.cpp',
+        'fts_query_parser.cpp',
         'fts_spec.cpp',
         'fts_spec_legacy.cpp',
         'fts_language.cpp',

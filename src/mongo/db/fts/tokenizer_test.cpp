@@ -71,10 +71,6 @@ namespace mongo {
             ASSERT_EQUALS( "blue", a.data.toString() );
             ASSERT_EQUALS( "-", b.data.toString() );
             ASSERT_EQUALS( "red", c.data.toString() );
-
-            ASSERT( a.previousWhiteSpace );
-            ASSERT( !b.previousWhiteSpace );
-            ASSERT( !c.previousWhiteSpace );
         }
 
         TEST( Tokenizer, Basic3 ) {
@@ -93,11 +89,6 @@ namespace mongo {
             ASSERT_EQUALS( "blue", a.data.toString() );
             ASSERT_EQUALS( "-", b.data.toString() );
             ASSERT_EQUALS( "red", c.data.toString() );
-
-            ASSERT( a.previousWhiteSpace );
-            ASSERT( b.previousWhiteSpace );
-            ASSERT( !c.previousWhiteSpace );
-
 
             ASSERT_EQUALS( 0U, a.offset );
             ASSERT_EQUALS( 5U, b.offset );

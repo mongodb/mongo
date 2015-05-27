@@ -1,7 +1,5 @@
-// tokenizer.h
-
 /**
-*    Copyright (C) 2012 10gen Inc.
+*    Copyright (C) 2015 MongoDB Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -31,46 +29,60 @@
 
 #pragma once
 
-#include <string>
-
+#include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
-#include "mongo/db/fts/fts_language.h"
 
 namespace mongo {
 
     namespace fts {
 
-        struct Token {
+        struct QueryToken {
             enum Type { WHITESPACE, DELIMITER, TEXT, INVALID };
-            Token( Type type, StringData data, unsigned offset)
+            QueryToken( Type type, StringData data, unsigned offset, bool previousWhiteSpace )
                 : type( type ),
                   data( data ),
-                  offset( offset )
-                  {}
+                  offset( offset ),
+                  previousWhiteSpace( previousWhiteSpace ) {}
 
             bool ok() const { return type != INVALID; }
 
             Type type;
             StringData data;
             unsigned offset;
+            bool previousWhiteSpace;
         };
 
-        class Tokenizer {
-            MONGO_DISALLOW_COPYING( Tokenizer );
+        /**
+         * The pseudo EXBNF for the query parsing language is:
+         *
+         * SEARCH STRING = TOKEN_LIST ( ' ' TOKEN_LIST )*
+         *
+         * TOKEN_LIST = SEARCH_TOKEN
+         *          |'-' SEARCH_TOKEN
+         *          | QUOTED_SEARCH_TOKEN
+         *          |'-' QUOTED_SEARCH_TOKEN
+         *
+         * QUOTED_SEARCH_TOKEN = '“' SEARCH_TOKEN+ '"'
+         *
+         * SEARCH_TOKEN = CHARACTER_EXCLUDING_SPECIAL_CHARS
+         *
+         * SPECIAL_CHARS = '-' | ' ' | '"'
+         */
+        class FTSQueryParser {
+            MONGO_DISALLOW_COPYING( FTSQueryParser );
         public:
 
-            Tokenizer( const FTSLanguage* language, StringData str);
-
+            FTSQueryParser(StringData str);
             bool more() const;
-            Token next();
+            QueryToken next();
 
         private:
-            Token::Type _type( char c ) const;
-            bool _skipWhitespace();
+            QueryToken::Type getType( char c ) const;
+            bool skipWhitespace();
 
             unsigned _pos;
+            bool _previousWhiteSpace;
             const StringData _raw;
-            bool _english;
         };
 
     }

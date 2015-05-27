@@ -33,8 +33,8 @@
 #include "mongo/db/fts/fts_query.h"
 
 #include "mongo/db/fts/fts_spec.h"
+#include "mongo/db/fts/fts_query_parser.h"
 #include "mongo/db/fts/fts_tokenizer.h"
-#include "mongo/db/fts/tokenizer.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/stringutils.h"
 
@@ -69,11 +69,11 @@ namespace mongo {
 
             unsigned quoteOffset = 0;
 
-            Tokenizer i( _language, query );
+            FTSQueryParser i(query);
             while ( i.more() ) {
-                Token t = i.next();
+                QueryToken t = i.next();
 
-                if ( t.type == Token::TEXT ) {
+                if ( t.type == QueryToken::TEXT ) {
                     string s = t.data.toString();
 
                     if ( inPhrase && inNegation ) {
@@ -93,7 +93,7 @@ namespace mongo {
                     if ( inNegation && !inPhrase )
                         inNegation = false;
                 }
-                else if ( t.type == Token::DELIMITER ) {
+                else if ( t.type == QueryToken::DELIMITER ) {
                     char c = t.data[0];
                     if ( c == '-' ) {
                         if ( !inPhrase && t.previousWhiteSpace ) {
