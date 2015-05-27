@@ -1022,8 +1022,8 @@ __wt_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
  *	Check whether a page can be evicted.
  */
 static inline int
-__wt_page_can_evict(
-    WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags, int *inmem_splitp)
+__wt_page_can_evict(WT_SESSION_IMPL *session,
+    WT_PAGE *page, int check_splits, int *inmem_splitp)
 {
 	WT_BTREE *btree;
 	WT_PAGE_MODIFY *mod;
@@ -1048,7 +1048,7 @@ __wt_page_can_evict(
 	 * a transaction value, once that's globally visible, we know we can
 	 * evict the created page.
 	 */
-	if (LF_ISSET(WT_EVICT_CHECK_SPLITS) && WT_PAGE_IS_INTERNAL(page) &&
+	if (check_splits && WT_PAGE_IS_INTERNAL(page) &&
 	    !__wt_txn_visible_all(session, mod->mod_split_txn))
 		return (0);
 
@@ -1108,7 +1108,7 @@ __wt_page_can_evict(
 	 * similar to __wt_txn_visible_all, but ignores the checkpoints
 	 * transaction.
 	 */
-	if (LF_ISSET(WT_EVICT_CHECK_SPLITS) &&
+	if (check_splits &&
 	    WT_TXNID_LE(txn_global->oldest_id, mod->inmem_split_txn))
 		return (0);
 
