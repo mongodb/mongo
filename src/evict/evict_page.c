@@ -60,7 +60,7 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 	conn = S2C(session);
 
 	page = ref->page;
-	forced_eviction = (page->read_gen == WT_READGEN_OLDEST);
+	forced_eviction = page->read_gen == WT_READGEN_OLDEST;
 	inmem_split = 0;
 
 	WT_RET(__wt_verbose(session, WT_VERB_EVICT,
@@ -126,8 +126,8 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 		if (__wt_ref_is_root(ref))
 			__wt_ref_out(session, ref);
 		else
-			WT_ERR(__evict_page_dirty_update(
-			    session, ref, LF_ISSET(WT_EVICT_EXCLUSIVE)));
+			WT_ERR(__evict_page_dirty_update(session,
+			    ref, LF_ISSET(WT_EVICT_EXCLUSIVE) ? 1 : 0));
 
 		WT_STAT_FAST_CONN_INCR(session, cache_eviction_dirty);
 		WT_STAT_FAST_DATA_INCR(session, cache_eviction_dirty);
@@ -183,6 +183,7 @@ __evict_page_dirty_update(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 
 	switch (F_ISSET(mod, WT_PM_REC_MASK)) {
 	case WT_PM_REC_EMPTY:				/* Page is empty */
+		/* Discard the parent's address. */
 		if (ref->addr != NULL && __wt_off_page(parent, ref->addr)) {
 			__wt_free(session, ((WT_ADDR *)ref->addr)->addr);
 			__wt_free(session, ref->addr);
@@ -212,6 +213,7 @@ __evict_page_dirty_update(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 		WT_RET(__wt_split_multi(session, ref, exclusive));
 		break;
 	case WT_PM_REC_REPLACE: 			/* 1-for-1 page swap */
+		/* Discard the parent's address. */
 		if (ref->addr != NULL && __wt_off_page(parent, ref->addr)) {
 			__wt_free(session, ((WT_ADDR *)ref->addr)->addr);
 			__wt_free(session, ref->addr);
