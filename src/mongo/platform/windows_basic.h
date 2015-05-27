@@ -84,7 +84,6 @@
 
 #include <winsock2.h>  //this must be included before the first windows.h include
 #include <ws2tcpip.h>
-#include <wspiapi.h>
 #include <windows.h>
 
 // Should come either from the command line, or if not set there, the inclusion of sdkddkver.h

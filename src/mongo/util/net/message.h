@@ -483,6 +483,10 @@ public:
         return _freeIt;
     }
 
+    char* buf() {
+        return _buf;
+    }
+
     void send(MessagingPort& p, const char* context);
 
     std::string toString() const;

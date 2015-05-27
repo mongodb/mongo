@@ -2,6 +2,8 @@
 
 Import("env")
 
+env.InjectThirdPartyIncludePaths('asio')
+
 env.Library(target='task_executor_interface',
             source=['task_executor.cpp',],
             LIBDEPS=[
@@ -36,3 +38,15 @@ env.Library(target='network_test_env',
                 '$BUILD_DIR/mongo/db/repl/replication_executor',
             ])
 
+env.Library(
+    target='network_interface_asio',
+    source=[
+        'network_interface_asio.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/client/clientdriver',
+        '$BUILD_DIR/mongo/db/coredb',
+        '$BUILD_DIR/mongo/db/repl/replication_executor',
+        '$BUILD_DIR/mongo/db/serveronly',
+        '$BUILD_DIR/third_party/shim_asio',
+    ])
