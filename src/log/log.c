@@ -34,6 +34,32 @@ __wt_log_ckpt(WT_SESSION_IMPL *session, WT_LSN *ckp_lsn)
 }
 
 /*
+ * __wt_log_background --
+ *	Record the given LSN as the background LSN and signal the
+ *	thread as needed.
+ */
+void
+__wt_log_background(WT_SESSION_IMPL *session, WT_LSN *lsn)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_LOG *log;
+
+	conn = S2C(session);
+	log = conn->log;
+	session->bg_sync_lsn = *lsn;
+	/*
+	 * Advance the logging subsystem background sync LSN if
+	 * needed.
+	 */
+	__wt_spin_lock(session, &log->log_sync_lock);
+	if (WT_LOG_CMP(lsn, &log->bg_sync_lsn) > 0)
+		log->bg_sync_lsn = *lsn;
+	__wt_spin_unlock(session, &log->log_sync_lock);
+	__wt_cond_signal(session, conn->log_close_cond);
+	return;
+}
+
+/*
  * __wt_log_needs_recovery --
  *	Return 0 if we encounter a clean shutdown and 1 if recovery
  *	must be run in the given variable.
@@ -1769,25 +1795,14 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 			(void)__wt_cond_wait(
 			    session, log->log_write_cond, 10000);
 	}
+
 	/*
-	 * Advance the background sync LSN if needed and it is later than
-	 * another transaction.
+	 * Advance the background sync LSN if needed.
 	 */
-bg:
-	if (LF_ISSET(WT_LOG_BACKGROUND) &&
-	    WT_LOG_CMP(&session->bg_sync_lsn, &lsn) <= 0) {
-		session->bg_sync_lsn = lsn;
-		/*
-		 * Advance the logging subsystem background sync LSN if
-		 * needed.
-		 */
-		__wt_spin_lock(session, &log->log_sync_lock);
-		if (WT_LOG_CMP(&lsn, &log->bg_sync_lsn) > 0)
-			log->bg_sync_lsn = lsn;
-		__wt_spin_unlock(session, &log->log_sync_lock);
-	}
-err:
-	if (locked)
+bg:	if (LF_ISSET(WT_LOG_BACKGROUND) &&
+	    WT_LOG_CMP(&session->bg_sync_lsn, &lsn) <= 0)
+		__wt_log_background(session, &lsn);
+err:	 if (locked)
 		__wt_spin_unlock(session, &log->log_slot_lock);
 	if (ret == 0 && lsnp != NULL)
 		*lsnp = lsn;

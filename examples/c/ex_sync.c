@@ -83,7 +83,8 @@ main(void)
 		if (i == MAX_KEYS/2) {
 			ret = session->commit_transaction(
 			    session, "sync=background");
-			ret = session->transaction_sync(session, "timeout_ms=0");
+			ret = session->transaction_sync(
+			    session, "timeout_ms=0");
 			if (ret == ETIMEDOUT)
 				printf("Transactions not yet stable\n");
 			else if (ret != 0)

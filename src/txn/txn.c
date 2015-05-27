@@ -469,11 +469,6 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 		 */
 		__wt_txn_release_snapshot(session);
 		ret = __wt_txn_log_commit(session, cfg);
-		/*
-		 * If we're doing a background sync, signal the thread.
-		 */
-		if (txn->txn_logsync == WT_LOG_BACKGROUND)
-			__wt_cond_signal(session, conn->log_close_cond);
 	}
 
 	/*
