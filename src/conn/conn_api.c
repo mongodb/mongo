@@ -637,7 +637,7 @@ __extractor_confchk(
  */
 int
 __wt_extractor_config(WT_SESSION_IMPL *session,
-    const char *config, WT_EXTRACTOR **extractorp, int *ownp)
+    const char *uri, const char *config, WT_EXTRACTOR **extractorp, int *ownp)
 {
 	WT_CONFIG_ITEM cname;
 	WT_EXTRACTOR *extractor;
@@ -658,7 +658,7 @@ __wt_extractor_config(WT_SESSION_IMPL *session,
 		WT_RET(__wt_config_getones(session,
 		    config, "app_metadata", &cname));
 		WT_RET(extractor->customize(extractor, &session->iface,
-		   session->dhandle->name, &cname, extractorp));
+		    uri, &cname, extractorp));
 	}
 
 	if (*extractorp == NULL)
@@ -986,6 +986,9 @@ err:	/*
 			WT_TRET(wt_session->rollback_transaction(
 			    wt_session, NULL));
 		}
+
+	/* Release all named snapshots. */
+	WT_TRET(__wt_txn_named_snapshot_destroy(session));
 
 	/* Close open, external sessions. */
 	for (s = conn->sessions, i = 0; i < conn->session_cnt; ++s, ++i)

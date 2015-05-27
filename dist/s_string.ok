@@ -6,6 +6,7 @@ AAAAAAAAAAAAAAAA
 AAAAAAAAAAAAAAAAAA
 ABCDEFGHIJKLMNOPQRSTUVWXYZ
 ADDR
+ADDRs
 AJ
 API
 APIs
@@ -43,13 +44,17 @@ CAS
 CCCCCCCCCCCCCCCCCC
 CELL's
 CELLs
+CET
+CFLAGS
 CHECKKEY
 CKPT
 CMP
 CONCAT
 CONFIG
+COVERITY
 CPUs
 CRC
+CSV
 CURSORs
 CURSTD
 CallsCustDate
@@ -59,6 +64,7 @@ CityHash
 CloseHandle
 Comparator
 Config
+Coverity
 CreateFileMapping
 Crummey
 CustomersPhone
@@ -75,6 +81,7 @@ Decrement
 Decrypt
 EAGAIN
 EBUSY
+EEXIST
 EINTR
 EINVAL
 EMSG
@@ -124,6 +131,7 @@ HFS
 HHHH
 HHHHLL
 HHHLL
+HyperLevelDB
 IEC
 IEEE
 IKEY
@@ -138,6 +146,7 @@ Inline
 Intra
 Ippokratis
 Iu
+JIRA
 JPEG
 JSON
 Jyrki
@@ -162,6 +171,7 @@ LTE
 LZ
 LZO
 LeafGreen
+LevelDB
 Levyx
 Llqr
 Llqrt
@@ -178,11 +188,13 @@ Manos
 MapViewOfFile
 Marsaglia's
 Mellor
+Memrata
 Metadata
 Mewhort
 Mitzenmacher
 MongoDB
 MoveFile
+Multi
 Multithreaded
 Mutex
 MySecret
@@ -205,6 +217,7 @@ ObWgfvgw
 Obama
 PARAM
 POSIX
+PREDEFINE
 PRIu
 PTHREAD
 PTR
@@ -213,6 +226,7 @@ Phong
 PlatformSDK
 Posix
 Pre
+Preload
 Prepend
 Qsort
 RCS
@@ -222,6 +236,7 @@ RET
 RHEL
 RLE
 RLEs
+RMW
 RNG
 RPC
 RUNDIR
@@ -229,6 +244,7 @@ Radu
 RedHat
 Redistributions
 Resize
+RocksDB
 SIMD
 SLIST
 SLVG
@@ -238,12 +254,14 @@ SQL
 SSHH
 SSq
 STAILQ
+STEC
 STRUCT
 Scalability
 Scalable
 Sedgewick
 Seigh
 SetEndOfFile
+SetEndofFile
 SetFilePointerEx
 Sevii
 SiH
@@ -286,6 +304,7 @@ Vigenere
 Vixie
 Vo
 VxWorks
+WAL
 WIREDTIGER
 WRLSN
 WakeAllConditionVariable
@@ -297,6 +316,7 @@ WinNT
 WiredTiger
 WiredTiger's
 WiredTigerCheckpoint
+WiredTigerException
 WiredTigerInit
 WiredTigerLog
 WiredTigerPreplog
@@ -328,9 +348,13 @@ argv
 async
 asyncopp
 asyncops
+atomicity
 autocommit
+autoconf
+automake
 bInheritHandle
 basecfg
+basho
 bdb
 beginthreadex
 bigram
@@ -354,6 +378,8 @@ btree
 btrees
 buf
 bufsz
+bugfix
+bugfixes
 builtin
 builtins
 bytelock
@@ -374,6 +400,7 @@ centric
 cfg
 cfkos
 change's
+changelog
 checkpointed
 checkpointer
 checkpointing
@@ -412,8 +439,10 @@ copyout
 cp
 cpuid
 crc
+create's
 crypto
 cryptobad
+csv
 ctime
 ctype
 curbackup
@@ -453,6 +482,7 @@ decrypts
 deflateCopy
 deflateEnd
 deflateInit
+defno
 del
 dequeue
 dequeued
@@ -481,6 +511,7 @@ dst
 dstlen
 dsync
 dumpcmp
+dumpfile
 dup
 eg
 emp
@@ -553,6 +584,7 @@ getraw
 gettime
 gettimeofday
 getv
+github
 gobare
 goesc
 gostring
@@ -562,6 +594,7 @@ hashval
 havesize
 hdr
 highjack
+hotbackup
 html
 huffman
 hval
@@ -610,17 +643,20 @@ kvraw
 kvs
 kvsbdb
 lang
+latencies
 lbrace
 lbracket
 len
 lenp
 level's
+leveldb
 lex
 lexicographically
 lf
 lfence
 libdatasource
 libs
+libtool
 libwiredtiger
 llll
 llu
@@ -703,6 +739,7 @@ noraw
 notfound
 notsup
 nset
+nsnap
 nul
 nuls
 numSymbols
@@ -711,10 +748,12 @@ offpage
 ok
 ondisk
 onint
+online
 onpage
 oo
 opendir
 openfile
+optimizations
 optype
 os
 ovfl
@@ -726,6 +765,7 @@ parserp
 patchp
 pathname
 pathnames
+perf
 pfx
 poptable
 popthreads
@@ -768,6 +808,7 @@ readlock
 readonly
 readunlock
 realloc
+rebalancing
 recno
 recnos
 reconfig
@@ -785,6 +826,7 @@ rf
 rle
 rmw
 rng
+rocksdb
 rotN
 rotn
 rpc
@@ -830,6 +872,7 @@ strcmp
 strdup
 strerror
 strftime
+strget
 strlen
 strncpy
 strndup
@@ -852,6 +895,7 @@ sys
 t's
 tV
 tablename
+tcbench
 testutil
 th
 tid
@@ -918,6 +962,7 @@ util
 uu
 vW
 va
+valgrind
 valuep
 valuev
 vanishingly
@@ -938,14 +983,17 @@ wb
 wiredtiger
 workFactor
 wrapup
+writeable
 writelock
 writeunlock
 wrlock
 wrlsn
 ws
+wtbench
 wti
 wtperf
 wts
+wtstats
 xF
 xff
 xxxx

@@ -162,7 +162,7 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	WT_TRET(__wt_cache_destroy(session));
 
 	/* Discard transaction state. */
-	__wt_txn_global_destroy(session);
+	WT_TRET(__wt_txn_global_destroy(session));
 
 	/* Close extensions, first calling any unload entry point. */
 	while ((dlh = TAILQ_FIRST(&conn->dlhqh)) != NULL) {

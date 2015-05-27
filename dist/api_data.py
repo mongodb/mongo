@@ -834,6 +834,9 @@ methods = {
         priority of the transaction for resolving conflicts.
         Transactions with higher values are less likely to abort''',
         min='-100', max='100'),
+    Config('snapshot', '', r'''
+        use a named, in-memory snapshot, see
+        @ref transaction_named_snapshots'''),
     Config('sync', '', r'''
         whether to sync log records when the transaction commits,
         inherited from ::wiredtiger_open \c transaction_sync''',
@@ -868,6 +871,24 @@ methods = {
         including LSM trees may not be named)'''),
     Config('target', '', r'''
         if non-empty, checkpoint the list of objects''', type='list'),
+]),
+
+'WT_SESSION.snapshot' : Method([
+    Config('drop', '', r'''
+            if non-empty, specifies which snapshots to drop. Where a group
+            of snapshots are being dropped, the order is based on snapshot
+            creation order not alphanumeric name order''',
+        type='category', subconfig=[
+        Config('all', 'false', r'''
+            drop all named snapshots''', type='boolean'),
+        Config('before', '', r'''
+            drop all snapshots up to but not including the specified name'''),
+        Config('names', '', r'''
+            drop specific named snapshots''', type='list'),
+        Config('to', '', r'''
+            drop all snapshots up to and including the specified name.'''),
+    ]),
+    Config('name', '', r'''specify a name for the snapshot'''),
 ]),
 
 'WT_CONNECTION.add_collator' : Method([]),
