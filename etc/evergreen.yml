@@ -34,6 +34,7 @@ variables:
   - func: "run tests"
     vars:
       resmoke_args: --help
+      run_multiple_jobs: false
 
 #######################################
 #            Functions                #
@@ -230,7 +231,11 @@ functions:
         set -o verbose
 
         cp mongodb*/bin/* .
-        ${asan_symbolizer} ${enable_lsan} ${python|python} buildscripts/resmoke.py ${resmoke_args} ${test_flags} --log=buildlogger --reportFile=report.json
+        if [ ${run_multiple_jobs|false} = true ]; then
+          ${asan_symbolizer} ${enable_lsan} ${python|python} buildscripts/resmoke.py ${resmoke_args} --jobs=${num_cores|1} ${test_flags} --log=buildlogger --reportFile=report.json
+        else
+          ${asan_symbolizer} ${enable_lsan} ${python|python} buildscripts/resmoke.py ${resmoke_args} --jobs=1 ${test_flags} --log=buildlogger --reportFile=report.json
+        fi
 
 pre:
   - command: shell.track
@@ -594,7 +599,8 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: -j8 --suites=core --storageEngine=mmapv1
+      resmoke_args: --suites=core --storageEngine=mmapv1
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: jsCore_WT
@@ -602,7 +608,8 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: -j8 --suites=core --storageEngine=wiredTiger
+      resmoke_args: --suites=core --storageEngine=wiredTiger
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: jsCore_compatibility
@@ -610,7 +617,8 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: -j8 --suites=core --shellWriteMode=compatibility --storageEngine=mmapv1
+      resmoke_args: --suites=core --shellWriteMode=compatibility --storageEngine=mmapv1
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: jsCore_compatibility_WT
@@ -618,7 +626,8 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: -j8 --suites=core --shellWriteMode=compatibility --storageEngine=wiredTiger
+      resmoke_args: --suites=core --shellWriteMode=compatibility --storageEngine=wiredTiger
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: jsCore_auth
@@ -626,7 +635,8 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: -j8 --suites=core_auth
+      resmoke_args: --suites=core_auth
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: jsCore_op_command
@@ -634,7 +644,8 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: -j8 --suites=core_op_command --storageEngine=mmapv1
+      resmoke_args: --suites=core_op_command --storageEngine=mmapv1
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: jsCore_op_command_WT
@@ -642,7 +653,8 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: -j8 --suites=core_op_command --storageEngine=wiredTiger
+      resmoke_args: --suites=core_op_command --storageEngine=wiredTiger
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: inMemoryExperiment
@@ -650,7 +662,8 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: -j8 --suites=core --storageEngine=inMemoryExperiment
+      resmoke_args: --suites=core --storageEngine=inMemoryExperiment
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: jsCore_small_oplog
@@ -1524,6 +1537,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release --variant-dir="linux2/release"
+    num_cores: $(grep -c ^processor /proc/cpuinfo)
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     has_debugsymbols: true
@@ -1617,6 +1631,7 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux-debug
     push_arch: x86_64
+    num_cores: $(grep -c ^processor /proc/cpuinfo)
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/dbg_on/opt_on"
@@ -1692,6 +1707,7 @@ buildvariants:
     push_arch: x86_64
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/durableDefaultOff"
     has_debugsymbols: true
+    num_cores: $(grep -c ^processor /proc/cpuinfo)
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure --nojournal
   tasks:
@@ -1741,6 +1757,7 @@ buildvariants:
     gitvars: LD_LIBRARY_PATH=/opt/openssl/lib64 #needed to workaround the old openSSL on rhel55 builders.
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release --variant-dir="linux2/release"
+    num_cores: $(grep -c ^processor /proc/cpuinfo)
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure --wiredTigerCollectionConfig=type=lsm --wiredTigerIndexConfig=type=lsm
   tasks:
@@ -1786,6 +1803,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-ubuntu1204
     compile_flags: --ssl --distmod=ubuntu1204 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/release"
+    num_cores: $(grep -c ^processor /proc/cpuinfo)
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     has_debugsymbols: true
@@ -1876,6 +1894,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-ubuntu1404
     compile_flags: --ssl --distmod=ubuntu1404 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/release"
+    num_cores: $(grep -c ^processor /proc/cpuinfo)
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     has_debugsymbols: true
@@ -1967,6 +1986,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-enterprise-amzn64
     compile_flags: --ssl --ssl-fips-capability --distmod=amzn64 --release -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/release"
+    num_cores: $(grep -c ^processor /proc/cpuinfo)
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     has_debugsymbols: true
@@ -2020,6 +2040,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-amazon
     compile_flags: --ssl --distmod=amazon -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/release"
+    num_cores: $(grep -c ^processor /proc/cpuinfo)
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     has_debugsymbols: true
@@ -2111,6 +2132,7 @@ buildvariants:
     push_name: linux
     push_arch: i686
     compile_flags: --release --distarch=i686 -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/release" --wiredtiger=off CCFLAGS="-m32" LINKFLAGS="-m32"
+    num_cores: $(grep -c ^processor /proc/cpuinfo)
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure --storageEngine=mmapv1 -j1  # Avoid starting too many mongod's on 32-bit systems.
     has_debugsymbols: true
@@ -2148,6 +2170,7 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux-debug
     push_arch: i686
+    num_cores: $(grep -c ^processor /proc/cpuinfo)
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure --storageEngine=mmapv1 -j1  # Avoid starting too many mongod's on 32-bit systems.
     has_debugsymbols: true
@@ -2189,6 +2212,7 @@ buildvariants:
     msi_target: msi
     content_type: application/zip
     compile_flags: --release -j$(grep -c ^processor /proc/cpuinfo) --variant-dir=win32
+    num_cores: $(grep -c ^processor /proc/cpuinfo)
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     ext: zip
@@ -2273,6 +2297,7 @@ buildvariants:
     msi_target: msi
     content_type: application/zip
     compile_flags: --release --win-version-min=ws08r2 -j$(grep -c ^processor /proc/cpuinfo) --distmod=2008plus --variant-dir=win32
+    num_cores: $(grep -c ^processor /proc/cpuinfo)
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     ext: zip
@@ -2343,6 +2368,7 @@ buildvariants:
     push_name: win32-debug
     push_arch: x86_64-2008plus
     content_type: application/zip
+    num_cores: $(grep -c ^processor /proc/cpuinfo)
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     compile_flags: --dbg=on --opt=on --win-version-min=ws08r2 -j$(grep -c ^processor /proc/cpuinfo) --distmod=2008plus
@@ -2410,6 +2436,7 @@ buildvariants:
     msi_target: msi
     content_type: application/zip
     compile_flags: --release --ssl --ssl-fips-capability --distmod=windows-64 CPPPATH="c:/openssl/include c:/sasl/include c:/snmp/include" LIBPATH="c:/openssl/lib c:/sasl/lib c:/snmp/lib" -j$(grep -c ^processor /proc/cpuinfo) --dynamic-windows --win-version-min=ws08r2 --variant-dir=win32
+    num_cores: $(grep -c ^processor /proc/cpuinfo)
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     ext: zip
@@ -2452,6 +2479,7 @@ buildvariants:
     msi_target: msi
     content_type: application/zip
     compile_flags: --release --ssl --distmod=2008plus-ssl CPPPATH="c:/openssl/include" LIBPATH="c:/openssl/lib" -j$(grep -c ^processor /proc/cpuinfo) --dynamic-windows --win-version-min=ws08r2 --variant-dir=win32
+    num_cores: $(grep -c ^processor /proc/cpuinfo)
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     ext: zip
@@ -2527,6 +2555,7 @@ buildvariants:
     msi_target: msi
     content_type: application/zip
     compile_flags: --release -j$(grep -c ^processor /proc/cpuinfo) --wiredtiger=off TARGET_ARCH=i386 --variant-dir=win32
+    num_cores: $(grep -c ^processor /proc/cpuinfo)
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure --storageEngine=mmapv1 -j1  # Avoid starting too many mongod's on 32-bit systems.
     ext: zip
@@ -2569,6 +2598,7 @@ buildvariants:
     push_name: osx
     push_arch: x86_64
     compile_flags: --allocator=system -j$(sysctl -n hw.logicalcpu) --release --osx-version-min=10.7 --libc++
+    num_cores: $(sysctl -n hw.logicalcpu)
     num_jobs_unittests: $(sysctl -n hw.logicalcpu)
     test_flags: --continueOnFailure
   tasks:
@@ -2646,6 +2676,7 @@ buildvariants:
     push_arch: x86_64
     tooltags: "-tags ssl"
     compile_flags: --ssl --allocator=system -j$(sysctl -n hw.logicalcpu) --release --osx-version-min=10.7 --libc++
+    num_cores: $(sysctl -n hw.logicalcpu)
     num_jobs_unittests: $(sysctl -n hw.logicalcpu)
     test_flags: --continueOnFailure
   tasks:
@@ -2723,6 +2754,7 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: osx-debug
     push_arch: x86_64
+    num_cores: $(sysctl -n hw.logicalcpu)
     num_jobs_unittests: $(sysctl -n hw.logicalcpu)
     test_flags: --continueOnFailure
     compile_flags: --dbg=on --opt=on --allocator=system -j$(sysctl -n hw.logicalcpu) --osx-version-min=10.7 --libc++
@@ -2771,6 +2803,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-enterprise-rhel57
     compile_flags: --ssl --ssl-fips-capability --distmod=rhel57 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/release"
+    num_cores: $(grep -c ^processor /proc/cpuinfo)
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     has_debugsymbols: true
@@ -2810,6 +2843,7 @@ buildvariants:
     push_arch: x86_64-enterprise-rhel62
     rlp_environment: MONGOD_UNITTEST_RLP_LANGUAGE_TEST_BTROOT=/opt/basis
     compile_flags: --ssl --ssl-fips-capability --distmod=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/release" CPPPATH="/opt/basis/rlp/rlp/include /opt/basis/rlp/utilities/include" --use-basis-tech-rosette-linguistics-platform=on
+    num_cores: $(grep -c ^processor /proc/cpuinfo)
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     has_debugsymbols: true
@@ -2849,6 +2883,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-enterprise-rhel70
     compile_flags: --ssl --ssl-fips-capability --distmod=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/release"
+    num_cores: $(grep -c ^processor /proc/cpuinfo)
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     has_debugsymbols: true
@@ -2886,6 +2921,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-rhel55
     compile_flags: --ssl --distmod=rhel55 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/release"
+    num_cores: $(grep -c ^processor /proc/cpuinfo)
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     has_debugsymbols: true
@@ -2977,6 +3013,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-rhel62
     compile_flags: --ssl --distmod=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/release"
+    num_cores: $(grep -c ^processor /proc/cpuinfo)
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     has_debugsymbols: true
@@ -3068,6 +3105,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-rhel70
     compile_flags: --ssl --distmod=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/release"
+    num_cores: $(grep -c ^processor /proc/cpuinfo)
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     has_debugsymbols: true
@@ -3164,6 +3202,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-enterprise-ubuntu1204
     compile_flags: --ssl --ssl-fips-capability --distmod=ubuntu1204 --release -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/release"
+    num_cores: $(grep -c ^processor /proc/cpuinfo)
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     has_debugsymbols: true
@@ -3202,6 +3241,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-enterprise-ubuntu1404
     compile_flags: --ssl --ssl-fips-capability --distmod=ubuntu1404 --release -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/release"
+    num_cores: $(grep -c ^processor /proc/cpuinfo)
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     has_debugsymbols: true
@@ -3244,6 +3284,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-enterprise-suse11
     compile_flags: --ssl --ssl-fips-capability --distmod=suse11 --release -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/release"
+    num_cores: $(grep -c ^processor /proc/cpuinfo)
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     has_debugsymbols: true
@@ -3283,6 +3324,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-suse11
     compile_flags: --ssl --distmod=suse11 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/release"
+    num_cores: $(grep -c ^processor /proc/cpuinfo)
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     has_debugsymbols: true
@@ -3378,6 +3420,7 @@ buildvariants:
     push_name: sunos5
     push_arch: x86_64
     compile_flags: CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ -j$(kstat cpu | sort -u | grep -c "^module") --release CCFLAGS="-m64" LINKFLAGS="-m64 -static-libstdc++ -static-libgcc"
+    num_cores: $(kstat cpu | sort -u | grep -c "^module")
     num_jobs_unittests: $(kstat cpu | sort -u | grep -c "^module")
     test_flags: --continueOnFailure
     has_debugsymbols: true
@@ -3430,6 +3473,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-enterprise-debian71
     compile_flags: --ssl --ssl-fips-capability --distmod=debian71 --release -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/release"
+    num_cores: $(grep -c ^processor /proc/cpuinfo)
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     has_debugsymbols: true
@@ -3467,6 +3511,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-debian71
     compile_flags: --ssl --distmod=debian71 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/release"
+    num_cores: $(grep -c ^processor /proc/cpuinfo)
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     has_debugsymbols: true
@@ -3558,6 +3603,7 @@ buildvariants:
   expansions:
     build_rocksdb: true
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --dbg=off --opt=on CPPPATH=$(readlink -f ../rocksdb/include/) LIBPATH=$(readlink -f ../rocksdb/) LIBS=rocksdb CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --variant-dir=release
+    num_cores: $(grep -c ^processor /proc/cpuinfo)
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure --storageEngine=rocksdb
   tasks:
@@ -3616,6 +3662,7 @@ buildvariants:
     asan_symbolizer: ASAN_SYMBOLIZER_PATH=/usr/bin/llvm-symbolizer-3.4
     enable_lsan: LSAN_OPTIONS="suppressions=etc/lsan.suppressions" ASAN_OPTIONS=detect_leaks=1
     compile_flags: CC=/usr/bin/clang CXX=/usr/bin/clang++ --dbg=on --opt=on --allocator=system --sanitize=address --ssl -j$(grep -c ^processor /proc/cpuinfo) --nostrip --variant-dir=build
+    num_cores: $(grep -c ^processor /proc/cpuinfo)
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: -j1 --continueOnFailure  # Avoid starting too many mongod's under ASAN build.
   tasks:
@@ -3695,6 +3742,7 @@ buildvariants:
   expansions:
     tooltags: "-tags 'ssl'"
     compile_flags: CC=/usr/bin/clang CXX=/usr/bin/clang++ --libc++ --ssl -j$(grep -c ^processor /proc/cpuinfo) --variant-dir=build --distmod=ubuntu1410-clang
+    num_cores: $(grep -c ^processor /proc/cpuinfo)
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     push_path: linux
