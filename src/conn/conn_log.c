@@ -270,11 +270,12 @@ err:
 }
 
 /*
- * __log_close_server --
- *	The log close server thread.
+ * __log_file_server --
+ *	The log file server thread.  This worker thread manages
+ *	log file operations such as closing and syncing. 
  */
 static WT_THREAD_RET
-__log_close_server(void *arg)
+__log_file_server(void *arg)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
@@ -354,7 +355,7 @@ __log_close_server(void *arg)
 		}
 		/* Wait until the next event. */
 		WT_ERR(__wt_cond_wait(
-		    session, conn->log_close_cond, WT_MILLION));
+		    session, conn->log_file_cond, WT_MILLION));
 	}
 
 	if (0) {
@@ -459,7 +460,7 @@ __log_wrlsn_server(void *arg)
 				 */
 				if (F_ISSET(slot, SLOT_CLOSEFH))
 					WT_ERR(__wt_cond_signal(session,
-					    conn->log_close_cond));
+					    conn->log_file_cond));
 				WT_ERR(__wt_log_slot_free(session, slot));
 			}
 		}
@@ -609,16 +610,16 @@ __wt_logmgr_open(WT_SESSION_IMPL *session)
 	 * If logging is enabled, this thread runs.
 	 */
 	WT_RET(__wt_open_internal_session(
-	    conn, "log-close-server", 0, 0, &conn->log_close_session));
-	WT_RET(__wt_cond_alloc(conn->log_close_session,
-	    "log close server", 0, &conn->log_close_cond));
+	    conn, "log-close-server", 0, 0, &conn->log_file_session));
+	WT_RET(__wt_cond_alloc(conn->log_file_session,
+	    "log close server", 0, &conn->log_file_cond));
 
 	/*
 	 * Start the log file close thread.
 	 */
-	WT_RET(__wt_thread_create(conn->log_close_session,
-	    &conn->log_close_tid, __log_close_server, conn->log_close_session));
-	conn->log_close_tid_set = 1;
+	WT_RET(__wt_thread_create(conn->log_file_session,
+	    &conn->log_file_tid, __log_file_server, conn->log_file_session));
+	conn->log_file_tid_set = 1;
 
 	/*
 	 * Start the log write LSN thread.  It is not configurable.
@@ -693,16 +694,16 @@ __wt_logmgr_destroy(WT_SESSION_IMPL *session)
 		conn->log_tid_set = 0;
 	}
 	WT_TRET(__wt_cond_destroy(session, &conn->log_cond));
-	if (conn->log_close_tid_set) {
-		WT_TRET(__wt_cond_signal(session, conn->log_close_cond));
-		WT_TRET(__wt_thread_join(session, conn->log_close_tid));
-		conn->log_close_tid_set = 0;
+	if (conn->log_file_tid_set) {
+		WT_TRET(__wt_cond_signal(session, conn->log_file_cond));
+		WT_TRET(__wt_thread_join(session, conn->log_file_tid));
+		conn->log_file_tid_set = 0;
 	}
-	WT_TRET(__wt_cond_destroy(session, &conn->log_close_cond));
-	if (conn->log_close_session != NULL) {
-		wt_session = &conn->log_close_session->iface;
+	WT_TRET(__wt_cond_destroy(session, &conn->log_file_cond));
+	if (conn->log_file_session != NULL) {
+		wt_session = &conn->log_file_session->iface;
 		WT_TRET(wt_session->close(wt_session, NULL));
-		conn->log_close_session = NULL;
+		conn->log_file_session = NULL;
 	}
 	if (conn->log_wrlsn_tid_set) {
 		WT_TRET(__wt_cond_signal(session, conn->log_wrlsn_cond));

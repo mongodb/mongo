@@ -55,7 +55,7 @@ __wt_log_background(WT_SESSION_IMPL *session, WT_LSN *lsn)
 	if (WT_LOG_CMP(lsn, &log->bg_sync_lsn) > 0)
 		log->bg_sync_lsn = *lsn;
 	__wt_spin_unlock(session, &log->log_sync_lock);
-	__wt_cond_signal(session, conn->log_close_cond);
+	__wt_cond_signal(session, conn->log_file_cond);
 	return;
 }
 
@@ -1063,7 +1063,7 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, int *freep)
 	 * Signal the close thread if needed.
 	 */
 	if (F_ISSET(slot, SLOT_CLOSEFH))
-		WT_ERR(__wt_cond_signal(session, conn->log_close_cond));
+		WT_ERR(__wt_cond_signal(session, conn->log_file_cond));
 
 	/*
 	 * Try to consolidate calls to fsync to wait less.  Acquire a spin lock
