@@ -403,6 +403,13 @@ namespace mongo {
     };
 
 
+    class ExpressionArrayElemAt final : public ExpressionFixedArity<ExpressionArrayElemAt, 2> {
+    public:
+        Value evaluateInternal(Variables* vars) const final;
+        const char* getOpName() const final;
+    };
+
+
     class ExpressionCoerceToBool : public Expression {
     public:
         // virtuals from ExpressionNary

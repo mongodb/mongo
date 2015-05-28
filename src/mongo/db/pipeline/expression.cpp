@@ -593,6 +593,44 @@ namespace {
         return "$anyElementTrue";
     }
 
+    /* ------------------------- ExpressionArrayElemAt -------------------------- */
+
+    Value ExpressionArrayElemAt::evaluateInternal(Variables* vars) const {
+        const Value array = vpOperand[0]->evaluateInternal(vars);
+        const Value indexArg = vpOperand[1]->evaluateInternal(vars);
+
+        if (array.nullish() || indexArg.nullish()) {
+            return Value(BSONNULL);
+        }
+
+        uassert(28689, str::stream() << getOpName() << "'s first argument must be an array, but is "
+                                     << typeName(array.getType()),
+                array.getType() == Array);
+        uassert(28690, str::stream() << getOpName() << "'s second argument must be a numeric value,"
+                                     << " but is " << typeName(indexArg.getType()),
+                indexArg.numeric());
+        uassert(28691, str::stream() << getOpName() << "'s second argument must be representable as"
+                                     << " a 32-bit integer: " << indexArg.coerceToDouble(),
+                indexArg.integral());
+
+        long long i = indexArg.coerceToLong();
+        if (i < 0 && static_cast<size_t>(std::abs(i)) > array.getArrayLength()) {
+            // Positive indices that are too large are handled automatically by Value.
+            return Value();
+        }
+        else if (i < 0) {
+            // Index from the back of the array.
+            i = array.getArrayLength() + i;
+        }
+        const size_t index = static_cast<size_t>(i);
+        return array[index];
+    }
+
+    REGISTER_EXPRESSION("$arrayElemAt", ExpressionArrayElemAt::parse);
+    const char* ExpressionArrayElemAt::getOpName() const {
+        return "$arrayElemAt";
+    }
+
     /* -------------------- ExpressionCoerceToBool ------------------------- */
 
     intrusive_ptr<ExpressionCoerceToBool> ExpressionCoerceToBool::create(
@@ -1931,11 +1969,8 @@ namespace {
             uassert(16610, "can't $mod by 0",
                     right != 0);
 
-            if (leftType == NumberDouble
-                || (rightType == NumberDouble && rhs.coerceToInt() != right)) {
-                // the shell converts ints to doubles so if right is larger than int max or
-                // if right truncates to something other than itself, it is a real double.
-                // Integer-valued double case is handled below
+            if (leftType == NumberDouble || (rightType == NumberDouble && !rhs.integral())) {
+                // Need to do fmod. Integer-valued double case is handled below.
 
                 double left = lhs.coerceToDouble();
                 return Value(fmod(left, right));

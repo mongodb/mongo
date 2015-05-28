@@ -31,6 +31,7 @@
 #include "mongo/db/pipeline/value.h"
 
 #include <cmath>
+#include <limits>
 #include <boost/functional/hash.hpp>
 
 #include "mongo/base/compare_numbers.h"
@@ -820,6 +821,22 @@ namespace mongo {
 
         // Reachable, but callers must subsequently err out in this case.
         return Undefined;
+    }
+
+    bool Value::integral() const {
+        switch (getType()) {
+        case NumberInt:
+            return true;
+        case NumberLong:
+            return (_storage.longValue <= numeric_limits<int>::max()
+                    && _storage.longValue >= numeric_limits<int>::min());
+        case NumberDouble:
+            return (_storage.doubleValue <= numeric_limits<int>::max()
+                    && _storage.doubleValue >= numeric_limits<int>::min()
+                    && _storage.doubleValue == static_cast<int>(_storage.doubleValue));
+        default:
+            return false;
+        }
     }
 
     size_t Value::getApproximateSize() const {
