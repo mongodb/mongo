@@ -3,6 +3,7 @@ package mongodump
 import (
 	"bufio"
 	"bytes"
+	"compress/gzip"
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/archive"
 	"github.com/mongodb/mongo-tools/common/bsonutil"
@@ -21,13 +22,37 @@ type collectionInfo struct {
 	Options *bson.D `bson:"options"`
 }
 
+type writeFlusher interface {
+	Flush() error
+	io.Writer
+}
+
+// errorReader implements io.Reader
+type errorReader struct{}
+
+// Read on an errorReader already returns an error
+func (errorReader) Read([]byte) (int, error) {
+	return 0, os.ErrInvalid
+}
+
+// writeFlushCloser allows us to treat a bufio.Writer, or any other writeFlusher
+// as a WriteCloser ( which it's not otherwise )
+type writeFlushCloser struct {
+	writeFlusher
+}
+
+// Close calls Flush
+func (bwc writeFlushCloser) Close() error {
+	return bwc.Flush()
+}
+
 // realBSONFile implements the intents.file interface. It lets intents write to real BSON files
 // ok disk via an embedded bufio.Writer
-// The Write method of the intents.file interface is implemented here by the embedded bufio.Writer
 type realBSONFile struct {
-	*bufio.Writer
-	file   *os.File
+	io.WriteCloser
+	errorReader
 	intent *intents.Intent
+	gzip   bool
 }
 
 // Open is part of the intents.file interface. realBSONFiles need to have Open called before
@@ -43,35 +68,35 @@ func (f *realBSONFile) Open() (err error) {
 		return fmt.Errorf("error creating directory for BSON file %v: %v",
 			filepath.Dir(f.intent.BSONPath), err)
 	}
-	f.file, err = os.Create(f.intent.BSONPath)
-	if err != nil {
-		return fmt.Errorf("error creating BSON file %v: %v", f.intent.BSONPath, err)
-	}
 
-	// wrap writer in buffer to reduce load on disk
-	f.Writer = bufio.NewWriterSize(f.file, 32*1024)
+	fileName := f.intent.BSONPath
+	if f.gzip {
+		fileName += ".gz"
+	}
+	inner, err := os.Create(fileName)
+	if err != nil {
+		return fmt.Errorf("error creating BSON file %v: %v", fileName, err)
+	}
+	var writeCloser io.WriteCloser
+	if f.gzip {
+		writeCloser = gzip.NewWriter(inner)
+	} else {
+		// wrap writer in buffer to reduce load on disk
+		writeCloser = writeFlushCloser{bufio.NewWriterSize(inner, 32*1024)}
+	}
+	f.WriteCloser = &wrappedWriteCloser{
+		WriteCloser: writeCloser,
+		inner:       inner,
+	}
 
 	return nil
 }
 
-// Read is is part of the intents.file interface, Read on realBSONFile shouldn't be used.r
-// We could probabbly justifiably panic here.
-func (f *realBSONFile) Read([]byte) (int, error) {
-	return 0, io.EOF
-}
-
-// Close is part of the intents.file interface, Close on realBSONFiles gets called in DumpIntent
-func (f *realBSONFile) Close() error {
-	err := f.Writer.Flush()
-	if err != nil {
-		return err
-	}
-	return f.file.Close()
-}
-
 type realMetadataFile struct {
-	*os.File
+	io.WriteCloser
+	errorReader
 	intent *intents.Intent
+	gzip   bool
 }
 
 func (f *realMetadataFile) Open() (err error) {
@@ -83,10 +108,17 @@ func (f *realMetadataFile) Open() (err error) {
 		return fmt.Errorf("error creating directory for Metadata file %v: %v",
 			filepath.Dir(f.intent.MetadataPath), err)
 	}
-	f.File, err = os.Create(f.intent.MetadataPath)
+
+	fileName := f.intent.MetadataPath
+	if f.gzip {
+		fileName += ".gz"
+	}
+	f.WriteCloser, err = os.Create(fileName)
 	if err != nil {
-		return fmt.Errorf("error creating Metadata file %v: %v",
-			f.intent.MetadataPath, err)
+		return fmt.Errorf("error creating Metadata file %v: %v", fileName, err)
+	}
+	if f.gzip {
+		f.WriteCloser = gzip.NewWriter(f.WriteCloser)
 	}
 	return nil
 }
@@ -179,7 +211,7 @@ func (dump *MongoDump) NewIntent(dbName, colName string, stdout bool) (*intents.
 			return nil, fmt.Errorf(`"%v.%v" contains a path separator '%c' `+
 				`and can't be dumped to the filesystem`, dbName, colName, c)
 		}
-		intent.BSONFile = &realBSONFile{intent: intent}
+		intent.BSONFile = &realBSONFile{intent: intent, gzip: dump.OutputOptions.Gzip}
 	}
 
 	if !intent.IsSystemIndexes() {
@@ -190,7 +222,7 @@ func (dump *MongoDump) NewIntent(dbName, colName string, stdout bool) (*intents.
 				Buffer: &bytes.Buffer{},
 			}
 		} else {
-			intent.MetadataFile = &realMetadataFile{intent: intent}
+			intent.MetadataFile = &realMetadataFile{intent: intent, gzip: dump.OutputOptions.Gzip}
 		}
 	}
 
@@ -226,7 +258,7 @@ func (dump *MongoDump) CreateOplogIntents() error {
 	if dump.OutputOptions.Archive != "" {
 		oplogIntent.BSONFile = &archive.MuxIn{Mux: dump.archive.Mux, Intent: oplogIntent}
 	} else {
-		oplogIntent.BSONFile = &realBSONFile{intent: oplogIntent}
+		oplogIntent.BSONFile = &realBSONFile{intent: oplogIntent, gzip: dump.OutputOptions.Gzip}
 	}
 	dump.manager.Put(oplogIntent)
 	return nil
@@ -259,9 +291,9 @@ func (dump *MongoDump) CreateUsersRolesVersionIntentsForDB(db string) error {
 		rolesIntent.BSONFile = &archive.MuxIn{Intent: rolesIntent, Mux: dump.archive.Mux}
 		versionIntent.BSONFile = &archive.MuxIn{Intent: versionIntent, Mux: dump.archive.Mux}
 	} else {
-		usersIntent.BSONFile = &realBSONFile{intent: usersIntent}
-		rolesIntent.BSONFile = &realBSONFile{intent: rolesIntent}
-		versionIntent.BSONFile = &realBSONFile{intent: versionIntent}
+		usersIntent.BSONFile = &realBSONFile{intent: usersIntent, gzip: dump.OutputOptions.Gzip}
+		rolesIntent.BSONFile = &realBSONFile{intent: rolesIntent, gzip: dump.OutputOptions.Gzip}
+		versionIntent.BSONFile = &realBSONFile{intent: versionIntent, gzip: dump.OutputOptions.Gzip}
 	}
 	dump.manager.Put(usersIntent)
 	dump.manager.Put(rolesIntent)

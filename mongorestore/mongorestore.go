@@ -15,6 +15,7 @@ import (
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sync"
@@ -375,9 +376,22 @@ func (restore *MongoRestore) Restore() error {
 	return nil
 }
 
+type wrappedReadCloser struct {
+	io.ReadCloser
+	inner io.ReadCloser
+}
+
+func (wrc *wrappedReadCloser) Close() error {
+	err := wrc.ReadCloser.Close()
+	if err != nil {
+		return err
+	}
+	return wrc.inner.Close()
+}
+
 func (restore *MongoRestore) getArchiveReader() (rc io.ReadCloser, err error) {
 	if restore.InputOptions.Archive == "-" {
-		rc = os.Stdin
+		rc = ioutil.NopCloser(os.Stdin)
 	} else {
 		targetStat, err := os.Stat(restore.InputOptions.Archive)
 		if err != nil {
@@ -400,7 +414,11 @@ func (restore *MongoRestore) getArchiveReader() (rc io.ReadCloser, err error) {
 		}
 	}
 	if restore.InputOptions.Gzip {
-		return gzip.NewReader(rc)
+		gzrc, err := gzip.NewReader(rc)
+		if err != nil {
+			return nil, err
+		}
+		return &wrappedReadCloser{gzrc, rc}, nil
 	}
 	return rc, nil
 }

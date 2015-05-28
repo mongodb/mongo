@@ -1,6 +1,7 @@
 package mongorestore
 
 import (
+	"compress/gzip"
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/archive"
 	"github.com/mongodb/mongo-tools/common/intents"
@@ -23,13 +24,21 @@ const (
 	MetadataFileType
 )
 
+type errorWriter struct{}
+
+func (errorWriter) Write([]byte) (int, error) {
+	return 0, os.ErrInvalid
+}
+
 // realBSONFile implements the intents.file interface. It lets intents read from real BSON files
 // ok disk via an embedded os.File
 // The Read, Write and Close methods of the intents.file interface is implemented here by the
 // embedded os.File, the Write will return an error and not succeed
 type realBSONFile struct {
-	*os.File
+	io.ReadCloser
+	errorWriter
 	intent *intents.Intent
+	gzip   bool
 }
 
 // Open is part of the intents.file interface. realBSONFiles need to be Opened before Read
@@ -39,9 +48,18 @@ func (f *realBSONFile) Open() (err error) {
 		// this error shouldn't happen normally
 		return fmt.Errorf("error reading BSON file for %v", f.intent.Namespace())
 	}
-	f.File, err = os.Open(f.intent.BSONPath)
+	file, err := os.Open(f.intent.BSONPath)
 	if err != nil {
 		return fmt.Errorf("error reading BSON file %v: %v", f.intent.BSONPath, err)
+	}
+	if f.gzip {
+		gzFile, err := gzip.NewReader(file)
+		if err != nil {
+			return fmt.Errorf("error decompressing compresed BSON file %v: %v", f.intent.BSONPath, err)
+		}
+		f.ReadCloser = &wrappedReadCloser{gzFile, file}
+	} else {
+		f.ReadCloser = file
 	}
 	return nil
 }
@@ -51,8 +69,10 @@ func (f *realBSONFile) Open() (err error) {
 // The Read, Write and Close methods of the intents.file interface is implemented here by the
 // embedded os.File, the Write will return an error and not succeed
 type realMetadataFile struct {
-	*os.File
+	io.ReadCloser
+	errorWriter
 	intent *intents.Intent
+	gzip   bool
 }
 
 // Open is part of the intents.file interface. realMetadataFiles need to be Opened before Read
@@ -61,9 +81,18 @@ func (f *realMetadataFile) Open() (err error) {
 	if f.intent.MetadataPath == "" {
 		return fmt.Errorf("error reading Metadata file for %v", f.intent.Namespace())
 	}
-	f.File, err = os.Open(f.intent.MetadataPath)
+	file, err := os.Open(f.intent.MetadataPath)
 	if err != nil {
 		return fmt.Errorf("error reading Metadata file %v: %v", f.intent.MetadataPath, err)
+	}
+	if f.gzip {
+		gzFile, err := gzip.NewReader(file)
+		if err != nil {
+			return fmt.Errorf("error reading compresed Metadata file %v: %v", f.intent.MetadataPath, err)
+		}
+		f.ReadCloser = &wrappedReadCloser{gzFile, file}
+	} else {
+		f.ReadCloser = file
 	}
 	return nil
 }
@@ -94,21 +123,27 @@ func (f *stdinFile) Write(p []byte) (n int, err error) {
 	return 0, fmt.Errorf("can't write to standard output")
 }
 
-// GetInfoFromFilename pulls the base collection name and FileType from a given file.
-func GetInfoFromFilename(filename string) (string, FileType) {
+// getInfoFromFilename pulls the base collection name and FileType from a given file.
+func (restore *MongoRestore) getInfoFromFilename(filename string) (string, FileType) {
 	baseFileName := filepath.Base(filename)
 	switch {
-	case strings.HasSuffix(baseFileName, ".metadata.json"):
+	case strings.HasSuffix(baseFileName, ".metadata.json") && !restore.InputOptions.Gzip:
 		// this logic can't be simple because technically
 		// "x.metadata.json" is a valid collection name
 		baseName := strings.TrimSuffix(baseFileName, ".metadata.json")
+		return baseName, MetadataFileType
+	case strings.HasSuffix(baseFileName, ".metadata.json.gz") && restore.InputOptions.Gzip:
+		baseName := strings.TrimSuffix(baseFileName, ".metadata.json.gz")
 		return baseName, MetadataFileType
 	case strings.HasSuffix(baseFileName, ".bin"):
 		// .bin supported for legacy reasons
 		baseName := strings.TrimSuffix(baseFileName, ".bin")
 		return baseName, BSONFileType
-	case strings.HasSuffix(baseFileName, ".bson"):
+	case strings.HasSuffix(baseFileName, ".bson") && !restore.InputOptions.Gzip:
 		baseName := strings.TrimSuffix(baseFileName, ".bson")
+		return baseName, BSONFileType
+	case strings.HasSuffix(baseFileName, ".bson.gz") && restore.InputOptions.Gzip:
+		baseName := strings.TrimSuffix(baseFileName, ".bson.gz")
 		return baseName, BSONFileType
 	default:
 		return "", UnknownFileType
@@ -171,7 +206,7 @@ func (restore *MongoRestore) CreateAllIntents(dir archive.DirLike, filterDB stri
 							Demux:  restore.archive.Demux,
 						}
 				} else {
-					oplogIntent.BSONFile = &realBSONFile{intent: oplogIntent}
+					oplogIntent.BSONFile = &realBSONFile{intent: oplogIntent, gzip: restore.InputOptions.Gzip}
 				}
 				restore.manager.Put(oplogIntent)
 			} else {
@@ -203,7 +238,7 @@ func (restore *MongoRestore) CreateIntentsForDB(db string, filterCollection stri
 			log.Logf(log.Always, `don't know what to do with subdirectory "%v", skipping...`,
 				filepath.Join(dir.Name(), entry.Name()))
 		} else {
-			collection, fileType := GetInfoFromFilename(entry.Name())
+			collection, fileType := restore.getInfoFromFilename(entry.Name())
 			switch fileType {
 			case BSONFileType:
 				var skip = mute
@@ -267,7 +302,7 @@ func (restore *MongoRestore) CreateIntentsForDB(db string, filterCollection stri
 						}
 						intent.BSONFile = &stdinFile{intent: intent}
 					} else {
-						intent.BSONFile = &realBSONFile{intent: intent}
+						intent.BSONFile = &realBSONFile{intent: intent, gzip: restore.InputOptions.Gzip}
 					}
 				}
 				log.Logf(log.Info, "found collection %v bson to restore", intent.Namespace())
@@ -282,7 +317,7 @@ func (restore *MongoRestore) CreateIntentsForDB(db string, filterCollection stri
 				if restore.InputOptions.Archive != "" {
 					intent.MetadataFile = &archive.MetadataPreludeFile{Intent: intent, Prelude: restore.archive.Prelude}
 				} else {
-					intent.MetadataFile = &realMetadataFile{intent: intent}
+					intent.MetadataFile = &realMetadataFile{intent: intent, gzip: restore.InputOptions.Gzip}
 				}
 				log.Logf(log.Info, "found collection %v metadata to restore", intent.Namespace())
 				restore.manager.Put(intent)
@@ -327,7 +362,7 @@ func (restore *MongoRestore) CreateIntentForCollection(db string, collection str
 		return fmt.Errorf("file %v is a directory, not a bson file", dir.Path())
 	}
 
-	baseName, fileType := GetInfoFromFilename(dir.Name())
+	baseName, fileType := restore.getInfoFromFilename(dir.Name())
 	if fileType != BSONFileType {
 		return fmt.Errorf("file %v does not have .bson extension", dir.Path())
 	}
@@ -339,7 +374,7 @@ func (restore *MongoRestore) CreateIntentForCollection(db string, collection str
 		BSONPath: dir.Path(),
 		Size:     dir.Size(),
 	}
-	intent.BSONFile = &realBSONFile{intent: intent}
+	intent.BSONFile = &realBSONFile{intent: intent, gzip: restore.InputOptions.Gzip}
 
 	// finally, check if it has a .metadata.json file in its folder
 	log.Logf(log.DebugLow, "scanning directory %v for metadata file", dir.Name())
@@ -357,7 +392,7 @@ func (restore *MongoRestore) CreateIntentForCollection(db string, collection str
 			metadataPath := entry.Path()
 			log.Logf(log.Info, "found metadata for collection at %v", metadataPath)
 			intent.MetadataPath = metadataPath
-			intent.MetadataFile = &realMetadataFile{intent: intent}
+			intent.MetadataFile = &realMetadataFile{intent: intent, gzip: restore.InputOptions.Gzip}
 			break
 		}
 	}
@@ -392,7 +427,7 @@ func (restore *MongoRestore) handleBSONInsteadOfDirectory(path string) error {
 	// like a bson file and infer as much as we can
 	if restore.ToolOptions.Collection == "" {
 		// if the user did not set -c, use the file name for the collection
-		newCollectionName, fileType := GetInfoFromFilename(path)
+		newCollectionName, fileType := restore.getInfoFromFilename(path)
 		if fileType != BSONFileType {
 			return fmt.Errorf("file %v does not have .bson extension", path)
 		}

@@ -630,21 +630,21 @@ func (*nopCloseWriter) Close() error {
 	return nil
 }
 
-// wrappedWriterCloser implements io.WriteCloser. It wraps up two WriteClosers. The Write methond
+// wrappedWriteCloser implements io.WriteCloser. It wraps up two WriteClosers. The Write methond
 // of the io.WriteCloser is implemented by the embedded io.WriteCloser
-type wrappedWriterCloser struct {
+type wrappedWriteCloser struct {
 	io.WriteCloser
-	wrappedWriter io.WriteCloser
+	inner io.WriteCloser
 }
 
 // Close is part of the io.WriteCloser interface. Close closes both the embedded io.WriteCloser as
-// well as the wrapped io.WriteCloser
-func (wwc *wrappedWriterCloser) Close() error {
+// well as the inner io.WriteCloser
+func (wwc *wrappedWriteCloser) Close() error {
 	err := wwc.WriteCloser.Close()
 	if err != nil {
 		return err
 	}
-	return wwc.wrappedWriter.Close()
+	return wwc.inner.Close()
 }
 
 func (dump *MongoDump) getArchiveOut() (out io.WriteCloser, err error) {
@@ -670,9 +670,9 @@ func (dump *MongoDump) getArchiveOut() (out io.WriteCloser, err error) {
 		}
 	}
 	if dump.OutputOptions.Gzip {
-		return &wrappedWriterCloser{
-			WriteCloser:   gzip.NewWriter(out),
-			wrappedWriter: out,
+		return &wrappedWriteCloser{
+			WriteCloser: gzip.NewWriter(out),
+			inner:       out,
 		}, nil
 	}
 	return out, nil
