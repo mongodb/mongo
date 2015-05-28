@@ -65,6 +65,31 @@ __compact_rewrite(WT_SESSION_IMPL *session, WT_REF *ref, int *skipp)
 }
 
 /*
+ * __compact_skip --
+ *	Return if it may be worthwhile compacting a file.
+ */
+static int
+__compact_skip(WT_SESSION_IMPL *session, int *skipp)
+{
+	WT_BTREE *btree;
+	WT_PAGE_INDEX *pindex;
+
+	*skipp = 1;
+
+	btree = S2BT(session);
+
+	/* Trees with less than 4 level one pages aren't worth compacting */
+	WT_INTL_INDEX_GET(session, btree->root.page, pindex);
+	if (pindex->entries < 4)
+		return (0);
+
+	/* Check with the block manager whether compaction may be useful */
+	WT_RET(btree->bm->compact_skip(btree->bm, session, skipp));
+
+	return (0);
+}
+
+/*
  * __wt_compact --
  *	Compact a file.
  */
@@ -93,7 +118,7 @@ __wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
 	 * to compact the data source if we make no progress, set a flag if the
 	 * block layer thinks compaction is possible.
 	 */
-	WT_RET(bm->compact_skip(bm, session, &skip));
+	WT_RET(__compact_skip(session, &skip));
 	if (skip)
 		return (0);
 
