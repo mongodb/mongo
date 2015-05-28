@@ -78,8 +78,11 @@ __compact_skip(WT_SESSION_IMPL *session, int *skipp)
 
 	btree = S2BT(session);
 
-	/* Trees with less than 4 level one pages aren't worth compacting */
-	WT_INTL_INDEX_GET(session, btree->root.page, pindex);
+	/*
+	 * It's safe to look at the pindex of the root page here. Trees with
+	 * less than 4 level one pages aren't worth compacting.
+	 */
+	pindex = WT_INTL_INDEX_GET_SAFE(btree->root.page);
 	if (pindex->entries < 4)
 		return (0);
 
