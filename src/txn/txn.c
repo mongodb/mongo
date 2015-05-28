@@ -335,14 +335,12 @@ __wt_txn_config(WT_SESSION_IMPL *session, const char *cfg[])
 	 * be overridden by an explicit "sync" setting for this transaction.
 	 *
 	 * !!! This is an unusual use of the config code: the "default" value
-	 * we pass in is inherited from the connection.  If flush is not set in
-	 * the connection-wide flag and not overridden here, we end up clearing
-	 * all flags.
+	 * we pass in is inherited from the connection.
 	 */
 	WT_RET(__wt_config_gets_def(session, cfg, "sync",
 	    FLD_ISSET(txn->txn_logsync, WT_LOG_FLUSH) ? 1 : 0, &cval));
 	if (!cval.val)
-		txn->txn_logsync = 0;
+		FLD_CLR(txn->txn_logsync, WT_LOG_FLUSH);
 
 	WT_RET(__wt_config_gets_def(session, cfg, "snapshot", 0, &cval));
 	if (cval.len > 0)
