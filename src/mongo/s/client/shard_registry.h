@@ -39,6 +39,9 @@ namespace mongo {
 
     class BSONObjBuilder;
     class CatalogManager;
+    class RemoteCommandRunner;
+    class RemoteCommandTargeter;
+    class RemoteCommandTargeterFactory;
     class Shard;
     class ShardType;
 
@@ -47,8 +50,15 @@ namespace mongo {
      */
     class ShardRegistry {
     public:
-        ShardRegistry(CatalogManager* catalogManager);
+        ShardRegistry(std::unique_ptr<RemoteCommandTargeterFactory> targeterFactory,
+                      std::unique_ptr<RemoteCommandRunner> commandRunner,
+                      CatalogManager* catalogManager);
+
         ~ShardRegistry();
+
+        boost::shared_ptr<RemoteCommandTargeter> getTargeterForShard(const std::string& shardId);
+
+        RemoteCommandRunner* getCommandRunner() const { return _commandRunner.get(); }
 
         void reload();
 
@@ -67,20 +77,26 @@ namespace mongo {
 
         void getAllShardIds(std::vector<ShardId>* all) const;
 
-        bool isAShardNode(const std::string& addr) const;
-
         void toBSON(BSONObjBuilder* result) const;
 
     private:
         typedef std::map<ShardId, boost::shared_ptr<Shard>> ShardMap;
-
+        typedef std::map<ShardId, boost::shared_ptr<RemoteCommandTargeter>> TargeterMap;
 
         /**
          * Creates a shard based on the specified information and puts it into the lookup maps.
          */
         void _addShard_inlock(const ShardType& shardType);
 
-        boost::shared_ptr<Shard> _findUsingLookUp(const ShardId& id);
+        boost::shared_ptr<Shard> _findUsingLookUp(const ShardId& shardId);
+
+        boost::shared_ptr<RemoteCommandTargeter> _findTargeter(const std::string& shardId);
+
+        // Factory to obtain remote command targeters for shards
+        const std::unique_ptr<RemoteCommandTargeterFactory> _targeterFactory;
+
+        // API to run remote commands to shards
+        const std::unique_ptr<RemoteCommandRunner> _commandRunner;
 
         // Catalog manager from which to load the shard information. Not owned and must outlive
         // the shard registry object.
@@ -92,7 +108,12 @@ namespace mongo {
         // Map of both shardName -> Shard and hostName -> Shard
         ShardMap _lookup;
 
-        // Map from ReplSet name to shard
+        // TODO: These should eventually disappear and become parts of Shard
+
+        // Map of shard name to targeter for this shard
+        TargeterMap _targeters;
+
+        // Map from all hosts within a replica set to the shard representing this replica set
         ShardMap _rsLookup;
     };
 

@@ -28,23 +28,31 @@
 
 #pragma once
 
-#include "mongo/client/remote_command_targeter.h"
-#include "mongo/util/net/hostandport.h"
+#include <memory>
+
+#include "mongo/base/disallow_copying.h"
 
 namespace mongo {
 
+    class ConnectionString;
+    class RemoteCommandTargeter;
+
     /**
-     * Implements a standalone instance remote command targeter, which always returns the same
-     * host regardless of the read preferences.
+     * Constructs RemoteCommandTargeters based on the specific type of the target (standalone,
+     * replica set, etc).
      */
-    class RemoteCommandTargeterStandalone final : public RemoteCommandTargeter {
+    class RemoteCommandTargeterFactory {
+        MONGO_DISALLOW_COPYING(RemoteCommandTargeterFactory);
     public:
-        explicit RemoteCommandTargeterStandalone(const HostAndPort& hostAndPort);
+        virtual ~RemoteCommandTargeterFactory() = default;
 
-        StatusWith<HostAndPort> findHost(const ReadPreferenceSetting& readPref) override;
+        /**
+         * Instantiates a RemoteCommandTargeter for the specified connection string.
+         */
+        virtual std::unique_ptr<RemoteCommandTargeter> create(const ConnectionString& connStr) = 0;
 
-    private:
-        const HostAndPort _hostAndPort;
+    protected:
+        RemoteCommandTargeterFactory() = default;
     };
 
 } // namespace mongo

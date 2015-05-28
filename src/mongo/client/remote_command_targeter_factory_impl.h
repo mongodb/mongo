@@ -28,23 +28,22 @@
 
 #pragma once
 
-#include "mongo/client/remote_command_targeter.h"
-#include "mongo/util/net/hostandport.h"
+#include "mongo/client/remote_command_targeter_factory.h"
 
 namespace mongo {
 
     /**
-     * Implements a standalone instance remote command targeter, which always returns the same
-     * host regardless of the read preferences.
+     * Targeter factory that instantiates remote command targeters based on the type of the
+     * connection. It will return RemoteCommandTargeterStandalone for a single node (MASTER) or
+     * custom (CUSTOM) connection string and RemoteCommandTargeterRS for a SET connection string.
+     * All other connection strings are not supported and will cause a failed invariant error.
      */
-    class RemoteCommandTargeterStandalone final : public RemoteCommandTargeter {
+    class RemoteCommandTargeterFactoryImpl final : public RemoteCommandTargeterFactory {
     public:
-        explicit RemoteCommandTargeterStandalone(const HostAndPort& hostAndPort);
+        RemoteCommandTargeterFactoryImpl();
+        ~RemoteCommandTargeterFactoryImpl();
 
-        StatusWith<HostAndPort> findHost(const ReadPreferenceSetting& readPref) override;
-
-    private:
-        const HostAndPort _hostAndPort;
+        std::unique_ptr<RemoteCommandTargeter> create(const ConnectionString& connStr) override;
     };
 
 } // namespace mongo

@@ -55,7 +55,7 @@ namespace {
     const char kSecondaryPreferred[] = "secondaryPreferred";
     const char kNearest[] = "nearest";
 
-    StringData toString(ReadPreference pref) {
+    StringData readPreferenceName(ReadPreference pref) {
         switch (pref) {
         case ReadPreference::PrimaryOnly:
             return StringData(kPrimaryOnly);
@@ -177,11 +177,15 @@ namespace {
 
     BSONObj ReadPreferenceSetting::toBSON() const {
         BSONObjBuilder bob;
-        bob.append(kModeFieldName, toString(pref));
+        bob.append(kModeFieldName, readPreferenceName(pref));
         if (tags != defaultTagSetForMode(pref)) {
             bob.append(kTagsFieldName, tags.getTagBSON());
         }
         return bob.obj();
+    }
+
+    std::string ReadPreferenceSetting::toString() const {
+        return toBSON().toString();
     }
 
 }  // namespace mongo

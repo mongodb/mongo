@@ -673,6 +673,7 @@ namespace {
         }
         catch (const DBException& e) {
             if (shardConnectionString.type() == ConnectionString::SET) {
+                shardConnectionPool.removeHost(shardConnectionString.getSetName());
                 ReplicaSetMonitor::remove(shardConnectionString.getSetName());
             }
 
@@ -773,8 +774,7 @@ namespace {
         BSONObj searchDoc = BSON(ShardType::name() << name);
 
         // Case 1: start draining chunks
-        BSONObj drainingDoc =
-            BSON(ShardType::name() << name << ShardType::draining(true));
+        BSONObj drainingDoc = BSON(ShardType::name() << name << ShardType::draining(true));
         BSONObj shardDoc = conn->findOne(ShardType::ConfigNS, drainingDoc);
         if (shardDoc.isEmpty()) {
             log() << "going to start draining shard: " << name;
@@ -830,6 +830,7 @@ namespace {
             }
 
             Shard::removeShard(name);
+
             shardConnectionPool.removeHost(name);
             ReplicaSetMonitor::remove(name);
 
@@ -981,7 +982,7 @@ namespace {
 
         // Delete data from all mongods
         for (vector<ShardType>::const_iterator i = allShards.begin(); i != allShards.end(); i++) {
-            const auto& shard = grid.shardRegistry()->findIfExists(i->getHost());
+            const auto& shard = grid.shardRegistry()->findIfExists(i->getName());
             ScopedDbConnection conn(shard->getConnString());
 
             BSONObj info;
@@ -1031,7 +1032,7 @@ namespace {
         LOG(1) << "dropCollection " << collectionNs << " chunk data deleted";
 
         for (vector<ShardType>::const_iterator i = allShards.begin(); i != allShards.end(); i++) {
-            const auto& shard = grid.shardRegistry()->findIfExists(i->getHost());
+            const auto& shard = grid.shardRegistry()->findIfExists(i->getName());
             ScopedDbConnection conn(shard->getConnString());
 
             BSONObj res;

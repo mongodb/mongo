@@ -33,13 +33,10 @@
 #include "mongo/s/config.h"
 
 #include <boost/scoped_ptr.hpp>
-#include <pcrecpp.h>
 
 #include "mongo/client/connpool.h"
-#include "mongo/client/dbclientcursor.h"
 #include "mongo/db/client.h"
 #include "mongo/db/lasterror.h"
-#include "mongo/db/server_options.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/catalog_manager.h"
@@ -51,26 +48,20 @@
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/chunk_version.h"
-#include "mongo/s/client/shard_connection.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_write.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/server.h"
 #include "mongo/s/type_locks.h"
 #include "mongo/s/type_lockpings.h"
-#include "mongo/util/exit.h"
 #include "mongo/util/log.h"
-#include "mongo/util/net/message.h"
-#include "mongo/util/stringutils.h"
 
 namespace mongo {
 
     using boost::scoped_ptr;
     using std::auto_ptr;
     using std::endl;
-    using std::pair;
     using std::set;
-    using std::stringstream;
+    using std::string;
     using std::vector;
 
     CollectionInfo::CollectionInfo(const CollectionType& coll) {
@@ -321,7 +312,7 @@ namespace mongo {
         
         // TODO: We need to keep this first one-chunk check in until we have a more efficient way of
         // creating/reusing a chunk manager, as doing so requires copying the full set of chunks currently
-        std::vector<ChunkType> newestChunk;
+        vector<ChunkType> newestChunk;
         if ( oldVersion.isSet() && ! forceReload ) {
             uassertStatusOK(grid.catalogManager()->getChunks(
                                         Query(BSON(ChunkType::ns(ns)))

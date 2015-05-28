@@ -12,6 +12,8 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/clientdriver',
+        '$BUILD_DIR/mongo/client/remote_command_runner_impl',
+        '$BUILD_DIR/mongo/client/remote_command_targeter',
         '$BUILD_DIR/mongo/s/catalog/catalog_manager',
     ]
 )

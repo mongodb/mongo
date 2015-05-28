@@ -35,13 +35,16 @@
 #include <string>
 #include <vector>
 
-#include "mongo/client/connpool.h"
 #include "mongo/client/replica_set_monitor.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/client/remote_command_runner.h"
+#include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/log.h"
@@ -102,27 +105,12 @@ namespace {
         invariant(_cs.isValid());
     }
 
-    bool Shard::containsNode( const string& node ) const {
-        if (_cs.toString() == node) {
-            return true;
-        }
-
-        if ( _cs.type() == ConnectionString::SET ) {
-            ReplicaSetMonitorPtr rs = ReplicaSetMonitor::get(_cs.getSetName());
-            if (!rs) {
-                // Possibly still yet to be initialized. See SERVER-8194.
-                warning() << "Monitor not found for a known shard: " << _cs.getSetName();
-                return false;
-            }
-
-            return rs->contains(HostAndPort(node));
-        }
-
-        return false;
+    RemoteCommandTargeter* Shard::getTargeter() const {
+        return grid.shardRegistry()->getTargeterForShard(getId()).get();
     }
 
-    bool Shard::isAShardNode( const string& ident ) {
-        return grid.shardRegistry()->isAShardNode( ident );
+    RemoteCommandRunner* Shard::getCommandRunner() const {
+        return grid.shardRegistry()->getCommandRunner();
     }
 
     ShardPtr Shard::lookupRSName(const string& name) {
@@ -150,20 +138,30 @@ namespace {
     }
 
     bool Shard::runCommand(const string& db, const BSONObj& cmd, BSONObj& res) const {
-        ScopedDbConnection conn(getConnString());
-        bool ok = conn->runCommand(db, cmd, res);
-        conn.done();
-        return ok;
+        const ReadPreferenceSetting readPref(ReadPreference::PrimaryOnly, TagSet::primaryOnly());
+        auto selectedHost = getTargeter()->findHost(readPref);
+        if (!selectedHost.isOK()) {
+            return false;
+        }
+
+        const RemoteCommandRequest request(selectedHost.getValue(), db, cmd);
+
+        auto statusCommand = getCommandRunner()->runCommand(request);
+        if (!statusCommand.isOK()) {
+            return false;
+        }
+
+        res = statusCommand.getValue().data.getOwned();
+
+        return getStatusFromCommandResult(res).isOK();
     }
 
     ShardStatus Shard::getStatus() const {
-        ScopedDbConnection conn(getConnString());
-
         BSONObj listDatabases;
         uassert(28589,
                 str::stream() << "call to listDatabases on " << getConnString().toString()
                               << " failed: " << listDatabases,
-                conn->runCommand("admin", BSON("listDatabases" << 1), listDatabases));
+                runCommand("admin", BSON("listDatabases" << 1), listDatabases));
 
         BSONElement totalSizeElem = listDatabases["totalSize"];
         uassert(28590, "totalSize field not found in listDatabases", totalSizeElem.isNumber());
@@ -172,12 +170,10 @@ namespace {
         uassert(28591,
                 str::stream() << "call to serverStatus on " << getConnString().toString()
                               << " failed: " << serverStatus,
-                conn->runCommand("admin", BSON("serverStatus" << 1), serverStatus));
+                runCommand("admin", BSON("serverStatus" << 1), serverStatus));
 
         BSONElement versionElement = serverStatus["version"];
         uassert(28599, "version field not found in serverStatus", versionElement.type() == String);
-
-        conn.done();
 
         return ShardStatus(totalSizeElem.numberLong(), versionElement.str());
     }
@@ -192,18 +188,22 @@ namespace {
 
     ShardPtr Shard::pick() {
         vector<ShardId> all;
+
         grid.shardRegistry()->getAllShardIds(&all);
-        if ( all.size() == 0 ) {
+        if (all.size() == 0) {
             grid.shardRegistry()->reload();
             grid.shardRegistry()->getAllShardIds(&all);
-            if ( all.size() == 0 )
+
+            if (all.empty()) {
                 return nullptr;
+            }
         }
 
         auto bestShard = grid.shardRegistry()->findIfExists(all[0]);
         if (!bestShard) {
             return nullptr;
         }
+
         ShardStatus bestStatus = bestShard->getStatus();
 
         for (size_t i = 1; i < all.size(); i++) {
@@ -211,6 +211,7 @@ namespace {
             if (!shard) {
                 continue;
             }
+
             const ShardStatus status = shard->getStatus();
 
             if (status < bestStatus) {

@@ -29,26 +29,22 @@
 #pragma once
 
 #include <boost/shared_ptr.hpp>
+#include <set>
 
+#include "mongo/db/jsobj.h"
 #include "mongo/s/client/shard.h"
-#include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/concurrency/mutex.h"
 
 namespace mongo {
 
     class ChunkManager;
     class CollectionType;
-    class ConfigServer;
     class DatabaseType;
     class DBConfig;
 
     typedef boost::shared_ptr<DBConfig> DBConfigPtr;
 
-    extern ConfigServer& configServer;
-
-
     struct CollectionInfo {
-
         CollectionInfo() {
             _dirty = false;
             _dropped = false;

@@ -33,40 +33,31 @@
 #include "mongo/s/grid.h"
 
 #include "mongo/base/status_with.h"
-#include "mongo/client/connpool.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/type_settings.h"
-#include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard_registry.h"
-#include "mongo/s/config.h"
-#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
-
-    using boost::shared_ptr;
-    using std::endl;
-    using std::map;
-    using std::set;
-    using std::string;
-    using std::vector;
 
     Grid::Grid() : _allowLocalShard(true) {
 
     }
 
-    void Grid::setCatalogManager(std::unique_ptr<CatalogManager> catalogManager) {
+    void Grid::init(std::unique_ptr<CatalogManager> catalogManager,
+                    std::unique_ptr<ShardRegistry> shardRegistry) {
+
         invariant(!_catalogManager);
         invariant(!_catalogCache);
         invariant(!_shardRegistry);
 
         _catalogManager = std::move(catalogManager);
         _catalogCache = stdx::make_unique<CatalogCache>(_catalogManager.get());
-        _shardRegistry = stdx::make_unique<ShardRegistry>(_catalogManager.get());
+        _shardRegistry = std::move(shardRegistry);
     }
 
-    StatusWith<shared_ptr<DBConfig>> Grid::implicitCreateDb(const std::string& dbName) {
+    StatusWith<boost::shared_ptr<DBConfig>> Grid::implicitCreateDb(const std::string& dbName) {
         auto status = catalogCache()->getDatabase(dbName);
         if (status.isOK()) {
             return status;
@@ -124,6 +115,12 @@ namespace mongo {
         }
 
         return shouldBalance(balSettings);
+    }
+
+    void Grid::clearForUnitTests() {
+        _catalogManager.reset();
+        _catalogCache.reset();
+        _shardRegistry.reset();
     }
 
     Grid grid;

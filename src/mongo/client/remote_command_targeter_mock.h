@@ -33,7 +33,7 @@
 
 namespace mongo {
 
-    class RemoteCommandTargeterMock : public RemoteCommandTargeter {
+    class RemoteCommandTargeterMock final : public RemoteCommandTargeter {
     public:
         RemoteCommandTargeterMock();
         virtual ~RemoteCommandTargeterMock() = default;
@@ -42,7 +42,7 @@ namespace mongo {
          * Returns the return value last set by setFindHostReturnValue.
          * Returns ErrorCodes::InternalError if setFindHostReturnValue was never called.
          */
-        virtual StatusWith<HostAndPort> findHost(const ReadPreferenceSetting& readPref) override;
+        StatusWith<HostAndPort> findHost(const ReadPreferenceSetting& readPref) override;
 
         /**
          * Sets the return value for the next call to findHost.

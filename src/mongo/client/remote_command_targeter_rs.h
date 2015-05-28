@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <boost/shared_ptr.hpp>
 #include <string>
 #include <vector>
 
@@ -35,11 +36,13 @@
 
 namespace mongo {
 
+    class ReplicaSetMonitor;
+
     /**
      * Implements a replica-set backed remote command targeter, which monitors the specified
      * replica set and responds to state changes.
      */
-    class RemoteCommandTargeterRS : public RemoteCommandTargeter {
+    class RemoteCommandTargeterRS final : public RemoteCommandTargeter {
     public:
         /**
          * Instantiates a new targeter for the specified replica set and seed hosts. The RS name
@@ -48,11 +51,14 @@ namespace mongo {
         RemoteCommandTargeterRS(const std::string& rsName,
                                 const std::vector<HostAndPort>& seedHosts);
 
-        StatusWith<HostAndPort> findHost(const ReadPreferenceSetting& readPref) final;
+        StatusWith<HostAndPort> findHost(const ReadPreferenceSetting& readPref) override;
 
     private:
+        // Name of the replica set which this targeter maintains
         const std::string _rsName;
-        const std::vector<HostAndPort> _seedHosts;
+
+        // Monitor for this replica set
+        boost::shared_ptr<ReplicaSetMonitor> _rsMonitor;
     };
 
 } // namespace mongo

@@ -31,22 +31,47 @@
 #include "mongo/client/remote_command_targeter_rs.h"
 
 #include "mongo/base/status_with.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/client/replica_set_monitor.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
 
     RemoteCommandTargeterRS::RemoteCommandTargeterRS(const std::string& rsName,
                                                      const std::vector<HostAndPort>& seedHosts)
-        : _rsName(rsName),
-          _seedHosts(seedHosts) {
+        : _rsName(rsName) {
 
+        _rsMonitor = ReplicaSetMonitor::get(rsName);
+        if (!_rsMonitor) {
+            std::set<HostAndPort> seedServers(seedHosts.begin(), seedHosts.end());
+
+            // TODO: Replica set monitor should be entirely owned and maintained by the remote
+            //       command targeter. Otherwise, there is a slight race condition here where the
+            //       RS monitor might be created, but then before the get call it gets removed so
+            //       we end up with a NULL _rsMonitor.
+            ReplicaSetMonitor::createIfNeeded(rsName, seedServers);
+            _rsMonitor = ReplicaSetMonitor::get(rsName);
+        }
     }
 
     StatusWith<HostAndPort> RemoteCommandTargeterRS::findHost(
                                     const ReadPreferenceSetting& readPref) {
-        invariant(false);
-        return Status(ErrorCodes::IllegalOperation, "Not yet implemented");
+
+        if (!_rsMonitor) {
+            return Status(ErrorCodes::ReplicaSetNotFound,
+                          str::stream() << "unknown replica set " << _rsName);
+        }
+
+        HostAndPort hostAndPort = _rsMonitor->getHostOrRefresh(readPref);
+        if (hostAndPort.empty()) {
+            return Status(ErrorCodes::HostNotFound,
+                          str::stream() << "could not find host matching read preference "
+                                        << readPref.toString() << " for set " << _rsName);
+        }
+
+        return hostAndPort;
     }
 
 } // namespace mongo

@@ -54,10 +54,15 @@ namespace mongo {
         Grid();
 
         /**
-         * Called at startup time so the catalog manager can be set. Should be called only once
-         * for the lifetime of the grid object. Takes ownership of the passed in pointer.
+         * Called at startup time so the global sharding services (catalog manager, shard registry)
+         * can be set. This method must be called once and once only for the lifetime of the
+         * service.
+         *
+         * NOTE: Unit-tests are allowed to call it more than once, provided they reset the object's
+         *       state using clearForUnitTests.
          */
-        void setCatalogManager(std::unique_ptr<CatalogManager> catalogManager);
+        void init(std::unique_ptr<CatalogManager> catalogManager,
+                  std::unique_ptr<ShardRegistry> shardRegistry);
 
         /**
          * Implicitly creates the specified database as non-sharded.
@@ -88,6 +93,15 @@ namespace mongo {
         CatalogManager* catalogManager() const { return _catalogManager.get(); }
         CatalogCache* catalogCache() const { return _catalogCache.get(); }
         ShardRegistry* shardRegistry() const { return _shardRegistry.get(); }
+
+        /**
+         * Clears the grid object so that it can be reused between test executions. This will not
+         * be necessary if grid is hanging off the global ServiceContext and each test gets its
+         * own service context.
+         *
+         * NOTE: Do not use this outside of unit-tests.
+         */
+        void clearForUnitTests();
 
     private:
         std::unique_ptr<CatalogManager> _catalogManager;

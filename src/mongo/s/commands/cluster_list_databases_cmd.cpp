@@ -157,14 +157,8 @@ namespace {
                 bb.append(temp.obj());
             }
 
-            // obtain cached config shard
+            // Obtain the cached config shard
             const auto& configShard = grid.shardRegistry()->findIfExists("config");
-            if (!configShard->ok()) {
-                return appendCommandStatus(result,
-                                           Status(ErrorCodes::ShardNotFound,
-                                                  "Couldn't find shard "
-                                                  "representing config server"));
-            }
 
             {
                 // get config db from the config servers (first one)

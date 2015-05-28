@@ -26,25 +26,40 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/platform/basic.h"
 
-#include "mongo/client/remote_command_targeter.h"
-#include "mongo/util/net/hostandport.h"
+#include "mongo/client/remote_command_targeter_factory_impl.h"
+
+#include "mongo/base/status_with.h"
+#include "mongo/client/connection_string.h"
+#include "mongo/client/remote_command_targeter_rs.h"
+#include "mongo/client/remote_command_targeter_standalone.h"
+#include "mongo/stdx/memory.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
-    /**
-     * Implements a standalone instance remote command targeter, which always returns the same
-     * host regardless of the read preferences.
-     */
-    class RemoteCommandTargeterStandalone final : public RemoteCommandTargeter {
-    public:
-        explicit RemoteCommandTargeterStandalone(const HostAndPort& hostAndPort);
+    RemoteCommandTargeterFactoryImpl::RemoteCommandTargeterFactoryImpl() = default;
 
-        StatusWith<HostAndPort> findHost(const ReadPreferenceSetting& readPref) override;
+    RemoteCommandTargeterFactoryImpl::~RemoteCommandTargeterFactoryImpl() = default;
 
-    private:
-        const HostAndPort _hostAndPort;
-    };
+    std::unique_ptr<RemoteCommandTargeter>
+    RemoteCommandTargeterFactoryImpl::create(const ConnectionString& connStr) {
+        switch (connStr.type()) {
+        case ConnectionString::MASTER:
+        case ConnectionString::CUSTOM:
+            invariant(connStr.getServers().size() == 1);
+            return stdx::make_unique<RemoteCommandTargeterStandalone>(connStr.getServers().front());
+        case ConnectionString::SET:
+            return stdx::make_unique<RemoteCommandTargeterRS>(connStr.getSetName(),
+                                                             connStr.getServers());
+        case ConnectionString::INVALID:
+        case ConnectionString::SYNC:
+            // These connections should never be seen
+            break;
+        }
+
+        MONGO_UNREACHABLE;
+    }
 
 } // namespace mongo

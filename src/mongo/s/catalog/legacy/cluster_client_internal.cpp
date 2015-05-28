@@ -142,15 +142,15 @@ namespace mongo {
                                            << " failed validation: " << causedBy(status));
                 }
 
-                string errMsg;
-                ConnectionString shardLoc = ConnectionString::parse(shard.getHost(), errMsg);
-                if (shardLoc.type() == ConnectionString::INVALID) {
+                const auto shardConnStatus = ConnectionString::parse(shard.getHost());
+                if (!shardConnStatus.isOK()) {
                     return Status(ErrorCodes::UnsupportedFormat,
                                   stream() << "invalid shard host " << shard.getHost()
-                                           << " read from the config server" << causedBy(errMsg));
+                                           << " read from the config server"
+                                           << shardConnStatus.getStatus().toString());
                 }
 
-                vector<HostAndPort> shardServers = shardLoc.getServers();
+                vector<HostAndPort> shardServers = shardConnStatus.getValue().getServers();
                 servers.insert(servers.end(), shardServers.begin(), shardServers.end());
             }
         }

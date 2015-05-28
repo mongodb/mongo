@@ -37,6 +37,8 @@
 namespace mongo {
 
     class BSONObj;
+    class RemoteCommandRunner;
+    class RemoteCommandTargeter;
 
     using ShardId = std::string;
 
@@ -63,19 +65,28 @@ namespace mongo {
     using ShardPtr = boost::shared_ptr<Shard>;
 
     /*
-     * A "shard" one partition of the overall database (and a replica set typically).
+     * Maintains the targeting and command execution logic for a single shard. Performs polling of
+     * the shard (if replica set).
      */
     class Shard {
         MONGO_DISALLOW_COPYING(Shard);
     public:
-
+        /**
+         * Instantiates a new shard connection management object for the specified shard and
+         * connection string.
+         */
         Shard(const ShardId& id,
               const ConnectionString& connStr,
               long long maxSizeMB,
               bool isDraining);
 
         const ShardId& getId() const { return _id; }
+
         const ConnectionString& getConnString() const { return _cs; }
+
+        RemoteCommandTargeter* getTargeter() const;
+
+        RemoteCommandRunner* getCommandRunner() const;
 
         long long getMaxSizeMB() const {
             return _maxSizeMB;
@@ -107,8 +118,6 @@ namespace mongo {
             return _id < o._id;
         }
 
-        bool ok() const { return _cs.isValid(); }
-
         BSONObj runCommand(const std::string& db, const std::string& simple) const;
         BSONObj runCommand(const std::string& db, const BSONObj& cmd) const;
 
@@ -119,13 +128,6 @@ namespace mongo {
          * Returns metadata and stats for this shard.
          */
         ShardStatus getStatus() const;
-
-        /**
-         * mostly for replica set
-         * retursn true if node is the shard
-         * of if the replica set contains node
-         */
-        bool containsNode( const std::string& node ) const;
 
         static ShardPtr lookupRSName(const std::string& name);
         
@@ -138,14 +140,13 @@ namespace mongo {
         static void reloadShardInfo();
 
         static void removeShard(const ShardId& id);
-
-        static bool isAShardNode( const std::string& ident );
         
         static void installShard(const ShardId& id, const Shard& shard);
 
     private:
-        ShardId _id;
-        ConnectionString _cs;
+        const ShardId _id;
+        const ConnectionString _cs;
+
         long long _maxSizeMB;    // in MBytes, 0 is unlimited
         bool      _isDraining; // shard is currently being removed
     };

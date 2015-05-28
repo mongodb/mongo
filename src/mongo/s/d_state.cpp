@@ -39,6 +39,8 @@
 #include <vector>
 
 #include "mongo/client/connpool.h"
+#include "mongo/client/remote_command_runner_impl.h"
+#include "mongo/client/remote_command_targeter_factory_impl.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
@@ -54,6 +56,7 @@
 #include "mongo/db/wire_version.h"
 #include "mongo/s/catalog/legacy/catalog_manager_legacy.h"
 #include "mongo/s/client/shard_connection.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/client/sharding_connection_hook.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
@@ -492,7 +495,12 @@ namespace mongo {
         auto catalogManager = stdx::make_unique<CatalogManagerLegacy>();
         uassertStatusOK(catalogManager->init(configServerCS));
 
-        grid.setCatalogManager(std::move(catalogManager));
+        auto shardRegistry = stdx::make_unique<ShardRegistry>(
+                                stdx::make_unique<RemoteCommandTargeterFactoryImpl>(),
+                                stdx::make_unique<RemoteCommandRunnerImpl>(0),
+                                catalogManager.get());
+
+        grid.init(std::move(catalogManager), std::move(shardRegistry));
 
         _enabled = true;
     }
