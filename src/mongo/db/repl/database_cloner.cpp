@@ -96,7 +96,8 @@ namespace {
                                   stdx::bind(&DatabaseCloner::_listCollectionsCallback,
                                              this,
                                              stdx::placeholders::_1,
-                                             stdx::placeholders::_2)),
+                                             stdx::placeholders::_2,
+                                             stdx::placeholders::_3)),
           // TODO: replace with executor database worker when it is available.
           _scheduleDbWorkFn(stdx::bind(&ReplicationExecutor::scheduleWorkWithGlobalExclusiveLock,
                                        _executor,
@@ -179,7 +180,8 @@ namespace {
     }
 
     void DatabaseCloner::_listCollectionsCallback(const StatusWith<Fetcher::BatchData>& result,
-                                                  Fetcher::NextAction* nextAction) {
+                                                  Fetcher::NextAction* nextAction,
+                                                  BSONObjBuilder* getMoreBob) {
 
         boost::lock_guard<boost::mutex> lk(_mutex);
 
@@ -190,7 +192,8 @@ namespace {
             return;
         }
 
-        auto&& documents = result.getValue().documents;
+        auto batchData(result.getValue());
+        auto&& documents = batchData.documents;
 
         // We may be called with multiple batches leading to a need to grow _collectionInfos.
         _collectionInfos.reserve(_collectionInfos.size() + documents.size());
@@ -198,8 +201,12 @@ namespace {
                      std::back_inserter(_collectionInfos),
                      _listCollectionsPredicate);
 
-        // The fetcher will continue to call with kContinue until an error or the last batch.
-        if (*nextAction == Fetcher::NextAction::kContinue) {
+        // The fetcher will continue to call with kGetMore until an error or the last batch.
+        if (*nextAction == Fetcher::NextAction::kGetMore) {
+            invariant(getMoreBob);
+            getMoreBob->append("getMore", batchData.cursorId);
+            getMoreBob->append("collection", batchData.nss.coll());
+
             _active = true;
             return;
         }

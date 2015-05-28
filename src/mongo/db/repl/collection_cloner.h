@@ -123,13 +123,15 @@ namespace repl {
          * Read index specs from listIndexes result.
          */
         void _listIndexesCallback(const StatusWith<Fetcher::BatchData>& fetchResult,
-                                  Fetcher::NextAction* nextAction);
+                                  Fetcher::NextAction* nextAction,
+                                  BSONObjBuilder* getMoreBob);
 
         /**
          * Read collection documents from find result.
          */
         void _findCallback(const StatusWith<Fetcher::BatchData>& fetchResult,
-                           Fetcher::NextAction* nextAction);
+                           Fetcher::NextAction* nextAction,
+                           BSONObjBuilder* getMoreBob);
 
         /**
          * Request storage interface to create collection.

@@ -62,7 +62,8 @@ namespace repl {
                               stdx::bind(&CollectionCloner::_listIndexesCallback,
                                          this,
                                          stdx::placeholders::_1,
-                                         stdx::placeholders::_2)),
+                                         stdx::placeholders::_2,
+                                         stdx::placeholders::_3)),
          _findFetcher(_executor,
                       _source,
                       _sourceNss.db().toString(),
@@ -71,7 +72,8 @@ namespace repl {
                       stdx::bind(&CollectionCloner::_findCallback,
                                  this,
                                  stdx::placeholders::_1,
-                                 stdx::placeholders::_2)),
+                                 stdx::placeholders::_2,
+                                 stdx::placeholders::_3)),
           _indexSpecs(),
           _documents(),
           _dbWorkCallbackHandle(),
@@ -182,7 +184,8 @@ namespace repl {
     }
 
     void CollectionCloner::_listIndexesCallback(const StatusWith<Fetcher::BatchData>& fetchResult,
-                                                Fetcher::NextAction* nextAction) {
+                                                Fetcher::NextAction* nextAction,
+                                                BSONObjBuilder* getMoreBob) {
         boost::lock_guard<boost::mutex> lk(_mutex);
 
         _active = false;
@@ -192,7 +195,9 @@ namespace repl {
             return;
         }
 
-        auto&& documents = fetchResult.getValue().documents;
+        auto batchData(fetchResult.getValue());
+        auto&& documents = batchData.documents;
+
         if (documents.empty()) {
             warning() << "No indexes found for collection " <<  _sourceNss.ns()
                       << " while cloning from " << _source;
@@ -202,8 +207,12 @@ namespace repl {
         _indexSpecs.reserve(_indexSpecs.size() + documents.size());
         _indexSpecs.insert(_indexSpecs.end(), documents.begin(), documents.end());
 
-        // The fetcher will continue to call with kContinue until an error or the last batch.
-        if (*nextAction == Fetcher::NextAction::kContinue) {
+        // The fetcher will continue to call with kGetMore until an error or the last batch.
+        if (*nextAction == Fetcher::NextAction::kGetMore) {
+            invariant(getMoreBob);
+            getMoreBob->append("getMore", batchData.cursorId);
+            getMoreBob->append("collection", batchData.nss.coll());
+
             _active = true;
             return;
         }
@@ -221,7 +230,8 @@ namespace repl {
     }
 
     void CollectionCloner::_findCallback(const StatusWith<Fetcher::BatchData>& fetchResult,
-                                         Fetcher::NextAction* nextAction) {
+                                         Fetcher::NextAction* nextAction,
+                                         BSONObjBuilder* getMoreBob) {
         boost::lock_guard<boost::mutex> lk(_mutex);
 
         _active = false;
@@ -231,7 +241,8 @@ namespace repl {
             return;
         }
 
-        _documents = fetchResult.getValue().documents;
+        auto batchData(fetchResult.getValue());
+        _documents = batchData.documents;
 
         bool lastBatch = *nextAction == Fetcher::NextAction::kNoAction;
         auto&& scheduleResult = _scheduleDbWorkFn(stdx::bind(
@@ -239,6 +250,12 @@ namespace repl {
         if (!scheduleResult.isOK()) {
             _work(scheduleResult.getStatus());
             return;
+        }
+
+        if (*nextAction == Fetcher::NextAction::kGetMore) {
+            invariant(getMoreBob);
+            getMoreBob->append("getMore", batchData.cursorId);
+            getMoreBob->append("collection", batchData.nss.coll());
         }
 
         _active = true;

@@ -56,11 +56,9 @@ namespace {
      */
     Status parseCursorResponse(const BSONObj& obj,
                                const std::string& batchFieldName,
-                               Fetcher::BatchData* batchData,
-                               NamespaceString* nss) {
+                               Fetcher::BatchData* batchData) {
         invariant(batchFieldName == kFirstBatchFieldName || batchFieldName == kNextBatchFieldName);
         invariant(batchData);
-        invariant(nss);
 
         BSONElement cursorElement = obj.getField(kCursorFieldName);
         if (cursorElement.eoo()) {
@@ -105,7 +103,7 @@ namespace {
                           "'" << kCursorFieldName << "." << kNamespaceFieldName <<
                           "' contains an invalid namespace: " << obj);
         }
-        *nss = tempNss;
+        batchData->nss = tempNss;
 
         BSONElement batchElement = cursorObj.getField(batchFieldName);
         if (batchElement.eoo()) {
@@ -132,12 +130,17 @@ namespace {
         return Status::OK();
     }
 
+    Status parseReplResponse(const BSONObj& obj) {
+        return Status::OK();
+    }
+    
 } // namespace
 
-    Fetcher::BatchData::BatchData() : cursorId(0), documents() { }
-
-    Fetcher::BatchData::BatchData(CursorId theCursorId, Documents theDocuments)
+    Fetcher::BatchData::BatchData(CursorId theCursorId,
+                                  const NamespaceString& theNss,
+                                  Documents theDocuments)
         : cursorId(theCursorId),
+          nss(theNss),
           documents(theDocuments) { }
 
     Fetcher::Fetcher(ReplicationExecutor* executor,
@@ -229,54 +232,59 @@ namespace {
 
     void Fetcher::_callback(const ReplicationExecutor::RemoteCommandCallbackData& rcbd,
                             const char* batchFieldName) {
-        NextAction nextAction = NextAction::kNoAction;
 
         if (!rcbd.response.isOK()) {
-            _work(StatusWith<Fetcher::BatchData>(rcbd.response.getStatus()), &nextAction);
+            _work(StatusWith<Fetcher::BatchData>(rcbd.response.getStatus()), nullptr, nullptr);
             _finishCallback();
             return;
         }
 
-        const BSONObj& cursorReponseObj = rcbd.response.getValue().data;
-        Status status = getStatusFromCommandResult(cursorReponseObj);
+        const BSONObj& queryResponseObj = rcbd.response.getValue().data;
+        Status status = getStatusFromCommandResult(queryResponseObj);
         if (!status.isOK()) {
-            _work(StatusWith<Fetcher::BatchData>(status), &nextAction);
+            _work(StatusWith<Fetcher::BatchData>(status), nullptr, nullptr);
             _finishCallback();
             return;
         }
 
+        status = parseReplResponse(queryResponseObj);
+        if (!status.isOK()) {
+            _work(StatusWith<Fetcher::BatchData>(status), nullptr, nullptr);
+            _finishCallback();
+            return;
+        }
 
         BatchData batchData;
-        NamespaceString nss;
-        status = parseCursorResponse(cursorReponseObj, batchFieldName, &batchData, &nss);
+        status = parseCursorResponse(queryResponseObj, batchFieldName, &batchData);
         if (!status.isOK()) {
-            _work(StatusWith<Fetcher::BatchData>(status), &nextAction);
+            _work(StatusWith<Fetcher::BatchData>(status), nullptr, nullptr);
             _finishCallback();
             return;
         }
 
+        NextAction nextAction = NextAction::kNoAction;
+
         if (batchData.cursorId) {
-            nextAction = NextAction::kContinue;
+            nextAction = NextAction::kGetMore;
         }
 
-        _work(StatusWith<BatchData>(batchData), &nextAction);
+        BSONObjBuilder bob;
+        _work(StatusWith<BatchData>(batchData), &nextAction, &bob);
 
         // Callback function _work may modify nextAction to request the fetcher
         // not to schedule a getMore command.
-        if (!batchData.cursorId || nextAction != NextAction::kContinue) {
+        if (!batchData.cursorId || nextAction != NextAction::kGetMore) {
             _finishCallback();
             return;
         }
 
         {
             stdx::lock_guard<stdx::mutex> lk(_mutex);
-            BSONObj getMoreCmdObj = BSON("getMore" << batchData.cursorId <<
-                                         "collection" << nss.coll());
-            status = _schedule_inlock(getMoreCmdObj, kNextBatchFieldName);
+            status = _schedule_inlock(bob.obj(), kNextBatchFieldName);
         }
         if (!status.isOK()) {
             nextAction = NextAction::kNoAction;
-            _work(StatusWith<Fetcher::BatchData>(status), &nextAction);
+            _work(StatusWith<Fetcher::BatchData>(status), nullptr, nullptr);
             _finishCallback();
             return;
         }

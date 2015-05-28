@@ -144,7 +144,8 @@ namespace repl {
          * Read collection names and options from listCollections result.
          */
         void _listCollectionsCallback(const StatusWith<Fetcher::BatchData>& fetchResult,
-                                      Fetcher::NextAction* nextAction);
+                                      Fetcher::NextAction* nextAction,
+                                      BSONObjBuilder* getMoreBob);
 
         /**
          * Forwards collection cloner result to client.
