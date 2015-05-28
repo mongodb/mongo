@@ -406,15 +406,14 @@ __wt_encryptor_config(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval,
 	WT_KEYED_ENCRYPTOR *kenc;
 	WT_NAMED_ENCRYPTOR *nenc;
 	uint64_t bucket, hash;
-	int locked;
 
 	*kencryptorp = NULL;
+
 	kenc = NULL;
 	conn = S2C(session);
-	locked = 0;
 
 	__wt_spin_lock(session, &conn->encryptor_lock);
-	locked = 1;
+
 	WT_ERR(__encryptor_confchk(session, cval, &nenc));
 	if (nenc == NULL) {
 		if (keyid->len != 0)
@@ -462,8 +461,7 @@ err:	if (kenc != NULL) {
 		__wt_free(session, kenc->keyid);
 		__wt_free(session, kenc);
 	}
-	if (locked)
-		__wt_spin_unlock(session, &conn->encryptor_lock);
+	__wt_spin_unlock(session, &conn->encryptor_lock);
 	return (ret);
 }
 
