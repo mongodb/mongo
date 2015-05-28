@@ -462,6 +462,13 @@ namespace mongo {
     };
 
 
+    class ExpressionConcatArrays final : public ExpressionVariadic<ExpressionConcatArrays> {
+    public:
+        Value evaluateInternal(Variables* vars) const final;
+        const char* getOpName() const final;
+    };
+
+
     class ExpressionCond : public ExpressionFixedArity<ExpressionCond, 3> {
         typedef ExpressionFixedArity<ExpressionCond, 3> Base;
     public:

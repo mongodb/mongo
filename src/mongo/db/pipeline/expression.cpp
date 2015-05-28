@@ -748,6 +748,33 @@ namespace {
         return "$concat";
     }
 
+    /* ------------------------- ExpressionConcatArrays ----------------------------- */
+
+    Value ExpressionConcatArrays::evaluateInternal(Variables* vars) const {
+        const size_t n = vpOperand.size();
+        vector<Value> values;
+
+        for (size_t i = 0; i < n; ++i) {
+            Value val = vpOperand[i]->evaluateInternal(vars);
+            if (val.nullish()) {
+                return Value(BSONNULL);
+            }
+
+            uassert(28664, str::stream() << "$concatArrays only supports arrays, not "
+                                         << typeName(val.getType()),
+                    val.getType() == Array);
+
+            const auto& subValues = val.getArray();
+            values.insert(values.end(), subValues.begin(), subValues.end());
+        }
+        return Value(std::move(values));
+    }
+
+    REGISTER_EXPRESSION("$concatArrays", ExpressionConcatArrays::parse);
+    const char* ExpressionConcatArrays::getOpName() const {
+        return "$concatArrays";
+    }
+
     /* ----------------------- ExpressionCond ------------------------------ */
 
     Value ExpressionCond::evaluateInternal(Variables* vars) const {
