@@ -524,28 +524,6 @@ tasks:
           cp mongodb*/bin/* .
           ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} mongosTest
 
-- name: mongosTest_auth
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "get buildnumber"
-    - func: "setup credentials"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          export MONGO_USE_BUILDLOGGER="true"
-          export MONGO_BUILDER_NAME=MCI_2.6_${build_variant}
-          export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export MONGO_PHASE="${task_name}_${execution}"
-
-          ${decompress|unzip} mongodb*.${ext|tgz}
-          cp mongodb*/bin/* .
-          ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --auth mongosTest
-
 - name: multiversion
   depends_on:
   - name: compile
@@ -1373,7 +1351,6 @@ buildvariants:
   - name: jsCore_compatibility
   - name: jsCore_small_oplog
   - name: mongosTest
-  - name: mongosTest_auth
   - name: multiversion
   - name: noPassthrough
   - name: noPassthroughWithMongod
@@ -1423,7 +1400,6 @@ buildvariants:
   - name: jsCore_compatibility
   - name: jsCore_small_oplog
   - name: mongosTest
-  - name: mongosTest_auth
   - name: noPassthrough
   - name: noPassthroughWithMongod
   - name: parallel
@@ -1469,7 +1445,6 @@ buildvariants:
   - name: jsCore_compatibility
   - name: jsCore_small_oplog
   - name: mongosTest
-  - name: mongosTest_auth
   - name: noPassthrough
   - name: noPassthroughWithMongod
   - name: parallel
@@ -1646,7 +1621,6 @@ buildvariants:
   - name: jsCore_compatibility
   - name: jsCore_small_oplog
   - name: mongosTest
-  - name: mongosTest_auth
   - name: noPassthrough
   - name: noPassthroughWithMongod
   - name: parallel
@@ -1993,7 +1967,6 @@ buildvariants:
   - name: jsCore_auth
   - name: jsCore_compatibility
   - name: mongosTest
-  - name: mongosTest_auth
   - name: noPassthrough
   - name: noPassthroughWithMongod
   - name: parallel
@@ -2159,7 +2132,6 @@ buildvariants:
   - name: jsCore_compatibility
   - name: jsCore_small_oplog
   - name: mongosTest
-  - name: mongosTest_auth
   - name: multiversion
   - name: noPassthrough
   - name: noPassthroughWithMongod
@@ -2273,7 +2245,6 @@ buildvariants:
   - name: jsCore_compatibility
   - name: jsCore_small_oplog
   - name: mongosTest
-  - name: mongosTest_auth
   - name: noPassthrough
   - name: noPassthroughWithMongod
   - name: parallel
