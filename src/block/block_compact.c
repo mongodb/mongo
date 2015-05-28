@@ -55,7 +55,7 @@ __wt_block_compact_skip(WT_SESSION_IMPL *session, WT_BLOCK *block, int *skipp)
 	WT_EXT *ext;
 	WT_EXTLIST *el;
 	WT_FH *fh;
-	wt_off_t avail_eighty, avail_ninety, eighty, ninety;
+	wt_off_t avail_eighty, avail_ninety, avail_total, eighty, ninety;
 
 	*skipp = 1;				/* Return a default skip. */
 
@@ -67,7 +67,7 @@ __wt_block_compact_skip(WT_SESSION_IMPL *session, WT_BLOCK *block, int *skipp)
 	 * worth doing.  Ignore small files, and files where we are unlikely
 	 * to recover 10% of the file.
 	 */
-	if (fh->size <= 10 * 1024)
+	if (fh->size <= 10 * WT_MEGABYTE)
 		return (0);
 
 	__wt_spin_lock(session, &block->live_lock);
@@ -76,18 +76,24 @@ __wt_block_compact_skip(WT_SESSION_IMPL *session, WT_BLOCK *block, int *skipp)
 		WT_ERR(__block_dump_avail(session, block));
 
 	/* Sum the available bytes in the first 80% and 90% of the file. */
-	avail_eighty = avail_ninety = 0;
+	avail_eighty = avail_ninety = avail_total = 0;
 	ninety = fh->size - fh->size / 10;
 	eighty = fh->size - ((fh->size / 10) * 2);
 
 	el = &block->live.avail;
-	WT_EXT_FOREACH(ext, el->off)
+	WT_EXT_FOREACH(ext, el->off) {
+		avail_total += ext->size;
 		if (ext->off < ninety) {
 			avail_ninety += ext->size;
 			if (ext->off < eighty)
 				avail_eighty += ext->size;
 		}
+	}
 
+	WT_ERR(__wt_verbose(session, WT_VERB_COMPACT,
+	    "%s: %" PRIuMAX "MB (%" PRIuMAX ") available space in the file",
+	    block->name,
+	    (uintmax_t)avail_total / WT_MEGABYTE, (uintmax_t)avail_total));
 	WT_ERR(__wt_verbose(session, WT_VERB_COMPACT,
 	    "%s: %" PRIuMAX "MB (%" PRIuMAX ") available space in the first "
 	    "80%% of the file",
@@ -115,7 +121,7 @@ __wt_block_compact_skip(WT_SESSION_IMPL *session, WT_BLOCK *block, int *skipp)
 	 * empty file can be processed quickly, so more aggressive compaction is
 	 * less useful.
 	 */
-	if (avail_ninety >= fh->size / 10) {
+	if (avail_total > WT_MEGABYTE && avail_ninety >= fh->size / 10) {
 		*skipp = 0;
 		block->compact_pct_tenths = 1;
 		if (avail_eighty >= ((fh->size / 10) * 2))
