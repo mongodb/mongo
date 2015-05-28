@@ -15,7 +15,8 @@ Please do not report issues through GitHub.
 Information on configuring, building and installing WiredTiger can be
 found at:
 
-	http://source.wiredtiger.com/2.6.1/install.html
+	http://source.wiredtiger.com/2.6.1/build-posix.html
+	http://source.wiredtiger.com/2.6.1/build-windows.html
 
 WiredTiger licensing information can be found at:
 
