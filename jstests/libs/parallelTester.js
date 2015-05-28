@@ -225,6 +225,7 @@ if ( typeof _threadInject != "undefined" ){
         var wrapper = function( fun, argv ) {
                    eval (
                          "var z = function() {" +
+                         "TestData = " + tojson(TestData) + ";" +
                          "var __parallelTests__fun = " + fun.toString() + ";" +
                          "var __parallelTests__argv = " + tojson( argv ) + ";" +
                          "var __parallelTests__passed = false;" +
