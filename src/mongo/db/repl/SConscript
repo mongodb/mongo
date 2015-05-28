@@ -78,6 +78,76 @@ env.Library(
 )
 
 env.Library(
+    target='oplog_interface_local',
+    source=[
+        'oplog_interface_local.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/query/internal_plans',
+        '$BUILD_DIR/mongo/db/query/query',
+    ],
+)
+
+env.Library(
+    target='oplog_interface_mock',
+    source=[
+        'oplog_interface_mock.cpp',
+    ],
+    LIBDEPS=[
+    ],
+)
+
+env.Library(
+    target='oplog_interface_remote',
+    source=[
+        'oplog_interface_remote.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/client/clientdriver',
+    ],
+)
+
+env.Library(
+    target='rs_rollback',
+    source=[
+        'rs_rollback.cpp',
+    ],
+    LIBDEPS=[
+        'oplog_interface_local',
+        'oplog_interface_remote',
+        'roll_back_local_operations',
+        'rollback_source_impl',
+    ],
+)
+
+env.CppUnitTest(
+    target='rs_rollback_test',
+    source=[
+        'rs_rollback_test.cpp',
+    ],
+    LIBDEPS=[
+        'oplog_interface_mock',
+        'replmocks',
+        'rs_rollback',
+        '$BUILD_DIR/mongo/db/coredb',
+        '$BUILD_DIR/mongo/db/serveronly',
+        '$BUILD_DIR/mongo/util/ntservice_mock',
+    ],
+    NO_CRUTCH = True,
+)
+
+env.Library(
+    target='rollback_source_impl',
+    source=[
+        'rollback_source_impl.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/bson/bson',
+        '$BUILD_DIR/mongo/client/clientdriver',
+    ],
+)
+
+env.Library(
     target='sync_tail',
     source=[
         'sync_tail.cpp',
@@ -543,5 +613,26 @@ env.CppUnitTest(
         'applier',
         'replication_executor_test_fixture',
         '$BUILD_DIR/mongo/unittest/concurrency',
+    ],
+)
+
+env.Library(
+    target='roll_back_local_operations',
+    source=[
+        'roll_back_local_operations.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/bson/bson',
+        '$BUILD_DIR/mongo/logger/logger',
+        '$BUILD_DIR/mongo/util/foundation',
+    ],
+)
+
+env.CppUnitTest(
+    target='roll_back_local_operations_test',
+    source='roll_back_local_operations_test.cpp',
+    LIBDEPS=[
+        'oplog_interface_mock',
+        'roll_back_local_operations',
     ],
 )

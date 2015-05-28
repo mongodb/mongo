@@ -64,6 +64,12 @@ namespace repl {
     }
 
     ReplicationCoordinator::Mode ReplicationCoordinatorMock::getReplicationMode() const {
+        if (_settings.usingReplSets()) {
+            return modeReplSet;
+        }
+        if (_settings.master || _settings.slave) {
+            return modeMasterSlave;
+        }
         return modeNone;
     }
 

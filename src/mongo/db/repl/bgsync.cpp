@@ -41,8 +41,11 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/oplog_interface_local.h"
+#include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/replication_coordinator_impl.h"
+#include "mongo/db/repl/rollback_source_impl.h"
 #include "mongo/db/repl/rs_rollback.h"
 #include "mongo/db/repl/rs_sync.h"
 #include "mongo/db/stats/timer_stats.h"
@@ -394,6 +397,19 @@ namespace {
     bool BackgroundSync::_rollbackIfNeeded(OperationContext* txn, OplogReader& r) {
         string hn = r.conn()->getServerAddress();
 
+        // Abort only when syncRollback detects we are in a unrecoverable state.
+        // In other cases, we log the message contained in the error status and retry later.
+        auto fassertRollbackStatusNoTrace = [](int msgid, const Status& status) {
+            if (status.isOK()) {
+                return;
+            }
+            if (ErrorCodes::UnrecoverableRollbackError == status.code()) {
+                fassertNoTrace(msgid, status);
+            }
+            warning() << "rollback cannot proceed at this time (retrying later): "
+                      << status;
+        };
+
         if (!r.more()) {
             try {
                 BSONObj theirLastOp = r.getLastOp(rsOplogName.c_str());
@@ -405,7 +421,14 @@ namespace {
                 OpTime theirOpTime = extractOpTime(theirLastOp);
                 if (theirOpTime < _lastOpTimeFetched) {
                     log() << "we are ahead of the sync source, will try to roll back";
-                    syncRollback(txn, _replCoord->getMyLastOptime(), &r, _replCoord);
+                    fassertRollbackStatusNoTrace(
+                        28656,
+                        syncRollback(txn,
+                                     _replCoord->getMyLastOptime(),
+                                     OplogInterfaceLocal(txn, rsOplogName),
+                                     RollbackSourceImpl(r.conn(), rsOplogName),
+                                     _replCoord));
+
                     return true;
                 }
                 /* we're not ahead?  maybe our new query got fresher data.  best to come back and try again */
@@ -425,7 +448,13 @@ namespace {
         if ( opTime != _lastOpTimeFetched || hash != _lastFetchedHash ) {
             log() << "our last op time fetched: " << _lastOpTimeFetched;
             log() << "source's GTE: " << opTime;
-            syncRollback(txn, _replCoord->getMyLastOptime(), &r, _replCoord);
+            fassertRollbackStatusNoTrace(
+                28657,
+                syncRollback(txn,
+                             _replCoord->getMyLastOptime(),
+                             OplogInterfaceLocal(txn, rsOplogName),
+                             RollbackSourceImpl(r.conn(), rsOplogName),
+                             _replCoord));
             return true;
         }
 
