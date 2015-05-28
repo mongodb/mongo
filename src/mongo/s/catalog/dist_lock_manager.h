@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/oid.h"
 #include "mongo/stdx/chrono.h"
@@ -36,6 +35,8 @@
 namespace mongo {
 
     using DistLockHandle = OID;
+    class Status;
+    template <typename T> class StatusWith;
 
     /**
      * Interface for handling distributed locks.
@@ -58,6 +59,9 @@ namespace mongo {
      */
     class DistLockManager {
     public:
+
+        static const stdx::chrono::milliseconds kDefaultSingleLockAttemptTimeout;
+        static const stdx::chrono::milliseconds kDefaultLockRetryInterval;
 
         /**
          * RAII type for distributed lock. Not meant to be shared across multiple threads.
@@ -104,8 +108,8 @@ namespace mongo {
         virtual StatusWith<ScopedDistLock> lock(
                 StringData name,
                 StringData whyMessage,
-                stdx::chrono::milliseconds waitFor = stdx::chrono::milliseconds(0),
-                stdx::chrono::milliseconds lockTryInterval = stdx::chrono::milliseconds(1000)) = 0;
+                stdx::chrono::milliseconds waitFor = kDefaultSingleLockAttemptTimeout,
+                stdx::chrono::milliseconds lockTryInterval = kDefaultLockRetryInterval) = 0;
 
     protected:
 
@@ -113,7 +117,7 @@ namespace mongo {
          * Unlocks the given lockHandle. Will attempt to retry again later if the config
          * server is not reachable.
          */
-        virtual void unlock(const DistLockHandle& lockHandle) BOOST_NOEXCEPT = 0;
+        virtual void unlock(const DistLockHandle& lockHandle) = 0;
 
         /**
          * Checks if the lockHandle still exists in the config server.

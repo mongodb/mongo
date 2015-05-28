@@ -36,6 +36,9 @@
 
 namespace mongo {
 
+    const stdx::chrono::milliseconds DistLockManager::kDefaultSingleLockAttemptTimeout(0);
+    const stdx::chrono::milliseconds DistLockManager::kDefaultLockRetryInterval(1000);
+
     DistLockManager::ScopedDistLock::ScopedDistLock(): _lockManager(nullptr) {
     }
 

@@ -102,7 +102,7 @@ namespace {
 
         Timer timer;
         Timer msgTimer;
-        while (waitFor <= milliseconds::zero() || timer.millis() < waitFor.count()) {
+        while (waitFor <= milliseconds::zero() || milliseconds(timer.millis()) < waitFor) {
             bool acquired = false;
             BSONObj lockDoc;
             try {
@@ -165,7 +165,7 @@ namespace {
 
             milliseconds timeRemaining =
                     std::max(milliseconds::zero(), waitFor - milliseconds(timer.millis()));
-            sleepmillis(std::min(lockTryInterval, timeRemaining).count());
+            sleepFor(std::min(lockTryInterval, timeRemaining));
         }
 
         return lastStatus;

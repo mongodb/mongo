@@ -76,7 +76,7 @@ namespace mongo {
         return DistLockManager::ScopedDistLock(info.lockID, this);
     }
 
-    void DistLockManagerMock::unlock(const DistLockHandle& lockHandle) BOOST_NOEXCEPT {
+    void DistLockManagerMock::unlock(const DistLockHandle& lockHandle) {
         std::vector<LockInfo>::iterator it =
                 std::find_if(
                         _locks.begin(),

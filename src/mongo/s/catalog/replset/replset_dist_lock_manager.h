@@ -26,32 +26,46 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+#pragma once
 
-#include "mongo/platform/basic.h"
+#include <memory>
+#include <string>
 
-#include "mongo/s/dist_lock_logic.h"
-
-#include "mongo/s/distlock.h"
-#include "mongo/s/type_locks.h"
-#include "mongo/stdx/memory.h"
+#include "mongo/base/string_data.h"
+#include "mongo/s/catalog/dist_lock_manager.h"
 
 namespace mongo {
 
-namespace dist_lock_logic {
-    StatusWith<DistLockHandle> lock(CatalogManager* lockCatalogue,
-                                    const std::string& name,
-                                    const std::string& whyMessage) BOOST_NOEXCEPT {
-        // TODO
-        DistLockHandle dummy;
-        return StatusWith<DistLockHandle>(dummy);
-    }
+    class DistLockCatalog;
 
-     bool unlock(CatalogManager* lockCatalogue,
-                 const DistLockHandle& lockHandle) BOOST_NOEXCEPT {
-        // TODO
-        return true;
-    }
-} // namespace dist_lock_logic
+    class ReplSetDistLockManager: public DistLockManager {
+    public:
+        ReplSetDistLockManager(StringData processID,
+                               std::unique_ptr<DistLockCatalog> catalog);
 
-} // namespace mongo
+        virtual ~ReplSetDistLockManager();
+
+        virtual void startUp() override;
+        virtual void shutDown() override;
+
+        virtual StatusWith<DistLockManager::ScopedDistLock> lock(
+                StringData name,
+                StringData whyMessage,
+                stdx::chrono::milliseconds waitFor,
+                stdx::chrono::milliseconds lockTryInterval) override;
+
+    protected:
+
+        virtual void unlock(const DistLockHandle& lockSessionID) override;
+
+        virtual Status checkStatus(const DistLockHandle& lockSessionID) override;
+
+    private:
+
+        void queueUnlock(const OID& lockSessionID);
+
+        std::string _processID;
+        std::unique_ptr<DistLockCatalog> _catalog;
+
+    };
+}

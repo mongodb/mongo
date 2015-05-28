@@ -1,0 +1,25 @@
+# -*- mode: python -*-
+
+Import("env")
+
+env.Library(
+    target='replset_dist_lock_manager',
+    source=[
+        'replset_dist_lock_manager.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/s/catalog/dist_lock_catalog',
+        '$BUILD_DIR/mongo/s/catalog/dist_lock_manager'
+    ],
+)
+
+env.CppUnitTest(
+    target='replset_dist_lock_manager_test',
+    source=[
+        'replset_dist_lock_manager_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/s/catalog/dist_lock_catalog_mock',
+        'replset_dist_lock_manager'
+    ]
+)

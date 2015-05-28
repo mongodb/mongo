@@ -54,7 +54,7 @@ namespace mongo {
 
     protected:
 
-        virtual void unlock(const DistLockHandle& lockHandle) BOOST_NOEXCEPT override;
+        virtual void unlock(const DistLockHandle& lockHandle) override;
 
         virtual Status checkStatus(const DistLockHandle& lockHandle) override;
 

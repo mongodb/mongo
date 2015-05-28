@@ -30,23 +30,33 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/repl_set_dist_lock_manager.h"
+#include "mongo/s/catalog/replset_dist_lock_manager.h"
 
-#include "mongo/s/dist_lock_logic.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/s/catalog/dist_lock_catalog.h"
+#include "mongo/s/type_locks.h"
+#include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/log.h"
+#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {
 
     using std::string;
+    using std::unique_ptr;
     using stdx::chrono::milliseconds;
 
-    ReplSetDistLockManager::ReplSetDistLockManager(CatalogManager* lockCatalogue):
-        _lockCatalogue(lockCatalogue) {
+    ReplSetDistLockManager::ReplSetDistLockManager(StringData processID,
+                                                   unique_ptr<DistLockCatalog> catalog):
+        _processID(processID.toString()),
+        _catalog(std::move(catalog)) {
     }
 
+    ReplSetDistLockManager::~ReplSetDistLockManager() = default;
+
     void ReplSetDistLockManager::startUp() {
-        // TODO: start background task.
+        // TODO
     }
 
     void ReplSetDistLockManager::shutDown() {
@@ -58,31 +68,45 @@ namespace mongo {
             StringData whyMessage,
             milliseconds waitFor,
             milliseconds lockTryInterval) {
-        auto lastStatus = StatusWith<DistLockHandle>(
-                ErrorCodes::LockBusy, str::stream() << "timed out waiting for " << name);
 
         Timer timer;
         Timer msgTimer;
+
         while (waitFor <= milliseconds::zero() || timer.millis() < waitFor.count()) {
-            lastStatus = dist_lock_logic::lock(_lockCatalogue,
-                                               name.toString(),
-                                               whyMessage.toString());
+            OID lockSessionID = OID::gen();
+            string who = str::stream() << _processID << ":" << getThreadName();
+            auto lockResult = _catalog->grabLock(name,
+                                                 lockSessionID,
+                                                 who,
+                                                 _processID,
+                                                 Date_t::now(),
+                                                 whyMessage);
 
-            if (lastStatus.isOK()) {
-                // TODO: add to pinger.
-                return StatusWith<ScopedDistLock>(ScopedDistLock(lastStatus.getValue(), this));
+            auto status = lockResult.getStatus();
+            const auto& lockDoc = lockResult.getValue();
+
+            if (!status.isOK()) {
+                // An error occurred but the write might have actually been applied on the
+                // other side. Schedule an unlock to clean it up just in case.
+                queueUnlock(lockSessionID);
+                return status;
             }
 
-            if (waitFor.count() == 0) break;
-
-            if (lastStatus.getStatus() != ErrorCodes::LockBusy) {
-                return StatusWith<ScopedDistLock>(lastStatus.getStatus());
+            string errmsg;
+            if (lockDoc.isValid(&errmsg)) {
+                // Lock is acquired since findAndModify was able to successfully modify
+                // the lock document.
+                return ScopedDistLock(lockSessionID, this);
             }
+
+            // TODO: implement lock overtaking here.
+
+            if (waitFor == milliseconds::zero()) break;
 
             // Periodically message for debugging reasons
             if (msgTimer.seconds() > 10) {
                 LOG(0) << "waited " << timer.seconds() << "s for distributed lock " << name
-                       << " for " << whyMessage << ": " << causedBy(lastStatus.getStatus());
+                       << " for " << whyMessage;
 
                 msgTimer.reset();
             }
@@ -92,19 +116,20 @@ namespace mongo {
             sleepmillis(std::min(lockTryInterval, timeRemaining).count());
         }
 
-        return StatusWith<ScopedDistLock>(lastStatus.getStatus());
+        return {ErrorCodes::LockBusy, str::stream() << "timed out waiting for " << name};
     }
 
-    void ReplSetDistLockManager::unlock(const DistLockHandle& lockHandle) BOOST_NOEXCEPT {
-        // TODO: stop pinging.
-
-        if (!dist_lock_logic::unlock(_lockCatalogue, lockHandle)) {
-            // TODO: deferred unlocking
-        }
+    void ReplSetDistLockManager::unlock(const DistLockHandle& lockHandle) {
+        queueUnlock(lockHandle);
     }
 
     Status ReplSetDistLockManager::checkStatus(const DistLockHandle& lockHandle) {
-        // TODO: use catalogue to check.
-        return Status::OK();
+        invariant(false);
+        return {ErrorCodes::InternalError, "not yet implemented"};
+    }
+
+    void ReplSetDistLockManager::queueUnlock(const OID& lockSessionID) {
+        // TODO: make this asynchronous
+        auto unlockStatus = _catalog->unlock(lockSessionID);
     }
 }

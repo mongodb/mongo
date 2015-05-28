@@ -156,7 +156,7 @@ namespace mongo {
         }
 
         // Optional Fields
-        void setProcess(StringData& process) {
+        void setProcess(StringData process) {
             _process = process.toString();
             _isProcessSet = true;
         }
@@ -198,7 +198,7 @@ namespace mongo {
                 return lockID.getDefault();
             }
         }
-        void setWho(StringData& who) {
+        void setWho(StringData who) {
             _who = who.toString();
             _isWhoSet = true;
         }
@@ -219,7 +219,7 @@ namespace mongo {
                 return who.getDefault();
             }
         }
-        void setWhy(StringData& why) {
+        void setWhy(StringData why) {
             _why = why.toString();
             _isWhySet = true;
         }

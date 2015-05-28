@@ -28,32 +28,45 @@
 
 #pragma once
 
-#include "mongo/base/status_with.h"
-#include "mongo/s/dist_lock_manager.h"
+#include <memory>
+#include <string>
 
-/**
- * Helper methods for handling distributed locks that are backed by replica set config servers.
- */
+#include "mongo/base/string_data.h"
+#include "mongo/s/catalog/dist_lock_manager.h"
 
 namespace mongo {
 
-    class CatalogManager;
+    class DistLockCatalog;
 
-namespace dist_lock_logic {
+    class ReplSetDistLockManager: public DistLockManager {
+    public:
+        ReplSetDistLockManager(StringData processID,
+                               std::unique_ptr<DistLockCatalog> catalog);
 
-    /**
-     * Tries to acquire the distributed lock with the given name and returns the
-     * handle of the newly acquired lock on success.
-     */
-    StatusWith<DistLockHandle> lock(CatalogManager* lockCatalogue,
-                                    const std::string& name,
-                                    const std::string& whyMessage) BOOST_NOEXCEPT;
+        virtual ~ReplSetDistLockManager();
 
-    /**
-     * Unlocks the distributed lock with the given lock handle. Returns true on success.
-     */
-    bool unlock(CatalogManager* lockCatalogue,
-                const DistLockHandle& lockHandle) BOOST_NOEXCEPT;
+        virtual void startUp() override;
+        virtual void shutDown() override;
 
-} // namespace dist_lock_logic
-} // namespace mongo
+        virtual StatusWith<DistLockManager::ScopedDistLock> lock(
+                StringData name,
+                StringData whyMessage,
+                stdx::chrono::milliseconds waitFor = stdx::chrono::milliseconds(0),
+                stdx::chrono::milliseconds lockTryInterval =
+                        stdx::chrono::milliseconds(1000)) override;
+
+    protected:
+
+        virtual void unlock(const DistLockHandle& lockHandle) override;
+
+        virtual Status checkStatus(const DistLockHandle& lockHandle) override;
+
+    private:
+
+        void queueUnlock(const OID& lockSessionID);
+
+        std::string _processID;
+        std::unique_ptr<DistLockCatalog> _catalog;
+
+    };
+}

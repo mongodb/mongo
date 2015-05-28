@@ -837,6 +837,10 @@ namespace {
     }
 #endif
 
+    void sleepFor(const Milliseconds& time) {
+        sleepmillis(time.count());
+    }
+
     void Backoff::nextSleepMillis(){
 
         // Get the current time
