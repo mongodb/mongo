@@ -161,6 +161,13 @@ static const WT_CONFIG_CHECK confchk_WT_SESSION_checkpoint[] = {
 	{ NULL, NULL, NULL, NULL, NULL, 0 }
 };
 
+static const WT_CONFIG_CHECK confchk_WT_SESSION_commit_transaction[] = {
+	{ "sync", "string",
+	    NULL, "choices=[\"background\",\"off\",\"on\"]",
+	    NULL, 0 },
+	{ NULL, NULL, NULL, NULL, NULL, 0 }
+};
+
 static const WT_CONFIG_CHECK confchk_WT_SESSION_compact[] = {
 	{ "timeout", "int", NULL, NULL, NULL, 0 },
 	{ NULL, NULL, NULL, NULL, NULL, 0 }
@@ -302,6 +309,11 @@ static const WT_CONFIG_CHECK confchk_WT_SESSION_snapshot[] = {
 	    NULL, NULL,
 	    confchk_WT_SESSION_snapshot_drop_subconfigs, 4 },
 	{ "name", "string", NULL, NULL, NULL, 0 },
+	{ NULL, NULL, NULL, NULL, NULL, 0 }
+};
+
+static const WT_CONFIG_CHECK confchk_WT_SESSION_transaction_sync[] = {
+	{ "timeout_ms", "int", NULL, NULL, NULL, 0 },
 	{ NULL, NULL, NULL, NULL, NULL, 0 }
 };
 
@@ -789,8 +801,8 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  NULL, 0
 	},
 	{ "WT_SESSION.commit_transaction",
-	  "",
-	  NULL, 0
+	  "sync=",
+	  confchk_WT_SESSION_commit_transaction, 1
 	},
 	{ "WT_SESSION.compact",
 	  "timeout=1200",
@@ -849,6 +861,10 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	{ "WT_SESSION.strerror",
 	  "",
 	  NULL, 0
+	},
+	{ "WT_SESSION.transaction_sync",
+	  "timeout_ms=",
+	  confchk_WT_SESSION_transaction_sync, 1
 	},
 	{ "WT_SESSION.truncate",
 	  "",

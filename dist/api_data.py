@@ -790,6 +790,14 @@ methods = {
         type='boolean'),
 ]),
 'WT_SESSION.strerror' : Method([]),
+'WT_SESSION.transaction_sync' : Method([
+    Config('timeout_ms', '', r'''
+        maximum amount of time to wait for background sync to complete in
+        milliseconds.  A value of zero disables the timeout and returns
+        immediately.  The default waits forever.''',
+        type='int'),
+]),
+
 'WT_SESSION.truncate' : Method([]),
 'WT_SESSION.upgrade' : Method([]),
 'WT_SESSION.verify' : Method([
@@ -835,7 +843,12 @@ methods = {
         type='boolean'),
 ]),
 
-'WT_SESSION.commit_transaction' : Method([]),
+'WT_SESSION.commit_transaction' : Method([
+    Config('sync', '', r'''
+        override whether to sync log records when the transaction commits,
+        inherited from ::wiredtiger_open \c transaction_sync''',
+        choices=['background', 'off', 'on']),
+]),
 'WT_SESSION.rollback_transaction' : Method([]),
 
 'WT_SESSION.checkpoint' : Method([
