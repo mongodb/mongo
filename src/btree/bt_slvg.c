@@ -327,8 +327,7 @@ __wt_bt_salvage(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, const char *cfg[])
 	 */
 	if (ss->root_ref.page != NULL) {
 		btree->ckpt = ckptbase;
-		ret = __wt_evict(
-		    session, &ss->root_ref, WT_EVICT_PAGE_EXCLUSIVE);
+		ret = __wt_evict(session, &ss->root_ref, WT_EVICT_EXCLUSIVE);
 		ss->root_ref.page = NULL;
 		btree->ckpt = NULL;
 	}
@@ -1314,7 +1313,7 @@ __slvg_col_build_leaf(WT_SESSION_IMPL *session, WT_TRACK *trk, WT_REF *ref)
 
 	ret = __wt_page_release(session, ref, 0);
 	if (ret == 0)
-		ret = __wt_evict(session, ref, WT_EVICT_PAGE_EXCLUSIVE);
+		ret = __wt_evict(session, ref, WT_EVICT_EXCLUSIVE);
 
 	if (0) {
 err:		WT_TRET(__wt_page_release(session, ref, 0));
@@ -2023,7 +2022,7 @@ __slvg_row_build_leaf(
 	 */
 	ret = __wt_page_release(session, ref, 0);
 	if (ret == 0)
-		ret = __wt_evict(session, ref, WT_EVICT_PAGE_EXCLUSIVE);
+		ret = __wt_evict(session, ref, WT_EVICT_EXCLUSIVE);
 
 	if (0) {
 err:		WT_TRET(__wt_page_release(session, ref, 0));

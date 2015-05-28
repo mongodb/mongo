@@ -45,7 +45,7 @@ struct __wt_evict_worker {
 };
 
 #define	WT_EVICT_CHECK_SPLITS	1	/* Boolean to __wt_page_can_evict  */
-#define	WT_EVICT_PAGE_EXCLUSIVE	1	/* Boolean to __wt_evict */
+#define	WT_EVICT_EXCLUSIVE	1	/* Boolean to __wt_evict */
 
 /*
  * WiredTiger cache structure.
