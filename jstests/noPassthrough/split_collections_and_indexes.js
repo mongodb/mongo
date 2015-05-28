@@ -1,5 +1,5 @@
 
-if ( jsTest.options().storageEngine == "wiredTiger" ) {
+if (!jsTest.options().storageEngine || jsTest.options().storageEngine === "wiredTiger") {
 
     var baseDir = "jstests_split_c_and_i";
     port = allocatePorts( 1 )[ 0 ];

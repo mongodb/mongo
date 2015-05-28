@@ -193,8 +193,10 @@ assert(db.getCollection( "test_db" ).getIndexes().length == 0,24);
                'indexDetails missing from ' + 'db.collection.stats(' + tojson(options) +
                ') result: ' + tojson(collectionStats));
         // Currently, indexDetails is only supported with WiredTiger.
-        if (jsTest.options().storageEngine == undefined) { return; }
-        if (jsTest.options().storageEngine.toLowerCase() != "wiredtiger") { return; }
+        var storageEngine = jsTest.options().storageEngine;
+        if (storageEngine && storageEngine !== 'wiredTiger') {
+            return;
+        }
         assert.eq(1, Object.keys(collectionStats.indexDetails).length,
                   'indexDetails must have exactly one entry');
         assert(collectionStats.indexDetails[indexName],
