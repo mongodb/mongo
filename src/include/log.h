@@ -126,6 +126,7 @@ typedef struct {
 	 * System LSNs
 	 */
 	WT_LSN		alloc_lsn;	/* Next LSN for allocation */
+	WT_LSN		bg_sync_lsn;	/* Latest background sync LSN */
 	WT_LSN		ckpt_lsn;	/* Last checkpoint LSN */
 	WT_LSN		first_lsn;	/* First LSN */
 	WT_LSN		sync_dir_lsn;	/* LSN of the last directory sync */

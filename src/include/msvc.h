@@ -41,9 +41,6 @@
 	(WT_STATIC_ASSERT(sizeof(v) == (n)),				\
 	_InterlockedCompareExchange ## s				\
 	((t*)&(v), (t)(new), (t)(old)) == (t)(old))
-#define	__WT_ATOMIC_CAS_VAL(v, old, new, n, s, t)			\
-	(WT_STATIC_ASSERT(sizeof(v) == (n)),				\
-	_InterlockedCompareExchange ## s((t*)&(v), (t)(new), (t)(old)))
 #define	__WT_ATOMIC_STORE(v, val, n, s, t)				\
 	(WT_STATIC_ASSERT(sizeof(v) == (n)),				\
 	_InterlockedExchange ## s((t*)&(v), (t)(val)))
@@ -55,8 +52,6 @@
 #define	WT_ATOMIC_FETCH_ADD1(v, val)					\
 	__WT_ATOMIC_FETCH_ADD(v, val, 1, 8, char)
 #define	WT_ATOMIC_CAS1(v, old, new)	__WT_ATOMIC_CAS(v, old, new, 1, 8, char)
-#define	WT_ATOMIC_CAS_VAL1(v, old, new)					\
-	__WT_ATOMIC_CAS_VAL(v, old, new, 1, 8, char)
 #define	WT_ATOMIC_STORE1(v, val)	__WT_ATOMIC_STORE(v, val, 1, 8, char)
 #define	WT_ATOMIC_SUB1(v, val)		__WT_ATOMIC_SUB(v, val, 1, 8, char)
 
@@ -65,16 +60,12 @@
 	__WT_ATOMIC_FETCH_ADD(v, val, 2, 16, short)
 #define	WT_ATOMIC_CAS2(v, old, new)					\
 	__WT_ATOMIC_CAS(v, old, new, 2, 16, short)
-#define	WT_ATOMIC_CAS_VAL2(v, old, new)					\
-	__WT_ATOMIC_CAS_VAL(v, old, new, 2, 16, short)
 #define	WT_ATOMIC_STORE2(v, val)	__WT_ATOMIC_STORE(v, val, 2, 16, short)
 #define	WT_ATOMIC_SUB2(v, val)		__WT_ATOMIC_SUB(v, val, 2, 16, short)
 
 #define	WT_ATOMIC_ADD4(v, val)		__WT_ATOMIC_ADD(v, val, 4, , long)
 #define	WT_ATOMIC_FETCH_ADD4(v, val)	__WT_ATOMIC_FETCH_ADD(v, val, 4, , long)
 #define	WT_ATOMIC_CAS4(v, old, new)	__WT_ATOMIC_CAS(v, old, new, 4, , long)
-#define	WT_ATOMIC_CAS_VAL4(v, old, new)					\
-	__WT_ATOMIC_CAS_VAL(v, old, new, 4, , long)
 #define	WT_ATOMIC_STORE4(v, val)	__WT_ATOMIC_STORE(v, val, 4, , long)
 #define	WT_ATOMIC_SUB4(v, val)		__WT_ATOMIC_SUB(v, val, 4, , long)
 
@@ -83,8 +74,6 @@
 	__WT_ATOMIC_FETCH_ADD(v, val, 8, 64, __int64)
 #define	WT_ATOMIC_CAS8(v, old, new)					\
 	__WT_ATOMIC_CAS(v, old, new, 8, 64, __int64)
-#define	WT_ATOMIC_CAS_VAL8(v, old, new)					\
-	__WT_ATOMIC_CAS_VAL(v, old, new, 8, 64, __int64)
 #define	WT_ATOMIC_STORE8(v, val)					\
 	__WT_ATOMIC_STORE(v, val, 8, 64, __int64)
 #define	WT_ATOMIC_SUB8(v, val)		__WT_ATOMIC_SUB(v, val, 8, 64, __int64)

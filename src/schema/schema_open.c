@@ -155,7 +155,8 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table, WT_INDEX *idx)
 	}
 
 	WT_ERR(__wt_extractor_config(
-	    session, idx->config, &idx->extractor, &idx->extractor_owned));
+	    session, idx->name, idx->config, &idx->extractor,
+	    &idx->extractor_owned));
 
 	WT_ERR(__wt_config_getones(session, idx->config, "key_format", &cval));
 	WT_ERR(__wt_strndup(session, cval.str, cval.len, &idx->key_format));

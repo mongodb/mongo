@@ -57,6 +57,7 @@ int cursor_ops(WT_SESSION *session);
 int cursor_search_near(WT_CURSOR *cursor);
 int cursor_statistics(WT_SESSION *session);
 int pack_ops(WT_SESSION *session);
+int named_snapshot_ops(WT_SESSION *session);
 int session_ops(WT_SESSION *session);
 int transaction_ops(WT_CONNECTION *conn, WT_SESSION *session);
 
@@ -519,6 +520,26 @@ cursor_statistics(WT_SESSION *session)
 }
 
 int
+named_snapshot_ops(WT_SESSION *session)
+{
+	int ret;
+
+	/*! [Snapshot examples] */
+
+	/* Create a named snapshot */
+	ret = session->snapshot(session, "name=June01");
+
+	/* Open a transaction at a given snapshot */
+	ret = session->begin_transaction(session, "snapshot=June01");
+
+	/* Drop all named snapshots */
+	ret = session->snapshot(session, "drop=(all)");
+	/*! [Snapshot examples] */
+
+	return (ret);
+}
+
+int
 session_ops(WT_SESSION *session)
 {
 	int ret;
@@ -663,6 +684,10 @@ session_ops(WT_SESSION *session)
 	/*! [Truncate a table] */
 	ret = session->truncate(session, "table:mytable", NULL, NULL, NULL);
 	/*! [Truncate a table] */
+
+	/*! [Transaction sync] */
+	ret = session->transaction_sync(session, NULL);
+	/*! [Transaction sync] */
 
 	{
 	/*

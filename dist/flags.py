@@ -29,6 +29,7 @@ flags = {
         'LOGSCAN_RECOVER',
     ],
     'log_write' : [
+        'LOG_BACKGROUND',
         'LOG_DSYNC',
         'LOG_FLUSH',
         'LOG_FSYNC',

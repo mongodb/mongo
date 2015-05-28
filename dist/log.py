@@ -12,7 +12,7 @@ tmp_file = '__tmp'
 field_types = {
     'string' : ('const char *', 'S', '%s', 'arg', ''),
     'item' : ('WT_ITEM *', 'u', '%s', 'escaped',
-        'WT_RET(__logrec_jsonify_str(session, &escaped, &arg));'),
+        'WT_ERR(__logrec_jsonify_str(session, &escaped, &arg));'),
     'recno' : ('uint64_t', 'r', '%" PRIu64 "', 'arg', ''),
     'uint32' : ('uint32_t', 'I', '%" PRIu32 "', 'arg', ''),
     'uint64' : ('uint64_t', 'Q', '%" PRIu64 "', 'arg', ''),
@@ -256,31 +256,35 @@ int
 __wt_logop_%(name)s_print(
     WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end, FILE *out)
 {
-\t%(arg_decls)s
+%(arg_ret)s\t%(arg_decls)s
 
 \t%(arg_init)sWT_RET(__wt_logop_%(name)s_unpack(
 \t    session, pp, end%(arg_addrs)s));
 
-\tfprintf(out, " \\"optype\\": \\"%(name)s\\",\\n");
+\tWT_RET(__wt_fprintf(out, " \\"optype\\": \\"%(name)s\\",\\n"));
 \t%(print_args)s
-\t%(arg_fini)sreturn (0);
+%(arg_fini)s
 }
 ''' % {
     'name' : optype.name,
+    'arg_ret' : ('\tWT_DECL_RET;\n' if has_escape(optype.fields) else ''),
     'arg_decls' : ('\n\t'.join('%s%s%s;' %
         (clocaltype(f), '' if clocaltype(f)[-1] == '*' else ' ', f[1])
         for f in optype.fields)) + escape_decl(optype.fields),
     'arg_init' : ('escaped = NULL;\n\t' if has_escape(optype.fields) else ''),
-    'arg_fini' : ('__wt_free(session, escaped);\n\t'
-    if has_escape(optype.fields) else ''),
+    'arg_fini' : ('\nerr:\t__wt_free(session, escaped);\n\treturn (ret);'
+    if has_escape(optype.fields) else '\treturn (0);'),
     'arg_addrs' : ''.join(', &%s' % f[1] for f in optype.fields),
     'print_args' : '\n\t'.join(
-        '%sfprintf(out, "        \\"%s\\": \\"%s\\",\\n",%s);' %
-        (printf_setup(f), f[1], printf_fmt(f), printf_arg(f))
+        '%s%s(__wt_fprintf(out,\n\t    "        \\"%s\\": \\"%s\\",\\n",%s));' %
+        (printf_setup(f),
+        'WT_ERR' if has_escape(optype.fields) else 'WT_RET',
+        f[1], printf_fmt(f), printf_arg(f))
         for f in optype.fields[:-1]) + str(
-        '\n\t%sfprintf(out, "        \\"%s\\": \\"%s\\"",%s);' %
-        (printf_setup(last_field), last_field[1],
-            printf_fmt(last_field), printf_arg(last_field))),
+        '\n\t%s%s(__wt_fprintf(out,\n\t    "        \\"%s\\": \\"%s\\"",%s));' %
+        (printf_setup(last_field),
+        'WT_ERR' if has_escape(optype.fields) else 'WT_RET',
+        last_field[1], printf_fmt(last_field), printf_arg(last_field))),
 })
 
 # Emit the printlog entry point
