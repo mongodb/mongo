@@ -1768,7 +1768,7 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 		 * All needed syncing will be handled directly except
 		 * a background sync.  Handle that here.
 		 */
-		 if (ret == 0) {
+		if (ret == 0) {
 			if (LF_ISSET(WT_LOG_BACKGROUND))
 				goto bg;
 			else
