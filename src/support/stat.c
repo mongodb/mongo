@@ -549,6 +549,7 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	    "transaction: transaction range of IDs currently pinned";
 	stats->txn_pinned_checkpoint_range.desc =
 	    "transaction: transaction range of IDs currently pinned by a checkpoint";
+	stats->txn_sync.desc = "transaction: transaction sync calls";
 	stats->txn_commit.desc = "transaction: transactions committed";
 	stats->txn_rollback.desc = "transaction: transactions rolled back";
 }
@@ -669,6 +670,7 @@ __wt_stat_refresh_connection_stats(void *stats_arg)
 	stats->txn_begin.v = 0;
 	stats->txn_checkpoint.v = 0;
 	stats->txn_fail_cache.v = 0;
+	stats->txn_sync.v = 0;
 	stats->txn_commit.v = 0;
 	stats->txn_rollback.v = 0;
 }

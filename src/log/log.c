@@ -34,18 +34,43 @@ __wt_log_ckpt(WT_SESSION_IMPL *session, WT_LSN *ckp_lsn)
 }
 
 /*
+ * __wt_log_background --
+ *	Record the given LSN as the background LSN and signal the
+ *	thread as needed.
+ */
+int
+__wt_log_background(WT_SESSION_IMPL *session, WT_LSN *lsn)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_LOG *log;
+
+	conn = S2C(session);
+	log = conn->log;
+	session->bg_sync_lsn = *lsn;
+
+	/*
+	 * Advance the logging subsystem background sync LSN if
+	 * needed.
+	 */
+	__wt_spin_lock(session, &log->log_sync_lock);
+	if (WT_LOG_CMP(lsn, &log->bg_sync_lsn) > 0)
+		log->bg_sync_lsn = *lsn;
+	__wt_spin_unlock(session, &log->log_sync_lock);
+	return (__wt_cond_signal(session, conn->log_file_cond));
+}
+
+/*
  * __wt_log_force_sync --
  *	Force a sync of the log and files.
  */
 int
 __wt_log_force_sync(WT_SESSION_IMPL *session, WT_LSN *min_lsn)
 {
-	WT_CONNECTION_IMPL *conn;
-	WT_DECL_RET;
 	WT_LOG *log;
+	WT_DECL_RET;
 
-	conn = S2C(session);
-	log = conn->log;
+	log = S2C(session)->log;
+
 	__wt_spin_lock(session, &log->log_sync_lock);
 	WT_ASSERT(session, log->log_dir_fh != NULL);
 	/*
@@ -1081,7 +1106,7 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, int *freep)
 	 * Signal the close thread if needed.
 	 */
 	if (F_ISSET(slot, WT_SLOT_CLOSEFH))
-		WT_ERR(__wt_cond_signal(session, conn->log_close_cond));
+		WT_ERR(__wt_cond_signal(session, conn->log_file_cond));
 
 	/*
 	 * Try to consolidate calls to fsync to wait less.  Acquire a spin lock
@@ -1739,8 +1764,16 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 		ret = __log_direct_write(session, record, &lsn, flags);
 		if (ret == 0 && lsnp != NULL)
 			*lsnp = lsn;
-		if (ret == 0)
-			return (0);
+		/*
+		 * All needed syncing will be handled directly except
+		 * a background sync.  Handle that here.
+		 */
+		 if (ret == 0) {
+			if (LF_ISSET(WT_LOG_BACKGROUND))
+				goto bg;
+			else
+				return (0);
+		}
 		if (ret != EAGAIN)
 			WT_ERR(ret);
 		/*
@@ -1803,8 +1836,15 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 			(void)__wt_cond_wait(
 			    session, log->log_write_cond, 10000);
 	}
-err:
-	if (locked)
+
+	/*
+	 * Advance the background sync LSN if needed.
+	 */
+bg:	if (LF_ISSET(WT_LOG_BACKGROUND) &&
+	    WT_LOG_CMP(&session->bg_sync_lsn, &lsn) <= 0)
+		WT_ERR(__wt_log_background(session, &lsn));
+
+err:	if (locked)
 		__wt_spin_unlock(session, &log->log_slot_lock);
 	if (ret == 0 && lsnp != NULL)
 		*lsnp = lsn;
@@ -1818,6 +1858,7 @@ err:
 	if (LF_ISSET(WT_LOG_DSYNC | WT_LOG_FSYNC) && ret == 0 &&
 	    myslot.slot != NULL)
 		ret = myslot.slot->slot_error;
+
 	return (ret);
 }
 
