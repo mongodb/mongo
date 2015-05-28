@@ -219,6 +219,44 @@ __wt_txn_read(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 }
 
 /*
+ * __wt_txn_begin --
+ *	Begin a transaction.
+ */
+static inline int
+__wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
+{
+	WT_TXN *txn;
+
+	txn = &session->txn;
+	txn->isolation = session->isolation;
+	txn->txn_logsync = S2C(session)->txn_logsync;
+
+	if (cfg != NULL)
+		WT_RET(__wt_txn_config(session, cfg));
+
+	/*
+	 * Allocate a snapshot if required. Named snapshot transactions already
+	 * have an ID setup.
+	 */
+	if (txn->isolation == WT_ISO_SNAPSHOT &&
+	    !F_ISSET(txn, WT_TXN_NAMED_SNAPSHOT)) {
+		if (session->ncursors > 0)
+			WT_RET(__wt_session_copy_values(session));
+
+		/*
+		 * We're about to allocate a snapshot: if we need to block for
+		 * eviction, it's better to do it beforehand.
+		 */
+		WT_RET(__wt_cache_full_check(session));
+
+		__wt_txn_get_snapshot(session);
+	}
+
+	F_SET(txn, WT_TXN_RUNNING);
+	return (0);
+}
+
+/*
  * __wt_txn_autocommit_check --
  *	If an auto-commit transaction is required, start one.
 */

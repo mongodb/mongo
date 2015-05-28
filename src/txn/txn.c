@@ -286,10 +286,13 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 	 * The default sync setting is inherited from the connection, but can
 	 * be overridden by an explicit "sync" setting for this transaction.
 	 *
+	 * If the flush flag is not set, then either the connection-wide
+	 * transaction sync is disabled (the default), or this transaction was
+	 * configured with sync=false.  Either way, if we are not flushing,
+	 * clear all flags that cause the log write to flush.
+	 *
 	 * !!! This is an unusual use of the config code: the "default" value
-	 * we pass in is inherited from the connection.  If flush is not set in
-	 * the connection-wide flag and not overridden here, we end up clearing
-	 * all flags.
+	 * we pass in is inherited from the connection.
 	 */
 	txn->txn_logsync = S2C(session)->txn_logsync;
 	WT_RET(__wt_config_gets_def(session, cfg, "sync",
