@@ -1480,7 +1480,7 @@ namespace {
 
         verify(str::equals(expr.fieldName(), "$filter"));
 
-        uassert(28646, "$filter only supports an object as it's argument",
+        uassert(28646, "$filter only supports an object as its argument",
                 expr.type() == Object);
 
         // "cond" must be parsed after "as" regardless of BSON order.
@@ -1693,7 +1693,7 @@ namespace {
 
         verify(str::equals(expr.fieldName(), "$map"));
 
-        uassert(16878, "$map only supports an object as it's argument",
+        uassert(16878, "$map only supports an object as its argument",
                 expr.type() == Object);
 
         // "in" must be parsed after "as" regardless of BSON order
