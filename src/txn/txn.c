@@ -337,7 +337,8 @@ __wt_txn_config(WT_SESSION_IMPL *session, const char *cfg[])
 	 * We want to distinguish between inheriting implicitly and explicitly.
 	 */
 	F_CLR(txn, WT_TXN_SYNC_SET);
-	WT_RET(__wt_config_gets_def(session, cfg, "sync", UINT_MAX, &cval));
+	WT_RET(__wt_config_gets_def(
+	    session, cfg, "sync", (int)UINT_MAX, &cval));
 	if (cval.val == 0 || cval.val == 1)
 		/*
 		 * This is an explicit setting of sync.  Set the flag so
