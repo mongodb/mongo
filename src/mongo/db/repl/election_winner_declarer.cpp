@@ -77,16 +77,18 @@ namespace repl {
             const RemoteCommandRequest& request,
             const ResponseStatus& response) {
         _responsesProcessed++;
-        Status cmdResponseStatus = getStatusFromCommandResult(response.getValue().data);
         if (!response.isOK()) { // failed response
             log() << "ElectionWinnerDeclarer: Got failed response from " << request.target
                   << ": " << response.getStatus();
+            return;
         }
-        else if (!cmdResponseStatus.isOK()) { // disagreement response
+
+        Status cmdResponseStatus = getStatusFromCommandResult(response.getValue().data);
+        if (!cmdResponseStatus.isOK()) { // disagreement response
             _failed = true;
             _status = cmdResponseStatus;
             log() << "ElectionWinnerDeclarer: Got error response from " << request.target
-                  << " with term: " << response.getValue().data["term"].Number() 
+                  << " with term: " << response.getValue().data["term"].Number()
                   << " and error: " << cmdResponseStatus;
         }
     }
