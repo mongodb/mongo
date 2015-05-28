@@ -88,6 +88,11 @@ namespace mongo {
         BSONObj getInitialQuery() const;
 
         /**
+         * Returns true if the pipeline contains a $out stage, and false otherwise.
+         */
+        bool hasOutStage() const;
+
+        /**
           Write the Pipeline as a BSONObj command.  This should be the
           inverse of parseCommand().
 
@@ -125,7 +130,7 @@ namespace mongo {
          * explain flag true (for DocumentSource::serializeToArray()).
          */
         std::vector<Value> writeExplainOps() const;
-        
+
         /**
          * Returns the dependencies needed by this pipeline.
          *

@@ -467,6 +467,15 @@ namespace mongo {
         return match->getQuery();
     }
 
+    bool Pipeline::hasOutStage() const {
+        if (sources.empty()) {
+            return false;
+        }
+
+        // The $out stage must be the last one in the pipeline, so check if the last stage is $out.
+        return dynamic_cast<DocumentSourceOut*>(sources.back().get());
+    }
+
     Document Pipeline::serialize() const {
         MutableDocument serialized;
         // create an array out of the pipeline operations

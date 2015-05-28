@@ -42,6 +42,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/s/catalog/catalog_cache.h"
+#include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/commands/cluster_commands_common.h"
 #include "mongo/s/config.h"
@@ -99,18 +100,6 @@ namespace {
 
             const string fullns = parseNs(dbname, cmdObj);
 
-            intrusive_ptr<ExpressionContext> mergeCtx =
-                                        new ExpressionContext(txn, NamespaceString(fullns));
-            mergeCtx->inRouter = true;
-            // explicitly *not* setting mergeCtx->tempDir
-
-            // Parse the pipeline specification
-            intrusive_ptr<Pipeline> pipeline(Pipeline::parseCommand(errmsg, cmdObj, mergeCtx));
-            if (!pipeline.get()) {
-                // There was some parsing error
-                return false;
-            }
-
             auto status = grid.catalogCache()->getDatabase(dbname);
             if (!status.isOK()) {
                 return appendEmptyResultSet(result, status.getStatus(), fullns);
@@ -124,14 +113,45 @@ namespace {
                 return aggPassthrough(conf, cmdObj, result, options);
             }
 
-            // Split the pipeline into pieces for mongod(s) and this mongos
-            intrusive_ptr<Pipeline> shardPipeline(pipeline->splitForSharded());
+            intrusive_ptr<ExpressionContext> mergeCtx =
+                                        new ExpressionContext(txn, NamespaceString(fullns));
+            mergeCtx->inRouter = true;
+            // explicitly *not* setting mergeCtx->tempDir
+
+            // Parse the pipeline specification
+            intrusive_ptr<Pipeline> pipeline(Pipeline::parseCommand(errmsg, cmdObj, mergeCtx));
+            if (!pipeline.get()) {
+                // There was some parsing error
+                return false;
+            }
+
+            // If the first $match stage is an exact match on the shard key, we only have to send it
+            // to one shard, so send the command to that shard.
+            BSONObj firstMatchQuery = pipeline->getInitialQuery();
+            ChunkManagerPtr chunkMgr = conf->getChunkManager(fullns);
+            BSONObj shardKeyMatches = uassertStatusOK(
+                chunkMgr->getShardKeyPattern().extractShardKeyFromQuery(firstMatchQuery));
+
+            // Don't need to split pipeline if the first $match is an exact match on shard key, but
+            // we can't send the entire pipeline to one shard if there is a $out stage, since that
+            // shard may not be the primary shard for the database.
+            bool needSplit = shardKeyMatches.isEmpty() || pipeline->hasOutStage();
+
+            // Split the pipeline into pieces for mongod(s) and this mongos. If needSplit is true,
+            // 'pipeline' will become the merger side.
+            intrusive_ptr<Pipeline> shardPipeline(needSplit ? pipeline->splitForSharded()
+                                                            : pipeline);
 
             // Create the command for the shards. The 'fromRouter' field means produce output to
             // be merged.
             MutableDocument commandBuilder(shardPipeline->serialize());
-            commandBuilder.setField("fromRouter", Value(true));
-            commandBuilder.setField("cursor", Value(DOC("batchSize" << 0)));
+            if (needSplit) {
+                commandBuilder.setField("fromRouter", Value(true));
+                commandBuilder.setField("cursor", Value(DOC("batchSize" << 0)));
+            }
+            else {
+                commandBuilder.setField("cursor", Value(cmdObj["cursor"]));
+            }
 
             if (cmdObj.hasField("$queryOptions")) {
                 commandBuilder.setField("$queryOptions", Value(cmdObj["$queryOptions"]));
@@ -159,8 +179,14 @@ namespace {
                 // This must be checked before we start modifying result.
                 uassertAllShardsSupportExplain(shardResults);
 
-                result << "splitPipeline" << DOC("shardsPart" << shardPipeline->writeExplainOps()
-                       << "mergerPart" << pipeline->writeExplainOps());
+                if (needSplit) {
+                    result << "splitPipeline"
+                               << DOC("shardsPart" << shardPipeline->writeExplainOps()
+                                   << "mergerPart" << pipeline->writeExplainOps());
+                }
+                else {
+                    result << "splitPipeline" << BSONNULL;
+                }
 
                 BSONObjBuilder shardExplains(result.subobjStart("shards"));
                 for (size_t i = 0; i < shardResults.size(); i++) {
@@ -170,6 +196,14 @@ namespace {
                 }
 
                 return true;
+            }
+
+            if (!needSplit) {
+                invariant(shardResults.size() == 1);
+                const auto& reply = shardResults[0].result;
+                storePossibleCursor(shardResults[0].target.toString(), reply);
+                result.appendElements(reply);
+                return reply["ok"].trueValue();
             }
 
             DocumentSourceMergeCursors::CursorIds cursorIds = parseCursors(shardResults, fullns);
