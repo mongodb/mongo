@@ -19,6 +19,16 @@ if debugBuild:
         "HAVE_VERBOSE",
         ])
 
+conf = Configure(env)
+if conf.CheckFunc("fallocate"):
+        env.Append(CPPDEFINES=[
+                "HAVE_FALLOCATE"
+    ])
+if conf.CheckFunc("sync_file_range"):
+        env.Append(CPPDEFINES=[
+                "HAVE_SYNC_FILE_RANGE"
+    ])
+
 if env.TargetOSIs('windows'):
     env.Append(CPPPATH=["build_win"])
     env.Append(CFLAGS=[
