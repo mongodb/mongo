@@ -53,7 +53,7 @@ namespace mongo {
          * Do not use! This constructor is available only because StatusWith requires the
          * type to have one.
          */
-        FindAndModifyRequest();
+        FindAndModifyRequest(); // TODO: SERVER-18007
 
         /**
          * Creates a new instance of an 'update' type findAndModify request.

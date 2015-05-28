@@ -49,8 +49,7 @@ namespace mongo {
          */
         struct ServerInfo {
         public:
-            // Remove default constructor once StatusWith can be instantiated without one.
-            ServerInfo();
+            ServerInfo(); // TODO: SERVER-18007
             ServerInfo(Date_t time, OID electionId);
 
             // The local time of the server at the time this was created.

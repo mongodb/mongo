@@ -66,8 +66,7 @@ namespace mongo {
             MONGO_DISALLOW_COPYING(ScopedDistLock);
 
         public:
-            // TODO: remove default constructor after StatusWith supports types without one.
-            ScopedDistLock();
+            ScopedDistLock(); // TODO: SERVER-18007
             ScopedDistLock(DistLockHandle lockHandle, DistLockManager* lockManager);
             ~ScopedDistLock();
 
