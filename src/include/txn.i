@@ -240,7 +240,14 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 
 	if (cfg != NULL)
 		WT_RET(__wt_txn_config(session, cfg));
-	else if (!FLD_ISSET(txn->txn_logsync, WT_LOG_FLUSH))
+
+	/*
+	 * If the flush flag is not set, then either the connection-wide
+	 * transaction sync is disabled (the default), or this transaction was
+	 * configured with sync=false.  Either way, if we are not flushing,
+	 * clear all flags that cause the log write to flush.
+	 */
+	if (!FLD_ISSET(txn->txn_logsync, WT_LOG_FLUSH))
 		txn->txn_logsync = 0;
 
 	/*
