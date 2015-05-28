@@ -948,52 +948,6 @@ tasks:
           cp mongodb*/bin/* .
           ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} mongosTest
 
-- name: mongosTest_WT
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          export MONGO_USE_BUILDLOGGER="true"
-          export MONGO_BUILDER_NAME=MCI_${build_variant}
-          export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export MONGO_PHASE="${task_name}_${execution}"
-
-          cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --storageEngine=wiredTiger mongosTest
-
-- name: mongosTest_auth
-  depends_on:
-  - name: compile
-  commands:
-    - func: "fetch artifacts"
-    - func: "fetch binaries"
-    - func: "extract binaries"
-    - func: "setup credentials"
-    - func: "get buildnumber"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          export MONGO_USE_BUILDLOGGER="true"
-          export MONGO_BUILDER_NAME=MCI_${build_variant}
-          export MONGO_BUILD_NUMBER=${builder_num|}
-          export BUILDLOGGER_URL=${logger_url|https://logkeeper.mongodb.org/}
-          export BUILDLOGGER_CREDENTIALS=./mci.buildlogger
-          export MONGO_PHASE="${task_name}_${execution}"
-
-          cp mongodb*/bin/* .
-          ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --auth mongosTest
-
 - name: multiversion
   depends_on:
   - name: compile
@@ -2197,8 +2151,6 @@ buildvariants:
   - name: jsCore_small_oplog_WT
   - name: mmap
   - name: mongosTest
-  - name: mongosTest_WT
-  - name: mongosTest_auth
   - name: multiversion
   - name: noPassthrough
   - name: noPassthrough_WT
@@ -2288,8 +2240,6 @@ buildvariants:
   - name: jsCore_small_oplog
   - name: jsCore_small_oplog_WT
   - name: mongosTest
-  - name: mongosTest_WT
-  - name: mongosTest_auth
   - name: noPassthrough
   - name: noPassthrough_WT
   - name: noPassthroughWithMongod
@@ -2352,7 +2302,6 @@ buildvariants:
   - name: jsCore_small_oplog
   - name: mongosTest
   - name: mmap
-  - name: mongosTest_auth
   - name: noPassthrough
   - name: noPassthroughWithMongod
   - name: parallel
@@ -2392,7 +2341,6 @@ buildvariants:
   - name: jsCore_WT
   - name: jsCore_compatibility_WT
   - name: jsCore_small_oplog_WT
-  - name: mongosTest_WT
   - name: noPassthrough_WT
   - name: noPassthroughWithMongod_WT
   - name: parallel_WT
@@ -2448,9 +2396,7 @@ buildvariants:
   - name: jsCore_small_oplog
   - name: jsCore_small_oplog_WT
   - name: mongosTest
-  - name: mongosTest_WT
   - name: mmap
-  - name: mongosTest_auth
   - name: multiversion
   - name: noPassthrough
   - name: noPassthrough_WT
@@ -2527,8 +2473,6 @@ buildvariants:
   - name: jsCore_small_oplog_WT
   - name: mmap
   - name: mongosTest
-  - name: mongosTest_WT
-  - name: mongosTest_auth
   - name: multiversion
   - name: noPassthrough
   - name: noPassthrough_WT
@@ -2652,8 +2596,6 @@ buildvariants:
   - name: jsCore_small_oplog_WT
   - name: mmap
   - name: mongosTest
-  - name: mongosTest_WT
-  - name: mongosTest_auth
   - name: multiversion
   - name: noPassthrough
   - name: noPassthrough_WT
@@ -2804,7 +2746,6 @@ buildvariants:
   - name: jsCore_small_oplog_WT
   - name: mmap
   - name: mongosTest
-  - name: mongosTest_WT
   - name: noPassthrough
   - name: noPassthrough_WT
   - name: noPassthroughWithMongod
@@ -2870,7 +2811,6 @@ buildvariants:
   - name: jsCore_small_oplog_WT
   - name: mmap
   - name: mongosTest
-  - name: mongosTest_WT
   - name: noPassthrough
   - name: noPassthrough_WT
   - name: noPassthroughWithMongod
@@ -2935,7 +2875,6 @@ buildvariants:
   - name: jsCore_small_oplog_WT
   - name: mmap
   - name: mongosTest
-  - name: mongosTest_WT
   - name: noPassthrough
   - name: noPassthrough_WT
   - name: noPassthroughWithMongod
@@ -3034,7 +2973,6 @@ buildvariants:
   - name: jsCore_small_oplog_WT
   - name: mmap
   - name: mongosTest
-  - name: mongosTest_WT
   - name: noPassthrough
   - name: noPassthrough_WT
   - name: noPassthroughWithMongod
@@ -3143,7 +3081,6 @@ buildvariants:
   - name: jsCore_small_oplog_WT
   - name: mmap
   - name: mongosTest
-  - name: mongosTest_WT
   - name: noPassthrough
   - name: noPassthrough_WT
   - name: noPassthroughWithMongod
@@ -3209,7 +3146,6 @@ buildvariants:
   - name: jsCore_small_oplog_WT
   - name: mmap
   - name: mongosTest
-  - name: mongosTest_WT
   - name: noPassthrough
   - name: noPassthrough_WT
   - name: noPassthroughWithMongod
@@ -3269,7 +3205,6 @@ buildvariants:
   - name: jsCore_compatibility_WT
   - name: mmap
   - name: mongosTest
-  - name: mongosTest_WT
   - name: replicasets
   - name: replicasets_WT
   - name: replication
@@ -3431,8 +3366,6 @@ buildvariants:
   - name: jsCore_small_oplog_WT
   - name: mmap
   - name: mongosTest
-  - name: mongosTest_WT
-  - name: mongosTest_auth
   - name: multiversion
   - name: noPassthrough
   - name: noPassthrough_WT
@@ -3510,8 +3443,6 @@ buildvariants:
   - name: jsCore_small_oplog_WT
   - name: mmap
   - name: mongosTest
-  - name: mongosTest_WT
-  - name: mongosTest_auth
   - name: multiversion
   - name: noPassthrough
   - name: noPassthrough_WT
@@ -3589,8 +3520,6 @@ buildvariants:
   - name: jsCore_small_oplog_WT
   - name: mmap
   - name: mongosTest
-  - name: mongosTest_WT
-  - name: mongosTest_auth
   - name: multiversion
   - name: noPassthrough
   - name: noPassthrough_WT
@@ -3781,8 +3710,6 @@ buildvariants:
   - name: jsCore_small_oplog_WT
   - name: mmap
   - name: mongosTest
-  - name: mongosTest_WT
-  - name: mongosTest_auth
   - name: multiversion
   - name: noPassthrough
   - name: noPassthrough_WT
@@ -3946,8 +3873,6 @@ buildvariants:
   - name: jsCore_small_oplog_WT
   - name: mmap
   - name: mongosTest
-  - name: mongosTest_WT
-  - name: mongosTest_auth
   - name: multiversion
   - name: noPassthrough
   - name: noPassthrough_WT
@@ -4024,8 +3949,6 @@ buildvariants:
   - name: jsCore_small_oplog_WT
   - name: mmap
   - name: mongosTest
-  - name: mongosTest_WT
-  - name: mongosTest_auth
   - name: multiversion
   - name: noPassthrough
   - name: noPassthrough_WT
@@ -4098,8 +4021,6 @@ buildvariants:
   - name: jsCore_small_oplog_WT
   - name: mmap
   - name: mongosTest
-  - name: mongosTest_WT
-  - name: mongosTest_auth
   - name: multiversion
   - name: noPassthrough
   - name: noPassthrough_WT
