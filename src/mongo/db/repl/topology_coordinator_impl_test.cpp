@@ -141,8 +141,8 @@ namespace {
                 ErrorCodes::Error errcode = ErrorCodes::HostUnreachable) {
             // timed out heartbeat to mark a node as down
 
-            Milliseconds roundTripTime{
-                ReplicaSetConfig::kDefaultHeartbeatTimeoutPeriod.total_milliseconds()};
+            Milliseconds roundTripTime(
+                ReplicaSetConfig::kDefaultHeartbeatTimeoutPeriod.total_milliseconds());
             return _receiveHeartbeatHelper(Status(errcode, ""),
                                            member,
                                            setName,
@@ -1836,7 +1836,7 @@ namespace {
                 firstRequestDate() + 7100,
                 Milliseconds(400),
                 target(),
-                StatusWith<ReplSetHeartbeatResponse>(Status{ErrorCodes::HostUnreachable, ""}),
+                StatusWith<ReplSetHeartbeatResponse>(Status(ErrorCodes::HostUnreachable, "")),
                 OpTime(0, 0));  // We've never applied anything.
 
         ASSERT_EQUALS(HeartbeatResponseAction::NoAction, action.getAction());
