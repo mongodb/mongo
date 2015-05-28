@@ -180,58 +180,41 @@ namespace {
         return ok;
     }
 
-    string Shard::getShardMongoVersion(const string& shardHost) {
-        ScopedDbConnection conn(shardHost);
-        BSONObj serverStatus;
-        bool ok = conn->runCommand("admin", BSON("serverStatus" << 1), serverStatus);
-        conn.done();
+    ShardStatus Shard::getStatus() const {
+        ScopedDbConnection conn(getConnString());
 
-        uassert(28598,
-                str::stream() << "call to serverStatus on " << shardHost
-                              << " failed: " << serverStatus,
-                ok);
-
-        BSONElement versionElement = serverStatus["version"];
-
-        uassert(28589, "version field not found in serverStatus",
-                versionElement.type() == String);
-        return serverStatus["version"].String();
-    }
-
-    long long Shard::getShardDataSizeBytes(const string& shardHost) {
-        ScopedDbConnection conn(shardHost);
         BSONObj listDatabases;
-        bool ok = conn->runCommand("admin", BSON("listDatabases" << 1), listDatabases);
-        conn.done();
-
-        uassert(28599,
-                str::stream() << "call to listDatabases on " << shardHost
+        uassert(28589,
+                str::stream() << "call to listDatabases on " << getConnString().toString()
                               << " failed: " << listDatabases,
-                ok);
+                conn->runCommand("admin", BSON("listDatabases" << 1), listDatabases));
 
         BSONElement totalSizeElem = listDatabases["totalSize"];
+        uassert(28590, "totalSize field not found in listDatabases", totalSizeElem.isNumber());
 
-        uassert(28590, "totalSize field not found in listDatabases",
-                totalSizeElem.isNumber());
-        return listDatabases["totalSize"].numberLong();
-    }
+        BSONObj serverStatus;
+        uassert(28591,
+                str::stream() << "call to serverStatus on " << getConnString().toString()
+                              << " failed: " << serverStatus,
+                conn->runCommand("admin", BSON("serverStatus" << 1), serverStatus));
 
-    ShardStatus Shard::getStatus() const {
-        return ShardStatus(*this,
-                           getShardDataSizeBytes(getConnString().toString()),
-                           getShardMongoVersion(getConnString().toString()));
+        BSONElement versionElement = serverStatus["version"];
+        uassert(28599, "version field not found in serverStatus", versionElement.type() == String);
+
+        conn.done();
+
+        return ShardStatus(totalSizeElem.numberLong(), versionElement.str());
     }
 
     void Shard::reloadShardInfo() {
         grid.shardRegistry()->reload();
     }
 
-
     void Shard::removeShard( const string& name ) {
         grid.shardRegistry()->remove( name );
     }
 
-    Shard Shard::pick( const Shard& current ) {
+    Shard Shard::pick() {
         vector<Shard> all;
         grid.shardRegistry()->getAllShards( all );
         if ( all.size() == 0 ) {
@@ -241,28 +224,41 @@ namespace {
                 return EMPTY;
         }
 
-        // if current shard was provided, pick a different shard only if it is a better choice
-        ShardStatus best = all[0].getStatus();
-        if ( current != EMPTY ) {
-            best = current.getStatus();
+        Shard bestShard = all[0];
+        ShardStatus bestStatus = bestShard.getStatus();
+
+        for (size_t i = 0; i < all.size(); i++) {
+            Shard shard = all[i];
+            ShardStatus status = shard.getStatus();
+
+            if (status < bestStatus) {
+                bestShard = shard;
+                bestStatus = status;
+            }
         }
 
-        for ( size_t i=0; i<all.size(); i++ ) {
-            ShardStatus t = all[i].getStatus();
-            if ( t < best )
-                best = t;
-        }
-
-        LOG(1) << "best shard for new allocation is " << best;
-        return best.shard();
+        LOG(1) << "best shard for new allocation is " << bestStatus;
+        return bestShard;
     }
 
     void Shard::installShard(const std::string& name, const Shard& shard) {
         grid.shardRegistry()->set(name, shard);
     }
 
-    ShardStatus::ShardStatus(const Shard& shard, long long dataSizeBytes, const string& version):
-            _shard(shard), _dataSizeBytes(dataSizeBytes), _mongoVersion(version) {
+
+    ShardStatus::ShardStatus(long long dataSizeBytes, const string& mongoVersion)
+        : _dataSizeBytes(dataSizeBytes),
+          _mongoVersion(mongoVersion) {
+
+    }
+
+    std::string ShardStatus::toString() const {
+        return str::stream() << " dataSizeBytes: " << _dataSizeBytes
+                             << " version: " << _mongoVersion;
+    }
+
+    bool ShardStatus::operator< (const ShardStatus& other) const {
+        return dataSizeBytes() < other.dataSizeBytes();
     }
 
 } // namespace mongo

@@ -35,11 +35,11 @@
 
 #include <algorithm>
 
-#include "mongo/client/connpool.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/chunk_manager.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/log.h"
 #include "mongo/util/stringutils.h"
@@ -253,23 +253,33 @@ namespace mongo {
                 return status;
             }
 
-            for (const ShardType& shard : shards) {
-                std::set<std::string> dummy;
-                ShardInfo newShardEntry(shard.getMaxSize(),
-                                        Shard::getShardDataSizeBytes(shard.getHost()) /
-                                            1024 / 1024,
-                                        shard.getDraining(),
-                                        dummy,
-                                        Shard::getShardMongoVersion(shard.getHost()));
+            for (const ShardType& shardData : shards) {
+                boost::shared_ptr<Shard> shard =
+                    grid.shardRegistry()->findIfExists(shardData.getHost());
 
-                vector<string> shardTags = shard.getTags();
-                for (vector<string>::const_iterator it = shardTags.begin();
-                     it != shardTags.end();
-                     it++) {
-                    newShardEntry.addTag(*it);
+                // The shard must still exist in the registry. If it doesn't, which may happen in
+                // the very low proability case that it gets dropped between the call to
+                // getAllShards above and the call to findIfExists, just don't account for it since
+                // it is missing anyways.
+                if (!shard) {
+                    continue;
                 }
 
-                shardInfo->insert(make_pair(shard.getName(), newShardEntry));
+                ShardStatus shardStatus = shard->getStatus();
+
+                std::set<std::string> dummy;
+
+                ShardInfo newShardEntry(shardData.getMaxSize(),
+                                        shardStatus.dataSizeBytes() / 1024 / 1024,
+                                        shardData.getDraining(),
+                                        dummy,
+                                        shardStatus.mongoVersion());
+
+                for (const string& shardTag : shardData.getTags()) {
+                    newShardEntry.addTag(shardTag);
+                }
+
+                shardInfo->insert(make_pair(shardData.getName(), newShardEntry));
             }
         }
         catch (const DBException& ex) {

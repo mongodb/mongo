@@ -35,7 +35,26 @@
 namespace mongo {
 
     class BSONObj;
-    class ShardStatus;
+
+    /**
+     * Contains runtime information obtained from the shard.
+     */
+    class ShardStatus {
+    public:
+        ShardStatus(long long dataSizeBytes, const std::string& version);
+
+        long long dataSizeBytes() const { return _dataSizeBytes; }
+        const std::string& mongoVersion() const { return _mongoVersion; }
+
+        std::string toString() const;
+
+        bool operator< (const ShardStatus& other) const;
+
+    private:
+        long long _dataSizeBytes;
+        std::string _mongoVersion;
+    };
+
 
     /*
      * A "shard" one partition of the overall database (and a replica set typically).
@@ -118,19 +137,9 @@ namespace mongo {
         bool runCommand(const std::string& db, const BSONObj& cmd, BSONObj& res) const;
 
         /**
-         * Returns the version string from the shard based from the serverStatus command result.
-         */
-        static std::string getShardMongoVersion(const std::string& shardHost);
-
-        /**
-         * Returns the total data size in bytes the shard is currently using.
-         */
-        static long long getShardDataSizeBytes(const std::string& shardHost);
-
-        /**
          * Returns metadata and stats for this shard.
          */
-        ShardStatus getStatus() const ;
+        ShardStatus getStatus() const;
 
         /**
          * mostly for replica set
@@ -146,7 +155,7 @@ namespace mongo {
          * @parm current - shard where the chunk/database currently lives in
          * @return the currently emptiest shard, if best then current, or EMPTY
          */
-        static Shard pick( const Shard& current = EMPTY );
+        static Shard pick();
 
         static void reloadShardInfo();
 
@@ -167,38 +176,4 @@ namespace mongo {
 
     typedef boost::shared_ptr<Shard> ShardPtr;
 
-    class ShardStatus {
-    public:
-        ShardStatus(const Shard& shard, long long dataSizeBytes, const std::string& version);
-
-        std::string toString() const {
-            std::stringstream ss;
-            ss << "shard: " << _shard.toString()
-               << " dataSizeBytes: " << _dataSizeBytes
-               << " version: " << _mongoVersion;
-            return ss.str();
-        }
-
-        bool operator<( const ShardStatus& other ) const {
-            return _dataSizeBytes < other._dataSizeBytes;
-        }
-
-        Shard shard() const {
-            return _shard;
-        }
-
-        long long dataSizeBytes() const {
-            return _dataSizeBytes;
-        }
-
-        std::string mongoVersion() const {
-            return _mongoVersion;
-        }
-
-    private:
-        Shard _shard;
-        long long _dataSizeBytes;
-        std::string _mongoVersion;
-    };
-
-}
+} // namespace mongo
