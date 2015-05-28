@@ -921,7 +921,7 @@ __session_transaction_sync(WT_SESSION *wt_session, const char *config)
 	 * our timeout.
 	 */
 	while (WT_LOG_CMP(&session->bg_sync_lsn, &log->sync_lsn) > 0) {
-		__wt_cond_signal(session, conn->log_file_cond);
+		WT_ERR(__wt_cond_signal(session, conn->log_file_cond));
 		WT_ERR(__wt_epoch(session, &now));
 		waited_ms = WT_TIMEDIFF(now, start) / WT_MILLION;
 		if (forever || waited_ms < timeout_ms)
