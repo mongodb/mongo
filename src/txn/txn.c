@@ -334,11 +334,7 @@ __wt_txn_config(WT_SESSION_IMPL *session, const char *cfg[])
 	 * The default sync setting is inherited from the connection, but can
 	 * be overridden by an explicit "sync" setting for this transaction.
 	 *
-	 * !!! This is an unusual use of the config code: the "default" value
-	 * we pass in is inherited from the connection.  If flush is not set in
-	 * the connection-wide flag and not overridden here, we end up clearing
-	 * all flags.  We want to distinguish between inheriting implicitly
-	 * and explicitly.
+	 * We want to distinguish between inheriting implicitly and explicitly.
 	 */
 	F_CLR(txn, WT_TXN_SYNC_SET);
 	WT_RET(__wt_config_gets_def(session, cfg, "sync", UINT_MAX, &cval));
@@ -348,12 +344,9 @@ __wt_txn_config(WT_SESSION_IMPL *session, const char *cfg[])
 		 * that we know not to overwrite it in commit_transaction.
 		 */
 		F_SET(txn, WT_TXN_SYNC_SET);
-	if (cval.val == 0 || (!F_ISSET(txn, WT_TXN_SYNC_SET) &&
-	    !FLD_ISSET(txn->txn_logsync, WT_LOG_FLUSH)))
-		/*
-		 * Only reset the value if the setting was turned off.
-		 */
-		txn->txn_logsync = 0;
+
+	if (cval.val == 0)
+		FLD_CLR(txn->txn_logsync, WT_LOG_FLUSH);
 
 	WT_RET(__wt_config_gets_def(session, cfg, "snapshot", 0, &cval));
 	if (cval.len > 0)
@@ -407,8 +400,8 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 	 */
 	__wt_txn_release_snapshot(session);
 	txn->isolation = session->isolation;
-	F_CLR(txn, WT_TXN_ERROR | WT_TXN_HAS_ID |
-	    WT_TXN_NAMED_SNAPSHOT | WT_TXN_READONLY | WT_TXN_RUNNING);
+	/* Ensure the transaction flags are cleared on exit */
+	txn->flags = 0;
 }
 
 /*
@@ -437,13 +430,16 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	 * be overridden by an explicit "sync" setting for this transaction.
 	 */
 	WT_RET(__wt_config_gets_def(session, cfg, "sync", 0, &cval));
+
 	/*
-	 * If the user chose the default setting, check whether
-	 * transaction_sync is enabled in the connection.  If it isn't,
-	 * we want to clear the field.  Otherwise check for specific
-	 * settings.  We don't need to check for "on" because that is
-	 * the default inherited from the connection.  If the user set
-	 * anything in begin_transaction, we only override with an
+	 * If the user chose the default setting, check whether sync is enabled
+	 * for this transaction (either inherited or via begin_transaction).
+	 * If sync is disabled, clear the field to avoid the log write being
+	 * flushed.
+	 *
+	 * Otherwise check for specific settings.  We don't need to check for
+	 * "on" because that is the default inherited from the connection.  If
+	 * the user set anything in begin_transaction, we only override with an
 	 * explicit setting.
 	 */
 	if (cval.len == 0) {
