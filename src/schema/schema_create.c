@@ -306,6 +306,59 @@ __wt_schema_index_source(WT_SESSION_IMPL *session,
 }
 
 /*
+ * __fill_index --
+ *	Fill the index from the current contents of the table.
+ */
+static int
+__fill_index(WT_SESSION_IMPL *session, WT_TABLE *table, const char *name)
+{
+	WT_DECL_RET;
+	WT_CURSOR *tcur, *icur, *child;
+	WT_CURSOR_INDEX *cindex;
+	WT_CURSOR_TABLE *ctable;
+	WT_INDEX *idx;
+	WT_SESSION *sess;
+
+	sess = (WT_SESSION *)session;
+	tcur = NULL;
+	icur = NULL;
+	WT_RET(__wt_schema_open_colgroups(session, table));
+
+	/*
+	 * If the column groups have not been completely created,
+	 * there cannot be data inserted yet, and we're done.
+	 */
+	if (!table->cg_complete)
+		return (0);
+
+	WT_ERR(sess->open_cursor(sess, table->name, NULL, "readonly", &tcur));
+	WT_ERR(sess->open_cursor(sess, name, NULL, NULL, &icur));
+
+	ctable = (WT_CURSOR_TABLE *)tcur;
+	cindex = (WT_CURSOR_INDEX *)icur;
+	child = cindex->child;
+	idx = cindex->index;
+
+	while ((ret = tcur->next(tcur)) == 0) {
+		/*
+		 * For LSM indices, we must drop locks so that the
+		 * LSM worker thread can grab the schema lock during
+		 * a switch.
+		 */
+		WT_WITHOUT_LOCKS(session,
+		    WT_ERR(__wt_apply_single_idx(session, idx,
+		    child, ctable, child->insert)));
+	}
+	WT_ERR_NOTFOUND_OK(ret);
+err:
+	if (icur)
+		WT_TRET(icur->close(icur));
+	if (tcur)
+		WT_TRET(tcur->close(tcur));
+	return (ret);
+}
+
+/*
  * __create_index --
  *	Create an index.
  */
@@ -476,6 +529,7 @@ __create_index(WT_SESSION_IMPL *session,
 			ret = exclusive ? EEXIST : 0;
 		goto err;
 	}
+	WT_ERR(__fill_index(session, table, name));
 
 	/* Make sure that the configuration is valid. */
 	WT_ERR(__wt_schema_open_index(
