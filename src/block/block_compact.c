@@ -55,7 +55,7 @@ __wt_block_compact_skip(WT_SESSION_IMPL *session, WT_BLOCK *block, int *skipp)
 	WT_EXT *ext;
 	WT_EXTLIST *el;
 	WT_FH *fh;
-	wt_off_t avail_eighty, avail_ninety, avail_total, eighty, ninety;
+	wt_off_t avail_eighty, avail_ninety, eighty, ninety;
 
 	*skipp = 1;				/* Return a default skip. */
 
@@ -76,24 +76,18 @@ __wt_block_compact_skip(WT_SESSION_IMPL *session, WT_BLOCK *block, int *skipp)
 		WT_ERR(__block_dump_avail(session, block));
 
 	/* Sum the available bytes in the first 80% and 90% of the file. */
-	avail_eighty = avail_ninety = avail_total = 0;
+	avail_eighty = avail_ninety = 0;
 	ninety = fh->size - fh->size / 10;
 	eighty = fh->size - ((fh->size / 10) * 2);
 
 	el = &block->live.avail;
-	WT_EXT_FOREACH(ext, el->off) {
-		avail_total += ext->size;
+	WT_EXT_FOREACH(ext, el->off)
 		if (ext->off < ninety) {
 			avail_ninety += ext->size;
 			if (ext->off < eighty)
 				avail_eighty += ext->size;
 		}
-	}
 
-	WT_ERR(__wt_verbose(session, WT_VERB_COMPACT,
-	    "%s: %" PRIuMAX "MB (%" PRIuMAX ") available space in the file",
-	    block->name,
-	    (uintmax_t)avail_total / WT_MEGABYTE, (uintmax_t)avail_total));
 	WT_ERR(__wt_verbose(session, WT_VERB_COMPACT,
 	    "%s: %" PRIuMAX "MB (%" PRIuMAX ") available space in the first "
 	    "80%% of the file",
@@ -112,6 +106,8 @@ __wt_block_compact_skip(WT_SESSION_IMPL *session, WT_BLOCK *block, int *skipp)
 	    *skipp ? "skipped" : "proceeding"));
 
 	/*
+	 * Skip files where we can't recover at least 1MB.
+	 *
 	 * If at least 20% of the total file is available and in the first 80%
 	 * of the file, we'll try compaction on the last 20% of the file; else,
 	 * if at least 10% of the total file is available and in the first 90%
@@ -121,11 +117,14 @@ __wt_block_compact_skip(WT_SESSION_IMPL *session, WT_BLOCK *block, int *skipp)
 	 * empty file can be processed quickly, so more aggressive compaction is
 	 * less useful.
 	 */
-	if (avail_total > WT_MEGABYTE && avail_ninety >= fh->size / 10) {
+	if (avail_eighty > WT_MEGABYTE &&
+	    avail_eighty >= ((fh->size / 10) * 2)) {
+		*skipp = 0;
+		block->compact_pct_tenths = 2;
+	 } else if (avail_ninety > WT_MEGABYTE &&
+	    avail_ninety >= fh->size / 10) {
 		*skipp = 0;
 		block->compact_pct_tenths = 1;
-		if (avail_eighty >= ((fh->size / 10) * 2))
-			block->compact_pct_tenths = 2;
 	}
 
 err:	__wt_spin_unlock(session, &block->live_lock);
