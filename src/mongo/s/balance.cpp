@@ -533,7 +533,8 @@ namespace mongo {
                     warning() << balSettingsResult.getStatus();
                     return;
                 }
-                const SettingsType& balancerConfig = balSettingsResult.getValue();
+                const SettingsType& balancerConfig = isBalSettingsAbsent ?
+                    SettingsType{} : balSettingsResult.getValue();
 
                 // now make sure we should even be running
                 if ((!isBalSettingsAbsent && !grid.shouldBalance(balancerConfig)) ||
