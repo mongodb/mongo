@@ -65,7 +65,7 @@ __wt_log_force_sync(WT_SESSION_IMPL *session, WT_LSN *min_lsn)
 	/*
 	 * Sync the log file if needed.
 	 */
-	if (WT_LOG_CMP(&log->sync_lsn, min_lsn) < 0) {
+	if (LOG_CMP(&log->sync_lsn, min_lsn) < 0) {
 		WT_ERR(__wt_verbose(session, WT_VERB_LOG,
 		    "log_force_sync: sync to LSN %d/%lu",
 		    min_lsn->file, min_lsn->offset));

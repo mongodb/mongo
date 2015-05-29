@@ -353,14 +353,14 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	    { WT_CONFIG_BASE(session, session_begin_transaction),
 	      "isolation=snapshot", NULL };
 	void *saved_meta_next;
-	int full, logging, tracking;
+	int full, idle, logging, tracking;
 	u_int i;
 
 	conn = S2C(session);
 	txn_global = &conn->txn_global;
 	saved_isolation = session->isolation;
 	txn = &session->txn;
-	full = logging = tracking = 0;
+	full = idle = logging = tracking = 0;
 
 	/* Ensure the metadata table is open before taking any locks. */
 	WT_RET(__wt_metadata_open(session));
