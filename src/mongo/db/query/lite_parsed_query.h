@@ -185,7 +185,7 @@ namespace mongo {
                            LiteParsedQuery** out);
 
     private:
-        LiteParsedQuery();
+        LiteParsedQuery() = default;
 
         /**
          * Parsing code calls this after construction of the LPQ is complete. There are additional
@@ -227,36 +227,36 @@ namespace mongo {
         // {$hint: <String>}, where <String> is the index name hinted.
         BSONObj _hint;
 
-        int _skip;
-        bool _wantMore;
+        int _skip = 0;
+        bool _wantMore = true;
 
         boost::optional<int> _limit;
         boost::optional<int> _batchSize;
 
-        bool _fromCommand;
-        bool _explain;
+        bool _fromCommand = false;
+        bool _explain = false;
 
         std::string _comment;
 
-        int _maxScan;
-        int _maxTimeMS;
+        int _maxScan = 0;
+        int _maxTimeMS = 0;
 
         BSONObj _min;
         BSONObj _max;
 
-        bool _returnKey;
-        bool _showRecordId;
-        bool _snapshot;
-        bool _hasReadPref;
+        bool _returnKey = false;
+        bool _showRecordId = false;
+        bool _snapshot = false;
+        bool _hasReadPref = false;
 
         // Options that can be specified in the OP_QUERY 'flags' header.
-        bool _tailable;
-        bool _slaveOk;
-        bool _oplogReplay;
-        bool _noCursorTimeout;
-        bool _awaitData;
-        bool _exhaust;
-        bool _partial;
+        bool _tailable = false;
+        bool _slaveOk = false;
+        bool _oplogReplay = false;
+        bool _noCursorTimeout = false;
+        bool _awaitData = false;
+        bool _exhaust = false;
+        bool _partial = false;
     };
 
 } // namespace mongo
