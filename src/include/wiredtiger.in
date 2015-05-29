@@ -1104,10 +1104,12 @@ struct __wt_session {
 	 * temporarily ignored when large values are written.  The default is
 	 * one-half the size of a newly split leaf page., an integer greater
 	 * than or equal to 0; default \c 0.}
-	 * @config{logging, the logging setting for this table.  Only valid if
-	 * logging is enabled on the connection.  If logging is disabled this
-	 * table has checkpoint-level durability., a boolean flag; default \c
-	 * true.}
+	 * @config{log = (, the transaction log configuration for this object.
+	 * Only valid if log is enabled in ::wiredtiger_open., a set of related
+	 * configuration options defined below.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, if false\, this object has
+	 * checkpoint-level durability., a boolean flag; default \c true.}
+	 * @config{ ),,}
 	 * @config{lsm = (, options only relevant for LSM data sources., a set
 	 * of related configuration options defined below.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;auto_throttle, Throttle inserts into
@@ -2072,7 +2074,7 @@ struct __wt_connection {
  * string; default \c none.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;secretkey, A string
  * that is passed to the WT_ENCRYPTOR::customize function.  It is never stored
- * in clear text\, so must be given to any subsequent wiredtiger_open calls to
+ * in clear text\, so must be given to any subsequent ::wiredtiger_open calls to
  * reopen the database.  It must also be provided to any "wt" commands used with
  * this database., a string; default empty.}
  * @config{ ),,}

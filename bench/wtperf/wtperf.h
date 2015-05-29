@@ -98,7 +98,7 @@ typedef struct {
 	uint8_t ops[100];		/* Operation schedule */
 } WORKLOAD;
 
-#define	LOG_PARTIAL_CONFIG	",logging=false"
+#define	LOG_PARTIAL_CONFIG	",log=(enabled=false)"
 /*
  * NOTE:  If you add any fields to this structure here, you must also add
  * an initialization in wtperf.c in the default_cfg.

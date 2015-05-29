@@ -269,7 +269,8 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 			F_SET(btree, WT_BTREE_IN_MEMORY | WT_BTREE_NO_EVICTION);
 		else
 			F_CLR(btree, WT_BTREE_IN_MEMORY | WT_BTREE_NO_EVICTION);
-		WT_RET(__wt_config_gets(session, cfg, "logging", &cval));
+
+		WT_RET(__wt_config_gets(session, cfg, "log.enabled", &cval));
 		if (cval.val)
 			F_CLR(btree, WT_BTREE_NO_LOGGING);
 		else
