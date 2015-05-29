@@ -869,21 +869,21 @@ __session_transaction_sync(WT_SESSION *wt_session, const char *config)
 	int forever;
 
 	session = (WT_SESSION_IMPL *)wt_session;
+	SESSION_API_CALL(session, transaction_sync, config, cfg);
+	WT_STAT_FAST_CONN_INCR(session, txn_sync);
+
 	conn = S2C(session);
 	txn = &session->txn;
 	if (F_ISSET(txn, WT_TXN_RUNNING))
-		WT_RET_MSG(session, EINVAL, "transaction in progress");
+		WT_ERR_MSG(session, EINVAL, "transaction in progress");
 
 	/*
 	 * If logging is not enabled there is nothing to do.
 	 */
 	if (!FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED))
-		return (0);
-	SESSION_API_CALL(session, transaction_sync, config, cfg);
-	WT_STAT_FAST_CONN_INCR(session, txn_sync);
+		WT_ERR_MSG(session, EINVAL, "logging not enabled");
 
 	log = conn->log;
-	ret = 0;
 	timeout_ms = waited_ms = 0;
 	forever = 1;
 
