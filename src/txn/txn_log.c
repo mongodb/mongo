@@ -158,7 +158,8 @@ __wt_txn_log_op(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 	txn = &session->txn;
 
 	if (!FLD_ISSET(S2C(session)->log_flags, WT_CONN_LOG_ENABLED) ||
-	    F_ISSET(session, WT_SESSION_NO_LOGGING))
+	    F_ISSET(session, WT_SESSION_NO_LOGGING) ||
+	    F_ISSET(S2BT(session), WT_BTREE_NO_LOGGING))
 		return (0);
 
 	/* We'd better have a transaction. */
@@ -204,6 +205,11 @@ __wt_txn_log_commit(WT_SESSION_IMPL *session, const char *cfg[])
 
 	WT_UNUSED(cfg);
 	txn = &session->txn;
+	/*
+	 * If there are no log records there is nothing to do.
+	 */
+	if (txn->logrec == NULL)
+		return (0);
 
 	/* Write updates to the log. */
 	return (__wt_log_write(session, txn->logrec, NULL, txn->txn_logsync));

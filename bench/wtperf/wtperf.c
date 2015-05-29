@@ -32,6 +32,7 @@
 static const CONFIG default_cfg = {
 	"WT_TEST",			/* home */
 	"WT_TEST",			/* monitor dir */
+	NULL,				/* partial logging */
 	NULL,				/* base_uri */
 	NULL,				/* uris */
 	NULL,				/* helium_mount */
@@ -1673,7 +1674,14 @@ create_tables(CONFIG *cfg)
 	}
 
 	for (i = 0; i < cfg->table_count; i++) {
-		if ((ret = session->create(
+		if (cfg->log_partial && i > 0) {
+			if (((ret = session->create(session,
+			    cfg->uris[i], cfg->partial_config)) != 0)) {
+				lprintf(cfg, ret, 0,
+				    "Error creating table %s", cfg->uris[i]);
+				return (ret);
+			}
+		} else if ((ret = session->create(
 		    session, cfg->uris[i], cfg->table_config)) != 0) {
 			lprintf(cfg, ret, 0,
 			    "Error creating table %s", cfg->uris[i]);
@@ -2154,6 +2162,16 @@ main(int argc, char *argv[])
 		    cfg->helium_mount == NULL ? "" : HELIUM_CONFIG);
 		if ((ret = config_opt_str(cfg, "table_config", tc_buf)) != 0)
 			goto err;
+	}
+	if (cfg->log_partial && cfg->table_count > 1) {
+		req_len = strlen(cfg->table_config) +
+		    strlen(LOG_PARTIAL_CONFIG) + 1;
+		if ((cfg->partial_config = calloc(req_len, 1)) == NULL) {
+			ret = enomem(cfg);
+			goto err;
+		}
+		snprintf((char *)cfg->partial_config, req_len, "%s%s",
+		    (char *)cfg->table_config, LOG_PARTIAL_CONFIG);
 	}
 
 	/* Sanity-check the configuration. */

@@ -147,10 +147,11 @@ struct __wt_btree {
 #define	WT_BTREE_BULK		0x00100	/* Bulk-load handle */
 #define	WT_BTREE_IN_MEMORY	0x00200	/* Cache-resident object */
 #define	WT_BTREE_NO_EVICTION	0x00400	/* Disable eviction */
-#define	WT_BTREE_SALVAGE	0x00800	/* Handle is for salvage */
-#define	WT_BTREE_SKIP_CKPT	0x01000	/* Handle skipped checkpoint */
-#define	WT_BTREE_UPGRADE	0x02000	/* Handle is for upgrade */
-#define	WT_BTREE_VERIFY		0x04000	/* Handle is for verify */
+#define	WT_BTREE_NO_LOGGING	0x00800	/* Disable logging */
+#define	WT_BTREE_SALVAGE	0x01000	/* Handle is for salvage */
+#define	WT_BTREE_SKIP_CKPT	0x02000	/* Handle skipped checkpoint */
+#define	WT_BTREE_UPGRADE	0x04000	/* Handle is for upgrade */
+#define	WT_BTREE_VERIFY		0x08000	/* Handle is for verify */
 	uint32_t flags;
 };
 
