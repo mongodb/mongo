@@ -110,7 +110,6 @@ env.Library(
     LIBDEPS= [
         'extent',
         '$BUILD_DIR/mongo/db/commands/server_status_core',
-        '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/util/concurrency/spin_lock',
         '$BUILD_DIR/mongo/util/progress_meter',
         ]
@@ -196,8 +195,7 @@ env.Library(
         'btree/key.cpp'
         ],
     LIBDEPS= [
-        '$BUILD_DIR/mongo/bson/bson',
-        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/bson/bson'
         ]
     )
 

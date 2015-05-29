@@ -101,8 +101,8 @@ namespace {
 
                 ss << "<tr><td>" << client->desc() << "</td>";
 
-                tablecell(ss, txn->getOpID());
-                tablecell(ss, true);
+                tablecell(ss, curOp->opNum());
+                tablecell(ss, curOp->active());
 
                 // LockState
                 {
@@ -115,7 +115,12 @@ namespace {
                     tablecell(ss, lockerInfoBuilder.obj());
                 }
 
-                tablecell(ss, curOp->elapsedSeconds());
+                if (curOp->active()) {
+                    tablecell(ss, curOp->elapsedSeconds());
+                }
+                else {
+                    tablecell(ss, "");
+                }
 
                 tablecell(ss, curOp->getOp());
                 tablecell(ss, html::escape(curOp->getNS()));
@@ -205,9 +210,7 @@ namespace {
                 client->reportState(b);
 
                 const OperationContext* txn = client->getOperationContext();
-                b.appendBool("active", static_cast<bool>(txn));
                 if (txn) {
-                    b.append("opid", txn->getOpID());
 
                     // CurOp
                     if (CurOp::get(txn)) {

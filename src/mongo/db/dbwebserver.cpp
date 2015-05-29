@@ -314,7 +314,7 @@ namespace {
                                 vector<string>& headers,
                                 const SockAddr &from) {
 
-        auto txn = getGlobalServiceContext()->newOpCtx();
+        boost::scoped_ptr<OperationContext> txn(getGlobalServiceContext()->newOpCtx());
 
         if (url.size() > 1) {
 

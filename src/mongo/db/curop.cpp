@@ -56,10 +56,10 @@ namespace mongo {
      *
      * The stack itself is represented in the _parent pointers of the CurOp class.
      */
-    class CurOp::CurOpStack {
-        MONGO_DISALLOW_COPYING(CurOpStack);
+    class CurOp::ClientCuropStack {
+        MONGO_DISALLOW_COPYING(ClientCuropStack);
     public:
-        CurOpStack() : _base(nullptr, this) {}
+        ClientCuropStack() : _base(nullptr, this) {}
 
         /**
          * Returns the top of the CurOp stack.
@@ -69,15 +69,15 @@ namespace mongo {
         /**
          * Adds "curOp" to the top of the CurOp stack for a client. Called by CurOp's constructor.
          */
-        void push(OperationContext* opCtx, CurOp* curOp) {
-            invariant(opCtx);
-            if (_opCtx) {
-                invariant(_opCtx == opCtx);
+        void push(Client* client, CurOp* curOp) {
+            invariant(client);
+            if (_client) {
+                invariant(_client == client);
             }
             else {
-                _opCtx = opCtx;
+                _client = client;
             }
-            boost::lock_guard<Client> lk(*_opCtx->getClient());
+            boost::lock_guard<Client> lk(*_client);
             push_nolock(curOp);
         }
 
@@ -101,20 +101,20 @@ namespace mongo {
             // the client during the final pop.
             const bool shouldLock = _top->_parent;
             if (shouldLock) {
-                invariant(_opCtx);
-                _opCtx->getClient()->lock();
+                invariant(_client);
+                _client->lock();
             }
             invariant(_top);
             CurOp* retval = _top;
             _top = _top->_parent;
             if (shouldLock) {
-                _opCtx->getClient()->unlock();
+                _client->unlock();
             }
             return retval;
         }
 
     private:
-        OperationContext* _opCtx = nullptr;
+        Client* _client = nullptr;
 
         // Top of the stack of CurOps for a Client.
         CurOp* _top = nullptr;
@@ -123,8 +123,8 @@ namespace mongo {
         const CurOp _base;
     };
 
-    const OperationContext::Decoration<CurOp::CurOpStack> CurOp::_curopStack =
-        OperationContext::declareDecoration<CurOp::CurOpStack>();
+    const Client::Decoration<CurOp::ClientCuropStack> CurOp::_curopStack =
+        Client::declareDecoration<CurOp::ClientCuropStack>();
 
     // Enabling the maxTimeAlwaysTimeOut fail point will cause any query or command run with a
     // valid non-zero max time to fail immediately.  Any getmore operation on a cursor already
@@ -146,18 +146,33 @@ namespace mongo {
 
     CurOp* CurOp::get(const OperationContext* opCtx) { return get(*opCtx); }
 
-    CurOp* CurOp::get(const OperationContext& opCtx) { return _curopStack(opCtx).top(); }
+    CurOp* CurOp::get(const OperationContext& opCtx) {
+        return _curopStack(opCtx.getClient()).top();
+    }
 
-    CurOp::CurOp(OperationContext* opCtx) : CurOp(opCtx, &_curopStack(opCtx)) {}
+    CurOp::CurOp(Client* client) : CurOp(client, &_curopStack(client)) {}
 
-    CurOp::CurOp(OperationContext* opCtx, CurOpStack* stack) : _stack(stack) {
-        if (opCtx) {
-            _stack->push(opCtx, this);
+    CurOp::CurOp(Client* client, ClientCuropStack* stack) : _stack(stack) {
+        if (client) {
+            _stack->push(client, this);
         }
         else {
             _stack->push_nolock(this);
         }
         _start = 0;
+        _active = false;
+        _reset();
+        _op = 0;
+        _opNum = _nextOpNum.fetchAndAdd(1);
+        _command = NULL;
+    }
+
+    CurOp::CurOp(Client* client, int op) : CurOp(client, &_curopStack(client)) {
+        _op = op;
+        _active = true;
+    }
+
+    void CurOp::_reset() {
         _isCommand = false;
         _dbprofile = 0;
         _end = 0;
@@ -168,11 +183,20 @@ namespace mongo {
         _killPending.store(0);
         _numYields = 0;
         _expectedLatencyMs = 0;
-        _op = 0;
-        _command = NULL;
     }
 
-    void CurOp::setOp(int op) {
+    void CurOp::reset() {
+        _reset();
+        _start = 0;
+        _opNum = _nextOpNum.fetchAndAdd(1);
+        _ns = "";
+        _debug.reset();
+        _query.reset();
+        _active = true; // this should be last for ui clarity
+    }
+
+    void CurOp::reset(int op) {
+        reset();
         _op = op;
     }
 
@@ -230,8 +254,11 @@ namespace mongo {
     }
 
     void CurOp::reportState(BSONObjBuilder* builder) {
+        builder->append("opid", _opNum);
+        bool a = _active && _start;
+        builder->append("active", a);
 
-        if (_start) {
+        if( a ) {
             builder->append("secs_running", elapsedSeconds() );
             builder->append("microsecs_running", static_cast<long long int>(elapsedMicros()) );
         }
@@ -384,6 +411,8 @@ namespace mongo {
         return _targetEpochMicros - now;
     }
 
+
+    AtomicUInt32 CurOp::_nextOpNum;
 
     static Counter64 returnedCounter;
     static Counter64 insertedCounter;

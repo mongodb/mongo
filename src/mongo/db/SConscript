@@ -387,7 +387,6 @@ env.Library(
     source=[
         'client.cpp',
         'client_basic.cpp',
-        'operation_context.cpp',
         'service_context.cpp',
         'service_context_noop.cpp',
     ],

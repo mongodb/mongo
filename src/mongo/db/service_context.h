@@ -251,9 +251,9 @@ namespace mongo {
         virtual void registerKillOpListener(KillOpListenerInterface* listener) = 0;
 
         /**
-         * Returns a new OperationContext.
+         * Returns a new OperationContext.  Caller owns pointer.
          */
-        virtual std::unique_ptr<OperationContext> newOpCtx() = 0;
+        virtual OperationContext* newOpCtx() = 0;
 
         //
         // Global OpObserver.

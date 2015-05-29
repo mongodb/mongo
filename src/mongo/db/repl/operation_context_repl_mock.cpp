@@ -36,20 +36,27 @@
 namespace mongo {
 namespace repl {
 
-    OperationContextReplMock::OperationContextReplMock() : OperationContextReplMock(0) {}
-
-    OperationContextReplMock::OperationContextReplMock(unsigned int opNum) :
-        OperationContextReplMock(nullptr, opNum) {
-    }
-
-    OperationContextReplMock::OperationContextReplMock(Client* client, unsigned int opNum) :
-            OperationContextNoop(client, opNum, new MMAPV1LockerImpl()),
+    OperationContextReplMock::OperationContextReplMock():
+            _lockState(new MMAPV1LockerImpl()),
+            _opID(0),
             _checkForInterruptStatus(Status::OK()),
             _maxTimeMicrosRemaining(0),
             _writesAreReplicated(true) {
     }
 
-    OperationContextReplMock::~OperationContextReplMock() = default;
+    OperationContextReplMock::~OperationContextReplMock() {}
+
+    Locker* OperationContextReplMock::lockState() const {
+        return _lockState.get();
+    }
+
+    unsigned int OperationContextReplMock::getOpID() const {
+        return _opID;
+    }
+
+    void OperationContextReplMock::setOpID(unsigned int opID) {
+        _opID = opID;
+    }
 
     void OperationContextReplMock::checkForInterrupt() const {
         uassertStatusOK(checkForInterruptNoAssert());

@@ -87,7 +87,7 @@ namespace {
 
         AuthorizationSession::get(txn.getClient())->grantInternalAuthorization();
 
-        CurOp::get(txn)->setOp(dbInsert);
+        CurOp::get(txn)->reset(dbInsert);
         NamespaceString ns(_index["ns"].String());
 
         ScopedTransaction transaction(&txn, MODE_IX);

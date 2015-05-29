@@ -47,12 +47,18 @@ namespace mongo {
         virtual RecoveryUnitState setRecoveryUnit(RecoveryUnit* unit,
                                                   RecoveryUnitState state) override;
 
+        virtual Locker* lockState() const override;
+
         virtual ProgressMeter* setMessage(const char* msg,
                                           const std::string& name,
                                           unsigned long long progressMeterTotal,
                                           int secondsBetween) override;
 
         virtual std::string getNS() const override;
+
+        virtual Client* getClient() const override;
+
+        virtual unsigned int getOpID() const override;
 
         virtual uint64_t getRemainingMaxTimeMicros() const override;
 
@@ -66,6 +72,8 @@ namespace mongo {
 
     private:
         std::auto_ptr<RecoveryUnit> _recovery;
+        Client* const _client; // cached, not owned
+        Locker* const _locker; // cached, not owned
         bool _writesAreReplicated;
     };
 

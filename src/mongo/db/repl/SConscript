@@ -468,7 +468,6 @@ env.Library(
     ],
     LIBDEPS=[
         'task_runner',
-        '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/unittest/concurrency',
         '$BUILD_DIR/mongo/util/decorable',
     ],

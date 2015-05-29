@@ -33,7 +33,6 @@
 #include "mongo/base/init.h"
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/operation_context_noop.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_noop.h"
 #include "mongo/stdx/memory.h"
@@ -78,8 +77,7 @@ namespace mongo {
         TEST(TimeHasExpired, PosSimple) {
             auto service = stdx::make_unique<ServiceContextNoop>();
             auto client = service->makeClient("CurOpTest");
-            OperationContextNoop txn(client.get(), 100);
-            CurOp curOp(&txn);
+            CurOp curOp(client.get());
             curOp.setMaxTimeMicros(intervalShort);
             curOp.ensureStarted();
             sleepmicros(intervalLong);
@@ -90,8 +88,7 @@ namespace mongo {
         TEST(TimeHasExpired, NegSimple) {
             auto service = stdx::make_unique<ServiceContextNoop>();
             auto client = service->makeClient("CurOpTest");
-            OperationContextNoop txn(client.get(), 100);
-            CurOp curOp(&txn);
+            CurOp curOp(client.get());
             curOp.setMaxTimeMicros(intervalLong);
             curOp.ensureStarted();
             sleepmicros(intervalShort);

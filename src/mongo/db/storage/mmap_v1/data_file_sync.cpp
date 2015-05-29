@@ -32,7 +32,6 @@
 
 #include "mongo/db/storage/mmap_v1/data_file_sync.h"
 
-#include "mongo/db/client.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/instance.h"

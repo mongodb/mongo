@@ -227,11 +227,14 @@ namespace mongo {
         if (!opCtx) {
             return false;
         }
-        if (opCtx->getOpID() != opId) {
-            return false;
+        for( CurOp *k = CurOp::get(opCtx); k; k = k->parent() ) {
+            if ( k->opNum() != opId )
+                continue;
+
+            _killOperation_inlock(opCtx);
+            return true;
         }
-        _killOperation_inlock(opCtx);
-        return true;
+        return false;
     }
 
     void ServiceContextMongoD::_killOperation_inlock(OperationContext* opCtx) {
@@ -292,8 +295,8 @@ namespace mongo {
         _killOpListeners.push_back(listener);
     }
 
-    std::unique_ptr<OperationContext> ServiceContextMongoD::newOpCtx() {
-        return stdx::make_unique<OperationContextImpl>();
+    OperationContext* ServiceContextMongoD::newOpCtx() {
+        return new OperationContextImpl();
     }
 
     void ServiceContextMongoD::setOpObserver(std::unique_ptr<OpObserver> opObserver) {

@@ -32,7 +32,6 @@
 
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/op_observer.h"
-#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
@@ -82,8 +81,8 @@ namespace mongo {
     void ServiceContextNoop::registerKillOpListener(KillOpListenerInterface* listener) {
     }
 
-    std::unique_ptr<OperationContext> ServiceContextNoop::newOpCtx() {
-        return stdx::make_unique<OperationContextNoop>();
+    OperationContext* ServiceContextNoop::newOpCtx() {
+        return new OperationContextNoop();
     }
 
     void ServiceContextNoop::setOpObserver(std::unique_ptr<OpObserver> opObserver) {

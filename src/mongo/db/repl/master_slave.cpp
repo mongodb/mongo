@@ -695,9 +695,6 @@ namespace repl {
         if ( !only.empty() && only != clientName )
             return;
 
-        // Push the CurOp stack for "txn" so each individual oplog entry application is separately
-        // reported.
-        CurOp individualOp(txn);
         txn->setReplicatedWrites(false);
         const ReplSettings& replSettings = getGlobalReplicationCoordinator()->getSettings();
         if (replSettings.pretouch &&
@@ -760,6 +757,7 @@ namespace repl {
         // mongos will not send requests there. That's why the last argument is false (do not do
         // version checking).
         OldClientContext ctx(txn, ns, false);
+        CurOp::get(txn)->reset();
 
         bool empty = !ctx.db()->getDatabaseCatalogEntry()->hasUserData();
         bool incompleteClone = incompleteCloneDbs.count( clientName ) != 0;

@@ -516,8 +516,13 @@ namespace {
             break;
         }
 
+        scoped_ptr<CurOp> nestedOp;
+        if (CurOp::get(txn)->active()) {
+            nestedOp.reset(new CurOp(&c));
+        }
+
         CurOp& currentOp = *CurOp::get(txn);
-        currentOp.setOp(op);
+        currentOp.reset(op);
 
         OpDebug& debug = currentOp.debug();
         debug.op = op;

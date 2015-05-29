@@ -157,6 +157,7 @@ namespace repl {
 
     void SyncSourceFeedback::run() {
         Client::initThread("SyncSourceFeedback");
+        OperationContextImpl txn;
 
         ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
         while (true) { // breaks once _shutdownSignaled is true
@@ -173,7 +174,6 @@ namespace repl {
                 _positionChanged = false;
             }
 
-            auto txn = cc().getServiceContext()->newOpCtx();
             MemberState state = replCoord->getMemberState();
             if (state.primary() || state.startup()) {
                 _resetConnection();
@@ -192,14 +192,14 @@ namespace repl {
                     _positionChanged = true;
                     continue;
                 }
-                if (!_connect(txn.get(), target)) {
+                if (!_connect(&txn, target)) {
                     sleepmillis(500);
                     boost::unique_lock<boost::mutex> lock(_mtx);
                     _positionChanged = true;
                     continue;
                 }
             }
-            Status status = updateUpstream(txn.get());
+            Status status = updateUpstream(&txn);
             if (!status.isOK()) {
                 sleepmillis(500);
                 boost::unique_lock<boost::mutex> lock(_mtx);

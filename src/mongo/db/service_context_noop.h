@@ -57,7 +57,7 @@ namespace mongo {
 
         void registerKillOpListener(KillOpListenerInterface* listener);
 
-        std::unique_ptr<OperationContext> newOpCtx();
+        OperationContext* newOpCtx();
 
         void setOpObserver(std::unique_ptr<OpObserver> opObserver);
 

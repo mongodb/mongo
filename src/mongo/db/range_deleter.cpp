@@ -448,6 +448,8 @@ namespace {
         while (!inShutdown() && !stopRequested()) {
             string errMsg;
 
+            boost::scoped_ptr<OperationContext> txn(getGlobalServiceContext()->newOpCtx());
+
             RangeDeleteEntry* nextTask = NULL;
 
             {
@@ -470,11 +472,12 @@ namespace {
                             RangeDeleteEntry* entry = *iter;
 
                             set<CursorId> cursorsNow;
-                            if (entry->options.waitForOpenCursors) {
-                                auto txn = getGlobalServiceContext()->newOpCtx();
-                                _env->getCursorIds(txn.get(),
-                                                   entry->options.range.ns,
-                                                   &cursorsNow);
+                            {
+                                if (entry->options.waitForOpenCursors) {
+                                    _env->getCursorIds(txn.get(),
+                                                       entry->options.range.ns,
+                                                       &cursorsNow);
+                                }
                             }
 
                             set<CursorId> cursorsLeft;
@@ -513,7 +516,6 @@ namespace {
             }
 
             {
-                auto txn = getGlobalServiceContext()->newOpCtx();
                 nextTask->stats.deleteStartTS = jsTime();
                 bool delResult = _env->deleteRange(txn.get(),
                                                    *nextTask,
