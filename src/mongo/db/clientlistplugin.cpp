@@ -92,7 +92,7 @@ namespace {
                 invariant(client);
 
                 // Make the client stable
-                stdx::lock_guard<Client> lk(*client);
+                boost::unique_lock<Client> clientLock(*client);
                 const OperationContext* txn = client->getOperationContext();
                 if (!txn) continue;
 
@@ -205,7 +205,7 @@ namespace {
                 BSONObjBuilder b;
 
                 // Make the client stable
-                stdx::lock_guard<Client> lk(*client);
+                boost::unique_lock<Client> clientLock(*client);
 
                 client->reportState(b);
 

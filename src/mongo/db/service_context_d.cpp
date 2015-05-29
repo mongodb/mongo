@@ -205,11 +205,11 @@ namespace mongo {
     }
 
     void ServiceContextMongoD::setKillAllOperations() {
-        stdx::lock_guard<stdx::mutex> clientLock(_mutex);
+        boost::lock_guard<boost::mutex> clientLock(_mutex);
         _globalKill = true;
-        for (const auto listener : _killOpListeners) {
+        for (size_t i = 0; i < _killOpListeners.size(); i++) {
             try {
-                listener->interruptAll();
+                _killOpListeners[i]->interruptAll();
             }
             catch (...) {
                 std::terminate();
@@ -223,38 +223,30 @@ namespace mongo {
 
     bool ServiceContextMongoD::_killOperationsAssociatedWithClientAndOpId_inlock(
             Client* client, unsigned int opId) {
-        OperationContext* opCtx = client->getOperationContext();
-        if (!opCtx) {
-            return false;
-        }
-        for( CurOp *k = CurOp::get(opCtx); k; k = k->parent() ) {
+        for( CurOp *k = CurOp::getFromClient(client); k; k = k->parent() ) {
             if ( k->opNum() != opId )
                 continue;
 
-            _killOperation_inlock(opCtx);
+            k->kill();
+            for( CurOp *l = CurOp::getFromClient(client); l; l = l->parent() ) {
+                l->kill();
+            }
+
+            for (size_t i = 0; i < _killOpListeners.size(); i++) {
+                try {
+                    _killOpListeners[i]->interrupt(opId);
+                }
+                catch (...) {
+                    std::terminate();
+                }
+            }
             return true;
         }
         return false;
     }
 
-    void ServiceContextMongoD::_killOperation_inlock(OperationContext* opCtx) {
-        for(CurOp *l = CurOp::get(opCtx); l; l = l->parent()) {
-            l->kill();
-        }
-
-        for (const auto listener : _killOpListeners) {
-            try {
-                listener->interrupt(opCtx->getOpID());
-            }
-            catch (...) {
-                std::terminate();
-            }
-        }
-    }
-
     bool ServiceContextMongoD::killOperation(unsigned int opId) {
         for (LockedClientsCursor cursor(this); Client* client = cursor.next();) {
-            stdx::lock_guard<Client> lk(*client);
             bool found = _killOperationsAssociatedWithClientAndOpId_inlock(client, opId);
             if (found) {
                 return true;
@@ -271,18 +263,17 @@ namespace mongo {
                 continue;
             }
 
-            stdx::lock_guard<Client> lk(*client);
-            OperationContext* toKill = client->getOperationContext();
-            if (!toKill) {
-                continue;
-            }
-
-            if (toKill->getOpID() == txn->getOpID()) {
+            if (CurOp::getFromClient(client)->opNum() == txn->getOpID()) {
                 // Don't kill ourself.
                 continue;
             }
 
-            _killOperation_inlock(toKill);
+            bool found = _killOperationsAssociatedWithClientAndOpId_inlock(
+                    client, CurOp::getFromClient(client)->opNum());
+            if (!found) {
+                warning() << "Attempted to kill operation " << CurOp::getFromClient(client)->opNum()
+                          << " but the opId changed";
+            }
         }
     }
 
@@ -291,7 +282,7 @@ namespace mongo {
     }
 
     void ServiceContextMongoD::registerKillOpListener(KillOpListenerInterface* listener) {
-        stdx::lock_guard<stdx::mutex> clientLock(_mutex);
+        boost::lock_guard<boost::mutex> clientLock(_mutex);
         _killOpListeners.push_back(listener);
     }
 

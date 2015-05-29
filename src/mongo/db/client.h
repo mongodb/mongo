@@ -86,29 +86,11 @@ namespace mongo {
         void lock() { _lock.lock(); }
         void unlock() { _lock.unlock(); }
 
-        /**
-         * Sets the active operation context on this client to "txn", which must be non-NULL.
-         *
-         * It is an error to call this method if there is already an operation context on Client.
-         * It is an error to call this on an unlocked client.
-         */
+        // Changes the currently active operation context on this client. There can only be one
+        // active OperationContext at a time.
         void setOperationContext(OperationContext* txn);
-
-        /**
-         * Clears the active operation context on this client.
-         *
-         * There must already be such a context set on this client.
-         * It is an error to call this on an unlocked client.
-         */
         void resetOperationContext();
-
-        /**
-         * Gets the operation context active on this client, or nullptr if there is no such context.
-         *
-         * It is an error to call this method on an unlocked client, or to use the value returned
-         * by this method while the client is not locked.
-         */
-        OperationContext* getOperationContext() { return _txn; }
+        const OperationContext* getOperationContext() const { return _txn; }
 
         // TODO(spencer): SERVER-10228 SERVER-14779 Remove this/move it fully into OperationContext.
         bool isInDirectClient() const { return _inDirectClient; }

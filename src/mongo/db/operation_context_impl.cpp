@@ -83,13 +83,11 @@ namespace {
         StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
         _recovery.reset(storageEngine->newRecoveryUnit());
 
-        stdx::lock_guard<Client> lk(*_client);
         _client->setOperationContext(this);
     }
 
     OperationContextImpl::~OperationContextImpl() {
         _locker->assertEmptyAndReset();
-        stdx::lock_guard<Client> lk(*_client);
         _client->resetOperationContext();
     }
 
