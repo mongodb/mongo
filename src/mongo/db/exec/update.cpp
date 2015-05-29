@@ -730,23 +730,26 @@ namespace mongo {
             return;
         }
 
-        WriteUnitOfWork wunit(_txn);
-        invariant(_collection);
-        StatusWith<RecordId> newLoc = _collection->insertDocument(_txn,
-                                                                 newObj,
-                                                                 !request->isGod()/*enforceQuota*/);
-        uassertStatusOK(newLoc.getStatus());
-        if (request->shouldCallLogOp()) {
-            repl::logOp(_txn,
-                        "i",
-                        request->getNamespaceString().ns().c_str(),
-                        newObj,
-                        NULL,
-                        NULL,
-                        request->isFromMigration());
-        }
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+            WriteUnitOfWork wunit(_txn);
+            invariant(_collection);
+            const bool enforceQuota = !request->isGod();
+            StatusWith<RecordId> newLoc = _collection->insertDocument(_txn,
+                                                                      newObj,
+                                                                      enforceQuota);
+            uassertStatusOK(newLoc.getStatus());
+            if (request->shouldCallLogOp()) {
+                repl::logOp(_txn,
+                            "i",
+                            request->getNamespaceString().ns().c_str(),
+                            newObj,
+                            NULL,
+                            NULL,
+                            request->isFromMigration());
+            }
 
-        wunit.commit();
+            wunit.commit();
+        } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(_txn, "upsert", _collection->ns().ns());
     }
 
     bool UpdateStage::doneUpdating() {
