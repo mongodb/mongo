@@ -46,6 +46,9 @@ struct __wt_data_handle {
 	int32_t	 session_inuse;		/* Sessions using this handle */
 	time_t	 timeofdeath;		/* Use count went to 0 */
 
+	WT_SESSION_IMPL *owner;		/* Session that owns this exclusively */
+	uint32_t owner_ref;		/* Number of references from owner */
+
 	uint64_t name_hash;		/* Hash of name */
 	const char *name;		/* Object name as a URI */
 	const char *checkpoint;		/* Checkpoint name (or NULL) */

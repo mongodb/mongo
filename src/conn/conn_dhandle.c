@@ -330,6 +330,11 @@ __wt_conn_btree_open(
 
 	WT_ERR(__wt_btree_open(session, cfg));
 	F_SET(dhandle, WT_DHANDLE_OPEN);
+	if (F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE) &&
+	    !LF_ISSET(WT_BTREE_SPECIAL_FLAGS)) {
+		dhandle->owner = session;
+		dhandle->owner_ref = 1;
+	}
 
 	/*
 	 * Checkpoint handles are read only, so eviction calculations
