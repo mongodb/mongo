@@ -78,6 +78,7 @@
 #include "mongo/s/catalog/dist_lock_manager.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/client/shard.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/elapsed_tracker.h"
 #include "mongo/util/exit.h"
@@ -1136,8 +1137,6 @@ namespace {
             // This catches the case where we had to previously changed a shard's host by
             // removing/adding a shard with the same name
             Shard::reloadShardInfo();
-            Shard toShard(toShardName);
-            Shard fromShard(fromShardName);
 
             ConnectionString configLoc = ConnectionString::parse(shardingState.getConfigServer(),
                                                                  errmsg);
@@ -1180,9 +1179,8 @@ namespace {
                 return false;
             }
 
-            BSONObj chunkInfo =
-                BSON("min" << min << "max" << max <<
-                     "from" << fromShard.getName() << "to" << toShard.getName());
+            BSONObj chunkInfo = BSON("min" << min << "max" << max <<
+                                     "from" << fromShardName << "to" << toShardName);
 
             grid.catalogManager()->logChange(txn, "moveChunk.start", ns, chunkInfo);
 
@@ -1191,7 +1189,6 @@ namespace {
             Status refreshStatus = shardingState.refreshMetadataNow(txn, ns, &origShardVersion);
 
             if (!refreshStatus.isOK()) {
-
                 errmsg = str::stream() << "moveChunk cannot start migrate of chunk "
                                        << "[" << minKey << "," << maxKey << ")"
                                        << causedBy(refreshStatus.reason());
@@ -1201,7 +1198,6 @@ namespace {
             }
 
             if (origShardVersion.majorVersion() == 0) {
-
                 // It makes no sense to migrate if our version is zero and we have no chunks
                 errmsg = str::stream() << "moveChunk cannot start migrate of chunk "
                                        << "[" << minKey << "," << maxKey << ")"
@@ -1230,6 +1226,7 @@ namespace {
 
             // Get collection metadata
             const CollectionMetadataPtr origCollMetadata(shardingState.getCollectionMetadata(ns));
+
             // With nonzero shard version, we must have metadata
             invariant(NULL != origCollMetadata);
 
@@ -1238,12 +1235,14 @@ namespace {
 
             // With nonzero shard version, we must have a coll version >= our shard version
             invariant(origCollVersion >= origShardVersion);
+
             // With nonzero shard version, we must have a shard key
             invariant(!shardKeyPattern.isEmpty());
 
             ChunkType origChunk;
             if (!origCollMetadata->getNextChunk(min, &origChunk)
-                || origChunk.getMin().woCompare(min) || origChunk.getMax().woCompare(max)) {
+                    || origChunk.getMin().woCompare(min)
+                    || origChunk.getMax().woCompare(max)) {
 
                 // Our boundaries are different from those passed in
                 errmsg = str::stream() << "moveChunk cannot find chunk "
@@ -1268,6 +1267,29 @@ namespace {
                 return false;
             }
 
+            ConnectionString fromShardCS;
+            ConnectionString toShardCS;
+
+            // Resolve the shard connection strings.
+            {
+                boost::shared_ptr<Shard> fromShard =
+                    grid.shardRegistry()->findIfExists(fromShardName);
+                uassert(28674,
+                        str::stream() << "Source shard " << fromShardName
+                                      << " is missing. This indicates metadata corruption.",
+                        fromShard);
+                
+                fromShardCS = fromShard->getConnString();
+
+                boost::shared_ptr<Shard> toShard = grid.shardRegistry()->findIfExists(toShardName);
+                uassert(28675,
+                        str::stream() << "Destination shard " << toShardName
+                                      << " is missing. This indicates metadata corruption.",
+                        toShard);
+
+                toShardCS = toShard->getConnString();
+            }
+
             {
                 // See comment at the top of the function for more information on what
                 // synchronization is used here.
@@ -1276,7 +1298,7 @@ namespace {
                     return false;
                 }
 
-                ScopedDbConnection connTo(toShard.getConnString());
+                ScopedDbConnection connTo(toShardCS);
                 BSONObj res;
                 bool ok;
 
@@ -1284,9 +1306,9 @@ namespace {
 
                 BSONObjBuilder recvChunkStartBuilder;
                 recvChunkStartBuilder.append("_recvChunkStart", ns);
-                recvChunkStartBuilder.append("from", fromShard.getConnString().toString());
-                recvChunkStartBuilder.append("fromShardName", fromShard.getName());
-                recvChunkStartBuilder.append("toShardName", toShard.getName());
+                recvChunkStartBuilder.append("from", fromShardCS.toString());
+                recvChunkStartBuilder.append("fromShardName", fromShardName);
+                recvChunkStartBuilder.append("toShardName", toShardName);
                 recvChunkStartBuilder.append("min", min);
                 recvChunkStartBuilder.append("max", max);
                 recvChunkStartBuilder.append("shardKeyPattern", shardKeyPattern);
@@ -1332,8 +1354,9 @@ namespace {
 
                 // Exponential sleep backoff, up to 1024ms. Don't sleep much on the first few
                 // iterations, since we want empty chunk migrations to be fast.
-                sleepmillis( 1 << std::min( i , 10 ) );
-                ScopedDbConnection conn(toShard.getConnString());
+                sleepmillis(1 << std::min(i, 10));
+
+                ScopedDbConnection conn(toShardCS);
                 bool ok;
                 res = BSONObj();
                 try {
@@ -1349,7 +1372,7 @@ namespace {
                 conn.done();
 
                 if ( res["ns"].str() != ns ||
-                        res["from"].str() != fromShard.getConnString().toString() ||
+                        res["from"].str() != fromShardCS.toString() ||
                         !res["min"].isABSONObj() ||
                         res["min"].Obj().woCompare(min) != 0 ||
                         !res["max"].isABSONObj() ||
@@ -1378,14 +1401,14 @@ namespace {
                     break;
 
                 if ( migrateFromStatus.mbUsed() > (500 * 1024 * 1024) ) {
-                    // this is too much memory for us to use for this
-                    // so we're going to abort the migrate
-                    ScopedDbConnection conn(toShard.getConnString());
+                    // This is too much memory for us to use for this so we're going to abort
+                    // the migrate
+                    ScopedDbConnection conn(toShardCS);
 
                     BSONObj res;
-                    if (!conn->runCommand( "admin", BSON( "_recvChunkAbort" << 1 ), res )) {
+                    if (!conn->runCommand("admin", BSON("_recvChunkAbort" << 1), res)) {
                         warning() << "Error encountered while trying to abort migration on "
-                                  << "destination shard" << toShard.getConnString();
+                                  << "destination shard" << toShardCS;
                     }
 
                     res = res.getOwned();
@@ -1398,6 +1421,7 @@ namespace {
 
                 txn->checkForInterrupt();
             }
+
             timing.done(4);
             MONGO_FP_PAUSE_WHILE(moveChunkHangAtStep4);
 
@@ -1464,13 +1488,13 @@ namespace {
                 bool ok;
 
                 try {
-                    ScopedDbConnection connTo( toShard.getConnString(), 35.0 );
+                    ScopedDbConnection connTo(toShardCS, 35.0);
                     ok = connTo->runCommand( "admin", BSON( "_recvChunkCommit" << 1 ), res );
                     connTo.done();
                 }
                 catch ( DBException& e ) {
                     errmsg = str::stream() << "moveChunk could not contact to: shard "
-                                           << toShard.getConnString().toString()
+                                           << toShardCS.toString()
                                            << " to commit transfer" << causedBy(e);
                     warning() << errmsg;
                     ok = false;
@@ -1528,7 +1552,7 @@ namespace {
                     n.append(ChunkType::ns(), ns);
                     n.append(ChunkType::min(), min);
                     n.append(ChunkType::max(), max);
-                    n.append(ChunkType::shard(), toShard.getName());
+                    n.append(ChunkType::shard(), toShardName);
                     n.done();
 
                     BSONObjBuilder q( op.subobjStart( "o2" ) );
@@ -1570,7 +1594,7 @@ namespace {
                     n.append(ChunkType::ns(), ns);
                     n.append(ChunkType::min(), bumpMin);
                     n.append(ChunkType::max(), bumpMax);
-                    n.append(ChunkType::shard(), fromShard.getName());
+                    n.append(ChunkType::shard(), fromShardName);
                     n.done();
 
                     BSONObjBuilder q( op.subobjStart( "o2" ) );

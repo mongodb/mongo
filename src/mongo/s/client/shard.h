@@ -68,10 +68,6 @@ namespace mongo {
               long long maxSizeMB,
               bool isDraining);
 
-        Shard( const std::string& ident ) {
-            reset( ident );
-        }
-
         /**
          * Returns a Shard corresponding to 'ident', which can
          * either be a shard name or a connection string.

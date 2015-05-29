@@ -47,6 +47,7 @@
 #include "mongo/s/chunk.h"
 #include "mongo/s/chunk_diff.h"
 #include "mongo/s/client/shard_connection.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/log.h"
@@ -260,8 +261,9 @@ namespace {
             for (ShardVersionMap::iterator it = shardVersions->begin();
                  it != shardVersions->end(); ) {
 
-                if (Shard::findIfExists(it->first).ok()) {
-                    shards.insert(it->first);
+                shared_ptr<Shard> shard = grid.shardRegistry()->findIfExists(it->first);
+                if (shard) {
+                    shards.insert(*shard);
                     ++it;
                 }
                 else {

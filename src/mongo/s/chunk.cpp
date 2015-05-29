@@ -47,6 +47,7 @@
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_settings.h"
 #include "mongo/s/chunk_manager.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/config.h"
 #include "mongo/s/cursors.h"
 #include "mongo/s/grid.h"
@@ -129,10 +130,15 @@ namespace {
 
         log() << "moving chunk (auto): " << toMove->toString() << " to: " << newLocation;
 
-        BSONObj res;
+        shared_ptr<Shard> newShard = grid.shardRegistry()->findIfExists(newLocation);
+        if (!newShard) {
+            warning() << "Newly selected shard " << newLocation << " could not be found.";
+            return false;
+        }
 
+        BSONObj res;
         WriteConcernOptions noThrottle;
-        if (!toMove->moveAndCommit(newLocation,
+        if (!toMove->moveAndCommit(*newShard,
                                    Chunk::MaxChunkSize,
                                    &noThrottle, /* secondaryThrottle */
                                    false, /* waitForDelete - small chunk, no need */
