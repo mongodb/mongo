@@ -1739,8 +1739,7 @@ __conn_write_base_config(WT_SESSION_IMPL *session, const char *cfg[])
 
 	if (0) {
 		/* Close open file handle, remove any temporary file. */
-err:		if (fp != NULL)
-			WT_TRET(__wt_fclose(&fp, WT_FHANDLE_WRITE));
+err:		WT_TRET(__wt_fclose(&fp, WT_FHANDLE_WRITE));
 		WT_TRET(__wt_remove_if_exists(session, WT_BASECONFIG_SET));
 	}
 
