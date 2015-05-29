@@ -349,16 +349,16 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_TXN *txn;
 	WT_TXN_GLOBAL *txn_global;
 	WT_TXN_ISOLATION saved_isolation;
+	void *saved_meta_next;
+	u_int i;
+	int full, idle, logging, tracking;
 	const char *txn_cfg[] = { WT_CONFIG_BASE(session,
 	    WT_SESSION_begin_transaction), "isolation=snapshot", NULL };
-	void *saved_meta_next;
-	int full, idle, logging, tracking;
-	u_int i;
 
 	conn = S2C(session);
-	txn_global = &conn->txn_global;
 	saved_isolation = session->isolation;
 	txn = &session->txn;
+	txn_global = &conn->txn_global;
 	logging = FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED);
 	full = idle = tracking = 0;
 
