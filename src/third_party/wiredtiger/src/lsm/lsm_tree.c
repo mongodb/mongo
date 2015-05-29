@@ -27,6 +27,13 @@ __lsm_tree_discard(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, int final)
 
 	WT_UNUSED(final);	/* Only used in diagnostic builds */
 
+	/*
+	 * The work unit queue should be empty, but it's worth checking
+	 * since work units use a different locking scheme to regular tree
+	 * operations.
+	 */
+	WT_ASSERT(session, lsm_tree->queue_ref == 0);
+
 	/* We may be destroying an lsm_tree before it was added. */
 	if (F_ISSET(lsm_tree, WT_LSM_TREE_OPEN)) {
 		WT_ASSERT(session, final ||
@@ -1223,13 +1230,13 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 		    "LSM compaction requires active merge threads");
 
 	/*
-	 * We are done if there is a single chunk in the tree and we have
-	 * already created a bloom filter for it or we are configured not to.
+	 * There is no work to do if there is only a single chunk in the tree
+	 * and it has a bloom filter or is configured to never have a bloom
+	 * filter.
 	 */
 	if (lsm_tree->nchunks == 1 &&
-	    ((FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_OLDEST) &&
-	    F_ISSET(lsm_tree->chunk[0], WT_LSM_CHUNK_BLOOM)) ||
-	    !FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_OLDEST))) {
+	    (!FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_OLDEST) ||
+	    F_ISSET(lsm_tree->chunk[0], WT_LSM_CHUNK_BLOOM))) {
 		__wt_lsm_tree_release(session, lsm_tree);
 		return (0);
 	}

@@ -114,9 +114,8 @@ __wt_session_lock_dhandle(
 			WT_RET(__wt_readlock(session, dhandle->rwlock));
 			if (F_ISSET(dhandle, WT_DHANDLE_DEAD)) {
 				*is_deadp = 1;
-				WT_RET(
+				return (
 				    __wt_readunlock(session, dhandle->rwlock));
-				return (0);
 			}
 
 			is_open = F_ISSET(dhandle, WT_DHANDLE_OPEN) ? 1 : 0;
@@ -135,9 +134,8 @@ __wt_session_lock_dhandle(
 		if ((ret = __wt_try_writelock(session, dhandle->rwlock)) == 0) {
 			if (F_ISSET(dhandle, WT_DHANDLE_DEAD)) {
 				*is_deadp = 1;
-				WT_RET(
+				return (
 				    __wt_writeunlock(session, dhandle->rwlock));
-				return (0);
 			}
 
 			/*

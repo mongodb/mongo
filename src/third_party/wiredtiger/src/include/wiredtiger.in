@@ -1389,6 +1389,8 @@ struct __wt_session {
 	 * @config{priority, priority of the transaction for resolving
 	 * conflicts.  Transactions with higher values are less likely to
 	 * abort., an integer between -100 and 100; default \c 0.}
+	 * @config{snapshot, use a named\, in-memory snapshot\, see @ref
+	 * transaction_named_snapshots., a string; default empty.}
 	 * @config{sync, whether to sync log records when the transaction
 	 * commits\, inherited from ::wiredtiger_open \c transaction_sync., a
 	 * boolean flag; default empty.}
@@ -1408,7 +1410,12 @@ struct __wt_session {
 	 * @snippet ex_all.c transaction commit/rollback
 	 *
 	 * @param session the session handle
-	 * @configempty{WT_SESSION.commit_transaction, see dist/api_data.py}
+	 * @configstart{WT_SESSION.commit_transaction, see dist/api_data.py}
+	 * @config{sync, override whether to sync log records when the
+	 * transaction commits\, inherited from ::wiredtiger_open \c
+	 * transaction_sync., a string\, chosen from the following options: \c
+	 * "background"\, \c "off"\, \c "on"; default empty.}
+	 * @configend
 	 * @errors
 	 */
 	int __F(commit_transaction)(WT_SESSION *session, const char *config);
@@ -1459,6 +1466,36 @@ struct __wt_session {
 	int __F(checkpoint)(WT_SESSION *session, const char *config);
 
 	/*!
+	 * Manage named snapshot transactions. Use this API to create and drop
+	 * named snapshots. Named snapshot transactions can be accessed via
+	 * WT_CURSOR::open. See @ref transaction_named_snapshots.
+	 *
+	 * @snippet ex_all.c Snapshot examples
+	 *
+	 * @param session the session handle
+	 * @configstart{WT_SESSION.snapshot, see dist/api_data.py}
+	 * @config{drop = (, if non-empty\, specifies which snapshots to drop.
+	 * Where a group of snapshots are being dropped\, the order is based on
+	 * snapshot creation order not alphanumeric name order., a set of
+	 * related configuration options defined below.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;all, drop all named snapshots., a
+	 * boolean flag; default \c false.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;before, drop all snapshots up to but
+	 * not including the specified name., a string; default empty.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;names, drop specific named
+	 * snapshots., a list of strings; default empty.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;to, drop all snapshots up to and
+	 * including the specified name., a string; default empty.}
+	 * @config{
+	 * ),,}
+	 * @config{name, specify a name for the snapshot., a string; default
+	 * empty.}
+	 * @configend
+	 * @errors
+	 */
+	int __F(snapshot)(WT_SESSION *session, const char *config);
+
+	/*!
 	 * Return the transaction ID range pinned by the session handle.
 	 *
 	 * The ID range is approximate and is calculated based on the oldest
@@ -1474,6 +1511,24 @@ struct __wt_session {
 	 */
 	int __F(transaction_pinned_range)(WT_SESSION* session, uint64_t *range);
 
+	/*!
+	 * Wait for a transaction to become synchronized.  This method is
+	 * only useful when ::wiredtiger_open is configured with the
+	 * \c transaction_sync setting disabled.  This method must be called
+	 * when no transactions are active in the session.
+	 *
+	 * @snippet ex_all.c Transaction sync
+	 *
+	 * @param session the session handle
+	 * @configstart{WT_SESSION.transaction_sync, see dist/api_data.py}
+	 * @config{timeout_ms, maximum amount of time to wait for background
+	 * sync to complete in milliseconds.  A value of zero disables the
+	 * timeout and returns immediately.  The default waits forever., an
+	 * integer; default \c .}
+	 * @configend
+	 * @errors
+	 */
+	int __F(transaction_sync)(WT_SESSION *session, const char *config);
 	/*! @} */
 };
 
@@ -3730,8 +3785,10 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_TXN_PINNED_RANGE			1139
 /*! transaction: transactions rolled back */
 #define	WT_STAT_CONN_TXN_ROLLBACK			1140
+/*! transaction: transaction sync calls */
+#define	WT_STAT_CONN_TXN_SYNC				1141
 /*! connection: total write I/Os */
-#define	WT_STAT_CONN_WRITE_IO				1141
+#define	WT_STAT_CONN_WRITE_IO				1142
 
 /*!
  * @}

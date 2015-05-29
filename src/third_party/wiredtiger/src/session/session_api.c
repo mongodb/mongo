@@ -9,6 +9,7 @@
 #include "wt_internal.h"
 
 static int __session_checkpoint(WT_SESSION *, const char *);
+static int __session_snapshot(WT_SESSION *, const char *);
 static int __session_rollback_transaction(WT_SESSION *, const char *);
 
 /*
@@ -74,6 +75,7 @@ __session_clear(WT_SESSION_IMPL *session)
 	memset(session, 0, WT_SESSION_CLEAR_SIZE(session));
 	session->hazard_size = 0;
 	session->nhazard = 0;
+	WT_INIT_LSN(&session->bg_sync_lsn);
 }
 
 /*
@@ -850,6 +852,89 @@ err:	API_END_RET(session, ret);
 }
 
 /*
+ * __session_transaction_sync --
+ *	WT_SESSION->transaction_sync method.
+ */
+static int
+__session_transaction_sync(WT_SESSION *wt_session, const char *config)
+{
+	WT_CONFIG_ITEM cval;
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+	WT_LOG *log;
+	WT_SESSION_IMPL *session;
+	WT_TXN *txn;
+	struct timespec now, start;
+	uint64_t timeout_ms, waited_ms;
+	int forever;
+
+	session = (WT_SESSION_IMPL *)wt_session;
+	conn = S2C(session);
+	txn = &session->txn;
+	if (F_ISSET(txn, WT_TXN_RUNNING))
+		WT_RET_MSG(session, EINVAL, "transaction in progress");
+
+	/*
+	 * If logging is not enabled there is nothing to do.
+	 */
+	if (!FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED))
+		return (0);
+	SESSION_API_CALL(session, transaction_sync, config, cfg);
+	WT_STAT_FAST_CONN_INCR(session, txn_sync);
+
+	log = conn->log;
+	ret = 0;
+	timeout_ms = waited_ms = 0;
+	forever = 1;
+
+	/*
+	 * If there is no background sync LSN in this session, there
+	 * is nothing to do.
+	 */
+	if (WT_IS_INIT_LSN(&session->bg_sync_lsn))
+		goto err;
+
+	/*
+	 * If our LSN is smaller than the current sync LSN then our
+	 * transaction is stable.  We're done.
+	 */
+	if (WT_LOG_CMP(&session->bg_sync_lsn, &log->sync_lsn) <= 0)
+		goto err;
+
+	/*
+	 * Our LSN is not yet stable.  Wait and check again depending on the
+	 * timeout.
+	 */
+	WT_ERR(__wt_config_gets_def(
+	    session, cfg, "timeout_ms", (int)UINT_MAX, &cval));
+	if ((unsigned int)cval.len != UINT_MAX) {
+		timeout_ms = (uint64_t)cval.val;
+		forever = 0;
+	}
+
+	if (timeout_ms == 0)
+		WT_ERR(ETIMEDOUT);
+
+	WT_ERR(__wt_epoch(session, &start));
+	/*
+	 * Keep checking the LSNs until we find it is stable or we reach
+	 * our timeout.
+	 */
+	while (WT_LOG_CMP(&session->bg_sync_lsn, &log->sync_lsn) > 0) {
+		WT_ERR(__wt_cond_signal(session, conn->log_file_cond));
+		WT_ERR(__wt_epoch(session, &now));
+		waited_ms = WT_TIMEDIFF(now, start) / WT_MILLION;
+		if (forever || waited_ms < timeout_ms)
+			WT_ERR(__wt_cond_wait(
+			    session, log->log_sync_cond, waited_ms));
+		else
+			WT_ERR(ETIMEDOUT);
+	}
+
+err:	API_END_RET(session, ret);
+}
+
+/*
  * __session_checkpoint --
  *	WT_SESSION->checkpoint method.
  */
@@ -915,6 +1000,42 @@ __session_checkpoint(WT_SESSION *wt_session, const char *config)
 	WT_STAT_FAST_CONN_SET(session, txn_checkpoint_running, 0);
 
 err:	F_CLR(session, WT_SESSION_CAN_WAIT | WT_SESSION_NO_CACHE_CHECK);
+
+	API_END_RET_NOTFOUND_MAP(session, ret);
+}
+
+/*
+ * __session_snapshot --
+ *	WT_SESSION->snapshot method.
+ */
+static int
+__session_snapshot(WT_SESSION *wt_session, const char *config)
+{
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+	WT_TXN_GLOBAL *txn_global;
+	int has_create, has_drop;
+
+	has_create = has_drop = 0;
+	session = (WT_SESSION_IMPL *)wt_session;
+	txn_global = &S2C(session)->txn_global;
+
+	SESSION_API_CALL(session, snapshot, config, cfg);
+
+	WT_ERR(__wt_txn_named_snapshot_config(
+	    session, cfg, &has_create, &has_drop));
+
+	WT_ERR(__wt_writelock(session, txn_global->nsnap_rwlock));
+
+	/* Drop any snapshots to be removed first. */
+	if (has_drop)
+		WT_ERR(__wt_txn_named_snapshot_drop(session, cfg));
+
+	/* Start the named snapshot if requested. */
+	if (has_create)
+		WT_ERR(__wt_txn_named_snapshot_begin(session, cfg));
+
+err:	WT_TRET(__wt_writeunlock(session, txn_global->nsnap_rwlock));
 
 	API_END_RET_NOTFOUND_MAP(session, ret);
 }
@@ -997,7 +1118,9 @@ __wt_open_session(WT_CONNECTION_IMPL *conn,
 		__session_commit_transaction,
 		__session_rollback_transaction,
 		__session_checkpoint,
-		__session_transaction_pinned_range
+		__session_snapshot,
+		__session_transaction_pinned_range,
+		__session_transaction_sync
 	};
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session, *session_ret;

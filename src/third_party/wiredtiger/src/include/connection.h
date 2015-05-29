@@ -330,10 +330,10 @@ struct __wt_connection_impl {
 	WT_SESSION_IMPL *log_session;	/* Log server session */
 	wt_thread_t	 log_tid;	/* Log server thread */
 	int		 log_tid_set;	/* Log server thread set */
-	WT_CONDVAR	*log_close_cond;/* Log close thread wait mutex */
-	WT_SESSION_IMPL *log_close_session;/* Log close thread session */
-	wt_thread_t	 log_close_tid;	/* Log close thread thread */
-	int		 log_close_tid_set;/* Log close thread set */
+	WT_CONDVAR	*log_file_cond;	/* Log file thread wait mutex */
+	WT_SESSION_IMPL *log_file_session;/* Log file thread session */
+	wt_thread_t	 log_file_tid;	/* Log file thread thread */
+	int		 log_file_tid_set;/* Log file thread set */
 	WT_CONDVAR	*log_wrlsn_cond;/* Log write lsn thread wait mutex */
 	WT_SESSION_IMPL *log_wrlsn_session;/* Log write lsn thread session */
 	wt_thread_t	 log_wrlsn_tid;	/* Log write lsn thread thread */

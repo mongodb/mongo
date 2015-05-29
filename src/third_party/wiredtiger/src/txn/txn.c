@@ -258,6 +258,11 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, int force)
 	if (WT_TXNID_LT(snap_min, oldest_id))
 		oldest_id = snap_min;
 
+	/* The oldest ID can't move past any named snapshots. */
+	if ((id = txn_global->nsnap_oldest_id) != WT_TXN_NONE &&
+	    WT_TXNID_LT(id, oldest_id))
+		oldest_id = id;
+
 	/* Update the last running ID. */
 	if (WT_TXNID_LT(txn_global->last_running, snap_min)) {
 		txn_global->last_running = snap_min;
@@ -329,15 +334,30 @@ __wt_txn_config(WT_SESSION_IMPL *session, const char *cfg[])
 	 * The default sync setting is inherited from the connection, but can
 	 * be overridden by an explicit "sync" setting for this transaction.
 	 *
-	 * !!! This is an unusual use of the config code: the "default" value
-	 * we pass in is inherited from the connection.  If flush is not set in
-	 * the connection-wide flag and not overridden here, we end up clearing
-	 * all flags.
+	 * We want to distinguish between inheriting implicitly and explicitly.
 	 */
-	WT_RET(__wt_config_gets_def(session, cfg, "sync",
-	    FLD_ISSET(txn->txn_logsync, WT_LOG_FLUSH) ? 1 : 0, &cval));
-	if (!cval.val)
-		txn->txn_logsync = 0;
+	F_CLR(txn, WT_TXN_SYNC_SET);
+	WT_RET(__wt_config_gets_def(
+	    session, cfg, "sync", (int)UINT_MAX, &cval));
+	if (cval.val == 0 || cval.val == 1)
+		/*
+		 * This is an explicit setting of sync.  Set the flag so
+		 * that we know not to overwrite it in commit_transaction.
+		 */
+		F_SET(txn, WT_TXN_SYNC_SET);
+
+	if (cval.val == 0)
+		FLD_CLR(txn->txn_logsync, WT_LOG_FLUSH);
+
+	WT_RET(__wt_config_gets_def(session, cfg, "snapshot", 0, &cval));
+	if (cval.len > 0)
+		/*
+		 * The layering here isn't ideal - the named snapshot get
+		 * function does both validation and setup. Otherwise we'd
+		 * need to walk the list of named snapshots twice during
+		 * transaction open.
+		 */
+		WT_RET(__wt_txn_named_snapshot_get(session, &cval));
 
 	return (0);
 }
@@ -381,7 +401,8 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 	 */
 	__wt_txn_release_snapshot(session);
 	txn->isolation = session->isolation;
-	F_CLR(txn, WT_TXN_ERROR | WT_TXN_HAS_ID | WT_TXN_RUNNING);
+	/* Ensure the transaction flags are cleared on exit */
+	txn->flags = 0;
 }
 
 /*
@@ -391,16 +412,59 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 int
 __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 {
+	WT_CONFIG_ITEM cval;
+	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_TXN *txn;
 	WT_TXN_OP *op;
 	u_int i;
 
 	txn = &session->txn;
+	conn = S2C(session);
 	WT_ASSERT(session, !F_ISSET(txn, WT_TXN_ERROR));
 
 	if (!F_ISSET(txn, WT_TXN_RUNNING))
 		WT_RET_MSG(session, EINVAL, "No transaction is active");
+
+	/*
+	 * The default sync setting is inherited from the connection, but can
+	 * be overridden by an explicit "sync" setting for this transaction.
+	 */
+	WT_RET(__wt_config_gets_def(session, cfg, "sync", 0, &cval));
+
+	/*
+	 * If the user chose the default setting, check whether sync is enabled
+	 * for this transaction (either inherited or via begin_transaction).
+	 * If sync is disabled, clear the field to avoid the log write being
+	 * flushed.
+	 *
+	 * Otherwise check for specific settings.  We don't need to check for
+	 * "on" because that is the default inherited from the connection.  If
+	 * the user set anything in begin_transaction, we only override with an
+	 * explicit setting.
+	 */
+	if (cval.len == 0) {
+		if (!FLD_ISSET(txn->txn_logsync, WT_LOG_FLUSH) &&
+		    !F_ISSET(txn, WT_TXN_SYNC_SET))
+			txn->txn_logsync = 0;
+	} else {
+		/*
+		 * If the caller already set sync on begin_transaction then
+		 * they should not be using sync on commit_transaction.
+		 * Flag that as an error.
+		 */
+		if (F_ISSET(txn, WT_TXN_SYNC_SET))
+			WT_RET_MSG(session, EINVAL,
+			    "Sync already set during begin_transaction.");
+		if (WT_STRING_MATCH("background", cval.str, cval.len))
+			txn->txn_logsync = WT_LOG_BACKGROUND;
+		else if (WT_STRING_MATCH("off", cval.str, cval.len))
+			txn->txn_logsync = 0;
+		/*
+		 * We don't need to check for "on" here because that is the
+		 * default to inherit from the connection setting.
+		 */
+	}
 
 	/* Commit notification. */
 	if (txn->notify != NULL)
@@ -409,7 +473,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 
 	/* If we are logging, write a commit log record. */
 	if (ret == 0 && txn->mod_count > 0 &&
-	    FLD_ISSET(S2C(session)->log_flags, WT_CONN_LOG_ENABLED) &&
+	    FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED) &&
 	    !F_ISSET(session, WT_SESSION_NO_LOGGING)) {
 		/*
 		 * We are about to block on I/O writing the log.
@@ -596,8 +660,14 @@ __wt_txn_global_init(WT_SESSION_IMPL *session, const char *cfg[])
 	txn_global->current = txn_global->last_running =
 	    txn_global->oldest_id = WT_TXN_FIRST;
 
+	WT_RET(__wt_rwlock_alloc(session,
+	    &txn_global->nsnap_rwlock, "named snapshot lock"));
+	txn_global->nsnap_oldest_id = WT_TXN_NONE;
+	STAILQ_INIT(&txn_global->nsnaph);
+
 	WT_RET(__wt_calloc_def(
 	    session, conn->session_size, &txn_global->states));
+
 	for (i = 0, s = txn_global->states; i < conn->session_size; i++, s++)
 		s->id = s->snap_min = WT_TXN_NONE;
 
@@ -608,15 +678,21 @@ __wt_txn_global_init(WT_SESSION_IMPL *session, const char *cfg[])
  * __wt_txn_global_destroy --
  *	Destroy the global transaction state.
  */
-void
+int
 __wt_txn_global_destroy(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
 	WT_TXN_GLOBAL *txn_global;
 
 	conn = S2C(session);
 	txn_global = &conn->txn_global;
 
-	if (txn_global != NULL)
-		__wt_free(session, txn_global->states);
+	if (txn_global == NULL)
+		return (0);
+
+	WT_TRET(__wt_rwlock_destroy(session, &txn_global->nsnap_rwlock));
+	__wt_free(session, txn_global->states);
+
+	return (ret);
 }

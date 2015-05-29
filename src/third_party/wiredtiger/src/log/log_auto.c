@@ -122,6 +122,7 @@ int
 __wt_logop_col_put_print(
     WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end, FILE *out)
 {
+	WT_DECL_RET;
 	uint32_t fileid;
 	uint64_t recno;
 	WT_ITEM value;
@@ -131,13 +132,17 @@ __wt_logop_col_put_print(
 	WT_RET(__wt_logop_col_put_unpack(
 	    session, pp, end, &fileid, &recno, &value));
 
-	fprintf(out, " \"optype\": \"col_put\",\n");
-	fprintf(out, "        \"fileid\": \"%" PRIu32 "\",\n", fileid);
-	fprintf(out, "        \"recno\": \"%" PRIu64 "\",\n", recno);
-	WT_RET(__logrec_jsonify_str(session, &escaped, &value));
-	fprintf(out, "        \"value\": \"%s\"", escaped);
-	__wt_free(session, escaped);
-	return (0);
+	WT_RET(__wt_fprintf(out, " \"optype\": \"col_put\",\n"));
+	WT_ERR(__wt_fprintf(out,
+	    "        \"fileid\": \"%" PRIu32 "\",\n", fileid));
+	WT_ERR(__wt_fprintf(out,
+	    "        \"recno\": \"%" PRIu64 "\",\n", recno));
+	WT_ERR(__logrec_jsonify_str(session, &escaped, &value));
+	WT_ERR(__wt_fprintf(out,
+	    "        \"value\": \"%s\"", escaped));
+
+err:	__wt_free(session, escaped);
+	return (ret);
 }
 
 int
@@ -190,9 +195,11 @@ __wt_logop_col_remove_print(
 	WT_RET(__wt_logop_col_remove_unpack(
 	    session, pp, end, &fileid, &recno));
 
-	fprintf(out, " \"optype\": \"col_remove\",\n");
-	fprintf(out, "        \"fileid\": \"%" PRIu32 "\",\n", fileid);
-	fprintf(out, "        \"recno\": \"%" PRIu64 "\"", recno);
+	WT_RET(__wt_fprintf(out, " \"optype\": \"col_remove\",\n"));
+	WT_RET(__wt_fprintf(out,
+	    "        \"fileid\": \"%" PRIu32 "\",\n", fileid));
+	WT_RET(__wt_fprintf(out,
+	    "        \"recno\": \"%" PRIu64 "\"", recno));
 	return (0);
 }
 
@@ -247,10 +254,13 @@ __wt_logop_col_truncate_print(
 	WT_RET(__wt_logop_col_truncate_unpack(
 	    session, pp, end, &fileid, &start, &stop));
 
-	fprintf(out, " \"optype\": \"col_truncate\",\n");
-	fprintf(out, "        \"fileid\": \"%" PRIu32 "\",\n", fileid);
-	fprintf(out, "        \"start\": \"%" PRIu64 "\",\n", start);
-	fprintf(out, "        \"stop\": \"%" PRIu64 "\"", stop);
+	WT_RET(__wt_fprintf(out, " \"optype\": \"col_truncate\",\n"));
+	WT_RET(__wt_fprintf(out,
+	    "        \"fileid\": \"%" PRIu32 "\",\n", fileid));
+	WT_RET(__wt_fprintf(out,
+	    "        \"start\": \"%" PRIu64 "\",\n", start));
+	WT_RET(__wt_fprintf(out,
+	    "        \"stop\": \"%" PRIu64 "\"", stop));
 	return (0);
 }
 
@@ -298,6 +308,7 @@ int
 __wt_logop_row_put_print(
     WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end, FILE *out)
 {
+	WT_DECL_RET;
 	uint32_t fileid;
 	WT_ITEM key;
 	WT_ITEM value;
@@ -307,14 +318,18 @@ __wt_logop_row_put_print(
 	WT_RET(__wt_logop_row_put_unpack(
 	    session, pp, end, &fileid, &key, &value));
 
-	fprintf(out, " \"optype\": \"row_put\",\n");
-	fprintf(out, "        \"fileid\": \"%" PRIu32 "\",\n", fileid);
-	WT_RET(__logrec_jsonify_str(session, &escaped, &key));
-	fprintf(out, "        \"key\": \"%s\",\n", escaped);
-	WT_RET(__logrec_jsonify_str(session, &escaped, &value));
-	fprintf(out, "        \"value\": \"%s\"", escaped);
-	__wt_free(session, escaped);
-	return (0);
+	WT_RET(__wt_fprintf(out, " \"optype\": \"row_put\",\n"));
+	WT_ERR(__wt_fprintf(out,
+	    "        \"fileid\": \"%" PRIu32 "\",\n", fileid));
+	WT_ERR(__logrec_jsonify_str(session, &escaped, &key));
+	WT_ERR(__wt_fprintf(out,
+	    "        \"key\": \"%s\",\n", escaped));
+	WT_ERR(__logrec_jsonify_str(session, &escaped, &value));
+	WT_ERR(__wt_fprintf(out,
+	    "        \"value\": \"%s\"", escaped));
+
+err:	__wt_free(session, escaped);
+	return (ret);
 }
 
 int
@@ -361,6 +376,7 @@ int
 __wt_logop_row_remove_print(
     WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end, FILE *out)
 {
+	WT_DECL_RET;
 	uint32_t fileid;
 	WT_ITEM key;
 	char *escaped;
@@ -369,12 +385,15 @@ __wt_logop_row_remove_print(
 	WT_RET(__wt_logop_row_remove_unpack(
 	    session, pp, end, &fileid, &key));
 
-	fprintf(out, " \"optype\": \"row_remove\",\n");
-	fprintf(out, "        \"fileid\": \"%" PRIu32 "\",\n", fileid);
-	WT_RET(__logrec_jsonify_str(session, &escaped, &key));
-	fprintf(out, "        \"key\": \"%s\"", escaped);
-	__wt_free(session, escaped);
-	return (0);
+	WT_RET(__wt_fprintf(out, " \"optype\": \"row_remove\",\n"));
+	WT_ERR(__wt_fprintf(out,
+	    "        \"fileid\": \"%" PRIu32 "\",\n", fileid));
+	WT_ERR(__logrec_jsonify_str(session, &escaped, &key));
+	WT_ERR(__wt_fprintf(out,
+	    "        \"key\": \"%s\"", escaped));
+
+err:	__wt_free(session, escaped);
+	return (ret);
 }
 
 int
@@ -421,6 +440,7 @@ int
 __wt_logop_row_truncate_print(
     WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end, FILE *out)
 {
+	WT_DECL_RET;
 	uint32_t fileid;
 	WT_ITEM start;
 	WT_ITEM stop;
@@ -431,15 +451,20 @@ __wt_logop_row_truncate_print(
 	WT_RET(__wt_logop_row_truncate_unpack(
 	    session, pp, end, &fileid, &start, &stop, &mode));
 
-	fprintf(out, " \"optype\": \"row_truncate\",\n");
-	fprintf(out, "        \"fileid\": \"%" PRIu32 "\",\n", fileid);
-	WT_RET(__logrec_jsonify_str(session, &escaped, &start));
-	fprintf(out, "        \"start\": \"%s\",\n", escaped);
-	WT_RET(__logrec_jsonify_str(session, &escaped, &stop));
-	fprintf(out, "        \"stop\": \"%s\",\n", escaped);
-	fprintf(out, "        \"mode\": \"%" PRIu32 "\"", mode);
-	__wt_free(session, escaped);
-	return (0);
+	WT_RET(__wt_fprintf(out, " \"optype\": \"row_truncate\",\n"));
+	WT_ERR(__wt_fprintf(out,
+	    "        \"fileid\": \"%" PRIu32 "\",\n", fileid));
+	WT_ERR(__logrec_jsonify_str(session, &escaped, &start));
+	WT_ERR(__wt_fprintf(out,
+	    "        \"start\": \"%s\",\n", escaped));
+	WT_ERR(__logrec_jsonify_str(session, &escaped, &stop));
+	WT_ERR(__wt_fprintf(out,
+	    "        \"stop\": \"%s\",\n", escaped));
+	WT_ERR(__wt_fprintf(out,
+	    "        \"mode\": \"%" PRIu32 "\"", mode));
+
+err:	__wt_free(session, escaped);
+	return (ret);
 }
 
 int
