@@ -782,4 +782,186 @@ namespace {
         }
     }
 
+    // Newly elected primary with electionId >= maximum electionId seen by the Refresher
+    TEST(ReplicaSetMonitorTests, NewPrimaryWithMaxElectionId) {
+        SetStatePtr state = boost::make_shared<SetState>("name", basicSeedsSet);
+        Refresher refresher(state);
+
+        set<HostAndPort> seen;
+
+        // get all hosts to contact first
+        for (size_t i = 0; i != basicSeeds.size(); ++i) {
+            NextStep ns = refresher.getNextStep();
+            ASSERT_EQUALS(ns.step, NextStep::CONTACT_HOST);
+            ASSERT(basicSeedsSet.count(ns.host));
+            ASSERT(!seen.count(ns.host));
+            seen.insert(ns.host);
+        }
+
+        const ReadPreferenceSetting primaryOnly(ReadPreference::PrimaryOnly, TagSet());
+
+        // mock all replies
+        for (size_t i = 0; i != basicSeeds.size(); ++i) {
+            // All hosts to talk to are already dispatched, but no reply has been received
+            NextStep ns = refresher.getNextStep();
+            ASSERT_EQUALS(ns.step, NextStep::WAIT);
+            ASSERT(ns.host.empty());
+
+            refresher.receivedIsMaster(basicSeeds[i],
+                                       -1,
+                                       BSON("setName" << "name"
+                                            << "ismaster" << true
+                                            << "secondary" << false
+                                            << "hosts" << BSON_ARRAY("a" << "b" << "c")
+                                            << "electionId" << OID::gen()
+                                            << "ok" << true));
+
+            // Ensure the set primary is the host we just got a reply from
+            HostAndPort currentPrimary = state->getMatchingHost(primaryOnly);
+            ASSERT_EQUALS(currentPrimary.host(), basicSeeds[i].host());
+            ASSERT_EQUALS(state->nodes.size(), basicSeeds.size());
+
+            // Check the state of each individual node
+            for (size_t j = 0; j != basicSeeds.size(); ++j) {
+                Node* node = state->findNode(basicSeeds[j]);
+                ASSERT(node);
+                ASSERT_EQUALS(node->host.toString(), basicSeeds[j].toString());
+                ASSERT_EQUALS(node->isUp, j <= i);
+                ASSERT_EQUALS(node->isMaster, j == i);
+                ASSERT(node->tags.isEmpty());
+            }
+        }
+
+        // Now all hosts have returned data
+        NextStep ns = refresher.getNextStep();
+        ASSERT_EQUALS(ns.step, NextStep::DONE);
+        ASSERT(ns.host.empty());
+    }
+
+    // Ignore electionId of secondaries
+    TEST(ReplicaSetMonitorTests, IgnoreElectionIdFromSecondaries) {
+        SetStatePtr state = boost::make_shared<SetState>("name", basicSeedsSet);
+        Refresher refresher(state);
+
+        set<HostAndPort> seen;
+
+        const OID primaryElectionId = OID::gen();
+
+        // mock all replies
+        for (size_t i = 0; i != basicSeeds.size(); ++i) {
+            NextStep ns = refresher.getNextStep();
+            ASSERT_EQUALS(ns.step, NextStep::CONTACT_HOST);
+            ASSERT(basicSeedsSet.count(ns.host));
+            ASSERT(!seen.count(ns.host));
+            seen.insert(ns.host);
+
+            // mock a reply
+            const bool primary = ns.host.host() == "a";
+            refresher.receivedIsMaster(ns.host,
+                                       -1,
+                                       BSON("setName" << "name"
+                                            << "ismaster" << primary
+                                            << "secondary" << !primary
+                                            << "electionId" << (primary ?
+                                                                primaryElectionId : OID::gen())
+                                            << "hosts" << BSON_ARRAY("a" << "b" << "c")
+                                            << "ok" << true));
+        }
+
+        // check that the SetState's maxElectionId == primary's electionId
+        ASSERT_EQUALS(state->maxElectionId, primaryElectionId);
+
+        // Now all hosts have returned data
+        NextStep ns = refresher.getNextStep();
+        ASSERT_EQUALS(ns.step, NextStep::DONE);
+        ASSERT(ns.host.empty());
+    }
+
+    // Stale Primary with obsolete electionId
+    TEST(ReplicaSetMonitorTests, StalePrimaryWithObsoleteElectionId) {
+        SetStatePtr state = boost::make_shared<SetState>("name", basicSeedsSet);
+        Refresher refresher(state);
+
+        const OID firstElectionId = OID::gen();
+        const OID secondElectionId = OID::gen();
+
+        set<HostAndPort> seen;
+
+        // contact first host claiming to be primary with greater electionId
+        {
+            NextStep ns = refresher.getNextStep();
+            ASSERT_EQUALS(ns.step, NextStep::CONTACT_HOST);
+            ASSERT(basicSeedsSet.count(ns.host));
+            ASSERT(!seen.count(ns.host));
+            seen.insert(ns.host);
+
+            refresher.receivedIsMaster(ns.host,
+                                       -1,
+                                       BSON("setName" << "name"
+                                            << "ismaster" << true
+                                            << "secondary" << false
+                                            << "electionId" << secondElectionId
+                                            << "hosts" << BSON_ARRAY("a" << "b" << "c")
+                                            << "ok" << true));
+
+            Node* node = state->findNode(ns.host);
+            ASSERT(node);
+            ASSERT_TRUE(node->isMaster);
+            ASSERT_EQUALS(state->maxElectionId, secondElectionId);
+        }
+
+        // contact second host claiming to be primary with smaller electionId
+        {
+            NextStep ns = refresher.getNextStep();
+            ASSERT_EQUALS(ns.step, NextStep::CONTACT_HOST);
+            ASSERT(basicSeedsSet.count(ns.host));
+            ASSERT(!seen.count(ns.host));
+            seen.insert(ns.host);
+
+            refresher.receivedIsMaster(ns.host,
+                                       -1,
+                                       BSON("setName" << "name"
+                                            << "ismaster" << true
+                                            << "secondary" << false
+                                            << "electionId" << firstElectionId
+                                            << "hosts" << BSON_ARRAY("a" << "b" << "c")
+                                            << "ok" << true));
+
+            Node* node = state->findNode(ns.host);
+            ASSERT(node);
+            // The SetState shouldn't see this host as master
+            ASSERT_FALSE(node->isMaster);
+            // the max electionId should remain the same
+            ASSERT_EQUALS(state->maxElectionId, secondElectionId);
+        }
+
+        // third host is a secondary
+        {
+            NextStep ns = refresher.getNextStep();
+            ASSERT_EQUALS(ns.step, NextStep::CONTACT_HOST);
+            ASSERT(basicSeedsSet.count(ns.host));
+            ASSERT(!seen.count(ns.host));
+            seen.insert(ns.host);
+
+            refresher.receivedIsMaster(ns.host,
+                                       -1,
+                                       BSON("setName" << "name"
+                                            << "ismaster" << false
+                                            << "secondary" << true
+                                            << "hosts" << BSON_ARRAY("a" << "b" << "c")
+                                            << "ok" << true));
+
+            Node* node = state->findNode(ns.host);
+            ASSERT(node);
+            ASSERT_FALSE(node->isMaster);
+            // the max electionId should remain the same
+            ASSERT_EQUALS(state->maxElectionId, secondElectionId);
+        }
+
+        // Now all hosts have returned data
+        NextStep ns = refresher.getNextStep();
+        ASSERT_EQUALS(ns.step, NextStep::DONE);
+        ASSERT(ns.host.empty());
+    }
+
 } // namespace

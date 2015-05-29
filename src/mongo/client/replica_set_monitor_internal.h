@@ -69,6 +69,7 @@ namespace mongo {
         bool isMaster;
         bool secondary;
         bool hidden;
+        OID electionId; // Set if this isMaster reply is from the primary
         HostAndPort primary; // empty if not present
         std::set<HostAndPort> normalHosts; // both "hosts" and "passives"
         BSONObj tags;
@@ -177,6 +178,7 @@ namespace mongo {
         const std::string name; // safe to read outside lock since it is const
         int consecutiveFailedScans;
         std::set<HostAndPort> seedNodes; // updated whenever a master reports set membership changes
+        OID maxElectionId; // largest election id observed by this ReplicaSetMonitor
         HostAndPort lastSeenMaster; // empty if we have never seen a master. can be same as current
         Nodes nodes; // maintained sorted and unique by host
         ScanStatePtr currentScan; // NULL if no scan in progress

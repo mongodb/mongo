@@ -306,12 +306,17 @@ namespace mongo {
         static ScanStatePtr startNewScan(const SetState* set);
 
     private:
+
         /**
+         * First, checks that the "reply" is not from a stale primary by
+         * comparing the electionId of "reply" to the maxElectionId recorded by the SetState.
+         * Returns true if "reply" belongs to a non-stale primary.
+         *
          * Updates _set and _scan based on set-membership information from a master.
          * Applies _scan->unconfirmedReplies to confirmed nodes.
          * Does not update this host's node in _set->nodes.
          */
-        void receivedIsMasterFromMaster(const IsMasterReply& reply);
+        bool receivedIsMasterFromMaster(const IsMasterReply& reply);
 
         /**
          * Adjusts the _scan work queue based on information from this host.
