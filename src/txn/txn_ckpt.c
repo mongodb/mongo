@@ -356,10 +356,10 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	    WT_SESSION_begin_transaction), "isolation=snapshot", NULL };
 
 	conn = S2C(session);
-	saved_isolation = session->isolation;
 	txn = &session->txn;
 	txn_global = &conn->txn_global;
-	logging = FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED);
+	saved_isolation = session->isolation;
+	logging = FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED) ? 1 : 0;
 	full = idle = tracking = 0;
 
 	/* Ensure the metadata table is open before taking any locks. */
