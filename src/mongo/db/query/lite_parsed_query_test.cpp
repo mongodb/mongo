@@ -837,6 +837,34 @@ namespace {
         ASSERT_NOT_OK(status);
     }
 
+    TEST(LiteParsedQueryTest, DefaultQueryParametersCorrect) {
+        BSONObj cmdObj = fromjson("{find: 'testns'}");
+
+        LiteParsedQuery* rawLpq;
+        Status status = LiteParsedQuery::make("testns", cmdObj, false, &rawLpq);
+        ASSERT_OK(status);
+
+        boost::scoped_ptr<LiteParsedQuery> lpq(rawLpq);
+
+        ASSERT_EQUALS(0, lpq->getSkip());
+        ASSERT_EQUALS(true, lpq->wantMore());
+        ASSERT_EQUALS(true, lpq->fromFindCommand());
+        ASSERT_EQUALS(false, lpq->isExplain());
+        ASSERT_EQUALS(0, lpq->getMaxScan());
+        ASSERT_EQUALS(0, lpq->getMaxTimeMS());
+        ASSERT_EQUALS(false, lpq->returnKey());
+        ASSERT_EQUALS(false, lpq->showRecordId());
+        ASSERT_EQUALS(false, lpq->isSnapshot());
+        ASSERT_EQUALS(false, lpq->hasReadPref());
+        ASSERT_EQUALS(false, lpq->isTailable());
+        ASSERT_EQUALS(false, lpq->isSlaveOk());
+        ASSERT_EQUALS(false, lpq->isOplogReplay());
+        ASSERT_EQUALS(false, lpq->isNoCursorTimeout());
+        ASSERT_EQUALS(false, lpq->isAwaitData());
+        ASSERT_EQUALS(false, lpq->isExhaust());
+        ASSERT_EQUALS(false, lpq->isPartial());
+    }
+
     //
     // Extra fields cause the parse to fail.
     //

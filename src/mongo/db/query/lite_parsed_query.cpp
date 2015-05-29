@@ -560,25 +560,6 @@ namespace mongo {
         return false;
     }
 
-    LiteParsedQuery::LiteParsedQuery() :
-        _skip(0),
-        _wantMore(true),
-        _fromCommand(false),
-        _explain(false),
-        _maxScan(0),
-        _maxTimeMS(0),
-        _returnKey(false),
-        _showRecordId(false),
-        _snapshot(false),
-        _hasReadPref(false),
-        _tailable(false),
-        _slaveOk(false),
-        _oplogReplay(false),
-        _noCursorTimeout(false),
-        _awaitData(false),
-        _exhaust(false),
-        _partial(false) { }
-
     //
     // Old LiteParsedQuery parsing code: SOON TO BE DEPRECATED.
     //
