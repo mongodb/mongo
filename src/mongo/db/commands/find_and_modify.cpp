@@ -466,11 +466,12 @@ namespace {
             } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "findAndModify", nsString.ns());
 
             WriteConcernResult res;
-            wcResult = waitForWriteConcern(
-                    txn,
-                    repl::ReplClientInfo::forClient(txn->getClient()).getLastOp(),
-                    &res);
-            appendCommandWCStatus(result, wcResult.getStatus());
+            auto waitForWCStatus = waitForWriteConcern(
+                txn,
+                repl::ReplClientInfo::forClient(txn->getClient()).getLastOp(),
+                &res
+            );
+            appendCommandWCStatus(result, waitForWCStatus);
 
             return true;
         }
