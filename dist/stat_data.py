@@ -285,6 +285,7 @@ connection_stats = [
         'no_clear,no_scale'),
     TxnStat('txn_pinned_range',
         'transaction range of IDs currently pinned', 'no_clear,no_scale'),
+    TxnStat('txn_sync', 'transaction sync calls'),
     TxnStat('txn_commit', 'transactions committed'),
     TxnStat('txn_fail_cache', 'transaction failures due to cache overflow'),
     TxnStat('txn_rollback', 'transactions rolled back'),

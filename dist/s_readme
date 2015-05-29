@@ -35,23 +35,25 @@ WiredTiger release packages and documentation can be found at:
 
 	http://source.wiredtiger.com/
 
+The documentation for this specific release can be found at:
+
+	http://source.wiredtiger.com/$WIREDTIGER_VERSION/index.html
+
+The WiredTiger source code can be found at:
+
+	http://github.com/wiredtiger/wiredtiger
+
 WiredTiger uses JIRA for issue management:
 
 	http://jira.mongodb.org/browse/WT
 
 Please do not report issues through GitHub.
 
-Information on configuring, building and installing WiredTiger can be
-found at:
-
-	http://source.wiredtiger.com/$WIREDTIGER_VERSION/install.html
-
 WiredTiger licensing information can be found at:
 
 	http://source.wiredtiger.com/license.html
 
-For general questions and discussion, please use the WiredTiger mailing
-list:
+For general questions and discussion, there's a WiredTiger group:
 
 	http://groups.google.com/group/wiredtiger-users
 END_TEXT

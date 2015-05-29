@@ -82,7 +82,7 @@ __wt_try_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	writers = l->s.writers;
 	old = (pad << 48) + (users << 32) + (users << 16) + writers;
 	new = (pad << 48) + ((users + 1) << 32) + ((users + 1) << 16) + writers;
-	return (WT_ATOMIC_CAS_VAL8(l->u, old, new) == old ? 0 : EBUSY);
+	return (WT_ATOMIC_CAS8(l->u, old, new) ? 0 : EBUSY);
 }
 
 /*
@@ -163,7 +163,7 @@ __wt_try_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	users = l->s.users;
 	old = (pad << 48) + (users << 32) + (readers << 16) + users;
 	new = (pad << 48) + ((users + 1) << 32) + (readers << 16) + users;
-	return (WT_ATOMIC_CAS_VAL8(l->u, old, new) == old ? 0 : EBUSY);
+	return (WT_ATOMIC_CAS8(l->u, old, new) ? 0 : EBUSY);
 }
 
 /*

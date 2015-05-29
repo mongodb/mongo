@@ -31,7 +31,7 @@ __curlog_logrec(WT_SESSION_IMPL *session,
 	 * Read the log header.  Set up the step pointers to walk the
 	 * operations inside the record.  Get the record type.
 	 */
-	cl->stepp = LOG_SKIP_HEADER(cl->logrec->data);
+	cl->stepp = WT_LOG_SKIP_HEADER(cl->logrec->data);
 	cl->stepp_end = (uint8_t *)cl->logrec->data + logrec->size;
 	WT_RET(__wt_logrec_read(session, &cl->stepp, cl->stepp_end,
 	    &cl->rectype));
@@ -174,8 +174,8 @@ __curlog_kv(WT_SESSION_IMPL *session, WT_CURSOR *cursor)
 		 * header and the adjusted size.  Add one to skip over the type
 		 * which is normally consumed by __wt_logrec_read.
 		 */
-		cl->opvalue->data = LOG_SKIP_HEADER(cl->logrec->data) + 1;
-		cl->opvalue->size = LOG_REC_SIZE(cl->logrec->size) - 1;
+		cl->opvalue->data = WT_LOG_SKIP_HEADER(cl->logrec->data) + 1;
+		cl->opvalue->size = WT_LOG_REC_SIZE(cl->logrec->size) - 1;
 	}
 	/*
 	 * The log cursor sets the LSN and step count as the cursor key and
@@ -187,24 +187,25 @@ __curlog_kv(WT_SESSION_IMPL *session, WT_CURSOR *cursor)
 	if (FLD_ISSET(cursor->flags, WT_CURSTD_RAW)) {
 		memset(&item, 0, sizeof(item));
 		WT_RET(wiredtiger_struct_size((WT_SESSION *)session,
-		    &item.size, LOGC_KEY_FORMAT, cl->cur_lsn->file,
+		    &item.size, WT_LOGC_KEY_FORMAT, cl->cur_lsn->file,
 		    cl->cur_lsn->offset, key_count));
 		WT_RET(__wt_realloc(session, NULL, item.size, &cl->packed_key));
 		item.data = cl->packed_key;
 		WT_RET(wiredtiger_struct_pack((WT_SESSION *)session,
-		    cl->packed_key, item.size, LOGC_KEY_FORMAT,
+		    cl->packed_key, item.size, WT_LOGC_KEY_FORMAT,
 		    cl->cur_lsn->file, cl->cur_lsn->offset, key_count));
 		__wt_cursor_set_key(cursor, &item);
 
 		WT_RET(wiredtiger_struct_size((WT_SESSION *)session,
-		    &item.size, LOGC_VALUE_FORMAT, cl->txnid, cl->rectype,
+		    &item.size, WT_LOGC_VALUE_FORMAT, cl->txnid, cl->rectype,
 		    optype, fileid, cl->opkey, cl->opvalue));
 		WT_RET(__wt_realloc(session, NULL, item.size,
 		    &cl->packed_value));
 		item.data = cl->packed_value;
 		WT_RET(wiredtiger_struct_pack((WT_SESSION *)session,
-		    cl->packed_value, item.size, LOGC_VALUE_FORMAT, cl->txnid,
-		    cl->rectype, optype, fileid, cl->opkey, cl->opvalue));
+		    cl->packed_value, item.size, WT_LOGC_VALUE_FORMAT,
+		    cl->txnid, cl->rectype, optype, fileid, cl->opkey,
+		    cl->opvalue));
 		__wt_cursor_set_value(cursor, &item);
 	} else {
 		__wt_cursor_set_key(cursor, cl->cur_lsn->file,
@@ -237,8 +238,11 @@ __curlog_next(WT_CURSOR *cursor)
 	 */
 	if (cl->stepp == NULL || cl->stepp >= cl->stepp_end || !*cl->stepp) {
 		cl->txnid = 0;
-		WT_ERR(__wt_log_scan(session, cl->next_lsn, WT_LOGSCAN_ONE,
-		    __curlog_logrec, cl));
+		ret = __wt_log_scan(session, cl->next_lsn, WT_LOGSCAN_ONE,
+		    __curlog_logrec, cl);
+		if (ret == ENOENT)
+			ret = WT_NOTFOUND;
+		WT_ERR(ret);
 	}
 	WT_ASSERT(session, cl->logrec->data != NULL);
 	WT_ERR(__curlog_kv(session, cursor));
@@ -271,8 +275,11 @@ __curlog_search(WT_CURSOR *cursor)
 	 */
 	WT_ERR(__wt_cursor_get_key((WT_CURSOR *)cl,
 	    &key.file, &key.offset, &counter));
-	WT_ERR(__wt_log_scan(session, &key, WT_LOGSCAN_ONE,
-	    __curlog_logrec, cl));
+	ret = __wt_log_scan(session, &key, WT_LOGSCAN_ONE,
+	    __curlog_logrec, cl);
+	if (ret == ENOENT)
+		ret = WT_NOTFOUND;
+	WT_ERR(ret);
 	WT_ERR(__curlog_kv(session, cursor));
 	WT_STAT_FAST_CONN_INCR(session, cursor_search);
 	WT_STAT_FAST_DATA_INCR(session, cursor_search);
@@ -377,8 +384,8 @@ __wt_curlog_open(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_scr_alloc(session, 0, &cl->logrec));
 	WT_ERR(__wt_scr_alloc(session, 0, &cl->opkey));
 	WT_ERR(__wt_scr_alloc(session, 0, &cl->opvalue));
-	cursor->key_format = LOGC_KEY_FORMAT;
-	cursor->value_format = LOGC_VALUE_FORMAT;
+	cursor->key_format = WT_LOGC_KEY_FORMAT;
+	cursor->value_format = WT_LOGC_VALUE_FORMAT;
 
 	WT_INIT_LSN(cl->cur_lsn);
 	WT_INIT_LSN(cl->next_lsn);

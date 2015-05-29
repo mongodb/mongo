@@ -44,6 +44,7 @@ CAS
 CCCCCCCCCCCCCCCCCC
 CELL's
 CELLs
+CET
 CFLAGS
 CHECKKEY
 CKPT
@@ -53,6 +54,7 @@ CONFIG
 COVERITY
 CPUs
 CRC
+CSV
 CURSORs
 CURSTD
 CallsCustDate
@@ -440,6 +442,7 @@ crc
 create's
 crypto
 cryptobad
+csv
 ctime
 ctype
 curbackup
@@ -736,6 +739,7 @@ noraw
 notfound
 notsup
 nset
+nsnap
 nul
 nuls
 numSymbols

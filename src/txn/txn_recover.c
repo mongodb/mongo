@@ -273,7 +273,7 @@ __txn_log_recover(WT_SESSION_IMPL *session,
 
 	WT_UNUSED(next_lsnp);
 	r = cookie;
-	p = LOG_SKIP_HEADER(logrec->data);
+	p = WT_LOG_SKIP_HEADER(logrec->data);
 	end = (const uint8_t *)logrec->data + logrec->size;
 	WT_UNUSED(firstrecord);
 
@@ -463,8 +463,11 @@ __wt_txn_recover(WT_SESSION_IMPL *session)
 			 * there.
 			 */
 			r.ckpt_lsn = metafile->ckpt_lsn;
-			WT_ERR(__wt_log_scan(session,
-			    &metafile->ckpt_lsn, 0, __txn_log_recover, &r));
+			ret = __wt_log_scan(session,
+			    &metafile->ckpt_lsn, 0, __txn_log_recover, &r);
+			if (ret == ENOENT)
+				ret = 0;
+			WT_ERR(ret);
 		}
 	}
 
@@ -502,9 +505,13 @@ __wt_txn_recover(WT_SESSION_IMPL *session)
 		WT_ERR(__wt_log_scan(session, NULL,
 		    WT_LOGSCAN_FIRST | WT_LOGSCAN_RECOVER,
 		    __txn_log_recover, &r));
-	else
-		WT_ERR(__wt_log_scan(session, &r.ckpt_lsn,
-		    WT_LOGSCAN_RECOVER, __txn_log_recover, &r));
+	else {
+		ret = __wt_log_scan(session, &r.ckpt_lsn,
+		    WT_LOGSCAN_RECOVER, __txn_log_recover, &r);
+		if (ret == ENOENT)
+			ret = 0;
+		WT_ERR(ret);
+	}
 
 	conn->next_file_id = r.max_fileid;
 

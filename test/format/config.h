@@ -57,6 +57,10 @@ typedef struct {
 	char		**vstr;		/* Value for string options */
 } CONFIG;
 
+#define	COMPRESSION_LIST						\
+	"(none | bzip | bzip-raw | lz4 | lz4-noraw | lzo | none | "	\
+	"snappy | zlib | zlib-noraw)"
+
 static CONFIG c[] = {
 	{ "abort",
 	  "if timed run should drop core",			/* 0% */
@@ -111,8 +115,7 @@ static CONFIG c[] = {
 	  C_BOOL, 10, 0, 0, &g.c_compact, NULL },
 
 	{ "compression",
-	  "type of compression (none | bzip | "
-	  "bzip-raw | lz4 | lz4-noraw | lzo | snappy | zlib | zlib-noraw)",
+	  "type of compression " COMPRESSION_LIST,
 	  C_IGNORE|C_STRING, 0, 0, 0, NULL, &g.c_compression },
 
 	{ "data_extend",
@@ -130,6 +133,10 @@ static CONFIG c[] = {
 	{ "dictionary",
 	  "if values are dictionary compressed",		/* 20% */
 	  C_BOOL, 20, 0, 0, &g.c_dictionary, NULL },
+
+	{ "encryption",
+	  "type of encryption (none | rotn-7)",
+	  C_IGNORE|C_STRING, 0, 0, 0, NULL, &g.c_encryption },
 
 	{ "evict_max",
 	  "the maximum number of eviction workers",
@@ -191,6 +198,10 @@ static CONFIG c[] = {
 	{ "logging",
 	  "if logging configured",				/* 30% */
 	  C_BOOL, 30, 0, 0, &g.c_logging, NULL },
+
+	{ "logging_compression",
+	  "type of logging compression " COMPRESSION_LIST,
+	  C_IGNORE|C_STRING, 0, 0, 0, NULL, &g.c_logging_compression },
 
 	{ "logging_archive",
 	  "if log file archival configured",			/* 50% */

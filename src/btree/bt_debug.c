@@ -188,7 +188,7 @@ __dmsg(WT_DBG *ds, const char *fmt, ...)
 		}
 	} else {
 		va_start(ap, fmt);
-		(void)vfprintf(ds->fp, fmt, ap);
+		(void)__wt_vfprintf(ds->fp, fmt, ap);
 		va_end(ap);
 	}
 }
@@ -202,13 +202,14 @@ __wt_debug_addr_print(
     WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_size)
 {
 	WT_DECL_ITEM(buf);
+	WT_DECL_RET;
 
 	WT_RET(__wt_scr_alloc(session, 128, &buf));
-	fprintf(stderr, "%s\n",
-	    __wt_addr_string(session, addr, addr_size, buf));
+	ret = __wt_fprintf(stderr,
+	    "%s\n", __wt_addr_string(session, addr, addr_size, buf));
 	__wt_scr_free(session, &buf);
 
-	return (0);
+	return (ret);
 }
 
 /*
@@ -437,7 +438,7 @@ __debug_tree_shape_worker(WT_DBG *ds, WT_PAGE *page, int level)
 
 	session = ds->session;
 
-	if (page->type == WT_PAGE_ROW_INT || page->type == WT_PAGE_COL_INT) {
+	if (WT_PAGE_IS_INTERNAL(page)) {
 		__dmsg(ds, "%*s" "I" "%d %s\n",
 		    level * 3, " ", level, __debug_tree_shape_info(page));
 		WT_INTL_FOREACH_BEGIN(session, page, ref) {

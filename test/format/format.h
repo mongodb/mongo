@@ -78,6 +78,9 @@ extern WT_EXTENSION_API *wt_api;
 #define	REVERSE_PATH							\
 	EXTPATH "collators/reverse/.libs/libwiredtiger_reverse_collator.so"
 
+#define	ROTN_PATH							\
+	EXTPATH "encryptors/rotn/.libs/libwiredtiger_rotn.so"
+
 #define	KVS_BDB_PATH							\
 	EXTPATH "test/kvs_bdb/.libs/libwiredtiger_kvs_bdb.so"
 #define	HELIUM_PATH							\
@@ -180,6 +183,7 @@ typedef struct {
 	char	*c_checksum;
 	uint32_t c_chunk_size;
 	char	*c_compression;
+	char	*c_encryption;
 	char	*c_config_open;
 	uint32_t c_data_extend;
 	char	*c_data_source;
@@ -201,6 +205,7 @@ typedef struct {
 	uint32_t c_leak_memory;
 	uint32_t c_logging;
 	uint32_t c_logging_archive;
+	char	*c_logging_compression;
 	uint32_t c_logging_prealloc;
 	uint32_t c_lsm_worker_threads;
 	uint32_t c_merge_max;
@@ -241,6 +246,11 @@ typedef struct {
 #define	COMPRESS_ZLIB			8
 #define	COMPRESS_ZLIB_NO_RAW		9
 	u_int c_compression_flag;		/* Compression flag value */
+	u_int c_logging_compression_flag;	/* Log compression flag value */
+
+#define	ENCRYPT_NONE			1
+#define	ENCRYPT_ROTN_7			2
+	u_int c_encryption_flag;		/* Encryption flag value */
 
 #define	ISOLATION_RANDOM		1
 #define	ISOLATION_READ_UNCOMMITTED	2

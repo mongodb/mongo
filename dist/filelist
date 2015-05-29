@@ -166,4 +166,5 @@ src/txn/txn.c
 src/txn/txn_ckpt.c
 src/txn/txn_ext.c
 src/txn/txn_log.c
+src/txn/txn_nsnap.c
 src/txn/txn_recover.c

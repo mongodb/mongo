@@ -39,12 +39,12 @@
  * ever changes.  The value is the following:
  * txnid, record type, operation type, file id, operation key, operation value
  */
-#define	LOGC_KEY_FORMAT		WT_UNCHECKED_STRING(IqI)
-#define	LOGC_VALUE_FORMAT	WT_UNCHECKED_STRING(qIIIuu)
+#define	WT_LOGC_KEY_FORMAT	WT_UNCHECKED_STRING(IqI)
+#define	WT_LOGC_VALUE_FORMAT	WT_UNCHECKED_STRING(qIIIuu)
 
-#define	LOG_SKIP_HEADER(data)						\
+#define	WT_LOG_SKIP_HEADER(data)					\
     ((const uint8_t *)(data) + offsetof(WT_LOG_RECORD, record))
-#define	LOG_REC_SIZE(size)						\
+#define	WT_LOG_REC_SIZE(size)						\
     ((size) - offsetof(WT_LOG_RECORD, record))
 
 /*
@@ -68,6 +68,9 @@
  * WT_LOG_SLOT_WRITTEN - slot is written and should be processed by worker.
  * WT_LOG_SLOT_READY - slot is ready for threads to join.
  * > WT_LOG_SLOT_READY - threads are actively consolidating on this slot.
+ *
+ * The slot state must be volatile: threads loop checking the state and can't
+ * cache the first value they see.
  */
 #define	WT_LOG_SLOT_DONE	0
 #define	WT_LOG_SLOT_FREE	1
@@ -75,10 +78,10 @@
 #define	WT_LOG_SLOT_WRITTEN	3
 #define	WT_LOG_SLOT_READY	4
 typedef WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) struct {
-	int64_t	 slot_state;		/* Slot state */
+	volatile int64_t slot_state;	/* Slot state */
 	uint64_t slot_group_size;	/* Group size */
 	int32_t	 slot_error;		/* Error value */
-#define	SLOT_INVALID_INDEX	0xffffffff
+#define	WT_SLOT_INVALID_INDEX	0xffffffff
 	uint32_t slot_index;		/* Active slot index */
 	wt_off_t slot_start_offset;	/* Starting file offset */
 	WT_LSN	slot_release_lsn;	/* Slot release LSN */
@@ -88,15 +91,15 @@ typedef WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) struct {
 	WT_ITEM slot_buf;		/* Buffer for grouped writes */
 	int32_t	slot_churn;		/* Active slots are scarce. */
 
-#define	SLOT_BUF_GROW	0x01			/* Grow buffer on release */
-#define	SLOT_BUFFERED	0x02			/* Buffer writes */
-#define	SLOT_CLOSEFH	0x04			/* Close old fh on release */
-#define	SLOT_SYNC	0x08			/* Needs sync on release */
-#define	SLOT_SYNC_DIR	0x10			/* Directory sync on release */
+#define	WT_SLOT_BUF_GROW	0x01		/* Grow buffer on release */
+#define	WT_SLOT_BUFFERED	0x02		/* Buffer writes */
+#define	WT_SLOT_CLOSEFH		0x04		/* Close old fh on release */
+#define	WT_SLOT_SYNC		0x08		/* Needs sync on release */
+#define	WT_SLOT_SYNC_DIR	0x10		/* Directory sync on release */
 	uint32_t flags;			/* Flags */
 } WT_LOGSLOT;
 
-#define	SLOT_INIT_FLAGS	(SLOT_BUFFERED)
+#define	WT_SLOT_INIT_FLAGS	(WT_SLOT_BUFFERED)
 
 typedef struct {
 	WT_LOGSLOT	*slot;
@@ -104,7 +107,7 @@ typedef struct {
 } WT_MYSLOT;
 
 					/* Offset of first record */
-#define	LOG_FIRST_RECORD	log->allocsize
+#define	WT_LOG_FIRST_RECORD	log->allocsize
 
 typedef struct {
 	uint32_t	allocsize;	/* Allocation alignment size */
@@ -123,6 +126,7 @@ typedef struct {
 	 * System LSNs
 	 */
 	WT_LSN		alloc_lsn;	/* Next LSN for allocation */
+	WT_LSN		bg_sync_lsn;	/* Latest background sync LSN */
 	WT_LSN		ckpt_lsn;	/* Last checkpoint LSN */
 	WT_LSN		first_lsn;	/* First LSN */
 	WT_LSN		sync_dir_lsn;	/* LSN of the last directory sync */
@@ -147,16 +151,16 @@ typedef struct {
 
 	/*
 	 * Consolidation array information
-	 * SLOT_ACTIVE must be less than SLOT_POOL.
+	 * WT_SLOT_ACTIVE must be less than WT_SLOT_POOL.
 	 * Our testing shows that the more consolidation we generate the
 	 * better the performance we see which equates to an active slot
 	 * slot count of one.
 	 */
-#define	SLOT_ACTIVE	1
-#define	SLOT_POOL	16
+#define	WT_SLOT_ACTIVE	1
+#define	WT_SLOT_POOL	16
 	uint32_t	 pool_index;		/* Global pool index */
-	WT_LOGSLOT	*slot_array[SLOT_ACTIVE];	/* Active slots */
-	WT_LOGSLOT	 slot_pool[SLOT_POOL];	/* Pool of all slots */
+	WT_LOGSLOT	*slot_array[WT_SLOT_ACTIVE];	/* Active slots */
+	WT_LOGSLOT	 slot_pool[WT_SLOT_POOL];	/* Pool of all slots */
 
 #define	WT_LOG_FORCE_CONSOLIDATE	0x01	/* Disable direct writes */
 	uint32_t	 flags;

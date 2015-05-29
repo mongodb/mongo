@@ -29,6 +29,7 @@ flags = {
         'LOGSCAN_RECOVER',
     ],
     'log_write' : [
+        'LOG_BACKGROUND',
         'LOG_DSYNC',
         'LOG_FLUSH',
         'LOG_FSYNC',
@@ -55,7 +56,7 @@ flags = {
         'SKIP_UPDATE_RESTORE',
     ],
     'txn_log_checkpoint' : [
-        'TXN_LOG_CKPT_FAIL',
+        'TXN_LOG_CKPT_CLEANUP',
         'TXN_LOG_CKPT_PREPARE',
         'TXN_LOG_CKPT_START',
         'TXN_LOG_CKPT_STOP',

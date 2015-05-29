@@ -30,13 +30,15 @@
 #include "config.h"
 
 static void	   config_checksum(void);
-static void	   config_compression(void);
+static void	   config_compression(const char *);
+static void	   config_encryption(void);
 static const char *config_file_type(u_int);
 static CONFIG	  *config_find(const char *, size_t);
 static int	   config_is_perm(const char *);
 static void	   config_isolation(void);
 static void	   config_map_checksum(const char *, u_int *);
 static void	   config_map_compression(const char *, u_int *);
+static void	   config_map_encryption(const char *, u_int *);
 static void	   config_map_file_type(const char *, u_int *);
 static void	   config_map_isolation(const char *, u_int *);
 
@@ -134,7 +136,9 @@ config_setup(void)
 		g.c_reverse = 0;
 
 	config_checksum();
-	config_compression();
+	config_compression("compression");
+	config_compression("logging_compression");
+	config_encryption();
 	config_isolation();
 
 	/*
@@ -218,9 +222,10 @@ config_checksum(void)
  *	Compression configuration.
  */
 static void
-config_compression(void)
+config_compression(const char *conf_name)
 {
 	const char *cstr;
+	char confbuf[128];
 
 	/*
 	 * Compression: choose something if compression wasn't specified,
@@ -229,31 +234,60 @@ config_compression(void)
 	 * robust, since it's possible to build compression libraries into
 	 * the WiredTiger library.
 	 */
-	if (!config_is_perm("compression")) {
-		cstr = "compression=none";
+	if (!config_is_perm(conf_name)) {
+		cstr = "none";
 		switch (mmrand(NULL, 1, 20)) {
 		case 1: case 2: case 3: case 4:		/* 20% no compression */
 			break;
 		case 5:					/* 5% bzip */
-			cstr = "compression=bzip";
+			cstr = "bzip";
 			break;
 		case 6:					/* 5% bzip-raw */
-			cstr = "compression=bzip-raw";
+			cstr = "bzip-raw";
 			break;
 		case 7: case 8: case 9: case 10:	/* 20% lz4 */
-			cstr = "compression=lz4";
+			cstr = "lz4";
 			break;
 		case 11:				/* 5% lz4-no-raw */
-			cstr = "compression=lz4-noraw";
+			cstr = "lz4-noraw";
 			break;
 		case 12: case 13: case 14: case 15:	/* 20% snappy */
-			cstr = "compression=snappy";
+			cstr = "snappy";
 			break;
 		case 16: case 17: case 18: case 19:	/* 20% zlib */
-			cstr = "compression=zlib";
+			cstr = "zlib";
 			break;
 		case 20:				/* 5% zlib-no-raw */
-			cstr = "compression=zlib-noraw";
+			cstr = "zlib-noraw";
+			break;
+		}
+
+		(void)snprintf(confbuf, sizeof(confbuf), "%s=%s", conf_name,
+		    cstr);
+		config_single(confbuf, 0);
+	}
+}
+
+/*
+ * config_encryption --
+ *	Encryption configuration.
+ */
+static void
+config_encryption(void)
+{
+	const char *cstr;
+
+	/*
+	 * Encryption: choose something if encryption wasn't specified.
+	 */
+	if (!config_is_perm("encryption")) {
+		cstr = "encryption=none";
+		switch (mmrand(NULL, 1, 10)) {
+		case 1: case 2: case 3: case 4: case 5:	/* 70% no encryption */
+		case 6: case 7:
+			break;
+		case 8: case 9: case 10:		/* 30% rotn */
+			cstr = "encryption=rotn-7";
 			break;
 		}
 
@@ -437,12 +471,21 @@ config_single(const char *s, int perm)
 		    s, "compression", strlen("compression")) == 0) {
 			config_map_compression(ep, &g.c_compression_flag);
 			*cp->vstr = strdup(ep);
+		} else if (strncmp(
+		    s, "encryption", strlen("encryption")) == 0) {
+			config_map_encryption(ep, &g.c_encryption_flag);
+			*cp->vstr = strdup(ep);
 		} else if (strncmp(s, "isolation", strlen("isolation")) == 0) {
 			config_map_isolation(ep, &g.c_isolation_flag);
 			*cp->vstr = strdup(ep);
 		} else if (strncmp(s, "file_type", strlen("file_type")) == 0) {
 			config_map_file_type(ep, &g.type);
 			*cp->vstr = strdup(config_file_type(g.type));
+		} else if (strncmp(s, "logging_compression",
+		    strlen("logging_compression")) == 0) {
+			config_map_compression(ep,
+			    &g.c_logging_compression_flag);
+			*cp->vstr = strdup(ep);
 		} else {
 			free(*cp->vstr);
 			*cp->vstr = strdup(ep);
@@ -538,6 +581,21 @@ config_map_compression(const char *s, u_int *vp)
 		*vp = COMPRESS_ZLIB_NO_RAW;
 	else
 		die(EINVAL, "illegal compression configuration: %s", s);
+}
+
+/*
+ * config_map_encryption --
+ *	Map a encryption configuration to a flag.
+ */
+static void
+config_map_encryption(const char *s, u_int *vp)
+{
+	if (strcmp(s, "none") == 0)
+		*vp = ENCRYPT_NONE;
+	else if (strcmp(s, "rotn-7") == 0)
+		*vp = ENCRYPT_ROTN_7;
+	else
+		die(EINVAL, "illegal encryption configuration: %s", s);
 }
 
 /*
