@@ -7,6 +7,7 @@ processes are terminated.
 
 from __future__ import absolute_import
 
+import atexit
 import logging
 import os
 import os.path
@@ -23,6 +24,7 @@ _POPEN_LOCK = threading.Lock()
 
 # Job objects are the only reliable way to ensure that processes are terminated on Windows.
 if sys.platform == "win32":
+    import win32api
     import win32con
     import win32job
     import win32process
@@ -45,10 +47,14 @@ if sys.platform == "win32":
                                          win32job.JobObjectExtendedLimitInformation,
                                          job_info)
 
-        # TODO: register an atexit handler to ensure that the job object handle gets closed
         return job_object
 
-    _JOB_OBJECT = _init_job_object()
+    # Don't create a job object if the current process is already inside one.
+    if win32job.IsProcessInJob(win32process.GetCurrentProcess(), None):
+        _JOB_OBJECT = None
+    else:
+        _JOB_OBJECT = _init_job_object()
+        atexit.register(win32api.CloseHandle, _JOB_OBJECT)
 
 
 class Process(object):
@@ -85,7 +91,7 @@ class Process(object):
         """
 
         creation_flags = 0
-        if sys.platform == "win32":
+        if sys.platform == "win32" and _JOB_OBJECT is not None:
             creation_flags |= win32process.CREATE_BREAKAWAY_FROM_JOB
 
         with _POPEN_LOCK:
@@ -102,7 +108,7 @@ class Process(object):
         self._stdout_pipe.wait_until_started()
         self._stderr_pipe.wait_until_started()
 
-        if sys.platform == "win32":
+        if sys.platform == "win32" and _JOB_OBJECT is not None:
             try:
                 win32job.AssignProcessToJobObject(_JOB_OBJECT, self._process._handle)
             except win32job.error as err:
