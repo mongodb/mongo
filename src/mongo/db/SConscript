@@ -520,7 +520,6 @@ serverOnlyFiles = [
     "commands/count.cpp",
     "commands/create_indexes.cpp",
     "commands/current_op.cpp",
-    "commands/cursor_responses.cpp",
     "commands/dbhash.cpp",
     "commands/distinct.cpp",
     "commands/drop_indexes.cpp",

@@ -99,12 +99,13 @@ env.Library(
 )
 
 env.Library(
-    target="getmore_request",
+    target='getmore_request_response',
     source=[
-        "getmore_request.cpp"
+        'cursor_responses.cpp',
+        'getmore_request.cpp',
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/bson/bson",
+        '$BUILD_DIR/mongo/bson/bson',
     ],
 )
 
@@ -114,7 +115,7 @@ env.CppUnitTest(
         "getmore_request_test.cpp"
     ],
     LIBDEPS=[
-        "getmore_request",
+        "getmore_request_response",
     ],
 )
 

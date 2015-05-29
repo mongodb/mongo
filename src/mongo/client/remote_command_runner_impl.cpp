@@ -31,8 +31,8 @@
 #include "mongo/client/remote_command_runner_impl.h"
 
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/cursor_responses.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/query/cursor_responses.h"
 #include "mongo/db/query/getmore_request.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/base/status_with.h"

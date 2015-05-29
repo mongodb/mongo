@@ -26,10 +26,11 @@
  *    it in the license file.
  */
 
-#include "mongo/db/commands/cursor_responses.h"
+#include "mongo/platform/basic.h"
+
+#include "mongo/db/query/cursor_responses.h"
 
 #include "mongo/db/jsobj.h"
-#include "mongo/db/repl/replication_coordinator_global.h"
 
 namespace mongo {
 
@@ -42,8 +43,6 @@ namespace mongo {
         cursorObj.append("ns", cursorNamespace);
         cursorObj.append("firstBatch", firstBatch);
         cursorObj.done();
-        // TODO(dannenberg): only append the replication info if it was requested
-        repl::getGlobalReplicationCoordinator()->prepareCursorResponseInfo(builder);
     }
 
     void appendGetMoreResponseObject(long long cursorId,
@@ -55,8 +54,6 @@ namespace mongo {
         cursorObj.append("ns", cursorNamespace);
         cursorObj.append("nextBatch", nextBatch);
         cursorObj.done();
-        // TODO(dannenberg): only append the replication info if it was requested
-        repl::getGlobalReplicationCoordinator()->prepareCursorResponseInfo(builder);
     }
 
 } // namespace mongo

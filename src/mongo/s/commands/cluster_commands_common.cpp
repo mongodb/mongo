@@ -31,6 +31,7 @@
 #include "mongo/s/commands/cluster_commands_common.h"
 
 #include "mongo/db/commands.h"
+#include "mongo/db/query/cursor_responses.h"
 #include "mongo/s/cursors.h"
 
 namespace mongo {
@@ -68,10 +69,12 @@ namespace mongo {
         invariant(!status.isOK());
 
         if (status == ErrorCodes::DatabaseNotFound) {
-            result << "result" << BSONArray()
-                   << "cursor" << BSON("id" << 0LL <<
-                                       "ns" << ns <<
-                                       "firstBatch" << BSONArray());
+            // Old style reply
+            result << "result" << BSONArray();
+
+            // New (command) style reply
+            appendCursorResponseObject(0LL, ns, BSONArray(), &result);
+
             return true;
         }
 

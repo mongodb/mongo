@@ -28,15 +28,17 @@
 *    it in the license file.
 */
 
+#include "mongo/platform/basic.h"
+
 #include <memory>
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/cursor_responses.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/multi_iterator.h"
+#include "mongo/db/query/cursor_responses.h"
 
 namespace mongo {
 
