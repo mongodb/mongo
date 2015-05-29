@@ -249,6 +249,275 @@ TEST(IndexBoundsTest, ComplementRanges2) {
 }
 
 //
+// Equality
+//
+
+TEST(IndexBoundsTest, IndexBoundsEqual) {
+    // Both sets of bounds are {a: [[1, 3), (4, 5]], b: [[1,1]]}
+    OrderedIntervalList oil1;
+    oil1.name = "a";
+    oil1.intervals.push_back(Interval(BSON("" << 1 << "" << 3), true, false));
+    oil1.intervals.push_back(Interval(BSON("" << 4 << "" << 5), false, true));
+
+    OrderedIntervalList oil2;
+    oil2.name = "b";
+    oil2.intervals.push_back(Interval(BSON("" << 1 << "" << 1), true, true));
+
+    IndexBounds bounds1;
+    bounds1.fields.push_back(oil1);
+    bounds1.fields.push_back(oil2);
+
+    OrderedIntervalList oil3;
+    oil3.name = "a";
+    oil3.intervals.push_back(Interval(BSON("" << 1 << "" << 3), true, false));
+    oil3.intervals.push_back(Interval(BSON("" << 4 << "" << 5), false, true));
+
+    OrderedIntervalList oil4;
+    oil4.name = "b";
+    oil4.intervals.push_back(Interval(BSON("" << 1 << "" << 1), true, true));
+
+    IndexBounds bounds2;
+    bounds2.fields.push_back(oil3);
+    bounds2.fields.push_back(oil4);
+
+    ASSERT_TRUE(bounds1 == bounds2);
+    ASSERT_FALSE(bounds1 != bounds2);
+}
+
+TEST(IndexBoundsTest, EmptyBoundsEqual) {
+    IndexBounds bounds1;
+    IndexBounds bounds2;
+    ASSERT_TRUE(bounds1 == bounds2);
+    ASSERT_FALSE(bounds1 != bounds2);
+}
+
+TEST(IndexBoundsTest, SimpleRangeBoundsEqual) {
+    IndexBounds bounds1;
+    bounds1.isSimpleRange = true;
+    bounds1.startKey = BSON("" << 1 << "" << 3);
+    bounds1.endKey = BSON("" << 2 << "" << 4);
+    bounds1.endKeyInclusive = false;
+
+    IndexBounds bounds2;
+    bounds2.isSimpleRange = true;
+    bounds2.startKey = BSON("" << 1 << "" << 3);
+    bounds2.endKey = BSON("" << 2 << "" << 4);
+    bounds2.endKeyInclusive = false;
+
+    ASSERT_TRUE(bounds1 == bounds2);
+    ASSERT_FALSE(bounds1 != bounds2);
+}
+
+TEST(IndexBoundsTest, BoundsNotEqualDifferentFieldNames) {
+    // First set of bounds: {a: [[1, 3), (4, 5]], b: [[1,1]]}
+    OrderedIntervalList oil1;
+    oil1.name = "a";
+    oil1.intervals.push_back(Interval(BSON("" << 1 << "" << 3), true, false));
+    oil1.intervals.push_back(Interval(BSON("" << 4 << "" << 5), false, true));
+
+    OrderedIntervalList oil2;
+    oil2.name = "b";
+    oil2.intervals.push_back(Interval(BSON("" << 1 << "" << 1), true, true));
+
+    IndexBounds bounds1;
+    bounds1.fields.push_back(oil1);
+    bounds1.fields.push_back(oil2);
+
+    // Second set of bounds identical except for the second field name:
+    //    {a: [[1, 3), (4, 5]], c: [[1,1]]}
+    OrderedIntervalList oil3;
+    oil3.name = "a";
+    oil3.intervals.push_back(Interval(BSON("" << 1 << "" << 3), true, false));
+    oil3.intervals.push_back(Interval(BSON("" << 4 << "" << 5), false, true));
+
+    OrderedIntervalList oil4;
+    oil4.name = "c";
+    oil4.intervals.push_back(Interval(BSON("" << 1 << "" << 1), true, true));
+
+    IndexBounds bounds2;
+    bounds2.fields.push_back(oil3);
+    bounds2.fields.push_back(oil4);
+
+    ASSERT_FALSE(bounds1 == bounds2);
+    ASSERT_TRUE(bounds1 != bounds2);
+}
+
+TEST(IndexBoundsTest, BoundsNotEqualOneRangeExclusive) {
+    // First set of bounds: {a: [[1, 3), (4, 5]], b: [[1,1]]}
+    OrderedIntervalList oil1;
+    oil1.name = "a";
+    oil1.intervals.push_back(Interval(BSON("" << 1 << "" << 3), true, false));
+    oil1.intervals.push_back(Interval(BSON("" << 4 << "" << 5), false, true));
+
+    OrderedIntervalList oil2;
+    oil2.name = "b";
+    oil2.intervals.push_back(Interval(BSON("" << 1 << "" << 1), true, true));
+
+    IndexBounds bounds1;
+    bounds1.fields.push_back(oil1);
+    bounds1.fields.push_back(oil2);
+
+    // Second set of bounds identical except for (4, 5] changed to (4, 5):
+    //    {a: [[1, 3), (4, 5]], b: [[1,1]]}
+    OrderedIntervalList oil3;
+    oil3.name = "a";
+    oil3.intervals.push_back(Interval(BSON("" << 1 << "" << 3), true, false));
+    oil3.intervals.push_back(Interval(BSON("" << 4 << "" << 5), false, false));
+
+    OrderedIntervalList oil4;
+    oil4.name = "b";
+    oil4.intervals.push_back(Interval(BSON("" << 1 << "" << 1), true, true));
+
+    IndexBounds bounds2;
+    bounds2.fields.push_back(oil3);
+    bounds2.fields.push_back(oil4);
+
+    ASSERT_FALSE(bounds1 == bounds2);
+    ASSERT_TRUE(bounds1 != bounds2);
+}
+
+TEST(IndexBoundsTest, BoundsNotEqualExtraInterval) {
+    // First set of bounds: {a: [[1, 3), (4, 5]], b: [[1,1]]}
+    OrderedIntervalList oil1;
+    oil1.name = "a";
+    oil1.intervals.push_back(Interval(BSON("" << 1 << "" << 3), true, false));
+    oil1.intervals.push_back(Interval(BSON("" << 4 << "" << 5), false, true));
+
+    OrderedIntervalList oil2;
+    oil2.name = "b";
+    oil2.intervals.push_back(Interval(BSON("" << 1 << "" << 1), true, true));
+
+    IndexBounds bounds1;
+    bounds1.fields.push_back(oil1);
+    bounds1.fields.push_back(oil2);
+
+    // Second set of bounds has an additional interval for field 'a':
+    //    {a: [[1, 3), (4, 5], (6, 7)], b: [[1,1]]}
+    OrderedIntervalList oil3;
+    oil3.name = "a";
+    oil3.intervals.push_back(Interval(BSON("" << 1 << "" << 3), true, false));
+    oil3.intervals.push_back(Interval(BSON("" << 4 << "" << 5), false, true));
+    oil3.intervals.push_back(Interval(BSON("" << 6 << "" << 7), false, false));
+
+    OrderedIntervalList oil4;
+    oil4.name = "b";
+    oil4.intervals.push_back(Interval(BSON("" << 1 << "" << 1), true, true));
+
+    IndexBounds bounds2;
+    bounds2.fields.push_back(oil3);
+    bounds2.fields.push_back(oil4);
+
+    ASSERT_FALSE(bounds1 == bounds2);
+    ASSERT_TRUE(bounds1 != bounds2);
+}
+
+TEST(IndexBoundsTest, BoundsNotEqualExtraField) {
+    // First set of bounds: {a: [[1, 3), (4, 5]], b: [[1,1]]}
+    OrderedIntervalList oil1;
+    oil1.name = "a";
+    oil1.intervals.push_back(Interval(BSON("" << 1 << "" << 3), true, false));
+    oil1.intervals.push_back(Interval(BSON("" << 4 << "" << 5), false, true));
+
+    OrderedIntervalList oil2;
+    oil2.name = "b";
+    oil2.intervals.push_back(Interval(BSON("" << 1 << "" << 1), true, true));
+
+    IndexBounds bounds1;
+    bounds1.fields.push_back(oil1);
+    bounds1.fields.push_back(oil2);
+
+    // Second set of bounds has an additional field 'c':
+    //    {a: [[1, 3), (4, 5]], b: [[1,1]], c: [[1]]}
+    OrderedIntervalList oil3;
+    oil3.name = "a";
+    oil3.intervals.push_back(Interval(BSON("" << 1 << "" << 3), true, false));
+    oil3.intervals.push_back(Interval(BSON("" << 4 << "" << 5), false, true));
+
+    OrderedIntervalList oil4;
+    oil4.name = "b";
+    oil4.intervals.push_back(Interval(BSON("" << 1 << "" << 1), true, true));
+
+    OrderedIntervalList oil5;
+    oil4.name = "c";
+    oil4.intervals.push_back(Interval(BSON("" << 1 << "" << 1), true, true));
+
+    IndexBounds bounds2;
+    bounds2.fields.push_back(oil3);
+    bounds2.fields.push_back(oil4);
+    bounds2.fields.push_back(oil5);
+
+    ASSERT_FALSE(bounds1 == bounds2);
+    ASSERT_TRUE(bounds1 != bounds2);
+}
+
+TEST(IndexBoundsTest, SimpleRangeBoundsNotEqualToRegularBounds) {
+    IndexBounds bounds1;
+    bounds1.isSimpleRange = true;
+    bounds1.startKey = BSON("" << 1 << "" << 3);
+    bounds1.endKey = BSON("" << 2 << "" << 4);
+    bounds1.endKeyInclusive = false;
+
+    IndexBounds bounds2;
+    OrderedIntervalList oil;
+    oil.intervals.push_back(Interval(BSON("" << 1 << "" << 1), true, true));
+    bounds2.fields.push_back(oil);
+
+    ASSERT_FALSE(bounds1 == bounds2);
+    ASSERT_TRUE(bounds1 != bounds2);
+}
+
+TEST(IndexBoundsTest, SimpleRangeBoundsNotEqualDifferentStartKey) {
+    IndexBounds bounds1;
+    bounds1.isSimpleRange = true;
+    bounds1.startKey = BSON("" << 1 << "" << 3);
+    bounds1.endKey = BSON("" << 2 << "" << 4);
+    bounds1.endKeyInclusive = false;
+
+    IndexBounds bounds2;
+    bounds1.isSimpleRange = true;
+    bounds1.startKey = BSON("" << 1 << "" << 1);
+    bounds1.endKey = BSON("" << 2 << "" << 4);
+    bounds1.endKeyInclusive = false;
+
+    ASSERT_FALSE(bounds1 == bounds2);
+    ASSERT_TRUE(bounds1 != bounds2);
+}
+
+TEST(IndexBoundsTest, SimpleRangeBoundsNotEqualDifferentEndKey) {
+    IndexBounds bounds1;
+    bounds1.isSimpleRange = true;
+    bounds1.startKey = BSON("" << 1 << "" << 3);
+    bounds1.endKey = BSON("" << 2 << "" << 4);
+    bounds1.endKeyInclusive = false;
+
+    IndexBounds bounds2;
+    bounds1.isSimpleRange = true;
+    bounds1.startKey = BSON("" << 1 << "" << 3);
+    bounds1.endKey = BSON("" << 2 << "" << 99);
+    bounds1.endKeyInclusive = false;
+
+    ASSERT_FALSE(bounds1 == bounds2);
+    ASSERT_TRUE(bounds1 != bounds2);
+}
+
+TEST(IndexBoundsTest, SimpleRangeBoundsNotEqualDifferentEndKeyInclusive) {
+    IndexBounds bounds1;
+    bounds1.isSimpleRange = true;
+    bounds1.startKey = BSON("" << 1 << "" << 3);
+    bounds1.endKey = BSON("" << 2 << "" << 4);
+    bounds1.endKeyInclusive = false;
+
+    IndexBounds bounds2;
+    bounds1.isSimpleRange = true;
+    bounds1.startKey = BSON("" << 1 << "" << 3);
+    bounds1.endKey = BSON("" << 2 << "" << 4);
+    bounds1.endKeyInclusive = true;
+
+    ASSERT_FALSE(bounds1 == bounds2);
+    ASSERT_TRUE(bounds1 != bounds2);
+}
+
+//
 // Iteration over
 //
 

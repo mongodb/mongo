@@ -39,6 +39,7 @@
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/record_id.h"
+#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
@@ -108,6 +109,19 @@ public:
      * Returns a non-OK status if the plan was killed during yield or if planning fails.
      */
     Status pickBestPlan(PlanYieldPolicy* yieldPolicy);
+
+    /**
+     * Takes a match expression, 'root', which has a single "contained OR". This means that
+     * 'root' is an AND with exactly one OR child.
+     *
+     * Returns a logically equivalent query after rewriting so that the contained OR is at the
+     * root of the expression tree.
+     *
+     * Used internally so that the subplanner can be used for contained OR type queries, but
+     * exposed for testing.
+     */
+    static std::unique_ptr<MatchExpression> rewriteToRootedOr(
+        std::unique_ptr<MatchExpression> root);
 
     //
     // For testing.
@@ -179,6 +193,11 @@ private:
 
     // Not owned here.
     CanonicalQuery* _query;
+
+    // The copy of the query that we will annotate with tags and use to construct the composite
+    // solution. Must be a rooted $or query, or a contained $or that has been rewritten to a
+    // rooted $or.
+    std::unique_ptr<MatchExpression> _orExpression;
 
     // If we successfully create a "composite solution" by planning each $or branch
     // independently, that solution is owned here.

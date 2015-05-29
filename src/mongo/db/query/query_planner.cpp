@@ -662,7 +662,7 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
            << query.root()->toString();
 
     // If there is a GEO_NEAR it must have an index it can use directly.
-    MatchExpression* gnNode = NULL;
+    const MatchExpression* gnNode = NULL;
     if (QueryPlannerCommon::hasNode(query.root(), MatchExpression::GEO_NEAR, &gnNode)) {
         // No index for GEO_NEAR?  No query.
         RelevantTag* tag = static_cast<RelevantTag*>(gnNode->getTag());
@@ -677,7 +677,7 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
     }
 
     // Likewise, if there is a TEXT it must have an index it can use directly.
-    MatchExpression* textNode = NULL;
+    const MatchExpression* textNode = NULL;
     if (QueryPlannerCommon::hasNode(query.root(), MatchExpression::TEXT, &textNode)) {
         RelevantTag* tag = static_cast<RelevantTag*>(textNode->getTag());
 

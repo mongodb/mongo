@@ -47,7 +47,6 @@ struct OrderedIntervalList {
     // Must be ordered according to the index order.
     std::vector<Interval> intervals;
 
-    // TODO: We could drop this.  Only used in IndexBounds::isValidFor.
     std::string name;
 
     bool isValidFor(int expectedOrientation) const;
@@ -65,6 +64,9 @@ struct OrderedIntervalList {
      *   where this OIL has direction==1.
      */
     void complement();
+
+    bool operator==(const OrderedIntervalList& other) const;
+    bool operator!=(const OrderedIntervalList& other) const;
 };
 
 /**
@@ -94,6 +96,9 @@ struct IndexBounds {
     size_t getNumIntervals(size_t i) const;
     Interval getInterval(size_t i, size_t j) const;
     std::string toString() const;
+
+    bool operator==(const IndexBounds& other) const;
+    bool operator!=(const IndexBounds& other) const;
 
     /**
      * BSON format for explain. The format is an array of strings for each field.

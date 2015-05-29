@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <memory>
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
@@ -457,6 +458,8 @@ struct IndexScanNode : public QuerySolutionNode {
     }
 
     QuerySolutionNode* clone() const;
+
+    bool operator==(const IndexScanNode& other) const;
 
     BSONObjSet _sorts;
 

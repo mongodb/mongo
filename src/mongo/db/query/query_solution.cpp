@@ -578,6 +578,27 @@ QuerySolutionNode* IndexScanNode::clone() const {
     return copy;
 }
 
+namespace {
+
+bool filtersAreEquivalent(const MatchExpression* lhs, const MatchExpression* rhs) {
+    if (!lhs && !rhs) {
+        return true;
+    } else if (!lhs || !rhs) {
+        return false;
+    } else {
+        return lhs->equivalent(rhs);
+    }
+}
+
+}  // namespace
+
+bool IndexScanNode::operator==(const IndexScanNode& other) const {
+    return filtersAreEquivalent(filter.get(), other.filter.get()) &&
+        indexKeyPattern == other.indexKeyPattern && indexIsMultiKey == other.indexIsMultiKey &&
+        direction == other.direction && maxScan == other.maxScan &&
+        addKeyMetadata == other.addKeyMetadata && bounds == other.bounds;
+}
+
 //
 // ProjectionNode
 //

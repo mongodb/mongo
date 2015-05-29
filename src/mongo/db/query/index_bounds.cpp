@@ -29,6 +29,7 @@
 #include "mongo/db/query/index_bounds.h"
 
 #include <algorithm>
+#include <tuple>
 #include <utility>
 
 namespace mongo {
@@ -93,6 +94,33 @@ Interval IndexBounds::getInterval(size_t i, size_t j) const {
     }
 }
 
+bool IndexBounds::operator==(const IndexBounds& other) const {
+    if (this->isSimpleRange != other.isSimpleRange) {
+        return false;
+    }
+
+    if (this->isSimpleRange) {
+        return std::tie(this->startKey, this->endKey, this->endKeyInclusive) ==
+            std::tie(other.startKey, other.endKey, other.endKeyInclusive);
+    }
+
+    if (this->fields.size() != other.fields.size()) {
+        return false;
+    }
+
+    for (size_t i = 0; i < this->fields.size(); ++i) {
+        if (this->fields[i] != other.fields[i]) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool IndexBounds::operator!=(const IndexBounds& other) const {
+    return !(*this == other);
+}
+
 string OrderedIntervalList::toString() const {
     mongoutils::str::stream ss;
     ss << "['" << name << "']: ";
@@ -103,6 +131,28 @@ string OrderedIntervalList::toString() const {
         }
     }
     return ss;
+}
+
+bool OrderedIntervalList::operator==(const OrderedIntervalList& other) const {
+    if (this->name != other.name) {
+        return false;
+    }
+
+    if (this->intervals.size() != other.intervals.size()) {
+        return false;
+    }
+
+    for (size_t i = 0; i < this->intervals.size(); ++i) {
+        if (this->intervals[i] != other.intervals[i]) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool OrderedIntervalList::operator!=(const OrderedIntervalList& other) const {
+    return !(*this == other);
 }
 
 // static

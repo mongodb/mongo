@@ -40,6 +40,7 @@
 #include "mongo/db/query/planner_analysis.h"
 #include "mongo/db/query/planner_access.h"
 #include "mongo/db/query/query_planner.h"
+#include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/stage_builder.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
@@ -51,7 +52,6 @@ using std::unique_ptr;
 using std::vector;
 using stdx::make_unique;
 
-// static
 const char* SubplanStage::kStageType = "SUBPLAN";
 
 SubplanStage::SubplanStage(OperationContext* txn,
@@ -64,20 +64,35 @@ SubplanStage::SubplanStage(OperationContext* txn,
       _ws(ws),
       _plannerParams(params),
       _query(cq),
-      _child(nullptr),
       _commonStats(kStageType) {
     invariant(_collection);
 }
 
-// static
+namespace {
+
+/**
+ * Returns true if 'expr' is an AND that contains a single OR child.
+ */
+bool isContainedOr(const MatchExpression* expr) {
+    if (MatchExpression::AND != expr->matchType()) {
+        return false;
+    }
+
+    size_t numOrs = 0;
+    for (size_t i = 0; i < expr->numChildren(); ++i) {
+        if (MatchExpression::OR == expr->getChild(i)->matchType()) {
+            ++numOrs;
+        }
+    }
+
+    return (numOrs == 1U);
+}
+
+}  // namespace
+
 bool SubplanStage::canUseSubplanning(const CanonicalQuery& query) {
     const LiteParsedQuery& lpq = query.getParsed();
     const MatchExpression* expr = query.root();
-
-    // Only rooted ORs work with the subplan scheme.
-    if (MatchExpression::OR != expr->matchType()) {
-        return false;
-    }
 
     // Hint provided
     if (!lpq.getHint().isEmpty()) {
@@ -106,7 +121,52 @@ bool SubplanStage::canUseSubplanning(const CanonicalQuery& query) {
         return false;
     }
 
-    return true;
+    // If it's a rooted $or and has none of the disqualifications above, then subplanning is
+    // allowed.
+    if (MatchExpression::OR == expr->matchType()) {
+        return true;
+    }
+
+    // We also allow subplanning if it's a contained OR that does not have a TEXT or GEO_NEAR node.
+    const bool hasTextOrGeoNear = QueryPlannerCommon::hasNode(expr, MatchExpression::TEXT) ||
+        QueryPlannerCommon::hasNode(expr, MatchExpression::GEO_NEAR);
+    return isContainedOr(expr) && !hasTextOrGeoNear;
+}
+
+std::unique_ptr<MatchExpression> SubplanStage::rewriteToRootedOr(
+    std::unique_ptr<MatchExpression> root) {
+    dassert(isContainedOr(root.get()));
+
+    // Detach the OR from the root.
+    std::vector<MatchExpression*>& rootChildren = *root->getChildVector();
+    std::unique_ptr<MatchExpression> orChild;
+    for (size_t i = 0; i < rootChildren.size(); ++i) {
+        if (MatchExpression::OR == rootChildren[i]->matchType()) {
+            orChild.reset(rootChildren[i]);
+            rootChildren.erase(rootChildren.begin() + i);
+            break;
+        }
+    }
+
+    // We should have found an OR, and the OR should have at least 2 children.
+    invariant(orChild);
+    invariant(orChild->getChildVector());
+    invariant(orChild->getChildVector()->size() > 1U);
+
+    // AND the existing root with each OR child.
+    std::vector<MatchExpression*>& orChildren = *orChild->getChildVector();
+    for (size_t i = 0; i < orChildren.size(); ++i) {
+        std::unique_ptr<AndMatchExpression> ama = stdx::make_unique<AndMatchExpression>();
+        ama->add(orChildren[i]);
+        ama->add(root->shallowClone().release());
+        orChildren[i] = ama.release();
+    }
+
+    // Normalize and sort the resulting match expression.
+    orChild = std::unique_ptr<MatchExpression>(CanonicalQuery::normalizeTree(orChild.release()));
+    CanonicalQuery::sortTree(orChild.get());
+
+    return orChild;
 }
 
 Status SubplanStage::planSubqueries() {
@@ -114,22 +174,26 @@ Status SubplanStage::planSubqueries() {
     // work that happens here, so this is needed for the time accounting to make sense.
     ScopedTimer timer(&_commonStats.executionTimeMillis);
 
-    MatchExpression* orExpr = _query->root();
+    _orExpression = _query->root()->shallowClone();
+    if (isContainedOr(_orExpression.get())) {
+        _orExpression = rewriteToRootedOr(std::move(_orExpression));
+        invariant(CanonicalQuery::isValid(_orExpression.get(), _query->getParsed()).isOK());
+    }
 
     for (size_t i = 0; i < _plannerParams.indices.size(); ++i) {
         const IndexEntry& ie = _plannerParams.indices[i];
         _indexMap[ie.keyPattern] = i;
-        LOG(5) << "Subplanner: index " << i << " is " << ie.toString() << endl;
+        LOG(5) << "Subplanner: index " << i << " is " << ie.toString();
     }
 
     const WhereCallbackReal whereCallback(_txn, _collection->ns().db());
 
-    for (size_t i = 0; i < orExpr->numChildren(); ++i) {
+    for (size_t i = 0; i < _orExpression->numChildren(); ++i) {
         // We need a place to shove the results from planning this branch.
         _branchResults.push_back(new BranchPlanningResult());
         BranchPlanningResult* branchResult = _branchResults.back();
 
-        MatchExpression* orChild = orExpr->getChild(i);
+        MatchExpression* orChild = _orExpression->getChild(i);
 
         // Turn the i-th child into its own query.
         auto statusWithCQ = CanonicalQuery::canonicalize(*_query, orChild, whereCallback);
@@ -152,12 +216,12 @@ Status SubplanStage::planSubqueries() {
                 .isOK()) {
             // We have a CachedSolution. Store it for later.
             LOG(5) << "Subplanner: cached plan found for child " << i << " of "
-                   << orExpr->numChildren();
+                   << _orExpression->numChildren();
 
             branchResult->cachedSolution.reset(rawCS);
         } else {
             // No CachedSolution found. We'll have to plan from scratch.
-            LOG(5) << "Subplanner: planning child " << i << " of " << orExpr->numChildren();
+            LOG(5) << "Subplanner: planning child " << i << " of " << _orExpression->numChildren();
 
             // We don't set NO_TABLE_SCAN because peeking at the cache data will keep us from
             // considering any plan that's a collscan.
@@ -230,15 +294,11 @@ Status tagOrChildAccordingToCache(PlanCacheIndexTree* compositeCacheData,
 }  // namespace
 
 Status SubplanStage::choosePlanForSubqueries(PlanYieldPolicy* yieldPolicy) {
-    // This is what we annotate with the index selections and then turn into a solution.
-    unique_ptr<OrMatchExpression> orExpr(
-        static_cast<OrMatchExpression*>(_query->root()->shallowClone().release()));
-
     // This is the skeleton of index selections that is inserted into the cache.
-    unique_ptr<PlanCacheIndexTree> cacheData(new PlanCacheIndexTree());
+    std::unique_ptr<PlanCacheIndexTree> cacheData(new PlanCacheIndexTree());
 
-    for (size_t i = 0; i < orExpr->numChildren(); ++i) {
-        MatchExpression* orChild = orExpr->getChild(i);
+    for (size_t i = 0; i < _orExpression->numChildren(); ++i) {
+        MatchExpression* orChild = _orExpression->getChild(i);
         BranchPlanningResult* branchResult = _branchResults[i];
 
         if (branchResult->cachedSolution.get()) {
@@ -319,11 +379,11 @@ Status SubplanStage::choosePlanForSubqueries(PlanYieldPolicy* yieldPolicy) {
     }
 
     // Must do this before using the planner functionality.
-    sortUsingTags(orExpr.get());
+    sortUsingTags(_orExpression.get());
 
-    // Use the cached index assignments to build solnRoot.  Takes ownership of 'orExpr'.
+    // Use the cached index assignments to build solnRoot. Takes ownership of '_orExpression'.
     QuerySolutionNode* solnRoot = QueryPlannerAccess::buildIndexedDataAccess(
-        *_query, orExpr.release(), false, _plannerParams.indices, _plannerParams);
+        *_query, _orExpression.release(), false, _plannerParams.indices, _plannerParams);
 
     if (NULL == solnRoot) {
         mongoutils::str::stream ss;
@@ -343,7 +403,7 @@ Status SubplanStage::choosePlanForSubqueries(PlanYieldPolicy* yieldPolicy) {
         return Status(ErrorCodes::BadValue, ss);
     }
 
-    LOG(5) << "Subplanner: Composite solution is " << _compositeSolution->toString() << endl;
+    LOG(5) << "Subplanner: Composite solution is " << _compositeSolution->toString();
 
     // Use the index tags from planning each branch to construct the composite solution,
     // and set that solution as our child stage.
@@ -360,7 +420,7 @@ Status SubplanStage::choosePlanWholeQuery(PlanYieldPolicy* yieldPolicy) {
     _ws->clear();
 
     // Use the query planning module to plan the whole query.
-    vector<QuerySolution*> rawSolutions;
+    std::vector<QuerySolution*> rawSolutions;
     Status status = QueryPlanner::plan(*_query, _plannerParams, &rawSolutions);
     if (!status.isOK()) {
         return Status(ErrorCodes::BadValue,
@@ -499,8 +559,8 @@ void SubplanStage::invalidate(OperationContext* txn, const RecordId& dl, Invalid
     }
 }
 
-vector<PlanStage*> SubplanStage::getChildren() const {
-    vector<PlanStage*> children;
+std::vector<PlanStage*> SubplanStage::getChildren() const {
+    std::vector<PlanStage*> children;
     if (NULL != _child.get()) {
         children.push_back(_child.get());
     }

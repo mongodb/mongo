@@ -28,11 +28,14 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/query/planner_access.h"
 
 #include <algorithm>
 #include <vector>
 
+#include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/matcher/expression_text.h"
@@ -54,6 +57,51 @@ using namespace mongo;
  */
 bool isTextNode(const QuerySolutionNode* node) {
     return STAGE_TEXT == node->getType();
+}
+
+/**
+ * Casts 'node' to a FetchNode* if it is a FetchNode, otherwise returns null.
+ */
+FetchNode* getFetchNode(QuerySolutionNode* node) {
+    if (STAGE_FETCH != node->getType()) {
+        return nullptr;
+    }
+
+    return static_cast<FetchNode*>(node);
+}
+
+/**
+ * If 'node' is an index scan node, casts it to IndexScanNode*. If 'node' is a FetchNode with an
+ * IndexScanNode child, then returns a pointer to the child index scan node. Otherwise returns
+ * null.
+ */
+const IndexScanNode* getIndexScanNode(const QuerySolutionNode* node) {
+    if (STAGE_IXSCAN == node->getType()) {
+        return static_cast<const IndexScanNode*>(node);
+    } else if (STAGE_FETCH == node->getType()) {
+        invariant(1U == node->children.size());
+        const QuerySolutionNode* child = node->children[0];
+        if (STAGE_IXSCAN == child->getType()) {
+            return static_cast<const IndexScanNode*>(child);
+        }
+    }
+
+    return nullptr;
+}
+
+/**
+ * Takes as input two query solution nodes returned by processIndexScans(). If both are
+ * IndexScanNode or FetchNode with an IndexScanNode child and the index scan nodes are identical
+ * (same bounds, same filter, same direction, etc.), then returns true. Otherwise returns false.
+ */
+bool scansAreEquivalent(const QuerySolutionNode* lhs, const QuerySolutionNode* rhs) {
+    const IndexScanNode* leftIxscan = getIndexScanNode(lhs);
+    const IndexScanNode* rightIxscan = getIndexScanNode(rhs);
+    if (!leftIxscan || !rightIxscan) {
+        return false;
+    }
+
+    return *leftIxscan == *rightIxscan;
 }
 
 }  // namespace
@@ -567,6 +615,61 @@ void QueryPlannerAccess::findElemMatchChildren(const MatchExpression* node,
 }
 
 // static
+std::vector<QuerySolutionNode*> QueryPlannerAccess::collapseEquivalentScans(
+    const std::vector<QuerySolutionNode*> scans) {
+    OwnedPointerVector<QuerySolutionNode> ownedScans(scans);
+    invariant(ownedScans.size() > 0);
+
+    // Scans that need to be collapsed will be adjacent to each other in the list due to how we
+    // sort the query predicate. We step through the list, either merging the current scan into
+    // the last scan in 'collapsedScans', or adding a new entry to 'collapsedScans' if it can't
+    // be merged.
+    OwnedPointerVector<QuerySolutionNode> collapsedScans;
+
+    collapsedScans.push_back(ownedScans.releaseAt(0));
+    for (size_t i = 1; i < ownedScans.size(); ++i) {
+        if (scansAreEquivalent(collapsedScans.back(), ownedScans[i])) {
+            // We collapse the entry from 'ownedScans' into the back of 'collapsedScans'.
+            std::unique_ptr<QuerySolutionNode> collapseFrom(ownedScans.releaseAt(i));
+            FetchNode* collapseFromFetch = getFetchNode(collapseFrom.get());
+            FetchNode* collapseIntoFetch = getFetchNode(collapsedScans.back());
+
+            // If there's no filter associated with a fetch node on 'collapseFrom', all we have to
+            // do is clear the filter on the node that we are collapsing into.
+            if (!collapseFromFetch || !collapseFromFetch->filter.get()) {
+                if (collapseIntoFetch) {
+                    collapseIntoFetch->filter.reset();
+                }
+                continue;
+            }
+
+            // If there's no filter associated with a fetch node on the back of the 'collapsedScans'
+            // list, then there's nothing more to do.
+            if (!collapseIntoFetch || !collapseIntoFetch->filter.get()) {
+                continue;
+            }
+
+            // Both the 'from' and 'into' nodes have filters. We join them with an
+            // OrMatchExpression.
+            std::unique_ptr<OrMatchExpression> collapsedFilter =
+                stdx::make_unique<OrMatchExpression>();
+            collapsedFilter->add(collapseFromFetch->filter.release());
+            collapsedFilter->add(collapseIntoFetch->filter.release());
+
+            // Normalize the filter and add it to 'into'.
+            collapseIntoFetch->filter.reset(
+                CanonicalQuery::normalizeTree(collapsedFilter.release()));
+        } else {
+            // Scans are not equivalent and can't be collapsed.
+            collapsedScans.push_back(ownedScans.releaseAt(i));
+        }
+    }
+
+    invariant(collapsedScans.size() > 0);
+    return collapsedScans.release();
+}
+
+// static
 bool QueryPlannerAccess::processIndexScans(const CanonicalQuery& query,
                                            MatchExpression* root,
                                            bool inArrayOperator,
@@ -961,6 +1064,10 @@ QuerySolutionNode* QueryPlannerAccess::buildIndexedOr(const CanonicalQuery& quer
         // indexed.
         return NULL;
     }
+
+    // If all index scans are identical, then we collapse them into a single scan. This prevents
+    // us from creating OR plans where the branches of the OR perform duplicate work.
+    ixscanNodes = collapseEquivalentScans(ixscanNodes);
 
     QuerySolutionNode* orResult = NULL;
 

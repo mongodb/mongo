@@ -190,4 +190,8 @@ inline bool operator==(const Interval& lhs, const Interval& rhs) {
     return lhs.compare(rhs) == Interval::INTERVAL_EQUALS;
 }
 
+inline bool operator!=(const Interval& lhs, const Interval& rhs) {
+    return !(lhs == rhs);
+}
+
 }  // namespace mongo
