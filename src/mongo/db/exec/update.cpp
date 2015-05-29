@@ -730,18 +730,19 @@ namespace mongo {
         if (request->isExplain()) {
             return;
         }
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+            WriteUnitOfWork wunit(_txn);
+            invariant(_collection);
+            const bool enforceQuota = !request->isGod();
+            uassertStatusOK(_collection->insertDocument(_txn,
+                                                        newObj,
+                                                        enforceQuota,
+                                                        request->isFromMigration()));
 
-        WriteUnitOfWork wunit(_txn);
-        invariant(_collection);
-        StatusWith<RecordId> newLoc = _collection->insertDocument(_txn,
-                                                                  newObj,
-                                                                  !request->isGod()/*enforceQuota*/,
-                                                                  request->isFromMigration());
-        uassertStatusOK(newLoc.getStatus());
-
-        // Technically, we should save/restore state here, but since we are going to return
-        // immediately after, it would just be wasted work.
-        wunit.commit();
+            // Technically, we should save/restore state here, but since we are going to return
+            // immediately after, it would just be wasted work.
+            wunit.commit();
+        } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(_txn, "upsert", _collection->ns().ns());
     }
 
     bool UpdateStage::doneUpdating() {
