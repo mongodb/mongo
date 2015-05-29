@@ -104,7 +104,6 @@ namespace {
         case MatchExpression::MOD: return "mo"; break;
         case MatchExpression::EXISTS: return "ex"; break;
         case MatchExpression::MATCH_IN: return "in"; break;
-        case MatchExpression::NIN: return "ni"; break;
         case MatchExpression::TYPE_OPERATOR: return "ty"; break;
         case MatchExpression::GEO: return "go"; break;
         case MatchExpression::WHERE: return "wh"; break;
