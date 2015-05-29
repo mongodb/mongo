@@ -63,6 +63,7 @@ __compact_rewrite(WT_SESSION_IMPL *session, WT_REF *ref, int *skipp)
 	}
 	return (0);
 }
+
 /*
  * __wt_compact --
  *	Compact a file.

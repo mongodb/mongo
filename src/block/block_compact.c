@@ -67,7 +67,7 @@ __wt_block_compact_skip(WT_SESSION_IMPL *session, WT_BLOCK *block, int *skipp)
 	 * worth doing.  Ignore small files, and files where we are unlikely
 	 * to recover 10% of the file.
 	 */
-	if (fh->size <= 10 * WT_MEGABYTE)
+	if (fh->size <= WT_MEGABYTE)
 		return (0);
 
 	__wt_spin_lock(session, &block->live_lock);
