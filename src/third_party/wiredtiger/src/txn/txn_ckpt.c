@@ -353,14 +353,14 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	    { WT_CONFIG_BASE(session, session_begin_transaction),
 	      "isolation=snapshot", NULL };
 	void *saved_meta_next;
-	int full, logging, tracking;
+	int full, idle, logging, tracking;
 	u_int i;
 
 	conn = S2C(session);
 	txn_global = &conn->txn_global;
 	saved_isolation = session->isolation;
 	txn = &session->txn;
-	full = logging = tracking = 0;
+	full = idle = logging = tracking = 0;
 
 	/* Ensure the metadata table is open before taking any locks. */
 	WT_RET(__wt_metadata_open(session));
@@ -554,11 +554,19 @@ err:	/*
 	txn_global->checkpoint_id = WT_TXN_NONE;
 	txn_global->checkpoint_snap_min = WT_TXN_NONE;
 
-	/* Tell logging that we have finished a database checkpoint. */
-	if (logging)
+	/*
+	 * Tell logging that we have finished a database checkpoint.  Do not
+	 * write a log record if the database was idle.
+	 */
+	if (logging) {
+		if (ret == 0 && full &&
+		    F_ISSET((WT_BTREE *)session->meta_dhandle->handle,
+		    WT_BTREE_SKIP_CKPT))
+			idle = 1;
 		WT_TRET(__wt_txn_checkpoint_log(session, full,
-		    (ret == 0) ? WT_TXN_LOG_CKPT_STOP : WT_TXN_LOG_CKPT_FAIL,
-		    NULL));
+		    (ret == 0 && !idle) ?
+		    WT_TXN_LOG_CKPT_STOP : WT_TXN_LOG_CKPT_CLEANUP, NULL));
+	}
 
 	for (i = 0; i < session->ckpt_handle_next; ++i) {
 		if (session->ckpt_handle[i].dhandle == NULL) {
@@ -789,6 +797,7 @@ __checkpoint_worker(
 	 * means it must exist.
 	 */
 	force = 0;
+	F_CLR(btree, WT_BTREE_SKIP_CKPT);
 	if (!btree->modified && cfg != NULL) {
 		ret = __wt_config_gets(session, cfg, "force", &cval);
 		if (ret != 0 && ret != WT_NOTFOUND)
@@ -797,8 +806,10 @@ __checkpoint_worker(
 			force = 1;
 	}
 	if (!btree->modified && !force) {
-		if (!is_checkpoint)
+		if (!is_checkpoint) {
+			F_SET(btree, WT_BTREE_SKIP_CKPT);
 			goto done;
+		}
 
 		deleted = 0;
 		WT_CKPT_FOREACH(ckptbase, ckpt)
@@ -816,8 +827,10 @@ __checkpoint_worker(
 		    (strcmp(name, (ckpt - 1)->name) == 0 ||
 		    (WT_PREFIX_MATCH(name, WT_CHECKPOINT) &&
 		    WT_PREFIX_MATCH((ckpt - 1)->name, WT_CHECKPOINT))) &&
-		    deleted < 2)
+		    deleted < 2) {
+			F_SET(btree, WT_BTREE_SKIP_CKPT);
 			goto done;
+		}
 	}
 
 	/* Add a new checkpoint entry at the end of the list. */

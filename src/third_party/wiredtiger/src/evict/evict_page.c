@@ -275,7 +275,7 @@ __evict_review(
 	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_PAGE_MODIFY *mod;
-	uint32_t flags;
+	uint32_t reconcile_flags;
 
 	/*
 	 * Get exclusive access to the page if our caller doesn't have the tree
@@ -349,17 +349,17 @@ __evict_review(
 	 * Don't set the update-restore flag for internal pages, they don't have
 	 * updates that can be saved and restored.
 	 */
-	flags = WT_EVICTING;
+	reconcile_flags = WT_EVICTING;
 	if (__wt_page_is_modified(page)) {
 		if (exclusive)
-			LF_SET(WT_SKIP_UPDATE_ERR);
+			FLD_SET(reconcile_flags, WT_SKIP_UPDATE_ERR);
 		else if (!WT_PAGE_IS_INTERNAL(page) &&
 		    page->read_gen == WT_READGEN_OLDEST)
-			LF_SET(WT_SKIP_UPDATE_RESTORE);
-		WT_RET(__wt_reconcile(session, ref, NULL, flags));
+			FLD_SET(reconcile_flags, WT_SKIP_UPDATE_RESTORE);
+		WT_RET(__wt_reconcile(session, ref, NULL, reconcile_flags));
 		WT_ASSERT(session,
 		    !__wt_page_is_modified(page) ||
-		    LF_ISSET(WT_SKIP_UPDATE_RESTORE));
+		    FLD_ISSET(reconcile_flags, WT_SKIP_UPDATE_RESTORE));
 	}
 
 	/*
@@ -368,7 +368,7 @@ __evict_review(
 	 */
 	if (!exclusive && mod != NULL &&
 	    !__wt_txn_visible_all(session, mod->rec_max_txn) &&
-	    !LF_ISSET(WT_SKIP_UPDATE_RESTORE))
+	    !FLD_ISSET(reconcile_flags, WT_SKIP_UPDATE_RESTORE))
 		return (EBUSY);
 
 	return (0);

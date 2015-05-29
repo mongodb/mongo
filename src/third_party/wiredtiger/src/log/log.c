@@ -36,6 +36,50 @@ __wt_log_ckpt(WT_SESSION_IMPL *session, WT_LSN *ckp_lsn)
 }
 
 /*
+ * __wt_log_force_sync --
+ *	Force a sync of the log and files.
+ */
+int
+__wt_log_force_sync(WT_SESSION_IMPL *session, WT_LSN *min_lsn)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+	WT_LOG *log;
+
+	conn = S2C(session);
+	log = conn->log;
+	__wt_spin_lock(session, &log->log_sync_lock);
+	WT_ASSERT(session, log->log_dir_fh != NULL);
+	/*
+	 * Sync the directory if the log file entry hasn't been written
+	 * into the directory.
+	 */
+	if (log->sync_dir_lsn.file < min_lsn->file) {
+		WT_ERR(__wt_verbose(session, WT_VERB_LOG,
+		    "log_force_sync: sync directory %s",
+		    log->log_dir_fh->name));
+		WT_ERR(__wt_directory_sync_fh(session, log->log_dir_fh));
+		log->sync_dir_lsn = *min_lsn;
+		WT_STAT_FAST_CONN_INCR(session, log_sync_dir);
+	}
+	/*
+	 * Sync the log file if needed.
+	 */
+	if (LOG_CMP(&log->sync_lsn, min_lsn) < 0) {
+		WT_ERR(__wt_verbose(session, WT_VERB_LOG,
+		    "log_force_sync: sync to LSN %d/%lu",
+		    min_lsn->file, min_lsn->offset));
+		WT_ERR(__wt_fsync(session, log->log_fh));
+		log->sync_lsn = *min_lsn;
+		WT_STAT_FAST_CONN_INCR(session, log_sync);
+		WT_ERR(__wt_cond_signal(session, log->log_sync_cond));
+	}
+err:
+	__wt_spin_unlock(session, &log->log_sync_lock);
+	return (ret);
+}
+
+/*
  * __wt_log_needs_recovery --
  *	Return 0 if we encounter a clean shutdown and 1 if recovery
  *	must be run in the given variable.

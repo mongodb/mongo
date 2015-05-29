@@ -221,7 +221,7 @@ __wt_txn_read(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 /*
  * __wt_txn_autocommit_check --
  *	If an auto-commit transaction is required, start one.
-*/
+ */
 static inline int
 __wt_txn_autocommit_check(WT_SESSION_IMPL *session)
 {
