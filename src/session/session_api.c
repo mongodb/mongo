@@ -907,7 +907,7 @@ __session_transaction_sync(WT_SESSION *wt_session, const char *config)
 	 */
 	WT_ERR(__wt_config_gets_def(
 	    session, cfg, "timeout_ms", (int)UINT_MAX, &cval));
-	if ((unsigned int)cval.len != UINT_MAX) {
+	if ((unsigned int)cval.val != UINT_MAX) {
 		timeout_ms = (uint64_t)cval.val;
 		forever = 0;
 	}
