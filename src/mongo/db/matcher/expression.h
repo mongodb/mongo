@@ -57,7 +57,7 @@ namespace mongo {
             EQ, LTE, LT, GT, GTE, REGEX, MOD, EXISTS, MATCH_IN,
 
             // Negations.
-            NOT, NIN, NOR,
+            NOT, NOR,
 
             // special types
             TYPE_OPERATOR, GEO, WHERE,
