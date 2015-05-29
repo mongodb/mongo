@@ -67,6 +67,7 @@
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/db/stats/top.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/s/collection_metadata.h"
 #include "mongo/s/d_state.h"
@@ -589,7 +590,12 @@ namespace mongo {
         currentOp->done();
         int executionTime = currentOp->debug().executionTime = currentOp->totalTimeMillis();
         currentOp->debug().recordStats();
-        currentOp->recordGlobalTime(true, currentOp->totalTimeMicros());
+        Top::get(txn->getClient()->getServiceContext()).record(
+                currentOp->getNS(),
+                currentOp->getOp(),
+                1, // "write locked"
+                currentOp->totalTimeMicros(),
+                currentOp->isCommand());
 
         if ( opError ) {
             currentOp->debug().exceptionInfo = ExceptionInfo( opError->getErrMessage(),

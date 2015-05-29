@@ -269,6 +269,11 @@ namespace mongo {
          */
         int getOp() const { return _op; }
 
+        /**
+         * Returns true if the current operation is known to be a command.
+         */
+        bool isCommand() const { return _isCommand; }
+
         //
         // Methods for controlling CurOp "max time".
         //
@@ -367,8 +372,6 @@ namespace mongo {
 
         long long getExpectedLatencyMs() const { return _expectedLatencyMs; }
         void setExpectedLatencyMs( long long latency ) { _expectedLatencyMs = latency; }
-
-        void recordGlobalTime(bool isWriteLocked, long long micros) const;
 
         /**
          * this should be used very sparingly

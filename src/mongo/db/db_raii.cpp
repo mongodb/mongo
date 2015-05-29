@@ -33,6 +33,7 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/stats/top.h"
 #include "mongo/s/d_state.h"
 
 namespace mongo {
@@ -108,7 +109,13 @@ namespace mongo {
 
     AutoGetCollectionForRead::~AutoGetCollectionForRead() {
         // Report time spent in read lock
-        CurOp::get(_txn)->recordGlobalTime(false, _timer.micros());
+        auto currentOp = CurOp::get(_txn);
+        Top::get(_txn->getClient()->getServiceContext()).record(
+                currentOp->getNS(),
+                currentOp->getOp(),
+                -1,  // "read locked"
+                _timer.micros(),
+                currentOp->isCommand());
     }
 
 
@@ -178,7 +185,13 @@ namespace mongo {
         // Lock must still be held
         invariant(_txn->lockState()->isLocked());
 
-        CurOp::get(_txn)->recordGlobalTime(_txn->lockState()->isWriteLocked(), _timer.micros());
+        auto currentOp = CurOp::get(_txn);
+        Top::get(_txn->getClient()->getServiceContext()).record(
+                currentOp->getNS(),
+                currentOp->getOp(),
+                _txn->lockState()->isWriteLocked() ? 1 : -1,
+                _timer.micros(),
+                currentOp->isCommand());
     }
 
 
