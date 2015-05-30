@@ -38,11 +38,11 @@ class suite_random:
     def __init__(self, *args):
         arglen = len(args)
         if arglen == 1:
-            self.seedw = int(args[0])
-            self.seedz = int(args[0])
+            self.seedw = int(args[0]) & 0xffffffff
+            self.seedz = int(args[0]) & 0xffffffff
         elif arglen == 2:
-            self.seedw = int(args[0])
-            self.seedz = int(args[1])
+            self.seedw = int(args[0]) & 0xffffffff
+            self.seedz = int(args[1]) & 0xffffffff
         else:
             self.seedw = 521288629
             self.seedz = 362436069
@@ -57,8 +57,8 @@ class suite_random:
             self.seedw = 521288629
             self.seedz = 362436069
 
-        self.seedz = 36969 * (z & 65535) + (z >> 16)
-        self.seedw = 18000 * (w & 65535) + (w >> 16)
+        self.seedz = (36969 * (z & 65535) + (z >> 16)) & 0xffffffff
+        self.seedw = (18000 * (w & 65535) + (w >> 16)) & 0xffffffff
         return ((z << 16) + w & 65535) & 0xffffffff
 
     def rand_range(self, n, m):
