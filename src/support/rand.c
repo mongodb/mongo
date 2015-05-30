@@ -86,5 +86,5 @@ __wt_random(uint64_t * volatile rnd_state)
 	M_W(rnd) = w = 18000 * (w & 65535) + (w >> 16);
 	*rnd_state = rnd;
 
-	return (z << 16) + (w & 65535);
+	return ((z << 16) + (w & 65535));
 }
