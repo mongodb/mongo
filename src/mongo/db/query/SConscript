@@ -23,7 +23,7 @@ env.Library(
     ],
     LIBDEPS=[
         "explain_common",
-        "getmore_request",
+        "getmore_request_response",
         "index_bounds",
         "lite_parsed_query",
         "$BUILD_DIR/mongo/bson/bson",
