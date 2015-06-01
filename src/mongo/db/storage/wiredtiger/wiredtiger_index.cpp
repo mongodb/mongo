@@ -289,7 +289,7 @@ namespace {
         TRACE_INDEX << " fullValidate";
 
         const auto requestedInfo = TRACING_ENABLED ? Cursor::kKeyAndLoc : Cursor::kJustExistance;
-        for (auto kv = cursor->seek(minKey, true, requestedInfo); kv; kv = cursor->next()) {
+        for (auto kv = cursor->seek(BSONObj(), true, requestedInfo); kv; kv = cursor->next()) {
             TRACE_INDEX << "\t" << kv->key << ' ' << kv->loc;
             count++;
         }
