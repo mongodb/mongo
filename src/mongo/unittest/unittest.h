@@ -37,6 +37,7 @@
 #include <cmath>
 #include <sstream>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <boost/config.hpp>
@@ -509,6 +510,12 @@ DECLARE_COMPARISON_ASSERTION(GTE, >=);
         const T& assertGet(const StatusWith<T>& swt) {
             ASSERT_OK(swt.getStatus());
             return swt.getValue();
+        }
+
+        template <typename T>
+        T assertGet(StatusWith<T>&& swt) {
+            ASSERT_OK(swt.getStatus());
+            return std::move(swt.getValue());
         }
 
         /**

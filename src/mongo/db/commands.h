@@ -278,12 +278,9 @@ namespace mutablebson {
          * functionality relevant to a specific command should be confined to its run() method.
          *
          * This is currently used by mongod and dbwebserver.
-         *
-         * TODO: Remove interposedCmd, see SERVER-18236
          */
         static void execCommand(OperationContext* txn,
                                 Command* command,
-                                const BSONObj& interposedCmd,
                                 const rpc::RequestInterface& request,
                                 rpc::ReplyBuilderInterface* replyBuilder);
 

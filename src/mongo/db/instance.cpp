@@ -1118,13 +1118,12 @@ namespace {
                 auto indexNs = NamespaceString(d.getns());
                 auto cmdRequestMsg = requestBuilder.setDatabase(indexNs.db())
                                                    .setCommandName("createIndexes")
-                                                   .setMetadata(rpc::metadata::empty())
+                                                   .setMetadata(rpc::makeEmptyMetadata())
                                                    .setCommandArgs(cmdObj).done();
                 rpc::LegacyRequest cmdRequest{cmdRequestMsg.get()};
                 rpc::LegacyReplyBuilder cmdReplyBuilder{};
                 Command::execCommand(txn,
                                      createIndexesCmd,
-                                     cmdObj, // TODO remove (SERVER-18236)
                                      cmdRequest,
                                      &cmdReplyBuilder);
                 auto cmdReplyMsg = cmdReplyBuilder.done();

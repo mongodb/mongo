@@ -34,6 +34,8 @@
 
 namespace mongo {
     class BSONObj;
+    class BSONObjBuilder;
+    class OperationContext;
 
 /**
  * Utilities for converting metadata between the legacy OP_QUERY format and the new
@@ -53,17 +55,21 @@ namespace mongo {
  * TODO: currently only $secondaryOk (request only) is handled. SERVER-18236 will cover the rest.
  */
 namespace rpc {
-namespace metadata {
 
     /**
      * Returns an empty metadata object.
      */
-    BSONObj empty();
+    BSONObj makeEmptyMetadata();
 
     /**
-     * The field name for the secondaryOk metadata field.
+     * Reads metadata from a metadata object and sets it on this OperationContext.
      */
-    extern const char kSecondaryOk[];
+    Status readRequestMetadata(OperationContext* txn, const BSONObj& metadataObj);
+
+    /**
+     * Writes metadata from an OperationContext to a metadata object.
+     */
+    Status writeRequestMetadata(OperationContext* txn, BSONObjBuilder* metadataBob);
 
     /**
      * A command object and a corresponding metadata object.
@@ -80,14 +86,13 @@ namespace metadata {
      * Given a legacy command object and a query flags bitfield, attempts to parse and remove
      * the metadata from the command object and construct a corresponding metadata object.
      */
-    StatusWith<CommandAndMetadata> upconvertRequest(BSONObj legacyCmdObj, int queryFlags);
+    StatusWith<CommandAndMetadata> upconvertRequestMetadata(BSONObj legacyCmdObj, int queryFlags);
 
     /**
      * Given a command object and a metadata object, attempts to construct a legacy command
      * object and query flags bitfield augmented with the given metadata.
      */
-    StatusWith<LegacyCommandAndFlags> downconvertRequest(BSONObj cmdObj, BSONObj metadata);
+    StatusWith<LegacyCommandAndFlags> downconvertRequestMetadata(BSONObj cmdObj, BSONObj metadata);
 
-}  // namespace metadata
 }  // namespace rpc
 }  // namespace mongo

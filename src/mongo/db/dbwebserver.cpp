@@ -259,15 +259,14 @@ namespace {
 
             requestBuilder.setDatabase("admin")
                           .setCommandName(cmd)
-                          .setMetadata(rpc::metadata::empty())
+                          .setMetadata(rpc::makeEmptyMetadata())
                           .setCommandArgs(cmdObj);
 
             auto cmdRequestMsg = requestBuilder.done();
             rpc::CommandRequest cmdRequest{cmdRequestMsg.get()};
             rpc::CommandReplyBuilder cmdReplyBuilder{};
 
-            // TODO: remove cmdObj from parameters (SERVER-18236)
-            Command::execCommand(txn, c, cmdObj, cmdRequest, &cmdReplyBuilder);
+            Command::execCommand(txn, c, cmdRequest, &cmdReplyBuilder);
 
             auto cmdReplyMsg = cmdReplyBuilder.done();
             rpc::CommandReply cmdReply{cmdReplyMsg.get()};

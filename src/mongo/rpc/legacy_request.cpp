@@ -45,8 +45,8 @@ namespace rpc {
         , _database(NamespaceString(_queryMessage.ns).db().toString()) {
 
         std::tie(_upconvertedCommandArgs, _upconvertedMetadata) = uassertStatusOK(
-            metadata::upconvertRequest(std::move(_queryMessage.query),
-                                       std::move(_queryMessage.queryOptions))
+            rpc::upconvertRequestMetadata(std::move(_queryMessage.query),
+                                          std::move(_queryMessage.queryOptions))
         );
     }
 

@@ -33,6 +33,7 @@
 #include "mongo/platform/basic.h"
 
 #include <boost/scoped_ptr.hpp>
+#include <boost/optional.hpp>
 #include <time.h>
 
 #include "mongo/base/disallow_copying.h"
@@ -95,6 +96,7 @@
 #include "mongo/rpc/request_interface.h"
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/rpc/metadata.h"
+#include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/s/d_state.h"
 #include "mongo/s/stale_exception.h"  // for SendStaleConfigException
 #include "mongo/scripting/engine.h"
@@ -252,10 +254,10 @@ namespace mongo {
 
                 IndexCatalog::IndexKillCriteria criteria;
                 criteria.ns = ns;
-                std::vector<BSONObj> killedIndexes = 
+                std::vector<BSONObj> killedIndexes =
                     IndexBuilder::killMatchingIndexBuilds(db->getCollection(ns), criteria);
-                allKilledIndexes.insert(allKilledIndexes.end(), 
-                                        killedIndexes.begin(), 
+                allKilledIndexes.insert(allKilledIndexes.end(),
+                                        killedIndexes.begin(),
                                         killedIndexes.end());
             }
             return allKilledIndexes;
@@ -1189,7 +1191,6 @@ namespace {
     */
     void Command::execCommand(OperationContext* txn,
                               Command* command,
-                              const BSONObj& prevInterposedCmd,
                               const rpc::RequestInterface& request,
                               rpc::ReplyBuilderInterface* replyBuilder) {
 
@@ -1197,7 +1198,7 @@ namespace {
 
         // Right now our metadata handling relies on mutating the command object.
         // This will go away when SERVER-18236 is implemented
-        BSONObj interposedCmd = prevInterposedCmd;
+        BSONObj interposedCmd = request.getCommandArgs();
 
         std::string dbname = request.getDatabase().toString();
         scoped_ptr<MaintenanceModeSetter> mmSetter;
@@ -1213,7 +1214,7 @@ namespace {
             helpResult.append("lockType", command->isWriteCommandForConfigServer() ? 1 : 0);
 
             replyBuilder
-                ->setMetadata(rpc::metadata::empty())
+                ->setMetadata(rpc::makeEmptyMetadata())
                 .setCommandReply(helpResult.done());
 
             return;
@@ -1245,7 +1246,7 @@ namespace {
             Status s(ErrorCodes::IncompatibleAuditMetadata,
                     "Audit metadata does not include both user and role information.");
             replyBuilder
-                ->setMetadata(rpc::metadata::empty())
+                ->setMetadata(rpc::makeEmptyMetadata())
                 .setCommandReply(s);
 
             return;
@@ -1262,7 +1263,7 @@ namespace {
         if (!status.isOK()) {
 
             replyBuilder
-                ->setMetadata(rpc::metadata::empty())
+                ->setMetadata(rpc::makeEmptyMetadata())
                 .setCommandReply(status);
 
             return;
@@ -1271,21 +1272,17 @@ namespace {
         repl::ReplicationCoordinator* replCoord = repl::getGlobalReplicationCoordinator();
 
         bool iAmPrimary = replCoord->canAcceptWritesForDatabase(dbname);
-
         bool commandCanRunOnSecondary = command->slaveOk();
 
         bool commandIsOverriddenToRunOnSecondary = command->slaveOverrideOk() &&
-            // the $secondaryOk option is set
-            (request.getMetadata().hasField(rpc::metadata::kSecondaryOk) ||
 
-             // or the command has a read preference (may be incorrect, see SERVER-18194)
-             // confusingly, we need to check the original (unmodified) command for the read pref
-             // as it will have been removed by now.
-             // TODO: (SERVER-18236 read this off request metadata)
-             Query::hasReadPreference(request.getCommandArgs()));
+            // The $secondaryOk option is set.
+            (rpc::ServerSelectionMetadata::get(txn).isSecondaryOk() ||
+
+             // Or the command has a read preference (may be incorrect, see SERVER-18194).
+             (rpc::ServerSelectionMetadata::get(txn).getReadPreference() != boost::none));
 
         bool iAmStandalone = !txn->writesAreReplicated();
-
         bool canRunHere = iAmPrimary ||
                           commandCanRunOnSecondary ||
                           commandIsOverriddenToRunOnSecondary ||
@@ -1295,7 +1292,7 @@ namespace {
 
         if (!canRunHere) {
 
-            replyBuilder->setMetadata(rpc::metadata::empty());
+            replyBuilder->setMetadata(rpc::makeEmptyMetadata());
 
             if (command->slaveOverrideOk()) {
                 replyBuilder
@@ -1316,7 +1313,7 @@ namespace {
                 && !replCoord->canAcceptWritesForDatabase(dbname)
                 && !replCoord->getMemberState().secondary()) {
             replyBuilder
-                ->setMetadata(rpc::metadata::empty())
+                ->setMetadata(rpc::makeEmptyMetadata())
                 .setCommandReply(Status(ErrorCodes::NotMasterOrSecondaryCode, "node is recovering"),
                                  extraErrorData);
 
@@ -1342,13 +1339,13 @@ namespace {
         StatusWith<int> maxTimeMS = LiteParsedQuery::parseMaxTimeMSCommand(interposedCmd);
         if (!maxTimeMS.isOK()) {
             replyBuilder
-                ->setMetadata(rpc::metadata::empty())
+                ->setMetadata(rpc::makeEmptyMetadata())
                 .setCommandReply(maxTimeMS.getStatus());
             return;
         }
         if (interposedCmd.hasField("$maxTimeMS")) {
             replyBuilder
-                ->setMetadata(rpc::metadata::empty())
+                ->setMetadata(rpc::makeEmptyMetadata())
                 .setCommandReply(Status(ErrorCodes::InvalidOptions,
                                         "no such command option $maxTimeMS;"
                                         " use maxTimeMS instead"));
@@ -1398,7 +1395,7 @@ namespace {
 
         int queryFlags = 0;
         std::tie(std::ignore, queryFlags) = uassertStatusOK(
-            rpc::metadata::downconvertRequest(request.getCommandArgs(),
+            rpc::downconvertRequestMetadata(request.getCommandArgs(),
                                               request.getMetadata())
         );
 
@@ -1410,7 +1407,7 @@ namespace {
             auto readAfterParseStatus = readAfterOptimeSettings.initialize(interposedCmd);
             if (!readAfterParseStatus.isOK()) {
                 replyBuilder
-                    ->setMetadata(rpc::metadata::empty())
+                    ->setMetadata(rpc::makeEmptyMetadata())
                     .setCommandReply(readAfterParseStatus);
                 return false;
             }
@@ -1419,7 +1416,7 @@ namespace {
             readAfterResult.appendInfo(&replyBuilderBob);
             if (!readAfterResult.getStatus().isOK()) {
                 replyBuilder
-                    ->setMetadata(rpc::metadata::empty())
+                    ->setMetadata(rpc::makeEmptyMetadata())
                     .setCommandReply(readAfterResult.getStatus(), replyBuilderBob.done());
                 return false;
             }
@@ -1437,7 +1434,7 @@ namespace {
                     replCoord->getElectionId());
         }
 
-        replyBuilder->setMetadata(rpc::metadata::empty());
+        replyBuilder->setMetadata(rpc::makeEmptyMetadata());
 
         auto cmdResponse = replyBuilderBob.done();
 
@@ -1466,68 +1463,28 @@ namespace {
                      rpc::ReplyBuilderInterface* replyBuilder) {
 
         try {
-
+            uassertStatusOK(rpc::readRequestMetadata(txn, request.getMetadata()));
             dassert(replyBuilder->getState() == rpc::ReplyBuilderInterface::State::kMetadata);
 
-            string dbname = request.getDatabase().toString();
-
-            // right now our metadata handling depends on mutating the command
-            // the "interposedCmd" parameters will go away when SERVER-18236
-            // is resolved
-            BSONObj interposedCmd;
-            {
-                BSONElement e = request.getCommandArgs().firstElement();
-                if ( e.type() == Object && (e.fieldName()[0] == '$'
-                                            ? str::equals("query", e.fieldName()+1)
-                                            : str::equals("query", e.fieldName())))
-                    {
-                        interposedCmd = e.embeddedObject();
-                        if (request.getCommandArgs().hasField("$maxTimeMS")) {
-                            replyBuilder
-                                ->setMetadata(rpc::metadata::empty())
-                                .setCommandReply(Status(ErrorCodes::BadValue,
-                                                        "cannot use $maxTimeMS query option with "
-                                                        "commands; use maxTimeMS command option "
-                                                        "instead"));
-                            return;
-                        }
-                    }
-                else {
-                    interposedCmd = request.getCommandArgs();
-                }
-            }
-
-            BSONElement e = interposedCmd.firstElement();
-
-            Command* c = e.type() ? Command::findCommand( e.fieldNameStringData() ) : nullptr;
-
-            CurOp::get(txn)->setCommand(c);
-
-            if (c) {
-                LOG(2) << "run command " << request.getDatabase() << ".$cmd" << ' '
-                       << c->getRedactedCopyForLogging(request.getCommandArgs());
-
-                Command::execCommand(txn, c, interposedCmd, request, replyBuilder);
-                // We use a nested try block here so we can call the overload of
-                // generateErrorResponse that prints the redacted command arguments.
-                dassert(replyBuilder->getState() == rpc::ReplyBuilderInterface::State::kOutputDocs);
-            }
-            else {
-                // In the absence of a Command object, no redaction is possible. Therefore
-                // to avoid displaying potentially sensitive information in the logs,
-                // we restrict the log message to the name of the unrecognized command.
-                // However, the complete command object will still be echoed to the client.
-                string msg = str::stream() << "no such command: " << request.getCommandName();
-
-                LOG(2) << msg;
-                replyBuilder
-                    ->setMetadata(rpc::metadata::empty())
-                    .setCommandReply(Status(ErrorCodes::CommandNotFound, std::move(msg)),
-                                     BSON("bad cmd" << request.getCommandArgs()));
-
+            Command* c = nullptr;
+            // In the absence of a Command object, no redaction is possible. Therefore
+            // to avoid displaying potentially sensitive information in the logs,
+            // we restrict the log message to the name of the unrecognized command.
+            // However, the complete command object will still be echoed to the client.
+            if (!(c = Command::findCommand(request.getCommandName()))) {
                 Command::unknownCommands.increment();
+                std::string msg = str::stream() << "no such command: '"
+                                                << request.getCommandName() << "'";
+                LOG(2) << msg;
+                uasserted(ErrorCodes::CommandNotFound,
+                          str::stream() << msg << "', bad cmd: '"
+                                        << request.getCommandArgs() << "'");
             }
 
+            LOG(2) << "run command " << request.getDatabase() << ".$cmd" << ' '
+                   << c->getRedactedCopyForLogging(request.getCommandArgs());
+
+            Command::execCommand(txn, c, request, replyBuilder);
         }
 
         catch (const DBException& ex) {
@@ -1543,7 +1500,7 @@ namespace {
         CurOp::get(txn)->debug().exceptionInfo = exception.getInfo();
 
         // No metadata is needed for an error reply.
-        replyBuilder->setMetadata(rpc::metadata::empty());
+        replyBuilder->setMetadata(rpc::makeEmptyMetadata());
 
         // We need to include some extra information for SendStaleConfig.
         if (exception.getCode() == ErrorCodes::SendStaleConfig) {
