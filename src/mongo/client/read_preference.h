@@ -136,8 +136,8 @@ namespace mongo {
          */
         static StatusWith<ReadPreferenceSetting> fromBSON(const BSONObj& readPrefSettingObj);
 
-        const ReadPreference pref{ReadPreference::PrimaryOnly};
-        const TagSet tags{TagSet::primaryOnly()};
+        ReadPreference pref{ReadPreference::PrimaryOnly};
+        TagSet tags{TagSet::primaryOnly()};
     };
 
 } // namespace mongo

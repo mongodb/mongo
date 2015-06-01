@@ -32,38 +32,65 @@
 
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/rpc/metadata/server_selection_metadata.h"
 
 namespace mongo {
 namespace rpc {
-namespace metadata {
 
-    BSONObj empty() {
+    BSONObj makeEmptyMetadata() {
         return BSONObj();
     }
 
-    const char kSecondaryOk[] = "$secondaryOk";
+    Status readRequestMetadata(OperationContext* txn, const BSONObj& metadataObj) {
+        auto swServerSelectionMetadata = ServerSelectionMetadata::readFromMetadata(metadataObj);
+        if (!swServerSelectionMetadata.isOK()) {
+            return swServerSelectionMetadata.getStatus();
+        }
+        ServerSelectionMetadata::get(txn) = std::move(swServerSelectionMetadata.getValue());
 
-    StatusWith<CommandAndMetadata> upconvertRequest(BSONObj legacyCmdObj, int queryFlags) {
+        return Status::OK();
+    }
+
+    Status writeRequestMetadata(OperationContext* txn, BSONObjBuilder* metadataBob) {
+        auto ssStatus = ServerSelectionMetadata::writeToMetadata(
+            ServerSelectionMetadata::get(txn),
+            metadataBob
+        );
+        if (!ssStatus.isOK()) {
+            return ssStatus;
+        }
+        return Status::OK();
+    }
+
+    StatusWith<CommandAndMetadata> upconvertRequestMetadata(BSONObj legacyCmdObj, int queryFlags) {
+        BSONObjBuilder commandBob;
         BSONObjBuilder metadataBob;
 
-        // note second check may be erroneous: see SERVER-18194
-        if ((queryFlags & QueryOption_SlaveOk)) {
-            metadataBob.append(kSecondaryOk, 1);
+        auto upconvertStatus = ServerSelectionMetadata::upconvert(legacyCmdObj,
+                                                                  queryFlags,
+                                                                  &commandBob,
+                                                                  &metadataBob);
+        if (!upconvertStatus.isOK()) {
+            return upconvertStatus;
         }
 
-        return std::make_tuple(std::move(legacyCmdObj), std::move(metadataBob.obj()));
+        return std::make_tuple(commandBob.obj(), metadataBob.obj());
     }
 
-    StatusWith<LegacyCommandAndFlags> downconvertRequest(BSONObj cmdObj, BSONObj metadata) {
-        int flags = 0;
+    StatusWith<LegacyCommandAndFlags> downconvertRequestMetadata(BSONObj cmdObj, BSONObj metadata) {
+        int legacyQueryFlags = 0;
+        BSONObjBuilder legacyCommandBob;
 
-        if (metadata.hasField(kSecondaryOk)) {
-            flags |= QueryOption_SlaveOk;
+        auto downconvertStatus = ServerSelectionMetadata::downconvert(cmdObj,
+                                                                      metadata,
+                                                                      &legacyCommandBob,
+                                                                      &legacyQueryFlags);
+        if (!downconvertStatus.isOK()) {
+            return downconvertStatus;
         }
 
-        return std::make_tuple(std::move(cmdObj), flags);
+        return std::make_tuple(legacyCommandBob.obj(), std::move(legacyQueryFlags));
     }
 
-}  // namespace metadata
 }  // namespace rpc
 }  // namespace mongo

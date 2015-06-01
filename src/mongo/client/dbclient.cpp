@@ -297,7 +297,7 @@ namespace {
         // requestBuilder is a legacyRequest builder. Not sure what the best
         // way to get around that is without breaking the abstraction.
         std::tie(upconvertedCmd, upconvertedMetadata) = uassertStatusOK(
-            rpc::metadata::upconvertRequest(maybeInterposedCommand, options)
+            rpc::upconvertRequestMetadata(maybeInterposedCommand, options)
         );
 
         auto commandName = upconvertedCmd.firstElementFieldName();
