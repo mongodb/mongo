@@ -69,6 +69,11 @@ __wt_random(uint64_t * volatile rnd_state)
 	uint64_t rnd;
 	uint32_t w, z;
 
+	/*
+	 * Take a copy of the random state so we can ensure that the
+	 * calculation operates on the state consistently regardless of
+	 * concurrent calls with the same random state.
+	 */
 	rnd = *rnd_state;
 	w = M_W(rnd);
 	z = M_Z(rnd);
