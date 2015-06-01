@@ -49,29 +49,6 @@
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
-namespace {
-    std::vector<BSONObj> stopIndexBuildsEmptyCapped(OperationContext* opCtx,
-                                         Database* db, 
-                                         const NamespaceString& ns) {
-        IndexCatalog::IndexKillCriteria criteria;
-        criteria.ns = ns;
-        return IndexBuilder::killMatchingIndexBuilds(db->getCollection(ns), criteria);
-    }
-
-    std::vector<BSONObj> stopIndexBuildsConvertToCapped(OperationContext* opCtx,
-                                                        Database* db,
-                                                        const NamespaceString& ns) {
-        IndexCatalog::IndexKillCriteria criteria;
-        criteria.ns = ns;
-        Collection* coll = db->getCollection(ns);
-        if (coll) {
-            return IndexBuilder::killMatchingIndexBuilds(coll, criteria);
-        }
-        return std::vector<BSONObj>();
-    }
-
-} // namespace
-
     Status emptyCapped(OperationContext* txn,
                        const NamespaceString& collectionName) {
         ScopedTransaction scopedXact(txn, MODE_IX);
@@ -93,7 +70,7 @@ namespace {
         Collection* collection = db->getCollection(collectionName);
         massert(28584, "no such collection", collection);
 
-        std::vector<BSONObj> indexes = stopIndexBuildsEmptyCapped(txn, db, collectionName);
+        BackgroundOperation::assertNoBgOpInProgForNs(collectionName.ns());
 
         WriteUnitOfWork wuow(txn);
 
@@ -101,8 +78,6 @@ namespace {
         if (!status.isOK()) {
             return status;
         }
-
-        IndexBuilder::restoreIndexes(txn, indexes);
 
         getGlobalServiceContext()->getOpObserver()->onEmptyCapped(txn, collection->ns());
 
@@ -257,7 +232,6 @@ namespace {
                           str::stream() << "database " << dbname << " not found");
         }
 
-        stopIndexBuildsConvertToCapped(txn, db, collectionName);
         BackgroundOperation::assertNoBgOpInProgForDb(dbname);
 
         std::string shortTmpName = str::stream() << "tmp.convertToCapped." << shortSource;

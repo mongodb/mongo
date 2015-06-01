@@ -32,6 +32,7 @@
 
 #include "mongo/db/catalog/rename_collection.h"
 
+#include "mongo/db/background.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/database.h"
@@ -56,31 +57,6 @@ namespace {
             // ignoring failure case
             wunit.commit();
         }
-    }
-
-    // renameCollection's
-    std::vector<BSONObj> stopIndexBuilds(OperationContext* opCtx,
-                                         Database* db,
-                                         const NamespaceString& source,
-                                         const NamespaceString& target) {
-
-        IndexCatalog::IndexKillCriteria criteria;
-        criteria.ns = source;
-        std::vector<BSONObj> prelim = 
-            IndexBuilder::killMatchingIndexBuilds(db->getCollection(source), criteria);
-
-        std::vector<BSONObj> indexes;
-
-        for (int i = 0; i < static_cast<int>(prelim.size()); i++) {
-            // Change the ns
-            BSONObj stripped = prelim[i].removeField("ns");
-            BSONObjBuilder builder;
-            builder.appendElements(stripped);
-            builder.append("ns", target);
-            indexes.push_back(builder.obj());
-        }
-
-        return indexes;
     }
 } // namespace
 
@@ -136,9 +112,7 @@ namespace {
             }
         }
 
-        const std::vector<BSONObj> indexesInProg = stopIndexBuilds(txn, sourceDB, source, target);
-        // Dismissed on success
-        ScopeGuard indexBuildRestorer = MakeGuard(IndexBuilder::restoreIndexes, txn, indexesInProg);
+        BackgroundOperation::assertNoBgOpInProgForNs(source.ns());
 
         Database* const targetDB = dbHolder().openDb(txn, target.db());
 
@@ -175,7 +149,6 @@ namespace {
                         stayTemp);
 
                 wunit.commit();
-                indexBuildRestorer.Dismiss();
                 return Status::OK();
             }
 
@@ -278,7 +251,6 @@ namespace {
             wunit.commit();
         }
 
-        indexBuildRestorer.Dismiss();
         targetCollectionDropper.Dismiss();
         return Status::OK();
     }

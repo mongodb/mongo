@@ -32,6 +32,7 @@
 
 #include "mongo/db/catalog/drop_indexes.h"
 
+#include "mongo/db/background.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/index_catalog.h"
@@ -47,37 +48,6 @@
 
 namespace mongo {
 namespace {
-    std::vector<BSONObj> stopIndexBuilds(OperationContext* opCtx,
-                                         Database* db, 
-                                         const std::string& toDeleteNs, 
-                                         const BSONObj& cmdObj) {
-        Collection* collection = db->getCollection(toDeleteNs);
-        IndexCatalog::IndexKillCriteria criteria;
-
-        // Get index name to drop
-        BSONElement toDrop = cmdObj.getField("index");
-
-        if (toDrop.type() == String) {
-            // Kill all in-progress indexes
-            if (strcmp("*", toDrop.valuestr()) == 0) {
-                criteria.ns = toDeleteNs;
-                return IndexBuilder::killMatchingIndexBuilds(collection, criteria);
-            }
-            // Kill an in-progress index by name
-            else {
-                criteria.name = toDrop.valuestr();
-                return IndexBuilder::killMatchingIndexBuilds(collection, criteria);
-            }
-        }
-        // Kill an in-progress index build by index key
-        else if (toDrop.type() == Object) {
-            criteria.key = toDrop.Obj();
-            return IndexBuilder::killMatchingIndexBuilds(collection, criteria);
-        }
-
-        return std::vector<BSONObj>();
-    }
-
     Status wrappedRun(OperationContext* txn,
                       const StringData& dbname,
                       const std::string& toDeleteNs,
@@ -95,7 +65,7 @@ namespace {
         }
 
         OldClientContext ctx(txn, toDeleteNs);
-        stopIndexBuilds(txn, db, toDeleteNs, jsobj);
+        BackgroundOperation::assertNoBgOpInProgForNs(toDeleteNs);
 
         IndexCatalog* indexCatalog = collection->getIndexCatalog();
         anObjBuilder->appendNumber("nIndexesWas", indexCatalog->numIndexesTotal(txn));

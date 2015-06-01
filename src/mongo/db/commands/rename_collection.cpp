@@ -75,30 +75,6 @@ namespace mongo {
             help << " example: { renameCollection: foo.a, to: bar.b }";
         }
 
-        std::vector<BSONObj> stopIndexBuilds(OperationContext* opCtx,
-                                             Database* db,
-                                             const NamespaceString& source,
-                                             const NamespaceString& target) {
-
-            IndexCatalog::IndexKillCriteria criteria;
-            criteria.ns = source;
-            std::vector<BSONObj> prelim = 
-                IndexBuilder::killMatchingIndexBuilds(db->getCollection(source), criteria);
-
-            std::vector<BSONObj> indexes;
-
-            for (int i = 0; i < static_cast<int>(prelim.size()); i++) {
-                // Change the ns
-                BSONObj stripped = prelim[i].removeField("ns");
-                BSONObjBuilder builder;
-                builder.appendElements(stripped);
-                builder.append("ns", target);
-                indexes.push_back(builder.obj());
-            }
-
-            return indexes;
-        }
-
         static void dropCollection(OperationContext* txn, Database* db, StringData collName) {
             WriteUnitOfWork wunit(txn);
             if (db->dropCollection(txn, collName).isOK()) {

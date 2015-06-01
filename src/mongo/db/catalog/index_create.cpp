@@ -223,20 +223,6 @@ namespace mongo {
         return Status::OK();
     }
 
-    IndexDescriptor* MultiIndexBlock::registerIndexBuild() {
-        // Register background index build so that it can be found and killed when necessary
-        invariant(_collection);
-        invariant(_indexes.size() == 1);
-        invariant(_buildInBackground);
-        IndexDescriptor* descriptor = _indexes[0].block->getEntry()->descriptor();
-        _collection->getIndexCatalog()->registerIndexBuild(descriptor, _txn->getOpID());
-        return descriptor;
-    }
-
-    void MultiIndexBlock::unregisterIndexBuild(IndexDescriptor* descriptor) {
-        _collection->getIndexCatalog()->unregisterIndexBuild(descriptor);
-    }
-
     Status MultiIndexBlock::insertAllDocumentsInCollection(std::set<RecordId>* dupsOut) {
         const char* curopMessage = _buildInBackground ? "Index Build (background)" : "Index Build";
         ProgressMeterHolder progress(*_txn->setMessage(curopMessage,

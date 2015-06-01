@@ -115,15 +115,6 @@ namespace mongo {
         }
         CmdReIndex() : Command("reIndex") { }
 
-        virtual std::vector<BSONObj> stopIndexBuilds(OperationContext* opCtx,
-                                                     Database* db,
-                                                     const BSONObj& cmdObj) {
-            const std::string ns = parseNsCollectionRequired(db->name(), cmdObj);
-            IndexCatalog::IndexKillCriteria criteria;
-            criteria.ns = ns;
-            return IndexBuilder::killMatchingIndexBuilds(db->getCollection(ns), criteria);
-        }
-
         bool run(OperationContext* txn,
                  const string& dbname,
                  BSONObj& jsobj,
@@ -148,8 +139,6 @@ namespace mongo {
             }
 
             BackgroundOperation::assertNoBgOpInProgForNs( toDeleteNs );
-
-            std::vector<BSONObj> indexesInProg = stopIndexBuilds(txn, ctx.db(), jsobj);
 
             vector<BSONObj> all;
             {
@@ -203,7 +192,6 @@ namespace mongo {
             result.append( "nIndexes", (int)all.size() );
             result.append( "indexes", all );
 
-            IndexBuilder::restoreIndexes(txn, indexesInProg);
             return true;
         }
     } cmdReIndex;

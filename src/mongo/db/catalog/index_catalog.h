@@ -212,32 +212,6 @@ namespace mongo {
             BSONObj key;
         };
 
-        /**
-         * Registers an index build in an internal tracking map, for use with
-         * killMatchingIndexBuilds().  The opNum and descriptor provided must remain active
-         * for as long as the entry exists in the map.  The opNum provided must correspond to
-         * an operation building only one index, in the background.
-         * This function is intended for replication to use for tracking and managing background
-         * index builds.  It is expected that the caller has already taken steps to serialize
-         * calls to this function.
-         */
-        void registerIndexBuild(IndexDescriptor* descriptor, unsigned int opNum);
-
-        /**
-         * Removes an index build from the map, upon completion or termination of the index build.
-         * This function is intended for replication to use for tracking and managing background
-         * index builds.  It is expected that the caller has already taken steps to serialize
-         * calls to this function.
-         */
-        void unregisterIndexBuild(IndexDescriptor* descriptor);
-
-        /**
-         * Given some criteria, searches through all in-progress index builds
-         * and kills ones that match. (namespace, index name, and/or index key spec)
-         * Returns the list of index specs that were killed, for use in restarting them later.
-         */
-        std::vector<BSONObj> killMatchingIndexBuilds(const IndexKillCriteria& criteria);
-
         // ---- modify single index
 
         bool isMultikey( OperationContext* txn, const IndexDescriptor* idex );
@@ -314,8 +288,6 @@ namespace mongo {
         static BSONObj fixIndexKey( const BSONObj& key );
 
     private:
-        typedef unordered_map<IndexDescriptor*, unsigned int> InProgressIndexesMap;
-
         static const BSONObj _idObj; // { _id : 1 }
 
         bool _shouldOverridePlugin( OperationContext* txn, const BSONObj& keyPattern ) const;
@@ -380,9 +352,6 @@ namespace mongo {
         // Certain operations are prohibited until someone fixes.
         // Retrieve by calling getAndClearUnfinishedIndexes().
         std::vector<BSONObj> _unfinishedIndexes;
-
-        // Track in-progress index builds, in order to find and stop them when necessary.
-        InProgressIndexesMap _inProgressIndexes;
     };
 
 }

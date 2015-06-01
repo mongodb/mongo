@@ -32,6 +32,7 @@
 
 #include "mongo/db/catalog/drop_collection.h"
 
+#include "mongo/db/background.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/index_catalog.h"
@@ -47,17 +48,6 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
-namespace {
-    std::vector<BSONObj> stopIndexBuilds(OperationContext* opCtx,
-                                         Database* db,
-                                         const NamespaceString& collectionName) {
-        IndexCatalog::IndexKillCriteria criteria;
-        criteria.ns = collectionName;
-        return IndexBuilder::killMatchingIndexBuilds(db->getCollection(collectionName),
-                                                     criteria);
-    }
-
-} // namespace
     Status dropCollection(OperationContext* txn,
                           const NamespaceString& collectionName,
                           BSONObjBuilder& result) {
@@ -91,7 +81,7 @@ namespace {
 
             int numIndexes = coll->getIndexCatalog()->numIndexesTotal(txn);
 
-            stopIndexBuilds(txn, db, collectionName);
+            BackgroundOperation::assertNoBgOpInProgForNs(collectionName.ns());
 
             WriteUnitOfWork wunit(txn);
             Status s = db->dropCollection(txn, collectionName.ns());

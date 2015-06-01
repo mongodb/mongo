@@ -75,22 +75,6 @@ namespace mongo {
         Status buildInForeground(OperationContext* txn, Database* db) const;
 
         /**
-         * Kill all in-progress indexes matching criteria, if non-empty:
-         * index ns, index name, and/or index key spec.
-         * Returns a vector of the indexes that were killed.
-         */
-        static std::vector<BSONObj>
-            killMatchingIndexBuilds(Collection* collection,
-                                    const IndexCatalog::IndexKillCriteria& criteria);
-
-        /**
-         * Retry all index builds in the list. Builds each index in a separate thread. If ns does
-         * not match the ns field in the indexes list, the BSONObj's ns field is changed before the
-         * index is built (to handle rename).
-         */
-        static void restoreIndexes(OperationContext* txn, const std::vector<BSONObj>& indexes);
-
-        /**
          * Waits for a background index build to register itself.  This function must be called
          * after starting a background index build via a BackgroundJob and before starting a
          * subsequent one.

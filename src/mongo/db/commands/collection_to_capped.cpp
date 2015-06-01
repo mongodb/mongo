@@ -136,18 +136,6 @@ namespace mongo {
             out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
         }
 
-        std::vector<BSONObj> stopIndexBuilds(OperationContext* opCtx,
-                                             Database* db,
-                                             const NamespaceString& ns) {
-            IndexCatalog::IndexKillCriteria criteria;
-            criteria.ns = ns;
-            Collection* coll = db->getCollection(ns);
-            if (coll) {
-                return IndexBuilder::killMatchingIndexBuilds(coll, criteria);
-            }
-            return std::vector<BSONObj>();
-        }
-
         bool run(OperationContext* txn,
                  const string& dbname,
                  BSONObj& jsobj,

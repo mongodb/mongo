@@ -32,6 +32,7 @@
 
 #include "mongo/db/catalog/drop_database.h"
 
+#include "mongo/db/background.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/catalog/index_catalog.h"
@@ -47,30 +48,6 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
-namespace {
-    std::vector<BSONObj> stopIndexBuilds(OperationContext* opCtx, Database* db) {
-        invariant(db);
-        std::list<std::string> collections;
-        db->getDatabaseCatalogEntry()->getCollectionNamespaces(&collections);
-
-        std::vector<BSONObj> allKilledIndexes;
-        for (std::list<std::string>::iterator it = collections.begin();
-             it != collections.end();
-             ++it) {
-            std::string ns = *it;
-
-            IndexCatalog::IndexKillCriteria criteria;
-            criteria.ns = ns;
-            std::vector<BSONObj> killedIndexes =
-                IndexBuilder::killMatchingIndexBuilds(db->getCollection(ns), criteria);
-            allKilledIndexes.insert(allKilledIndexes.end(),
-                                    killedIndexes.begin(),
-                                    killedIndexes.end());
-        }
-        return allKilledIndexes;
-    }
-} // namespace
-
     Status dropDatabase(OperationContext* txn, const std::string& dbName) {
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
             ScopedTransaction transaction(txn, MODE_X);
@@ -93,7 +70,7 @@ namespace {
 
             log() << "dropDatabase " << dbName << " starting";
 
-            stopIndexBuilds(txn, db);
+            BackgroundOperation::assertNoBgOpInProgForDb(dbName);
             mongo::dropDatabase(txn, db);
 
             log() << "dropDatabase " << dbName << " finished";

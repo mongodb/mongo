@@ -828,6 +828,7 @@ namespace {
                 Lock::TempRelease release(txn->lockState());
 
                 BackgroundOperation::awaitNoBgOpInProgForDb(nsToDatabaseSubstring(ns));
+                txn->recoveryUnit()->abandonSnapshot();
                 break;
             }
             case ErrorCodes::BackgroundOperationInProgressForNamespace: {
@@ -836,6 +837,7 @@ namespace {
                 Command* cmd = Command::findCommand(o.firstElement().fieldName());
                 invariant(cmd);
                 BackgroundOperation::awaitNoBgOpInProgForNs(cmd->parseNs(nsToDatabase(ns), o));
+                txn->recoveryUnit()->abandonSnapshot();
                 break;
             }
             default:
