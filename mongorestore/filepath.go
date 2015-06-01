@@ -187,7 +187,9 @@ func (restore *MongoRestore) CreateAllIntents(dir archive.DirLike, filterDB stri
 					BSONPath: entry.Path(),
 					Size:     entry.Size(),
 				}
-				if filterDB != "" || filterCollection != "" {
+				// filterDB is used to mimic CreateIntentsForDB, and since CreateIntentsForDB wouldn't
+				// apply the oplog, even when asked, we don't either.
+				if filterDB != "" || !restore.InputOptions.OplogReplay {
 					if restore.InputOptions.Archive == "" {
 						continue
 					} else {

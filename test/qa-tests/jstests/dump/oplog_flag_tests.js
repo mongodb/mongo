@@ -1,5 +1,5 @@
 if (typeof getToolTest === 'undefined') {
-  load('jstests/configs/plain_28.config.js');
+  load('jstests/configs/replset_28.config.js');
 }
 
 (function() {

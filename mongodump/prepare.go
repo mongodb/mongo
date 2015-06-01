@@ -286,15 +286,14 @@ func (dump *MongoDump) NewIntent(dbName, colName string, stdout bool) (*intents.
 
 // CreateOplogIntents creates an intents.Intent for the oplog and adds it to the manager
 func (dump *MongoDump) CreateOplogIntents() error {
-
 	err := dump.determineOplogCollectionName()
 	if err != nil {
 		return err
 	}
 
 	oplogIntent := &intents.Intent{
-		DB:       "local",
-		C:        dump.oplogCollection,
+		DB:       "",
+		C:        "oplog",
 		BSONPath: dump.outputPath("oplog.bson", ""),
 	}
 	if dump.OutputOptions.Archive != "" {

@@ -81,9 +81,6 @@ func (demux *Demultiplexer) HeaderBSON(buf []byte) error {
 		return newWrappedError("header bson doesn't unmarshal as a collection header", err)
 	}
 	log.Logf(log.DebugHigh, "demux namespaceHeader: %v", colHeader)
-	if colHeader.Database == "" {
-		return newError("collection header is missing a Database")
-	}
 	if colHeader.Collection == "" {
 		return newError("collection header is missing a Collection")
 	}
@@ -92,6 +89,13 @@ func (demux *Demultiplexer) HeaderBSON(buf []byte) error {
 		if demux.NamespaceChan != nil {
 			demux.NamespaceChan <- demux.currentNamespace
 			err := <-demux.NamespaceErrorChan
+			if err == io.EOF {
+				// if the Prioritizer sends us back an io.EOF then it's telling us that
+				// it's finishing and doesn't need any more namespace announcements.
+				close(demux.NamespaceChan)
+				demux.NamespaceChan = nil
+				return nil
+			}
 			if err != nil {
 				return newWrappedError("failed arranging a consumer for new namespace", err)
 			}
@@ -372,6 +376,13 @@ func (prioritizer *Prioritizer) Get() *intents.Intent {
 	} else {
 		if intent.BSONPath != "" {
 			intent.BSONFile.Open()
+		}
+		if intent.IsOplog() {
+			// once we see the oplog we
+			// cause the RestoreIntents to finish because we don't
+			// want RestoreIntents to restore the oplog
+			prioritizer.NamespaceErrorChan <- io.EOF
+			return nil
 		}
 		prioritizer.NamespaceErrorChan <- nil
 	}
