@@ -40,6 +40,80 @@ __wt_lsm_merge_update_tree(WT_SESSION_IMPL *session,
 }
 
 /*
+ * __lsm_merge_aggressive_clear --
+ *	We found a merge to do - clear the aggressive timer.
+ */
+static int
+__lsm_merge_aggressive_clear(WT_LSM_TREE *lsm_tree)
+{
+	F_CLR(lsm_tree, WT_LSM_TREE_AGGRESSIVE_TIMER);
+	lsm_tree->merge_aggressiveness = 0;
+	return (0);
+}
+
+/*
+ * __lsm_merge_aggressive_update --
+ *	Update the merge aggressiveness for an LSM tree.
+ */
+static int
+__lsm_merge_aggressive_update(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
+{
+	struct timespec now;
+	uint64_t time_since_last_merge;
+	u_int new_aggressive;
+
+	new_aggressive = 0;
+
+	/*
+	 * If the tree is open read-only or we are compacting, be very
+	 * aggressive. Otherwise, we can spend a long time waiting for merges
+	 * to start in read-only applications.
+	 */
+	if (!lsm_tree->modified ||
+	    F_ISSET(lsm_tree, WT_LSM_TREE_COMPACTING)) {
+		lsm_tree->merge_aggressiveness = 10;
+		return (0);
+	}
+
+	/*
+	 * Only get aggressive if a reasonable number of flushes have been
+	 * completed since opening the tree.
+	 */
+	if (lsm_tree->chunks_flushed <= lsm_tree->merge_min)
+		return (__lsm_merge_aggressive_clear(lsm_tree));
+
+	/* Start the timer if it isn't running */
+	if (!F_ISSET(lsm_tree, WT_LSM_TREE_AGGRESSIVE_TIMER))
+		return (__wt_epoch(session, &lsm_tree->merge_aggressive_ts));
+
+	WT_RET(__wt_epoch(session, &now));
+	time_since_last_merge =
+	    WT_TIMEDIFF(now, lsm_tree->merge_aggressive_ts) / WT_MILLION;
+
+	/*
+	 * Never get aggressive before we should have created enough chunks
+	 * for a new merge.
+	 */
+	if (time_since_last_merge <
+	    lsm_tree->chunk_fill_ms * lsm_tree->merge_min)
+		return (0);
+
+	while ((time_since_last_merge /= lsm_tree->chunk_fill_ms) > 1)
+		++new_aggressive;
+
+	if (new_aggressive > lsm_tree->merge_aggressiveness) {
+		WT_RET(__wt_verbose(session, WT_VERB_LSM,
+		    "LSM merge %s got aggressive (old %u new %u), "
+		    "merge_min %d, %u / %" PRIu64,
+		    lsm_tree->name, lsm_tree->merge_aggressiveness,
+		    new_aggressive, lsm_tree->merge_min,
+		    time_since_last_merge, lsm_tree->chunk_fill_ms));
+		lsm_tree->merge_aggressiveness = new_aggressive;
+	}
+	return (0);
+}
+
+/*
  * __lsm_merge_span --
  *	Figure out the best span of chunks to merge. Return an error if
  *	there is no need to do any merges.  Called with the LSM tree
@@ -64,14 +138,7 @@ __lsm_merge_span(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree,
 	*end = 0;
 	*records = 0;
 
-	/*
-	 * If the tree is open read-only or we are compacting, be very
-	 * aggressive. Otherwise, we can spend a long time waiting for merges
-	 * to start in read-only applications.
-	 */
-	if (!lsm_tree->modified ||
-	    F_ISSET(lsm_tree, WT_LSM_TREE_COMPACTING))
-		lsm_tree->merge_aggressiveness = 10;
+	WT_RET(__lsm_merge_aggressive_update(session, lsm_tree));
 
 	aggressive = lsm_tree->merge_aggressiveness;
 	merge_max = (aggressive > WT_LSM_AGGRESSIVE_THRESHOLD) ?
@@ -216,9 +283,11 @@ __lsm_merge_span(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree,
 			    F_ISSET(chunk, WT_LSM_CHUNK_MERGING));
 			F_CLR(chunk, WT_LSM_CHUNK_MERGING);
 		}
+		WT_RET(__lsm_merge_aggressive_update(session, lsm_tree));
 		return (WT_NOTFOUND);
 	}
 
+	WT_RET(__lsm_merge_aggressive_clear(lsm_tree));
 	*records = record_count;
 	*start = start_chunk;
 	*end = end_chunk;
