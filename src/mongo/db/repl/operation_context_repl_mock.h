@@ -46,13 +46,9 @@ namespace repl {
     class OperationContextReplMock : public OperationContextNoop {
     public:
         OperationContextReplMock();
+        explicit OperationContextReplMock(unsigned int opNum);
+        OperationContextReplMock(Client* client, unsigned int opNum);
         virtual ~OperationContextReplMock();
-
-        virtual Locker* lockState() const override;
-
-        virtual unsigned int getOpID() const override;
-
-        void setOpID(unsigned int opID);
 
         virtual void checkForInterrupt() const override;
 
@@ -69,9 +65,6 @@ namespace repl {
         bool writesAreReplicated() const override;
 
     private:
-        boost::scoped_ptr<Locker> _lockState;
-        unsigned int _opID;
-
         Status _checkForInterruptStatus;
         uint64_t _maxTimeMicrosRemaining;
         bool _writesAreReplicated;

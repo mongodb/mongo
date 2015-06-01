@@ -31,13 +31,15 @@
 #include <string>
 
 #include "mongo/db/clientcursor.h"
-#include "mongo/db/curop.h"
 #include "mongo/db/dbmessage.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/util/net/message.h"
 
 namespace mongo {
 
+    class CurOp;
+    class NamespaceString;
     class OperationContext;
 
     class ScopedRecoveryUnitSwapper {

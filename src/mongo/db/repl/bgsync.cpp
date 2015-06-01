@@ -187,8 +187,6 @@ namespace {
             return;
         }
 
-        OperationContextImpl txn;
-
         // We need to wait until initial sync has started.
         if (_replCoord->getMyLastOptime().isNull()) {
             sleepsecs(1);
@@ -196,7 +194,8 @@ namespace {
         }
         // we want to unpause when we're no longer primary
         // start() also loads _lastOpTimeFetched, which we know is set from the "if"
-        else if (_pause) {
+        OperationContextImpl txn;
+        if (_pause) {
             start(&txn);
         }
 

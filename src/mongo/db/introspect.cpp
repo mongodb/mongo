@@ -37,6 +37,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/user_set.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/client.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/jsobj.h"

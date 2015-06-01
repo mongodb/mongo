@@ -113,9 +113,6 @@ namespace mongo {
                     // Skip over inactive connections.
                     if (!opCtx)
                         continue;
-                    auto curOp = CurOp::get(opCtx);
-                    if (!curOp || !curOp->active())
-                        continue;
                 }
 
                 BSONObjBuilder infoBuilder;
@@ -124,7 +121,9 @@ namespace mongo {
                 client->reportState(infoBuilder);
 
                 // Operation context specific information
+                infoBuilder.appendBool("active", static_cast<bool>(opCtx));
                 if (opCtx) {
+                    infoBuilder.append("opid", opCtx->getOpID());
                     // CurOp
                     if (CurOp::get(opCtx)) {
                         CurOp::get(opCtx)->reportState(&infoBuilder);
@@ -134,10 +133,6 @@ namespace mongo {
                     Locker::LockerInfo lockerInfo;
                     opCtx->lockState()->getLockerInfo(&lockerInfo);
                     fillLockerInfo(lockerInfo, infoBuilder);
-                }
-                else {
-                    // If no operation context, mark the operation as inactive
-                    infoBuilder.append("active", false);
                 }
 
                 infoBuilder.done();

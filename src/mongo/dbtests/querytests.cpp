@@ -217,7 +217,6 @@ namespace QueryTests {
     public:
         ClientBase() : _client(&_txn) {
             mongo::LastError::get(_txn.getClient()).reset();
-            CurOp::get(_txn)->reset();
         }
         virtual ~ClientBase() {
             mongo::LastError::get(_txn.getClient()).reset();

@@ -157,13 +157,13 @@ namespace mongo {
         }
 
         virtual void process(Message& m , AbstractMessagingPort* port) {
-            OperationContextImpl txn;
             while ( true ) {
                 if ( inShutdown() ) {
                     log() << "got request after shutdown()" << endl;
                     break;
                 }
 
+                OperationContextImpl txn;
                 DbResponse dbresponse;
                 assembleResponse(&txn, m, dbresponse, port->remote());
 

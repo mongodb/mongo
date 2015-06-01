@@ -38,6 +38,7 @@
 #include <iostream>
 
 #include "mongo/config.h"
+#include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/operation_context_impl.h"

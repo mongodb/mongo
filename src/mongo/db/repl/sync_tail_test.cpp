@@ -64,16 +64,6 @@ namespace {
     void BackgroundSyncMock::consume() { }
     void BackgroundSyncMock::waitForMore() { }
 
-    class OperationContextSyncTailMock : public OperationContextReplMock {
-    public:
-        Client* getClient() const override;
-    };
-
-    Client* OperationContextSyncTailMock::getClient() const {
-        Client::initThreadIfNotAlready();
-        return &cc();
-    }
-
     class SyncTailTest : public unittest::Test {
     public:
         SyncTailTest();
@@ -112,7 +102,9 @@ namespace {
         replSettings.oplogSize = 5 * 1024 * 1024;
 
         setGlobalReplicationCoordinator(new ReplicationCoordinatorMock(replSettings));
-        _txn.reset(new OperationContextSyncTailMock());
+
+        Client::initThreadIfNotAlready();
+        _txn.reset(new OperationContextReplMock(&cc(), 0));
         _opsApplied = 0;
         _applyOp = [](OperationContext* txn,
                                    Database* db,

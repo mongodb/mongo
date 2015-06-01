@@ -857,7 +857,8 @@ namespace {
 
     TEST_F(ReplCoordTest, AwaitReplicationInterrupt) {
         // Tests that a thread blocked in awaitReplication can be killed by a killOp operation
-        OperationContextReplMock txn;
+        const unsigned int opID = 100;
+        OperationContextReplMock txn{opID};
         assertStartSuccess(
                 BSON("_id" << "mySet" <<
                      "version" << 2 <<
@@ -878,8 +879,6 @@ namespace {
         writeConcern.wTimeout = WriteConcernOptions::kNoTimeout;
         writeConcern.wNumNodes = 2;
 
-        unsigned int opID = 100;
-        txn.setOpID(opID);
 
         // 2 nodes waiting for time2
         awaiter.setOpTime(time2);
@@ -1215,7 +1214,8 @@ namespace {
     }
 
     TEST_F(StepDownTest, InterruptStepDown) {
-        OperationContextReplMock txn;
+        const unsigned int opID = 100;
+        OperationContextReplMock txn{opID};
         OpTimeWithTermZero optime1(100, 1);
         OpTimeWithTermZero optime2(100, 2);
         // No secondary is caught up
@@ -1234,8 +1234,6 @@ namespace {
 
         runner.start(&txn);
 
-        unsigned int opID = 100;
-        txn.setOpID(opID);
         txn.setCheckForInterruptStatus(kInterruptedStatus);
         getReplCoord()->interrupt(opID);
 
