@@ -124,10 +124,11 @@ namespace mongo {
                 infoBuilder.appendBool("active", static_cast<bool>(opCtx));
                 if (opCtx) {
                     infoBuilder.append("opid", opCtx->getOpID());
-                    // CurOp
-                    if (CurOp::get(opCtx)) {
-                        CurOp::get(opCtx)->reportState(&infoBuilder);
+                    if (opCtx->isKillPending()) {
+                        infoBuilder.append("killPending", true);
                     }
+
+                    CurOp::get(opCtx)->reportState(&infoBuilder);
 
                     // LockState
                     Locker::LockerInfo lockerInfo;

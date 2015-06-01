@@ -165,7 +165,6 @@ namespace mongo {
         _maxTimeTracker.reset();
         _message = "";
         _progressMeter.finished();
-        _killPending.store(0);
         _numYields = 0;
         _expectedLatencyMs = 0;
         _op = 0;
@@ -268,14 +267,7 @@ namespace mongo {
             }
         }
 
-        if( killPending() )
-            builder->append("killPending", true);
-
         builder->append( "numYields" , _numYields );
-    }
-
-    void CurOp::kill() {
-        _killPending.store(1);
     }
 
     void CurOp::setMaxTimeMicros(uint64_t maxTimeMicros) {

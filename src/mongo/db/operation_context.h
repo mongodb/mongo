@@ -33,6 +33,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/decorable.h"
 
 namespace mongo {
@@ -106,12 +107,14 @@ namespace mongo {
         // --- operation level info? ---
 
         /**
-         * If the thread is not interrupted, returns Status::OK(), otherwise returns the cause
-         * for the interruption. The throw variant returns a user assertion corresponding to the
-         * interruption status.
+         * Raises a UserAssertion if this operation is in a killed state.
          */
-        virtual void checkForInterrupt() const = 0;
-        virtual Status checkForInterruptNoAssert() const = 0;
+        virtual void checkForInterrupt() = 0;
+
+        /**
+         * Returns Status::OK() unless this operation is in a killed state.
+         */
+        virtual Status checkForInterruptNoAssert() = 0;
 
         /**
          * Delegates to CurOp, but is included here to break dependencies.
@@ -167,6 +170,25 @@ namespace mongo {
          */
         virtual bool writesAreReplicated() const = 0;
 
+        /**
+         * Marks this operation as killed.
+         *
+         * Subsequent calls to checkForInterrupt and checkForInterruptNoAssert by the thread
+         * executing the operation will indicate that the operation has been killed.
+         *
+         * May be called by any thread that has locked the Client owning this operation context,
+         * or by the thread executing on behalf of this operation context.
+         */
+        void markKilled();
+
+        /**
+         * Returns true if markKilled has been called on this operation context.
+         *
+         * May be called by any thread that has locked the Client owning this operation context,
+         * or by the thread executing on behalf of this operation context.
+         */
+        bool isKillPending() const;
+
     protected:
         OperationContext(Client* client,
                          unsigned int opId,
@@ -183,6 +205,7 @@ namespace mongo {
         // safe to access _locker in the destructor of OperationContext.
         Locker* const _locker;
 
+        AtomicInt32 _killPending{0};
         WriteConcernOptions _writeConcern;
     };
 

@@ -43,4 +43,12 @@ namespace mongo {
         return _client;
     }
 
+    void OperationContext::markKilled() {
+        _killPending.store(1);
+    }
+
+    bool OperationContext::isKillPending() const {
+        return _killPending.loadRelaxed();
+    }
+
 }  // namespace mongo

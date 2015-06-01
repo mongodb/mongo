@@ -2492,7 +2492,7 @@ namespace {
          * Returns true if the majority of the nodes and the nodes corresponding to the given
          * writeConcern (if not empty) have applied till the specified lastOp.
          */
-        bool opReplicatedEnough(const OperationContext* txn,
+        bool opReplicatedEnough(OperationContext* txn,
                                 const repl::OpTime& lastOpApplied,
                                 const WriteConcernOptions& writeConcern) {
             WriteConcernOptions majorityWriteConcern;

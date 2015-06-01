@@ -242,9 +242,6 @@ namespace mongo {
         /**
          * Checks whether this operation has been running longer than its time limit.  Returns
          * false if not, or if the operation has no time limit.
-         *
-         * Note that KillCurrentOp objects are responsible for interrupting CurOp objects that
-         * have exceeded their allotted time; CurOp objects do not interrupt themselves.
          */
         bool maxTimeHasExpired();
 
@@ -298,12 +295,9 @@ namespace mongo {
         std::string getMessage() const { return _message.toString(); }
         ProgressMeter& getProgressMeter() { return _progressMeter; }
         CurOp *parent() const { return _parent; }
-        void kill(); 
-        bool killPendingStrict() const { return _killPending.load(); }
-        bool killPending() const { return _killPending.loadRelaxed(); }
         void yielded() { _numYields++; }
         int numYields() const { return _numYields; }
-        
+
         long long getExpectedLatencyMs() const { return _expectedLatencyMs; }
         void setExpectedLatencyMs( long long latency ) { _expectedLatencyMs = latency; }
 
@@ -336,7 +330,6 @@ namespace mongo {
         OpDebug _debug;
         ThreadSafeString _message;
         ProgressMeter _progressMeter;
-        AtomicInt32 _killPending;
         int _numYields;
         
         // this is how much "extra" time a query might take

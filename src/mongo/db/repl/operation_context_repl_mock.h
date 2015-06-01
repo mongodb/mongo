@@ -50,9 +50,9 @@ namespace repl {
         OperationContextReplMock(Client* client, unsigned int opNum);
         virtual ~OperationContextReplMock();
 
-        virtual void checkForInterrupt() const override;
+        virtual void checkForInterrupt() override;
 
-        virtual Status checkForInterruptNoAssert() const override;
+        virtual Status checkForInterruptNoAssert() override;
 
         void setCheckForInterruptStatus(Status status);
 

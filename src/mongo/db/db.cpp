@@ -163,9 +163,13 @@ namespace mongo {
                     break;
                 }
 
-                OperationContextImpl txn;
                 DbResponse dbresponse;
-                assembleResponse(&txn, m, dbresponse, port->remote());
+                {
+                    OperationContextImpl txn;
+                    assembleResponse(&txn, m, dbresponse, port->remote());
+                    // txn must go out of scope here so that the operation cannot show up in
+                    // currentOp results after the response reaches the client.
+                }
 
                 if ( dbresponse.response ) {
                     port->reply(m, *dbresponse.response, dbresponse.responseTo);

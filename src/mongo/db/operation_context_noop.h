@@ -88,8 +88,8 @@ namespace mongo {
             return &_pm;
         }
 
-        virtual void checkForInterrupt() const override { }
-        virtual Status checkForInterruptNoAssert() const override {
+        virtual void checkForInterrupt() override { }
+        virtual Status checkForInterruptNoAssert() override {
             return Status::OK();
         }
 

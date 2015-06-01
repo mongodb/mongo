@@ -767,7 +767,7 @@ namespace {
     }
 
     ReadAfterOpTimeResponse ReplicationCoordinatorImpl::waitUntilOpTime(
-            const OperationContext* txn,
+            OperationContext* txn,
             const ReadAfterOpTimeArgs& settings) {
         const auto& ts = settings.getOpTime();
         const auto& timeout = settings.getTimeout();
@@ -1035,7 +1035,7 @@ namespace {
     }
 
     ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorImpl::awaitReplication(
-            const OperationContext* txn,
+            OperationContext* txn,
             const OpTime& opTime,
             const WriteConcernOptions& writeConcern) {
         Timer timer;
@@ -1045,7 +1045,7 @@ namespace {
 
     ReplicationCoordinator::StatusAndDuration
             ReplicationCoordinatorImpl::awaitReplicationOfLastOpForClient(
-                    const OperationContext* txn,
+                    OperationContext* txn,
                     const WriteConcernOptions& writeConcern) {
         Timer timer;
         boost::unique_lock<boost::mutex> lock(_mutex);
@@ -1060,7 +1060,7 @@ namespace {
     ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorImpl::_awaitReplication_inlock(
             const Timer* timer,
             boost::unique_lock<boost::mutex>* lock,
-            const OperationContext* txn,
+            OperationContext* txn,
             const OpTime& opTime,
             const WriteConcernOptions& writeConcern) {
 

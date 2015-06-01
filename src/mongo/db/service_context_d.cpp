@@ -37,7 +37,6 @@
 #include "mongo/base/init.h"
 #include "mongo/base/initializer.h"
 #include "mongo/db/client.h"
-#include "mongo/db/curop.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -46,6 +45,7 @@
 #include "mongo/db/storage_options.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/log.h"
 #include "mongo/util/map_util.h"
 #include "mongo/util/mongoutils/str.h"
@@ -235,9 +235,7 @@ namespace mongo {
     }
 
     void ServiceContextMongoD::_killOperation_inlock(OperationContext* opCtx) {
-        for(CurOp *l = CurOp::get(opCtx); l; l = l->parent()) {
-            l->kill();
-        }
+        opCtx->markKilled();
 
         for (const auto listener : _killOpListeners) {
             try {

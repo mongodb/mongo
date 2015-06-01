@@ -56,8 +56,8 @@ namespace mongo {
 
         virtual uint64_t getRemainingMaxTimeMicros() const override;
 
-        virtual void checkForInterrupt() const override;
-        virtual Status checkForInterruptNoAssert() const override;
+        virtual void checkForInterrupt() override;
+        virtual Status checkForInterruptNoAssert() override;
 
         virtual bool isPrimaryFor( StringData ns ) override;
 

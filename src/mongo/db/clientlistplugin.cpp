@@ -208,11 +208,11 @@ namespace {
                 b.appendBool("active", static_cast<bool>(txn));
                 if (txn) {
                     b.append("opid", txn->getOpID());
-
-                    // CurOp
-                    if (CurOp::get(txn)) {
-                        CurOp::get(txn)->reportState(&b);
+                    if (txn->isKillPending()) {
+                        b.append("killPending", true);
                     }
+
+                    CurOp::get(txn)->reportState(&b);
 
                     // LockState
                     if (txn->lockState()) {

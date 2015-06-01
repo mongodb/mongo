@@ -181,7 +181,7 @@ namespace repl {
          * ErrorCodes::ShutdownInProgress if we are mid-shutdown
          * ErrorCodes::Interrupted if the operation was killed with killop()
          */
-        virtual StatusAndDuration awaitReplication(const OperationContext* txn,
+        virtual StatusAndDuration awaitReplication(OperationContext* txn,
                                                    const OpTime& opTime,
                                                    const WriteConcernOptions& writeConcern) = 0;
 
@@ -190,7 +190,7 @@ namespace repl {
          * performed on the client associated with "txn".
          */
         virtual StatusAndDuration awaitReplicationOfLastOpForClient(
-                const OperationContext* txn,
+                OperationContext* txn,
                 const WriteConcernOptions& writeConcern) = 0;
 
         /**
@@ -298,7 +298,7 @@ namespace repl {
          * Note: getDuration() on the returned ReadAfterOpTimeResponse will only be valid if
          * its didWait() method returns true.
          */
-        virtual ReadAfterOpTimeResponse waitUntilOpTime(const OperationContext* txn,
+        virtual ReadAfterOpTimeResponse waitUntilOpTime(OperationContext* txn,
                                                         const ReadAfterOpTimeArgs& settings) = 0;
 
         /**

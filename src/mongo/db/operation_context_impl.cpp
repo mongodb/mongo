@@ -175,7 +175,7 @@ namespace {
 
     } // namespace
 
-    void OperationContextImpl::checkForInterrupt() const {
+    void OperationContextImpl::checkForInterrupt() {
         // We cannot interrupt operation, while it's inside of a write unit of work, because logOp
         // cannot handle being iterrupted.
         if (lockState()->inAWriteUnitOfWork()) return;
@@ -183,14 +183,14 @@ namespace {
         uassertStatusOK(checkForInterruptNoAssert());
     }
 
-    Status OperationContextImpl::checkForInterruptNoAssert() const {
+    Status OperationContextImpl::checkForInterruptNoAssert() {
         if (getGlobalServiceContext()->getKillAllOperations()) {
             return Status(ErrorCodes::InterruptedAtShutdown, "interrupted at shutdown");
         }
 
         CurOp* curOp = CurOp::get(this);
         if (curOp->maxTimeHasExpired()) {
-            curOp->kill();
+            markKilled();
             return Status(ErrorCodes::ExceededTimeLimit, "operation exceeded time limit");
         }
 
@@ -199,11 +199,11 @@ namespace {
                 log() << "set pending kill on "
                       << (curOp->parent() ? "nested" : "top-level")
                       << " op " << getOpID() << ", for checkForInterruptFail";
-                curOp->kill();
+                markKilled();
             }
         }
 
-        if (curOp->killPending()) {
+        if (isKillPending()) {
             return Status(ErrorCodes::Interrupted, "operation was interrupted");
         }
 

@@ -51,11 +51,11 @@ namespace repl {
 
     OperationContextReplMock::~OperationContextReplMock() = default;
 
-    void OperationContextReplMock::checkForInterrupt() const {
+    void OperationContextReplMock::checkForInterrupt() {
         uassertStatusOK(checkForInterruptNoAssert());
     }
 
-    Status OperationContextReplMock::checkForInterruptNoAssert() const {
+    Status OperationContextReplMock::checkForInterruptNoAssert() {
         if (!_checkForInterruptStatus.isOK()) {
             return _checkForInterruptStatus;
         }

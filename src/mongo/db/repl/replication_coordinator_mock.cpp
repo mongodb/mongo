@@ -89,7 +89,7 @@ namespace repl {
     void ReplicationCoordinatorMock::clearSyncSourceBlacklist() {}
 
     ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorMock::awaitReplication(
-            const OperationContext* txn,
+            OperationContext* txn,
             const OpTime& opTime,
             const WriteConcernOptions& writeConcern) {
         // TODO
@@ -98,7 +98,7 @@ namespace repl {
 
     ReplicationCoordinator::StatusAndDuration
             ReplicationCoordinatorMock::awaitReplicationOfLastOpForClient(
-                    const OperationContext* txn,
+                    OperationContext* txn,
                     const WriteConcernOptions& writeConcern) {
         return StatusAndDuration(Status::OK(), Milliseconds(0));
     }
@@ -150,7 +150,7 @@ namespace repl {
     }
 
     ReadAfterOpTimeResponse ReplicationCoordinatorMock::waitUntilOpTime(
-            const OperationContext* txn,
+            OperationContext* txn,
             const ReadAfterOpTimeArgs& settings) {
         return ReadAfterOpTimeResponse();
     }
