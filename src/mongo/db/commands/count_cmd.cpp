@@ -84,8 +84,6 @@ namespace {
                 return parseStatus;
             }
 
-            request.explain = true;
-
             // Acquire the db read lock.
             AutoGetCollectionForRead ctx(txn, request.ns);
             Collection* collection = ctx.getCollection();
@@ -98,6 +96,7 @@ namespace {
             Status getExecStatus = getExecutorCount(txn,
                                                     collection,
                                                     request,
+                                                    true,   // explain
                                                     PlanExecutor::YIELD_AUTO,
                                                     &rawExec);
             if (!getExecStatus.isOK()) {
@@ -133,6 +132,7 @@ namespace {
             Status getExecStatus = getExecutorCount(txn,
                                                     collection,
                                                     request,
+                                                    false,  // !explain
                                                     PlanExecutor::YIELD_AUTO,
                                                     &rawExec);
             if (!getExecStatus.isOK()) {
@@ -220,9 +220,6 @@ namespace {
             request->hint = hintObj;
             request->limit = limit;
             request->skip = skip;
-
-            // By default, count requests are regular count not explain of count.
-            request->explain = false;
 
             return Status::OK();
         }
