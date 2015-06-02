@@ -32,7 +32,6 @@
 
 #include "mongo/db/curop.h"
 
-#include "mongo/base/counter.h"
 #include "mongo/base/disallow_copying.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/db/client.h"
@@ -371,57 +370,6 @@ namespace mongo {
 
         // Otherwise, calculate remaining time.
         return _targetEpochMicros - now;
-    }
-
-
-    static Counter64 returnedCounter;
-    static Counter64 insertedCounter;
-    static Counter64 updatedCounter;
-    static Counter64 deletedCounter;
-    static Counter64 scannedCounter;
-    static Counter64 scannedObjectCounter;
-
-    static ServerStatusMetricField<Counter64> displayReturned( "document.returned", &returnedCounter );
-    static ServerStatusMetricField<Counter64> displayUpdated( "document.updated", &updatedCounter );
-    static ServerStatusMetricField<Counter64> displayInserted( "document.inserted", &insertedCounter );
-    static ServerStatusMetricField<Counter64> displayDeleted( "document.deleted", &deletedCounter );
-    static ServerStatusMetricField<Counter64> displayScanned( "queryExecutor.scanned", &scannedCounter );
-    static ServerStatusMetricField<Counter64> displayScannedObjects( "queryExecutor.scannedObjects",
-                                                                     &scannedObjectCounter );
-
-    static Counter64 idhackCounter;
-    static Counter64 scanAndOrderCounter;
-    static Counter64 fastmodCounter;
-    static Counter64 writeConflictsCounter;
-
-    static ServerStatusMetricField<Counter64> displayIdhack( "operation.idhack", &idhackCounter );
-    static ServerStatusMetricField<Counter64> displayScanAndOrder( "operation.scanAndOrder", &scanAndOrderCounter );
-    static ServerStatusMetricField<Counter64> displayFastMod( "operation.fastmod", &fastmodCounter );
-    static ServerStatusMetricField<Counter64> displayWriteConflicts( "operation.writeConflicts",
-                                                                     &writeConflictsCounter );
-
-    void OpDebug::recordStats() {
-        if ( nreturned > 0 )
-            returnedCounter.increment( nreturned );
-        if ( ninserted > 0 )
-            insertedCounter.increment( ninserted );
-        if ( nMatched > 0 )
-            updatedCounter.increment( nMatched );
-        if ( ndeleted > 0 )
-            deletedCounter.increment( ndeleted );
-        if ( nscanned > 0 )
-            scannedCounter.increment( nscanned );
-        if ( nscannedObjects > 0 )
-            scannedObjectCounter.increment( nscannedObjects );
-
-        if ( idhack )
-            idhackCounter.increment();
-        if ( scanAndOrder )
-            scanAndOrderCounter.increment();
-        if ( fastmod )
-            fastmodCounter.increment();
-        if ( writeConflicts )
-            writeConflictsCounter.increment( writeConflicts );
     }
 
     void OpDebug::reset() {

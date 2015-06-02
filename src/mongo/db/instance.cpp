@@ -52,6 +52,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/curop_metrics.h"
 #include "mongo/db/db.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
@@ -652,7 +653,7 @@ namespace {
             }
         }
 
-        debug.recordStats();
+        recordCurOpMetrics(txn);
         debug.reset();
     }
 

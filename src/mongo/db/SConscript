@@ -139,11 +139,10 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
-        '$BUILD_DIR/mongo/db/commands/server_status_core',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/util/fail_point',
         '$BUILD_DIR/mongo/util/net/network',
-        '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/util/progress_meter',
     ],
 )
@@ -551,6 +550,7 @@ serverOnlyFiles = [
     "commands/write_commands/batch_executor.cpp",
     "commands/write_commands/write_commands.cpp",
     "commands/writeback_compatibility_shim.cpp",
+    "curop_metrics.cpp",
     "db_raii.cpp",
     "dbcommands.cpp",
     "dbdirectclient.cpp",

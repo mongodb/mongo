@@ -127,8 +127,6 @@ namespace mongo {
 
         void reset();
 
-        void recordStats();
-
         std::string report(const CurOp& curop, const SingleThreadedLockStats& lockStats) const;
 
         /**

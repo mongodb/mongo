@@ -43,6 +43,7 @@
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/curop_metrics.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/delete.h"
 #include "mongo/db/exec/update.h"
@@ -589,7 +590,7 @@ namespace mongo {
         CurOp* currentOp = CurOp::get(txn);
         currentOp->done();
         int executionTime = currentOp->debug().executionTime = currentOp->totalTimeMillis();
-        currentOp->debug().recordStats();
+        recordCurOpMetrics(txn);
         Top::get(txn->getClient()->getServiceContext()).record(
                 currentOp->getNS(),
                 currentOp->getOp(),
