@@ -461,25 +461,25 @@ namespace {
     }
 
     bool ReplicationCoordinatorImpl::setFollowerMode(const MemberState& newState) {
-        StatusWith<ReplicationExecutor::EventHandle> finishedSettingFollowerState =
+        StatusWith<ReplicationExecutor::EventHandle> finishedSettingFollowerMode =
             _replExecutor.makeEvent();
-        if (finishedSettingFollowerState.getStatus() == ErrorCodes::ShutdownInProgress) {
+        if (finishedSettingFollowerMode.getStatus() == ErrorCodes::ShutdownInProgress) {
             return false;
         }
-        fassert(18812, finishedSettingFollowerState.getStatus());
+        fassert(18812, finishedSettingFollowerMode.getStatus());
         bool success = false;
         CBHStatus cbh = _replExecutor.scheduleWork(
                 stdx::bind(&ReplicationCoordinatorImpl::_setFollowerModeFinish,
                            this,
                            stdx::placeholders::_1,
                            newState,
-                           finishedSettingFollowerState.getValue(),
+                           finishedSettingFollowerMode.getValue(),
                            &success));
         if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
             return false;
         }
         fassert(18699, cbh.getStatus());
-        _replExecutor.waitForEvent(finishedSettingFollowerState.getValue());
+        _replExecutor.waitForEvent(finishedSettingFollowerMode.getValue());
         return success;
     }
 
@@ -529,10 +529,10 @@ namespace {
 
         const PostMemberStateUpdateAction action =
             _updateMemberStateFromTopologyCoordinator_inlock();
-        *success = true;
-        _replExecutor.signalEvent(finishedSettingFollowerMode);
         lk.unlock();
         _performPostMemberStateUpdateAction(action);
+        *success = true;
+        _replExecutor.signalEvent(finishedSettingFollowerMode);
     }
 
     bool ReplicationCoordinatorImpl::isWaitingForApplierToDrain() {
