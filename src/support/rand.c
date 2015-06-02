@@ -50,7 +50,7 @@
  *	Initialize return of a 32-bit pseudo-random number.
  */
 void
-__wt_random_init(uint64_t * volatile rnd_state)
+__wt_random_init(uint64_t volatile * rnd_state)
 {
 	uint64_t rnd;
 
@@ -64,7 +64,7 @@ __wt_random_init(uint64_t * volatile rnd_state)
  *	Return a 32-bit pseudo-random number.
  */
 uint32_t
-__wt_random(uint64_t * volatile rnd_state)
+__wt_random(uint64_t volatile * rnd_state)
 {
 	uint64_t rnd;
 	uint32_t w, z;
