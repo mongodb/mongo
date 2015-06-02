@@ -59,17 +59,7 @@ namespace {
     const Milliseconds globalWriteLockTimeoutMs(10);
     const OplogInterfaceMock::Operations kEmptyMockOperations;
 
-    class OperationContextRollbackMock : public OperationContextReplMock {
-    public:
-        Client* getClient() const override;
-    };
-
-    Client* OperationContextRollbackMock::getClient() const {
-        Client::initThreadIfNotAlready();
-        return &cc();
-    }
-
- ReplSettings createReplSettings() {
+    ReplSettings createReplSettings() {
         ReplSettings settings;
         settings.oplogSize = 5 * 1024 * 1024;
         settings.replSet = "mySet/node1:12345";
@@ -162,7 +152,7 @@ namespace {
         }
 
         Client::initThreadIfNotAlready();
-        _txn.reset(new OperationContextRollbackMock());
+        _txn.reset(new OperationContextReplMock(&cc(), 1));
         _coordinator.reset(new ReplicationCoordinatorRollbackMock());
 
         _prevCoordinator = getGlobalReplicationCoordinator();
