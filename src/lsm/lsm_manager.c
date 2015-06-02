@@ -429,7 +429,8 @@ __lsm_manager_run_server(WT_SESSION_IMPL *session)
 				    session, WT_LSM_WORK_FLUSH, 0, lsm_tree));
 				WT_ERR(__wt_lsm_manager_push_entry(
 				    session, WT_LSM_WORK_BLOOM, 0, lsm_tree));
-				WT_ERR(__wt_verbose(session, WT_VERB_LSM,
+				WT_ERR(__wt_verbose(session,
+				    WT_VERB_LSM_MANAGER,
 				    "MGR %s: queue %d mod %d nchunks %d"
 				    " flags 0x%x aggressive %d pushms %" PRIu64
 				    " fillms %" PRIu64,
