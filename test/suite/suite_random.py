@@ -53,7 +53,7 @@ class suite_random:
         """
         w = self.seedw
         z = self.seedz
-	if w == 0 or z == 0:
+        if w == 0 or z == 0:
             self.seedw = 521288629
             self.seedz = 362436069
 
