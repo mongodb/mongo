@@ -32,9 +32,6 @@
 
 #include <boost/scoped_ptr.hpp>
 
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/database.h"
-#include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
@@ -46,12 +43,15 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
+namespace {
 
     using boost::scoped_ptr;
     using std::string;
     using std::stringstream;
 
-    /* select count(*) */
+    /**
+     * Implements the MongoD side of the count command.
+     */
     class CmdCount : public Command {
     public:
         virtual bool isWriteCommandForConfigServer() const { return false; }
@@ -229,4 +229,5 @@ namespace mongo {
 
     } cmdCount;
 
+} // namespace
 } // namespace mongo
