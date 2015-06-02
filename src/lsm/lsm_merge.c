@@ -127,6 +127,7 @@ __lsm_merge_span(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree,
 	uint32_t aggressive, max_gap, max_gen, max_level;
 	uint64_t record_count, chunk_size;
 	u_int end_chunk, i, merge_max, merge_min, nchunks, start_chunk;
+	u_int oldest_gen, youngest_gen;
 
 	chunk_size = 0;
 	nchunks = 0;
@@ -194,6 +195,8 @@ __lsm_merge_span(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree,
 	 * with the most recent set of chunks and work backwards until going
 	 * further becomes significantly less efficient.
 	 */
+retry_find:
+	oldest_gen = youngest_gen = lsm_tree->chunk[end_chunk]->generation;
 	for (start_chunk = end_chunk + 1, record_count = 0;
 	    start_chunk > 0; ) {
 		chunk = lsm_tree->chunk[start_chunk - 1];
@@ -225,6 +228,15 @@ __lsm_merge_span(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree,
 			    (chunk->generation > youngest->generation &&
 			    chunk_size - youngest->size > lsm_tree->chunk_max))
 				break;
+
+		/* Track chunk generations seen while looking for a merge */
+		if (chunk->generation < youngest_gen)
+			youngest_gen = chunk->generation;
+		else if (chunk->generation > oldest_gen)
+			oldest_gen = chunk->generation;
+
+		if (oldest_gen - youngest_gen > max_gap)
+			break;
 
 		/*
 		 * If we have enough chunks for a merge and the next chunk is
@@ -270,18 +282,26 @@ __lsm_merge_span(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree,
 
 	WT_ASSERT(session,
 	    nchunks == 0 || (chunk != NULL && youngest != NULL));
+
 	/*
 	 * Don't do merges that are too small or across too many
 	 * generations.
 	 */
 	if (nchunks < merge_min ||
-	    lsm_tree->chunk[end_chunk]->generation >
-	    youngest->generation + max_gap) {
+	    oldest_gen - youngest_gen > max_gap) {
 		for (i = 0; i < nchunks; i++) {
 			chunk = lsm_tree->chunk[start_chunk + i];
 			WT_ASSERT(session,
 			    F_ISSET(chunk, WT_LSM_CHUNK_MERGING));
 			F_CLR(chunk, WT_LSM_CHUNK_MERGING);
+		}
+		/*
+		 * If we didn't find a merge with appropriate gaps, try again
+		 * with a smaller range.
+		 */
+		if (oldest_gen - youngest_gen > max_gap) {
+			--end_chunk;
+			goto retry_find;
 		}
 		WT_RET(__lsm_merge_aggressive_update(session, lsm_tree));
 		return (WT_NOTFOUND);
@@ -368,8 +388,12 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id)
 		    start_chunk, end_chunk, dest_id, record_count, generation));
 		for (verb = start_chunk; verb <= end_chunk; verb++)
 			WT_ERR(__wt_verbose(session, WT_VERB_LSM,
-			    "%s: Chunk[%u] id %u",
-			    lsm_tree->name, verb, lsm_tree->chunk[verb]->id));
+			    "Merging %s: Chunk[%u] id %u, gen: %" PRIu32
+			    ", size: %" PRIu64 ", records: %" PRIu64,
+			    lsm_tree->name, verb, lsm_tree->chunk[verb]->id,
+			    lsm_tree->chunk[verb]->generation,
+			    lsm_tree->chunk[verb]->size,
+			    lsm_tree->chunk[verb]->count));
 	}
 
 	WT_ERR(__wt_calloc_one(session, &chunk));
