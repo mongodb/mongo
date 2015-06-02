@@ -194,7 +194,7 @@ wts_ops(int lastrun)
  *	Return the current session configuration.
  */
 static const char *
-ops_session_config(uint32_t *rnd)
+ops_session_config(uint64_t *rnd)
 {
 	u_int v;
 
@@ -232,7 +232,7 @@ ops(void *arg)
 	tinfo = arg;
 
 	/* Initialize the per-thread random number generator. */
-	__wt_random_init(tinfo->rnd);
+	__wt_random_init(&tinfo->rnd);
 
 	conn = g.wts_conn;
 	keybuf = valbuf = NULL;
@@ -240,7 +240,7 @@ ops(void *arg)
 
 	/* Set up the default key and value buffers. */
 	key_gen_setup(&keybuf);
-	val_gen_setup(tinfo->rnd, &valbuf);
+	val_gen_setup(&tinfo->rnd, &valbuf);
 
 	/* Set the first operation where we'll create sessions and cursors. */
 	session_op = 0;
@@ -248,7 +248,7 @@ ops(void *arg)
 	cursor = cursor_insert = NULL;
 
 	/* Set the first operation where we'll perform checkpoint operations. */
-	ckpt_op = g.c_checkpoints ? mmrand(tinfo->rnd, 100, 10000) : 0;
+	ckpt_op = g.c_checkpoints ? mmrand(&tinfo->rnd, 100, 10000) : 0;
 	ckpt_available = 0;
 
 	for (intxn = 0; !tinfo->quit; ++tinfo->ops) {
@@ -273,7 +273,7 @@ ops(void *arg)
 				die(ret, "session.close");
 
 			if ((ret = conn->open_session(conn, NULL,
-			    ops_session_config(tinfo->rnd), &session)) != 0)
+			    ops_session_config(&tinfo->rnd), &session)) != 0)
 				die(ret, "connection.open_session");
 
 			/*
@@ -288,7 +288,7 @@ ops(void *arg)
 			 * checkpoints.
 			 */
 			if (!SINGLETHREADED && !DATASOURCE("lsm") &&
-			    ckpt_available && mmrand(tinfo->rnd, 1, 10) == 1) {
+			    ckpt_available && mmrand(&tinfo->rnd, 1, 10) == 1) {
 				if ((ret = session->open_cursor(session,
 				    g.uri, NULL, ckpt_name, &cursor)) != 0)
 					die(ret, "session.open_cursor");
@@ -321,7 +321,7 @@ ops(void *arg)
 					die(ret, "session.open_cursor");
 
 				/* Pick the next session/cursor close/open. */
-				session_op += mmrand(tinfo->rnd, 100, 5000);
+				session_op += mmrand(&tinfo->rnd, 100, 5000);
 
 				/* Updates supported. */
 				readonly = 0;
@@ -338,7 +338,7 @@ ops(void *arg)
 			 */
 			if (DATASOURCE("helium") || DATASOURCE("kvsbdb") ||
 			    DATASOURCE("lsm") ||
-			    readonly || mmrand(tinfo->rnd, 1, 5) == 1)
+			    readonly || mmrand(&tinfo->rnd, 1, 5) == 1)
 				ckpt_config = NULL;
 			else {
 				(void)snprintf(ckpt_name, sizeof(ckpt_name),
@@ -373,7 +373,7 @@ ops(void *arg)
 			ckpt_available = 1;
 
 			/* Pick the next checkpoint operation. */
-			ckpt_op += mmrand(tinfo->rnd, 5000, 20000);
+			ckpt_op += mmrand(&tinfo->rnd, 5000, 20000);
 		}
 
 		/*
@@ -381,7 +381,7 @@ ops(void *arg)
 		 * start a transaction 20% of the time.
 		 */
 		if (!SINGLETHREADED &&
-		    !intxn && mmrand(tinfo->rnd, 1, 10) >= 8) {
+		    !intxn && mmrand(&tinfo->rnd, 1, 10) >= 8) {
 			if ((ret =
 			    session->begin_transaction(session, NULL)) != 0)
 				die(ret, "session.begin_transaction");
@@ -390,7 +390,7 @@ ops(void *arg)
 
 		insert = notfound = 0;
 
-		keyno = mmrand(tinfo->rnd, 1, (u_int)g.rows);
+		keyno = mmrand(&tinfo->rnd, 1, (u_int)g.rows);
 		key.data = keybuf;
 		value.data = valbuf;
 
@@ -401,7 +401,7 @@ ops(void *arg)
 		 * of deletes will mean fewer inserts and writes.  Modifications
 		 * are always followed by a read to confirm it worked.
 		 */
-		op = readonly ? UINT32_MAX : mmrand(tinfo->rnd, 1, 100);
+		op = readonly ? UINT32_MAX : mmrand(&tinfo->rnd, 1, 100);
 		if (op < g.c_delete_pct) {
 			++tinfo->remove;
 			switch (g.type) {
@@ -479,8 +479,8 @@ skip_insert:			if (col_update(tinfo,
 		 * a random direction.
 		 */
 		if (!insert) {
-			dir = (int)mmrand(tinfo->rnd, 0, 1);
-			for (np = 0; np < mmrand(tinfo->rnd, 1, 8); ++np) {
+			dir = (int)mmrand(&tinfo->rnd, 0, 1);
+			for (np = 0; np < mmrand(&tinfo->rnd, 1, 8); ++np) {
 				if (notfound)
 					break;
 				if (nextprev(cursor, dir, &notfound))
@@ -502,7 +502,7 @@ skip_insert:			if (col_update(tinfo,
 		 * rollback 10% of the time.
 		 */
 		if (intxn)
-			switch (mmrand(tinfo->rnd, 1, 10)) {
+			switch (mmrand(&tinfo->rnd, 1, 10)) {
 			case 1: case 2: case 3: case 4:		/* 40% */
 				if ((ret = session->commit_transaction(
 				    session, NULL)) != 0)
@@ -807,7 +807,7 @@ row_update(TINFO *tinfo,
 	session = cursor->session;
 
 	key_gen((uint8_t *)key->data, &key->size, keyno);
-	val_gen(tinfo->rnd, (uint8_t *)value->data, &value->size, keyno);
+	val_gen(&tinfo->rnd, (uint8_t *)value->data, &value->size, keyno);
 
 	/* Log the operation */
 	if (g.logging == LOG_OPS)
@@ -851,7 +851,7 @@ col_update(TINFO *tinfo,
 
 	session = cursor->session;
 
-	val_gen(tinfo->rnd, (uint8_t *)value->data, &value->size, keyno);
+	val_gen(&tinfo->rnd, (uint8_t *)value->data, &value->size, keyno);
 
 	/* Log the operation */
 	if (g.logging == LOG_OPS) {
@@ -1010,8 +1010,8 @@ row_insert(TINFO *tinfo,
 
 	session = cursor->session;
 
-	key_gen_insert(tinfo->rnd, (uint8_t *)key->data, &key->size, keyno);
-	val_gen(tinfo->rnd, (uint8_t *)value->data, &value->size, keyno);
+	key_gen_insert(&tinfo->rnd, (uint8_t *)key->data, &key->size, keyno);
+	val_gen(&tinfo->rnd, (uint8_t *)value->data, &value->size, keyno);
 
 	/* Log the operation */
 	if (g.logging == LOG_OPS)
@@ -1056,7 +1056,7 @@ col_insert(TINFO *tinfo,
 
 	session = cursor->session;
 
-	val_gen(tinfo->rnd, (uint8_t *)value->data, &value->size, g.rows + 1);
+	val_gen(&tinfo->rnd, (uint8_t *)value->data, &value->size, g.rows + 1);
 
 	if (g.type == FIX)
 		cursor->set_value(cursor, *(uint8_t *)value->data);

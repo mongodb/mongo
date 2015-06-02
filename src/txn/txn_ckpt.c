@@ -371,7 +371,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_RET(__checkpoint_apply_all(session, cfg, NULL, &full));
 
 	/* Configure logging only if doing a full checkpoint. */
-	fullckpt_logging = 
+	fullckpt_logging =
 	    full && FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED);
 
 	/*
