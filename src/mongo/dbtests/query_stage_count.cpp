@@ -227,7 +227,6 @@ namespace QueryStageCount {
             request.query = filter;
             request.limit = limit;
             request.skip = skip;
-            request.explain = false;
             request.hint = BSONObj();
             return request;
         }

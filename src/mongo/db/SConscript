@@ -518,7 +518,7 @@ serverOnlyFiles = [
     "commands/compact.cpp",
     "commands/copydb.cpp",
     "commands/copydb_start_commands.cpp",
-    "commands/count.cpp",
+    "commands/count_cmd.cpp",
     "commands/create_indexes.cpp",
     "commands/current_op.cpp",
     "commands/dbhash.cpp",
