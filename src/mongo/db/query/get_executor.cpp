@@ -1213,6 +1213,7 @@ namespace {
     Status getExecutorCount(OperationContext* txn,
                             Collection* collection,
                             const CountRequest& request,
+                            bool explain,
                             PlanExecutor::YieldPolicy yieldPolicy,
                             PlanExecutor** execOut) {
         auto_ptr<WorkingSet> ws(new WorkingSet());
@@ -1246,7 +1247,7 @@ namespace {
                 BSONObj(), // min
                 BSONObj(), // max
                 false, // snapshot
-                request.explain,
+                explain,
                 &rawCq,
                 collection ?
                     static_cast<const WhereCallback&>(WhereCallbackReal(txn,
