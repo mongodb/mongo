@@ -149,7 +149,6 @@ namespace {
     StatusWith<ServerSelectionMetadata>
     ServerSelectionMetadata::readFromMetadata(const BSONObj& metadata) {
         auto secondaryOkField = metadata.getField(kSecondaryOkFieldName);
-        auto readPrefField = metadata.getField(kReadPreferenceFieldName);
 
         bool secondaryOk = !secondaryOkField.eoo();
 
