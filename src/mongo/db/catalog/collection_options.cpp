@@ -180,8 +180,8 @@ namespace mongo {
         BSONObjBuilder b;
         if ( capped ) {
             b.appendBool( "capped", true );
-            if ( cappedSize )
-                b.appendNumber( "size", cappedSize );
+            b.appendNumber( "size", cappedSize );
+
             if ( cappedMaxDocs )
                 b.appendNumber( "max", cappedMaxDocs );
         }

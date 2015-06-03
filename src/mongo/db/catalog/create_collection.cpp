@@ -82,7 +82,7 @@ namespace mongo {
             WriteUnitOfWork wunit(txn);
 
             // Create collection.
-            status =  userCreateNS(txn, ctx.db(), ns.c_str(), options);
+            status = userCreateNS(txn, ctx.db(), ns.c_str(), options);
             if (!status.isOK()) {
                 return status;
             }
