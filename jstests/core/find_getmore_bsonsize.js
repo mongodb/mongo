@@ -4,7 +4,7 @@
     'use strict';
 
     var cmdRes;
-    var collName = 'find_getmore_cmd';
+    var collName = 'find_getmore_bsonsize';
     var coll = db[collName];
 
     coll.drop();
