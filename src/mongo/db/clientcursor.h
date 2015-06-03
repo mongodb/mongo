@@ -30,26 +30,18 @@
 
 #include <boost/noncopyable.hpp>
 #include <boost/scoped_ptr.hpp>
-#include <boost/thread/recursive_mutex.hpp>
 
 #include "mongo/db/jsobj.h"
-#include "mongo/db/keypattern.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/record_id.h"
 #include "mongo/s/collection_metadata.h"
-#include "mongo/util/background.h"
 #include "mongo/util/net/message.h"
 
 namespace mongo {
 
-    typedef boost::lock_guard<boost::recursive_mutex> recursive_scoped_lock;
     class ClientCursor;
     class Collection;
-    class CurOp;
     class CursorManager;
-    class Database;
-    class NamespaceDetails;
-    class ParsedQuery;
     class RecoveryUnit;
 
     typedef long long CursorId; /* passed to the client so it can send back on getMore */

@@ -28,7 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/client/find_and_modify_request.h"
+#include "mongo/db/query/find_and_modify_request.h"
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobjbuilder.h"
