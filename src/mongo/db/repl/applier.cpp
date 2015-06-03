@@ -30,6 +30,8 @@
 
 #include "mongo/db/repl/applier.h"
 
+#include <algorithm>
+
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/util/assert_util.h"
@@ -164,6 +166,72 @@ namespace repl {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         _active = false;
         _condition.notify_all();
+    }
+
+namespace {
+
+    void pauseBeforeCompletion(
+        const StatusWith<Timestamp>& result,
+        const Applier::Operations& operationsOnCompletion,
+        const PauseDataReplicatorFn& pauseDataReplicator,
+        const Applier::CallbackFn& onCompletion) {
+
+        if (result.isOK()) {
+            pauseDataReplicator();
+        }
+        onCompletion(result, operationsOnCompletion);
+    };
+
+} // namespace
+
+    StatusWith<std::pair<std::unique_ptr<Applier>, Applier::Operations> > applyUntilAndPause(
+        ReplicationExecutor* executor,
+        const Applier::Operations& operations,
+        const Applier::ApplyOperationFn& applyOperation,
+        const Timestamp& lastTimestampToApply,
+        const PauseDataReplicatorFn& pauseDataReplicator,
+        const Applier::CallbackFn& onCompletion) {
+
+        try {
+            auto comp = [](const BSONObj& left, const BSONObj& right) {
+                uassert(ErrorCodes::FailedToParse,
+                        str::stream() << "Operation missing 'ts' field': " << left,
+                        left.hasField("ts"));
+                uassert(ErrorCodes::FailedToParse,
+                        str::stream() << "Operation missing 'ts' field': " << left,
+                        right.hasField("ts"));
+                return left["ts"].timestamp() < right["ts"].timestamp();
+            };
+            auto wrapped = BSON("ts" << lastTimestampToApply);
+            auto i = std::lower_bound(operations.cbegin(), operations.cend(), wrapped, comp);
+            bool found = i != operations.cend() && !comp(wrapped, *i);
+            auto j = found ? i+1 : i;
+            Applier::Operations operationsInRange(operations.cbegin(), j);
+            Applier::Operations operationsNotInRange(j, operations.cend());
+            if (!found) {
+                return std::make_pair(
+                    std::unique_ptr<Applier>(
+                        new Applier(executor, operationsInRange, applyOperation, onCompletion)),
+                    operationsNotInRange);
+            }
+
+            return std::make_pair(
+                std::unique_ptr<Applier>(new Applier(
+                    executor,
+                    operationsInRange,
+                    applyOperation,
+                    stdx::bind(pauseBeforeCompletion,
+                               stdx::placeholders::_1,
+                               stdx::placeholders::_2,
+                               pauseDataReplicator,
+                               onCompletion))),
+                operationsNotInRange);
+        }
+        catch (...) {
+            return exceptionToStatus();
+        }
+        MONGO_UNREACHABLE;
+        return Status(ErrorCodes::InternalError, "unreachable");
     }
 
 } // namespace repl
