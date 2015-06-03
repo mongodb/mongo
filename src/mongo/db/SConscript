@@ -619,7 +619,7 @@ if has_option('use-cpu-profiler'):
     # scope it more narrowly. Better would be if the commands were a library, and could be
     # conditionally made to depend on this file, as a library and then we could easily scope
     # just to this file.
-    env.InjectThirdPartyIncludePaths('tcmalloc')
+    env.InjectThirdPartyIncludePaths('gperftools')
 
 serveronlyEnv = env.Clone()
 serveronlyEnv.InjectThirdPartyIncludePaths(libraries=['snappy'])
