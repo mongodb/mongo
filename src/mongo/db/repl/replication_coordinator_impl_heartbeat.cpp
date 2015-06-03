@@ -139,8 +139,6 @@ namespace {
             resp = cbData.response.getValue().data;
             responseStatus = hbResponse.initialize(resp, _topCoord->getTerm());
         }
-        const bool isUnauthorized = (responseStatus.code() == ErrorCodes::Unauthorized) ||
-                                    (responseStatus.code() == ErrorCodes::AuthenticationFailed);
         const Date_t now = _replExecutor.now();
         const OpTime lastApplied = getMyLastOptime();  // Locks and unlocks _mutex.
         Milliseconds networkTime(0);
@@ -155,9 +153,6 @@ namespace {
                 LOG(3) << "heartbeat response: " << resp;
             }
 
-            if (isUnauthorized) {
-                networkTime = cbData.response.getValue().elapsedMillis;
-            }
             hbStatusResponse = StatusWith<ReplSetHeartbeatResponse>(responseStatus);
         }
 
