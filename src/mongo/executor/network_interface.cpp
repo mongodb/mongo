@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2015 MongoDB Inc.
+ *    Copyright (C) 2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -28,49 +28,21 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/repl/replication_executor_test_fixture.h"
+#include "mongo/executor/network_interface.h"
 
-#include "mongo/db/repl/replication_executor.h"
-#include "mongo/db/repl/storage_interface_mock.h"
-#include "mongo/executor/network_interface_mock.h"
 
 namespace mongo {
-namespace repl {
+namespace executor {
 
-namespace {
+    // This is a bitmask with the first bit set. It's used to mark connections that should be kept
+    // open during stepdowns.
+#ifndef _MSC_EXTENSIONS
+    const unsigned int NetworkInterface::kMessagingPortKeepOpen;
+#endif // _MSC_EXTENSIONS
 
-    const int64_t prngSeed = 1;
+    NetworkInterface::NetworkInterface() {}
+    NetworkInterface::~NetworkInterface() {}
 
-} // namespace
 
-    void ReplicationExecutorTest::launchExecutorThread() {
-        ASSERT(!_executorThread);
-        _executorThread.reset(
-                new boost::thread(stdx::bind(&ReplicationExecutor::run, _executor.get())));
-        getNet()->enterNetwork();
-    }
-
-    void ReplicationExecutorTest::joinExecutorThread() {
-        ASSERT(_executorThread);
-        getNet()->exitNetwork();
-        _executorThread->join();
-        _executorThread.reset();
-    }
-
-    void ReplicationExecutorTest::setUp() {
-        _net = new executor::NetworkInterfaceMock;
-        _storage = new StorageInterfaceMock;
-        _executor.reset(new ReplicationExecutor(_net, _storage, prngSeed));
-    }
-
-    void ReplicationExecutorTest::tearDown() {
-        if (_executorThread) {
-            _executor->shutdown();
-            joinExecutorThread();
-        }
-        _executor.reset();
-        _net = nullptr;
-    }
-
-}  // namespace repl
-}  // namespace mongo
+} // namespace executor
+} // namespace mongo

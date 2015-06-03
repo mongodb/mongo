@@ -36,11 +36,12 @@
 #include "mongo/base/status.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/check_quorum_for_config_change.h"
-#include "mongo/db/repl/network_interface_mock.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
 #include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/replication_executor.h"
+#include "mongo/db/repl/storage_interface_mock.h"
+#include "mongo/executor/network_interface_mock.h"
 #include "mongo/platform/unordered_set.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/unittest/unittest.h"
@@ -62,6 +63,8 @@ namespace mongo {
 namespace repl {
 namespace {
 
+    using executor::NetworkInterfaceMock;
+
     class CheckQuorumTest : public mongo::unittest::Test {
     protected:
         CheckQuorumTest();
@@ -71,6 +74,7 @@ namespace {
         bool isQuorumCheckDone();
 
         NetworkInterfaceMock* _net;
+        StorageInterfaceMock* _storage;
         boost::scoped_ptr<ReplicationExecutor> _executor;
 
     private:
@@ -93,7 +97,8 @@ namespace {
 
     void CheckQuorumTest::setUp() {
         _net = new NetworkInterfaceMock;
-        _executor.reset(new ReplicationExecutor(_net, 1 /* prng */ ));
+        _storage = new StorageInterfaceMock;
+        _executor.reset(new ReplicationExecutor(_net, _storage, 1 /* prng */ ));
         _executorThread.reset(new boost::thread(stdx::bind(&ReplicationExecutor::run,
                                                            _executor.get())));
     }

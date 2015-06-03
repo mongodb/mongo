@@ -41,7 +41,6 @@
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/repl/handshake_args.h"
 #include "mongo/db/repl/is_master_response.h"
-#include "mongo/db/repl/network_interface_mock.h"
 #include "mongo/db/repl/operation_context_repl_mock.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/read_after_optime_args.h"
@@ -57,6 +56,7 @@
 #include "mongo/db/repl/update_position_args.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/executor/network_interface_mock.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -68,6 +68,7 @@ namespace mongo {
 namespace repl {
 namespace {
 
+    using executor::NetworkInterfaceMock;
     typedef ReplicationCoordinator::ReplSetReconfigArgs ReplSetReconfigArgs;
     Status kInterruptedStatus(ErrorCodes::Interrupted, "operation was interrupted");
 

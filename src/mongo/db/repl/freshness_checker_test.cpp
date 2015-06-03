@@ -33,11 +33,12 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/repl/freshness_checker.h"
 #include "mongo/db/repl/member_heartbeat_data.h"
-#include "mongo/db/repl/network_interface_mock.h"
 #include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/replication_executor.h"
-#include "mongo/db/repl/freshness_checker.h"
+#include "mongo/db/repl/storage_interface_mock.h"
+#include "mongo/executor/network_interface_mock.h"
 #include "mongo/platform/unordered_set.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/unittest/unittest.h"
@@ -49,6 +50,7 @@ namespace mongo {
 namespace repl {
 namespace {
 
+    using executor::NetworkInterfaceMock;
     using unittest::assertGet;
 
     bool stringContains(const std::string &haystack, const std::string& needle) {
@@ -73,6 +75,7 @@ namespace {
         }
 
         NetworkInterfaceMock* _net;
+        StorageInterfaceMock* _storage;
         boost::scoped_ptr<ReplicationExecutor> _executor;
         boost::scoped_ptr<boost::thread> _executorThread;
 
@@ -91,7 +94,8 @@ namespace {
 
     void FreshnessCheckerTest::setUp() {
         _net = new NetworkInterfaceMock;
-        _executor.reset(new ReplicationExecutor(_net, 1 /* prng seed */));
+        _storage = new StorageInterfaceMock;
+        _executor.reset(new ReplicationExecutor(_net, _storage, 1 /* prng seed */));
         _executorThread.reset(new boost::thread(stdx::bind(&ReplicationExecutor::run,
                                                            _executor.get())));
         _checker.reset(new  FreshnessChecker);

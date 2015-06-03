@@ -32,9 +32,9 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/fetcher.h"
-#include "mongo/db/repl/network_interface_mock.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/replication_executor_test_fixture.h"
+#include "mongo/executor/network_interface_mock.h"
 
 #include "mongo/unittest/unittest.h"
 
@@ -42,6 +42,7 @@ namespace {
 
     using namespace mongo;
     using namespace mongo::repl;
+    using executor::NetworkInterfaceMock;
 
     const HostAndPort target("localhost", -1);
     const BSONObj findCmdObj = BSON("find" << "coll");

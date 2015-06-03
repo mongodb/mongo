@@ -1,0 +1,22 @@
+# -*- mode: python -*-
+
+Import("env")
+
+env.Library(target='network_interface',
+            source=['network_interface.cpp',],
+            LIBDEPS=[
+            ])
+
+env.Library(target='network_interface_impl', # TODO: rename to thread_pool_network_interface
+            source=['network_interface_impl.cpp',],
+            LIBDEPS=[
+                '$BUILD_DIR/mongo/client/remote_command_runner_impl',
+                'network_interface',
+                # TODO: add dependency on the task executor *interface* once available.
+            ])
+
+env.Library('network_interface_mock',
+            'network_interface_mock.cpp',
+            LIBDEPS=[
+                'network_interface',
+            ])

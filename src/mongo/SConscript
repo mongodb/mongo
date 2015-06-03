@@ -30,6 +30,7 @@ env.SConscript(
         'crypto',
         'db',
         'dbtests',
+        'executor',
         'installer',
         'logger',
         'platform',
@@ -189,6 +190,7 @@ mongod = env.Program(
         "db/mongodandmongos",
         "db/mongodwebserver",
         "db/serveronly",
+        "db/repl/storage_interface_impl",
         "util/ntservice",
     ],
 )

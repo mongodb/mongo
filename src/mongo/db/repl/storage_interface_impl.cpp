@@ -26,51 +26,29 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
+
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/repl/replication_executor_test_fixture.h"
+#include "mongo/db/repl/storage_interface_impl.h"
 
-#include "mongo/db/repl/replication_executor.h"
-#include "mongo/db/repl/storage_interface_mock.h"
-#include "mongo/executor/network_interface_mock.h"
+#include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/client.h"
+#include "mongo/db/operation_context_impl.h"
 
 namespace mongo {
 namespace repl {
 
-namespace {
+    StorageInterfaceImpl::StorageInterfaceImpl() : StorageInterface() {}
+    StorageInterfaceImpl::~StorageInterfaceImpl() { }
 
-    const int64_t prngSeed = 1;
-
-} // namespace
-
-    void ReplicationExecutorTest::launchExecutorThread() {
-        ASSERT(!_executorThread);
-        _executorThread.reset(
-                new boost::thread(stdx::bind(&ReplicationExecutor::run, _executor.get())));
-        getNet()->enterNetwork();
-    }
-
-    void ReplicationExecutorTest::joinExecutorThread() {
-        ASSERT(_executorThread);
-        getNet()->exitNetwork();
-        _executorThread->join();
-        _executorThread.reset();
-    }
-
-    void ReplicationExecutorTest::setUp() {
-        _net = new executor::NetworkInterfaceMock;
-        _storage = new StorageInterfaceMock;
-        _executor.reset(new ReplicationExecutor(_net, _storage, prngSeed));
-    }
-
-    void ReplicationExecutorTest::tearDown() {
-        if (_executorThread) {
-            _executor->shutdown();
-            joinExecutorThread();
+    OperationContext* StorageInterfaceImpl::createOperationContext() {
+        if (!ClientBasic::getCurrent()) {
+            Client::initThreadIfNotAlready();
+            AuthorizationSession::get(*ClientBasic::getCurrent())->grantInternalAuthorization();
         }
-        _executor.reset();
-        _net = nullptr;
+        return new OperationContextImpl();
     }
 
 }  // namespace repl
-}  // namespace mongo
+} // namespace mongo

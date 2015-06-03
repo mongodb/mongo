@@ -56,6 +56,7 @@
 #include "mongo/db/repl/rs_sync.h"
 #include "mongo/db/repl/last_vote.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/executor/network_interface.h"
 #include "mongo/s/d_state.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/assert_util.h"
@@ -294,8 +295,7 @@ namespace {
     }
 
     void ReplicationCoordinatorExternalStateImpl::closeConnections() {
-        MessagingPort::closeAllSockets(
-            ReplicationExecutor::NetworkInterface::kMessagingPortKeepOpen);
+        MessagingPort::closeAllSockets(executor::NetworkInterface::kMessagingPortKeepOpen);
     }
 
     void ReplicationCoordinatorExternalStateImpl::killAllUserOperations(OperationContext* txn) {

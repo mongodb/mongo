@@ -32,7 +32,6 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context_noop.h"
-#include "mongo/db/repl/network_interface_mock.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
 #include "mongo/db/repl/replica_set_config.h"
@@ -40,6 +39,7 @@
 #include "mongo/db/repl/replication_coordinator_impl.h"
 #include "mongo/db/repl/replication_coordinator_test_fixture.h"
 #include "mongo/db/repl/replication_coordinator.h" // ReplSetReconfigArgs
+#include "mongo/executor/network_interface_mock.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"
 
@@ -47,6 +47,7 @@ namespace mongo {
 namespace repl {
 namespace {
 
+    using executor::NetworkInterfaceMock;
     typedef ReplicationCoordinator::ReplSetReconfigArgs ReplSetReconfigArgs;
 
     TEST_F(ReplCoordTest, ReconfigBeforeInitialized) {

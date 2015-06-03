@@ -33,7 +33,6 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/repl/is_master_response.h"
-#include "mongo/db/repl/network_interface_mock.h"
 #include "mongo/db/repl/operation_context_repl_mock.h"
 #include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
@@ -41,12 +40,15 @@
 #include "mongo/db/repl/replication_coordinator_external_state_mock.h"
 #include "mongo/db/repl/replication_coordinator_impl.h"
 #include "mongo/db/repl/replication_coordinator_test_fixture.h"
+#include "mongo/executor/network_interface_mock.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 namespace repl {
 namespace {
+
+    using executor::NetworkInterfaceMock;
 
     class ReplCoordElectV1Test : public ReplCoordTest {
     protected:

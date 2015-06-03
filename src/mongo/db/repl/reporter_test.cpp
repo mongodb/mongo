@@ -28,9 +28,9 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/repl/network_interface_mock.h"
 #include "mongo/db/repl/replication_executor_test_fixture.h"
 #include "mongo/db/repl/reporter.h"
+#include "mongo/executor/network_interface_mock.h"
 
 #include "mongo/unittest/unittest.h"
 
@@ -38,6 +38,7 @@ namespace {
 
     using namespace mongo;
     using namespace mongo::repl;
+    using executor::NetworkInterfaceMock;
 
     class MockProgressManager : public ReplicationProgressManager {
         public:

@@ -30,9 +30,9 @@
 
 #include <boost/scoped_ptr.hpp>
 
+#include "mongo/db/repl/repl_set_heartbeat_response.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/db/repl/repl_set_heartbeat_response.h"
 
 namespace mongo {
 namespace repl {

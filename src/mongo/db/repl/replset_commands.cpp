@@ -54,6 +54,7 @@
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/update_position_args.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/executor/network_interface.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 
@@ -709,7 +710,7 @@ namespace {
             {
                 AbstractMessagingPort *mp = txn->getClient()->port();
                 if( mp )
-                    mp->tag |= ReplicationExecutor::NetworkInterface::kMessagingPortKeepOpen;
+                    mp->tag |= executor::NetworkInterface::kMessagingPortKeepOpen;
             }
 
             if (getGlobalReplicationCoordinator()->isV1ElectionProtocol()) {

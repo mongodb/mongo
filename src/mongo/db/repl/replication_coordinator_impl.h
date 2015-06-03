@@ -38,13 +38,14 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/data_replicator.h"
+#include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_external_state.h"
 #include "mongo/db/repl/replication_executor.h"
+#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/update_position_args.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/unordered_map.h"
@@ -81,7 +82,8 @@ namespace repl {
         // Takes ownership of the "externalState", "topCoord" and "network" objects.
         ReplicationCoordinatorImpl(const ReplSettings& settings,
                                    ReplicationCoordinatorExternalState* externalState,
-                                   ReplicationExecutor::NetworkInterface* network,
+                                   executor::NetworkInterface* network,
+                                   StorageInterface* storage,
                                    TopologyCoordinator* topoCoord,
                                    int64_t prngSeed);
         // Takes ownership of the "externalState" and "topCoord" objects.
@@ -296,7 +298,8 @@ namespace repl {
                                    ReplicationCoordinatorExternalState* externalState,
                                    TopologyCoordinator* topCoord,
                                    int64_t prngSeed,
-                                   ReplicationExecutor::NetworkInterface* network,
+                                   executor::NetworkInterface* network,
+                                   StorageInterface* storage,
                                    ReplicationExecutor* replExec);
         /**
          * Configuration states for a replica set node.

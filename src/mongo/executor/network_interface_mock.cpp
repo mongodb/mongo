@@ -28,7 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/repl/network_interface_mock.h"
+#include "mongo/executor/network_interface_mock.h"
 
 #include "mongo/db/repl/operation_context_repl_mock.h"
 #include "mongo/db/repl/replication_executor.h"
@@ -36,7 +36,7 @@
 #include "mongo/util/time_support.h"
 
 namespace mongo {
-namespace repl {
+namespace executor {
 
     NetworkInterfaceMock::NetworkInterfaceMock()
         : _waitingToRunMask(0),
@@ -64,12 +64,8 @@ namespace repl {
         return _now_inlock();
     }
 
-    OperationContext* NetworkInterfaceMock::createOperationContext() {
-        return new OperationContextReplMock();
-    }
-
     void NetworkInterfaceMock::startCommand(
-            const ReplicationExecutor::CallbackHandle& cbHandle,
+            const repl::ReplicationExecutor::CallbackHandle& cbHandle,
             const RemoteCommandRequest& request,
             const RemoteCommandCompletionFn& onFinish) {
 
@@ -96,13 +92,13 @@ namespace repl {
             return false;
         }
         scheduled->splice(scheduled->begin(), *other, noi);
-        noi->setResponse(now, ResponseStatus(ErrorCodes::CallbackCanceled,
-                                             "Network operation canceled"));
+        noi->setResponse(now, repl::ResponseStatus(ErrorCodes::CallbackCanceled,
+                                                   "Network operation canceled"));
         return true;
     }
 
     void NetworkInterfaceMock::cancelCommand(
-            const ReplicationExecutor::CallbackHandle& cbHandle) {
+            const repl::ReplicationExecutor::CallbackHandle& cbHandle) {
         boost::lock_guard<boost::mutex> lk(_mutex);
         invariant(!_inShutdown);
         stdx::function<bool (const NetworkOperation&)> matchesHandle = stdx::bind(
@@ -146,8 +142,8 @@ namespace repl {
         _waitingToRunMask |= kExecutorThread;  // Prevents network thread from scheduling.
         lk.unlock();
         for (NetworkOperationIterator iter = todo.begin(); iter != todo.end(); ++iter) {
-            iter->setResponse(now, ResponseStatus(ErrorCodes::ShutdownInProgress,
-                                                  "Shutting down mock network"));
+            iter->setResponse(now, repl::ResponseStatus(ErrorCodes::ShutdownInProgress,
+                                                        "Shutting down mock network"));
             iter->finishResponse();
         }
         lk.lock();
@@ -208,7 +204,7 @@ namespace repl {
     void NetworkInterfaceMock::scheduleResponse(
             NetworkOperationIterator noi,
             Date_t when,
-            const ResponseStatus& response) {
+            const repl::ResponseStatus& response) {
 
         boost::lock_guard<boost::mutex> lk(_mutex);
         invariant(_currentlyRunning == kNetworkThread);
@@ -364,7 +360,7 @@ namespace repl {
     }
 
     NetworkInterfaceMock::NetworkOperation::NetworkOperation(
-            const ReplicationExecutor::CallbackHandle& cbHandle,
+            const repl::ReplicationExecutor::CallbackHandle& cbHandle,
             const RemoteCommandRequest& theRequest,
             Date_t theRequestDate,
             const RemoteCommandCompletionFn& onFinish)
@@ -388,7 +384,7 @@ namespace repl {
 
     void NetworkInterfaceMock::NetworkOperation::setResponse(
             Date_t responseDate,
-            const ResponseStatus& response) {
+            const repl::ResponseStatus& response) {
 
         invariant(responseDate >= _requestDate);
         _responseDate = responseDate;
@@ -401,5 +397,5 @@ namespace repl {
         _onFinish = RemoteCommandCompletionFn();
     }
 
-}  // namespace repl
+}  // namespace executor
 }  // namespace mongo

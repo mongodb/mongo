@@ -36,14 +36,15 @@
 #include <vector>
 
 #include "mongo/client/remote_command_runner_impl.h"
-#include "mongo/db/repl/replication_executor.h"
+#include "mongo/executor/network_interface.h"
 #include "mongo/stdx/list.h"
 
 namespace mongo {
-namespace repl {
+namespace executor {
 
     /**
-     * Implementation of the network interface used by the ReplicationExecutor inside mongod.
+     * Implementation of the network interface for use by classes implementing TaskExecutor
+     * inside mongod.
      *
      * This implementation manages a dynamically sized group of worker threads for performing
      * network operations.  The minimum and maximum number of threads is set at compile time, and
@@ -65,10 +66,11 @@ namespace repl {
      * The implementation also manages a pool of network connections to recently contacted remote
      * nodes.  The size of this pool is not bounded, but connections are retired unconditionally
      * after they have been connected for a certain maximum period.
+     * TODO(spencer): Rename this to ThreadPoolNetworkInterface
      */
-    class NetworkInterfaceImpl : public ReplicationExecutor::NetworkInterface {
+    class NetworkInterfaceImpl : public NetworkInterface {
     public:
-        explicit NetworkInterfaceImpl();
+        NetworkInterfaceImpl();
         virtual ~NetworkInterfaceImpl();
         virtual std::string getDiagnosticString();
         virtual void startup();
@@ -78,20 +80,18 @@ namespace repl {
         virtual void signalWorkAvailable();
         virtual Date_t now();
         virtual void startCommand(
-                const ReplicationExecutor::CallbackHandle& cbHandle,
+                const repl::ReplicationExecutor::CallbackHandle& cbHandle,
                 const RemoteCommandRequest& request,
                 const RemoteCommandCompletionFn& onFinish);
-        virtual void cancelCommand(const ReplicationExecutor::CallbackHandle& cbHandle);
-        OperationContext* createOperationContext() override;
-
-        std::string getNextCallbackWithGlobalLockThreadName();
+        virtual void cancelCommand(const repl::ReplicationExecutor::CallbackHandle& cbHandle);
 
     private:
+
         /**
          * Information describing an in-flight command.
          */
         struct CommandData {
-            ReplicationExecutor::CallbackHandle cbHandle;
+            repl::ReplicationExecutor::CallbackHandle cbHandle;
             RemoteCommandRequest request;
             RemoteCommandCompletionFn onFinish;
         };
@@ -160,5 +160,5 @@ namespace repl {
         size_t _numActiveNetworkRequests;
     };
 
-}  // namespace repl
+} // namespace executor
 } // namespace mongo

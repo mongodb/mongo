@@ -77,12 +77,12 @@
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/range_deleter_service.h"
 #include "mongo/db/repair_database.h"
-#include "mongo/db/repl/network_interface_impl.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator_external_state_impl.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/replication_coordinator_impl.h"
+#include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/repl/topology_coordinator_impl.h"
 #include "mongo/db/restapi.h"
 #include "mongo/db/server_parameters.h"
@@ -93,6 +93,7 @@
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/db/ttl.h"
+#include "mongo/executor/network_interface_impl.h"
 #include "mongo/platform/process_id.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/stdx/memory.h"
@@ -757,7 +758,8 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(CreateReplicationManager, ("SetGlobalEnviro
     repl::ReplicationCoordinatorImpl* replCoord = new repl::ReplicationCoordinatorImpl(
             getGlobalReplSettings(),
             new repl::ReplicationCoordinatorExternalStateImpl,
-            new repl::NetworkInterfaceImpl,
+            new executor::NetworkInterfaceImpl{},
+            new repl::StorageInterfaceImpl{},
             new repl::TopologyCoordinatorImpl(Seconds(repl::maxSyncSourceLagSecs)),
             static_cast<int64_t>(curTimeMillis64()));
     repl::setGlobalReplicationCoordinator(replCoord);

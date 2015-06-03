@@ -34,14 +34,15 @@
 
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/repl/is_master_response.h"
-#include "mongo/db/repl/network_interface_mock.h"
 #include "mongo/db/repl/operation_context_repl_mock.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
 #include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
 #include "mongo/db/repl/replication_coordinator_external_state_mock.h"
 #include "mongo/db/repl/replication_coordinator_impl.h"
+#include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/repl/topology_coordinator_impl.h"
+#include "mongo/executor/network_interface_mock.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"
@@ -54,6 +55,8 @@ namespace {
         return haystack.find(needle) != std::string::npos;
     }
 }  // namespace
+
+    using executor::NetworkInterfaceMock;
 
     ReplicaSetConfig ReplCoordTest::assertMakeRSConfig(const BSONObj& configBson) {
         ReplicaSetConfig config;
@@ -104,10 +107,12 @@ namespace {
 
         _topo = new TopologyCoordinatorImpl(Seconds(0));
         _net = new NetworkInterfaceMock;
+        _storage = new StorageInterfaceMock;
         _externalState = new ReplicationCoordinatorExternalStateMock;
         _repl.reset(new ReplicationCoordinatorImpl(_settings,
                                                    _externalState,
                                                    _net,
+                                                   _storage,
                                                    _topo,
                                                    seed));
     }

@@ -33,11 +33,12 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/repl/elect_cmd_runner.h"
 #include "mongo/db/repl/member_heartbeat_data.h"
-#include "mongo/db/repl/network_interface_mock.h"
 #include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/replication_executor.h"
-#include "mongo/db/repl/elect_cmd_runner.h"
+#include "mongo/db/repl/storage_interface_mock.h"
+#include "mongo/executor/network_interface_mock.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/unittest/unittest.h"
 
@@ -47,6 +48,8 @@ using boost::scoped_ptr;
 namespace mongo {
 namespace repl {
 namespace {
+
+    using executor::NetworkInterfaceMock;
 
     class ElectCmdRunnerTest : public mongo::unittest::Test {
     public:
@@ -65,6 +68,7 @@ namespace {
                                   const std::vector<HostAndPort>& hosts);
 
         NetworkInterfaceMock* _net;
+        StorageInterfaceMock* _storage;
         boost::scoped_ptr<ReplicationExecutor> _executor;
         boost::scoped_ptr<boost::thread> _executorThread;
 
@@ -77,7 +81,8 @@ namespace {
 
     void ElectCmdRunnerTest::setUp() {
         _net = new NetworkInterfaceMock;
-        _executor.reset(new ReplicationExecutor(_net, 1 /* prng seed */));
+        _storage = new StorageInterfaceMock;
+        _executor.reset(new ReplicationExecutor(_net, _storage, 1 /* prng seed */));
         _executorThread.reset(new boost::thread(stdx::bind(&ReplicationExecutor::run,
                                                            _executor.get())));
     }

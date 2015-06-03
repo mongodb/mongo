@@ -41,12 +41,16 @@ namespace mongo {
     class BSONObj;
     struct HostAndPort;
 
+namespace executor {
+    class NetworkInterfaceMock;
+} // namespace executor
+
 namespace repl {
 
-    class NetworkInterfaceMock;
     class ReplicaSetConfig;
     class ReplicationCoordinatorExternalStateMock;
     class ReplicationCoordinatorImpl;
+    class StorageInterfaceMock;
     class TopologyCoordinatorImpl;
 
     /**
@@ -58,7 +62,7 @@ namespace repl {
          * Makes a ResponseStatus with the given "doc" response and optional elapsed time "millis".
          */
         static ResponseStatus makeResponseStatus(const BSONObj& doc,
-                                                 Milliseconds millis = Milliseconds(0));
+                                                           Milliseconds millis = Milliseconds(0));
 
         /**
          * Constructs a ReplicaSetConfig from the given BSON, or raises a test failure exception.
@@ -75,7 +79,7 @@ namespace repl {
         /**
          * Gets the network mock.
          */
-        NetworkInterfaceMock* getNet() { return _net; }
+        executor::NetworkInterfaceMock* getNet() { return _net; }
 
         /**
          * Gets the replication coordinator under test.
@@ -182,7 +186,9 @@ namespace repl {
         // Owned by ReplicationCoordinatorImpl
         TopologyCoordinatorImpl* _topo;
         // Owned by ReplicationCoordinatorImpl
-        NetworkInterfaceMock* _net;
+        executor::NetworkInterfaceMock* _net;
+        // Owned by ReplicationCoordinatorImpl
+        StorageInterfaceMock* _storage;
         // Owned by ReplicationCoordinatorImpl
         ReplicationCoordinatorExternalStateMock* _externalState;
         ReplSettings _settings;

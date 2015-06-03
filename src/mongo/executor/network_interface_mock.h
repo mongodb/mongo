@@ -32,23 +32,23 @@
 #include <boost/thread/condition_variable.hpp>
 #include <map>
 
-#include "mongo/db/repl/replication_executor.h"
+#include "mongo/executor/network_interface.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
-namespace repl {
+namespace executor {
 
     /**
      * Mock network implementation for use in unit tests.
      *
      * To use, construct a new instance on the heap, and keep a pointer to it.  Pass
-     * the pointer to the instance into the ReplicationExecutor constructor, transfering
+     * the pointer to the instance into the TaskExecutor constructor, transferring
      * ownership.  Start the executor's run() method in a separate thread, schedule the
      * work you want to test into the executor, then while the test is still going, iterate
      * through the ready network requests, servicing them and advancing time as needed.
      *
      * The mock has a fully virtualized notion of time and the the network.  When the
-     * replication executor under test schedules a network operation, the startCommand
+     * executor under test schedules a network operation, the startCommand
      * method of this class adds an entry to the _unscheduled queue for immediate consideration.
      * The test driver loop, when it examines the request, may schedule a response, ask the
      * interface to redeliver the request at a later virtual time, or to swallow the virtual
@@ -59,7 +59,7 @@ namespace repl {
      * The thread acting as the "network" and the executor run thread are highly synchronized
      * by this code, allowing for deterministic control of operation interleaving.
      */
-    class NetworkInterfaceMock : public ReplicationExecutor::NetworkInterface {
+    class NetworkInterfaceMock : public NetworkInterface {
     public:
         class NetworkOperation;
         typedef stdx::list<NetworkOperation> NetworkOperationList;
@@ -71,7 +71,7 @@ namespace repl {
 
         ////////////////////////////////////////////////////////////////////////////////
         //
-        // ReplicationExecutor::NetworkInterface methods
+        // NetworkInterface methods
         //
         ////////////////////////////////////////////////////////////////////////////////
 
@@ -81,11 +81,10 @@ namespace repl {
         virtual void waitForWorkUntil(Date_t when);
         virtual void signalWorkAvailable();
         virtual Date_t now();
-        virtual void startCommand(const ReplicationExecutor::CallbackHandle& cbHandle,
+        virtual void startCommand(const repl::ReplicationExecutor::CallbackHandle& cbHandle,
                                   const RemoteCommandRequest& request,
                                   const RemoteCommandCompletionFn& onFinish);
-        virtual void cancelCommand(const ReplicationExecutor::CallbackHandle& cbHandle);
-        OperationContext* createOperationContext() override;
+        virtual void cancelCommand(const repl::ReplicationExecutor::CallbackHandle& cbHandle);
 
 
         ////////////////////////////////////////////////////////////////////////////////
@@ -108,7 +107,7 @@ namespace repl {
         /**
          * Causes the currently running thread to drop the mantle of "network simulation thread".
          *
-         * Call this before calling any methods that might block waiting for the replciation
+         * Call this before calling any methods that might block waiting for the
          * executor thread.
          */
         void exitNetwork();
@@ -131,7 +130,7 @@ namespace repl {
         void scheduleResponse(
                 NetworkOperationIterator noi,
                 Date_t when,
-                const ResponseStatus& response);
+                const repl::ResponseStatus& response);
 
         /**
          * Swallows "noi", causing the network interface to not respond to it until
@@ -253,7 +252,7 @@ namespace repl {
 
         // Pointer to the executor into which this mock is installed.  Used to signal the executor
         // when the clock changes.
-        ReplicationExecutor* _executor;                          // (R)
+        repl::ReplicationExecutor* _executor;                    // (R)
     };
 
     /**
@@ -262,7 +261,7 @@ namespace repl {
     class NetworkInterfaceMock::NetworkOperation {
     public:
         NetworkOperation();
-        NetworkOperation(const ReplicationExecutor::CallbackHandle& cbHandle,
+        NetworkOperation(const repl::ReplicationExecutor::CallbackHandle& cbHandle,
                          const RemoteCommandRequest& theRequest,
                          Date_t theRequestDate,
                          const RemoteCommandCompletionFn& onFinish);
@@ -277,13 +276,13 @@ namespace repl {
         /**
          * Sets the response and thet virtual time at which it will be delivered.
          */
-        void setResponse(Date_t responseDate, const ResponseStatus& response);
+        void setResponse(Date_t responseDate, const repl::ResponseStatus& response);
 
         /**
          * Predicate that returns true if cbHandle equals the executor's handle for this network
          * operation.  Used for searching lists of NetworkOperations.
          */
-        bool isForCallback(const ReplicationExecutor::CallbackHandle& cbHandle) const {
+        bool isForCallback(const repl::ReplicationExecutor::CallbackHandle& cbHandle) const {
             return cbHandle == _cbHandle;
         }
 
@@ -318,11 +317,11 @@ namespace repl {
         Date_t _requestDate;
         Date_t _nextConsiderationDate;
         Date_t _responseDate;
-        ReplicationExecutor::CallbackHandle _cbHandle;
+        repl::ReplicationExecutor::CallbackHandle _cbHandle;
         RemoteCommandRequest _request;
-        ResponseStatus _response;
+        repl::ResponseStatus _response;
         RemoteCommandCompletionFn _onFinish;
     };
 
-}  // namespace repl
+}  // namespace executor
 }  // namespace mongo

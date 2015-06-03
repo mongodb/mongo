@@ -34,8 +34,8 @@
 #include "mongo/base/status.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/election_winner_declarer.h"
-#include "mongo/db/repl/network_interface_mock.h"
 #include "mongo/db/repl/replication_executor.h"
+#include "mongo/executor/network_interface_mock.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/mongoutils/str.h"
@@ -46,6 +46,7 @@ namespace mongo {
 namespace repl {
 namespace {
 
+    using executor::NetworkInterfaceMock;
     using unittest::assertGet;
 
     bool stringContains(const std::string &haystack, const std::string& needle) {

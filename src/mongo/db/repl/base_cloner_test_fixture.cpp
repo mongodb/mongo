@@ -106,7 +106,7 @@ namespace repl {
         ReplicationExecutorTest::setUp();
         clear();
         launchExecutorThread();
-        storageInterface.reset(new StorageInterfaceMock());
+        storageInterface.reset(new ClonerStorageInterfaceMock());
     }
 
     void BaseClonerTest::tearDown() {
@@ -245,21 +245,21 @@ namespace repl {
         ASSERT_FALSE(getCloner()->isActive());
     }
 
-    Status StorageInterfaceMock::beginCollection(OperationContext* txn,
-                                                 const NamespaceString& nss,
-                                                 const CollectionOptions& options,
-                                                 const std::vector<BSONObj>& specs) {
+    Status ClonerStorageInterfaceMock::beginCollection(OperationContext* txn,
+                                                       const NamespaceString& nss,
+                                                       const CollectionOptions& options,
+                                                       const std::vector<BSONObj>& specs) {
         return beginCollectionFn ? beginCollectionFn(txn, nss, options, specs) : Status::OK();
     }
 
-    Status StorageInterfaceMock::insertDocuments(OperationContext* txn,
-                                                 const NamespaceString& nss,
-                                                 const std::vector<BSONObj>& docs) {
+    Status ClonerStorageInterfaceMock::insertDocuments(OperationContext* txn,
+                                                       const NamespaceString& nss,
+                                                       const std::vector<BSONObj>& docs) {
         return insertDocumentsFn ? insertDocumentsFn(txn, nss, docs) : Status::OK();
     }
 
-    Status StorageInterfaceMock::commitCollection(OperationContext* txn,
-                                                  const NamespaceString& nss) {
+    Status ClonerStorageInterfaceMock::commitCollection(OperationContext* txn,
+                                                        const NamespaceString& nss) {
         return Status::OK();
     }
 

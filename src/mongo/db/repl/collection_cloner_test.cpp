@@ -35,7 +35,6 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/base_cloner_test_fixture.h"
 #include "mongo/db/repl/collection_cloner.h"
-#include "mongo/db/repl/network_interface_mock.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {

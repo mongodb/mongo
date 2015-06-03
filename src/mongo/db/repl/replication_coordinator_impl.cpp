@@ -78,6 +78,7 @@ namespace repl {
 
 namespace {
     typedef StatusWith<ReplicationExecutor::CallbackHandle> CBHStatus;
+    using executor::NetworkInterface;
 
     void lockAndCall(boost::unique_lock<boost::mutex>* lk, const stdx::function<void ()>& fn) {
         if (!lk->owns_lock()) {
@@ -159,13 +160,16 @@ namespace {
                                                 ReplicationCoordinatorExternalState* externalState,
                                                 TopologyCoordinator* topCoord,
                                                 int64_t prngSeed,
-                                                ReplicationExecutor::NetworkInterface* network,
+                                                NetworkInterface* network,
+                                                StorageInterface* storage,
                                                 ReplicationExecutor* replExec) :
                         _settings(settings),
                         _replMode(getReplicationModeFromSettings(settings)),
                         _topCoord(topCoord),
                         _replExecutorIfOwned(replExec ? nullptr :
-                                                        new ReplicationExecutor(network, prngSeed)),
+                                                        new ReplicationExecutor(network,
+                                                                                storage,
+                                                                                prngSeed)),
                         _replExecutor(replExec ? *replExec : *_replExecutorIfOwned),
                         _externalState(externalState),
                         _inShutdown(false),
@@ -198,13 +202,15 @@ namespace {
     ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
             const ReplSettings& settings,
             ReplicationCoordinatorExternalState* externalState,
-            ReplicationExecutor::NetworkInterface* network,
+            NetworkInterface* network,
+            StorageInterface* storage,
             TopologyCoordinator* topCoord,
             int64_t prngSeed) : ReplicationCoordinatorImpl(settings,
                                                            externalState,
                                                            topCoord,
                                                            prngSeed,
                                                            network,
+                                                           storage,
                                                            nullptr) { }
 
     ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
@@ -216,6 +222,7 @@ namespace {
                                                            externalState,
                                                            topCoord,
                                                            prngSeed,
+                                                           nullptr,
                                                            nullptr,
                                                            replExec) { }
 

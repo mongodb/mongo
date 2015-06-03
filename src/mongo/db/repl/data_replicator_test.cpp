@@ -33,7 +33,6 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/data_replicator.h"
 #include "mongo/db/repl/fetcher.h"
-#include "mongo/db/repl/network_interface_mock.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_impl.h"
 #include "mongo/db/repl/replication_coordinator_external_state_mock.h"
@@ -41,6 +40,7 @@
 #include "mongo/db/repl/replication_executor_test_fixture.h"
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/db/repl/topology_coordinator_impl.h"
+#include "mongo/executor/network_interface_mock.h"
 #include "mongo/util/fail_point_service.h"
 
 #include "mongo/unittest/unittest.h"
@@ -48,6 +48,7 @@
 namespace {
     using namespace mongo;
     using namespace mongo::repl;
+    using executor::NetworkInterfaceMock;
 
     const HostAndPort target("localhost", -1);
 

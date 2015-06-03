@@ -15,17 +15,20 @@ env.Library('rslog',
                 '$BUILD_DIR/mongo/logger/logger',
             ])
 
+env.Library('storage_interface',
+            'storage_interface.cpp',
+            LIBDEPS=[
+            ])
+
 env.Library(
-    target='network_interface_impl',
+    target='storage_interface_impl',
     source=[
-        'network_interface_impl.cpp',
+        'storage_interface_impl.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base/base',
-        '$BUILD_DIR/mongo/bson/bson',
-        '$BUILD_DIR/mongo/client/remote_command_runner_impl',
-        '$BUILD_DIR/mongo/db/coredb',
-        '$BUILD_DIR/mongo/db/common',
+        '$BUILD_DIR/mongo/db/serveronly', # For OperationContextImpl
+        '$BUILD_DIR/mongo/db/service_context',
+        'storage_interface',
         ])
 
 env.Library(
@@ -38,7 +41,9 @@ env.Library(
     LIBDEPS=[
         'database_task',
         'task_runner',
+        'storage_interface',
         '$BUILD_DIR/mongo/client/remote_command_runner',
+        '$BUILD_DIR/mongo/executor/network_interface',
         '$BUILD_DIR/mongo/util/foundation',
         '$BUILD_DIR/mongo/util/net/hostandport',
     ],
@@ -343,16 +348,18 @@ env.Library('repl_coordinator_global',
 
 env.Library('replmocks',
             [
-                'network_interface_mock.cpp',
                 'operation_context_repl_mock.cpp',
                 'replication_coordinator_external_state_mock.cpp',
                 'replication_coordinator_mock.cpp',
+                'storage_interface_mock.cpp',
             ],
             LIBDEPS=[
                 '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+                '$BUILD_DIR/mongo/executor/network_interface_mock',
                 'repl_coordinator_interface',
                 'replica_set_messages',
                 'replication_executor',
+                'storage_interface',
             ])
 
 env.Library('read_after_optime_args',

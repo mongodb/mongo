@@ -26,51 +26,34 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
 
-#include "mongo/db/repl/replication_executor_test_fixture.h"
+#pragma once
 
-#include "mongo/db/repl/replication_executor.h"
-#include "mongo/db/repl/storage_interface_mock.h"
-#include "mongo/executor/network_interface_mock.h"
 
 namespace mongo {
+
+    class OperationContext;
+
 namespace repl {
 
-namespace {
+    /**
+     * Storage interface used by used by the ReplicationExecutor inside mongod for supporting
+     * ReplicationExectutor's ability to take database locks.
+     */
+    class StorageInterface {
+    public:
+        virtual ~StorageInterface();
 
-    const int64_t prngSeed = 1;
+        /**
+         * Creates an operation context for running database operations.
+         */
+        virtual OperationContext* createOperationContext() = 0;
 
-} // namespace
+    protected:
 
-    void ReplicationExecutorTest::launchExecutorThread() {
-        ASSERT(!_executorThread);
-        _executorThread.reset(
-                new boost::thread(stdx::bind(&ReplicationExecutor::run, _executor.get())));
-        getNet()->enterNetwork();
-    }
+        StorageInterface();
 
-    void ReplicationExecutorTest::joinExecutorThread() {
-        ASSERT(_executorThread);
-        getNet()->exitNetwork();
-        _executorThread->join();
-        _executorThread.reset();
-    }
-
-    void ReplicationExecutorTest::setUp() {
-        _net = new executor::NetworkInterfaceMock;
-        _storage = new StorageInterfaceMock;
-        _executor.reset(new ReplicationExecutor(_net, _storage, prngSeed));
-    }
-
-    void ReplicationExecutorTest::tearDown() {
-        if (_executorThread) {
-            _executor->shutdown();
-            joinExecutorThread();
-        }
-        _executor.reset();
-        _net = nullptr;
-    }
+    };
 
 }  // namespace repl
-}  // namespace mongo
+} // namespace mongo

@@ -34,9 +34,10 @@
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/repl/network_interface_mock.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/replication_executor_test_fixture.h"
+#include "mongo/db/repl/storage_interface_mock.h"
+#include "mongo/executor/network_interface_mock.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/unittest.h"
@@ -47,6 +48,8 @@ namespace mongo {
 namespace repl {
 
 namespace {
+
+    using executor::NetworkInterfaceMock;
 
     bool operator==(const RemoteCommandRequest lhs,
                     const RemoteCommandRequest rhs) {
@@ -155,6 +158,7 @@ namespace {
         void onGoAfterTriggered(const ReplicationExecutor::CallbackData& cbData);
 
         NetworkInterfaceMock* net;
+        StorageInterfaceMock* storage;
         ReplicationExecutor executor;
         boost::thread executorThread;
         const ReplicationExecutor::EventHandle goEvent;
@@ -176,7 +180,8 @@ namespace {
 
     EventChainAndWaitingTest::EventChainAndWaitingTest() :
         net(new NetworkInterfaceMock),
-        executor(net, prngSeed),
+        storage(new StorageInterfaceMock),
+        executor(net, storage, prngSeed),
         executorThread(stdx::bind(&ReplicationExecutor::run, &executor)),
         goEvent(unittest::assertGet(executor.makeEvent())),
         event2(unittest::assertGet(executor.makeEvent())),

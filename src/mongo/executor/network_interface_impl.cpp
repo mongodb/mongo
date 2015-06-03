@@ -26,19 +26,16 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kExecutor
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/repl/network_interface_impl.h"
+#include "mongo/executor/network_interface_impl.h"
 
 #include <boost/make_shared.hpp>
 #include <memory>
 
-#include "mongo/db/auth/authorization_session.h"
 #include "mongo/client/connection_pool.h"
-#include "mongo/db/client.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
@@ -46,7 +43,7 @@
 #include "mongo/util/time_support.h"
 
 namespace mongo {
-namespace repl {
+namespace executor {
 
 namespace {
 
@@ -57,6 +54,7 @@ namespace {
 }  // namespace
 
     NetworkInterfaceImpl::NetworkInterfaceImpl() :
+        NetworkInterface(),
         _numIdleThreads(0),
         _nextThreadId(0),
         _lastFullUtilizationDate(),
@@ -200,7 +198,7 @@ namespace {
             ++_numActiveNetworkRequests;
             --_numIdleThreads;
             lk.unlock();
-            ResponseStatus result = _commandRunner.runCommand(todo.request);
+            repl::ResponseStatus result = _commandRunner.runCommand(todo.request);
             LOG(2) << "Network status of sending " << todo.request.cmdObj.firstElementFieldName() <<
                 " to " << todo.request.target << " was " << result.getStatus();
             todo.onFinish(result);
@@ -226,11 +224,11 @@ namespace {
         }
         severe().stream() << "Could not find this thread, with id " <<
             stdx::this_thread::get_id() << " in the replication networking thread pool";
-        fassertFailedNoTrace(28581);
+        fassertFailedNoTrace(28676);
     }
 
     void NetworkInterfaceImpl::startCommand(
-            const ReplicationExecutor::CallbackHandle& cbHandle,
+            const repl::ReplicationExecutor::CallbackHandle& cbHandle,
             const RemoteCommandRequest& request,
             const RemoteCommandCompletionFn& onFinish) {
         LOG(2) << "Scheduling " << request.cmdObj.firstElementFieldName() << " to " <<
@@ -250,7 +248,8 @@ namespace {
         _hasPending.notify_one();
     }
 
-    void NetworkInterfaceImpl::cancelCommand(const ReplicationExecutor::CallbackHandle& cbHandle) {
+    void NetworkInterfaceImpl::cancelCommand(
+            const repl::ReplicationExecutor::CallbackHandle& cbHandle) {
         boost::unique_lock<boost::mutex> lk(_mutex);
         CommandDataList::iterator iter;
         for (iter = _pending.begin(); iter != _pending.end(); ++iter) {
@@ -266,7 +265,7 @@ namespace {
             iter->request.target;
         _pending.erase(iter);
         lk.unlock();
-        onFinish(ResponseStatus(ErrorCodes::CallbackCanceled, "Callback canceled"));
+        onFinish(repl::ResponseStatus(ErrorCodes::CallbackCanceled, "Callback canceled"));
         lk.lock();
         _signalWorkAvailable_inlock();
     }
@@ -275,13 +274,5 @@ namespace {
         return Date_t::now();
     }
 
-    OperationContext* NetworkInterfaceImpl::createOperationContext() {
-        if (!ClientBasic::getCurrent()) {
-            Client::initThreadIfNotAlready();
-            AuthorizationSession::get(*ClientBasic::getCurrent())->grantInternalAuthorization();
-        }
-        return new OperationContextImpl();
-    }
-
-}  // namespace repl
+} // namespace executor
 } // namespace mongo

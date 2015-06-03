@@ -36,8 +36,8 @@
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/collection_cloner.h"
-#include "mongo/db/repl/network_interface_mock.h"
 #include "mongo/db/repl/replication_executor_test_fixture.h"
+#include "mongo/executor/network_interface_mock.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/net/hostandport.h"
@@ -50,11 +50,11 @@ namespace mongo {
 namespace repl {
 
     class BaseCloner;
-    class StorageInterfaceMock;
+    class ClonerStorageInterfaceMock;
 
     class BaseClonerTest : public ReplicationExecutorTest {
     public:
-        typedef NetworkInterfaceMock::NetworkOperationIterator NetworkOperationIterator;
+        typedef executor::NetworkInterfaceMock::NetworkOperationIterator NetworkOperationIterator;
 
         /**
          * Creates an initial error status suitable for checking if
@@ -128,7 +128,7 @@ namespace repl {
 
     protected:
 
-        std::unique_ptr<StorageInterfaceMock> storageInterface;
+        std::unique_ptr<ClonerStorageInterfaceMock> storageInterface;
 
     private:
 
@@ -141,7 +141,7 @@ namespace repl {
 
     };
 
-    class StorageInterfaceMock : public CollectionCloner::StorageInterface {
+    class ClonerStorageInterfaceMock : public CollectionCloner::StorageInterface {
     public:
         Status beginCollection(OperationContext* txn,
                                const NamespaceString& nss,

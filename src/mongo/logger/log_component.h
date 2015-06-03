@@ -47,6 +47,7 @@ namespace logger {
             kAccessControl,
             kCommand,
             kControl,
+            kExecutor,
             kGeo,
             kIndex,
             kNetwork,
