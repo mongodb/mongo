@@ -642,10 +642,10 @@ namespace {
         hosts.push_back(hostB);
         hosts.push_back(hostC);
 
-        // One host hangs, last host is fastest with result
+        // Host A hangs
         mockSystem.addMockHungHostAt(hostA, 1000, &unhangNotify);
-        mockSystem.addMockHostResultAt(hostB, 3000);
-        mockSystem.addMockHostResultAt(hostC, 2000);
+        mockSystem.addMockHostResultAt(hostB, 2000);
+        mockSystem.addMockHostResultAt(hostC, 3000);
 
         MultiHostQueryOp queryOp(&mockSystem, &threadPool);
 
@@ -657,7 +657,9 @@ namespace {
 
         ASSERT_OK(result.getStatus());
         ASSERT(NULL != result.getValue());
-        ASSERT_EQUALS(result.getValue()->originalHost(), hostC.toString());
+
+        // We should never have results from hostA
+        ASSERT_NOT_EQUALS(result.getValue()->originalHost(), hostA.toString());
 
         delete result.getValue();
     }
