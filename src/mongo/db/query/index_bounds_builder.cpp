@@ -383,7 +383,7 @@ namespace mongo {
             verify(dataObj.isOwned());
             oilOut->intervals.push_back(makeRangeInterval(dataObj, typeMatch(dataObj), true));
 
-            if (dataElt.isSimpleType()) {
+            if (dataElt.isSimpleType() || dataElt.type() == BSONType::BinData) {
                 *tightnessOut = IndexBoundsBuilder::EXACT;
             }
             else {
@@ -426,7 +426,7 @@ namespace mongo {
                 oilOut->intervals.push_back(interval);
             }
 
-            if (dataElt.isSimpleType()) {
+            if (dataElt.isSimpleType() || dataElt.type() == BSONType::BinData) {
                 *tightnessOut = IndexBoundsBuilder::EXACT;
             }
             else {
@@ -468,7 +468,7 @@ namespace mongo {
                 oilOut->intervals.push_back(interval);
             }
 
-            if (dataElt.isSimpleType()) {
+            if (dataElt.isSimpleType() || dataElt.type() == BSONType::BinData) {
                 *tightnessOut = IndexBoundsBuilder::EXACT;
             }
             else {
@@ -506,7 +506,7 @@ namespace mongo {
             verify(dataObj.isOwned());
 
             oilOut->intervals.push_back(makeRangeInterval(dataObj, true, typeMatch(dataObj)));
-            if (dataElt.isSimpleType()) {
+            if (dataElt.isSimpleType() || dataElt.type() == BSONType::BinData) {
                 *tightnessOut = IndexBoundsBuilder::EXACT;
             }
             else {
