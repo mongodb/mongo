@@ -1603,8 +1603,7 @@ namespace {
                     preCond.append( b.obj() );
                 }
 
-                int exceptionCode = OkCode;
-                ok = false;
+                Status applyOpsStatus{Status::OK()};
                 try {
                     
                     // For testing migration failures
@@ -1613,23 +1612,20 @@ namespace {
                                            PrepareConfigsFailedCode );
                     }
 
-                    Status status = grid.catalogManager()->applyChunkOpsDeprecated(updates.arr(),
-                                                                                   preCond.arr());
-                    ok = status.isOK();
-                    exceptionCode = status.code();
+                    applyOpsStatus = grid.catalogManager()->applyChunkOpsDeprecated(updates.arr(),
+                                                                                    preCond.arr());
 
                     if (MONGO_FAIL_POINT(failMigrationApplyOps)) {
                         throw SocketException(SocketException::RECV_ERROR,
                                               shardingState.getConfigServer());
                     }
                 }
-                catch (const DBException& e) {
-                    warning() << e << migrateLog;
-                    ok = false;
-                    exceptionCode = e.getCode();
+                catch (const DBException& ex) {
+                    warning() << ex << migrateLog;
+                    applyOpsStatus = ex.toStatus();
                 }
 
-                if ( exceptionCode == PrepareConfigsFailedCode ) {
+                if (applyOpsStatus == ErrorCodes::PrepareConfigsFailedCode) {
 
                     // In the process of issuing the migrate commit, the SyncClusterConnection
                     // checks that the config servers are reachable. If they are not, we are
@@ -1656,7 +1652,7 @@ namespace {
                     return false;
 
                 }
-                else if ( ! ok || exceptionCode != OkCode ) {
+                else if (!applyOpsStatus.isOK()) {
 
                     // this could be a blip in the connectivity
                     // wait out a few seconds and check if the commit request made it
