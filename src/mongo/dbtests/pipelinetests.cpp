@@ -67,7 +67,7 @@ namespace PipelineTests {
                     ASSERT_EQUALS(errmsg, "");
                     ASSERT(outputPipe != NULL);
 
-                    ASSERT_EQUALS(outputPipe->serialize()["pipeline"],
+                    ASSERT_EQUALS(Value(outputPipe->writeExplainOps()),
                                   Value(outputPipeExpected["pipeline"]));
                 }
 
@@ -75,6 +75,55 @@ namespace PipelineTests {
 
             private:
                 OperationContextImpl _opCtx;
+            };
+
+            class MoveSkipBeforeProject: public Base {
+                string inputPipeJson() override {
+                    return "[{$project: {a : 1}}, {$skip : 5}]";
+                }
+
+                string outputPipeJson() override {
+                    return "[{$skip : 5}, {$project: {a : true}}]";
+                }
+            };
+
+            class MoveLimitBeforeProject: public Base {
+                string inputPipeJson() override {
+                    return "[{$project: {a : 1}}, {$limit : 5}]";
+                }
+
+                string outputPipeJson() override {
+                    return "[{$limit : 5}, {$project: {a : true}}]";
+                }
+            };
+
+            class MoveMulitipleSkipsAndLimitsBeforeProject: public Base {
+                string inputPipeJson() override {
+                    return "[{$project: {a : 1}}, {$limit : 5}, {$skip : 3}]";
+                }
+
+                string outputPipeJson() override {
+                    return "[{$limit : 5}, {$skip : 3}, {$project: {a : true}}]";
+                }
+            };
+
+            class SortMatchProjSkipLimBecomesMatchTopKSortSkipProj: public Base {
+                string inputPipeJson() override {
+                    return "[{$sort: {a: 1}}"
+                           ",{$match: {a: 1}}"
+                           ",{$project : {a: 1}}"
+                           ",{$skip : 3}"
+                           ",{$limit: 5}"
+                           "]";
+                }
+
+                string outputPipeJson() override {
+                    return "[{$match: {a: 1}}"
+                           ",{$sort: {sortKey: {a: 1}, limit: 8}}"
+                           ",{$skip: 3}"
+                           ",{$project: {a: true}}"
+                           "]";
+                }
             };
 
             class RemoveSkipZero : public Base {
@@ -157,9 +206,9 @@ namespace PipelineTests {
                     intrusive_ptr<Pipeline> shardPipe = mergePipe->splitForSharded();
                     ASSERT(shardPipe != NULL);
 
-                    ASSERT_EQUALS(shardPipe->serialize()["pipeline"],
+                    ASSERT_EQUALS(Value(shardPipe->writeExplainOps()),
                                   Value(shardPipeExpected["pipeline"]));
-                    ASSERT_EQUALS(mergePipe->serialize()["pipeline"],
+                    ASSERT_EQUALS(Value(mergePipe->writeExplainOps()),
                                   Value(mergePipeExpected["pipeline"]));
                 }
 
@@ -272,18 +321,39 @@ namespace PipelineTests {
                     // change.
                     string inputPipeJson() {
                         return "[{$project: {_id:true, a:true}}"
-                               ",{$limit:1}"
                                ",{$group: {_id: '$_id'}}"
                                "]";
                     }
                     string shardPipeJson() {
                         return "[{$project: {_id:true, a:true}}"
-                               ",{$limit:1}"
+                               ",{$group: {_id: '$_id'}}"
                                "]";
                     }
                     string mergePipeJson() {
-                        return "[{$limit:1}"
-                               ",{$group: {_id: '$_id'}}"
+                        return "[{$group: {_id: '$$ROOT._id', $doingMerge: true}}"
+                               "]";
+                    }
+                };
+
+                class ShardedSortMatchProjSkipLimBecomesMatchTopKSortSkipProj: public Base {
+                    string inputPipeJson() {
+                        return "[{$sort: {a : 1}}"
+                               ",{$match: {a: 1}}"
+                               ",{$project : {a: 1}}"
+                               ",{$skip : 3}"
+                               ",{$limit: 5}"
+                               "]";
+                    }
+                    string shardPipeJson() {
+                        return "[{$match: {a: 1}}"
+                               ",{$sort: {sortKey: {a: 1}, limit: 8}}"
+                               ",{$project: {a: true, _id: true}}"
+                               "]";
+                    }
+                    string mergePipeJson() {
+                        return "[{$sort: {sortKey: {a: 1}, mergePresorted: true, limit: 8}}"
+                               ",{$skip: 3}"
+                               ",{$project: {a: true}}"
                                "]";
                     }
                 };
@@ -298,6 +368,10 @@ namespace PipelineTests {
         }
         void setupTests() {
             add<Optimizations::Local::RemoveSkipZero>();
+            add<Optimizations::Local::MoveLimitBeforeProject>();
+            add<Optimizations::Local::MoveSkipBeforeProject>();
+            add<Optimizations::Local::MoveMulitipleSkipsAndLimitsBeforeProject>();
+            add<Optimizations::Local::SortMatchProjSkipLimBecomesMatchTopKSortSkipProj>();
             add<Optimizations::Local::DoNotRemoveSkipOne>();
             add<Optimizations::Local::RemoveEmptyMatch>();
             add<Optimizations::Local::RemoveMultipleEmptyMatches>();
@@ -313,6 +387,7 @@ namespace PipelineTests {
             add<Optimizations::Sharded::limitFieldsSentFromShardsToMerger::NothingNeeded>();
             add<Optimizations::Sharded::limitFieldsSentFromShardsToMerger::JustNeedsMetadata>();
             add<Optimizations::Sharded::limitFieldsSentFromShardsToMerger::ShardAlreadyExhaustive>();
+            add<Optimizations::Sharded::limitFieldsSentFromShardsToMerger::ShardedSortMatchProjSkipLimBecomesMatchTopKSortSkipProj>();
         }
     };
 

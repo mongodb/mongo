@@ -223,6 +223,7 @@ namespace mongo {
         // The order in which optimizations are applied can have significant impact on the
         // efficiency of the final pipeline. Be Careful!
         Optimizations::Local::moveMatchBeforeSort(pPipeline.get());
+        Optimizations::Local::moveSkipAndLimitBeforeProject(pPipeline.get());
         Optimizations::Local::moveLimitBeforeSkip(pPipeline.get());
         Optimizations::Local::coalesceAdjacent(pPipeline.get());
         Optimizations::Local::optimizeEachDocumentSource(pPipeline.get());
@@ -248,6 +249,38 @@ namespace mongo {
                     pSource = pTemp;
                 }
             }
+        }
+    }
+
+    void Pipeline::Optimizations::Local::moveSkipAndLimitBeforeProject(Pipeline* pipeline) {
+        SourceContainer& sources = pipeline->sources;
+        if (sources.empty()) return;
+
+        for (int i = sources.size() - 1; i >= 1 /* not looking at 0 */; i--) {
+            // This optimization only applies when a $project comes before a $skip or $limit.
+            auto project = dynamic_cast<DocumentSourceProject*>(sources[i-1].get());
+            if (!project) continue;
+
+            auto skip = dynamic_cast<DocumentSourceSkip*>(sources[i].get());
+            auto limit = dynamic_cast<DocumentSourceLimit*>(sources[i].get());
+            if (!(skip || limit)) continue;
+
+            swap(sources[i], sources[i-1]);
+
+            // Start at back again. This is needed to handle cases with more than 1 $skip or
+            // $limit (S means skip, L means limit, P means project)
+            //
+            // These would work without second pass (assuming back to front ordering)
+            // PS  -> SP
+            // PL  -> LP
+            // PPL -> LPP
+            // PPS -> SPP
+            //
+            // The following cases need a second pass to handle the second skip or limit
+            // PLL  -> LLP
+            // PPLL -> LLPP
+            // PLPL -> LLPP
+            i = sources.size(); // decremented before next pass
         }
     }
 

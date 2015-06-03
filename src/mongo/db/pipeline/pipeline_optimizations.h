@@ -53,6 +53,14 @@ namespace mongo {
         static void moveMatchBeforeSort(Pipeline* pipeline);
 
         /**
+         * Moves skip and limit before any adjacent project phases.
+         *
+         * While this is performance-neutral on its own, it enables other optimizations
+         * such as combining sort and limit.
+         */
+        static void moveSkipAndLimitBeforeProject(Pipeline* pipeline);
+
+        /**
          * Moves limits before any adjacent skip phases.
          *
          * This is more optimal for sharding since currently, we can only split
