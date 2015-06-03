@@ -66,9 +66,9 @@ namespace {
 
 
     BOOST_STATIC_ASSERT(DataFileHeader::HeaderSize == 8192);
-    BOOST_STATIC_ASSERT(sizeof(reinterpret_cast<DataFileHeader*>(NULL)->data) == 4);
+    BOOST_STATIC_ASSERT(sizeof(static_cast<DataFileHeader*>(NULL)->data) == 4);
     BOOST_STATIC_ASSERT(
-        sizeof(DataFileHeader) - sizeof(reinterpret_cast<DataFileHeader*>(NULL)->data)
+        sizeof(DataFileHeader) - sizeof(static_cast<DataFileHeader*>(NULL)->data)
                 == DataFileHeader::HeaderSize);
 
 
