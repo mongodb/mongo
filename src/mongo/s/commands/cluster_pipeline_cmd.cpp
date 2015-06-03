@@ -37,10 +37,12 @@
 #include <utility>
 #include <vector>
 
+#include "mongo/base/status.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard_connection.h"
@@ -395,6 +397,11 @@ namespace {
                 cursor && cursor->more());
 
         BSONObj result = cursor->nextSafe().getOwned();
+
+        if (ErrorCodes::SendStaleConfig == getStatusFromCommandResult(result)) {
+            throw RecvStaleConfigException("command failed because of stale config", result);
+        }
+
         uassertStatusOK(storePossibleCursor(cursor->originalHost(), result));
         return result;
     }
@@ -405,17 +412,11 @@ namespace {
                                          int queryOptions) {
 
         // Temporary hack. See comment on declaration for details.
-
         ShardConnection conn(conf->getPrimary().getConnString(), "");
         BSONObj result = aggRunCommand(conn.get(), conf->name(), cmd, queryOptions);
         conn.done();
-
-        bool ok = result["ok"].trueValue();
-        if (!ok && result["code"].numberInt() == SendStaleConfigCode) {
-            throw RecvStaleConfigException("command failed because of stale config", result);
-        }
         out.appendElements(result);
-        return ok;
+        return result["ok"].trueValue();
     }
 
 } // namespace
