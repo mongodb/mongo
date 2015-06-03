@@ -255,18 +255,23 @@ retry_find:
 		--start_chunk;
 
 		/*
-		 * If we have a full window, or the merge would be too big,
-		 * remove the youngest chunk.
+		 * If the merge would be too big, or we have a full window
+		 * and we could include an older chunk if the window wasn't
+		 * full, remove the youngest chunk.
 		 */
-		if (nchunks == merge_max ||
-		    chunk_size > lsm_tree->chunk_max) {
+		if (chunk_size > lsm_tree->chunk_max ||
+		    (nchunks == merge_max && start_chunk > 0 &&
+		     chunk->generation ==
+		     lsm_tree->chunk[start_chunk - 1]->generation)) {
 			WT_ASSERT(session,
 			    F_ISSET(youngest, WT_LSM_CHUNK_MERGING));
 			F_CLR(youngest, WT_LSM_CHUNK_MERGING);
 			record_count -= youngest->count;
 			chunk_size -= youngest->size;
 			--end_chunk;
-		}
+		} else if (nchunks == merge_max)
+			/* We've found the best full merge we can */
+			break;
 	}
 	nchunks = (end_chunk + 1) - start_chunk;
 
