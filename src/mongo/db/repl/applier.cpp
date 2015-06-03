@@ -30,9 +30,6 @@
 
 #include "mongo/db/repl/applier.h"
 
-#include <boost/thread/lock_guard.hpp>
-#include <boost/thread/lock_types.hpp>
-
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/util/assert_util.h"
@@ -71,7 +68,7 @@ namespace repl {
     }
 
     std::string Applier::getDiagnosticString() const {
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         str::stream output;
         output << "Applier";
         output << " executor: " << _executor->getDiagnosticString();
@@ -80,12 +77,12 @@ namespace repl {
     }
 
     bool Applier::isActive() const {
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         return _active;
     }
 
     Status Applier::start() {
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
 
         if (_active) {
             return Status(ErrorCodes::IllegalOperation, "applier already started");
@@ -106,7 +103,7 @@ namespace repl {
     void Applier::cancel() {
         ReplicationExecutor::CallbackHandle dbWorkCallbackHandle;
         {
-            boost::lock_guard<boost::mutex> lk(_mutex);
+            stdx::lock_guard<stdx::mutex> lk(_mutex);
 
             if (!_active) {
                 return;
@@ -121,7 +118,7 @@ namespace repl {
     }
 
     void Applier::wait() {
-        boost::unique_lock<boost::mutex> lk(_mutex);
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
 
         while (_active) {
             _condition.wait(lk);
@@ -164,7 +161,7 @@ namespace repl {
     void Applier::_finishCallback(const StatusWith<Timestamp>& result,
                                   const Operations& operations) {
         _onCompletion(result, operations);
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         _active = false;
         _condition.notify_all();
     }

@@ -28,8 +28,6 @@
 
 #pragma once
 
-#include <boost/thread/condition.hpp>
-#include <boost/thread/mutex.hpp>
 #include <string>
 #include <vector>
 
@@ -38,7 +36,9 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/repl/replication_executor.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 namespace repl {
@@ -132,9 +132,9 @@ namespace repl {
         CallbackFn _onCompletion;
 
         // Protects member data of this Applier.
-        mutable boost::mutex _mutex;
+        mutable stdx::mutex _mutex;
 
-        boost::condition _condition;
+        stdx::condition_variable _condition;
 
         // _active is true when Applier is scheduled to be run by the executor.
         bool _active;

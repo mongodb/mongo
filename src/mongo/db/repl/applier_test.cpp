@@ -175,7 +175,7 @@ namespace {
             barrier.countDownAndWait(); // generation 0
         });
         const BSONObj operation = BSON("ts" << Timestamp(Seconds(123), 0));
-        boost::mutex mutex;
+        stdx::mutex mutex;
         StatusWith<Timestamp> result = getDetectableErrorStatus();
         Applier::Operations operations;
         _applier.reset(new Applier(
@@ -183,7 +183,7 @@ namespace {
                 {operation},
                 [](OperationContext* txn, const BSONObj& operation) { return Status::OK(); },
                 [&](const StatusWith<Timestamp>& theResult, const Operations& theOperations) {
-            boost::lock_guard<boost::mutex> lock(mutex);
+            stdx::lock_guard<stdx::mutex> lock(mutex);
             result = theResult;
             operations = theOperations;
         }));
@@ -197,7 +197,7 @@ namespace {
         getApplier()->wait();
         ASSERT_FALSE(getApplier()->isActive());
 
-        boost::lock_guard<boost::mutex> lock(mutex);
+        stdx::lock_guard<stdx::mutex> lock(mutex);
         ASSERT_EQUALS(ErrorCodes::CallbackCanceled, result.getStatus().code());
         ASSERT_EQUALS(1U, operations.size());
         ASSERT_EQUALS(operation, operations.front());
@@ -214,7 +214,7 @@ namespace {
             sleepmillis(1);
         });
         const BSONObj operation = BSON("ts" << Timestamp(Seconds(123), 0));
-        boost::mutex mutex;
+        stdx::mutex mutex;
         StatusWith<Timestamp> result = getDetectableErrorStatus();
         Applier::Operations operations;
         _applier.reset(new Applier(
@@ -222,7 +222,7 @@ namespace {
                 {operation},
                 [](OperationContext* txn, const BSONObj& operation) { return Status::OK(); },
                 [&](const StatusWith<Timestamp>& theResult, const Operations& theOperations) {
-            boost::lock_guard<boost::mutex> lock(mutex);
+            stdx::lock_guard<stdx::mutex> lock(mutex);
             result = theResult;
             operations = theOperations;
         }));
@@ -237,7 +237,7 @@ namespace {
         // statuses.
         _applier.reset();
 
-        boost::lock_guard<boost::mutex> lock(mutex);
+        stdx::lock_guard<stdx::mutex> lock(mutex);
         if (result.isOK()) {
             ASSERT_TRUE(operations.empty());
         }
@@ -250,7 +250,7 @@ namespace {
 
     TEST_F(ApplierTest, WaitForCompletion) {
         const Timestamp timestamp(Seconds(123), 0);
-        boost::mutex mutex;
+        stdx::mutex mutex;
         StatusWith<Timestamp> result = getDetectableErrorStatus();
         Applier::Operations operations;
         _applier.reset(new Applier(
@@ -258,7 +258,7 @@ namespace {
                 {BSON("ts" << timestamp)},
                 [](OperationContext* txn, const BSONObj& operation) { return Status::OK(); },
                 [&](const StatusWith<Timestamp>& theResult, const Operations& theOperations) {
-            boost::lock_guard<boost::mutex> lock(mutex);
+            stdx::lock_guard<stdx::mutex> lock(mutex);
             result = theResult;
             operations = theOperations;
         }));
@@ -267,7 +267,7 @@ namespace {
         getApplier()->wait();
         ASSERT_FALSE(getApplier()->isActive());
 
-        boost::lock_guard<boost::mutex> lock(mutex);
+        stdx::lock_guard<stdx::mutex> lock(mutex);
         ASSERT_OK(result.getStatus());
         ASSERT_EQUALS(timestamp, result.getValue());
         ASSERT_TRUE(operations.empty());
@@ -276,7 +276,7 @@ namespace {
     TEST_F(ApplierTest, DestroyShouldBlockUntilInactive) {
         const Timestamp timestamp(Seconds(123), 0);
         unittest::Barrier barrier(2U);
-        boost::mutex mutex;
+        stdx::mutex mutex;
         StatusWith<Timestamp> result = getDetectableErrorStatus();
         Applier::Operations operations;
         _applier.reset(new Applier(
@@ -284,7 +284,7 @@ namespace {
                 {BSON("ts" << timestamp)},
                 [](OperationContext* txn, const BSONObj& operation) { return Status::OK(); },
                 [&](const StatusWith<Timestamp>& theResult, const Operations& theOperations) {
-            boost::lock_guard<boost::mutex> lock(mutex);
+            stdx::lock_guard<stdx::mutex> lock(mutex);
             result = theResult;
             operations = theOperations;
             barrier.countDownAndWait();
@@ -294,7 +294,7 @@ namespace {
         barrier.countDownAndWait();
         _applier.reset();
 
-        boost::lock_guard<boost::mutex> lock(mutex);
+        stdx::lock_guard<stdx::mutex> lock(mutex);
         ASSERT_OK(result.getStatus());
         ASSERT_EQUALS(timestamp, result.getValue());
         ASSERT_TRUE(operations.empty());
@@ -307,14 +307,14 @@ namespace {
             BSON("op" << "b" << "ts" << Timestamp(Seconds(456), 0)),
             BSON("op" << "c" << "ts" << Timestamp(Seconds(789), 0)),
         };
-        boost::mutex mutex;
+        stdx::mutex mutex;
         StatusWith<Timestamp> result = getDetectableErrorStatus();
         bool areWritesReplicationOnOperationContext = true;
         bool isLockBatchWriter = false;
         Applier::Operations operationsApplied;
         Applier::Operations operationsOnCompletion;
         auto apply = [&](OperationContext* txn, const BSONObj& operation) {
-            boost::lock_guard<boost::mutex> lock(mutex);
+            stdx::lock_guard<stdx::mutex> lock(mutex);
             areWritesReplicationOnOperationContext = txn->writesAreReplicated();
             isLockBatchWriter = txn->lockState()->isBatchWriter();
             operationsApplied.push_back(operation);
@@ -322,7 +322,7 @@ namespace {
         };
         auto callback = [&](const StatusWith<Timestamp>& theResult,
                             const Operations& theOperations) {
-            boost::lock_guard<boost::mutex> lock(mutex);
+            stdx::lock_guard<stdx::mutex> lock(mutex);
             result = theResult;
             operationsOnCompletion = theOperations;
         };
@@ -331,7 +331,7 @@ namespace {
         _applier->start();
         _applier->wait();
 
-        boost::lock_guard<boost::mutex> lock(mutex);
+        stdx::lock_guard<stdx::mutex> lock(mutex);
         ASSERT_FALSE(areWritesReplicationOnOperationContext);
         ASSERT_TRUE(isLockBatchWriter);
         ASSERT_EQUALS(operationsToApply.size(), operationsApplied.size());
@@ -350,12 +350,12 @@ namespace {
             BSON("op" << "b" << "ts" << Timestamp(Seconds(456), 0)),
             BSON("op" << "c" << "ts" << Timestamp(Seconds(789), 0)),
         };
-        boost::mutex mutex;
+        stdx::mutex mutex;
         StatusWith<Timestamp> result = getDetectableErrorStatus();
         Applier::Operations operationsApplied;
         Applier::Operations operationsOnCompletion;
         auto apply = [&](OperationContext* txn, const BSONObj& operation) {
-            boost::lock_guard<boost::mutex> lock(mutex);
+            stdx::lock_guard<stdx::mutex> lock(mutex);
             if (operationsApplied.size() == opIndex) {
                 return fail();
             }
@@ -364,7 +364,7 @@ namespace {
         };
         auto callback = [&](const StatusWith<Timestamp>& theResult,
                             const Operations& theOperations) {
-            boost::lock_guard<boost::mutex> lock(mutex);
+            stdx::lock_guard<stdx::mutex> lock(mutex);
             result = theResult;
             operationsOnCompletion = theOperations;
         };
@@ -373,7 +373,7 @@ namespace {
         _applier->start();
         _applier->wait();
 
-        boost::lock_guard<boost::mutex> lock(mutex);
+        stdx::lock_guard<stdx::mutex> lock(mutex);
         ASSERT_EQUALS(opIndex, operationsApplied.size());
         size_t i = 0;
         for (const auto& operation : operationsApplied) {
