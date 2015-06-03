@@ -143,7 +143,7 @@ __lsm_merge_span(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree,
 
 	aggressive = lsm_tree->merge_aggressiveness;
 	merge_max = (aggressive > WT_LSM_AGGRESSIVE_THRESHOLD) ?
-	    100 : lsm_tree->merge_min;
+	    100 : lsm_tree->merge_max;
 	merge_min = (aggressive > WT_LSM_AGGRESSIVE_THRESHOLD) ?
 	    2 : lsm_tree->merge_min;
 	max_gap = (aggressive + 4) / 5;
