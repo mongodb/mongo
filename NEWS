@@ -12,8 +12,10 @@ New features:
   with caution.
   refs #1989
 
-* Add the ability to asynchronously flush transactions via a new
-  WT_SESSION::transaction_sync API.
+* Add the ability to flag a transaction to be flushed asynchronously on
+  commit via a new sycn=[background configuration option. Add a new 
+  WT_SESSION::transaction_sync API to wait for asynchronous flushes to
+  complete.
   refs WT-1908, #1943
 
 * Add the ability to create a named in-memory snapshot via a new
@@ -22,7 +24,8 @@ New features:
 
 * Move the sync configuration setting from WT_SESSION::begin_transaction to
   WT_SESSION::commit_transaction. Some applications don't know whether they
-  need to sync a transaction to disk until they come to commit.
+  need to sync a transaction to disk until they come to commit. See
+  upgrading documentation for more information.
   refs WT-1908
 
 
@@ -42,7 +45,8 @@ Other noteworthy changes:
   refs WT-1953
 
 * Fix a bug in the WiredTiger command line utility where it could create a
-  base configuration file for an existing database.
+  base configuration file for an existing database, if there had been a
+  crash while creating the database.
   refs WT-1943
 
 * Fix a build problem where recent versions of RedHat would fail to detect
@@ -50,8 +54,8 @@ Other noteworthy changes:
   refs WT-1951
 
 * Fix several problems with how we create, recover and backup databases.
-  Related to order of creation and differences between Windows and Posix
-  file semantic differences.
+  Related to order of creation and differences between Windows and POSIX
+  file system semantics.
   refs #1993
 
 * Fix a bug where we could flush the log file more often than required if
@@ -75,7 +79,7 @@ Other noteworthy changes:
   refs WT-1745
 
 * Improve performance and avoid changing files on startup if no recovery is
-  required by by avoiding the creation of unnecessary checkpoints and log
+  required by avoiding the creation of unnecessary checkpoints and log
   records for files that haven't changed.
   refs WT-1936
 
