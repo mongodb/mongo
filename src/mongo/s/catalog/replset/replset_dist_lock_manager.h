@@ -28,11 +28,15 @@
 
 #pragma once
 
+#include <deque>
 #include <memory>
 #include <string>
 
 #include "mongo/base/string_data.h"
 #include "mongo/s/catalog/dist_lock_manager.h"
+#include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/stdx/thread.h"
 
 namespace mongo {
 
@@ -41,7 +45,8 @@ namespace mongo {
     class ReplSetDistLockManager: public DistLockManager {
     public:
         ReplSetDistLockManager(StringData processID,
-                               std::unique_ptr<DistLockCatalog> catalog);
+                               std::unique_ptr<DistLockCatalog> catalog,
+                               stdx::chrono::milliseconds pingInterval);
 
         virtual ~ReplSetDistLockManager();
 
@@ -62,10 +67,46 @@ namespace mongo {
 
     private:
 
-        void queueUnlock(const OID& lockSessionID);
+        /**
+         * Queue a lock to be unlocked asynchronously with retry until it doesn't error.
+         */
+        void queueUnlock(const DistLockHandle& lockSessionID);
 
-        std::string _processID;
-        std::unique_ptr<DistLockCatalog> _catalog;
+        /**
+         * Periodically pings and checks if there are locks queued that needs unlocking.
+         */
+        void doTask();
 
+        /**
+         * Returns true if shutDown was called.
+         */
+        bool isShutDown();
+
+        //
+        // All member variables are labeled with one of the following codes indicating the
+        // synchronization rules for accessing them.
+        //
+        // (M) Must hold _mutex for access.
+        // (I) Immutable, no synchronization needed.
+        // (S) Can only be called inside startUp/shutDown.
+        //
+
+        const std::string _processID;                                                   // (I)
+        const std::unique_ptr<DistLockCatalog> _catalog;                                // (I)
+        const stdx::chrono::milliseconds _pingInterval;                                 // (I)
+
+        stdx::mutex _mutex;
+        std::unique_ptr<stdx::thread> _execThread;                                      // (S)
+
+        // Contains the list of locks queued for unlocking. Cases when unlock operation can
+        // be queued include:
+        // 1. First attempt on unlocking resulted in an error.
+        // 2. Attempting to grab or overtake a lock resulted in an error where we are uncertain
+        //    whether the modification was actually applied or not, and call unlock to make
+        //    sure that it was cleaned up.
+        std::deque<DistLockHandle> _unlockList;                                         // (M)
+
+        bool _isShutDown = false;                                                       // (M)
+        stdx::condition_variable _shutDownCV;                                           // (M)
     };
 }

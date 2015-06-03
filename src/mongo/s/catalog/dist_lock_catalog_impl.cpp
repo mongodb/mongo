@@ -59,6 +59,8 @@ namespace {
 
     /**
      * Returns the resulting new object from the findAndModify response object.
+     * Returns LockStateChangeFailed if value field was null, which indicates that
+     * the findAndModify command did not modify any document.
      * This also checks for errors in the response object.
      */
     StatusWith<BSONObj> extractFindAndModifyNewObj(const BSONObj& responseObj) {
@@ -86,25 +88,29 @@ namespace {
             return {ErrorCodes::WriteConcernFailed, wcError.getErrMessage()};
         }
 
-        if (wcErrStatus.code() != ErrorCodes::NoSuchKey) {
+        if (wcErrStatus != ErrorCodes::NoSuchKey) {
             return wcErrStatus;
         }
 
         if (const auto& newDocElem = responseObj[kFindAndModifyResponseResultDocField]) {
             if (newDocElem.isNull()) {
-                // For cases when nMatched == 0.
-                return BSONObj();
+                return {ErrorCodes::LockStateChangeFailed,
+                        "findAndModify query predicate didn't match any lock document"};
             }
 
             if (!newDocElem.isABSONObj()) {
                 return {ErrorCodes::UnsupportedFormat,
-                        "expected an object from the findAndModify response 'value' field"};
+                    str::stream() << "expected an object from the findAndModify response '"
+                                  << kFindAndModifyResponseResultDocField << "'field, got: "
+                                  << newDocElem};
             }
 
             return newDocElem.Obj();
         }
 
-        return BSONObj();
+        return {ErrorCodes::LockStateChangeFailed,
+                str::stream() << "no '" << kFindAndModifyResponseResultDocField
+                              << "' in findAndModify response"};
     }
 
     /**
@@ -270,7 +276,8 @@ namespace {
         BSONArrayBuilder orQueryBuilder;
         orQueryBuilder.append(BSON(LocksType::name() << lockID
                                     << LocksType::state(LocksType::UNLOCKED)));
-        orQueryBuilder.append(BSON(LocksType::name() << lockID << LocksType::lockID(currentHolderTS)));
+        orQueryBuilder.append(BSON(LocksType::name() << lockID
+                                    << LocksType::lockID(currentHolderTS)));
 
         BSONObj newLockDetails(BSON(LocksType::lockID(lockSessionID)
                                     << LocksType::state(LocksType::LOCKED)
@@ -341,8 +348,16 @@ namespace {
         const RemoteCommandResponse& response = resultStatus.getValue();
         BSONObj responseObj(response.data);
 
-        auto findAndModifyStatus = extractFindAndModifyNewObj(responseObj);
-        return findAndModifyStatus.getStatus();
+        auto findAndModifyStatus = extractFindAndModifyNewObj(responseObj).getStatus();
+
+        if (findAndModifyStatus == ErrorCodes::LockStateChangeFailed) {
+            // Did not modify any document, which implies that the lock already has a
+            // a different owner. This is ok since it means that the objective of
+            // releasing ownership of the lock has already been accomplished.
+            return Status::OK();
+        }
+
+        return findAndModifyStatus;
     }
 
     StatusWith<DistLockCatalog::ServerInfo> DistLockCatalogImpl::getServerInfo() {
@@ -389,9 +404,36 @@ namespace {
         return DistLockCatalog::ServerInfo(localTimeElem.date(), electionIdStatus.getValue());
     }
 
-    StatusWith<LocksType> DistLockCatalogImpl::getLockByTS(const OID& ts) {
+    StatusWith<LocksType> DistLockCatalogImpl::getLockByTS(const OID& lockSessionID) {
         invariant(false);
         return {ErrorCodes::InternalError, "not yet implemented"};
+    }
+
+    Status DistLockCatalogImpl::stopPing(StringData processId) {
+        auto targetStatus = _targeter->findHost(kReadPref);
+
+        if (!targetStatus.isOK()) {
+            return targetStatus.getStatus();
+        }
+
+        auto request = FindAndModifyRequest::makeRemove(_lockPingNS,
+                BSON(LockpingsType::process() << processId));
+        request.setWriteConcern(_writeConcern);
+
+        auto resultStatus = _cmdRunner->runCommand(
+                RemoteCommandRequest(targetStatus.getValue(),
+                                     _locksNS.db().toString(),
+                                     request.toBSON()));
+
+        if (!resultStatus.isOK()) {
+            return resultStatus.getStatus();
+        }
+
+        const RemoteCommandResponse& response = resultStatus.getValue();
+        BSONObj responseObj(response.data);
+
+        auto findAndModifyStatus = extractFindAndModifyNewObj(responseObj);
+        return findAndModifyStatus.getStatus();
     }
 
 } // namespace mongo

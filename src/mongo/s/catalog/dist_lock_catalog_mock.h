@@ -75,6 +75,9 @@ namespace mongo {
                                                   Date_t time,
                                                   StringData why)>;
         using UnlockFunc = stdx::function<void (const OID& lockSessionID)>;
+        using PingFunc = stdx::function<void (StringData processID, Date_t ping)>;
+        using StopPingFunc = stdx::function<void (StringData processID)>;
+        using GetLockByTSFunc = stdx::function<void (const OID& ts)>;
 
         virtual StatusWith<LockpingsType> getPing(StringData processID) override;
 
@@ -99,7 +102,9 @@ namespace mongo {
 
         virtual StatusWith<ServerInfo> getServerInfo() override;
 
-        virtual StatusWith<LocksType> getLockByTS(const OID& ts) override;
+        virtual StatusWith<LocksType> getLockByTS(const OID& lockSessionID) override;
+
+        virtual Status stopPing(StringData processId) override;
 
         /**
          * Sets the checker method to use and the return value for grabLock to return every
@@ -119,6 +124,23 @@ namespace mongo {
          */
         void setSucceedingExpectedUnLock(UnlockFunc checkerFunc, Status returnThis);
 
+        /**
+         * Sets the checker method to use and it's return value the every time ping is called.
+         */
+        void setSucceedingExpectedPing(PingFunc checkerFunc, Status returnThis);
+
+        /**
+         * Sets the checker method to use and it's return value the every time stopPing is called.
+         */
+        void setSucceedingExpectedStopPing(StopPingFunc checkerFunc, Status returnThis);
+
+        /**
+         * Sets the checker method to use and it's return value the every time
+         * getLockByTS is called.
+         */
+        void setSucceedingExpectedGetLockByTS(GetLockByTSFunc checkerFunc,
+                                              StatusWith<LocksType> returnThis);
+
     private:
         // Protects all the member variables.
         stdx::mutex _mutex;
@@ -128,5 +150,14 @@ namespace mongo {
 
         UnlockFunc _unlockChecker;
         Status _unlockReturnValue;
+
+        PingFunc _pingChecker;
+        Status _pingReturnValue;
+
+        StopPingFunc _stopPingChecker;
+        Status _stopPingReturnValue;
+
+        GetLockByTSFunc _getLockByTSChecker;
+        StatusWith<LocksType> _getLockByTSReturnValue;
     };
 }

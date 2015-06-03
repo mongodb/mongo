@@ -54,19 +54,40 @@ namespace {
                            << ", who: " << who
                            << ", processId: " << processId
                            << ", why: " << why);
-    };
+    }
 
     void noUnLockFuncSet(const OID& lockSessionID) {
         FAIL(str::stream() << "unlock not expected to be called. "
                            << "lockSessionID: " << lockSessionID);
-    };
+    }
+
+    void noPingFuncSet(StringData processID, Date_t ping) {
+        // Ping is expected to be called all the time, so default behavior is do nothing.
+    }
+
+    void noStopPingFuncSet(StringData processID) {
+        FAIL(str::stream() << "stopPing not expected to be called. "
+                           << "processID: " << processID);
+    }
+
+    void noGetLockByTSSet(const OID& lockSessionID) {
+        FAIL(str::stream() << "stopPing not expected to be called. "
+                           << "lockSessionID: " << lockSessionID);
+    }
+
 } // unnamed namespace
 
     DistLockCatalogMock::DistLockCatalogMock():
             _grabLockChecker(noGrabLockFuncSet),
             _grabLockReturnValue(kLocksTypeBadRetValue),
             _unlockChecker(noUnLockFuncSet),
-            _unlockReturnValue(kBadRetValue) {
+            _unlockReturnValue(kBadRetValue),
+            _pingChecker(noPingFuncSet),
+            _pingReturnValue(kBadRetValue),
+            _stopPingChecker(noStopPingFuncSet),
+            _stopPingReturnValue(kBadRetValue),
+            _getLockByTSChecker(noGetLockByTSSet),
+            _getLockByTSReturnValue(kLocksTypeBadRetValue) {
     }
 
     DistLockCatalogMock::~DistLockCatalogMock() {
@@ -78,8 +99,17 @@ namespace {
     }
 
     Status DistLockCatalogMock::ping(StringData processID, Date_t ping) {
-        invariant(false);
-        return {ErrorCodes::InternalError, "not yet implemented"};
+        auto ret = kBadRetValue;
+        PingFunc checkerFunc = noPingFuncSet;
+
+        {
+            stdx::lock_guard<stdx::mutex> ul(_mutex);
+            ret = _pingReturnValue;
+            checkerFunc = _pingChecker;
+        }
+
+        checkerFunc(processID, ping);
+        return ret;
     }
 
     StatusWith<LocksType> DistLockCatalogMock::grabLock(StringData lockID,
@@ -131,9 +161,32 @@ namespace {
         return {ErrorCodes::InternalError, "not yet implemented"};
     }
 
-    StatusWith<LocksType> DistLockCatalogMock::getLockByTS(const OID& ts) {
-        invariant(false);
-        return {ErrorCodes::InternalError, "not yet implemented"};
+    StatusWith<LocksType> DistLockCatalogMock::getLockByTS(const OID& lockSessionID) {
+        auto ret = kLocksTypeBadRetValue;
+        GetLockByTSFunc checkerFunc = noGetLockByTSSet;
+
+        {
+            stdx::lock_guard<stdx::mutex> ul(_mutex);
+            ret = _getLockByTSReturnValue;
+            checkerFunc = _getLockByTSChecker;
+        }
+
+        checkerFunc(lockSessionID);
+        return ret;
+    }
+
+    Status DistLockCatalogMock::stopPing(StringData processId) {
+        auto ret = kBadRetValue;
+        StopPingFunc checkerFunc = noStopPingFuncSet;
+
+        {
+            stdx::lock_guard<stdx::mutex> ul(_mutex);
+            ret = _stopPingReturnValue;
+            checkerFunc = _stopPingChecker;
+        }
+
+        checkerFunc(processId);
+        return ret;
     }
 
     void DistLockCatalogMock::setSucceedingExpectedGrabLock(
@@ -158,4 +211,27 @@ namespace {
         _unlockReturnValue = returnThis;
     }
 
+    void DistLockCatalogMock::setSucceedingExpectedPing(
+            DistLockCatalogMock::PingFunc checkerFunc,
+            Status returnThis) {
+        stdx::lock_guard<stdx::mutex> ul(_mutex);
+        _pingChecker = checkerFunc;
+        _pingReturnValue = returnThis;
+    }
+
+    void DistLockCatalogMock::setSucceedingExpectedStopPing(
+            StopPingFunc checkerFunc,
+            Status returnThis) {
+        stdx::lock_guard<stdx::mutex> ul(_mutex);
+        _stopPingChecker = checkerFunc;
+        _stopPingReturnValue = returnThis;
+    }
+
+    void DistLockCatalogMock::setSucceedingExpectedGetLockByTS(
+            GetLockByTSFunc checkerFunc,
+            StatusWith<LocksType> returnThis) {
+        stdx::lock_guard<stdx::mutex> ul(_mutex);
+        _getLockByTSChecker = checkerFunc;
+        _getLockByTSReturnValue = returnThis;
+    }
 }
