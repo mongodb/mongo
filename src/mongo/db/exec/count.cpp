@@ -50,7 +50,7 @@ namespace mongo {
         : _txn(txn),
           _collection(collection),
           _request(request),
-          _leftToSkip(request.skip),
+          _leftToSkip(request.getSkip()),
           _ws(ws),
           _child(child),
           _commonStats(kStageType) { }
@@ -62,7 +62,7 @@ namespace mongo {
             return true;
         }
 
-        if (_request.limit > 0 && _specificStats.nCounted >= _request.limit) {
+        if (_request.getLimit() > 0 && _specificStats.nCounted >= _request.getLimit()) {
             return true;
         }
 
@@ -73,14 +73,14 @@ namespace mongo {
         invariant(_collection);
         long long nCounted = _collection->numRecords(_txn);
 
-        if (0 != _request.skip) {
-            nCounted -= _request.skip;
+        if (0 != _request.getSkip()) {
+            nCounted -= _request.getSkip();
             if (nCounted < 0) {
                 nCounted = 0;
             }
         }
 
-        long long limit = _request.limit;
+        long long limit = _request.getLimit();
         if (limit < 0) {
             limit = -limit;
         }
@@ -90,7 +90,7 @@ namespace mongo {
         }
 
         _specificStats.nCounted = nCounted;
-        _specificStats.nSkipped = _request.skip;
+        _specificStats.nSkipped = _request.getSkip();
         _specificStats.trivialCount = true;
     }
 
@@ -105,7 +105,7 @@ namespace mongo {
 
         // If we don't have a query and we have a non-NULL collection, then we can execute this
         // as a trivial count (just ask the collection for how many records it has).
-        if (_request.query.isEmpty() && NULL != _collection) {
+        if (_request.getQuery().isEmpty() && NULL != _collection) {
             trivialCount();
             return PlanStage::IS_EOF;
         }

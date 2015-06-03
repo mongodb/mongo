@@ -40,7 +40,7 @@
 namespace mongo {
 
     class Collection;
-    struct CountRequest;
+    class CountRequest;
 
     struct GroupRequest;
 

@@ -101,6 +101,7 @@ env.Library(
 env.Library(
     target='command_request_response',
     source=[
+        'count_request.cpp',
         'cursor_responses.cpp',
         'find_and_modify_request.cpp',
         'getmore_request.cpp',
@@ -115,6 +116,7 @@ env.Library(
 env.CppUnitTest(
     target='command_request_response_test',
     source=[
+        'count_request_test.cpp',
         'find_and_modify_request_test.cpp',
         'getmore_request_test.cpp',
     ],

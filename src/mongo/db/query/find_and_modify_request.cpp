@@ -49,8 +49,6 @@ namespace {
 
 } // unnamed namespace
 
-    FindAndModifyRequest::FindAndModifyRequest() = default;
-
     FindAndModifyRequest::FindAndModifyRequest(NamespaceString fullNs,
                                                BSONObj query,
                                                BSONObj updateObj):

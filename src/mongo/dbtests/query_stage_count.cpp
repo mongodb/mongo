@@ -148,7 +148,7 @@ namespace QueryStageCount {
 
             unique_ptr<WorkingSet> ws(new WorkingSet);
 
-            StatusWithMatchExpression swme = MatchExpressionParser::parse(request.query);
+            StatusWithMatchExpression swme = MatchExpressionParser::parse(request.getQuery());
             unique_ptr<MatchExpression> expression(swme.getValue());
 
             PlanStage* scan;
@@ -164,7 +164,7 @@ namespace QueryStageCount {
 
             ASSERT_FALSE(stats->trivialCount);
             ASSERT_EQUALS(stats->nCounted, expected_n);
-            ASSERT_EQUALS(stats->nSkipped, request.skip);
+            ASSERT_EQUALS(stats->nSkipped, request.getSkip());
         }
 
         // Performs a test using a count stage whereby each unit of work is interjected
@@ -220,16 +220,6 @@ namespace QueryStageCount {
             return new CollectionScan(&_txn, params, ws, expr);
         }
 
-        CountRequest createCountRequest(const BSONObj& filter, size_t skip=0, size_t limit=0) {
-            CountRequest request;
-            request.ns = ns();
-            request.query = filter;
-            request.limit = limit;
-            request.skip = skip;
-            request.hint = BSONObj();
-            return request;
-        }
-
         static const char* ns() { return "unittest.QueryStageCount"; }
 
     protected:
@@ -244,8 +234,8 @@ namespace QueryStageCount {
     class QueryStageCountNoChangeDuringYield : public CountStageTest {
     public:
         void run() {
-            BSONObj filter = BSON("x" << LT << kDocuments/2);
-            CountRequest request = createCountRequest(filter);
+            CountRequest request(ns(), BSON("x" << LT << kDocuments / 2));
+
             testCount(request, kDocuments/2);
             testCount(request, kDocuments/2, true);
         }
@@ -254,7 +244,9 @@ namespace QueryStageCount {
     class QueryStageCountYieldWithSkip : public CountStageTest {
     public:
         void run() {
-            CountRequest request = createCountRequest(BSON("x" << GTE << 0), 2);
+            CountRequest request(ns(), BSON("x" << GTE << 0));
+            request.setSkip(2);
+
             testCount(request, kDocuments-2);
             testCount(request, kDocuments-2, true);
         }
@@ -263,7 +255,10 @@ namespace QueryStageCount {
     class QueryStageCountYieldWithLimit : public CountStageTest {
     public:
         void run() {
-            CountRequest request = createCountRequest(BSON("x" << GTE << 0), 0, 2);
+            CountRequest request(ns(), BSON("x" << GTE << 0));
+            request.setSkip(0);
+            request.setLimit(2);
+
             testCount(request, 2);
             testCount(request, 2, true);
         }
@@ -273,7 +268,8 @@ namespace QueryStageCount {
     class QueryStageCountInsertDuringYield : public CountStageTest {
     public:
         void run() {
-            CountRequest request = createCountRequest(BSON("x" << 1));
+            CountRequest request(ns(), BSON("x" << 1));
+
             testCount(request, kInterjections+1);
             testCount(request, kInterjections+1, true);
         }
@@ -289,7 +285,8 @@ namespace QueryStageCount {
         void run() {
             // expected count would be 99 but we delete the second record
             // after doing the first unit of work
-            CountRequest request = createCountRequest(BSON("x" << GTE << 1));
+            CountRequest request(ns(), BSON("x" << GTE << 1));
+
             testCount(request, kDocuments-2);
             testCount(request, kDocuments-2, true);
         }
@@ -313,7 +310,8 @@ namespace QueryStageCount {
         void run() {
             // expected count would be kDocuments-2 but we update the first and second records
             // after doing the first unit of work so they wind up getting counted later on
-            CountRequest request = createCountRequest(BSON("x" << GTE << 2));
+            CountRequest request(ns(), BSON("x" << GTE << 2));
+
             testCount(request, kDocuments);
             testCount(request, kDocuments, true);
         }
@@ -335,7 +333,7 @@ namespace QueryStageCount {
     class QueryStageCountMultiKeyDuringYield : public CountStageTest {
     public:
         void run() {
-            CountRequest request = createCountRequest(BSON("x" << 1));
+            CountRequest request(ns(), BSON("x" << 1));
             testCount(request, kDocuments+1, true); // only applies to indexed case
         }
 

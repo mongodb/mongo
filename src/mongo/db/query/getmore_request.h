@@ -45,7 +45,7 @@ namespace mongo {
         GetMoreRequest();
 
         /**
-         * Construct a GetMoreRequesst from the command specification and db name.
+         * Construct a GetMoreRequest from the command specification and db name.
          */
         static StatusWith<GetMoreRequest> parseFromBSON(const std::string& dbname,
                                                         const BSONObj& cmdObj);

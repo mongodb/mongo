@@ -30,35 +30,9 @@
 
 
 #include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/query/count_request.h"
 
 namespace mongo {
-
-    /**
-     * A description of a request for a count operation. Copyable.
-     */
-    struct CountRequest {
-        // Namespace to operate on (e.g. "foo.bar").
-        std::string ns;
-
-        // A predicate describing the set of documents to count.
-        //
-        // NOTE:
-        //   Parsing the raw BSON to our AST is left for later so that the parse method does not
-        //   have to look at the catalog. Specifically, creating a CanonicalQuery requires a
-        //   Collection* due to the WhereCallback, and we'd rather not have the parse method require
-        //   a Collection*.
-        BSONObj query;
-
-        // Indicates to the query planner that it should generate a count plan using a
-        // particular index.
-        BSONObj hint;
-
-        // An integer limiting the number of documents to count.
-        long long limit;
-
-        // An integer indicating to not include the first n documents in the count.
-        long long skip;
-    };
 
     /**
      * Stage used by the count command. This stage sits at the root of a plan tree

@@ -77,14 +77,13 @@ namespace {
                                ExplainCommon::Verbosity verbosity,
                                BSONObjBuilder* out) const {
 
-            CountRequest request;
-            Status parseStatus = parseRequest(dbname, cmdObj, &request);
-            if (!parseStatus.isOK()) {
-                return parseStatus;
+            auto request = CountRequest::parseFromBSON(dbname, cmdObj);
+            if (!request.isOK()) {
+                return request.getStatus();
             }
 
             // Acquire the db read lock.
-            AutoGetCollectionForRead ctx(txn, request.ns);
+            AutoGetCollectionForRead ctx(txn, request.getValue().getNs());
             Collection* collection = ctx.getCollection();
 
             // Prevent chunks from being cleaned up during yields - this allows us to only check the
@@ -94,7 +93,7 @@ namespace {
             PlanExecutor* rawExec;
             Status getExecStatus = getExecutorCount(txn,
                                                     collection,
-                                                    request,
+                                                    request.getValue(),
                                                     true,   // explain
                                                     PlanExecutor::YIELD_AUTO,
                                                     &rawExec);
@@ -114,13 +113,12 @@ namespace {
                          int, string& errmsg,
                          BSONObjBuilder& result) {
 
-            CountRequest request;
-            Status parseStatus = parseRequest(dbname, cmdObj, &request);
-            if (!parseStatus.isOK()) {
-                return appendCommandStatus(result, parseStatus);
+            auto request = CountRequest::parseFromBSON(dbname, cmdObj);
+            if (!request.isOK()) {
+                return appendCommandStatus(result, request.getStatus());
             }
 
-            AutoGetCollectionForRead ctx(txn, request.ns);
+            AutoGetCollectionForRead ctx(txn, request.getValue().getNs());
             Collection* collection = ctx.getCollection();
 
             // Prevent chunks from being cleaned up during yields - this allows us to only check the
@@ -130,7 +128,7 @@ namespace {
             PlanExecutor* rawExec;
             Status getExecStatus = getExecutorCount(txn,
                                                     collection,
-                                                    request,
+                                                    request.getValue(),
                                                     false,  // !explain
                                                     PlanExecutor::YIELD_AUTO,
                                                     &rawExec);
@@ -158,69 +156,6 @@ namespace {
 
             result.appendNumber("n", countStats->nCounted);
             return true;
-        }
-
-        /**
-         * Parses a count command object, 'cmdObj'.
-         *
-         * On success, fills in the out-parameter 'request' and returns an OK status.
-         *
-         * Returns a failure status if 'cmdObj' is not well formed.
-         */
-        Status parseRequest(const std::string& dbname,
-                            const BSONObj& cmdObj,
-                            CountRequest* request) const {
-
-            long long skip = 0;
-            if (cmdObj["skip"].isNumber()) {
-                skip = cmdObj["skip"].numberLong();
-                if (skip < 0) {
-                    return Status(ErrorCodes::BadValue, "skip value is negative in count query");
-                }
-            }
-            else if (cmdObj["skip"].ok()) {
-                return Status(ErrorCodes::BadValue, "skip value is not a valid number");
-            }
-
-            long long limit = 0;
-            if (cmdObj["limit"].isNumber()) {
-                limit = cmdObj["limit"].numberLong();
-            }
-            else if (cmdObj["limit"].ok()) {
-                return Status(ErrorCodes::BadValue, "limit value is not a valid number");
-            }
-
-            // For counts, limit and -limit mean the same thing.
-            if (limit < 0) {
-                limit = -limit;
-            }
-
-            // We don't validate that "query" is a nested object due to SERVER-15456.
-            BSONObj query = cmdObj.getObjectField("query");
-
-            BSONObj hintObj;
-            if (Object == cmdObj["hint"].type()) {
-                hintObj = cmdObj["hint"].Obj();
-            }
-            else if (String == cmdObj["hint"].type()) {
-                const std::string hint = cmdObj.getStringField("hint");
-                hintObj = BSON("$hint" << hint);
-            }
-
-            std::string ns = parseNs(dbname, cmdObj);
-
-            if (!nsIsFull(ns)) {
-                return Status(ErrorCodes::BadValue, "collection name missing");
-            }
-
-            // Parsed correctly. Fill out 'request' with the results.
-            request->ns = ns;
-            request->query = query;
-            request->hint = hintObj;
-            request->limit = limit;
-            request->skip = skip;
-
-            return Status::OK();
         }
 
     } cmdCount;

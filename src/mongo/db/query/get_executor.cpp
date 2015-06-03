@@ -1216,6 +1216,7 @@ namespace {
                             bool explain,
                             PlanExecutor::YieldPolicy yieldPolicy,
                             PlanExecutor** execOut) {
+
         unique_ptr<WorkingSet> ws(new WorkingSet());
         PlanStage* root;
         QuerySolution* querySolution;
@@ -1226,24 +1227,29 @@ namespace {
         // to create a child for the count stage in this case.
         //
         // If there is a hint, then we can't use a trival count plan as described above.
-        if (collection && request.query.isEmpty() && request.hint.isEmpty()) {
+        if (collection && request.getQuery().isEmpty() && request.getHint().isEmpty()) {
             root = new CountStage(txn, collection, request, ws.get(), NULL);
-            return PlanExecutor::make(txn, ws.release(), root, request.ns, yieldPolicy, execOut);
+            return PlanExecutor::make(txn,
+                                      ws.release(),
+                                      root,
+                                      request.getNs(),
+                                      yieldPolicy,
+                                      execOut);
         }
 
         unique_ptr<CanonicalQuery> cq;
-        if (!request.query.isEmpty() || !request.hint.isEmpty()) {
+        if (!request.getQuery().isEmpty() || !request.getHint().isEmpty()) {
             // If query or hint is not empty, canonicalize the query before working with collection.
             typedef MatchExpressionParser::WhereCallback WhereCallback;
             CanonicalQuery* rawCq = NULL;
             Status canonStatus = CanonicalQuery::canonicalize(
-                request.ns,
-                request.query,
+                request.getNs(),
+                request.getQuery(),
                 BSONObj(), // sort
                 BSONObj(), // projection
                 0, // skip
                 0, // limit
-                request.hint,
+                request.getHint(),
                 BSONObj(), // min
                 BSONObj(), // max
                 false, // snapshot
@@ -1264,7 +1270,12 @@ namespace {
             // reporting machinery always assumes that the root stage for a count operation is
             // a CountStage, so in this case we put a CountStage on top of an EOFStage.
             root = new CountStage(txn, collection, request, ws.get(), new EOFStage());
-            return PlanExecutor::make(txn, ws.release(), root, request.ns, yieldPolicy, execOut);
+            return PlanExecutor::make(txn,
+                                      ws.release(),
+                                      root,
+                                      request.getNs(),
+                                      yieldPolicy,
+                                      execOut);
         }
 
         invariant(cq.get());
