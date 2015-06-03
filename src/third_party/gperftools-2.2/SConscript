@@ -31,7 +31,7 @@ files = [
     'src/stacktrace.cc'
     ]
 
-if 'windows':
+if windows:
     files += [
         'src/windows/port.cc',
         'src/windows/system-alloc.cc',
