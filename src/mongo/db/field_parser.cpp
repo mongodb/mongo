@@ -26,13 +26,13 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/field_parser.h"
-#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
     using std::string;
-    using mongoutils::str::stream;
 
     FieldParser::FieldState FieldParser::extract( BSONObj doc,
                                                   const BSONField<bool>& field,

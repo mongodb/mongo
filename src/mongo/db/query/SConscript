@@ -23,7 +23,7 @@ env.Library(
     ],
     LIBDEPS=[
         "explain_common",
-        "getmore_request_response",
+        "command_request_response",
         "index_bounds",
         "lite_parsed_query",
         "$BUILD_DIR/mongo/bson/bson",
@@ -99,24 +99,28 @@ env.Library(
 )
 
 env.Library(
-    target='getmore_request_response',
+    target='command_request_response',
     source=[
         'cursor_responses.cpp',
+        'find_and_modify_request.cpp',
         'getmore_request.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson/bson',
-    ],
+        '$BUILD_DIR/mongo/db/common',
+        '$BUILD_DIR/mongo/db/namespace_string',
+    ]
 )
 
 env.CppUnitTest(
-    target="getmore_request_test",
+    target='command_request_response_test',
     source=[
-        "getmore_request_test.cpp"
+        'find_and_modify_request_test.cpp',
+        'getmore_request_test.cpp',
     ],
     LIBDEPS=[
-        "getmore_request_response",
-    ],
+        'command_request_response',
+    ]
 )
 
 env.Library(

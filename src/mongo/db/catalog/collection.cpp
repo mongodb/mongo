@@ -46,6 +46,7 @@
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/index/index_access_method.h"
+#include "mongo/db/keypattern.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context.h"

@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/field_ref_set.h"
 
 #include "mongo/util/assert_util.h"
@@ -35,7 +37,6 @@ namespace mongo {
 
     using std::vector;
     using std::string;
-    namespace str = mongoutils::str;
 
     namespace {
 

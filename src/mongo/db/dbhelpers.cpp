@@ -37,7 +37,6 @@
 #include <boost/filesystem/operations.hpp>
 #include <fstream>
 
-#include "mongo/client/dbclientinterface.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/db.h"

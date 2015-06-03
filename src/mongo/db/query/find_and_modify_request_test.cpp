@@ -29,7 +29,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/bson/json.h"
-#include "mongo/client/find_and_modify_request.h"
+#include "mongo/db/query/find_and_modify_request.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {

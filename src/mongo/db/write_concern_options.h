@@ -29,10 +29,11 @@
 
 #include <string>
 
-#include "mongo/base/status.h"
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
+
+    class Status;
 
     struct WriteConcernOptions {
     public:
