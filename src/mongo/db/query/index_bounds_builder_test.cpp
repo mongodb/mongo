@@ -530,6 +530,78 @@ namespace {
         ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
     }
 
+    TEST(IndexBoundsBuilderTest, TranslateLteBinData) {
+        IndexEntry testIndex = IndexEntry(BSONObj());
+        BSONObj obj = fromjson("{a: {$lte: {$binary: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAA',"
+                                           "$type: '00'}}}");
+        std::unique_ptr<MatchExpression> expr(parseMatchExpression(obj));
+        BSONElement elt = obj.firstElement();
+        OrderedIntervalList oil;
+        IndexBoundsBuilder::BoundsTightness tightness;
+        IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+        ASSERT_EQ(oil.name, "a");
+        ASSERT_EQ(oil.intervals.size(), 1U);
+        ASSERT_EQ(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
+            Interval(fromjson("{'': {$binary: '', $type: '00'},"
+                              "'': {$binary: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAA', $type: '00'}}"),
+                     true, true)));
+        ASSERT_EQ(tightness, IndexBoundsBuilder::EXACT);
+    }
+
+    TEST(IndexBoundsBuilderTest, TranslateLtBinData) {
+        IndexEntry testIndex = IndexEntry(BSONObj());
+        BSONObj obj = fromjson("{a: {$lt: {$binary: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAA',"
+                                          "$type: '00'}}}");
+        std::unique_ptr<MatchExpression> expr(parseMatchExpression(obj));
+        BSONElement elt = obj.firstElement();
+        OrderedIntervalList oil;
+        IndexBoundsBuilder::BoundsTightness tightness;
+        IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+        ASSERT_EQ(oil.name, "a");
+        ASSERT_EQ(oil.intervals.size(), 1U);
+        ASSERT_EQ(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
+            Interval(fromjson("{'': {$binary: '', $type: '00'},"
+                              "'': {$binary: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAA', $type: '00'}}"),
+                     true, false)));
+        ASSERT_EQ(tightness, IndexBoundsBuilder::EXACT);
+    }
+
+    TEST(IndexBoundsBuilderTest, TranslateGtBinData) {
+        IndexEntry testIndex = IndexEntry(BSONObj());
+        BSONObj obj = fromjson("{a: {$gt: {$binary: '////////////////////////////',"
+                                          "$type: '00'}}}");
+        std::unique_ptr<MatchExpression> expr(parseMatchExpression(obj));
+        BSONElement elt = obj.firstElement();
+        OrderedIntervalList oil;
+        IndexBoundsBuilder::BoundsTightness tightness;
+        IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+        ASSERT_EQ(oil.name, "a");
+        ASSERT_EQ(oil.intervals.size(), 1U);
+        ASSERT_EQ(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
+            Interval(fromjson("{'': {$binary: '////////////////////////////', $type: '00'},"
+                              "'': ObjectId('000000000000000000000000')}"),
+                     false, false)));
+        ASSERT_EQ(tightness, IndexBoundsBuilder::EXACT);
+    }
+
+    TEST(IndexBoundsBuilderTest, TranslateGteBinData) {
+        IndexEntry testIndex = IndexEntry(BSONObj());
+        BSONObj obj = fromjson("{a: {$gte: {$binary: '////////////////////////////',"
+                                           "$type: '00'}}}");
+        std::unique_ptr<MatchExpression> expr(parseMatchExpression(obj));
+        BSONElement elt = obj.firstElement();
+        OrderedIntervalList oil;
+        IndexBoundsBuilder::BoundsTightness tightness;
+        IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+        ASSERT_EQ(oil.name, "a");
+        ASSERT_EQ(oil.intervals.size(), 1U);
+        ASSERT_EQ(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
+            Interval(fromjson("{'': {$binary: '////////////////////////////', $type: '00'},"
+                              "'': ObjectId('000000000000000000000000')}"),
+                     true, false)));
+        ASSERT_EQ(tightness, IndexBoundsBuilder::EXACT);
+    }
+
     //
     // $exists tests
     //
