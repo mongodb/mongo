@@ -259,7 +259,6 @@ namespace mongo {
 
             if (verbosity >= ExplainCommon::EXEC_STATS) {
                 bob->appendNumber("flagged", spec->flagged);
-                bob->appendNumber("matchTested", spec->matchTested);
                 for (size_t i = 0; i < spec->failedAnd.size(); ++i) {
                     bob->appendNumber(string(stream() << "failedAnd_" << i),
                                       spec->failedAnd[i]);
@@ -361,7 +360,6 @@ namespace mongo {
                 bob->appendNumber("dupsTested", spec->dupsTested);
                 bob->appendNumber("dupsDropped", spec->dupsDropped);
                 bob->appendNumber("seenInvalidated", spec->seenInvalidated);
-                bob->appendNumber("matchTested", spec->matchTested);
             }
         }
         else if (STAGE_OR == stats.stageType) {
@@ -371,10 +369,6 @@ namespace mongo {
                 bob->appendNumber("dupsTested", spec->dupsTested);
                 bob->appendNumber("dupsDropped", spec->dupsDropped);
                 bob->appendNumber("locsForgotten", spec->locsForgotten);
-                for (size_t i = 0; i < spec->matchTested.size(); ++i) {
-                    bob->appendNumber(string(stream() << "matchTested_" << i),
-                                      spec->matchTested[i]);
-                }
             }
         }
         else if (STAGE_LIMIT == stats.stageType) {
