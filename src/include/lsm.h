@@ -225,7 +225,7 @@ struct __wt_lsm_tree {
 	uint32_t merge_aggressiveness;	/* Increase amount of work per merge */
 
 #define	WT_LSM_TREE_ACTIVE		0x01	/* Workers are active */
-#define	WT_LSM_TREE_AGGRESSIVE_TIMER	0x02	/* Workers are active */
+#define	WT_LSM_TREE_AGGRESSIVE_TIMER	0x02	/* Timer for merge aggression */
 #define	WT_LSM_TREE_COMPACTING		0x04	/* Tree being compacted */
 #define	WT_LSM_TREE_MERGES		0x08	/* Tree should run merges */
 #define	WT_LSM_TREE_NEED_SWITCH		0x10	/* New chunk needs creating */

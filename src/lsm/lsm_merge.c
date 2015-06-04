@@ -59,7 +59,7 @@ static int
 __lsm_merge_aggressive_update(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
 	struct timespec now;
-	uint64_t time_since_last_merge;
+	uint64_t msec_since_last_merge, msec_to_create_merge;
 	u_int new_aggressive;
 
 	new_aggressive = 0;
@@ -82,23 +82,44 @@ __lsm_merge_aggressive_update(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	if (lsm_tree->chunks_flushed <= lsm_tree->merge_min)
 		return (__lsm_merge_aggressive_clear(lsm_tree));
 
-	/* Start the timer if it isn't running */
-	if (!F_ISSET(lsm_tree, WT_LSM_TREE_AGGRESSIVE_TIMER))
+	/*
+	 * Start the timer if it isn't running. Use a flag to define whether
+	 * the timer is running - since clearing and checking a special
+	 * timer value isn't simple.
+	 */
+	if (!F_ISSET(lsm_tree, WT_LSM_TREE_AGGRESSIVE_TIMER)) {
+		F_SET(lsm_tree, WT_LSM_TREE_AGGRESSIVE_TIMER);
 		return (__wt_epoch(session, &lsm_tree->merge_aggressive_ts));
+	}
 
 	WT_RET(__wt_epoch(session, &now));
-	time_since_last_merge =
+	msec_since_last_merge =
 	    WT_TIMEDIFF(now, lsm_tree->merge_aggressive_ts) / WT_MILLION;
 
 	/*
-	 * Never get aggressive before we should have created enough chunks
-	 * for a new merge.
+	 * If there is no estimate for how long it's taking to fill chunks
+	 * pick 10 seconds.
 	 */
-	if (time_since_last_merge <
-	    lsm_tree->chunk_fill_ms * lsm_tree->merge_min)
+	msec_to_create_merge = lsm_tree->merge_min *
+	    (lsm_tree->chunk_fill_ms == 0 ? 10000 : lsm_tree->chunk_fill_ms);
+
+	/*
+	 * Don't consider getting aggressive until enough time has passed that
+	 * we should have created enough chunks to trigger a new merge. We
+	 * track average chunk-creation time - hence the "should"; the average
+	 * fill time may not reflect the actual state if an application
+	 * generates a variable load.
+	 */
+	if (msec_since_last_merge < msec_to_create_merge)
 		return (0);
 
-	while ((time_since_last_merge /= lsm_tree->chunk_fill_ms) > 1)
+	/*
+	 * Bump how aggressively we look for merges based on how long since
+	 * the last merge complete. The aggressive setting only increases
+	 * slowly - triggering merges across generations of chunks isn't
+	 * an efficient use of resources.
+	 */
+	while ((msec_since_last_merge /= msec_to_create_merge) > 1)
 		++new_aggressive;
 
 	if (new_aggressive > lsm_tree->merge_aggressiveness) {
@@ -107,7 +128,7 @@ __lsm_merge_aggressive_update(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		    "merge_min %d, %u / %" PRIu64,
 		    lsm_tree->name, lsm_tree->merge_aggressiveness,
 		    new_aggressive, lsm_tree->merge_min,
-		    time_since_last_merge, lsm_tree->chunk_fill_ms));
+		    msec_since_last_merge, lsm_tree->chunk_fill_ms));
 		lsm_tree->merge_aggressiveness = new_aggressive;
 	}
 	return (0);
@@ -138,8 +159,6 @@ __lsm_merge_span(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree,
 	*start = 0;
 	*end = 0;
 	*records = 0;
-
-	WT_RET(__lsm_merge_aggressive_update(session, lsm_tree));
 
 	aggressive = lsm_tree->merge_aggressiveness;
 	merge_max = (aggressive > WT_LSM_AGGRESSIVE_THRESHOLD) ?
@@ -287,7 +306,6 @@ retry_find:
 
 	WT_ASSERT(session,
 	    nchunks == 0 || (chunk != NULL && youngest != NULL));
-
 	/*
 	 * Don't do merges that are too small or across too many
 	 * generations.
@@ -304,10 +322,12 @@ retry_find:
 		 * If we didn't find a merge with appropriate gaps, try again
 		 * with a smaller range.
 		 */
-		if (oldest_gen - youngest_gen > max_gap) {
+		if (end_chunk > lsm_tree->merge_min &&
+		    oldest_gen - youngest_gen > max_gap) {
 			--end_chunk;
 			goto retry_find;
 		}
+		/* Consider getting aggressive if no merge was found */
 		WT_RET(__lsm_merge_aggressive_update(session, lsm_tree));
 		return (WT_NOTFOUND);
 	}
