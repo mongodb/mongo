@@ -49,3 +49,13 @@ env.CppUnitTest(
             '$BUILD_DIR/mongo/db/mongohasher',
         ],
 )
+
+env.CppUnitTest(
+		target='s2_index_test',
+		source=[
+			's2_index_test.cpp',
+		],
+		LIBDEPS=[
+			'key_generator',
+		],
+)
