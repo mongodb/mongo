@@ -962,7 +962,7 @@ namespace mongo {
         long long limit;
         long long count;
     };
-
+    
     class DocumentSourceSkip : public DocumentSource
                              , public SplittableDocumentSource {
     public:
@@ -1109,5 +1109,26 @@ namespace mongo {
         // these fields are used while processing the results
         BSONObj cmdOutput;
         boost::scoped_ptr<BSONObjIterator> resultsIterator; // iterator over cmdOutput["results"]
+    };
+    
+    class DocumentSourceObjectToArray : public DocumentSource {
+    public:
+        // virtuals from DocumentSource
+        virtual boost::optional<Document> getNext();
+        virtual const char *getSourceName() const;
+        virtual Value serialize(bool explain = false) const;
+        virtual GetDepsReturn getDependencies(DepsTracker* deps) const;
+        
+        static boost::intrusive_ptr<DocumentSource> createFromBson(
+                                                                   BSONElement elem,
+                                                                   const boost::intrusive_ptr<ExpressionContext> &pExpCtx);
+        
+        static const char objectToArrayName[];
+        
+    private:
+        DocumentSourceObjectToArray(const boost::intrusive_ptr<ExpressionContext> &pExpCtx, std::string pathString);
+        
+        FieldPath _otoaFieldPath;
+        MutableDocument _output;
     };
 }
