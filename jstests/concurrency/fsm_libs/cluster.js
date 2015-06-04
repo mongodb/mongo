@@ -86,6 +86,9 @@ var Cluster = function(options) {
             if (options.replication) {
                 shardConfig.rs = {
                     nodes: 3,
+                    // Increase the oplog size (in MB) to prevent rollover
+                    // during write-heavy workloads
+                    oplogSize: 1024,
                     verbose: verbosityLevel
                 };
             }
@@ -133,6 +136,8 @@ var Cluster = function(options) {
             // TODO: allow 'options' to specify the number of nodes
             var replSetConfig = {
                 nodes: 3,
+                // Increase the oplog size (in MB) to prevent rollover during write-heavy workloads
+                oplogSize: 1024,
                 nodeOptions: { verbose: verbosityLevel }
             };
 
