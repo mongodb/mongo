@@ -210,10 +210,6 @@ namespace mongo {
         ++_specificStats.docsExamined;
 
         if (Filter::passes(member, _filter)) {
-            if (NULL != _filter) {
-                ++_specificStats.matchTested;
-            }
-
             *out = memberID;
 
             ++_commonStats.advanced;
