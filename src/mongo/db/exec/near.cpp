@@ -195,6 +195,8 @@ namespace mongo {
         if (PlanStage::IS_EOF == intervalState) {
             _nextInterval = NULL;
             _searchState = SearchState_Advancing;
+            getNearStats()->intervalStats.push_back(*_nextIntervalStats);
+            _nextIntervalStats->minDistanceAllowed = 100;
             return PlanStage::NEED_TIME;
         }
         else if (PlanStage::FAILURE == intervalState) {
@@ -288,7 +290,6 @@ namespace mongo {
 
         if (_resultBuffer.empty()) {
 
-            getNearStats()->intervalStats.push_back(*_nextIntervalStats);
             _nextIntervalStats.reset();
 
             // We're done returning the documents buffered for this annulus, so we can
