@@ -1397,6 +1397,10 @@ namespace {
     Status ReplicationCoordinatorImpl::checkCanServeReadsFor(OperationContext* txn,
                                                              const NamespaceString& ns,
                                                              bool slaveOk) {
+        if (_memberState.rollback() && ns.isOplog()) {
+            return Status(ErrorCodes::NotMasterOrSecondaryCode,
+                          "cannot read from oplog collection while in rollback");
+        }
         if (txn->getClient()->isInDirectClient()) {
             return Status::OK();
         }
