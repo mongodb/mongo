@@ -31,6 +31,7 @@
 #include "mongo/db/repl/oplog_interface_local.h"
 
 #include "mongo/db/db_raii.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/util/mongoutils/str.h"
@@ -43,22 +44,31 @@ namespace {
     class OplogIteratorLocal : public OplogInterface::Iterator {
     public:
 
-        OplogIteratorLocal(std::unique_ptr<OldClientContext> ctx,
-                           std::unique_ptr<PlanExecutor> exec);
+        OplogIteratorLocal(OperationContext* txn,
+                           const std::string& collectionName);
 
         StatusWith<Value> next() override;
 
     private:
 
-        std::unique_ptr<OldClientContext> _ctx;
+        ScopedTransaction _transaction;
+        Lock::DBLock _dbLock;
+        Lock::CollectionLock _collectionLock;
+        OldClientContext _ctx;
         std::unique_ptr<PlanExecutor> _exec;
 
     };
 
-    OplogIteratorLocal::OplogIteratorLocal(std::unique_ptr<OldClientContext> ctx,
-                                           std::unique_ptr<PlanExecutor> exec)
-        : _ctx(std::move(ctx)),
-          _exec(std::move(exec)) { }
+    OplogIteratorLocal::OplogIteratorLocal(OperationContext* txn,
+                                           const std::string& collectionName)
+        : _transaction(txn, MODE_IS),
+          _dbLock(txn->lockState(), nsToDatabase(collectionName), MODE_IS),
+          _collectionLock(txn->lockState(), collectionName, MODE_S),
+          _ctx(txn, collectionName),
+          _exec(InternalPlanner::collectionScan(txn,
+                                                collectionName,
+                                                _ctx.db()->getCollection(collectionName),
+                                                InternalPlanner::BACKWARD)) { }
 
     StatusWith<OplogInterface::Iterator::Value> OplogIteratorLocal::next() {
         BSONObj obj;
@@ -89,14 +99,8 @@ namespace {
     }
 
     std::unique_ptr<OplogInterface::Iterator> OplogInterfaceLocal::makeIterator() const {
-        std::unique_ptr<OldClientContext> ctx(new OldClientContext(_txn, _collectionName));
-        std::unique_ptr<PlanExecutor> exec(
-                InternalPlanner::collectionScan(_txn,
-                                                _collectionName,
-                                                ctx->db()->getCollection(_collectionName),
-                                                InternalPlanner::BACKWARD));
         return std::unique_ptr<OplogInterface::Iterator>(
-            new OplogIteratorLocal(std::move(ctx), std::move(exec)));
+            new OplogIteratorLocal(_txn, _collectionName));
     }
 
 } // namespace repl
