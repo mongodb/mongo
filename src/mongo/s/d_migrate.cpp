@@ -1312,7 +1312,7 @@ namespace {
                 recvChunkStartBuilder.append("min", min);
                 recvChunkStartBuilder.append("max", max);
                 recvChunkStartBuilder.append("shardKeyPattern", shardKeyPattern);
-                recvChunkStartBuilder.append("configServer", configServer.modelServer());
+                recvChunkStartBuilder.append("configServer", shardingState.getConfigServer());
                 recvChunkStartBuilder.append("secondaryThrottle", isSecondaryThrottle);
 
                 // Follow the same convention in moveChunk.

@@ -39,6 +39,7 @@
 #include "mongo/client/dbclient_rs.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/catalog/catalog_cache.h"
+#include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard_connection.h"
@@ -206,7 +207,7 @@ namespace mongo {
 
             ok = setShardVersion(*conn,
                                  "",
-                                 configServer.modelServer(),
+                                 grid.catalogManager()->connectionString().toString(),
                                  ChunkVersion(),
                                  NULL,
                                  true,
@@ -377,7 +378,7 @@ namespace mongo {
         BSONObj result;
         if (setShardVersion(*conn,
                             ns,
-                            configServer.modelServer(),
+                            grid.catalogManager()->connectionString().toString(),
                             version,
                             manager.get(),
                             authoritative,

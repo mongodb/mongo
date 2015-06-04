@@ -72,7 +72,6 @@ namespace mongo {
     using std::stringstream;
     using std::vector;
 
-    int ConfigServer::VERSION = 3;
     Shard Shard::EMPTY;
 
 
@@ -665,11 +664,6 @@ namespace mongo {
 
     /* --- ConfigServer ---- */
 
-    const std::string& ConfigServer::modelServer() const {
-        uassert(10190, "ConfigServer not setup", _primary.ok());
-        return _primary.getConnString().toString();
-    }
-
     bool ConfigServer::init( const ConnectionString& configCS ) {
         invariant(configCS.isValid());
 
@@ -746,31 +740,6 @@ namespace mongo {
             }
         }
         return true;
-    }
-
-    int ConfigServer::dbConfigVersion() {
-        ScopedDbConnection conn(_primary.getConnString(), 30.0);
-        int version = dbConfigVersion( conn.conn() );
-        conn.done();
-        return version;
-    }
-
-    int ConfigServer::dbConfigVersion( DBClientBase& conn ) {
-        auto_ptr<DBClientCursor> c = conn.query( "config.version" , BSONObj() );
-        int version = 0;
-        if ( c->more() ) {
-            BSONObj o = c->next();
-            version = o["version"].numberInt();
-            uassert( 10189 ,  "should only have 1 thing in config.version" , ! c->more() );
-        }
-        else {
-            if (grid.catalogManager()->doShardsExist() ||
-                conn.count(DatabaseType::ConfigNS)) {
-                version = 1;
-            }
-        }
-
-        return version;
     }
 
     void ConfigServer::reloadSettings() {

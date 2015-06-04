@@ -112,8 +112,7 @@ namespace {
                 const HostOpTime& hot = it->second;
 
                 ConnectionString resolvedHost;
-                status = DBClientShardResolver::findMaster(shardEndpoint.toString(),
-                                                           &resolvedHost);
+                status = DBClientShardResolver::findMaster(shardEndpoint, &resolvedHost);
                 if (!status.isOK()) {
                     break;
                 }

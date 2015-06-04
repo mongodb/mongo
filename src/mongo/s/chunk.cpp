@@ -444,7 +444,7 @@ namespace {
         cmd.append( "max" , getMax() );
         cmd.append( "from" , getShard().getName() );
         cmd.append( "splitKeys" , m );
-        cmd.append( "configdb" , configServer.modelServer() );
+        cmd.append("configdb", grid.catalogManager()->connectionString().toString());
         cmd.append("epoch", _manager->getVersion().epoch());
         BSONObj cmdObj = cmd.obj();
 
@@ -482,7 +482,6 @@ namespace {
               << _shard.toString() << " -> " << to.toString();
 
         Shard from = _shard;
-        ScopedDbConnection fromconn(from.getConnString());
 
         BSONObjBuilder builder;
         builder.append("moveChunk", _manager->getns());
@@ -495,7 +494,7 @@ namespace {
         builder.append("min", _min);
         builder.append("max", _max);
         builder.append("maxChunkSizeBytes", chunkSize);
-        builder.append("configdb", configServer.modelServer());
+        builder.append("configdb", grid.catalogManager()->connectionString().toString());
 
         // For legacy secondary throttle setting.
         bool secondaryThrottle = true;
@@ -515,6 +514,7 @@ namespace {
         builder.append(LiteParsedQuery::cmdOptionMaxTimeMS, maxTimeMS);
         builder.append("epoch", _manager->getVersion().epoch());
 
+        ScopedDbConnection fromconn(from.getConnString());
         bool worked = fromconn->runCommand("admin", builder.done(), res);
         fromconn.done();
 

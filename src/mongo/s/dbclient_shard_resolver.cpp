@@ -31,78 +31,62 @@
 #include <set>
 
 #include "mongo/client/replica_set_monitor.h"
-#include "mongo/s/config.h"
 #include "mongo/s/client/shard.h"
+#include "mongo/s/client/shard_registry.h"
+#include "mongo/s/grid.h"
 
 namespace mongo {
 
     using std::string;
 
-    Status DBClientShardResolver::chooseWriteHost( const string& shardName,
-                                                   ConnectionString* shardHost ) const {
-
-        // Declare up here for parsing later
-        string errMsg;
-
-        // Special-case for config
-        if (shardName == "config") {
-            *shardHost = ConnectionString::parse( configServer.modelServer(), errMsg );
-            dassert( errMsg == "" );
-            return Status::OK();
-        }
-
-        //
-        // First get the information about the shard from the shard cache
-        //
+    Status DBClientShardResolver::chooseWriteHost(const string& shardName,
+                                                  ConnectionString* shardHost) const {
 
         // Internally uses our shard cache, does no reload
-        Shard shard = Shard::findIfExists( shardName );
-        if ( shard.getName() == "" ) {
-            return Status( ErrorCodes::ShardNotFound,
-                           string("unknown shard name ") + shardName );
+        boost::shared_ptr<Shard> shard = grid.shardRegistry()->findIfExists(shardName);
+        if (!shard) {
+            return Status(ErrorCodes::ShardNotFound,
+                          str::stream() << "unknown shard name " << shardName);
         }
-        return findMaster(shard.getConnString().toString(), shardHost);
+
+        return findMaster(shard->getConnString(), shardHost);
     }
 
-    Status DBClientShardResolver::findMaster( const std::string connString,
-                                              ConnectionString* resolvedHost ) {
-        std::string errMsg;
+    Status DBClientShardResolver::findMaster(const ConnectionString& connString,
+                                             ConnectionString* resolvedHost) {
 
-        ConnectionString rawHost = ConnectionString::parse( connString, errMsg );
-        dassert( errMsg == "" );
-        dassert( rawHost.type() == ConnectionString::SET
-                 || rawHost.type() == ConnectionString::MASTER );
-
-        if ( rawHost.type() == ConnectionString::MASTER ) {
-            *resolvedHost = rawHost;
+        if (connString.type() == ConnectionString::MASTER) {
+            *resolvedHost = connString;
             return Status::OK();
         }
+
+        dassert(connString.type() == ConnectionString::SET);
 
         //
         // If we need to, then get the particular node we're targeting in the replica set
         //
 
         // Don't create the monitor unless we need to - fast path
-        ReplicaSetMonitorPtr replMonitor = ReplicaSetMonitor::get(rawHost.getSetName());
+        ReplicaSetMonitorPtr replMonitor = ReplicaSetMonitor::get(connString.getSetName());
 
         if (!replMonitor) {
             // Slow path
-            std::set<HostAndPort> seedServers(rawHost.getServers().begin(),
-                                              rawHost.getServers().end());
-            ReplicaSetMonitor::createIfNeeded(rawHost.getSetName(), seedServers);
-            replMonitor = ReplicaSetMonitor::get(rawHost.getSetName());
+            std::set<HostAndPort> seedServers(connString.getServers().begin(),
+                                              connString.getServers().end());
+            ReplicaSetMonitor::createIfNeeded(connString.getSetName(), seedServers);
+
+            replMonitor = ReplicaSetMonitor::get(connString.getSetName());
         }
 
         if (!replMonitor) {
-            return Status( ErrorCodes::ReplicaSetNotFound,
-                           string("unknown replica set ") + rawHost.getSetName() );
+            return Status(ErrorCodes::ReplicaSetNotFound,
+                          str::stream() << "unknown replica set " << connString.getSetName());
         }
 
         try {
             // This can throw when we don't find a master!
             HostAndPort masterHostAndPort = replMonitor->getMasterOrUassert();
-            *resolvedHost = ConnectionString::parse( masterHostAndPort.toString(), errMsg );
-            dassert( errMsg == "" );
+            *resolvedHost = fassertStatusOK(0, ConnectionString::parse(masterHostAndPort.toString()));
             return Status::OK();
         }
         catch ( const DBException& ) {
@@ -111,9 +95,7 @@ namespace mongo {
                            + replMonitor->getName() );
         }
 
-        // Unreachable
-        dassert( false );
-        return Status( ErrorCodes::UnknownError, "" );
+        MONGO_UNREACHABLE;
     }
 
 } // namespace mongo

@@ -184,8 +184,6 @@ namespace mongo {
 
         bool ok( bool checkConsistency = false );
 
-        const std::string& modelServer() const;
-
         const Shard& getPrimary() const { return _primary; }
 
         /**
@@ -200,14 +198,9 @@ namespace mongo {
          */
         bool checkHostsAreUnique( const std::vector<std::string>& configHosts, std::string* errmsg );
 
-        int dbConfigVersion();
-        int dbConfigVersion( DBClientBase& conn );
-
         void reloadSettings();
 
         void replicaSetChange(const std::string& setName, const std::string& newConnectionString);
-
-        static int VERSION;
 
     private:
         std::string getHost( const std::string& name , bool withPort );
