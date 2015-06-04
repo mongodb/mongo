@@ -55,8 +55,10 @@ namespace mongo {
             AutoGetDb autoDB(txn, dbName, MODE_X);
             Database* const db = autoDB.getDb();
             if (!db) {
-                // DB doesn't exist, so deem it a success.
-                return Status::OK();
+                return Status(ErrorCodes::DatabaseNotFound,
+                        str::stream() << "Could not drop database " << dbName
+                                      << " because it does not exist");
+
             }
             OldClientContext context(txn, dbName);
 

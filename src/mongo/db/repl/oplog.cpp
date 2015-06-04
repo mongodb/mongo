@@ -498,7 +498,8 @@ namespace {
             {
                 [](OperationContext* txn, const char* ns, BSONObj& cmd) -> Status {
                     return dropDatabase(txn, NamespaceString(ns).db().toString());
-                }
+                },
+                {ErrorCodes::DatabaseNotFound} 
             }
         },
         {"drop", 

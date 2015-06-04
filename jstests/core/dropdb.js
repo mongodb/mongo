@@ -18,8 +18,13 @@ function check(shouldExist) {
 ddb.c.save( {} );
 check(true);
 
-ddb.dropDatabase();
+var res = ddb.dropDatabase();
+assert.commandWorked(res);
+assert.eq(res.dropped, baseName, "dropped field did not contain correct database name");
 check(false);
 
-ddb.dropDatabase();
+var res = ddb.dropDatabase();
+assert.commandWorked(res);
+assert.eq(res.dropped, undefined,
+          "dropped field was populated even though nothing should have been dropped");
 check(false);

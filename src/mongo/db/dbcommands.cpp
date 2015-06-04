@@ -208,6 +208,9 @@ namespace mongo {
             }
 
             Status status = dropDatabase(txn, dbname);
+            if (status == ErrorCodes::DatabaseNotFound) {
+                return appendCommandStatus(result, Status::OK());
+            }
             if (status.isOK()) {
                 result.append( "dropped" , dbname );
             }
