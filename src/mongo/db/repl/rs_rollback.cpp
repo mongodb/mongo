@@ -332,7 +332,6 @@ namespace {
         bool warn = false;
 
         invariant(!fixUpInfo.commonPointOurDiskloc.isNull());
-        invariant(txn->lockState()->isW());
 
         // we have items we are writing that aren't from a point-in-time.  thus best not to come
         // online until we get to that point in freshness.
@@ -351,31 +350,26 @@ namespace {
 
                 const NamespaceString nss(ns);
 
-                Database* db = dbHolder().openDb(txn, nss.db().toString());
-                invariant(db);
 
                 {
+                    ScopedTransaction transaction(txn, MODE_IX);
+                    Lock::DBLock dbLock(txn->lockState(), nss.db(), MODE_X);
+                    Database* db = dbHolder().openDb(txn, nss.db().toString());
+                    invariant(db);
                     WriteUnitOfWork wunit(txn);
                     db->dropCollection(txn, ns);
                     wunit.commit();
                 }
 
-                {
-                    // This comes as a GlobalWrite lock, so there is no DB to be acquired after
-                    // resume, so we can skip the DB stability checks. Also 
-                    // copyCollectionFromRemote will acquire its own database pointer, under the
-                    // appropriate locks, so just releasing and acquiring the lock is safe.
-                    invariant(txn->lockState()->isW());
-                    Lock::TempRelease release(txn->lockState());
-
-                    rollbackSource.copyCollectionFromRemote(txn, nss);
-                }
+                rollbackSource.copyCollectionFromRemote(txn, nss);
             }
 
             for (const string& ns : fixUpInfo.collectionsToResyncMetadata) {
                 log() << "rollback 4.1.2 coll metadata resync " << ns;
 
                 const NamespaceString nss(ns);
+                ScopedTransaction transaction(txn, MODE_IX);
+                Lock::DBLock dbLock(txn->lockState(), nss.db(), MODE_X);
                 auto db = dbHolder().openDb(txn, nss.db().toString());
                 invariant(db);
                 auto collection = db->getCollection(ns);
@@ -469,6 +463,9 @@ namespace {
                 it++) {
             log() << "rollback drop: " << *it;
 
+            ScopedTransaction transaction(txn, MODE_IX);
+            const NamespaceString nss(*it);
+            Lock::DBLock dbLock(txn->lockState(), nss.db(), MODE_X);
             Database* db = dbHolder().get(txn, nsToDatabaseSubstring(*it));
             if (db) {
                 WriteUnitOfWork wunit(txn);
@@ -509,12 +506,6 @@ namespace {
         }
 
         log() << "rollback 4.7";
-        OldClientContext ctx(txn, rsOplogName);
-        Collection* oplogCollection = ctx.db()->getCollection(rsOplogName);
-        uassert(13423,
-                str::stream() << "replSet error in rollback can't find " << rsOplogName,
-                oplogCollection);
-
         unsigned deletes = 0, updates = 0;
         time_t lastProgressUpdate = time(0);
         time_t progressUpdateGap = 10;
@@ -543,6 +534,9 @@ namespace {
                     removeSaver.reset(new Helpers::RemoveSaver("rollback", "", doc.ns));
 
                 // todo: lots of overhead in context, this can be faster
+                const NamespaceString docNss(doc.ns);
+                ScopedTransaction transaction(txn, MODE_IX);
+                Lock::DBLock docDbLock(txn->lockState(), docNss.db(), MODE_X);
                 OldClientContext ctx(txn, doc.ns);
 
                 // Add the doc to our rollback file
@@ -672,8 +666,22 @@ namespace {
         // clean up oplog
         LOG(2) << "rollback truncate oplog after " <<
                 fixUpInfo.commonPoint.toStringPretty();
-        // TODO: fatal error if this throws?
-        oplogCollection->temp_cappedTruncateAfter(txn, fixUpInfo.commonPointOurDiskloc, false);
+        {
+            const NamespaceString oplogNss(rsOplogName);
+            ScopedTransaction transaction(txn, MODE_IX);
+            Lock::DBLock oplogDbLock(txn->lockState(), oplogNss.db(), MODE_IX);
+            Lock::CollectionLock oplogCollectionLoc(txn->lockState(), oplogNss.ns(), MODE_X);
+            OldClientContext ctx(txn, rsOplogName);
+            Collection* oplogCollection = ctx.db()->getCollection(rsOplogName);
+            if (!oplogCollection) {
+                fassertFailedWithStatusNoTrace(
+                    13423,
+                    Status(ErrorCodes::UnrecoverableRollbackError, str::stream() <<
+                           "Can't find " << rsOplogName));
+            }
+            // TODO: fatal error if this throws?
+            oplogCollection->temp_cappedTruncateAfter(txn, fixUpInfo.commonPointOurDiskloc, false);
+        }
 
         Status status = getGlobalAuthorizationManager()->initialize(txn);
         if (!status.isOK()) {
@@ -697,19 +705,10 @@ namespace {
                          const OplogInterface& localOplog,
                          const RollbackSource& rollbackSource,
                          ReplicationCoordinator* replCoord,
-                         const SleepSecondsFn& sleepSecondsFn,
-                         Milliseconds globalWriteLockTimeoutMs) {
+                         const SleepSecondsFn& sleepSecondsFn) {
         invariant(!txn->lockState()->isLocked());
 
         log() << "rollback 0";
-
-        std::unique_ptr<Lock::GlobalWrite> globalWrite(
-            new Lock::GlobalWrite(txn->lockState(), globalWriteLockTimeoutMs.count()));
-        if (!globalWrite->isLocked()) {
-            sleepSecondsFn(Seconds(2));
-            return Status(ErrorCodes::LockTimeout,
-                          "rollback couldn't get write lock in a reasonable time");
-        }
 
         /** by doing this, we will not service reads (return an error as we aren't in secondary
          *  state. that perhaps is moot because of the write lock above, but that write lock
@@ -717,10 +716,14 @@ namespace {
          *
          *  also, this is better for status reporting - we know what is happening.
          */
-        if (!replCoord->setFollowerMode(MemberState::RS_ROLLBACK)) {
-            return Status(ErrorCodes::OperationFailed, str::stream() <<
-                          "Cannot transition from " << replCoord->getMemberState().toString() <<
-                          " to " << MemberState(MemberState::RS_ROLLBACK).toString());
+        {
+            Lock::GlobalWrite globalWrite(txn->lockState());
+            if (!replCoord->setFollowerMode(MemberState::RS_ROLLBACK)) {
+                return Status(
+                    ErrorCodes::OperationFailed, str::stream() <<
+                    "Cannot transition from " << replCoord->getMemberState().toString() <<
+                    " to " << MemberState(MemberState::RS_ROLLBACK).toString());
+            }
         }
 
         FixUpInfo how;
@@ -740,7 +743,6 @@ namespace {
                     switch (res.getStatus().code()) {
                         case ErrorCodes::OplogStartMissing:
                         case ErrorCodes::UnrecoverableRollbackError:
-                            globalWrite.reset();
                             sleepSecondsFn(Seconds(1));
                             return res.getStatus();
                         default:
@@ -761,11 +763,6 @@ namespace {
             }
             catch (const DBException& e) {
                 warning() << "rollback 2 exception " << e.toString() << "; sleeping 1 min";
-
-                // Release the GlobalWrite lock while sleeping. We should always come here with a
-                // GlobalWrite lock
-                invariant(txn->lockState()->isW());
-                globalWrite.reset();
 
                 sleepSecondsFn(Seconds(60));
                 throw;
@@ -809,8 +806,6 @@ namespace {
         return Status::OK();
     }
 
-    const Milliseconds kDefaultGlobalWriteLockTimeoutMs(20000);
-
 } // namespace
 
     Status syncRollback(OperationContext* txn,
@@ -818,8 +813,7 @@ namespace {
                         const OplogInterface& localOplog,
                         const RollbackSource& rollbackSource,
                         ReplicationCoordinator* replCoord,
-                        const SleepSecondsFn& sleepSecondsFn,
-                        Milliseconds globalWriteLockTimeoutMs) {
+                        const SleepSecondsFn& sleepSecondsFn) {
 
         invariant(txn);
         invariant(replCoord);
@@ -846,8 +840,7 @@ namespace {
                                       localOplog,
                                       rollbackSource,
                                       replCoord,
-                                      sleepSecondsFn,
-                                      globalWriteLockTimeoutMs);
+                                      sleepSecondsFn);
         
         log() << "rollback finished" << rsLog;
         return status;
@@ -864,8 +857,7 @@ namespace {
                             localOplog,
                             rollbackSource,
                             replCoord,
-                            [](Seconds seconds) { sleepsecs(seconds.count()); },
-                            kDefaultGlobalWriteLockTimeoutMs);
+                            [](Seconds seconds) { sleepsecs(seconds.count()); });
     }
 
 } // namespace repl

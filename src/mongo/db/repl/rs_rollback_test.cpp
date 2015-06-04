@@ -32,6 +32,7 @@
 #include <memory>
 #include <utility>
 
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/concurrency/d_concurrency.h"
@@ -56,7 +57,6 @@ namespace {
     using namespace mongo;
     using namespace mongo::repl;
 
-    const Milliseconds globalWriteLockTimeoutMs(10);
     const OplogInterfaceMock::Operations kEmptyMockOperations;
 
     ReplSettings createReplSettings() {
@@ -184,27 +184,9 @@ namespace {
                 RollbackSourceMock(std::unique_ptr<OplogInterface>(
                     new OplogInterfaceMock(kEmptyMockOperations))),
                 _coordinator.get(),
-                noSleep,
-                globalWriteLockTimeoutMs);
+                noSleep);
         ASSERT_EQUALS(ErrorCodes::UnrecoverableRollbackError, status.code());
         ASSERT_EQUALS(18750, status.location());
-    }
-
-    TEST_F(RSRollbackTest, CannotObtainGlobalWriteLock) {
-        OperationContextReplMock txn2;
-        Lock::DBLock dbLock(txn2.lockState(), "test", MODE_X);
-        ASSERT_FALSE(_txn->lockState()->isLocked());
-        ASSERT_EQUALS(
-            ErrorCodes::LockTimeout,
-            syncRollback(
-                _txn.get(),
-                OpTime(),
-                OplogInterfaceMock(kEmptyMockOperations),
-                RollbackSourceMock(std::unique_ptr<OplogInterface>(
-                    new OplogInterfaceMock(kEmptyMockOperations))),
-                _coordinator.get(),
-                noSleep,
-                globalWriteLockTimeoutMs).code());
     }
 
     TEST_F(RSRollbackTest, SetFollowerModeFailed) {
@@ -227,8 +209,7 @@ namespace {
                 RollbackSourceMock(std::unique_ptr<OplogInterface>(
                     new OplogInterfaceMock(kEmptyMockOperations))),
                 _coordinator.get(),
-                noSleep,
-                globalWriteLockTimeoutMs).code());
+                noSleep).code());
     }
 
     TEST_F(RSRollbackTest, OplogStartMissing) {
@@ -245,8 +226,7 @@ namespace {
                     operation,
                 }))),
                 _coordinator.get(),
-                noSleep,
-                globalWriteLockTimeoutMs).code());
+                noSleep).code());
     }
 
     TEST_F(RSRollbackTest, NoRemoteOpLog) {
@@ -261,8 +241,7 @@ namespace {
                 RollbackSourceMock(std::unique_ptr<OplogInterface>(
                     new OplogInterfaceMock(kEmptyMockOperations))),
                 _coordinator.get(),
-                noSleep,
-                globalWriteLockTimeoutMs);
+                noSleep);
         ASSERT_EQUALS(ErrorCodes::UnrecoverableRollbackError, status.code());
         ASSERT_EQUALS(18752, status.location());
     }
@@ -287,8 +266,7 @@ namespace {
                 RollbackSourceLocal(std::unique_ptr<OplogInterface>(
                     new OplogInterfaceMock(kEmptyMockOperations))),
                 _coordinator.get(),
-                noSleep,
-                globalWriteLockTimeoutMs),
+                noSleep),
             UserException,
             ErrorCodes::UnknownError);
     }
@@ -307,12 +285,38 @@ namespace {
                     operation,
                 }))),
                 _coordinator.get(),
-                noSleep,
-                globalWriteLockTimeoutMs));
+                noSleep));
     }
 
-    TEST_F(RSRollbackTest, FetchDeletedDocumentFromSource) {
-        createOplog(_txn.get());
+    /**
+     * Create test collection
+     */
+    void _createCollection(OperationContext* txn,
+                           const NamespaceString& nss,
+                           const CollectionOptions& options) {
+        Lock::DBLock dbLock(txn->lockState(), nss.db(), MODE_X);
+        mongo::WriteUnitOfWork wuow(txn);
+        auto db = dbHolder().openDb(txn, nss.db());
+        ASSERT_TRUE(db);
+        db->dropCollection(txn, nss.ns());
+        ASSERT_TRUE(db->createCollection(txn, nss.ns(), options));
+        wuow.commit();
+    }
+
+    void _createCollection(OperationContext* txn,
+                           const std::string& nss,
+                           const CollectionOptions& options) {
+        _createCollection(txn, NamespaceString(nss), options);
+    }
+
+    /**
+     * Test function to roll back a delete operation.
+     * Returns number of records in collection after rolling back delete operation.
+     * If collection does not exist after rolling back, returns -1.
+     */
+    int _testRollBackDelete(OperationContext* txn,
+                            ReplicationCoordinator* coordinator,
+                            const BSONObj& documentAtSource) {
         auto commonOperation =
             std::make_pair(BSON("ts" << Timestamp(Seconds(1), 0) << "h" << 1LL), RecordId(1));
         auto deleteOperation =
@@ -324,30 +328,73 @@ namespace {
                            RecordId(2));
         class RollbackSourceLocal : public RollbackSourceMock {
         public:
-            RollbackSourceLocal(std::unique_ptr<OplogInterface> oplog)
+            RollbackSourceLocal(const BSONObj& documentAtSource,
+                                std::unique_ptr<OplogInterface> oplog)
                 : RollbackSourceMock(std::move(oplog)),
-                  called(false) { }
+                  called(false),
+                  _documentAtSource(documentAtSource) { }
             BSONObj findOne(const NamespaceString& nss, const BSONObj& filter) const {
                 called = true;
-                return BSONObj();
+                return _documentAtSource;
             }
             mutable bool called;
+        private:
+            BSONObj _documentAtSource;
         };
-        RollbackSourceLocal rollbackSource(std::unique_ptr<OplogInterface>(new OplogInterfaceMock({
-            commonOperation,
+        RollbackSourceLocal rollbackSource(
+            documentAtSource,
+            std::unique_ptr<OplogInterface>(new OplogInterfaceMock({
+                commonOperation,
         })));
         OpTime opTime(deleteOperation.first["ts"].timestamp(),
                       deleteOperation.first["h"].Long());
         ASSERT_OK(
             syncRollback(
-                _txn.get(),
+                txn,
                 opTime,
                 OplogInterfaceMock({deleteOperation, commonOperation}),
                 rollbackSource,
-                _coordinator.get(),
-                noSleep,
-                globalWriteLockTimeoutMs));
+                coordinator,
+                noSleep));
         ASSERT_TRUE(rollbackSource.called);
+
+        Lock::DBLock dbLock(txn->lockState(), "test", MODE_S);
+        Lock::CollectionLock collLock(txn->lockState(), "test.t", MODE_S);
+        auto db = dbHolder().get(txn, "test");
+        ASSERT_TRUE(db);
+        auto collection = db->getCollection("test.t");
+        if (!collection) {
+            return -1;
+        }
+        return collection->getRecordStore()->numRecords(txn);
+    }
+
+    TEST_F(RSRollbackTest, RollBackDeleteNoDocumentAtSourceCollectionDoesNotExist) {
+        createOplog(_txn.get());
+        ASSERT_EQUALS(-1, _testRollBackDelete(_txn.get(), _coordinator.get(), BSONObj()));
+    }
+
+    TEST_F(RSRollbackTest, RollBackDeleteNoDocumentAtSourceCollectionExistsNonCapped) {
+        createOplog(_txn.get());
+        _createCollection(_txn.get(), "test.t", CollectionOptions());
+        _testRollBackDelete(_txn.get(), _coordinator.get(), BSONObj());
+        ASSERT_EQUALS(0, _testRollBackDelete(_txn.get(), _coordinator.get(), BSONObj()));
+    }
+
+    TEST_F(RSRollbackTest, RollBackDeleteNoDocumentAtSourceCollectionExistsCapped) {
+        createOplog(_txn.get());
+        CollectionOptions options;
+        options.capped = true;
+        _createCollection(_txn.get(), "test.t", options);
+        ASSERT_EQUALS(0, _testRollBackDelete(_txn.get(), _coordinator.get(), BSONObj()));
+    }
+
+    TEST_F(RSRollbackTest, RollBackDeleteRestoreDocument) {
+        createOplog(_txn.get());
+        _createCollection(_txn.get(), "test.t", CollectionOptions());
+        BSONObj doc = BSON("_id" << 0 << "a" << 1);
+        _testRollBackDelete(_txn.get(), _coordinator.get(), doc);
+        ASSERT_EQUALS(1, _testRollBackDelete(_txn.get(), _coordinator.get(), doc));
     }
 
     TEST_F(RSRollbackTest, RollbackUnknownCommand) {
@@ -380,14 +427,11 @@ namespace {
                     commonOperation,
                 }))),
                 _coordinator.get(),
-                noSleep,
-                globalWriteLockTimeoutMs);
+                noSleep);
         ASSERT_EQUALS(ErrorCodes::UnrecoverableRollbackError, status.code());
         ASSERT_EQUALS(18751, status.location());
     }
 
-// Re-enable after fixing recovery unit noop registerChange behavior
-#if 0
     TEST_F(RSRollbackTest, RollbackDropCollectionCommand) {
         createOplog(_txn.get());
         auto commonOperation =
@@ -413,14 +457,7 @@ namespace {
         RollbackSourceLocal rollbackSource(std::unique_ptr<OplogInterface>(new OplogInterfaceMock({
             commonOperation,
         })));
-        {
-            Lock::DBLock dbLock(_txn->lockState(), "test", MODE_X);
-            mongo::WriteUnitOfWork wuow(_txn.get());
-            auto db = dbHolder().openDb(_txn.get(), "test");
-            ASSERT_TRUE(db);
-            ASSERT_TRUE(db->getOrCreateCollection(_txn.get(), "test.t"));
-            wuow.commit();
-        }
+        _createCollection(_txn.get(), "test.t", CollectionOptions());
         OpTime opTime(dropCollectionOperation.first["ts"].timestamp(),
                       dropCollectionOperation.first["h"].Long());
         ASSERT_OK(
@@ -430,11 +467,42 @@ namespace {
                 OplogInterfaceMock({dropCollectionOperation, commonOperation}),
                 rollbackSource,
                 _coordinator.get(),
-                noSleep,
-                globalWriteLockTimeoutMs));
+                noSleep));
         ASSERT_TRUE(rollbackSource.called);
     }
-#endif // 0
+
+    TEST_F(RSRollbackTest, RollbackCreateCollectionCommand) {
+        createOplog(_txn.get());
+        auto commonOperation =
+            std::make_pair(BSON("ts" << Timestamp(Seconds(1), 0) << "h" << 1LL), RecordId(1));
+        auto createCollectionOperation =
+            std::make_pair(BSON("ts" << Timestamp(Seconds(2), 0) <<
+                                "h" << 1LL <<
+                                "op" << "c" <<
+                                "ns" << "test.t" <<
+                                "o" << BSON("create" << "t")),
+                           RecordId(2));
+        RollbackSourceMock rollbackSource(std::unique_ptr<OplogInterface>(new OplogInterfaceMock({
+            commonOperation,
+        })));
+        _createCollection(_txn.get(), "test.t", CollectionOptions());
+        OpTime opTime(createCollectionOperation.first["ts"].timestamp(),
+                      createCollectionOperation.first["h"].Long());
+        ASSERT_OK(
+            syncRollback(
+                _txn.get(),
+                opTime,
+                OplogInterfaceMock({createCollectionOperation, commonOperation}),
+                rollbackSource,
+                _coordinator.get(),
+                noSleep));
+        {
+            Lock::DBLock dbLock(_txn->lockState(), "test", MODE_S);
+            auto db = dbHolder().get(_txn.get(), "test");
+            ASSERT_TRUE(db);
+            ASSERT_FALSE(db->getCollection("test.t"));
+        }
+    }
 
     TEST_F(RSRollbackTest, RollbackCollectionModificationCommand) {
         createOplog(_txn.get());
@@ -461,14 +529,7 @@ namespace {
         RollbackSourceLocal rollbackSource(std::unique_ptr<OplogInterface>(new OplogInterfaceMock({
             commonOperation,
         })));
-        {
-            Lock::DBLock dbLock(_txn->lockState(), "test", MODE_X);
-            mongo::WriteUnitOfWork wuow(_txn.get());
-            auto db = dbHolder().openDb(_txn.get(), "test");
-            ASSERT_TRUE(db);
-            ASSERT_TRUE(db->getOrCreateCollection(_txn.get(), "test.t"));
-            wuow.commit();
-        }
+        _createCollection(_txn.get(), "test.t", CollectionOptions());
         OpTime opTime(collectionModificationOperation.first["ts"].timestamp(),
                       collectionModificationOperation.first["h"].Long());
         ASSERT_OK(
@@ -478,8 +539,7 @@ namespace {
                 OplogInterfaceMock({collectionModificationOperation, commonOperation}),
                 rollbackSource,
                 _coordinator.get(),
-                noSleep,
-                globalWriteLockTimeoutMs));
+                noSleep));
         ASSERT_TRUE(rollbackSource.called);
     }
 
@@ -505,14 +565,7 @@ namespace {
         RollbackSourceLocal rollbackSource(std::unique_ptr<OplogInterface>(new OplogInterfaceMock({
             commonOperation,
         })));
-        {
-            Lock::DBLock dbLock(_txn->lockState(), "test", MODE_X);
-            mongo::WriteUnitOfWork wuow(_txn.get());
-            auto db = dbHolder().openDb(_txn.get(), "test");
-            ASSERT_TRUE(db);
-            ASSERT_TRUE(db->getOrCreateCollection(_txn.get(), "test.t"));
-            wuow.commit();
-        }
+        _createCollection(_txn.get(), "test.t", CollectionOptions());
         OpTime opTime(collectionModificationOperation.first["ts"].timestamp(),
                       collectionModificationOperation.first["h"].Long());
         auto status =
@@ -522,8 +575,7 @@ namespace {
                 OplogInterfaceMock({collectionModificationOperation, commonOperation}),
                 rollbackSource,
                 _coordinator.get(),
-                noSleep,
-                globalWriteLockTimeoutMs);
+                noSleep);
         ASSERT_EQUALS(ErrorCodes::UnrecoverableRollbackError, status.code());
         ASSERT_EQUALS(18753, status.location());
     }

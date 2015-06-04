@@ -80,8 +80,7 @@ namespace repl {
                         const OplogInterface& localOplog,
                         const RollbackSource& rollbackSource,
                         ReplicationCoordinator* replCoord,
-                        const SleepSecondsFn& sleepSecondsFn,
-                        Milliseconds globalWriteLockTimeoutMs);
+                        const SleepSecondsFn& sleepSecondsFn);
 
     Status syncRollback(OperationContext* txn,
                         const OpTime& lastOpTimeWritten,
