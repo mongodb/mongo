@@ -37,15 +37,14 @@
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_geo.h"
+#include "mongo/stdx/memory.h"
 
 namespace mongo {
-
-    using std::auto_ptr;
 
     TEST( ExpressionGeoTest, Geo1 ) {
         BSONObj query = fromjson("{loc:{$within:{$box:[{x: 4, y:4},[6,6]]}}}");
 
-        auto_ptr<GeoExpression> gq(new GeoExpression);
+        std::unique_ptr<GeoExpression> gq(new GeoExpression);
         ASSERT_OK( gq->parseFrom( query["loc"].Obj() ) );
 
         GeoMatchExpression ge;
@@ -62,7 +61,7 @@ namespace mongo {
     TEST(ExpressionGeoTest, GeoNear1) {
         BSONObj query = fromjson("{loc:{$near:{$maxDistance:100, "
                                  "$geometry:{type:\"Point\", coordinates:[0,0]}}}}");
-        auto_ptr<GeoNearExpression> nq(new GeoNearExpression);
+        std::unique_ptr<GeoNearExpression> nq(new GeoNearExpression);
         ASSERT_OK(nq->parseFrom(query["loc"].Obj()));
 
         GeoNearMatchExpression gne;
@@ -74,4 +73,105 @@ namespace mongo {
         ASSERT_EQUALS(gne.getData().maxDistance, 100);
     }
 
+    std::unique_ptr<GeoMatchExpression> makeGeoMatchExpression(const BSONObj& locQuery) {
+        std::unique_ptr<GeoExpression> gq(new GeoExpression);
+        ASSERT_OK(gq->parseFrom(locQuery));
+
+        std::unique_ptr<GeoMatchExpression> ge = stdx::make_unique<GeoMatchExpression>();
+        ASSERT_OK(ge->init("a", gq.release(), locQuery));
+
+        return ge;
+    }
+
+    std::unique_ptr<GeoNearMatchExpression> makeGeoNearMatchExpression(const BSONObj& locQuery) {
+        std::unique_ptr<GeoNearExpression> nq(new GeoNearExpression);
+        ASSERT_OK(nq->parseFrom(locQuery));
+
+        std::unique_ptr<GeoNearMatchExpression> gne = stdx::make_unique<GeoNearMatchExpression>();
+        ASSERT_OK(gne->init("a", nq.release(), locQuery));
+
+        return gne;
+    }
+
+
+    /**
+     * A bunch of cases in which a geo expression is equivalent() to both itself or to another
+     * expression.
+     */
+    TEST(ExpressionGeoTest, GeoEquivalent) {
+        {
+            BSONObj query = fromjson("{$within: {$box: [{x: 4, y: 4}, [6, 6]]}}");
+            std::unique_ptr<GeoMatchExpression> ge(makeGeoMatchExpression(query));
+            ASSERT(ge->equivalent(ge.get()));
+        }
+        {
+            BSONObj query = fromjson("{$within: {$geometry: {type: 'Polygon',"
+                                      "coordinates: [[[0, 0], [3, 6], [6, 1], [0, 0]]]}}}");
+            std::unique_ptr<GeoMatchExpression> ge(makeGeoMatchExpression(query));
+            ASSERT(ge->equivalent(ge.get()));
+        }
+        {
+            BSONObj query1 = fromjson("{$within: {$geometry: {type: 'Polygon',"
+                                      "coordinates: [[[0, 0], [3, 6], [6, 1], [0, 0]]]}}}"),
+                    query2 = fromjson("{$within: {$geometry: {type: 'Polygon',"
+                                      "coordinates: [[[0, 0], [3, 6], [6, 1], [0, 0]]]}}}");
+            std::unique_ptr<GeoMatchExpression> ge1(makeGeoMatchExpression(query1)),
+                                                ge2(makeGeoMatchExpression(query2));
+            ASSERT(ge1->equivalent(ge2.get()));
+        }
+    }
+
+    /**
+     * A bunch of cases in which a *geoNear* expression is equivalent both to itself or to
+     * another expression.
+     */
+    TEST(ExpressionGeoTest, GeoNearEquivalent) {
+        {
+            BSONObj query = fromjson("{$near: {$maxDistance: 100, "
+                                      "$geometry: {type: 'Point', coordinates: [0, 0]}}}");
+            std::unique_ptr<GeoNearMatchExpression> gne(makeGeoNearMatchExpression(query));
+            ASSERT(gne->equivalent(gne.get()));
+        }
+        {
+            BSONObj query = fromjson("{$near: {$minDistance: 10, $maxDistance: 100,"
+                                      "$geometry: {type: 'Point', coordinates: [0, 0]}}}");
+            std::unique_ptr<GeoNearMatchExpression> gne(makeGeoNearMatchExpression(query));
+            ASSERT(gne->equivalent(gne.get()));
+        }
+        {
+            BSONObj query1 = fromjson("{$near: {$maxDistance: 100, "
+                                      "$geometry: {type: 'Point', coordinates: [1, 0]}}}"),
+                    query2 = fromjson("{$near: {$maxDistance: 100, "
+                                      "$geometry: {type: 'Point', coordinates: [1, 0]}}}");
+            std::unique_ptr<GeoNearMatchExpression> gne1(makeGeoNearMatchExpression(query1)),
+                                                    gne2(makeGeoNearMatchExpression(query2));
+            ASSERT(gne1->equivalent(gne2.get()));
+        }
+    }
+
+    /**
+     * A geo expression being not equivalent to another expression.
+     */
+    TEST(ExpressionGeoTest, GeoNotEquivalent) {
+        BSONObj query1 = fromjson("{$within: {$geometry: {type: 'Polygon',"
+                                  "coordinates: [[[0, 0], [3, 6], [6, 1], [0, 0]]]}}}"),
+                query2 = fromjson("{$within: {$geometry: {type: 'Polygon',"
+                                  "coordinates: [[[0, 0], [3, 6], [6, 2], [0, 0]]]}}}");
+        std::unique_ptr<GeoMatchExpression> ge1(makeGeoMatchExpression(query1)),
+                                            ge2(makeGeoMatchExpression(query2));
+        ASSERT(!ge1->equivalent(ge2.get()));
+    }
+
+    /**
+     * A *geoNear* expression being not equivalent to another expression.
+     */
+    TEST(ExpressionGeoTest, GeoNearNotEquivalent) {
+        BSONObj query1 = fromjson("{$near: {$maxDistance: 100, "
+                                  "$geometry: {type: 'Point', coordinates: [0, 0]}}}"),
+                query2 = fromjson("{$near: {$maxDistance: 100, "
+                                  "$geometry: {type: 'Point', coordinates: [1, 0]}}}");
+        std::unique_ptr<GeoNearMatchExpression> gne1(makeGeoNearMatchExpression(query1)),
+                                                gne2(makeGeoNearMatchExpression(query2));
+        ASSERT(!gne1->equivalent(gne2.get()));
+    }
 }
