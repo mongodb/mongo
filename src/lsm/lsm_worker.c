@@ -19,7 +19,7 @@ static WT_THREAD_RET __lsm_worker(void *);
 int
 __wt_lsm_worker_start(WT_SESSION_IMPL *session, WT_LSM_WORKER_ARGS *args)
 {
-	WT_RET(__wt_verbose(session, WT_VERB_LSM,
+	WT_RET(__wt_verbose(session, WT_VERB_LSM_MANAGER,
 	    "Start LSM worker %d type 0x%x", args->id, args->type));
 	return (__wt_thread_create(session, &args->tid, __lsm_worker, args));
 }

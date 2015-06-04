@@ -333,6 +333,7 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 
 	/* Update the flush timestamp to help track ongoing progress. */
 	WT_RET(__wt_epoch(session, &lsm_tree->last_flush_ts));
+	++lsm_tree->chunks_flushed;
 
 	/* Lock the tree, mark the chunk as on disk and update the metadata. */
 	WT_RET(__wt_lsm_tree_writelock(session, lsm_tree));

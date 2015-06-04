@@ -511,6 +511,7 @@ connection_runtime_config = [
             'fileops',
             'log',
             'lsm',
+            'lsm_manager',
             'metadata',
             'mutex',
             'overflow',
