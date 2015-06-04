@@ -20,6 +20,12 @@ load("jstests/replsets/rslib.js");
 
     var replTest = new ReplSetTest({name: name, nodes: nodes});
     nodes = replTest.startSet();
+
+    // When processing an updatePosition command, 2.6 goes through the array of updates until it
+    // finds a problematic one and then returns an error. In 3.0, we make sure our update is before
+    // the updates of others to ensure ours is processed even if we lack a handshake from a node for
+    // which we have progress. This does not protect the updates of nodes that sync through us, so
+    // we must have all nodes sync to the primary to ensure their update goes through.
     var config = {_id: name,
                   version: 1,
                   members: [{_id:0, host: nodes[0].host, priority: 3, votes: 1},
@@ -30,6 +36,7 @@ load("jstests/replsets/rslib.js");
                             {_id:5, host: nodes[5].host, votes: 1, arbiterOnly: true},
                             {_id:6, host: nodes[6].host, votes: 1, arbiterOnly: true},
                            ],
+                  settings: { chainingAllowed: false }
                   };
     replTest.initiate(config);
 
@@ -103,6 +110,7 @@ load("jstests/replsets/rslib.js");
                         {_id:5, host: nodes[5].host, priority: 0, votes: 0},
                         {_id:6, host: nodes[6].host, votes: 1, arbiterOnly: true},
                        ],
+              settings: { chainingAllowed: false }
               };
     replTest.initiate(config);
 
