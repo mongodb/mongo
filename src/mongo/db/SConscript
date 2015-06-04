@@ -455,6 +455,7 @@ coredbEnv.Library(
         "pipeline/document_source_skip.cpp",
         "pipeline/document_source_sort.cpp",
         "pipeline/document_source_unwind.cpp",
+        "pipeline/document_source_object_to_array.cpp",
         "pipeline/expression.cpp",
         "stats/timer_stats.cpp",
     ],
