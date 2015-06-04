@@ -371,9 +371,7 @@ namespace mongo {
         if ( path() != realOther->path() )
             return false;
 
-        // TODO:
-        // return _query == realOther->_query;
-        return false;
+        return _rawObj == realOther->_rawObj;
     }
 
     LeafMatchExpression* GeoMatchExpression::shallowClone() const {
@@ -428,9 +426,7 @@ namespace mongo {
         if ( path() != realOther->path() )
             return false;
 
-        // TODO:
-        // return _query == realOther->_query;
-        return false;
+        return _rawObj == realOther->_rawObj;
     }
 
     LeafMatchExpression* GeoNearMatchExpression::shallowClone() const {
