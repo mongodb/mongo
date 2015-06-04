@@ -18,8 +18,9 @@ var mongo = runMongoProgram("mongo",
 // if mongo shell didn't start/connect properly
 if (mongo != 0) {
     print("mongod failed to start, checking for FIPS support");
-    assert(rawMongoProgramOutput().match(
-            /this version of mongodb was not compiled with FIPS support/));
+    mongoOutput = rawMongoProgramOutput()
+    assert(mongoOutput.match(/this version of mongodb was not compiled with FIPS support/) ||
+        mongoOutput.match(/FIPS_mode_set:fips mode not supported/))
 }
 else {
     // verify that auth works, SERVER-18051
