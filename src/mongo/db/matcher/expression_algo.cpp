@@ -218,9 +218,14 @@ namespace expression {
             return false;
         }
 
-        // TODO: Add support for $or in queries.
         if (lhs->matchType() == MatchExpression::OR) {
-            return false;
+            // Every clause of 'lhs' must match a subset of the documents matched by 'rhs'.
+            for (size_t i = 0; i < lhs->numChildren(); i++) {
+                if (!isSubsetOf(lhs->getChild(i), rhs)) {
+                    return false;
+                }
+            }
+            return true;
         }
 
         if (isComparisonMatchExpression(lhs) && isComparisonMatchExpression(rhs)) {

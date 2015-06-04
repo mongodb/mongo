@@ -142,6 +142,28 @@ namespace mongo {
         ASSERT_FALSE(expression::isSubsetOf(filter.get(), query.get()));
     }
 
+    TEST(ExpressionAlgoIsSubsetOf, CompareOr_LT) {
+        ParsedMatchExpression lt5("{a: {$lt: 5}}");
+        ParsedMatchExpression eq2OrEq3("{$or: [{a: 2}, {a: 3}]}");
+        ParsedMatchExpression eq4OrEq5("{$or: [{a: 4}, {a: 5}]}");
+        ParsedMatchExpression eq4OrEq6("{$or: [{a: 4}, {a: 6}]}");
+
+        ASSERT_TRUE(expression::isSubsetOf(eq2OrEq3.get(), lt5.get()));
+        ASSERT_FALSE(expression::isSubsetOf(eq4OrEq5.get(), lt5.get()));
+        ASSERT_FALSE(expression::isSubsetOf(eq4OrEq6.get(), lt5.get()));
+    }
+
+    TEST(ExpressionAlgoIsSubsetOf, CompareOr_GTE) {
+        ParsedMatchExpression gte5("{a: {$gte: 5}}");
+        ParsedMatchExpression eq4OrEq6("{$or: [{a: 4}, {a: 6}]}");
+        ParsedMatchExpression eq5OrEq6("{$or: [{a: 5}, {a: 6}]}");
+        ParsedMatchExpression eq7OrEq8("{$or: [{a: 7}, {a: 8}]}");
+
+        ASSERT_FALSE(expression::isSubsetOf(eq4OrEq6.get(), gte5.get()));
+        ASSERT_TRUE(expression::isSubsetOf(eq5OrEq6.get(), gte5.get()));
+        ASSERT_TRUE(expression::isSubsetOf(eq7OrEq8.get(), gte5.get()));
+    }
+
     TEST(ExpressionAlgoIsSubsetOf, DifferentCanonicalTypes) {
         ParsedMatchExpression number("{x: {$gt: 1}}");
         ParsedMatchExpression string("{x: {$gt: 'a'}}");
@@ -266,6 +288,28 @@ namespace mongo {
 
         ASSERT_TRUE(expression::isSubsetOf(query.get(), filter.get()));
         ASSERT_FALSE(expression::isSubsetOf(filter.get(), query.get()));
+    }
+
+    TEST(ExpressionAlgoIsSubsetOf, MultipleRangesInUnboundedRange) {
+        ParsedMatchExpression filter("{a: {$gt: 1}}");
+        ParsedMatchExpression negative("{$or: [{a: {$gt: 5, $lt: 10}}, {a: {$lt: 0}}]}");
+        ParsedMatchExpression unbounded("{$or: [{a: {$gt: 5, $lt: 10}}, {a: {$gt: 15}}]}");
+        ParsedMatchExpression bounded("{$or: [{a: {$gt: 5, $lt: 10}}, {a: {$gt: 20, $lt: 30}}]}");
+
+        ASSERT_FALSE(expression::isSubsetOf(negative.get(), filter.get()));
+        ASSERT_TRUE(expression::isSubsetOf(unbounded.get(), filter.get()));
+        ASSERT_TRUE(expression::isSubsetOf(bounded.get(), filter.get()));
+    }
+
+    TEST(ExpressionAlgoIsSubsetOf, MultipleFields) {
+        ParsedMatchExpression filter("{a: {$gt: 5}, b: {$lt: 10}}");
+        ParsedMatchExpression onlyA("{$or: [{a: 6, b: {$lt: 4}}, {a: {$gt: 11}}]}");
+        ParsedMatchExpression onlyB("{$or: [{b: {$lt: 4}}, {a: {$gt: 11}, b: 9}]}");
+        ParsedMatchExpression both("{$or: [{a: 6, b: {$lt: 4}}, {a: {$gt: 11}, b: 9}]}");
+
+        ASSERT_FALSE(expression::isSubsetOf(onlyA.get(), filter.get()));
+        ASSERT_FALSE(expression::isSubsetOf(onlyB.get(), filter.get()));
+        ASSERT_TRUE(expression::isSubsetOf(both.get(), filter.get()));
     }
 
     TEST(ExpressionAlgoIsSubsetOf, Exists) {
