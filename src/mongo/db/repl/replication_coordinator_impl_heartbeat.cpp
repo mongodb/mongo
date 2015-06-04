@@ -146,6 +146,7 @@ namespace {
 
         if (responseStatus.isOK()) {
             networkTime = cbData.response.getValue().elapsedMillis;
+            _updateTerm_incallback(hbStatusResponse.getValue().getTerm(), nullptr);
         }
         else {
             log() << "Error in heartbeat request to " << target << "; " << responseStatus;
@@ -155,8 +156,6 @@ namespace {
 
             hbStatusResponse = StatusWith<ReplSetHeartbeatResponse>(responseStatus);
         }
-
-        _updateTerm_incallback(hbStatusResponse.getValue().getTerm(), nullptr);
 
         HeartbeatResponseAction action =
             _topCoord->processHeartbeatResponse(
