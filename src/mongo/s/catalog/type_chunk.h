@@ -44,22 +44,6 @@ namespace mongo {
      * This class represents the layout and contents of documents contained in the
      * config.chunks collection. All manipulation of documents coming from that
      * collection should be done with this class.
-     *
-     * Usage Example:
-     *
-     *     // Contact the config. 'conn' has been obtained before.
-     *     DBClientBase* conn;
-     *     BSONObj query = QUERY(ChunkType::exampleField("exampleFieldName"));
-     *     exampleDoc = conn->findOne(ChunkType::ConfigNS, query);
-     *
-     *     // Process the response.
-     *     StatusWith<ChunkType> exampleResult = ChunkType::fromBSON(exampleDoc);
-     *     if (!exampleResult.isOK()) {
-     *         // handle error -- exampleResult.getStatus()
-     *     }
-     *     ChunkType exampleType = exampleResult.getValue();
-     *     // use 'exampleType'
-     *
      */
     class ChunkType {
     public:
@@ -95,11 +79,6 @@ namespace mongo {
          * Returns the BSON representation of the entry.
          */
         BSONObj toBSON() const;
-
-        /**
-         * Clears the internal state.
-         */
-        void clear();
 
         /**
          * Returns a std::string representation of the current internal state.

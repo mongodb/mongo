@@ -664,133 +664,17 @@ namespace mongo {
 
     /* --- ConfigServer ---- */
 
-    bool ConfigServer::init( const ConnectionString& configCS ) {
-        invariant(configCS.isValid());
-
-        std::vector<HostAndPort> configHostAndPorts = configCS.getServers();
-        uassert( 10187 ,  "need configdbs" , configHostAndPorts.size() );
-
-        std::vector<std::string> configHosts;
-        set<string> hosts;
-        for ( size_t i=0; i<configHostAndPorts.size(); i++ ) {
-            string host = configHostAndPorts[i].toString();
-            hosts.insert( getHost( host , false ) );
-            configHosts.push_back(getHost( host , true ));
-        }
-
-        for ( set<string>::iterator i=hosts.begin(); i!=hosts.end(); i++ ) {
-
-            string host = *i;
-
-            // If this is a CUSTOM connection string (for testing) don't do DNS resolution
-            string errMsg;
-            if ( ConnectionString::parse( host, errMsg ).type() == ConnectionString::CUSTOM ) {
-                continue;
-            }
-
-            bool ok = false;
-            for ( int x=10; x>0; x-- ) {
-                if ( ! hostbyname( host.c_str() ).empty() ) {
-                    ok = true;
-                    break;
-                }
-                log() << "can't resolve DNS for [" << host << "]  sleeping and trying " << x << " more times" << endl;
-                sleepsecs( 10 );
-            }
-            if ( ! ok )
-                return false;
-        }
-
-        _config = configHosts;
-
-        string errmsg;
-        if( ! checkHostsAreUnique(configHosts, &errmsg) ) {
-            error() << errmsg << endl;;
-            return false;
-        }
-
-        // This should be the first time we are trying to set up the primary shard (i.e. init
-        // should be called only once)
-        invariant(_primary == Shard::EMPTY);
-        _primary = Shard("config", configCS, 0, false);
-
-        Shard::installShard("config", _primary);
-
-        LOG(1) << " config string : " << configCS.toString();
-
-        return true;
-    }
-
-    bool ConfigServer::checkHostsAreUnique( const vector<string>& configHosts, string* errmsg ) {
-
-        //If we have one host, its always unique
-        if ( configHosts.size() == 1 ) {
-            return true;
-        }
-
-        //Compare each host with all other hosts.
-        set<string> hostsTest;
-        pair<set<string>::iterator,bool> ret;
-        for ( size_t x=0; x < configHosts.size(); x++) {
-            ret = hostsTest.insert( configHosts[x] );
-            if ( ret.second == false ) {
-               *errmsg = str::stream() << "config servers " << configHosts[x]
-                                       << " exists twice in config listing.";
-               return false;
-            }
-        }
-        return true;
-    }
-
     void ConfigServer::reloadSettings() {
-        set<string> got;
+        auto chunkSize = grid.catalogManager()->getGlobalSettings(SettingsType::ChunkSizeDocKey);
+        if (chunkSize.isOK()) {
+            const int csize = chunkSize.getValue().getChunkSize();
+            LOG(1) << "Found MaxChunkSize: " << csize;
 
-        try {
-            ScopedDbConnection conn(_primary.getConnString(), 30.0);
-            auto_ptr<DBClientCursor> cursor = conn->query(SettingsType::ConfigNS, BSONObj());
-            verify(cursor.get());
-
-            while (cursor->more()) {
-                StatusWith<SettingsType> settingsResult =
-                    SettingsType::fromBSON(cursor->nextSafe());
-                if (!settingsResult.isOK()) {
-                    warning() << settingsResult.getStatus();
-                    continue;
-                }
-                SettingsType settings = settingsResult.getValue();
-                string key = settings.getKey();
-                got.insert(key);
-
-                if (key == SettingsType::ChunkSizeDocKey) {
-                    int csize = settings.getChunkSize();
-
-                    // validate chunksize before proceeding
-                    if (csize == 0) {
-                        // setting was not modified; mark as such
-                        got.erase(key);
-                        log() << "warning: invalid chunksize (" << csize << ") ignored" << endl;
-                    } else {
-                        LOG(1) << "MaxChunkSize: " << csize << endl;
-                        if (!Chunk::setMaxChunkSizeSizeMB(csize)) {
-                            warning() << "invalid chunksize: " << csize << endl;
-                        }
-                    }
-                }
-                else if (key == SettingsType::BalancerDocKey) {
-                    // ones we ignore here
-                }
-                else {
-                    log() << "warning: unknown setting [" << key << "]";
-                }
+            if (!Chunk::setMaxChunkSizeSizeMB(csize)) {
+                warning() << "invalid chunksize: " << csize;
             }
-
-            conn.done();
         }
-        catch (const DBException& ex) {
-            warning() << "couldn't load settings on config db" << causedBy(ex);
-        }
-
-        if (!got.count(SettingsType::ChunkSizeDocKey)) {
+        else if (chunkSize == ErrorCodes::NoSuchKey) {
             const int chunkSize = Chunk::MaxChunkSize / (1024 * 1024);
             Status result =
                 grid.catalogManager()->insert(SettingsType::ConfigNS,
@@ -800,6 +684,9 @@ namespace mongo {
             if (!result.isOK()) {
                 warning() << "couldn't set chunkSize on config db" << causedBy(result);
             }
+        }
+        else {
+            warning() << "couldn't load settings on config db: " << chunkSize.getStatus();
         }
 
         // indexes
@@ -883,25 +770,10 @@ namespace mongo {
         }
     }
 
-    string ConfigServer::getHost( const std::string& name , bool withPort ) {
-        if ( name.find( ":" ) != string::npos ) {
-            if ( withPort )
-                return name;
-            return name.substr( 0 , name.find( ":" ) );
-        }
-
-        if ( withPort ) {
-            stringstream ss;
-            ss << name << ":" << ServerGlobalParams::ConfigServerPort;
-            return ss.str();
-        }
-
-        return name;
-    }
-
     void ConfigServer::replicaSetChange(const string& setName, const string& newConnectionString) {
         // This is run in it's own thread. Exceptions escaping would result in a call to terminate.
         Client::initThread("replSetChange");
+
         try {
             Shard s = Shard::lookupRSName(setName);
             if (s == Shard::EMPTY) {
@@ -932,6 +804,4 @@ namespace mongo {
         }
     }
 
-
-    ConfigServer& configServer = *(new ConfigServer());
-}
+} // namespace mongo

@@ -45,22 +45,6 @@ namespace mongo {
      * This class represents the layout and contents of documents contained in the
      * config.shards collection. All manipulation of documents coming from that
      * collection should be done with this class.
-     *
-     * Usage Example:
-     *
-     *     // Contact the config. 'conn' has been obtained before.
-     *     DBClientBase* conn;
-     *     BSONObj query = QUERY(ShardType::exampleField("exampleFieldName"));
-     *     exampleDoc = conn->findOne(ShardType::ConfigNS, query);
-     *
-     *     // Process the response.
-     *     StatusWith<ShardType> exampleResult = ShardType::fromBSON(exampleDoc);
-     *     if (!exampleResult.isOK()) {
-     *         // handle error -- exampleResult.getStatus()
-     *     }
-     *     ShardType exampleType = exampleResult.getValue();
-     *     // use 'exampleType'
-     *
      */
     class ShardType {
     public:
@@ -75,8 +59,6 @@ namespace mongo {
         static const BSONField<long long> maxSize;
         static const BSONField<BSONArray> tags;
 
-        ShardType();
-        ~ShardType();
 
         /**
          * Constructs a new ShardType object from BSON.
@@ -96,38 +78,25 @@ namespace mongo {
         BSONObj toBSON() const;
 
         /**
-         * Clears the internal state.
-         */
-        void clear();
-
-        /**
-         * Copies all the fields present in 'this' to 'other'.
-         */
-        void cloneTo(ShardType* other) const;
-
-        /**
          * Returns a std::string representation of the current internal state.
          */
         std::string toString() const;
 
-        bool isNameSet() const { return _name.is_initialized(); }
         const std::string& getName() const { return _name.get(); }
         void setName(const std::string& name);
 
-        bool isHostSet() const { return _host.is_initialized(); }
         const std::string& getHost() const { return _host.get(); }
         void setHost(const std::string& host);
 
-        bool isDrainingSet() const { return _draining.is_initialized(); }
-        bool getDraining() const { return _draining.get(); }
+        bool getDraining() const { return _draining.value_or(false); }
         void setDraining(const bool draining);
 
-        bool isMaxSizeSet() const { return _maxSize.is_initialized(); }
-        long long getMaxSize() const { return _maxSize.get(); }
+        long long getMaxSize() const { return _maxSize.value_or(0); }
         void setMaxSize(const long long maxSize);
 
-        bool isTagsSet() const { return _tags.is_initialized(); }
-        const std::vector<std::string>& getTags() const { return _tags.get(); }
+        const std::vector<std::string> getTags() const {
+            return _tags.value_or(std::vector<std::string>());
+        }
         void setTags(const std::vector<std::string>& tags);
 
     private:
@@ -137,7 +106,7 @@ namespace mongo {
         boost::optional<std::string> _name;
         // (M)  connection string for the host(s)
         boost::optional<std::string> _host;
-        // (O) is it draining drunks?
+        // (O) is it draining chunks?
         boost::optional<bool> _draining;
         // (O) maximum allowed disk space in MB
         boost::optional<long long> _maxSize;

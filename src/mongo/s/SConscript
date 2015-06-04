@@ -288,21 +288,6 @@ env.CppUnitTest(
     ]
 )
 
-env.CppUnitTest(
-    target='config_server_tests',
-    source=[
-        'config_server_tests.cpp',
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/coredb",
-        "$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init",
-        "$BUILD_DIR/mongo/util/net/message_server_port",
-        "$BUILD_DIR/mongo/dbtests/mocklib",
-        "coreshard",
-        "mongoscore",
-    ],
-)
-
 env.Library(
     target='serveronly',
     source=[

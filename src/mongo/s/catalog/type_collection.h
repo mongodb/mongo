@@ -60,8 +60,6 @@ namespace mongo {
         static const BSONField<bool> dropped;
 
 
-        CollectionType();
-
         /**
          * Constructs a new DatabaseType object from BSON. Also does validation of the contents.
          */
@@ -77,11 +75,6 @@ namespace mongo {
          * Returns the BSON representation of the entry.
          */
         BSONObj toBSON() const;
-
-        /**
-         * Clears the internal state.
-         */
-        void clear();
 
         /**
          * Returns a std::string representation of the current internal state.

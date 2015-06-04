@@ -47,12 +47,6 @@ namespace mongo {
     const BSONField<long long> ShardType::maxSize("maxSize");
     const BSONField<BSONArray> ShardType::tags("tags");
 
-    ShardType::ShardType() {
-        clear();
-    }
-
-    ShardType::~ShardType() {
-    }
 
     StatusWith<ShardType> ShardType::fromBSON(const BSONObj& source) {
         ShardType shard;
@@ -142,14 +136,6 @@ namespace mongo {
         if (_tags) builder.append(tags(), getTags());
 
         return builder.obj();
-    }
-
-    void ShardType::clear() {
-        _name.reset();
-        _host.reset();
-        _draining.reset();
-        _maxSize.reset();
-        _tags.reset();
     }
 
     std::string ShardType::toString() const {

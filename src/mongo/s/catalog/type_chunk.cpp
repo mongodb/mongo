@@ -197,10 +197,6 @@ namespace mongo {
         return builder.obj();
     }
 
-    void ChunkType::clear() {
-        *this = ChunkType();
-    }
-
     std::string ChunkType::toString() const {
         return toBSON().toString();
     }

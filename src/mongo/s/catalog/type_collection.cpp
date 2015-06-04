@@ -49,10 +49,6 @@ namespace mongo {
     const BSONField<bool> CollectionType::dropped("dropped");
 
 
-    CollectionType::CollectionType() {
-        clear();
-    }
-
     StatusWith<CollectionType> CollectionType::fromBSON(const BSONObj& source) {
         CollectionType coll;
 
@@ -205,16 +201,6 @@ namespace mongo {
         }
 
         return builder.obj();
-    }
-
-    void CollectionType::clear() {
-        _fullNs.reset();
-        _epoch.reset();
-        _updatedAt.reset();
-        _keyPattern.reset();
-        _unique.reset();
-        _allowBalance.reset();
-        _dropped.reset();
     }
 
     std::string CollectionType::toString() const {

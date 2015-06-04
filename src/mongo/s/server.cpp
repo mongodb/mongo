@@ -211,8 +211,7 @@ static ExitCode runMongosServer( bool doUpgrade ) {
     // Mongos shouldn't lazily kill cursors, otherwise we can end up with extras from migration
     DBClientConnection::setLazyKillCursor( false );
 
-    ReplicaSetMonitor::setConfigChangeHook(
-        stdx::bind(&ConfigServer::replicaSetChange, &configServer, stdx::placeholders::_1 , stdx::placeholders::_2));
+    ReplicaSetMonitor::setConfigChangeHook(&ConfigServer::replicaSetChange);
 
     // Mongos connection pools already takes care of authenticating new connections so the
     // replica set connection shouldn't need to.
@@ -253,12 +252,7 @@ static ExitCode runMongosServer( bool doUpgrade ) {
 
     grid.setCatalogManager(std::move(catalogManager));
 
-    if (!configServer.init(mongosGlobalParams.configdbs)) {
-        mongo::log(LogComponent::kSharding) << "couldn't resolve config db address";
-        return EXIT_SHARDING_ERROR;
-    }
-
-    configServer.reloadSettings();
+    ConfigServer::reloadSettings();
 
 #if !defined(_WIN32)
     mongo::signalForkSuccess();

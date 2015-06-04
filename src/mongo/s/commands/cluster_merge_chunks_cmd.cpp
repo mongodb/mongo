@@ -38,10 +38,10 @@
 #include "mongo/db/field_parser.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/catalog/catalog_cache.h"
+#include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/client/shard.h"
 
 namespace mongo {
 
@@ -169,7 +169,7 @@ namespace {
             remoteCmdObjB.append( cmdObj[ ClusterMergeChunksCommand::nsField() ] );
             remoteCmdObjB.append( cmdObj[ ClusterMergeChunksCommand::boundsField() ] );
             remoteCmdObjB.append( ClusterMergeChunksCommand::configField(),
-                                  configServer.getPrimary().getConnString().toString() );
+                                  grid.catalogManager()->connectionString().toString() );
             remoteCmdObjB.append( ClusterMergeChunksCommand::shardNameField(),
                                   shard.getName() );
 

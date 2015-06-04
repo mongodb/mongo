@@ -1148,7 +1148,9 @@ namespace {
             if (!settingsResult.isOK()) {
                 return settingsResult.getStatus();
             }
+
             const SettingsType& settings = settingsResult.getValue();
+
             Status validationStatus = settings.validate();
             if (!validationStatus.isOK()) {
                 return validationStatus;

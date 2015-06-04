@@ -38,7 +38,7 @@ namespace mongo {
     class BSONObjBuilder;
     class CatalogManager;
     class Shard;
-
+    class ShardType;
 
     /**
      * Maintains the set of all shards known to the MongoS instance.
@@ -73,6 +73,11 @@ namespace mongo {
         typedef std::map<std::string, boost::shared_ptr<Shard>> ShardMap;
 
 
+        /**
+         * Creates a shard based on the specified information and puts it into the lookup maps.
+         */
+        void _addShard_inlock(const ShardType& shardType);
+
         boost::shared_ptr<Shard> _findUsingLookUp(const std::string& shardName);
 
 
@@ -80,12 +85,13 @@ namespace mongo {
         // the shard registry object.
         CatalogManager* const _catalogManager;
 
-        // Map of both shardName -> Shard and hostName -> Shard
+        // Protects the maps below
         mutable boost::mutex _mutex;
+
+        // Map of both shardName -> Shard and hostName -> Shard
         ShardMap _lookup;
 
         // Map from ReplSet name to shard
-        mutable boost::mutex _rsMutex;
         ShardMap _rsLookup;
     };
 

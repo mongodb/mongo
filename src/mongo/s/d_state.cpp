@@ -487,9 +487,8 @@ namespace mongo {
 
         auto catalogManager = stdx::make_unique<CatalogManagerLegacy>();
         uassertStatusOK(catalogManager->init(configServerCS));
-        grid.setCatalogManager(std::move(catalogManager));
 
-        configServer.init(configServerCS);
+        grid.setCatalogManager(std::move(catalogManager));
 
         _enabled = true;
     }

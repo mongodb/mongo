@@ -498,22 +498,25 @@ namespace mongo {
     }
 
     bool CollectionMetadata::getNextChunk( const BSONObj& lookupKey, ChunkType* chunk ) const {
-
-        RangeMap::const_iterator upperChunkIt = _chunksMap.upper_bound( lookupKey );
+        RangeMap::const_iterator upperChunkIt = _chunksMap.upper_bound(lookupKey);
         RangeMap::const_iterator lowerChunkIt = upperChunkIt;
-        if ( upperChunkIt != _chunksMap.begin() ) --lowerChunkIt;
-        else lowerChunkIt = _chunksMap.end();
 
-        if ( lowerChunkIt != _chunksMap.end() &&
-             lowerChunkIt->second.woCompare( lookupKey ) > 0 ) {
-            chunk->setMin( lowerChunkIt->first );
-            chunk->setMax( lowerChunkIt->second );
+        if (upperChunkIt != _chunksMap.begin()) {
+            --lowerChunkIt;
+        }
+        else {
+            lowerChunkIt = _chunksMap.end();
+        }
+
+        if (lowerChunkIt != _chunksMap.end() && lowerChunkIt->second.woCompare(lookupKey) > 0) {
+            chunk->setMin(lowerChunkIt->first);
+            chunk->setMax(lowerChunkIt->second);
             return true;
         }
 
-        if ( upperChunkIt != _chunksMap.end() ) {
-            chunk->setMin( upperChunkIt->first );
-            chunk->setMax( upperChunkIt->second );
+        if (upperChunkIt != _chunksMap.end()) {
+            chunk->setMin(upperChunkIt->first);
+            chunk->setMax(upperChunkIt->second);
             return true;
         }
 

@@ -67,55 +67,25 @@ namespace mongo {
 
         boost::lock_guard<boost::mutex> lk(_mutex);
 
-        // We use the _lookup table for all shards and for the primary config DB. The config DB
-        // info, however, does not come from the ShardNS::shard. So when cleaning the _lookup table
-        // we leave the config state intact. The rationale is that this way we could drop shards
-        // that were removed without reinitializing the config DB information.
-
-        ShardMap::iterator i = _lookup.find("config");
-        if (i != _lookup.end()) {
-            shared_ptr<Shard> config = i->second;
-            _lookup.clear();
-            _lookup["config"] = config;
-        }
-        else {
-            _lookup.clear();
-        }
-
+        _lookup.clear();
         _rsLookup.clear();
 
-        for (const ShardType& shardData : shards) {
-            uassertStatusOK(shardData.validate());
+        ShardType configServerShard;
+        configServerShard.setName("config");
+        configServerShard.setHost(_catalogManager->connectionString().toString());
 
-            // This validation should ideally go inside the ShardType::validate call. However,
-            // doing it there would prevent us from loading previously faulty shard hosts, which
-            // might have been stored (i.e., the entire getAllShards call would fail).
-            auto shardHostStatus = ConnectionString::parse(shardData.getHost());
-            if (!shardHostStatus.isOK()) {
-                warning() << "Unable to parse shard host "
-                          << shardHostStatus.getStatus().toString();
+        _addShard_inlock(configServerShard);
+
+        for (const ShardType& shardType : shards) {
+            uassertStatusOK(shardType.validate());
+
+            // Skip the config host even if there is one left over from legacy installations. The
+            // config host is installed manually from the catalog manager data.
+            if (shardType.getName() == "config") {
+                continue;
             }
 
-            const ConnectionString& shardHost(shardHostStatus.getValue());
-
-            shared_ptr<Shard> shard = boost::make_shared<Shard>(shardData.getName(),
-                                                                shardHost,
-                                                                shardData.getMaxSize(),
-                                                                shardData.getDraining());
-            _lookup[shardData.getName()] = shard;
-            _lookup[shardData.getHost()] = shard;
-
-            if (shardHost.type() == ConnectionString::SET) {
-                if (shardHost.getSetName().size()) {
-                    boost::lock_guard<boost::mutex> lk(_rsMutex);
-                    _rsLookup[shardHost.getSetName()] = shard;
-                }
-
-                vector<HostAndPort> servers = shardHost.getServers();
-                for (unsigned i = 0; i < servers.size(); i++) {
-                    _lookup[servers[i].toString()] = shard;
-                }
-            }
+            _addShard_inlock(shardType);
         }
     }
 
@@ -132,7 +102,7 @@ namespace mongo {
     }
 
     Shard ShardRegistry::lookupRSName(const string& name) {
-        boost::lock_guard<boost::mutex> lk(_rsMutex);
+        boost::lock_guard<boost::mutex> lk(_mutex);
         ShardMap::iterator i = _rsLookup.find(name);
 
         return (i == _rsLookup.end()) ? Shard::EMPTY : *(i->second.get());
@@ -221,6 +191,37 @@ namespace mongo {
         }
 
         result->append("map", b.obj());
+    }
+
+    void ShardRegistry::_addShard_inlock(const ShardType& shardType) {
+        // This validation should ideally go inside the ShardType::validate call. However, doing
+        // it there would prevent us from loading previously faulty shard hosts, which might have
+        // been stored (i.e., the entire getAllShards call would fail).
+        auto shardHostStatus = ConnectionString::parse(shardType.getHost());
+        if (!shardHostStatus.isOK()) {
+            warning() << "Unable to parse shard host "
+                        << shardHostStatus.getStatus().toString();
+        }
+
+        const ConnectionString& shardHost(shardHostStatus.getValue());
+
+        shared_ptr<Shard> shard = boost::make_shared<Shard>(shardType.getName(),
+                                                            shardHost,
+                                                            shardType.getMaxSize(),
+                                                            shardType.getDraining());
+        _lookup[shardType.getName()] = shard;
+        _lookup[shardType.getHost()] = shard;
+
+        if (shardHost.type() == ConnectionString::SET) {
+            if (shardHost.getSetName().size()) {
+                _rsLookup[shardHost.getSetName()] = shard;
+            }
+
+            vector<HostAndPort> servers = shardHost.getServers();
+            for (unsigned i = 0; i < servers.size(); i++) {
+                _lookup[servers[i].toString()] = shard;
+            }
+        }
     }
 
     shared_ptr<Shard> ShardRegistry::_findUsingLookUp(const string& shardName) {
