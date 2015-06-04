@@ -93,8 +93,8 @@ struct WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) __wt_session_impl {
 	SLIST_HEAD(__tables, __wt_table) tables;
 
 	WT_ITEM	**scratch;		/* Temporary memory for any function */
-	u_int	scratch_alloc;		/* Currently allocated */
-	size_t scratch_cached;		/* Scratch bytes cached */
+	u_int	  scratch_alloc;	/* Currently allocated */
+	size_t	  scratch_cached;	/* Scratch bytes cached */
 #ifdef HAVE_DIAGNOSTIC
 	/*
 	 * It's hard to figure out from where a buffer was allocated after it's
