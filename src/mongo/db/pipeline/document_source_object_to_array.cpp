@@ -30,11 +30,8 @@ namespace mongo {
         if(!input){
             return boost::none;
         }else{
-            BSONObjBuilder* builder = new BSONObjBuilder();
-            input -> toBson(builder);
+            MutableDocument _output(*input);
             
-            _output.reset(Document(builder -> obj()));
-
             BSONArrayBuilder* arrayBuilder = new BSONArrayBuilder();
             
             Value data = input -> getNestedField(_otoaFieldPath);
@@ -71,7 +68,7 @@ namespace mongo {
         /*
          Verify user path
          */
-        uassert(20003, str::stream() << "the " << objectToArrayName <<
+        uassert(28674, str::stream() << "the " << objectToArrayName <<
                 " field path must be specified as a string",
                 elem.type() == String);
         
