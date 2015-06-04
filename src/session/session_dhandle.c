@@ -177,12 +177,10 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 	int write_locked;
-	int locked;
 
 	btree = S2BT(session);
 	dhandle = session->dhandle;
 	write_locked = F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE) ? 1 : 0;
-	locked = 1;
 
 	/*
 	 * If we had special flags set, close the handle so that future access
@@ -198,19 +196,12 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 		F_CLR(dhandle, WT_DHANDLE_DISCARD);
 	}
 
-	if (session == dhandle->owner) {
-		if (--dhandle->owner_ref == 0)
-			dhandle->owner = NULL;
-		else
-			locked = 0;
-	}
-	if (locked) {
-		if (write_locked)
-			F_CLR(dhandle, WT_DHANDLE_EXCLUSIVE);
-		WT_TRET(write_locked ?
-		    __wt_writeunlock(session, dhandle->rwlock):
-		    __wt_readunlock(session, dhandle->rwlock));
-	}
+	if (write_locked)
+		F_CLR(dhandle, WT_DHANDLE_EXCLUSIVE);
+
+	WT_TRET(write_locked ?
+	    __wt_writeunlock(session, dhandle->rwlock):
+	    __wt_readunlock(session, dhandle->rwlock));
 
 	session->dhandle = NULL;
 	return (ret);
@@ -424,7 +415,6 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 	int is_dead;
-	int locked;
 
 	WT_ASSERT(session, !F_ISSET(session, WT_SESSION_NO_DATA_HANDLES));
 
@@ -432,25 +422,10 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 		WT_RET(__session_dhandle_find(session, uri, checkpoint));
 		dhandle = session->dhandle;
 
-		/*
-		 * If this session already owns the handle, increase
-		 * the owner ref count.
-		 */
-		locked = 0;
-		if (dhandle->owner == session &&
-		    !LF_ISSET(WT_BTREE_SPECIAL_FLAGS)) {
-			dhandle->owner_ref++;
-			F_SET(dhandle, flags &
-			    (WT_DHANDLE_DISCARD | WT_DHANDLE_DISCARD_FORCE));
-		}
-		else {
-			/* Try to lock the handle. */
-			WT_RET(__wt_session_lock_dhandle(
-			    session, flags, &is_dead));
-			if (is_dead)
-				continue;
-			locked = 1;
-		}
+		/* Try to lock the handle. */
+		WT_RET(__wt_session_lock_dhandle(session, flags, &is_dead));
+		if (is_dead)
+			continue;
 
 		/* If the handle is open in the mode we want, we're done. */
 		if (LF_ISSET(WT_DHANDLE_LOCK_ONLY) ||
@@ -458,8 +433,7 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 		    !LF_ISSET(WT_BTREE_SPECIAL_FLAGS)))
 			break;
 
-		WT_ASSERT(session,
-		    !locked || F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE));
+		WT_ASSERT(session, F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE));
 
 		/*
 		 * For now, we need the schema lock and handle list locks to
@@ -473,9 +447,7 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 		 */
 		if (!F_ISSET(session, WT_SESSION_LOCKED_SCHEMA) ||
 		    !F_ISSET(session, WT_SESSION_LOCKED_HANDLE_LIST)) {
-			if (locked)
-				F_CLR(dhandle, WT_DHANDLE_EXCLUSIVE);
-
+			F_CLR(dhandle, WT_DHANDLE_EXCLUSIVE);
 			WT_RET(__wt_writeunlock(session, dhandle->rwlock));
 
 			WT_WITH_SCHEMA_LOCK(session,
@@ -488,15 +460,13 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 
 		/* Open the handle. */
 		if ((ret = __wt_conn_btree_open(session, cfg, flags)) == 0 &&
-		    (LF_ISSET(WT_DHANDLE_EXCLUSIVE) || !locked))
+		    LF_ISSET(WT_DHANDLE_EXCLUSIVE))
 			break;
 
 		/*
 		 * If we got the handle exclusive to open it but only want
 		 * ordinary access, drop our lock and retry the open.
 		 */
-		dhandle->owner = NULL;
-		dhandle->owner_ref = 0;
 		F_CLR(dhandle, WT_DHANDLE_EXCLUSIVE);
 		WT_TRET(__wt_writeunlock(session, dhandle->rwlock));
 		WT_RET(ret);
@@ -505,6 +475,9 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 	WT_ASSERT(session, !F_ISSET(dhandle, WT_DHANDLE_DEAD));
 	WT_ASSERT(session, LF_ISSET(WT_DHANDLE_LOCK_ONLY) ||
 	    F_ISSET(dhandle, WT_DHANDLE_OPEN));
+
+	WT_ASSERT(session, LF_ISSET(WT_DHANDLE_EXCLUSIVE) ==
+	    F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE));
 
 	return (0);
 }
