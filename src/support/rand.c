@@ -31,7 +31,7 @@
 /*
  * This is an implementation of George Marsaglia's multiply-with-carry pseudo-
  * random number generator.  Computationally fast, with reasonable randomness
- * properties.
+ * properties, and a claimed period of > 2^60.
  *
  * Be very careful about races here. Multiple threads can call __wt_random
  * concurrently, and it is okay if those concurrent calls get the same return
@@ -79,10 +79,10 @@ __wt_random(uint64_t volatile * rnd_state)
 	z = M_Z(rnd);
 
 	/*
-	 * I don't know the period of this PRNG. Do a cheap check, if the value
-	 * goes to 0 (from which we won't recover), reset to the initial state.
-	 * This has additional value if a caller fails to initialize the state,
-	 * or initializes with a seed that results in a short period.
+	 * Check if the value goes to 0 (from which we won't recover), and reset
+	 * to the initial state. This has additional benefits if a caller fails
+	 * to initialize the state, or initializes with a seed that results in a
+	 * short period.
 	 */
 	if (z == 0 || w == 0)
 		__wt_random_init(rnd_state);
