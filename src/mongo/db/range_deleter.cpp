@@ -35,6 +35,7 @@
 #include <boost/date_time/posix_time/posix_time_duration.hpp>
 #include <memory>
 
+#include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/write_concern_options.h"
@@ -443,7 +444,8 @@ namespace {
     }
 
     void RangeDeleter::doWork() {
-        _env->initThread();
+        Client::initThreadIfNotAlready("RangeDeleter");
+        Client* client = &cc();
 
         while (!inShutdown() && !stopRequested()) {
             string errMsg;
@@ -471,7 +473,7 @@ namespace {
 
                             set<CursorId> cursorsNow;
                             if (entry->options.waitForOpenCursors) {
-                                auto txn = getGlobalServiceContext()->newOpCtx();
+                                auto txn = client->makeOperationContext();
                                 _env->getCursorIds(txn.get(),
                                                    entry->options.range.ns,
                                                    &cursorsNow);
@@ -513,7 +515,7 @@ namespace {
             }
 
             {
-                auto txn = getGlobalServiceContext()->newOpCtx();
+                auto txn = client->makeOperationContext();
                 nextTask->stats.deleteStartTS = jsTime();
                 bool delResult = _env->deleteRange(txn.get(),
                                                    *nextTask,

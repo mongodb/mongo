@@ -168,8 +168,8 @@ namespace mongo {
             return;
         }
 
-        OperationContext* noTxn = NULL; // mongos doesn't use transactions SERVER-13931
-        execCommandClientBasic(noTxn, c, cc(), queryOptions, ns, jsobj, anObjBuilder);
+        auto txn = cc().makeOperationContext();
+        execCommandClientBasic(txn.get(), c, cc(), queryOptions, ns, jsobj, anObjBuilder);
     }
 
 } //namespace mongo

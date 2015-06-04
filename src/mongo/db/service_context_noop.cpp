@@ -82,8 +82,8 @@ namespace mongo {
     void ServiceContextNoop::registerKillOpListener(KillOpListenerInterface* listener) {
     }
 
-    std::unique_ptr<OperationContext> ServiceContextNoop::newOpCtx() {
-        return stdx::make_unique<OperationContextNoop>();
+    std::unique_ptr<OperationContext> ServiceContextNoop::_newOpCtx(Client* client) {
+        return stdx::make_unique<OperationContextNoop>(client, _nextOpId.fetchAndAdd(1));
     }
 
     void ServiceContextNoop::setOpObserver(std::unique_ptr<OpObserver> opObserver) {

@@ -173,7 +173,7 @@ namespace repl {
                 _positionChanged = false;
             }
 
-            auto txn = cc().getServiceContext()->newOpCtx();
+            auto txn = cc().makeOperationContext();
             MemberState state = replCoord->getMemberState();
             if (state.primary() || state.startup()) {
                 _resetConnection();

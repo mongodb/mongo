@@ -94,28 +94,46 @@ namespace mongo {
         };
 
         /**
-         * Observer interface implemented to hook client creation and destruction.
+         * Observer interface implemented to hook client and operation context creation and
+         * destruction.
          */
         class ClientObserver {
         public:
             virtual ~ClientObserver() = default;
 
             /**
-             * Hook called after a new client "client" is created on "service" by
+             * Hook called after a new client "client" is created on a service by
              * service->makeClient().
              *
              * For a given client and registered instance of ClientObserver, if onCreateClient
              * returns without throwing an exception, onDestroyClient will be called when "client"
              * is deleted.
              */
-            virtual void onCreateClient(ServiceContext* service, Client* client) = 0;
+            virtual void onCreateClient(Client* client) = 0;
 
             /**
-             * Hook called on a "client" created by "service" before deleting "client".
+             * Hook called on a "client" created by a service before deleting "client".
              *
              * Like a destructor, must not throw exceptions.
              */
-            virtual void onDestroyClient(ServiceContext* service, Client* client) = 0;
+            virtual void onDestroyClient(Client* client) = 0;
+
+            /**
+             * Hook called after a new operation context is created on a client by
+             * service->makeOperationContext(client)  or client->makeOperationContext().
+             *
+             * For a given operation context and registered instance of ClientObserver, if
+             * onCreateOperationContext returns without throwing an exception,
+             * onDestroyOperationContext will be called when "opCtx" is deleted.
+             */
+            virtual void onCreateOperationContext(OperationContext* opCtx) = 0;
+
+            /**
+             * Hook called on a "opCtx" created by a service before deleting "opCtx".
+             *
+             * Like a destructor, must not throw exceptions.
+             */
+            virtual void onDestroyOperationContext(OperationContext* opCtx) = 0;
         };
 
         using ClientSet = unordered_set<Client*>;
@@ -145,9 +163,23 @@ namespace mongo {
         };
 
         /**
+         * Special deleter used for cleaning up OperationContext objects owned by a ServiceContext.
+         * See UniqueOperationContext, below.
+         */
+        class OperationContextDeleter {
+        public:
+            void operator()(OperationContext* opCtx) const;
+        };
+
+        /**
          * This is the unique handle type for Clients created by a ServiceContext.
          */
         using UniqueClient = std::unique_ptr<Client, ClientDeleter>;
+
+        /**
+         * This is the unique handle type for OperationContexts created by a ServiceContext.
+         */
+        using UniqueOperationContext = std::unique_ptr<OperationContext, OperationContextDeleter>;
 
         virtual ~ServiceContext();
 
@@ -171,6 +203,13 @@ namespace mongo {
          * If supplied, "p" is the communication channel used for communicating with the client.
          */
         UniqueClient makeClient(std::string desc, AbstractMessagingPort* p = nullptr);
+
+        /**
+         * Creates a new OperationContext on "client".
+         *
+         * "client" must not have an active operation context.
+         */
+        UniqueOperationContext makeOperationContext(Client* client);
 
         //
         // Storage
@@ -250,11 +289,6 @@ namespace mongo {
          */
         virtual void registerKillOpListener(KillOpListenerInterface* listener) = 0;
 
-        /**
-         * Returns a new OperationContext.
-         */
-        virtual std::unique_ptr<OperationContext> newOpCtx() = 0;
-
         //
         // Global OpObserver.
         //
@@ -279,6 +313,11 @@ namespace mongo {
         boost::mutex _mutex;
 
     private:
+        /**
+         * Returns a new OperationContext. Private, for use by makeOperationContext.
+         */
+        virtual std::unique_ptr<OperationContext> _newOpCtx(Client* client) = 0;
+
         /**
          * Vector of registered observers.
          */

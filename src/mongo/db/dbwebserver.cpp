@@ -313,7 +313,8 @@ namespace {
                                 vector<string>& headers,
                                 const SockAddr &from) {
 
-        auto txn = getGlobalServiceContext()->newOpCtx();
+        Client* client = &cc();
+        auto txn = client->makeOperationContext();
 
         if (url.size() > 1) {
 
@@ -437,7 +438,7 @@ namespace {
                                vector<string>& headers,
                                const SockAddr &from) {
 
-        AuthorizationSession* authSess = AuthorizationSession::get(cc());
+        AuthorizationSession* authSess = AuthorizationSession::get(txn->getClient());
         if (!authSess->getAuthorizationManager().isAuthEnabled()) {
             return true;
         }
@@ -464,8 +465,7 @@ namespace {
             // Only users in the admin DB are visible by the webserver
             UserName userName(parms["username"], "admin");
             User* user;
-            AuthorizationManager& authzManager =
-                AuthorizationSession::get(cc())->getAuthorizationManager();
+            AuthorizationManager& authzManager = authSess->getAuthorizationManager();
             Status status = authzManager.acquireUser(txn, userName, &user);
             if (!status.isOK()) {
                 if (status.code() != ErrorCodes::UserNotFound) {

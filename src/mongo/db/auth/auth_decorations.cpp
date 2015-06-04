@@ -70,13 +70,17 @@ namespace {
 
     class AuthzClientObserver final : public ServiceContext::ClientObserver {
     public:
-        void onCreateClient(ServiceContext* service, Client* client) override {
+        void onCreateClient(Client* client) override {
+            auto service = client->getServiceContext();
             AuthorizationSession::set(
                     client,
                     AuthorizationManager::get(service)->makeAuthorizationSession());
         }
 
-        void onDestroyClient(ServiceContext* service, Client* client) override {}
+        void onDestroyClient(Client* client) override {}
+
+        void onCreateOperationContext(OperationContext* opCtx) override {}
+        void onDestroyOperationContext(OperationContext* opCtx) override {}
     };
 
 }  // namespace

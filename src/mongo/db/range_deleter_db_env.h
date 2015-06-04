@@ -37,8 +37,6 @@ namespace mongo {
      */
     struct RangeDeleterDBEnv : public RangeDeleterEnv {
 
-        virtual void initThread();
-
         /**
          * Deletes the documents from the given range synchronously.
          *

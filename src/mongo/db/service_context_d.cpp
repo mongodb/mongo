@@ -290,7 +290,8 @@ namespace mongo {
         _killOpListeners.push_back(listener);
     }
 
-    std::unique_ptr<OperationContext> ServiceContextMongoD::newOpCtx() {
+    std::unique_ptr<OperationContext> ServiceContextMongoD::_newOpCtx(Client* client) {
+        invariant(&cc() == client);
         return stdx::make_unique<OperationContextImpl>();
     }
 

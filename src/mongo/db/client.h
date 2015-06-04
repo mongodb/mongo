@@ -87,6 +87,12 @@ namespace mongo {
         void unlock() { _lock.unlock(); }
 
         /**
+         * Makes a new operation context representing an operation on this client.  At most
+         * one operation context may be in scope on a client at a time.
+         */
+        ServiceContext::UniqueOperationContext makeOperationContext();
+
+        /**
          * Sets the active operation context on this client to "txn", which must be non-NULL.
          *
          * It is an error to call this method if there is already an operation context on Client.

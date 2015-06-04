@@ -39,7 +39,7 @@ namespace mongo {
     class Client;
     class StorageEngineLockFile;
 
-    class ServiceContextMongoD : public ServiceContext {
+    class ServiceContextMongoD final : public ServiceContext {
     public:
         typedef std::map<std::string, const StorageEngine::Factory*> FactoryMap;
 
@@ -47,38 +47,38 @@ namespace mongo {
 
         ~ServiceContextMongoD();
 
-        StorageEngine* getGlobalStorageEngine();
+        StorageEngine* getGlobalStorageEngine() override;
 
-        void initializeGlobalStorageEngine();
+        void initializeGlobalStorageEngine() override;
 
-        void shutdownGlobalStorageEngineCleanly();
+        void shutdownGlobalStorageEngineCleanly() override;
 
         void registerStorageEngine(const std::string& name,
-                                   const StorageEngine::Factory* factory);
+                                   const StorageEngine::Factory* factory) override;
 
-        bool isRegisteredStorageEngine(const std::string& name);
+        bool isRegisteredStorageEngine(const std::string& name) override;
 
-        StorageFactoriesIterator* makeStorageFactoriesIterator();
+        StorageFactoriesIterator* makeStorageFactoriesIterator() override;
 
-        void setKillAllOperations();
+        void setKillAllOperations() override;
 
-        void unsetKillAllOperations();
+        void unsetKillAllOperations() override;
 
-        bool getKillAllOperations();
+        bool getKillAllOperations() override;
 
-        bool killOperation(unsigned int opId);
+        bool killOperation(unsigned int opId) override;
 
-        void killAllUserOperations(const OperationContext* txn);
+        void killAllUserOperations(const OperationContext* txn) override;
 
-        void registerKillOpListener(KillOpListenerInterface* listener);
+        void registerKillOpListener(KillOpListenerInterface* listener) override;
 
-        std::unique_ptr<OperationContext> newOpCtx();
+        void setOpObserver(std::unique_ptr<OpObserver> opObserver) override;
 
-        void setOpObserver(std::unique_ptr<OpObserver> opObserver);
-
-        OpObserver* getOpObserver();
+        OpObserver* getOpObserver() override;
 
     private:
+
+        std::unique_ptr<OperationContext> _newOpCtx(Client* client) override;
 
         /**
          * Kills the active operation on "client" if that operation is associated with operation id
