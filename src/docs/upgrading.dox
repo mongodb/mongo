@@ -1,5 +1,17 @@
 /*! @page upgrading Upgrading WiredTiger applications
 
+@section version_261 Upgrading to Version 2.6.1
+
+<dl>
+<dt>Move the per transaction sync configuration</dt>
+<dd>
+Move the sync configuration setting from WT_SESSION::begin_transaction to
+WT_SESSION::commit_transaction. Change the configuration from a boolean to a
+string with options of on, off, background. Deprecated support for specifying
+the configuration to WT_SESSION::begin_transaction is maintained for now.
+</dd>
+
+</dl><hr>
 @section version_260 Upgrading to Version 2.6.0
 
 <dl>

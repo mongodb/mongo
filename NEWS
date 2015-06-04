@@ -1,3 +1,103 @@
+WiredTiger release 2.6.1, 2015-05-13
+------------------------------------
+
+The WiredTiger 2.6.1 release contains new features, minor API changes and bug
+fixes.
+
+New features:
+
+* Move the sync configuration setting from WT_SESSION::begin_transaction to
+  WT_SESSION::commit_transaction. Change the setting from a boolean to a
+  string. See upgrading documentation for more information.
+  refs WT-1908
+
+* Add the ability to flag a transaction to be flushed asynchronously on
+  commit via a new sync=[background] configuration option. Add a new 
+  WT_SESSION::transaction_sync API to wait for asynchronous flushes to
+  complete.
+  refs WT-1908, #1943
+
+* Add the ability to create a named in-memory snapshot via a new
+  WT_SESSION::snapshot API.
+  refs WT-1839
+
+* Add the ability to disable write ahead logging at a per-table granularity.
+  Accessed via log=(enabled) configuration for WT_SESSION::create API.
+  Partial logging has serious implications for recovery, it should be used
+  with caution.
+  refs #1989
+
+
+Other noteworthy changes:
+
+* Fix several bugs related to syncing files for checkpoint durability.
+  refs WT-1944
+
+* Fix a segfault during checkpoint where we could attempt to access a file
+  that was in the process of being dropped in the background.
+  refs SERVER-18014
+
+* Fix a segfault during eviction where we could attempt to evict a page from
+  a tree that was in the process of being dropped in the background.
+  refs SERVER-18460
+
+* Fix a bug where WiredTiger could segfault in a workload with lots of cache
+  pressure.
+  refs WT-1937
+
+* Fix a performance issue with WT_SESSION::compact, where it would spend a
+  long time compacting tables that had no space to reclaim.
+  refs WT-1953
+
+* Fix a bug where accessing an overflow item could return WT_NOTFOUND
+  incorrectly. The issue was related to an invalid transaction visibility
+  check.
+  refs WT-1745
+
+* Improve performance and avoid changing files on startup if no recovery is
+  required by avoiding the creation of unnecessary checkpoints and log
+  records for files that haven't changed.
+  refs WT-1936
+
+* Improve how we handle create of a table, if a file with the same name
+  already exists (possibly from an earlier failed create).
+  refs #1974
+
+* Fix compiler warnings for LZ4 implementation on Windows.
+  refs #2006
+
+* Fix a bug in the WiredTiger command line utility where it could create a
+  base configuration file for an existing database, if there had been a
+  crash while creating the database.
+  refs WT-1943
+
+* Fix a build problem where recent versions of RedHat would fail to detect
+  posix_memalign presence correctly.
+  refs WT-1951
+
+* Fix several problems with how we create, recover and backup databases.
+  Related to order of creation and differences between Windows and POSIX
+  file system semantics.
+  refs #1993
+
+* Fix a bug where we could flush the log file more often than required if
+  using auto-commit transactions.
+  refs WT-1949
+
+* Fix a performance problem in LSM, where trees created with an initial bulk
+  load could choose poor merges.
+  refs WT-1947
+
+* Improve how we decide whether to deepen a tree during an internal split
+  operation. Append workloads could create trees that were excessively deep.
+
+* Fix a bug in LSM which could lead to a hang on connection close.
+  refs WT-1935
+
+* Fix a bug in the internal random number generator, where concurrent calls
+  could lead to invalid sequences. Never seen in the wild.
+
+
 WiredTiger release 2.6.0, 2015-05-13
 ------------------------------------
 
