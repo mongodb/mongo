@@ -2050,8 +2050,9 @@ namespace {
             }
             return kActionNone;
         }
+
         PostMemberStateUpdateAction result;
-        if (_memberState.primary() || newState.removed()) {
+        if (_memberState.primary() || newState.removed() || newState.rollback()) {
             // Wake up any threads blocked in awaitReplication, close connections, etc.
             for (std::vector<WaiterInfo*>::iterator it = _replicationWaiterList.begin();
                  it != _replicationWaiterList.end(); ++it) {
@@ -2064,16 +2065,18 @@ namespace {
             result = kActionCloseAllConnections;
         }
         else {
-            if (_memberState.secondary() && !newState.primary()) {
-                // Switching out of SECONDARY, but not to PRIMARY.
-                _canServeNonLocalReads.store(0U);
-            }
-            else if (newState.secondary()) {
-                // Switching into SECONDARY, but not from PRIMARY.
-                _canServeNonLocalReads.store(1U);
-            }
             result = kActionFollowerModeStateChange;
         }
+
+        if (_memberState.secondary() && !newState.primary()) {
+            // Switching out of SECONDARY, but not to PRIMARY.
+            _canServeNonLocalReads.store(0U);
+        }
+        else if (!_memberState.primary() && newState.secondary()) {
+            // Switching into SECONDARY, but not from PRIMARY.
+            _canServeNonLocalReads.store(1U);
+        }
+
         if (newState.secondary() && _topCoord->getRole() == TopologyCoordinator::Role::candidate) {
             // When transitioning to SECONDARY, the only way for _topCoord to report the candidate
             // role is if the configuration represents a single-node replica set.  In that case, the
