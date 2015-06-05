@@ -1378,8 +1378,8 @@ namespace mongo {
                     ProgressMeter& progress( op->setMessage_inlock("m/r: (1/3) emit phase",
                                                                    "M/R: (1/3) Emit Progress",
                                                                    progressTotal ));
-                    progress.showTotal(showTotal);
                     lk.unlock();
+                    progress.showTotal(showTotal);
                     ProgressMeterHolder pm(progress);
 
                     // See cast on next line to 32 bit unsigned

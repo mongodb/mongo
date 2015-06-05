@@ -226,10 +226,11 @@ namespace mongo {
 
     Status MultiIndexBlock::insertAllDocumentsInCollection(std::set<RecordId>* dupsOut) {
         const char* curopMessage = _buildInBackground ? "Index Build (background)" : "Index Build";
+        const auto numRecords = _collection->numRecords(_txn);
         stdx::unique_lock<Client> lk(*_txn->getClient());
         ProgressMeterHolder progress(*_txn->setMessage_inlock(curopMessage,
                                                               curopMessage,
-                                                              _collection->numRecords(_txn)));
+                                                              numRecords));
         lk.unlock();
 
         Timer t;
