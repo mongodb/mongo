@@ -1203,9 +1203,9 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 	 * if we just did an in-memory split.
 	 */
 	page = ref->page;
-	if (F_ISSET(btree, WT_BTREE_NO_EVICTION) ||
+	if (page->read_gen != WT_READGEN_OLDEST ||
+	    F_ISSET(btree, WT_BTREE_NO_EVICTION) ||
 	    LF_ISSET(WT_READ_NO_EVICT) ||
-	    page->read_gen != WT_READGEN_OLDEST ||
 	    !__wt_page_can_evict(session, page, WT_EVICT_CHECK_SPLITS, NULL))
 		return (__wt_hazard_clear(session, page));
 
