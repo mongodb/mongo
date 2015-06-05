@@ -74,7 +74,7 @@ namespace mongo {
         Client::initThreadIfNotAlready("RangeDeleter");
 
         *deletedDocs = 0;
-        ShardForceVersionOkModeBlock forceVersion;
+        ShardForceVersionOkModeBlock forceVersion(txn->getClient());
         {
             Helpers::RemoveSaver removeSaver("moveChunk",
                                              ns,

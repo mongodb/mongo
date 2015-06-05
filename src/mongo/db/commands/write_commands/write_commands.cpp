@@ -225,7 +225,7 @@ namespace mongo {
             AutoGetDb autoDb( txn, nsString.db(), MODE_IX );
             Lock::CollectionLock colLock( txn->lockState(), nsString.ns(), MODE_IX );
 
-            ensureShardVersionOKOrThrow( nsString.ns() );
+            ensureShardVersionOKOrThrow( txn->getClient(), nsString.ns() );
 
             // Get a pointer to the (possibly NULL) collection.
             Collection* collection = NULL;
@@ -265,7 +265,7 @@ namespace mongo {
             AutoGetDb autoDb(txn, nsString.db(), MODE_IX);
             Lock::CollectionLock colLock(txn->lockState(), nsString.ns(), MODE_IX);
 
-            ensureShardVersionOKOrThrow( nsString.ns() );
+            ensureShardVersionOKOrThrow( txn->getClient(), nsString.ns() );
 
             // Get a pointer to the (possibly NULL) collection.
             Collection* collection = NULL;

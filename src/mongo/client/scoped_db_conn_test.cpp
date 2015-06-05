@@ -68,6 +68,7 @@ namespace {
 
 namespace mongo {
 
+    class Client;
     class OperationContext;
 
     // Symbols defined to build the binary correctly.
@@ -94,7 +95,7 @@ namespace mongo {
         dbexit(rc, "");
     }
 
-    bool haveLocalShardingInfo(const string& ns) {
+    bool haveLocalShardingInfo(Client* client, const string& ns) {
         return false;
     }
 

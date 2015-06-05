@@ -515,7 +515,8 @@ namespace mongo {
         args.This()->ForceSet(scope->v8StringData("_shortName"), args[2]);
         args.This()->ForceSet(v8::String::NewFromUtf8(scope->getIsolate(), "_fullName"), args[3]);
 
-        if (haveLocalShardingInfo(toSTLString(args[3]))) {
+        auto context = scope->getOpContext();
+        if (context && haveLocalShardingInfo(context->getClient(), toSTLString(args[3]))) {
             return v8AssertionException("can't use sharded collection from db.eval");
         }
 
@@ -636,7 +637,8 @@ namespace mongo {
                     prop->ToObject()->HasRealNamedProperty(
                         v8::String::NewFromUtf8(scope->getIsolate(), "_fullName"))) {
                     // need to check every time that the collection did not get sharded
-                    if (haveLocalShardingInfo(toSTLString(
+                    auto context = scope->getOpContext();
+                    if (context && haveLocalShardingInfo(context->getClient(), toSTLString(
                         prop->ToObject()->GetRealNamedProperty(
                             v8::String::NewFromUtf8(scope->getIsolate(), "_fullName"))))) {
                         result.Set(

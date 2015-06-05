@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/client.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/s/collection_metadata.h"
 #include "mongo/s/chunk_version.h"
@@ -131,7 +132,7 @@ namespace mongo {
 
         // querying support
 
-        bool needCollectionMetadata( const std::string& ns ) const;
+        bool needCollectionMetadata( Client* client, const std::string& ns ) const;
         CollectionMetadataPtr getCollectionMetadata( const std::string& ns );
 
         // chunk migrate and split support
@@ -304,13 +305,14 @@ namespace mongo {
      */
     class ShardedConnectionInfo {
     public:
+
         ShardedConnectionInfo();
 
         const ChunkVersion getVersion( const std::string& ns ) const;
         void setVersion( const std::string& ns , const ChunkVersion& version );
 
-        static ShardedConnectionInfo* get( bool create );
-        static void reset();
+        static ShardedConnectionInfo* get( Client* client, bool create );
+        static void reset( Client* client );
         static void addHook();
 
         bool inForceVersionOkMode() const {
@@ -326,13 +328,11 @@ namespace mongo {
 
         typedef std::map<std::string,ChunkVersion> NSVersionMap;
         NSVersionMap _versions;
-
-        static boost::thread_specific_ptr<ShardedConnectionInfo> _tl;
     };
 
     struct ShardForceVersionOkModeBlock {
-        ShardForceVersionOkModeBlock() {
-            info = ShardedConnectionInfo::get( false );
+        ShardForceVersionOkModeBlock(Client* client) {
+            info = ShardedConnectionInfo::get( client, false );
             if ( info )
                 info->enterForceVersionOkMode();
         }
@@ -351,7 +351,7 @@ namespace mongo {
     /**
      * @return true if we have any shard info for the ns
      */
-    bool haveLocalShardingInfo( const std::string& ns );
+    bool haveLocalShardingInfo( Client* client, const std::string& ns );
 
     /**
      * Validates whether the shard chunk version for the specified collection is up to date and if
@@ -362,7 +362,7 @@ namespace mongo {
      *
      * @param ns Complete collection namespace to be cheched.
      */
-    void ensureShardVersionOKOrThrow(const std::string& ns);
+    void ensureShardVersionOKOrThrow(Client* client, const std::string& ns);
 
     /**
      * If a migration for the chunk in 'ns' where 'obj' lives is occurring, save this log entry

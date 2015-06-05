@@ -67,11 +67,15 @@
 
 namespace mongo {
 
+    using boost::optional;
     using std::endl;
     using std::string;
     using std::stringstream;
     using std::vector;
 
+    namespace {
+        const auto clientSCI = Client::declareDecoration<optional<ShardedConnectionInfo>>();
+    } // namespace
 
     bool isMongos() {
         return false;
@@ -810,11 +814,11 @@ namespace mongo {
         versionB.done();
     }
 
-    bool ShardingState::needCollectionMetadata( const string& ns ) const {
+    bool ShardingState::needCollectionMetadata( Client* client, const string& ns ) const {
         if ( ! _enabled )
             return false;
 
-        if ( ! ShardedConnectionInfo::get( false ) )
+        if ( ! ShardedConnectionInfo::get( client, false ) )
             return false;
 
         return true;
@@ -838,24 +842,23 @@ namespace mongo {
 
     // -----ShardedConnectionInfo START ----
 
-    boost::thread_specific_ptr<ShardedConnectionInfo> ShardedConnectionInfo::_tl;
-
     ShardedConnectionInfo::ShardedConnectionInfo() {
         _forceVersionOk = false;
     }
 
-    ShardedConnectionInfo* ShardedConnectionInfo::get( bool create ) {
-        ShardedConnectionInfo* info = _tl.get();
-        if ( ! info && create ) {
+    ShardedConnectionInfo* ShardedConnectionInfo::get( Client* client, bool create ) {
+        auto& current = clientSCI(client);
+
+        if (!current && create) {
             LOG(1) << "entering shard mode for connection" << endl;
-            info = new ShardedConnectionInfo();
-            _tl.reset( info );
+            current = boost::in_place();
         }
-        return info;
+
+        return current ? &current.value() : nullptr;
     }
 
-    void ShardedConnectionInfo::reset() {
-        _tl.reset();
+    void ShardedConnectionInfo::reset(Client* client) {
+        clientSCI(client) = boost::none;
     }
 
     const ChunkVersion ShardedConnectionInfo::getVersion( const string& ns ) const {
@@ -899,14 +902,14 @@ namespace mongo {
     };
 
 
-    bool haveLocalShardingInfo( const string& ns ) {
+    bool haveLocalShardingInfo( Client* client, const string& ns ) {
         if ( ! shardingState.enabled() )
             return false;
 
         if ( ! shardingState.hasVersion( ns ) )
             return false;
 
-        return ShardedConnectionInfo::get(false) != NULL;
+        return ShardedConnectionInfo::get(client, false) != NULL;
     }
 
     class UnsetShardingCommand : public MongodShardCommand {
@@ -935,7 +938,7 @@ namespace mongo {
                  int,
                  string& errmsg,
                  BSONObjBuilder& result) {
-            ShardedConnectionInfo::reset();
+            ShardedConnectionInfo::reset(txn->getClient());
             return true;
         }
 
@@ -1027,8 +1030,9 @@ namespace mongo {
             
             // step 1
 
-            LastError::get(txn->getClient()).disable();
-            ShardedConnectionInfo* info = ShardedConnectionInfo::get( true );
+            Client* client = txn->getClient();
+            LastError::get(client).disable();
+            ShardedConnectionInfo* info = ShardedConnectionInfo::get( client, true );
 
             bool authoritative = cmdObj.getBoolField( "authoritative" );
             
@@ -1278,7 +1282,7 @@ namespace mongo {
 
             result.appendTimestamp("global", shardingState.getVersion(ns).toLong());
 
-            ShardedConnectionInfo* const info = ShardedConnectionInfo::get(false);
+            ShardedConnectionInfo* const info = ShardedConnectionInfo::get(txn->getClient(), false);
             result.appendBool("inShardedMode", info != NULL);
             if (info) {
                 result.appendTimestamp("mine", info->getVersion(ns).toLong());
@@ -1336,7 +1340,8 @@ namespace mongo {
      * @ return true if not in sharded mode
                      or if version for this client is ok
      */
-    static bool shardVersionOk(const string& ns,
+    static bool shardVersionOk(Client* client,
+                               const string& ns,
                                string& errmsg,
                                ChunkVersion& received,
                                ChunkVersion& wanted) {
@@ -1350,7 +1355,7 @@ namespace mongo {
             return true;
         }
 
-        ShardedConnectionInfo* info = ShardedConnectionInfo::get( false );
+        ShardedConnectionInfo* info = ShardedConnectionInfo::get( client, false );
 
         if ( ! info ) {
             // this means the client has nothing sharded
@@ -1420,11 +1425,11 @@ namespace mongo {
 
     }
 
-    void ensureShardVersionOKOrThrow(const std::string& ns) {
+    void ensureShardVersionOKOrThrow(Client* client, const std::string& ns) {
         string errmsg;
         ChunkVersion received;
         ChunkVersion wanted;
-        if (!shardVersionOk(ns, errmsg, received, wanted)) {
+        if (!shardVersionOk(client, ns, errmsg, received, wanted)) {
             StringBuilder sb;
             sb << "[" << ns << "] shard version not ok: " << errmsg;
             throw SendStaleConfigException(ns, sb.str(), received, wanted);

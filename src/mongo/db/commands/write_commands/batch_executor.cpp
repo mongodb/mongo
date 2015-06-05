@@ -829,7 +829,7 @@ namespace mongo {
         ExecInsertsState state(_txn, &request);
         normalizeInserts(request, &state.normalizedInserts);
 
-        ShardedConnectionInfo* info = ShardedConnectionInfo::get(false);
+        ShardedConnectionInfo* info = ShardedConnectionInfo::get(_txn->getClient(), false);
         if (info) {
             if (request.isMetadataSet() && request.getMetadata()->isShardVersionSet()) {
                 info->setVersion(request.getTargetingNS(),
@@ -889,7 +889,7 @@ namespace mongo {
         beginCurrentOp(_txn, updateItem);
         incOpStats( updateItem );
 
-        ShardedConnectionInfo* info = ShardedConnectionInfo::get(false);
+        ShardedConnectionInfo* info = ShardedConnectionInfo::get(_txn->getClient(), false);
         if (info) {
             auto rootRequest = updateItem.getRequest();
             if (!updateItem.getUpdate()->getMulti() &&
@@ -933,7 +933,7 @@ namespace mongo {
         beginCurrentOp(_txn, removeItem);
         incOpStats( removeItem );
 
-        ShardedConnectionInfo* info = ShardedConnectionInfo::get(false);
+        ShardedConnectionInfo* info = ShardedConnectionInfo::get(_txn->getClient(), false);
         if (info) {
             auto rootRequest = removeItem.getRequest();
             if (removeItem.getDelete()->getLimit() == 1 &&

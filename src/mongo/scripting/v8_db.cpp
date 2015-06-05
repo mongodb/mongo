@@ -40,6 +40,7 @@
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/client/sasl_scramsha1_client_conversation.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/s/d_state.h"
 #include "mongo/scripting/engine_v8.h"
 #include "mongo/scripting/v8_utils.h"
@@ -645,7 +646,8 @@ namespace mongo {
         args.This()->ForceSet(scope->v8StringData("_shortName"), args[2]);
         args.This()->ForceSet(v8::String::New("_fullName"), args[3]);
 
-        if (haveLocalShardingInfo(toSTLString(args[3]))) {
+        auto context = scope->getOpContext();
+        if (context && haveLocalShardingInfo(context->getClient(), toSTLString(args[3]))) {
             return v8AssertionException("can't use sharded collection from db.eval");
         }
 
@@ -755,7 +757,8 @@ namespace mongo {
                 if (prop->IsObject() &&
                     prop->ToObject()->HasRealNamedProperty(v8::String::New("_fullName"))) {
                     // need to check every time that the collection did not get sharded
-                    if (haveLocalShardingInfo(toSTLString(
+                    auto context = scope->getOpContext();
+                    if (context && haveLocalShardingInfo(context->getClient(), toSTLString(
                             prop->ToObject()->GetRealNamedProperty(v8::String::New("_fullName"))))) {
                         return v8AssertionException("can't use sharded collection from db.eval");
                     }
