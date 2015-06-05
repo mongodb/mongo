@@ -1,0 +1,149 @@
+stepback: false
+
+pre:
+    - command: shell.track
+
+post:
+    - command: shell.cleanup
+
+functions:
+  "setup standalone":
+    - command: shell.exec
+      params:
+        script: |
+          rm -rf ./*
+          mkdir src
+    - command: s3.get
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        remote_file: perf/${build_variant}/${revision}/mongod-${build_id}
+        bucket: mciuploads
+        local_file: src/mongod
+    - command: s3.get
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        remote_file: perf/${build_variant}/${revision}/mongo-${build_id}
+        bucket: mciuploads
+        local_file: src/mongo
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -e 
+          set -v
+          chmod +x mongod
+          chmod +x mongo
+          git clone https://github.com/mongodb/mongo-perf perf
+          pwd 
+          ls
+          cd perf
+          git checkout evergreen
+    - command: shell.exec
+      params:
+        background: true
+        working_dir: src
+        script: |
+          set -e 
+          set -o verbose
+          mkdir -p ./dbdata
+          ./mongod --storageEngine=${storageEngine} --dbpath ./dbdata
+          echo "MONGOD STARTED."
+  "run perf tests":
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -e 
+          set -v
+          pwd 
+          ls
+          cd perf
+          #  give mongod a few seconds to start up so that we can connect.
+          sleep 5
+          python ./benchrun.py --shell ../mongo --testFilter '${filter}' -t 1 2 4 8 16 -f testcases/* --out perf.json
+    - command: "json.send"
+      params:
+        name: "perf"
+        file: "src/perf/perf.json"
+
+tasks:
+- name: compile
+  commands:
+    - command: git.get_project
+      params:
+        directory: src
+    - command: git.apply_patch
+      params:
+        directory: src
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -o errexit
+          set -o verbose
+          ${scons|scons} ${compile_flags|} mongo
+          ${scons|scons} ${compile_flags|} mongod
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: src/mongod
+        remote_file: perf/${build_variant}/${revision}/mongod-${build_id}
+        bucket: mciuploads
+        permissions: public-read
+        content_type: ${content_type|application/octet-stream}
+        display_name: mongod
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: src/mongo
+        remote_file: perf/${build_variant}/${revision}/mongo-${build_id}
+        bucket: mciuploads
+        permissions: public-read
+        content_type: ${content_type|application/octet-stream}
+        display_name: mongo
+
+- name: query
+  depends_on:
+  - name: compile
+  commands:
+    - func: "setup standalone"
+    - func: "run perf tests"
+      vars:
+        filter: "core-query"
+- name: update
+  depends_on:
+  - name: compile
+  commands:
+    - func: "setup standalone"
+    - func: "run perf tests"
+      vars:
+        filter: "core-update"
+- name: insert
+  depends_on:
+  - name: compile
+  commands:
+    - func: "setup standalone"
+    - func: "run perf tests"
+      vars:
+        filter: "core-insert"
+
+buildvariants:
+- name: linux-wt-standalone
+  display_name: Linux WT Standalone
+  expansions:
+    storageEngine: "wiredTiger"
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release --variant-dir="linux2/release"
+
+  run_on:
+  - "ubuntu1404-test"
+  tasks:
+  - name: compile
+    distros:
+    - rhel55
+  - name: query
+  - name: update
+  - name: insert
