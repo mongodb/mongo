@@ -48,6 +48,7 @@
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/chunk_manager.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_write.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
@@ -353,10 +354,9 @@ namespace {
             // 2. move them one at a time
             // 3. split the big chunks to achieve the desired total number of initial chunks
 
-            vector<Shard> shards;
-            Shard primary = config->getPrimary();
-            primary.getAllShards(shards);
-            int numShards = shards.size();
+            vector<ShardId> shardIds;
+            grid.shardRegistry()->getAllShardIds(&shardIds);
+            int numShards = shardIds.size();
 
             vector<BSONObj> initSplits;  // there will be at most numShards-1 of these
             vector<BSONObj> allSplits;   // all of the initial desired split points
@@ -429,17 +429,22 @@ namespace {
                 // 2. Move and commit each "big chunk" to a different shard.
                 int i = 0;
                 for (ChunkMap::const_iterator c = chunkMap.begin(); c != chunkMap.end(); ++c, ++i){
-                    Shard to = shards[i % numShards];
+                    const ShardId& shardId = shardIds[i % numShards];
+                    const auto& to = grid.shardRegistry()->findIfExists(shardId);
+                    if (!to) {
+                        continue;
+                    }
+
                     ChunkPtr chunk = c->second;
 
                     // can't move chunk to shard it's already on
-                    if (to == chunk->getShard()) {
+                    if (*to == chunk->getShard()) {
                         continue;
                     }
 
                     BSONObj moveResult;
                     WriteConcernOptions noThrottle;
-                    if (!chunk->moveAndCommit(to,
+                    if (!chunk->moveAndCommit(*to,
                                               Chunk::MaxChunkSize,
                                               &noThrottle,
                                               true,
@@ -447,7 +452,7 @@ namespace {
                                               moveResult)) {
 
                         warning() << "couldn't move chunk " << chunk->toString()
-                                  << " to shard " << to
+                                  << " to shard " << *to
                                   << " while sharding collection " << ns << "."
                                   << " Reason: " << moveResult;
                     }

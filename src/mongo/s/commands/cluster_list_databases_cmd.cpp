@@ -37,6 +37,8 @@
 #include "mongo/client/connpool.h"
 #include "mongo/db/commands.h"
 #include "mongo/s/client/shard.h"
+#include "mongo/s/client/shard_registry.h"
+#include "mongo/s/grid.h"
 
 namespace mongo {
 
@@ -86,15 +88,19 @@ namespace {
                          std::string& errmsg,
                          BSONObjBuilder& result) {
 
-            vector<Shard> shards;
-            Shard::getAllShards(shards);
-
             map<string, long long> sizes;
             map<string, scoped_ptr<BSONObjBuilder> > dbShardInfo;
 
-            for (vector<Shard>::iterator i = shards.begin(); i != shards.end(); i++) {
-                Shard s = *i;
-                BSONObj x = s.runCommand("admin", "listDatabases");
+            vector<ShardId> shardIds;
+            grid.shardRegistry()->getAllShardIds(&shardIds);
+
+            for (const ShardId& shardId : shardIds) {
+                const auto& s = grid.shardRegistry()->findIfExists(shardId);
+                if (!s) {
+                    continue;
+                }
+
+                BSONObj x = s->runCommand("admin", "listDatabases");
 
                 BSONObjIterator j(x["databases"].Obj());
                 while (j.more()) {
@@ -118,7 +124,7 @@ namespace {
                         bb.reset(new BSONObjBuilder());
                     }
 
-                    bb->appendNumber(s.getName(), size);
+                    bb->appendNumber(s->getName(), size);
                 }
 
             }
@@ -152,8 +158,8 @@ namespace {
             }
 
             // obtain cached config shard
-            Shard configShard = Shard::findIfExists("config");
-            if (!configShard.ok()) {
+            const auto& configShard = grid.shardRegistry()->findIfExists("config");
+            if (!configShard->ok()) {
                 return appendCommandStatus(result,
                                            Status(ErrorCodes::ShardNotFound,
                                                   "Couldn't find shard "
@@ -163,7 +169,7 @@ namespace {
             {
                 // get config db from the config servers (first one)
                 BSONObj x;
-                if (configShard.runCommand("config", "dbstats", x)) {
+                if (configShard->runCommand("config", "dbstats", x)) {
                     BSONObjBuilder b;
                     b.append("name", "config");
                     b.appendBool("empty", false);
@@ -181,7 +187,7 @@ namespace {
             {
                 // get admin db from the config servers (first one)
                 BSONObj x;
-                if (configShard.runCommand("admin", "dbstats", x)) {
+                if (configShard->runCommand("admin", "dbstats", x)) {
                     BSONObjBuilder b;
                     b.append("name", "admin");
                     b.appendBool("empty", false);

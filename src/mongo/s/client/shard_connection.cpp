@@ -38,6 +38,8 @@
 #include "mongo/db/lasterror.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard.h"
+#include "mongo/s/client/shard_registry.h"
+#include "mongo/s/grid.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/version_manager.h"
 #include "mongo/util/concurrency/spin_lock.h"
@@ -277,18 +279,21 @@ namespace {
 
         void checkVersions( const string& ns ) {
 
-            vector<Shard> all;
-            Shard::getAllShards( all );
+            vector<ShardId> all;
+            grid.shardRegistry()->getAllShardIds(&all);
 
             // Don't report exceptions here as errors in GetLastError
             LastError::Disabled ignoreForGLE(&LastError::get(cc()));
 
             // Now only check top-level shard connections
-            for ( unsigned i=0; i<all.size(); i++ ) {
-
-                Shard& shard = all[i];
+            for (const ShardId& shardId : all) {
                 try {
-                    string sconnString = shard.getConnString().toString();
+                    const auto& shard = grid.shardRegistry()->findIfExists(shardId);
+                    if (!shard) {
+                        continue;
+                    }
+
+                    string sconnString = shard->getConnString().toString();
                     Status* s = _getStatus( sconnString );
 
                     if( ! s->avail ) {
@@ -301,7 +306,7 @@ namespace {
                 catch ( const DBException& ex ) {
 
                     warning() << "problem while initially checking shard versions on" << " "
-                              << shard.getName() << causedBy(ex);
+                              << shardId << causedBy(ex);
 
                     // NOTE: This is only a heuristic, to avoid multiple stale version retries
                     // across multiple shards, and does not affect correctness.

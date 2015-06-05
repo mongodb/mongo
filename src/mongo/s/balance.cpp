@@ -55,6 +55,7 @@
 #include "mongo/s/catalog/dist_lock_manager.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/client/shard.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/type_mongos.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/fail_point_service.h"
@@ -257,28 +258,39 @@ namespace mongo {
     }
 
     bool Balancer::_checkOIDs() {
-        vector<Shard> all;
-        Shard::getAllShards( all );
+        vector<ShardId> all;
+        grid.shardRegistry()->getAllShardIds(&all);
 
-        map<int,Shard> oids;
+        // map of OID machine ID => shardId
+        map<int, string> oids;
 
-        for ( vector<Shard>::iterator i=all.begin(); i!=all.end(); ++i ) {
-            Shard s = *i;
-            BSONObj f = s.runCommand( "admin" , "features" );
+        for (const ShardId& shardId : all) {
+            const auto& s = grid.shardRegistry()->findIfExists(shardId);
+            if (!s) {
+                continue;
+            }
+
+            BSONObj f = s->runCommand("admin", "features");
             if ( f["oidMachine"].isNumber() ) {
                 int x = f["oidMachine"].numberInt();
-                if ( oids.count(x) == 0 ) {
-                    oids[x] = s;
+                if (oids.count(x) == 0) {
+                    oids[x] = shardId;
                 }
                 else {
-                    log() << "error: 2 machines have " << x << " as oid machine piece " << s.toString() << " and " << oids[x].toString();
-                    s.runCommand( "admin" , BSON( "features" << 1 << "oidReset" << 1 ) );
-                    oids[x].runCommand( "admin" , BSON( "features" << 1 << "oidReset" << 1 ) );
+                    log() << "error: 2 machines have " << x
+                          << " as oid machine piece: " << shardId
+                          << " and " << oids[x];
+                    s->runCommand("admin", BSON("features" << 1 << "oidReset" << 1));
+
+                    const auto& otherShard = grid.shardRegistry()->findIfExists(oids[x]);
+                    if (otherShard) {
+                        otherShard->runCommand("admin", BSON("features" << 1 << "oidReset" << 1));
+                    }
                     return false;
                 }
             }
             else {
-                log() << "warning: oidMachine not set on: " << s.toString();
+                log() << "warning: oidMachine not set on: " << s->toString();
             }
         }
         return true;

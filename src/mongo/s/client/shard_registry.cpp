@@ -89,8 +89,8 @@ namespace mongo {
         }
     }
 
-    shared_ptr<Shard> ShardRegistry::findIfExists(const string& shardName) {
-        shared_ptr<Shard> shard = _findUsingLookUp(shardName);
+    shared_ptr<Shard> ShardRegistry::findIfExists(const ShardId& id) {
+        shared_ptr<Shard> shard = _findUsingLookUp(id);
         if (shard) {
             return shard;
         }
@@ -98,7 +98,7 @@ namespace mongo {
         // If we can't find the shard, we might just need to reload the cache
         reload();
 
-        return _findUsingLookUp(shardName);
+        return _findUsingLookUp(id);
     }
 
     Shard ShardRegistry::lookupRSName(const string& name) {
@@ -108,19 +108,19 @@ namespace mongo {
         return (i == _rsLookup.end()) ? Shard::EMPTY : *(i->second.get());
     }
 
-    void ShardRegistry::set(const string& name, const Shard& s) {
+    void ShardRegistry::set(const ShardId& id, const Shard& s) {
         shared_ptr<Shard> ss(boost::make_shared<Shard>(s));
 
         boost::lock_guard<boost::mutex> lk(_mutex);
-        _lookup[name] = ss;
+        _lookup[id] = ss;
     }
 
-    void ShardRegistry::remove(const string& name) {
+    void ShardRegistry::remove(const ShardId& id) {
         boost::lock_guard<boost::mutex> lk(_mutex);
 
         for (ShardMap::iterator i = _lookup.begin(); i != _lookup.end();) {
             shared_ptr<Shard> s = i->second;
-            if (s->getName() == name) {
+            if (s->getName() == id) {
                 _lookup.erase(i++);
             }
             else {
@@ -130,7 +130,7 @@ namespace mongo {
 
         for (ShardMap::iterator i = _rsLookup.begin(); i != _rsLookup.end();) {
             shared_ptr<Shard> s = i->second;
-            if (s->getName() == name) {
+            if (s->getName() == id) {
                 _rsLookup.erase(i++);
             }
             else {
@@ -139,23 +139,25 @@ namespace mongo {
         }
     }
 
-    void ShardRegistry::getAllShards(vector<Shard>& all) const {
+    void ShardRegistry::getAllShardIds(vector<ShardId>* all) const {
         std::set<string> seen;
 
-        boost::lock_guard<boost::mutex> lk(_mutex);
-        for (ShardMap::const_iterator i = _lookup.begin(); i != _lookup.end(); ++i) {
-            const shared_ptr<Shard>& s = i->second;
-            if (s->getName() == "config") {
-                continue;
-            }
+        {
+            boost::lock_guard<boost::mutex> lk(_mutex);
+            for (ShardMap::const_iterator i = _lookup.begin(); i != _lookup.end(); ++i) {
+                const shared_ptr<Shard>& s = i->second;
+                if (s->getName() == "config") {
+                    continue;
+                }
 
-            if (seen.count(s->getName())) {
-                continue;
+                if (seen.count(s->getName())) {
+                    continue;
+                }
+                seen.insert(s->getName());
             }
-
-            seen.insert(s->getName());
-            all.push_back(*s);
         }
+
+        all->assign(seen.begin(), seen.end());
     }
 
     bool ShardRegistry::isAShardNode(const string& addr) const {
@@ -224,9 +226,9 @@ namespace mongo {
         }
     }
 
-    shared_ptr<Shard> ShardRegistry::_findUsingLookUp(const string& shardName) {
+    shared_ptr<Shard> ShardRegistry::_findUsingLookUp(const ShardId& id) {
         boost::lock_guard<boost::mutex> lk(_mutex);
-        ShardMap::iterator it = _lookup.find(shardName);
+        ShardMap::iterator it = _lookup.find(id);
 
         if (it != _lookup.end()) {
             return it->second;
