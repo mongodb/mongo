@@ -312,7 +312,7 @@ static const WT_CONFIG_CHECK confchk_session_open_cursor[] = {
 	{ "readonly", "boolean", NULL, NULL, NULL },
 	{ "skip_sort_check", "boolean", NULL, NULL, NULL },
 	{ "statistics", "list",
-	    NULL, "choices=[\"all\",\"fast\",\"clear\"]",
+	    NULL, "choices=[\"all\",\"fast\",\"clear\",\"size\"]",
 	    NULL },
 	{ "target", "list", NULL, NULL, NULL },
 	{ NULL, NULL, NULL, NULL, NULL }

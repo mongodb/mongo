@@ -136,6 +136,12 @@ class test_stat01(wttest.WiredTigerTestCase):
         self.assertEqual(val, values[2])
         cursor.close()
 
+        cursor = self.session.open_cursor(
+            'statistics:' + self.uri, None, "statistics=(size)")
+        values = cursor[stat.dsrc.block_size]
+        self.assertNotEqual(values[2], 0)
+        cursor.close()
+
     # Test simple per-checkpoint statistics.
     def test_checkpoint_stats(self):
         for name in ('first', 'second', 'third'):
