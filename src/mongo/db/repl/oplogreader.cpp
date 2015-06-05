@@ -47,6 +47,7 @@
 #include "mongo/db/repl/minvalid.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/executor/network_interface.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 
@@ -101,6 +102,7 @@ namespace repl {
                 error() << errmsg << endl;
                 return false;
             }
+            _conn->port().tag |= executor::NetworkInterface::kMessagingPortKeepOpen;
             _host = host;
         }
         return true;
