@@ -57,8 +57,32 @@ t.insert({geo: { "type" : "Point", "coordinates" : [180, -90]}})
 t.insert({geo: { "type" : "Point", "coordinates" : [180, 90]}})
 t.insert({geo: { "type" : "Point", "coordinates" : [-180, 90]}})
 res = t.find({ "geo" : { "$near" : { "$geometry" : origin } } }).limit(10000)
+resCount = res.itcount()
 resNear = db.runCommand({geoNear : t.getName(), near: [0,0], num: 10000, spherical: true})
-assert.eq(res.itcount(), resNear.results.length, (2 * points) * (2 * points) + 4)
+assert.eq(resCount, resNear.results.length, (2 * points) * (2 * points) + 4)
+
+
+// SERVER-11004 MultiPoints and GeometryCollections should be ok if they contain a single point
+
+var multiRes = t.find( {
+            "geo" : { "$near" : {"$geometry" : {"type" : "MultiPoint", "coordinates" : [[0,0]] } } } 
+        }).limit(10000);
+assert.eq(multiRes.itcount(), resCount);
+
+var collRes = t.find( { 
+    "geo" : { 
+        "$near" : {
+            "$geometry" : {
+                "type" : "GeometryCollection", 
+                "geometries" : [ {
+                    "type" : "Point",
+                    "coordinates" : [0,0]
+                } ]
+            }
+        }
+    }
+});
+
 
 function testRadAndDegreesOK(distance) {
     // Distance for old style points is radians.

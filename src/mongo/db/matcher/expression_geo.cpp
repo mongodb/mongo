@@ -263,7 +263,7 @@ namespace mongo {
                                           str::stream()
                                                   << "invalid point in geo near query $geometry argument:"
                                                   << embeddedObj << " must contain exactly "
-                                                  << "1 point for geo near query");
+                                                  << "1 point for geo near query and nothing else");
                         }
                         //copy over first point, we need not set oldPoint since this only accepts geojson
                         centroid->point = multi->points[0];
