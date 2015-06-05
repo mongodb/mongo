@@ -30,7 +30,8 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/base/owned_pointer_vector.h"
+#include <vector>
+
 #include "mongo/client/connpool.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/namespace_string.h"
@@ -50,13 +51,13 @@ namespace mongo {
     using std::string;
     using mongoutils::str::stream;
 
-    static Status runApplyOpsCmd(const OwnedPointerVector<ChunkType>&,
+    static Status runApplyOpsCmd(const std::vector<ChunkType>&,
                                  const ChunkVersion&,
                                  const ChunkVersion&);
 
-    static BSONObj buildMergeLogEntry( const OwnedPointerVector<ChunkType>&,
-                                       const ChunkVersion&,
-                                       const ChunkVersion& );
+    static BSONObj buildMergeLogEntry(const std::vector<ChunkType>&,
+                                      const ChunkVersion&,
+                                      const ChunkVersion&);
 
     static bool isEmptyChunk( const ChunkType& );
 
@@ -154,7 +155,7 @@ namespace mongo {
         ChunkVersion mergeVersion = metadata->getCollVersion();
         mergeVersion.incMinor();
 
-        OwnedPointerVector<ChunkType> chunksToMerge;
+        std::vector<ChunkType> chunksToMerge;
 
         ChunkType itChunk;
         itChunk.setMin( minKey );
@@ -164,8 +165,7 @@ namespace mongo {
 
         while (itChunk.getMax().woCompare(maxKey) < 0 &&
                 metadata->getNextChunk(itChunk.getMax(), &itChunk)) {
-
-            chunksToMerge.mutableVector().push_back(new ChunkType(itChunk));
+            chunksToMerge.push_back(itChunk);
         }
 
         if ( chunksToMerge.empty() ) {
@@ -183,8 +183,8 @@ namespace mongo {
         // Validate the range starts and ends at chunks and has no holes, error if not valid
         //
 
-        BSONObj firstDocMin = ( *chunksToMerge.begin() )->getMin();
-        BSONObj firstDocMax = ( *chunksToMerge.begin() )->getMax();
+        BSONObj firstDocMin = chunksToMerge.front().getMin();
+        BSONObj firstDocMax = chunksToMerge.front().getMax();
         // minKey is inclusive
         bool minKeyInRange = rangeContains( firstDocMin, firstDocMax, minKey );
 
@@ -198,8 +198,8 @@ namespace mongo {
             return false;
         }
 
-        BSONObj lastDocMin = ( *chunksToMerge.rbegin() )->getMin();
-        BSONObj lastDocMax = ( *chunksToMerge.rbegin() )->getMax();
+        BSONObj lastDocMin = chunksToMerge.back().getMin();
+        BSONObj lastDocMax = chunksToMerge.back().getMax();
         // maxKey is exclusive
         bool maxKeyInRange = lastDocMin.woCompare( maxKey ) < 0 &&
                 lastDocMax.woCompare( maxKey ) >= 0;
@@ -237,33 +237,18 @@ namespace mongo {
             return false;
         }
 
-        bool holeInRange = false;
-
         // Look for hole in range
-        ChunkType* prevChunk = *chunksToMerge.begin();
-        ChunkType* nextChunk = NULL;
-        for ( OwnedPointerVector<ChunkType>::const_iterator it = chunksToMerge.begin();
-                it != chunksToMerge.end(); ++it ) {
-            if ( it == chunksToMerge.begin() ) continue;
+        for (size_t i = 1; i < chunksToMerge.size(); ++i) {
+            log() << "chunksToMerge[" << i-1 << "] = " << chunksToMerge[i-1].toBSON().toString();
+            if (chunksToMerge[i-1].getMax().woCompare(chunksToMerge[i].getMin()) != 0) {
+                *errMsg = stream() << "could not merge chunks, collection " << nss.ns()
+                                   << " has a hole in the range " << rangeToString(minKey, maxKey)
+                                   << " at " << rangeToString(chunksToMerge[i-1].getMax(),
+                                                              chunksToMerge[i].getMin());
 
-            nextChunk = *it;
-            if ( prevChunk->getMax().woCompare( nextChunk->getMin() ) != 0 ) {
-                holeInRange = true;
-                break;
+                warning() << *errMsg << endl;
+                return false;
             }
-            prevChunk = nextChunk;
-        }
-
-        if ( holeInRange ) {
-
-            dassert( NULL != nextChunk );
-            *errMsg = stream() << "could not merge chunks, collection " << nss.ns()
-                               << " has a hole in the range " << rangeToString( minKey, maxKey )
-                               << " at " << rangeToString( prevChunk->getMax(),
-                                                           nextChunk->getMin() );
-
-            warning() << *errMsg << endl;
-            return false;
         }
 
         //
@@ -303,18 +288,16 @@ namespace mongo {
     // Utilities for building BSONObjs for applyOps and change logging
     //
 
-    BSONObj buildMergeLogEntry( const OwnedPointerVector<ChunkType>& chunksToMerge,
-                                const ChunkVersion& currShardVersion,
-                                const ChunkVersion& newMergedVersion ) {
+    BSONObj buildMergeLogEntry(const std::vector<ChunkType>& chunksToMerge,
+                               const ChunkVersion& currShardVersion,
+                               const ChunkVersion& newMergedVersion) {
 
         BSONObjBuilder logDetailB;
 
         BSONArrayBuilder mergedB( logDetailB.subarrayStart( "merged" ) );
 
-        for ( OwnedPointerVector<ChunkType>::const_iterator it = chunksToMerge.begin();
-                it != chunksToMerge.end(); ++it ) {
-            ChunkType* chunkToMerge = *it;
-            mergedB.append( chunkToMerge->toBSON() );
+        for (const ChunkType& chunkToMerge : chunksToMerge) {
+            mergedB.append(chunkToMerge.toBSON());
         }
 
         mergedB.done();
@@ -375,33 +358,32 @@ namespace mongo {
         return preCond.arr();
     }
 
-    Status runApplyOpsCmd(const OwnedPointerVector<ChunkType>& chunksToMerge,
+    Status runApplyOpsCmd(const std::vector<ChunkType>& chunksToMerge,
                           const ChunkVersion& currShardVersion,
                           const ChunkVersion& newMergedVersion) {
 
         BSONArrayBuilder updatesB;
 
         // The chunk we'll be "expanding" is the first chunk
-        const ChunkType* chunkToMerge = *chunksToMerge.begin();
+        const ChunkType& firstChunk = chunksToMerge.front();
 
         // Fill in details not tracked by metadata
-        ChunkType mergedChunk = *chunkToMerge;
-        mergedChunk.setName( Chunk::genID( chunkToMerge->getNS(), chunkToMerge->getMin() ) );
-        mergedChunk.setMax( ( *chunksToMerge.vector().rbegin() )->getMax() );
-        mergedChunk.setVersion( newMergedVersion );
+        ChunkType mergedChunk(firstChunk);
+        mergedChunk.setName(Chunk::genID(firstChunk.getNS(), firstChunk.getMin()));
+        mergedChunk.setMax(chunksToMerge.back().getMax());
+        mergedChunk.setVersion(newMergedVersion);
 
-        updatesB.append( buildOpMergeChunk( mergedChunk ) );
+        updatesB.append(buildOpMergeChunk(mergedChunk));
 
         // Don't remove chunk we're expanding
-        OwnedPointerVector<ChunkType>::const_iterator it = chunksToMerge.begin();
-        for ( ++it; it != chunksToMerge.end(); ++it ) {
-            ChunkType* chunkToMerge = *it;
-            chunkToMerge->setName( Chunk::genID( chunkToMerge->getNS(), chunkToMerge->getMin() ) );
-            updatesB.append( buildOpRemoveChunk( *chunkToMerge ) );
+        for (size_t i = 1; i < chunksToMerge.size(); ++i) {
+            ChunkType chunkToMerge(chunksToMerge[i]);
+            chunkToMerge.setName(Chunk::genID(chunkToMerge.getNS(), chunkToMerge.getMin()));
+            updatesB.append(buildOpRemoveChunk(chunkToMerge));
         }
 
-        BSONArray preCond = buildOpPrecond(chunkToMerge->getNS(),
-                                           chunkToMerge->getShard(),
+        BSONArray preCond = buildOpPrecond(firstChunk.getNS(),
+                                           firstChunk.getShard(),
                                            currShardVersion);
         return grid.catalogManager()->applyChunkOpsDeprecated(updatesB.arr(), preCond);
     }
