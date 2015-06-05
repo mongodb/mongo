@@ -1117,7 +1117,7 @@ __wt_page_can_evict(WT_SESSION_IMPL *session,
 
 /*
  * __wt_page_release_evict --
- *	Attempt to release and immediately evict a page.
+ *	Release a reference to a page, and attempt to immediately evict it.
  */
 static inline int
 __wt_page_release_evict(WT_SESSION_IMPL *session, WT_REF *ref)
@@ -1166,7 +1166,7 @@ __wt_page_release_evict(WT_SESSION_IMPL *session, WT_REF *ref)
 
 /*
  * __wt_page_release --
- *	Release a reference to a page, fail if busy during forced eviction.
+ *	Release a reference to a page.
  */
 static inline int
 __wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
@@ -1196,16 +1196,13 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 	 * memory_page_max setting, when we see many deleted items, and when we
 	 * are attempting to scan without trashing the cache.
 	 *
-	 * Skip this if eviction is disabled for this operation or this tree,
-	 * or if there is no chance of eviction succeeding for dirty pages due
-	 * to a checkpoint or because we've already tried writing this page and
-	 * it contains an update that isn't stable.  Also skip forced eviction
-	 * if we just did an in-memory split.
+	 * Fast checks if eviction is disabled for this operation or this tree,
+	 * then perform a general check if eviction will be possible.
 	 */
 	page = ref->page;
 	if (page->read_gen != WT_READGEN_OLDEST ||
-	    F_ISSET(btree, WT_BTREE_NO_EVICTION) ||
 	    LF_ISSET(WT_READ_NO_EVICT) ||
+	    F_ISSET(btree, WT_BTREE_NO_EVICTION) ||
 	    !__wt_page_can_evict(session, page, WT_EVICT_CHECK_SPLITS, NULL))
 		return (__wt_hazard_clear(session, page));
 
