@@ -55,6 +55,12 @@ namespace mongo {
         static void cover2dsphere(const S2Region& region,
                                   const BSONObj& indexInfoObj,
                                   OrderedIntervalList* oilOut);
+
+        static void cover2dsphere( const S2Region& region,
+                                   const BSONObj& indexInfoObj,
+                                   const int coarsestLevel,
+                                   const int finestLevel,
+                                   OrderedIntervalList* oilOut );
     };
 
 }  // namespace mongo

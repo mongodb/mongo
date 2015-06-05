@@ -148,6 +148,10 @@ namespace mongo {
     GeoNearExpression::GeoNearExpression()
         : minDistance(0),
           maxDistance(std::numeric_limits<double>::max()),
+          finestLevel(30),
+          coarsestLevel(0),
+          finestLevelPresent(false),
+          coarsestLevelPresent(false),
           isNearSphere(false),
           unitsAreRadians(false),
           isWrappingQuery(false) { }
@@ -156,6 +160,10 @@ namespace mongo {
         : field(f),
           minDistance(0),
           maxDistance(std::numeric_limits<double>::max()),
+          finestLevel(30),
+          coarsestLevel(0),
+          finestLevelPresent(false),
+          coarsestLevelPresent(false),
           isNearSphere(false),
           unitsAreRadians(false),
           isWrappingQuery(false) { }
@@ -310,6 +318,16 @@ namespace mongo {
                 uassert(16899, "$maxDistance must be a number", e.isNumber());
                 maxDistance = e.Number();
                 uassert(16900, "$maxDistance must be non-negative", maxDistance >= 0.0);
+            } else if (equals(e.fieldName(), "$finestLevel")) {
+                uassert(28679, "$finestLevel must be a number", e.isNumber());
+                finestLevel = e.Number();
+                finestLevelPresent = true;
+                uassert(28680, "$finestLevel must be in the range [0,30]", finestLevel >= 0 && finestLevel <= 30);
+            } else if (equals(e.fieldName(), "$coarsestLevel")) {
+                uassert(28681, "$coarsestLevel must be a number", e.isNumber());
+                coarsestLevel = e.Number();
+                coarsestLevelPresent = true;
+                uassert(28682, "$coarsestLevel must be in the range [0,30]", coarsestLevel >= 0 && coarsestLevel <= 30);
             }
         }
 

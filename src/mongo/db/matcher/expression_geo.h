@@ -127,6 +127,15 @@ namespace mongo {
         double minDistance;
         double maxDistance;
 
+        // range of levels for S2 coverings
+        int finestLevel;
+        int coarsestLevel;
+
+        // because the default values should be the coarsest/finest indexed parameters
+        // I need to check whether these fields are present. TODO: Is there a more elegant way?
+        bool finestLevelPresent;
+        bool coarsestLevelPresent;
+
         // Is this a $nearSphere query
         bool isNearSphere;
         // $nearSphere with a legacy point implies units are radians

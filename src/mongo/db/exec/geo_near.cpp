@@ -1025,7 +1025,7 @@ namespace mongo {
             // we have to start to find documents at most S2::kMaxCellLevel - 1. Thus the finest
             // search area is 16 * finest cell area at S2::kMaxCellLevel, which is less than
             // (1.4 inch X 1.4 inch) on the earth.
-            _currentLevel = std::max(0, params.finestIndexedLevel - 1);
+            _currentLevel = std::max(0, params.finestQueryLevel - 1);
         }
 
         // Search for a document in neighbors at current level.
@@ -1274,9 +1274,20 @@ namespace mongo {
         TwoDSphereKeyInRegionExpression* keyMatcher =
             new TwoDSphereKeyInRegionExpression(_currBounds, s2Field);
 
-        ExpressionMapping::cover2dsphere(keyMatcher->getRegion(),
-                                         _s2Index->infoObj(),
-                                         coveredIntervals);
+        const GeoNearExpression * query = _nearParams.nearQuery;
+        if ( query->finestLevelPresent && query->coarsestLevelPresent ) {
+            ExpressionMapping::cover2dsphere( keyMatcher->getRegion(),
+                                              _s2Index->infoObj(),
+                                              query->coarsestLevel,
+                                              query->finestLevel,
+                                              coveredIntervals );
+        }
+        else {
+            ExpressionMapping::cover2dsphere( keyMatcher->getRegion(),
+                                              _s2Index->infoObj(),
+                                              coveredIntervals );
+        }
+
 
         // IndexScan owns the hash matcher
         IndexScan* scan = new IndexScanWithMatch(txn, scanParams, workingSet, keyMatcher);

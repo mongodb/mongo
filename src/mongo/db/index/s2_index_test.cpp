@@ -19,9 +19,6 @@ namespace mongo {
     void printKeyInfo(const BSONObj& b){
         std::string k = b.getField("").String();
         log() << k;
-        int num_bits = k.length() * 4;
-        log() << "I *think* The number of total bits is " << num_bits;
-        log() << "I *think* the indexed level is " << ((num_bits - 4)/2);
     }
 
     TEST_F(GeoIndexTest, TestKeysForPoint){

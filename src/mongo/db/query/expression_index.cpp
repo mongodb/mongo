@@ -25,7 +25,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
 #include "mongo/db/query/expression_index.h"
 
 #include <iostream>
@@ -36,7 +36,7 @@
 #include "mongo/db/geo/hash.h"
 #include "mongo/db/geo/r2_region_coverer.h"
 #include "mongo/db/hasher.h"
-
+#include "mongo/util/log.h"
 namespace mongo {
 
     using std::set;
@@ -98,29 +98,44 @@ namespace mongo {
         }
     }
 
-    // TODO: what should we really pass in for indexInfoObj?
     void ExpressionMapping::cover2dsphere(const S2Region& region,
                                           const BSONObj& indexInfoObj,
                                           OrderedIntervalList* oilOut) {
-
+        // if explicit query levels are not provided, use the indexed levels
         int coarsestIndexedLevel;
         BSONElement ce = indexInfoObj["coarsestIndexedLevel"];
-        if (ce.isNumber()) {
+        if ( ce.isNumber() ) {
             coarsestIndexedLevel = ce.numberInt();
         }
         else {
-            coarsestIndexedLevel =
-                S2::kAvgEdge.GetClosestLevel(100 * 1000.0 / kRadiusOfEarthInMeters);
+            coarsestIndexedLevel = S2::kAvgEdge.GetClosestLevel( 100 * 1000.0
+                / kRadiusOfEarthInMeters );
         }
 
         // The min level of our covering is the level whose cells are the closest match to the
         // *area* of the region (or the max indexed level, whichever is smaller) The max level
         // is 4 sizes larger.
-        double edgeLen = sqrt(region.GetRectBound().Area());
+        double edgeLen = sqrt( region.GetRectBound().Area() );
+
+        int coarsestLevel = min( coarsestIndexedLevel,
+                                 2 + S2::kAvgEdge.GetClosestLevel( edgeLen ) );
+        int finestLevel = 4 + coarsestLevel;
+
+        cover2dsphere(region, indexInfoObj, coarsestLevel, finestLevel, oilOut);
+    }
+
+    void ExpressionMapping::cover2dsphere(const S2Region& region,
+                                          const BSONObj& indexInfoObj,
+                                          const int coarsestLevel,
+                                          const int finestLevel,
+                                          OrderedIntervalList* oilOut) {
+        log() << "ExpressionMapping::cover2dsphere with \n"
+                << "coarsest " << coarsestLevel
+                << "finest " << finestLevel;
+
         S2RegionCoverer coverer;
-        coverer.set_min_level(min(coarsestIndexedLevel,
-                                  2 + S2::kAvgEdge.GetClosestLevel(edgeLen)));
-        coverer.set_max_level(4 + coverer.min_level());
+        coverer.set_min_level(coarsestLevel);
+        coverer.set_max_level(finestLevel);
 
         std::vector<S2CellId> cover;
         coverer.GetCovering(region, &cover);
@@ -149,7 +164,7 @@ namespace mongo {
             // created above, so we only want things where the value of the last digit is not
             // stored (and therefore could be 1).
 
-            while (coveredCell.level() > coarsestIndexedLevel) {
+            while (coveredCell.level() > coarsestLevel) {
 
                 // Add the parent cell of the currently covered cell since we aren't at the
                 // coarsest level yet

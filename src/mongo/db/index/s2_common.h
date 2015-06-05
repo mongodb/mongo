@@ -84,6 +84,13 @@ namespace mongo {
             // This is advisory; the two above are strict.
             coverer->set_max_cells(maxCellsInCovering);
         }
+
+        void configureQueryCoverer(S2RegionCoverer *coverer) const {
+            coverer->set_min_level(coarsestIndexedLevel);
+            coverer->set_max_level(finestIndexedLevel);
+            // This is advisory; the two above are strict.
+            coverer->set_max_cells(maxCellsInCovering);
+        }
     };
 
 }  // namespace mongo
