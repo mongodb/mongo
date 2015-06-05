@@ -52,6 +52,12 @@ func (mt *MongoTop) runDiff() (outDiff FormattableDiff, err error) {
 	if mt.OutputOptions.Locks {
 		if currentServerStatus.Locks == nil {
 			return nil, fmt.Errorf("server does not support reporting lock information")
+		} else {
+			for _, ns := range currentServerStatus.Locks {
+				if ns.AcquireCount != nil {
+					return nil, fmt.Errorf("server does not support reporting lock information")
+				}
+			}
 		}
 		if mt.previousServerStatus != nil {
 			serverStatusDiff := currentServerStatus.Diff(*mt.previousServerStatus)

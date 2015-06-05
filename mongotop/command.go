@@ -25,8 +25,9 @@ type ServerStatus struct {
 
 // LockStats contains information on time spent acquiring and holding a lock.
 type LockStats struct {
-	TimeLockedMicros    ReadWriteLockTimes `bson:"timeLockedMicros"`
-	TimeAcquiringMicros ReadWriteLockTimes `bson:"timeAcquiringMicros"`
+	AcquireCount        *ReadWriteLockTimes `bson:"acquireCount"`
+	TimeLockedMicros    ReadWriteLockTimes  `bson:"timeLockedMicros"`
+	TimeAcquiringMicros ReadWriteLockTimes  `bson:"timeAcquiringMicros"`
 }
 
 // ReadWriteLockTimes contains read/write lock times on a database.
