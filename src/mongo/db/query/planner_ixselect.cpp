@@ -154,6 +154,14 @@ namespace mongo {
                 }
             }
 
+            // Can't check for $in w/ null element w/a sparse index.
+            if (exprtype == MatchExpression::MATCH_IN && index.sparse) {
+                const InMatchExpression* expr = static_cast<const InMatchExpression*>(node);
+                if (expr->getData().hasNull()) {
+                    return false;
+                }
+            }
+
             // We can't use a btree-indexed field for geo expressions.
             if (exprtype == MatchExpression::GEO || exprtype == MatchExpression::GEO_NEAR) {
                 return false;
