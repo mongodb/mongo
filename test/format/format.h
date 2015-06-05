@@ -151,7 +151,7 @@ typedef struct {
 
 	pthread_rwlock_t backup_lock;		/* Hot backup running */
 
-	uint32_t rnd[2];			/* Global RNG state */
+	uint64_t rnd;				/* Global RNG state */
 
 	/*
 	 * We have a list of records that are appended, but not yet "resolved",
@@ -266,7 +266,7 @@ typedef struct {
 extern GLOBAL g;
 
 typedef struct {
-	uint32_t rnd[2];			/* thread RNG state */
+	uint64_t rnd;				/* thread RNG state */
 
 	uint64_t search;			/* operations */
 	uint64_t insert;
@@ -309,14 +309,14 @@ void	 config_setup(void);
 void	 config_single(const char *, int);
 void	 fclose_and_clear(FILE **);
 void	 key_gen(uint8_t *, size_t *, uint64_t);
-void	 key_gen_insert(uint32_t *, uint8_t *, size_t *, uint64_t);
+void	 key_gen_insert(uint64_t *, uint8_t *, size_t *, uint64_t);
 void	 key_gen_setup(uint8_t **);
 void	 key_len_setup(void);
 void	 path_setup(const char *);
-uint32_t rng(uint32_t *);
+uint32_t rng(uint64_t *);
 void	 track(const char *, uint64_t, TINFO *);
-void	 val_gen(uint32_t *, uint8_t *, size_t *, uint64_t);
-void	 val_gen_setup(uint32_t *, uint8_t **);
+void	 val_gen(uint64_t *, uint8_t *, size_t *, uint64_t);
+void	 val_gen_setup(uint64_t *, uint8_t **);
 void	 wts_close(void);
 void	 wts_create(void);
 void	 wts_dump(const char *, int);
@@ -339,7 +339,7 @@ __attribute__((__noreturn__))
  *	Return a random value between a min/max pair.
  */
 static inline uint32_t
-mmrand(uint32_t *rnd, u_int min, u_int max)
+mmrand(uint64_t *rnd, u_int min, u_int max)
 {
 	return (rng(rnd) % (((max) + 1) - (min)) + (min));
 }

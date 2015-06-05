@@ -39,19 +39,13 @@ class suite_random:
         arglen = len(args)
         if arglen == 1:
             self.seedw = int(args[0]) & 0xffffffff
-            self.seedz = int(args[0]) & 0Xffffffff
+            self.seedz = int(args[0]) & 0xffffffff
         elif arglen == 2:
             self.seedw = int(args[0]) & 0xffffffff
-            self.seedz = int(args[1]) & 0Xffffffff
+            self.seedz = int(args[1]) & 0xffffffff
         else:
-            self.seedw = 0
-            self.seedz = 0
-
-        # The seeds cannot be 0
-        if self.seedw == 0:
-            self.seedw += 22233
-        if self.seedz == 0:
-            self.seedz += 11133
+            self.seedw = 521288629
+            self.seedz = 362436069
 
     def rand32(self):
         """
@@ -59,9 +53,13 @@ class suite_random:
         """
         w = self.seedw
         z = self.seedz
-        self.seedw = (18000 * (w & 0xffff) + (w >> 16)) & 0xffffffff
-        self.seedz = (36969 * (z & 0xffff) + (z >> 16)) & 0xffffffff
-        return ((z << 16) + w) & 0xffffffff
+        if w == 0 or z == 0:
+            self.seedw = 521288629
+            self.seedz = 362436069
+
+        self.seedz = (36969 * (z & 65535) + (z >> 16)) & 0xffffffff
+        self.seedw = (18000 * (w & 65535) + (w >> 16)) & 0xffffffff
+        return ((z << 16) + w & 65535) & 0xffffffff
 
     def rand_range(self, n, m):
         """

@@ -98,6 +98,7 @@ typedef struct {
 	uint8_t ops[100];		/* Operation schedule */
 } WORKLOAD;
 
+#define	LOG_PARTIAL_CONFIG	",log=(enabled=false)"
 /*
  * NOTE:  If you add any fields to this structure here, you must also add
  * an initialization in wtperf.c in the default_cfg.
@@ -105,6 +106,7 @@ typedef struct {
 struct __config {			/* Configuration structure */
 	const char *home;		/* WiredTiger home */
 	const char *monitor_dir;	/* Monitor output dir */
+	const char *partial_config;	/* Config string for partial logging */
 	char *base_uri;			/* Object URI */
 	char **uris;			/* URIs if multiple tables */
 	const char *helium_mount;	/* Optional Helium mount point */
@@ -209,7 +211,7 @@ typedef struct {
 struct __config_thread {		/* Per-thread structure */
 	CONFIG *cfg;			/* Enclosing configuration */
 
-	uint32_t rnd[2];		/* Random number generation state */
+	uint64_t rnd;			/* Random number generation state */
 
 	pthread_t handle;		/* Handle */
 

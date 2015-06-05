@@ -67,6 +67,7 @@ flags = {
         'VERB_FILEOPS',
         'VERB_LOG',
         'VERB_LSM',
+        'VERB_LSM_MANAGER',
         'VERB_METADATA',
         'VERB_MUTEX',
         'VERB_OVERFLOW',

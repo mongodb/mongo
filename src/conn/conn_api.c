@@ -406,15 +406,14 @@ __wt_encryptor_config(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval,
 	WT_KEYED_ENCRYPTOR *kenc;
 	WT_NAMED_ENCRYPTOR *nenc;
 	uint64_t bucket, hash;
-	int locked;
 
 	*kencryptorp = NULL;
+
 	kenc = NULL;
 	conn = S2C(session);
-	locked = 0;
 
 	__wt_spin_lock(session, &conn->encryptor_lock);
-	locked = 1;
+
 	WT_ERR(__encryptor_confchk(session, cval, &nenc));
 	if (nenc == NULL) {
 		if (keyid->len != 0)
@@ -462,8 +461,7 @@ err:	if (kenc != NULL) {
 		__wt_free(session, kenc->keyid);
 		__wt_free(session, kenc);
 	}
-	if (locked)
-		__wt_spin_unlock(session, &conn->encryptor_lock);
+	__wt_spin_unlock(session, &conn->encryptor_lock);
 	return (ret);
 }
 
@@ -1721,8 +1719,8 @@ __conn_write_base_config(WT_SESSION_IMPL *session, const char *cfg[])
 	 * to be stripped out from the base configuration file; do that now, and
 	 * merge the rest to be written.
 	 */
-	WT_ERR(__wt_config_merge(session,
-	    cfg + 1, "create=,encryption=(secretkey=)", &base_config));
+	WT_ERR(__wt_config_merge(session, cfg + 1,
+	    "create=,encryption=(secretkey=),log=(recover=)", &base_config));
 	WT_ERR(__wt_config_init(session, &parser, base_config));
 	while ((ret = __wt_config_next(&parser, &k, &v)) == 0) {
 		/* Fix quoting for non-trivial settings. */
@@ -1741,8 +1739,7 @@ __conn_write_base_config(WT_SESSION_IMPL *session, const char *cfg[])
 
 	if (0) {
 		/* Close open file handle, remove any temporary file. */
-err:		if (fp != NULL)
-			WT_TRET(__wt_fclose(&fp, WT_FHANDLE_WRITE));
+err:		WT_TRET(__wt_fclose(&fp, WT_FHANDLE_WRITE));
 		WT_TRET(__wt_remove_if_exists(session, WT_BASECONFIG_SET));
 	}
 
@@ -1822,7 +1819,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	session = conn->default_session = &conn->dummy_session;
 	session->iface.connection = &conn->iface;
 	session->name = "wiredtiger_open";
-	__wt_random_init(session->rnd);
+	__wt_random_init(&session->rnd);
 	__wt_event_handler_set(session, event_handler);
 
 	/* Remaining basic initialization of the connection structure. */

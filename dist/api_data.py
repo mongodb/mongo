@@ -236,6 +236,14 @@ file_config = format_meta + [
     Config('leaf_item_max', '0', r'''
         historic term for leaf_key_max and leaf_value_max''',
         min=0, undoc=True),
+    Config('log', '', r'''
+        the transaction log configuration for this object.  Only valid if
+        log is enabled in ::wiredtiger_open.''',
+        type='category', subconfig=[
+        Config('enabled', 'true', r'''
+            if false, this object has checkpoint-level durability.''',
+            type='boolean'),
+        ]),
     Config('memory_page_max', '5MB', r'''
         the maximum size a page can grow to in memory before being
         reconciled to disk.  The specified size will be adjusted to a lower
@@ -503,6 +511,7 @@ connection_runtime_config = [
             'fileops',
             'log',
             'lsm',
+            'lsm_manager',
             'metadata',
             'mutex',
             'overflow',
@@ -568,7 +577,7 @@ common_wiredtiger_open = [
         Config('secretkey', '', r'''
             A string that is passed to the WT_ENCRYPTOR::customize function.
             It is never stored in clear text, so must be given to any
-            subsequent wiredtiger_open calls to reopen the database.
+            subsequent ::wiredtiger_open calls to reopen the database.
             It must also be provided to any "wt" commands used with
             this database.'''),
         ]),
