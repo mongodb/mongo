@@ -44,6 +44,7 @@
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard_connection.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/log.h"
@@ -145,8 +146,8 @@ namespace {
                 return false;
             }
 
-            Shard to = Shard::findIfExists(toString);
-            if (!to.ok()) {
+            const auto& to = grid.shardRegistry()->findIfExists(toString);
+            if (!to) {
                 string msg(str::stream() <<
                            "Could not move chunk in '" << nss.ns() <<
                            "' to shard '" << toString <<
@@ -223,7 +224,7 @@ namespace {
 
             const Shard& from = chunk->getShard();
 
-            if (from == to) {
+            if (from == *to) {
                 errmsg = "that chunk is already on that shard";
                 return false;
             }
@@ -251,7 +252,7 @@ namespace {
             }
 
             BSONObj res;
-            if (!chunk->moveAndCommit(to,
+            if (!chunk->moveAndCommit(*to,
                                       maxChunkSizeBytes,
                                       writeConcern.get(),
                                       cmdObj["_waitForDelete"].trueValue(),

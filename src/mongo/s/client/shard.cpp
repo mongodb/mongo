@@ -110,11 +110,6 @@ namespace {
         invariant(_cs.isValid());
     }
 
-    Shard Shard::findIfExists( const string& shardName ) {
-        ShardPtr shard = grid.shardRegistry()->findIfExists( shardName );
-        return shard ? *shard : Shard::EMPTY;
-    }
-
     void Shard::reset(const string& ident) {
         auto shard = grid.shardRegistry()->findIfExists(ident);
         invariant(shard);
@@ -139,10 +134,6 @@ namespace {
         }
 
         return false;
-    }
-
-    void Shard::getAllShards( vector<Shard>& all ) {
-        grid.shardRegistry()->getAllShards( all );
     }
 
     bool Shard::isAShardNode( const string& ident ) {
@@ -215,21 +206,27 @@ namespace {
     }
 
     Shard Shard::pick() {
-        vector<Shard> all;
-        grid.shardRegistry()->getAllShards( all );
+        vector<ShardId> all;
+        grid.shardRegistry()->getAllShardIds(&all);
         if ( all.size() == 0 ) {
             grid.shardRegistry()->reload();
-            grid.shardRegistry()->getAllShards( all );
+            grid.shardRegistry()->getAllShardIds(&all);
             if ( all.size() == 0 )
                 return EMPTY;
         }
 
-        Shard bestShard = all[0];
-        ShardStatus bestStatus = bestShard.getStatus();
+        auto bestShard = grid.shardRegistry()->findIfExists(all[0]);
+        if (!bestShard) {
+            return EMPTY;
+        }
+        ShardStatus bestStatus = bestShard->getStatus();
 
-        for (size_t i = 0; i < all.size(); i++) {
-            Shard shard = all[i];
-            ShardStatus status = shard.getStatus();
+        for (size_t i = 1; i < all.size(); i++) {
+            const auto& shard = grid.shardRegistry()->findIfExists(all[i]);
+            if (!shard) {
+                continue;
+            }
+            const ShardStatus status = shard->getStatus();
 
             if (status < bestStatus) {
                 bestShard = shard;
@@ -238,13 +235,12 @@ namespace {
         }
 
         LOG(1) << "best shard for new allocation is " << bestStatus;
-        return bestShard;
+        return *bestShard;
     }
 
     void Shard::installShard(const std::string& name, const Shard& shard) {
         grid.shardRegistry()->set(name, shard);
     }
-
 
     ShardStatus::ShardStatus(long long dataSizeBytes, const string& mongoVersion)
         : _dataSizeBytes(dataSizeBytes),

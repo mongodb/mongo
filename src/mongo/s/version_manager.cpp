@@ -43,6 +43,7 @@
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard_connection.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/mongos_options.h"
@@ -199,11 +200,12 @@ namespace mongo {
             // Check to see if this is actually a shard and not a single config server
             // NOTE: Config servers are registered only by the name "config" in the shard cache, not
             // by host, so lookup by host will fail unless the host is also a shard.
-            Shard shard = Shard::findIfExists(conn->getServerAddress());
-            if (!shard.ok())
+            const auto& shard = grid.shardRegistry()->findIfExists(conn->getServerAddress());
+            if (!shard) {
                 return false;
+            }
 
-            LOG(1) << "initializing shard connection to " << shard.toString() << endl;
+            LOG(1) << "initializing shard connection to " << shard->toString() << endl;
 
             ok = setShardVersion(*conn,
                                  "",

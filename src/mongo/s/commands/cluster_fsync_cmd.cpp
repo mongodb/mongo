@@ -30,6 +30,8 @@
 
 #include "mongo/db/commands.h"
 #include "mongo/s/client/shard.h"
+#include "mongo/s/client/shard_registry.h"
+#include "mongo/s/grid.h"
 
 namespace mongo {
 namespace {
@@ -79,13 +81,17 @@ namespace {
             bool ok = true;
             int numFiles = 0;
 
-            std::vector<Shard> shards;
-            Shard::getAllShards(shards);
-            for (std::vector<Shard>::const_iterator i = shards.begin(); i != shards.end(); i++) {
-                Shard s = *i;
+            std::vector<ShardId> shardIds;
+            grid.shardRegistry()->getAllShardIds(&shardIds);
 
-                BSONObj x = s.runCommand("admin", "fsync");
-                sub.append(s.getName(), x);
+            for (const ShardId& shardId : shardIds) {
+                const auto& s = grid.shardRegistry()->findIfExists(shardId);
+                if (!s) {
+                    continue;
+                }
+
+                BSONObj x = s->runCommand("admin", "fsync");
+                sub.append(s->getName(), x);
 
                 if (!x["ok"].trueValue()) {
                     ok = false;

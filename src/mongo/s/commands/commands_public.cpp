@@ -53,6 +53,7 @@
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard_connection.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_explain.h"
 #include "mongo/s/cluster_last_error_info.h"
 #include "mongo/s/commands/cluster_commands_common.h"
@@ -147,9 +148,15 @@ namespace mongo {
                     shards.insert(conf->getShard(fullns));
                 }
                 else {
-                    vector<Shard> shardList;
-                    Shard::getAllShards(shardList);
-                    shards.insert(shardList.begin(), shardList.end());
+                    vector<ShardId> shardIds;
+                    grid.shardRegistry()->getAllShardIds(&shardIds);
+
+                    for (const ShardId& shardId : shardIds) {
+                        const auto& shard = grid.shardRegistry()->findIfExists(shardId);
+                        if (shard) {
+                            shards.insert(*shard);
+                        }
+                    }
                 }
             }
         };

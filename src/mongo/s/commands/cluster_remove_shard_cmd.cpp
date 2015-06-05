@@ -38,6 +38,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/util/log.h"
@@ -87,8 +88,8 @@ namespace {
 
             const string target = cmdObj.firstElement().valuestrsafe();
 
-            Shard s = Shard::findIfExists(target);
-            if (!s.ok()) {
+            const auto& s = grid.shardRegistry()->findIfExists(target);
+            if (!s) {
                 string msg(str::stream() <<
                            "Could not drop shard '" << target <<
                            "' because it does not exist");
@@ -98,13 +99,13 @@ namespace {
             }
 
             StatusWith<ShardDrainingStatus> removeShardResult =
-                grid.catalogManager()->removeShard(txn, s.getName());
+                grid.catalogManager()->removeShard(txn, s->getName());
             if (!removeShardResult.isOK()) {
                 return appendCommandStatus(result, removeShardResult.getStatus());
             }
 
             vector<string> databases;
-            grid.catalogManager()->getDatabasesForShard(s.getName(), &databases);
+            grid.catalogManager()->getDatabasesForShard(s->getName(), &databases);
 
             // Get BSONObj containing:
             // 1) note about moving or dropping databases in a shard
@@ -131,13 +132,13 @@ namespace {
             case ShardDrainingStatus::STARTED:
                 result.append("msg", "draining started successfully");
                 result.append("state", "started");
-                result.append("shard", s.getName());
+                result.append("shard", s->getName());
                 result.appendElements(dbInfo);
                 break;
             case ShardDrainingStatus::ONGOING: {
                 vector<ChunkType> chunks;
                 Status status = grid.catalogManager()->getChunks(
-                                            Query(BSON(ChunkType::shard(s.getName()))),
+                                            Query(BSON(ChunkType::shard(s->getName()))),
                                             0,  // return all
                                             &chunks);
                 if (!status.isOK()) {
@@ -159,7 +160,7 @@ namespace {
             case ShardDrainingStatus::COMPLETED:
                 result.append("msg", "removeshard completed successfully");
                 result.append("state", "completed");
-                result.append("shard", s.getName());
+                result.append("shard", s->getName());
             }
 
             return true;

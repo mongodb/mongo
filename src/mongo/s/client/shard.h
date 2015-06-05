@@ -80,13 +80,6 @@ namespace mongo {
         }
 
         /**
-         * Returns a Shard corresponding to 'shardName' if such a shard
-         * exists.
-         * If not, it returns Shard::EMPTY
-         */
-        static Shard findIfExists( const std::string& shardName );
-
-        /**
          * @param ident either name or address
          */
         void reset( const std::string& ident );
@@ -144,7 +137,6 @@ namespace mongo {
          */
         bool containsNode( const std::string& node ) const;
 
-        static void getAllShards( std::vector<Shard>& all );
         static Shard lookupRSName( const std::string& name);
         
         /**

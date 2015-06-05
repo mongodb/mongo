@@ -40,6 +40,8 @@ namespace mongo {
     class Shard;
     class ShardType;
 
+    using ShardId = std::string;
+
     /**
      * Maintains the set of all shards known to the MongoS instance.
      */
@@ -50,7 +52,7 @@ namespace mongo {
 
         void reload();
 
-        boost::shared_ptr<Shard> findIfExists(const std::string& shardName);
+        boost::shared_ptr<Shard> findIfExists(const ShardId& id);
 
         /**
          * Lookup shard by replica set name. Returns Shard::EMTPY if the name can't be found.
@@ -59,18 +61,18 @@ namespace mongo {
          */
         Shard lookupRSName(const std::string& name);
 
-        void set(const std::string& name, const Shard& s);
+        void set(const ShardId& id, const Shard& s);
 
-        void remove(const std::string& name);
+        void remove(const ShardId& id);
 
-        void getAllShards(std::vector<Shard>& all) const;
+        void getAllShardIds(std::vector<ShardId>* all) const;
 
         bool isAShardNode(const std::string& addr) const;
 
         void toBSON(BSONObjBuilder* result) const;
 
     private:
-        typedef std::map<std::string, boost::shared_ptr<Shard>> ShardMap;
+        typedef std::map<ShardId, boost::shared_ptr<Shard>> ShardMap;
 
 
         /**
@@ -78,8 +80,7 @@ namespace mongo {
          */
         void _addShard_inlock(const ShardType& shardType);
 
-        boost::shared_ptr<Shard> _findUsingLookUp(const std::string& shardName);
-
+        boost::shared_ptr<Shard> _findUsingLookUp(const ShardId& id);
 
         // Catalog manager from which to load the shard information. Not owned and must outlive
         // the shard registry object.
