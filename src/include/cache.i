@@ -170,7 +170,7 @@ __wt_eviction_check(WT_SESSION_IMPL *session, int *fullp, int wake)
 	if (bytes_inuse <= (cache->eviction_trigger * bytes_max) / 100) {
 		dirty_inuse = __wt_cache_dirty_inuse(cache);
 		if (dirty_inuse <=
-		    (cache->eviction_dirty_target * bytes_max) / 100)
+		    (cache->eviction_dirty_trigger * bytes_max) / 100)
 			return (0);
 	}
 	return (__wt_evict_server_wake(session));

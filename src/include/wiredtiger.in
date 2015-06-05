@@ -1680,7 +1680,11 @@ struct __wt_connection {
 	 * @config{eviction_dirty_target, continue evicting until the cache has
 	 * less dirty memory than the value\, as a percentage of the total cache
 	 * size.  Dirty pages will only be evicted if the cache is full enough
-	 * to trigger eviction., an integer between 10 and 99; default \c 80.}
+	 * to trigger eviction., an integer between 5 and 99; default \c 80.}
+	 * @config{eviction_dirty_trigger, trigger eviction when the cache is
+	 * using this much memory for dirty content\, as a percentage of the
+	 * total cache size.  This setting only alters behavior if it is lower
+	 * than eviction_trigger., an integer between 5 and 99; default \c 95.}
 	 * @config{eviction_target, continue evicting until the cache has less
 	 * total memory than the value\, as a percentage of the total cache
 	 * size.  Must be less than \c eviction_trigger., an integer between 10
@@ -2096,7 +2100,11 @@ struct __wt_connection {
  * @config{eviction_dirty_target, continue evicting until the cache has less
  * dirty memory than the value\, as a percentage of the total cache size.  Dirty
  * pages will only be evicted if the cache is full enough to trigger eviction.,
- * an integer between 10 and 99; default \c 80.}
+ * an integer between 5 and 99; default \c 80.}
+ * @config{eviction_dirty_trigger, trigger eviction when the cache is using this
+ * much memory for dirty content\, as a percentage of the total cache size.
+ * This setting only alters behavior if it is lower than eviction_trigger., an
+ * integer between 5 and 99; default \c 95.}
  * @config{eviction_target, continue evicting until the cache has less total
  * memory than the value\, as a percentage of the total cache size.  Must be
  * less than \c eviction_trigger., an integer between 10 and 99; default \c 80.}
