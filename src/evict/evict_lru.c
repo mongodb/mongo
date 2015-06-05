@@ -1513,7 +1513,12 @@ __wt_cache_wait(WT_SESSION_IMPL *session, int full)
 		WT_RET(__wt_eviction_check(session, &full, 0));
 		if (full < 100)
 			return (0);
-		else if (ret == 0)
+		/*
+		 * The value of ret is set in the switch statement above (and
+		 * not altered by WT_RET), so it's 0 or WT_NOTFOUND depending
+		 * on whether or not there was a page to evict in the queue.
+		 */
+		if (ret == 0)
 			continue;
 
 		/*
@@ -1539,6 +1544,7 @@ __wt_cache_wait(WT_SESSION_IMPL *session, int full)
 			busy = count = 1;
 	}
 }
+
 #ifdef HAVE_DIAGNOSTIC
 /*
  * __wt_cache_dump --
