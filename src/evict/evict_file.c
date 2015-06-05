@@ -76,12 +76,12 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 			/*
 			 * Evict the page.
 			 */
-			WT_ERR(__wt_evict(session, ref, WT_EVICT_EXCLUSIVE));
+			WT_ERR(__wt_evict(session, ref, 1));
 			break;
 		case WT_SYNC_DISCARD:
 			WT_ASSERT(session,
 			    __wt_page_can_evict(session, page, 0, NULL));
-			__wt_evict_page_clean_update(session, ref);
+			__wt_evict_page_clean_update(session, ref, 1);
 			break;
 		case WT_SYNC_DISCARD_FORCE:
 			/*
@@ -97,7 +97,7 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 			}
 
 			F_SET(session, WT_SESSION_DISCARD_FORCE);
-			__wt_evict_page_clean_update(session, ref);
+			__wt_evict_page_clean_update(session, ref, 1);
 			F_CLR(session, WT_SESSION_DISCARD_FORCE);
 			break;
 		WT_ILLEGAL_VALUE_ERR(session);
