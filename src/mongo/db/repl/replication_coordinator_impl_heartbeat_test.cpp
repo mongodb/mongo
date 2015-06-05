@@ -158,8 +158,8 @@ namespace {
         BSONObj updatePositionCommand = updatePositionBuilder.obj();
         log() << updatePositionCommand.toString();
         ASSERT_EQ(OpTime(100,0),
-                  updatePositionCommand["optimes"].Array()[0].Obj()["optime"]._opTime());
-        ASSERT_EQ(1, updatePositionCommand["optimes"].Array()[0].Obj()["memberId"].numberInt());
+                  updatePositionCommand["optimes"].Array()[1].Obj()["optime"]._opTime());
+        ASSERT_EQ(1, updatePositionCommand["optimes"].Array()[1].Obj()["memberId"].numberInt());
     }
 
     TEST_F(ReplCoordHBTest, DoNotJoinReplSetIfNotAMember) {
