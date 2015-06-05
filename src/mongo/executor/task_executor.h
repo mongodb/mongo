@@ -48,7 +48,7 @@ namespace executor {
     /**
      * Generic event loop with notions of events and callbacks.
      *
-     * Callbacks are function objects representing work to be performed by the executor.
+     * Callbacks represent work to be performed by the executor.
      * They may be scheduled by client threads or by other callbacks.  Methods that
      * schedule callbacks return a CallbackHandle if they are able to enqueue the callback in the
      * appropriate work queue.  Every CallbackHandle represents an invocation of a function that
@@ -101,6 +101,11 @@ namespace executor {
         virtual ~TaskExecutor();
 
         /**
+         * Signals to the executor that it should shut down.
+         */
+        virtual void shutdown() = 0;
+
+        /**
          * Returns diagnostic information.
          */
         virtual std::string getDiagnosticString() = 0;
@@ -125,7 +130,7 @@ namespace executor {
          *
          * May be called by client threads or callbacks running in the executor.
          */
-        void signalEvent(const EventHandle& event);
+        virtual void signalEvent(const EventHandle& event) = 0;
 
         /**
          * Schedules a callback, "work", to run after "event" is signaled.  If "event"
@@ -148,7 +153,7 @@ namespace executor {
          * TODO(schwerin): Change return type so that the caller can know which of the two reasons
          * led to this method returning.
          */
-         void waitForEvent(const EventHandle& event);
+         virtual void waitForEvent(const EventHandle& event) = 0;
 
         /**
          * Schedules "work" to be run by the executor ASAP.
@@ -189,7 +194,7 @@ namespace executor {
          *
          * May be called by client threads or callbacks running in the executor.
          */
-        void cancel(const CallbackHandle& cbHandle);
+        virtual void cancel(const CallbackHandle& cbHandle) = 0;
 
         /**
          * Blocks until the executor finishes running the callback referenced by "cbHandle".
@@ -200,13 +205,24 @@ namespace executor {
          *
          * NOTE: Do not call from a callback running in the executor.
          */
-        void wait(const CallbackHandle& cbHandle);
+        virtual void wait(const CallbackHandle& cbHandle) = 0;
 
     protected:
 
         TaskExecutor();
+
+        // Retrieves the Callback from a given CallbackHandle
         CallbackState* getCallbackFromHandle(const CallbackHandle& cbHandle);
+
+        // Retrieves the Event from a given EventHandle
         EventState* getEventFromHandle(const EventHandle& eventHandle);
+
+        // Sets the given CallbackHandle to point to the given callback.
+        void setCallbackForHandle(CallbackHandle* cbHandle,
+                                  std::shared_ptr<CallbackState> callback);
+
+        // Sets the given EventHandle to point to the given event.
+        void setEventForHandle(EventHandle* eventHandle, std::shared_ptr<EventState> event);
     };
 
     /**
@@ -235,6 +251,7 @@ namespace executor {
 
     public:
 
+        CallbackHandle();
         explicit CallbackHandle(std::shared_ptr<CallbackState> cbData);
 
         bool operator==(const CallbackHandle &other) const {
@@ -245,9 +262,17 @@ namespace executor {
             return !(*this == other);
         }
 
+        bool isValid() const {
+            return _callback.get();
+        }
+
     private:
 
-        CallbackState* getCallbackState() const {
+        void setCallback(std::shared_ptr<CallbackState> callback) {
+            _callback = callback;
+        }
+
+        CallbackState* getCallback() const {
             return _callback.get();
         }
 
@@ -280,6 +305,7 @@ namespace executor {
 
     public:
 
+        EventHandle();
         explicit EventHandle(std::shared_ptr<EventState> event);
 
         bool operator==(const EventHandle &other) const {
@@ -290,9 +316,17 @@ namespace executor {
             return !(*this == other);
         }
 
+        bool isValid() const {
+            return _event.get();
+        }
+
     private:
 
-        EventState* getEventState() const {
+        void setEvent(std::shared_ptr<EventState> event) {
+            _event = event;
+        }
+
+        EventState* getEvent() const {
             return _event.get();
         }
 

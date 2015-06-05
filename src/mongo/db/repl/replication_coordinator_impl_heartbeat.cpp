@@ -61,7 +61,7 @@ namespace {
 
 }  //namespace
 
-    void ReplicationCoordinatorImpl::_doMemberHeartbeat(ReplicationExecutor::CallbackData cbData,
+    void ReplicationCoordinatorImpl::_doMemberHeartbeat(ReplicationExecutor::CallbackArgs cbData,
                                                         const HostAndPort& target,
                                                         int targetIndex) {
 
@@ -119,7 +119,7 @@ namespace {
     }
 
     void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
-            const ReplicationExecutor::RemoteCommandCallbackData& cbData, int targetIndex) {
+            const ReplicationExecutor::RemoteCommandCallbackArgs& cbData, int targetIndex) {
 
         // remove handle from queued heartbeats
         _untrackHeartbeatHandle(cbData.myHandle);
@@ -248,7 +248,7 @@ namespace {
     /**
      * This callback is purely for logging and has no effect on any other operations
      */
-    void remoteStepdownCallback(const ReplicationExecutor::RemoteCommandCallbackData& cbData) {
+    void remoteStepdownCallback(const ReplicationExecutor::RemoteCommandCallbackArgs& cbData) {
 
         const Status status = cbData.response.getStatus();
         if (status == ErrorCodes::CallbackCanceled) {
@@ -287,7 +287,7 @@ namespace {
     }
 
     void ReplicationCoordinatorImpl::_stepDownFinish(
-            const ReplicationExecutor::CallbackData& cbData) {
+            const ReplicationExecutor::CallbackArgs& cbData) {
 
         if (cbData.status == ErrorCodes::CallbackCanceled) {
             return;
@@ -354,7 +354,7 @@ namespace {
     }
 
     void ReplicationCoordinatorImpl::_heartbeatReconfigAfterElectionCanceled(
-            const ReplicationExecutor::CallbackData& cbData,
+            const ReplicationExecutor::CallbackArgs& cbData,
             const ReplicaSetConfig& newConfig) {
         if (cbData.status == ErrorCodes::CallbackCanceled) {
             return;
@@ -373,7 +373,7 @@ namespace {
     }
 
     void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
-        const ReplicationExecutor::CallbackData& cbd,
+        const ReplicationExecutor::CallbackArgs& cbd,
         const ReplicaSetConfig& newConfig) {
 
         if (cbd.status.code() == ErrorCodes::CallbackCanceled) {
@@ -429,7 +429,7 @@ namespace {
             _externalState->startThreads();
         }
 
-        const stdx::function<void (const ReplicationExecutor::CallbackData&)> reconfigFinishFn(
+        const stdx::function<void (const ReplicationExecutor::CallbackArgs&)> reconfigFinishFn(
                 stdx::bind(&ReplicationCoordinatorImpl::_heartbeatReconfigFinish,
                            this,
                            stdx::placeholders::_1,
@@ -452,7 +452,7 @@ namespace {
     }
 
     void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
-            const ReplicationExecutor::CallbackData& cbData,
+            const ReplicationExecutor::CallbackArgs& cbData,
             const ReplicaSetConfig& newConfig,
             StatusWith<int> myIndex) {
         if (cbData.status == ErrorCodes::CallbackCanceled) {

@@ -69,7 +69,7 @@ namespace {
             _topo.reset(new TopologyCoordinatorImpl(Seconds(100)));
             _now = Date_t();
             _selfIndex = -1;
-            _cbData.reset(new ReplicationExecutor::CallbackData(
+            _cbData.reset(new ReplicationExecutor::CallbackArgs(
                         NULL, ReplicationExecutor::CallbackHandle(), Status::OK()));
         }
 
@@ -80,7 +80,7 @@ namespace {
 
     protected:
         TopologyCoordinatorImpl& getTopoCoord() {return *_topo;}
-        ReplicationExecutor::CallbackData cbData() {return *_cbData;}
+        ReplicationExecutor::CallbackArgs cbData() {return *_cbData;}
         Date_t& now() {return _now;}
 
         int64_t countLogLinesContaining(const std::string& needle) {
@@ -211,7 +211,7 @@ namespace {
 
     private:
         unique_ptr<TopologyCoordinatorImpl> _topo;
-        unique_ptr<ReplicationExecutor::CallbackData> _cbData;
+        unique_ptr<ReplicationExecutor::CallbackArgs> _cbData;
         Date_t _now;
         int _selfIndex;
     };
@@ -2880,7 +2880,7 @@ namespace {
     protected:
         Date_t now;
         OID round;
-        ReplicationExecutor::CallbackData cbData;
+        ReplicationExecutor::CallbackArgs cbData;
     };
 
     TEST_F(PrepareElectResponseTest, ElectResponseIncorrectReplSetName) {
@@ -3304,10 +3304,10 @@ namespace {
                       ReplicationExecutor::CallbackHandle(),
                       Status(ErrorCodes::CallbackCanceled, "")) {}
 
-        virtual ReplicationExecutor::CallbackData cbData() { return ourCbData; }
+        virtual ReplicationExecutor::CallbackArgs cbData() { return ourCbData; }
 
     private:
-        ReplicationExecutor::CallbackData ourCbData;
+        ReplicationExecutor::CallbackArgs ourCbData;
     };
 
     TEST_F(ShutdownInProgressTest, ShutdownInProgressWhenCallbackCanceledSyncFrom) {

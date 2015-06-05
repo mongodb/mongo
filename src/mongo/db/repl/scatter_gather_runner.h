@@ -102,7 +102,7 @@ namespace repl {
         /**
          * Callback invoked once for every response from the network.
          */
-        static void _processResponse(const ReplicationExecutor::RemoteCommandCallbackData& cbData,
+        static void _processResponse(const ReplicationExecutor::RemoteCommandCallbackArgs& cbData,
                                      ScatterGatherRunner* runner);
 
         /**

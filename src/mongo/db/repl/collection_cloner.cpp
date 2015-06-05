@@ -252,7 +252,7 @@ namespace repl {
         _dbWorkCallbackHandle = scheduleResult.getValue();
     }
 
-    void CollectionCloner::_beginCollectionCallback(const ReplicationExecutor::CallbackData& cbd) {
+    void CollectionCloner::_beginCollectionCallback(const ReplicationExecutor::CallbackArgs& cbd) {
         OperationContext* txn = cbd.txn;
         if (!cbd.status.isOK()) {
             _finishCallback(txn, cbd.status);
@@ -272,7 +272,7 @@ namespace repl {
         }
     }
 
-    void CollectionCloner::_insertDocumentsCallback(const ReplicationExecutor::CallbackData& cbd,
+    void CollectionCloner::_insertDocumentsCallback(const ReplicationExecutor::CallbackArgs& cbd,
                                                     bool lastBatch) {
         OperationContext* txn = cbd.txn;
         if (!cbd.status.isOK()) {

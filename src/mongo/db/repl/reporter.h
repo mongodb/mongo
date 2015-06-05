@@ -95,7 +95,7 @@ namespace repl {
         /**
          * Callback for remote command.
          */
-        void _callback(const ReplicationExecutor::RemoteCommandCallbackData& rcbd);
+        void _callback(const ReplicationExecutor::RemoteCommandCallbackArgs& rcbd);
 
         // Not owned by us.
         ReplicationExecutor* _executor;

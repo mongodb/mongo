@@ -350,7 +350,7 @@ namespace {
     }
 
     void TopologyCoordinatorImpl::prepareSyncFromResponse(
-            const ReplicationExecutor::CallbackData& data,
+            const ReplicationExecutor::CallbackArgs& data,
             const HostAndPort& target,
             const OpTime& lastOpApplied,
             BSONObjBuilder* response,
@@ -1424,7 +1424,7 @@ namespace {
     }
 
     void TopologyCoordinatorImpl::prepareStatusResponse(
-            const ReplicationExecutor::CallbackData& data,
+            const ReplicationExecutor::CallbackArgs& data,
             Date_t now,
             unsigned selfUptime,
             const OpTime& lastOpApplied,

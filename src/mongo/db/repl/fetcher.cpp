@@ -232,7 +232,7 @@ namespace {
         return Status::OK();
     }
 
-    void Fetcher::_callback(const ReplicationExecutor::RemoteCommandCallbackData& rcbd,
+    void Fetcher::_callback(const ReplicationExecutor::RemoteCommandCallbackArgs& rcbd,
                             const char* batchFieldName) {
 
         if (!rcbd.response.isOK()) {

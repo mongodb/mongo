@@ -127,7 +127,7 @@ namespace repl {
         }
     }
 
-    void Applier::_callback(const ReplicationExecutor::CallbackData& cbd) {
+    void Applier::_callback(const ReplicationExecutor::CallbackArgs& cbd) {
         if (!cbd.status.isOK()) {
             _finishCallback(cbd.status, _operations);
             return;

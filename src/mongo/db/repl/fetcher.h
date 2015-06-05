@@ -158,7 +158,7 @@ namespace repl {
         /**
          * Callback for remote command.
          */
-        void _callback(const ReplicationExecutor::RemoteCommandCallbackData& rcbd,
+        void _callback(const ReplicationExecutor::RemoteCommandCallbackArgs& rcbd,
                        const char* batchFieldName);
 
         /**

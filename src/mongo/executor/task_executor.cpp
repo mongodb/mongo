@@ -39,12 +39,14 @@ namespace executor {
     TaskExecutor::CallbackState::CallbackState() = default;
     TaskExecutor::CallbackState::~CallbackState() = default;
 
+    TaskExecutor::CallbackHandle::CallbackHandle() = default;
     TaskExecutor::CallbackHandle::CallbackHandle(std::shared_ptr<CallbackState> callback) :
             _callback(std::move(callback)) {}
 
     TaskExecutor::EventState::EventState() = default;
     TaskExecutor::EventState::~EventState() = default;
 
+    TaskExecutor::EventHandle::EventHandle() = default;
     TaskExecutor::EventHandle::EventHandle(std::shared_ptr<EventState> event) :
             _event(std::move(event)) {}
 
@@ -72,28 +74,22 @@ namespace executor {
 
     TaskExecutor::CallbackState* TaskExecutor::getCallbackFromHandle(
             const CallbackHandle& cbHandle) {
-        return cbHandle.getCallbackState();
+        return cbHandle.getCallback();
     }
 
     TaskExecutor::EventState* TaskExecutor::getEventFromHandle(const EventHandle& eventHandle) {
-        return eventHandle.getEventState();
+        return eventHandle.getEvent();
     }
 
-    void TaskExecutor::signalEvent(const EventHandle& event) {
-        getEventFromHandle(event)->signal();
+    void TaskExecutor::setEventForHandle(EventHandle* eventHandle,
+                                        std::shared_ptr<EventState> event) {
+        eventHandle->setEvent(std::move(event));
     }
 
-    void TaskExecutor::waitForEvent(const EventHandle& event) {
-        getEventFromHandle(event)->waitUntilSignaled();
+    void TaskExecutor::setCallbackForHandle(CallbackHandle* cbHandle,
+                                           std::shared_ptr<CallbackState> callback) {
+        cbHandle->setCallback(std::move(callback));
     }
-
-    void TaskExecutor::cancel(const CallbackHandle& cbHandle) {
-        getCallbackFromHandle(cbHandle)->cancel();
-    };
-
-    void TaskExecutor::wait(const CallbackHandle& cbHandle) {
-        getCallbackFromHandle(cbHandle)->waitForCompletion();
-    };
 
 } // namespace executor
 } // namespace mongo

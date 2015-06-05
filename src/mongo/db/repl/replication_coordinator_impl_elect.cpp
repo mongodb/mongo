@@ -269,7 +269,7 @@ namespace {
     }
 
     void ReplicationCoordinatorImpl::_recoverFromElectionTie(
-            const ReplicationExecutor::CallbackData& cbData) {
+            const ReplicationExecutor::CallbackArgs& cbData) {
         if (!cbData.status.isOK()) {
             return;
         }

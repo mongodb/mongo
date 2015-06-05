@@ -59,7 +59,7 @@ namespace {
 
         void waitForTest();
 
-        void electCmdRunnerRunner(const ReplicationExecutor::CallbackData& data,
+        void electCmdRunnerRunner(const ReplicationExecutor::CallbackArgs& data,
                                   ElectCmdRunner* electCmdRunner,
                                   StatusWith<ReplicationExecutor::EventHandle>* evh,
                                   const ReplicaSetConfig& currentConfig,
@@ -124,7 +124,7 @@ namespace {
     // This is necessary because the run method must be scheduled in the Replication Executor
     // for correct concurrency operation.
     void ElectCmdRunnerTest::electCmdRunnerRunner(
-            const ReplicationExecutor::CallbackData& data,
+            const ReplicationExecutor::CallbackArgs& data,
             ElectCmdRunner* electCmdRunner,
             StatusWith<ReplicationExecutor::EventHandle>* evh,
             const ReplicaSetConfig& currentConfig,
@@ -132,8 +132,10 @@ namespace {
             const std::vector<HostAndPort>& hosts) {
 
         invariant(data.status.isOK());
+        ReplicationExecutor* executor = dynamic_cast<ReplicationExecutor*>(data.executor);
+        ASSERT(executor);
         *evh = electCmdRunner->start(
-                data.executor,
+                executor,
                 currentConfig,
                 selfIndex,
                 hosts);

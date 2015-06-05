@@ -120,7 +120,7 @@ namespace repl {
         return Status::OK();
     }
 
-    void Reporter::_callback(const ReplicationExecutor::RemoteCommandCallbackData& rcbd) {
+    void Reporter::_callback(const ReplicationExecutor::RemoteCommandCallbackArgs& rcbd) {
         boost::lock_guard<boost::mutex> lk(_mutex);
 
         _status = rcbd.response.getStatus();

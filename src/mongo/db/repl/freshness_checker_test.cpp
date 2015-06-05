@@ -79,7 +79,7 @@ namespace {
         std::unique_ptr<boost::thread> _executorThread;
 
     private:
-        void freshnessCheckerRunner(const ReplicationExecutor::CallbackData& data,
+        void freshnessCheckerRunner(const ReplicationExecutor::CallbackArgs& data,
                                     const Timestamp& lastOpTimeApplied,
                                     const ReplicaSetConfig& currentConfig,
                                     int selfIndex,
@@ -135,14 +135,16 @@ namespace {
     // This is necessary because the run method must be scheduled in the Replication Executor
     // for correct concurrency operation.
     void FreshnessCheckerTest::freshnessCheckerRunner(
-            const ReplicationExecutor::CallbackData& data,
+            const ReplicationExecutor::CallbackArgs& data,
             const Timestamp& lastOpTimeApplied,
             const ReplicaSetConfig& currentConfig,
             int selfIndex,
             const std::vector<HostAndPort>& hosts) {
 
         invariant(data.status.isOK());
-        StatusWith<ReplicationExecutor::EventHandle> evh = _checker->start(data.executor,
+        ReplicationExecutor* executor = dynamic_cast<ReplicationExecutor*>(data.executor);
+        ASSERT(executor);
+        StatusWith<ReplicationExecutor::EventHandle> evh = _checker->start(executor,
                                                                            lastOpTimeApplied,
                                                                            currentConfig,
                                                                            selfIndex,

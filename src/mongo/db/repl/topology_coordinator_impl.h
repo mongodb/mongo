@@ -140,7 +140,7 @@ namespace repl {
         virtual void setElectionSleepUntil(Date_t newTime);
         virtual void setFollowerMode(MemberState::MS newMode);
         virtual void adjustMaintenanceCountBy(int inc);
-        virtual void prepareSyncFromResponse(const ReplicationExecutor::CallbackData& data,
+        virtual void prepareSyncFromResponse(const ReplicationExecutor::CallbackArgs& data,
                                              const HostAndPort& target,
                                              const OpTime& lastOpApplied,
                                              BSONObjBuilder* response,
@@ -165,7 +165,7 @@ namespace repl {
                                                   const std::string& ourSetName,
                                                   const OpTime& lastOpApplied,
                                                   ReplSetHeartbeatResponse* response);
-        virtual void prepareStatusResponse(const ReplicationExecutor::CallbackData& data,
+        virtual void prepareStatusResponse(const ReplicationExecutor::CallbackArgs& data,
                                            Date_t now,
                                            unsigned uptime,
                                            const OpTime& lastOpApplied,

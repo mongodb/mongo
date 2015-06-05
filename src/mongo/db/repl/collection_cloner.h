@@ -143,7 +143,7 @@ namespace repl {
          * 'nextAction' is an in/out arg indicating the next action planned and to be taken
          *  by the fetcher.
          */
-        void _beginCollectionCallback(const ReplicationExecutor::CallbackData& callbackData);
+        void _beginCollectionCallback(const ReplicationExecutor::CallbackArgs& callbackData);
 
         /**
          * Called multiple times if there are more than one batch of documents from the fetcher.
@@ -152,7 +152,7 @@ namespace repl {
          * Each document returned will be inserted via the storage interfaceRequest storage
          * interface.
          */
-        void _insertDocumentsCallback(const ReplicationExecutor::CallbackData& callbackData,
+        void _insertDocumentsCallback(const ReplicationExecutor::CallbackArgs& callbackData,
                                       bool lastBatch);
 
         /**

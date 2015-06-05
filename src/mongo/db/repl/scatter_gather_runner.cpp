@@ -49,11 +49,14 @@ namespace repl {
     ScatterGatherRunner::~ScatterGatherRunner() {
     }
 
-    static void startTrampoline(const ReplicationExecutor::CallbackData& cbData,
+    static void startTrampoline(const ReplicationExecutor::CallbackArgs& cbData,
                                 ScatterGatherRunner* runner,
                                 StatusWith<ReplicationExecutor::EventHandle>* result) {
 
-        *result = runner->start(cbData.executor);
+        // TODO: remove static cast once ScatterGatherRunner is designed to work with a generic
+        // TaskExecutor.
+        ReplicationExecutor* executor = static_cast<ReplicationExecutor*>(cbData.executor);
+        *result = runner->start(executor);
     }
 
     Status ScatterGatherRunner::run(ReplicationExecutor* executor) {
@@ -121,7 +124,7 @@ namespace repl {
     }
 
     void ScatterGatherRunner::_processResponse(
-            const ReplicationExecutor::RemoteCommandCallbackData& cbData,
+            const ReplicationExecutor::RemoteCommandCallbackArgs& cbData,
             ScatterGatherRunner* runner) {
 
         // It is possible that the ScatterGatherRunner has already gone out of scope, if the
@@ -134,7 +137,10 @@ namespace repl {
         ++runner->_actualResponses;
         runner->_algorithm->processResponse(cbData.request, cbData.response);
         if (runner->_algorithm->hasReceivedSufficientResponses()) {
-            runner->_signalSufficientResponsesReceived(cbData.executor);
+            // TODO: remove static cast once ScatterGatherRunner is designed to work with a generic
+            // TaskExecutor.
+            ReplicationExecutor* executor = static_cast<ReplicationExecutor*>(cbData.executor);
+            runner->_signalSufficientResponsesReceived(executor);
         }
         else {
             invariant(runner->_actualResponses < runner->_callbacks.size());

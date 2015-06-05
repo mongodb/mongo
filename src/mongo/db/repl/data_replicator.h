@@ -53,9 +53,9 @@ namespace repl {
 
 using Operations = Applier::Operations;
 using BatchDataStatus = StatusWith<Fetcher::BatchData>;
-using CallbackData = ReplicationExecutor::CallbackData;
+using CallbackArgs = ReplicationExecutor::CallbackArgs;
 using CBHStatus = StatusWith<ReplicationExecutor::CallbackHandle>;
-using CommandCallbackData = ReplicationExecutor::RemoteCommandCallbackData;
+using CommandCallbackArgs = ReplicationExecutor::RemoteCommandCallbackArgs;
 using Event = ReplicationExecutor::EventHandle;
 using Handle = ReplicationExecutor::CallbackHandle;
 using LockGuard = stdx::lock_guard<stdx::mutex>;
@@ -68,7 +68,6 @@ using UniqueLock = stdx::unique_lock<stdx::mutex>;
 class QueryFetcher;
 class OplogFetcher;
 struct InitialSyncState;
-
 
 /** State for decision tree */
 enum class DataReplicatorState {
@@ -167,10 +166,10 @@ private:
 //    Status _run(void*());
 
     // Only executed via executor
-    void _resumeFinish(CallbackData cbData);
+    void _resumeFinish(CallbackArgs cbData);
     void _onOplogFetchFinish(const BatchDataStatus& fetchResult,
                              Fetcher::NextAction* nextAction);
-    void _doNextActionsCB(CallbackData cbData);
+    void _doNextActionsCB(CallbackArgs cbData);
     void _doNextActions();
     void _doNextActions_InitialSync_inlock();
     void _doNextActions_Rollback_inlock();
@@ -182,7 +181,7 @@ private:
     void _pauseApplier();
 
     Operations _getNextApplierBatch_inlock();
-    void _onApplyBatchFinish(const CallbackData&,
+    void _onApplyBatchFinish(const CallbackArgs&,
                              const TimestampStatus&,
                              const Operations&,
                              const size_t numApplied);

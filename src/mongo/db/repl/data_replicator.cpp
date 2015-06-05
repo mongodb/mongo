@@ -55,6 +55,7 @@
 
 namespace mongo {
 namespace repl {
+
     // Failpoint for initial sync
     MONGO_FP_DECLARE(failInitialSyncWithBadHost);
 
@@ -344,7 +345,7 @@ namespace {
 
         //  Callbacks
 
-        void _onListDatabaseFinish(const CommandCallbackData& cbd);
+        void _onListDatabaseFinish(const CommandCallbackArgs& cbd);
 
 
         // Member variables
@@ -464,7 +465,7 @@ namespace {
         return _status;
     }
 
-    void DatabasesCloner::_onListDatabaseFinish(const CommandCallbackData& cbd) {
+    void DatabasesCloner::_onListDatabaseFinish(const CommandCallbackArgs& cbd) {
         invariant(_exec->isRunThread());
         const Status respStatus = cbd.response.getStatus();
         if (!respStatus.isOK()) {
@@ -698,7 +699,7 @@ namespace {
         return status;
     }
 
-    void DataReplicator::_resumeFinish(CallbackData cbData) {
+    void DataReplicator::_resumeFinish(CallbackArgs cbData) {
         UniqueLock lk(_mutex);
         _fetcherPaused = _applierPaused = false;
         lk.unlock();
@@ -759,7 +760,7 @@ namespace {
     TimestampStatus DataReplicator::resync() {
         _shutdown();
         // Drop databases and do initialSync();
-        CBHStatus cbh = _exec->scheduleDBWork([&](const CallbackData& cbData) {
+        CBHStatus cbh = _exec->scheduleDBWork([&](const CallbackArgs& cbData) {
             _storage->dropUserDatabases(cbData.txn);
         });
 
@@ -987,7 +988,7 @@ namespace {
             _initialSyncState->dbsCloner.wait();
     }
 
-    void DataReplicator::_doNextActionsCB(CallbackData cbData) {
+    void DataReplicator::_doNextActionsCB(CallbackArgs cbData) {
         _doNextActions();
     }
 
@@ -1103,7 +1104,7 @@ namespace {
         return ops;
     }
 
-    void DataReplicator::_onApplyBatchFinish(const CallbackData& cbData,
+    void DataReplicator::_onApplyBatchFinish(const CallbackArgs& cbData,
                                              const TimestampStatus& ts,
                                              const Operations& ops,
                                              const size_t numApplied) {
@@ -1188,7 +1189,7 @@ namespace {
 
         const BSONObj missingDoc = *fetchResult.getValue().documents.begin();
         Status rs{Status::OK()};
-        auto s = _exec->scheduleDBWork(([&](const CallbackData& cd) {
+        auto s = _exec->scheduleDBWork(([&](const CallbackArgs& cd) {
                                            rs = _storage->insertMissingDoc(cd.txn, nss, missingDoc);
                                        }),
                                        nss,

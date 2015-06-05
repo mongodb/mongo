@@ -288,7 +288,7 @@ namespace {
     }
 
     void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
-            const ReplicationExecutor::CallbackData& cbData,
+            const ReplicationExecutor::CallbackArgs& cbData,
             const ReplicaSetConfig& localConfig,
             const StatusWith<OpTime>& lastOpTimeStatus) {
         if (!cbData.status.isOK()) {
@@ -460,7 +460,7 @@ namespace {
     }
 
     void ReplicationCoordinatorImpl::_clearSyncSourceBlacklist_finish(
-            const ReplicationExecutor::CallbackData& cbData) {
+            const ReplicationExecutor::CallbackArgs& cbData) {
         if (cbData.status == ErrorCodes::CallbackCanceled)
             return;
         _topCoord->clearSyncSourceBlacklist();
@@ -490,7 +490,7 @@ namespace {
     }
 
     void ReplicationCoordinatorImpl::_setFollowerModeFinish(
-            const ReplicationExecutor::CallbackData& cbData,
+            const ReplicationExecutor::CallbackArgs& cbData,
             const MemberState& newState,
             const ReplicationExecutor::EventHandle& finishedSettingFollowerMode,
             bool* success) {
@@ -1230,7 +1230,7 @@ namespace {
     }
 
     void ReplicationCoordinatorImpl::_signalStepDownWaitersFromCallback(
-            const ReplicationExecutor::CallbackData& cbData) {
+            const ReplicationExecutor::CallbackArgs& cbData) {
         if (!cbData.status.isOK()) {
             return;
         }
@@ -1248,7 +1248,7 @@ namespace {
     }
 
     void ReplicationCoordinatorImpl::_stepDownContinue(
-            const ReplicationExecutor::CallbackData& cbData,
+            const ReplicationExecutor::CallbackArgs& cbData,
             const ReplicationExecutor::EventHandle finishedEvent,
             OperationContext* txn,
             const Date_t waitUntil,
@@ -1341,7 +1341,7 @@ namespace {
     }
 
     void ReplicationCoordinatorImpl::_handleTimePassing(
-            const ReplicationExecutor::CallbackData& cbData) {
+            const ReplicationExecutor::CallbackArgs& cbData) {
         if (!cbData.status.isOK()) {
             return;
         }
@@ -1563,7 +1563,7 @@ namespace {
     }
 
     void ReplicationCoordinatorImpl::_fillIsMasterForReplSet_finish(
-            const ReplicationExecutor::CallbackData& cbData, IsMasterResponse* response) {
+            const ReplicationExecutor::CallbackArgs& cbData, IsMasterResponse* response) {
         if (cbData.status == ErrorCodes::CallbackCanceled) {
             response->markAsShutdownInProgress();
             return;
@@ -1619,7 +1619,7 @@ namespace {
     }
 
     void ReplicationCoordinatorImpl::_getMaintenanceMode_helper(
-            const ReplicationExecutor::CallbackData& cbData,
+            const ReplicationExecutor::CallbackArgs& cbData,
             bool* maintenanceMode) {
         if (cbData.status == ErrorCodes::CallbackCanceled) {
             return;
@@ -1649,7 +1649,7 @@ namespace {
     }
 
     void ReplicationCoordinatorImpl::_setMaintenanceMode_helper(
-            const ReplicationExecutor::CallbackData& cbData,
+            const ReplicationExecutor::CallbackArgs& cbData,
             bool activate,
             Status* result) {
         if (cbData.status == ErrorCodes::CallbackCanceled) {
@@ -1726,7 +1726,7 @@ namespace {
     }
 
     void ReplicationCoordinatorImpl::_processReplSetFreeze_finish(
-            const ReplicationExecutor::CallbackData& cbData,
+            const ReplicationExecutor::CallbackArgs& cbData,
             int secs,
             BSONObjBuilder* response,
             Status* result) {
@@ -1773,7 +1773,7 @@ namespace {
     }
 
     void ReplicationCoordinatorImpl::_processHeartbeatFinish(
-            const ReplicationExecutor::CallbackData& cbData,
+            const ReplicationExecutor::CallbackArgs& cbData,
             const ReplSetHeartbeatArgs& args,
             ReplSetHeartbeatResponse* response,
             Status* outStatus) {
@@ -1903,7 +1903,7 @@ namespace {
             return status;
         }
 
-        const stdx::function<void (const ReplicationExecutor::CallbackData&)> reconfigFinishFn(
+        const stdx::function<void (const ReplicationExecutor::CallbackArgs&)> reconfigFinishFn(
                 stdx::bind(&ReplicationCoordinatorImpl::_finishReplSetReconfig,
                            this,
                            stdx::placeholders::_1,
@@ -1927,7 +1927,7 @@ namespace {
     }
 
     void ReplicationCoordinatorImpl::_finishReplSetReconfig(
-            const ReplicationExecutor::CallbackData& cbData,
+            const ReplicationExecutor::CallbackArgs& cbData,
             const ReplicaSetConfig& newConfig,
             int myIndex) {
 
@@ -2031,7 +2031,7 @@ namespace {
     }
 
     void ReplicationCoordinatorImpl::_finishReplSetInitiate(
-            const ReplicationExecutor::CallbackData& cbData,
+            const ReplicationExecutor::CallbackArgs& cbData,
             const ReplicaSetConfig& newConfig,
             int myIndex) {
 
@@ -2168,7 +2168,7 @@ namespace {
     }
 
     void ReplicationCoordinatorImpl::_processReplSetFresh_finish(
-            const ReplicationExecutor::CallbackData& cbData,
+            const ReplicationExecutor::CallbackArgs& cbData,
             const ReplSetFreshArgs& args,
             BSONObjBuilder* response,
             Status* result) {
@@ -2200,7 +2200,7 @@ namespace {
     }
 
     void ReplicationCoordinatorImpl::_processReplSetElect_finish(
-            const ReplicationExecutor::CallbackData& cbData,
+            const ReplicationExecutor::CallbackArgs& cbData,
             const ReplSetElectArgs& args,
             BSONObjBuilder* response,
             Status* result) {
@@ -2412,7 +2412,7 @@ namespace {
     }
 
     void ReplicationCoordinatorImpl::_chooseNewSyncSource(
-            const ReplicationExecutor::CallbackData& cbData,
+            const ReplicationExecutor::CallbackArgs& cbData,
             HostAndPort* newSyncSource) {
         if (cbData.status == ErrorCodes::CallbackCanceled) {
             return;
@@ -2437,7 +2437,7 @@ namespace {
     }
 
     void ReplicationCoordinatorImpl::_blacklistSyncSource(
-        const ReplicationExecutor::CallbackData& cbData,
+        const ReplicationExecutor::CallbackArgs& cbData,
         const HostAndPort& host,
         Date_t until) {
         if (cbData.status == ErrorCodes::CallbackCanceled) {
@@ -2458,7 +2458,7 @@ namespace {
     }
 
     void ReplicationCoordinatorImpl::_unblacklistSyncSource(
-            const ReplicationExecutor::CallbackData& cbData,
+            const ReplicationExecutor::CallbackArgs& cbData,
             const HostAndPort& host) {
         if (cbData.status == ErrorCodes::CallbackCanceled)
             return;
@@ -2495,7 +2495,7 @@ namespace {
     }
 
     void ReplicationCoordinatorImpl::_shouldChangeSyncSource(
-            const ReplicationExecutor::CallbackData& cbData,
+            const ReplicationExecutor::CallbackArgs& cbData,
             const HostAndPort& currentSource,
             bool* shouldChange) {
         if (cbData.status == ErrorCodes::CallbackCanceled) {
@@ -2593,7 +2593,7 @@ namespace {
     }
 
     void ReplicationCoordinatorImpl::_processReplSetRequestVotes_finish(
-            const ReplicationExecutor::CallbackData& cbData,
+            const ReplicationExecutor::CallbackArgs& cbData,
             const ReplSetRequestVotesArgs& args,
             ReplSetRequestVotesResponse* response,
             Status* result) {
@@ -2633,7 +2633,7 @@ namespace {
     }
 
     void ReplicationCoordinatorImpl::_processReplSetDeclareElectionWinner_finish(
-            const ReplicationExecutor::CallbackData& cbData,
+            const ReplicationExecutor::CallbackArgs& cbData,
             const ReplSetDeclareElectionWinnerArgs& args,
             long long* responseTerm,
             Status* result) {
@@ -2683,7 +2683,7 @@ namespace {
     }
 
     void ReplicationCoordinatorImpl::_processHeartbeatFinishV1(
-            const ReplicationExecutor::CallbackData& cbData,
+            const ReplicationExecutor::CallbackArgs& cbData,
             const ReplSetHeartbeatArgsV1& args,
             ReplSetHeartbeatResponse* response,
             Status* outStatus) {
@@ -2725,7 +2725,7 @@ namespace {
         _replExecutor.wait(cbh.getValue());
     }
 
-    void ReplicationCoordinatorImpl::_summarizeAsHtml_finish(const CallbackData& cbData,
+    void ReplicationCoordinatorImpl::_summarizeAsHtml_finish(const CallbackArgs& cbData,
                                                              ReplSetHtmlSummary* output) {
         if (cbData.status == ErrorCodes::CallbackCanceled) {
             return;
@@ -2754,7 +2754,7 @@ namespace {
     }
 
     void ReplicationCoordinatorImpl::_getTerm_helper(
-            const ReplicationExecutor::CallbackData& cbData,
+            const ReplicationExecutor::CallbackArgs& cbData,
             long long* term) {
         if (cbData.status == ErrorCodes::CallbackCanceled) {
             return;
@@ -2799,7 +2799,7 @@ namespace {
     }
 
     void ReplicationCoordinatorImpl::_updateTerm_helper(
-            const ReplicationExecutor::CallbackData& cbData,
+            const ReplicationExecutor::CallbackArgs& cbData,
             long long term,
             bool* updated,
             Handle* cbHandle) {
