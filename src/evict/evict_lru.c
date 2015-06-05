@@ -1444,19 +1444,82 @@ __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_server)
 }
 
 /*
- * __wt_cache_wait --
- *	Wait for space in the cache.
+ * __cache_check --
+ *	Return the cache percent-full, and if eviction targets need addressing.
  */
-int
-__wt_cache_wait(WT_SESSION_IMPL *session, int full)
+static inline int
+__cache_check(WT_CONNECTION_IMPL *conn, int *pctp, int *targetp)
 {
 	WT_CACHE *cache;
+	uint64_t bytes_inuse, bytes_max;
+
+	cache = conn->cache;
+
+	/*
+	 * Avoid division by zero if the cache size has not yet been set in a
+	 * shared cache.
+	 */
+	bytes_inuse = __wt_cache_bytes_inuse(cache);
+	bytes_max = conn->cache_size + 1;
+
+	/* Return the cache full percentage. */
+	*pctp = (int)((100 * bytes_inuse) / bytes_max);
+
+	/*
+	 * Return if we're over the trigger cache size or there are too many
+	 * dirty pages.
+	 */
+	*targetp =
+	    bytes_inuse > (cache->eviction_trigger * bytes_max) / 100 ||
+	    __wt_cache_dirty_inuse(cache) >
+	    (cache->eviction_dirty_trigger * bytes_max) / 100;
+}
+
+/*
+ * __wt_cache_full_check --
+ *	Evict pages if the cache crosses its boundaries.
+ */
+int
+__wt_cache_full_check(WT_SESSION_IMPL *session, int busy, int *didworkp)
+{
+	WT_BTREE *btree;
+	WT_CACHE *cache;
+	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_TXN_GLOBAL *txn_global;
 	WT_TXN_STATE *txn_state;
-	int busy, count;
+	int count, full, q_found, target, txn_busy;
 
-	cache = S2C(session)->cache;
+	if (didworkp != NULL)
+		*didworkp = 0;
+
+	conn = S2C(session);
+	cache = conn->cache;
+
+	/*
+	 * LSM sets the no-cache-check flag when holding the LSM tree lock, in
+	 * that case, or when holding the schema or handle list locks (which
+	 * block eviction), we don't want to highjack the thread for eviction.
+	 */
+	if (F_ISSET(session, WT_SESSION_NO_CACHE_CHECK |
+	    WT_SESSION_LOCKED_HANDLE_LIST | WT_SESSION_LOCKED_SCHEMA))
+		return (0);
+
+	/*
+	 * Threads operating on trees that cannot be evicted are ignored,
+	 * mostly because they're not contributing to the problem.
+	 */
+	btree = S2BT_SAFE(session);
+	if (btree != NULL && F_ISSET(btree, WT_BTREE_NO_EVICTION))
+		return (0);
+
+	/*
+	 * If the cache is less than 95% full and the eviction targets are OK,
+	 * return immediately.
+	 */
+	__cache_check(conn, &full, &target);
+	if (full < 95 && !target)
+		return (0);
 
 	/*
 	 * If the current transaction is keeping the oldest ID pinned, it is in
@@ -1465,15 +1528,35 @@ __wt_cache_wait(WT_SESSION_IMPL *session, int full)
 	 * Otherwise, we are at a transaction boundary and we can work harder
 	 * to make sure there is free space in the cache.
 	 */
-	txn_global = &S2C(session)->txn_global;
+	txn_global = &conn->txn_global;
 	txn_state = &txn_global->states[session->id];
-	busy = txn_state->id != WT_TXN_NONE ||
+	txn_busy = txn_state->id != WT_TXN_NONE ||
 	    session->nhazard > 0 ||
 	    (txn_state->snap_min != WT_TXN_NONE &&
 	    txn_global->current != txn_global->oldest_id);
-	if (busy && full < 100)
-		return (0);
+	if (txn_busy) {
+		if (full < 100)
+			return (0);
+		busy = 1;
+	}
+
+	/*
+	 * If we're busy, either because of the transaction check we just did,
+	 * or because our caller is waiting on a longer-than-usual event (such
+	 * as a page read), limit the work to a single eviction and return. If
+	 * that's not the case, we can do more.
+	 */
 	count = busy ? 1 : 10;
+
+	/* Wake the eviction server. */
+	WT_RET(__wt_evict_server_wake(session));
+
+	/*
+	 * Some callers (those waiting for slow operations), will sleep if there
+	 * was no cache work to do. After this point, they can skip the sleep.
+	 */
+	if (didworkp != NULL)
+		*didworkp = 1;
 
 	for (;;) {
 		/*
@@ -1489,10 +1572,13 @@ __wt_cache_wait(WT_SESSION_IMPL *session, int full)
 			return (WT_ROLLBACK);
 		}
 
+		q_found = 0;
 		switch (ret = __wt_evict_lru_page(session, 0)) {
 		case 0:
 			if (--count == 0)
 				return (0);
+
+			q_found = 1;
 			break;
 		case EBUSY:
 			continue;
@@ -1502,15 +1588,13 @@ __wt_cache_wait(WT_SESSION_IMPL *session, int full)
 			return (ret);
 		}
 
-		WT_RET(__wt_eviction_check(session, &full, 0));
-		if (full < 100)
+		/* See if the cache is clean enough to just return. */
+		__cache_check(conn, &full, &target);
+		if (full < 95 && !target)
 			return (0);
-		/*
-		 * The value of ret is set in the switch statement above (and
-		 * not altered by WT_RET), so it's 0 or WT_NOTFOUND depending
-		 * on whether or not there was a page to evict in the queue.
-		 */
-		if (ret == 0)
+
+		/* If we found pages in the eviction queue, continue there. */
+		if (q_found)
 			continue;
 
 		/*
@@ -1527,14 +1611,15 @@ __wt_cache_wait(WT_SESSION_IMPL *session, int full)
 		}
 
 		/* Wait for the queue to re-populate before trying again. */
-		WT_RET(__wt_cond_wait(session,
-		    S2C(session)->cache->evict_waiter_cond, 100000));
+		WT_RET(
+		    __wt_cond_wait(session, cache->evict_waiter_cond, 100000));
 
 		/* Check if things have changed so that we are busy. */
 		if (!busy && txn_state->snap_min != WT_TXN_NONE &&
 		    txn_global->current != txn_global->oldest_id)
 			busy = count = 1;
 	}
+	/* NOTREACHED */
 }
 
 #ifdef HAVE_DIAGNOSTIC
