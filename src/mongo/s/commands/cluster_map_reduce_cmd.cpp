@@ -319,7 +319,7 @@ namespace {
                 // TODO: take distributed lock to prevent split / migration?
 
                 try {
-                    STRATEGY->commandOp(dbname, shardedCommand, 0, fullns, q, &mrCommandResults);
+                    Strategy::commandOp(dbname, shardedCommand, 0, fullns, q, &mrCommandResults);
                 }
                 catch (DBException& e){
                     e.addContext(str::stream() << "could not run map command on all shards for ns "
@@ -485,7 +485,7 @@ namespace {
                     mrCommandResults.clear();
 
                     try {
-                        STRATEGY->commandOp(outDB, finalCmdObj, 0, finalColLong, BSONObj(), &mrCommandResults);
+                        Strategy::commandOp(outDB, finalCmdObj, 0, finalColLong, BSONObj(), &mrCommandResults);
                         ok = true;
                     }
                     catch (DBException& e){

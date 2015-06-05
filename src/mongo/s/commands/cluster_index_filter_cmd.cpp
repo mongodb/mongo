@@ -120,7 +120,7 @@ namespace mongo {
         // Targeted shard commands are generally data-dependent but index filter
         // commands are tied to query shape (data has no effect on query shape).
         vector<Strategy::CommandResult> results;
-        STRATEGY->commandOp(dbName, cmdObj, options, nss.ns(), BSONObj(), &results);
+        Strategy::commandOp(dbName, cmdObj, options, nss.ns(), BSONObj(), &results);
 
         // Set value of first shard result's "ok" field.
         bool clusterCmdResult = true;

@@ -123,7 +123,7 @@ namespace {
             // Target the command to the shards based on the singleton batch item.
             BatchItemRef targetingBatchItem(&request, 0);
             vector<Strategy::CommandResult> shardResults;
-            Status status = STRATEGY->commandOpWrite(dbname,
+            Status status = Strategy::commandOpWrite(dbname,
                                                      explainCmdBob.obj(),
                                                      targetingBatchItem,
                                                      &shardResults);

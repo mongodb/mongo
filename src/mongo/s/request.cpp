@@ -118,20 +118,20 @@ namespace mongo {
                                               << ") for $cmd type ns - can only be 1 or -1",
                          n == 1 || n == -1 );
 
-                STRATEGY->clientCommandOp(*this);
+                Strategy::clientCommandOp(*this);
             }
             else {
-                STRATEGY->queryOp( *this );
+                Strategy::queryOp( *this );
             }
 
             globalOpCounters.gotOp( op , iscmd );
         }
         else if ( op == dbGetMore ) {
-            STRATEGY->getMore( *this );
+            Strategy::getMore( *this );
             globalOpCounters.gotOp( op , iscmd );
         }
         else {
-            STRATEGY->writeOp( op, *this );
+            Strategy::writeOp( op, *this );
             // globalOpCounters are handled by write commands.
         }
 

@@ -43,13 +43,11 @@ namespace mongo {
     class Strategy {
     public:
 
-        Strategy() {}
+        static void queryOp(Request& r);
 
-        void queryOp( Request& r );
+        static void getMore(Request& r);
 
-        void getMore( Request& r );
-
-        void writeOp( int op , Request& r );
+        static void writeOp(int op , Request& r);
 
         struct CommandResult {
             Shard shardTarget;
@@ -66,12 +64,12 @@ namespace mongo {
          * TODO: Replace these methods and all other methods of command dispatch with a more general
          * command op framework.
          */
-        void commandOp( const std::string& db,
-                        const BSONObj& command,
-                        int options,
-                        const std::string& versionedNS,
-                        const BSONObj& targetingQuery,
-                        std::vector<CommandResult>* results );
+        static void commandOp(const std::string& db,
+                              const BSONObj& command,
+                              int options,
+                              const std::string& versionedNS,
+                              const BSONObj& targetingQuery,
+                              std::vector<CommandResult>* results);
 
         /**
          * Executes a write command against a particular database, and targets the command based on
@@ -82,10 +80,10 @@ namespace mongo {
          * Similar to commandOp() above, but the targeting rules are different for writes than for
          * reads.
          */
-        Status commandOpWrite(const std::string& db,
-                              const BSONObj& command,
-                              BatchItemRef targetingBatchItem,
-                              std::vector<CommandResult>* results);
+        static Status commandOpWrite(const std::string& db,
+                                     const BSONObj& command,
+                                     BatchItemRef targetingBatchItem,
+                                     std::vector<CommandResult>* results);
 
         /**
          * Some commands can only be run in a sharded configuration against a namespace that has
@@ -96,26 +94,24 @@ namespace mongo {
          * On success, fills in 'shardResult' with output from the namespace's primary shard. This
          * output may itself indicate an error status on the shard.
          */
-        Status commandOpUnsharded(const std::string& db,
-                                  const BSONObj& command,
-                                  int options,
-                                  const std::string& versionedNS,
-                                  CommandResult* shardResult);
+        static Status commandOpUnsharded(const std::string& db,
+                                         const BSONObj& command,
+                                         int options,
+                                         const std::string& versionedNS,
+                                         CommandResult* shardResult);
 
         /**
          * Executes a command represented in the Request on the sharded cluster.
          *
          * DEPRECATED: should not be used by new code.
          */
-        void clientCommandOp( Request& r );
+        static void clientCommandOp( Request& r );
 
     protected:
 
-        bool handleSpecialNamespaces( Request& r , QueryMessage& q );
+        static bool handleSpecialNamespaces( Request& r , QueryMessage& q );
 
     };
-
-    extern Strategy* STRATEGY;
 
 }
 
