@@ -125,7 +125,7 @@ namespace executor {
          *
          * May be called by client threads or callbacks running in the executor.
          */
-        void signalEvent(const EventHandle& event) { eventHandle.getEventState()->signal(); };
+        void signalEvent(const EventHandle& event);
 
         /**
          * Schedules a callback, "work", to run after "event" is signaled.  If "event"
@@ -148,9 +148,7 @@ namespace executor {
          * TODO(schwerin): Change return type so that the caller can know which of the two reasons
          * led to this method returning.
          */
-         void waitForEvent(const EventHandle& event) {
-             event.getEventState()->waitUntilSignaled();
-         };
+         void waitForEvent(const EventHandle& event);
 
         /**
          * Schedules "work" to be run by the executor ASAP.
@@ -191,7 +189,7 @@ namespace executor {
          *
          * May be called by client threads or callbacks running in the executor.
          */
-        void cancel(const CallbackHandle& cbHandle) { cbHandle.getCallbackState()->cancel(); };
+        void cancel(const CallbackHandle& cbHandle);
 
         /**
          * Blocks until the executor finishes running the callback referenced by "cbHandle".
@@ -202,50 +200,13 @@ namespace executor {
          *
          * NOTE: Do not call from a callback running in the executor.
          */
-        void wait(const CallbackHandle& cbHandle) {
-            cbHandle.getCallbackState()->waitForCompletion();
-        };
+        void wait(const CallbackHandle& cbHandle);
 
     protected:
 
         TaskExecutor();
-        CallbackState* getCallbackFromHandle(const CallbackHandle& cbHandle) {
-            return cbHandle.getCallbackState();
-        }
-
-        EventState* getEventFromHandle(const EventHandle& eventHandle) {
-            return eventHandle.getEventState();
-        }
-    };
-
-    /**
-     * Argument passed to all callbacks scheduled via a TaskExecutor.
-     */
-    struct TaskExecutor::CallbackArgs {
-        CallbackArgs(TaskExecutor* theExecutor,
-                     const CallbackHandle& theHandle,
-                     const Status& theStatus,
-                     OperationContext* txn = NULL);
-
-        TaskExecutor* executor;
-        CallbackHandle myHandle;
-        Status status;
-        OperationContext* txn;
-    };
-
-    /**
-     * Argument passed to all remote command callbacks scheduled via a TaskExecutor.
-     */
-    struct TaskExecutor::RemoteCommandCallbackArgs {
-        RemoteCommandCallbackArgs(TaskExecutor* theExecutor,
-                                  const CallbackHandle& theHandle,
-                                  const RemoteCommandRequest& theRequest,
-                                  const StatusWith<RemoteCommandResponse>& theResponse);
-
-        TaskExecutor* executor;
-        CallbackHandle myHandle;
-        RemoteCommandRequest request;
-        StatusWith<RemoteCommandResponse> response;
+        CallbackState* getCallbackFromHandle(const CallbackHandle& cbHandle);
+        EventState* getEventFromHandle(const EventHandle& eventHandle);
     };
 
     /**
@@ -286,7 +247,7 @@ namespace executor {
 
     private:
 
-        CallbackState* getCallbackState() {
+        CallbackState* getCallbackState() const {
             return _callback.get();
         }
 
@@ -331,11 +292,41 @@ namespace executor {
 
     private:
 
-        EventState* getEventState() {
+        EventState* getEventState() const {
             return _event.get();
         }
 
         std::shared_ptr<EventState> _event;
+    };
+
+    /**
+     * Argument passed to all callbacks scheduled via a TaskExecutor.
+     */
+    struct TaskExecutor::CallbackArgs {
+        CallbackArgs(TaskExecutor* theExecutor,
+                     const CallbackHandle& theHandle,
+                     const Status& theStatus,
+                     OperationContext* txn = NULL);
+
+        TaskExecutor* executor;
+        CallbackHandle myHandle;
+        Status status;
+        OperationContext* txn;
+    };
+
+    /**
+     * Argument passed to all remote command callbacks scheduled via a TaskExecutor.
+     */
+    struct TaskExecutor::RemoteCommandCallbackArgs {
+        RemoteCommandCallbackArgs(TaskExecutor* theExecutor,
+                                  const CallbackHandle& theHandle,
+                                  const RemoteCommandRequest& theRequest,
+                                  const StatusWith<RemoteCommandResponse>& theResponse);
+
+        TaskExecutor* executor;
+        CallbackHandle myHandle;
+        RemoteCommandRequest request;
+        StatusWith<RemoteCommandResponse> response;
     };
 
 } // namespace executor

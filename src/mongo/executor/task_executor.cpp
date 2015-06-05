@@ -41,14 +41,12 @@ namespace executor {
 
     TaskExecutor::CallbackHandle::CallbackHandle(std::shared_ptr<CallbackState> callback) :
             _callback(std::move(callback)) {}
-    TaskExecutor::CallbackHandle::~CallbackHandle() = default;
 
     TaskExecutor::EventState::EventState() = default;
     TaskExecutor::EventState::~EventState() = default;
 
     TaskExecutor::EventHandle::EventHandle(std::shared_ptr<EventState> event) :
             _event(std::move(event)) {}
-    TaskExecutor::EventHandle::~EventHandle() = default;
 
     TaskExecutor::CallbackArgs::CallbackArgs(TaskExecutor* theExecutor,
                                              const CallbackHandle& theHandle,
@@ -71,6 +69,31 @@ namespace executor {
         request(theRequest),
         response(theResponse) {
     }
+
+    TaskExecutor::CallbackState* TaskExecutor::getCallbackFromHandle(
+            const CallbackHandle& cbHandle) {
+        return cbHandle.getCallbackState();
+    }
+
+    TaskExecutor::EventState* TaskExecutor::getEventFromHandle(const EventHandle& eventHandle) {
+        return eventHandle.getEventState();
+    }
+
+    void TaskExecutor::signalEvent(const EventHandle& event) {
+        getEventFromHandle(event)->signal();
+    }
+
+    void TaskExecutor::waitForEvent(const EventHandle& event) {
+        getEventFromHandle(event)->waitUntilSignaled();
+    }
+
+    void TaskExecutor::cancel(const CallbackHandle& cbHandle) {
+        getCallbackFromHandle(cbHandle)->cancel();
+    };
+
+    void TaskExecutor::wait(const CallbackHandle& cbHandle) {
+        getCallbackFromHandle(cbHandle)->waitForCompletion();
+    };
 
 } // namespace executor
 } // namespace mongo
