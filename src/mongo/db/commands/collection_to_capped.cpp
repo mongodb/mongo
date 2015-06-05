@@ -217,20 +217,6 @@ namespace {
             out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
         }
 
-        virtual std::vector<BSONObj> stopIndexBuilds(OperationContext* opCtx,
-                                                     Database* db,
-                                                     const BSONObj& cmdObj) {
-            const std::string ns = parseNsCollectionRequired(db->name(), cmdObj);
-
-            IndexCatalog::IndexKillCriteria criteria;
-            criteria.ns = ns;
-            Collection* coll = db->getCollection(ns);
-            if (coll) {
-                return IndexBuilder::killMatchingIndexBuilds(coll, criteria);
-            }
-            return std::vector<BSONObj>();
-        }
-
         bool run(OperationContext* txn,
                  const string& dbname,
                  BSONObj& jsobj,
@@ -259,7 +245,6 @@ namespace {
                                                  << dbname << " does not exist"));
             }
 
-            stopIndexBuilds(txn, db, jsobj);
             BackgroundOperation::assertNoBgOpInProgForDb(dbname.c_str());
 
             string shortSource = jsobj.getStringField( "convertToCapped" );

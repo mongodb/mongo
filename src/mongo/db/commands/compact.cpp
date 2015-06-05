@@ -76,16 +76,6 @@ namespace mongo {
         }
         CompactCmd() : Command("compact") { }
 
-        virtual std::vector<BSONObj> stopIndexBuilds(OperationContext* opCtx,
-                                                     Database* db,
-                                                     const BSONObj& cmdObj) {
-            const std::string ns = parseNsCollectionRequired(db->name(), cmdObj);
-
-            IndexCatalog::IndexKillCriteria criteria;
-            criteria.ns = ns;
-            return IndexBuilder::killMatchingIndexBuilds(db->getCollection(ns), criteria);
-        }
-
         virtual bool run(OperationContext* txn, const string& db, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             const std::string nsToCompact = parseNsCollectionRequired(db, cmdObj);
 
@@ -163,8 +153,6 @@ namespace mongo {
 
             log() << "compact " << ns << " begin, options: " << compactOptions.toString();
 
-            std::vector<BSONObj> indexesInProg = stopIndexBuilds(txn, collDB, cmdObj);
-
             StatusWith<CompactStats> status = collection->compact( txn, &compactOptions );
             if ( !status.isOK() )
                 return appendCommandStatus( result, status.getStatus() );
@@ -173,8 +161,6 @@ namespace mongo {
                 result.append("invalidObjects", status.getValue().corruptDocuments );
 
             log() << "compact " << ns << " end";
-
-            IndexBuilder::restoreIndexes(txn, indexesInProg);
 
             return true;
         }

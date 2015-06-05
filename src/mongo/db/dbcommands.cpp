@@ -146,30 +146,6 @@ namespace mongo {
 
         virtual bool isWriteCommandForConfigServer() const { return true; }
 
-        virtual std::vector<BSONObj> stopIndexBuilds(OperationContext* opCtx,
-                                                     Database* db,
-                                                     const BSONObj& cmdObj) {
-            invariant(db);
-            std::list<std::string> collections;
-            db->getDatabaseCatalogEntry()->getCollectionNamespaces(&collections);
-
-            std::vector<BSONObj> allKilledIndexes;
-            for (std::list<std::string>::iterator it = collections.begin();
-                 it != collections.end();
-                 ++it) {
-                std::string ns = *it;
-
-                IndexCatalog::IndexKillCriteria criteria;
-                criteria.ns = ns;
-                std::vector<BSONObj> killedIndexes =
-                    IndexBuilder::killMatchingIndexBuilds(db->getCollection(ns), criteria);
-                allKilledIndexes.insert(allKilledIndexes.end(),
-                                        killedIndexes.begin(),
-                                        killedIndexes.end());
-            }
-            return allKilledIndexes;
-        }
-
         CmdDropDatabase() : Command("dropDatabase") {}
 
         bool run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
@@ -210,7 +186,7 @@ namespace mongo {
 
                 log() << "dropDatabase " << dbname << " starting" << endl;
 
-                stopIndexBuilds(txn, db, cmdObj);
+                BackgroundOperation::assertNoBgOpInProgForDb(dbname);
                 dropDatabase(txn, db);
 
                 log() << "dropDatabase " << dbname << " finished";
@@ -254,30 +230,6 @@ namespace mongo {
 
         }
 
-        virtual std::vector<BSONObj> stopIndexBuilds(OperationContext* opCtx,
-                                                     Database* db,
-                                                     const BSONObj& cmdObj) {
-            invariant(db);
-            std::list<std::string> collections;
-            db->getDatabaseCatalogEntry()->getCollectionNamespaces(&collections);
-
-            std::vector<BSONObj> allKilledIndexes;
-            for (std::list<std::string>::iterator it = collections.begin();
-                 it != collections.end();
-                 ++it) {
-                std::string ns = *it;
-
-                IndexCatalog::IndexKillCriteria criteria;
-                criteria.ns = ns;
-                std::vector<BSONObj> killedIndexes = 
-                    IndexBuilder::killMatchingIndexBuilds(db->getCollection(ns), criteria);
-                allKilledIndexes.insert(allKilledIndexes.end(), 
-                                        killedIndexes.begin(), 
-                                        killedIndexes.end());
-            }
-            return allKilledIndexes;
-        }
-
         bool run(OperationContext* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             BSONElement e = cmdObj.firstElement();
             if ( e.numberInt() != 1 ) {
@@ -291,7 +243,7 @@ namespace mongo {
             Client::Context context(txn,  dbname );
 
             log() << "repairDatabase " << dbname;
-            std::vector<BSONObj> indexesInProg = stopIndexBuilds(txn, context.db(), cmdObj);
+            BackgroundOperation::assertNoBgOpInProgForDb(dbname);
 
             e = cmdObj.getField( "preserveClonedFilesOnFailure" );
             bool preserveClonedFilesOnFailure = e.isBoolean() && e.boolean();
@@ -301,8 +253,6 @@ namespace mongo {
             StorageEngine* engine = getGlobalEnvironment()->getGlobalStorageEngine();
             Status status = repairDatabase(txn, engine, dbname, preserveClonedFilesOnFailure,
                                            backupOriginalFiles );
-
-            IndexBuilder::restoreIndexes(txn, indexesInProg);
 
             // Open database before returning
             dbHolder().openDb(txn, dbname);
@@ -465,16 +415,6 @@ namespace mongo {
 
         virtual bool isWriteCommandForConfigServer() const { return true; }
 
-        virtual std::vector<BSONObj> stopIndexBuilds(OperationContext* opCtx,
-                                                     Database* db,
-                                                     const BSONObj& cmdObj) {
-            const std::string nsToDrop = parseNsCollectionRequired(db->name(), cmdObj);
-
-            IndexCatalog::IndexKillCriteria criteria;
-            criteria.ns = nsToDrop;
-            return IndexBuilder::killMatchingIndexBuilds(db->getCollection(nsToDrop), criteria);
-        }
-
         virtual bool run(OperationContext* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             const std::string nsToDrop = parseNsCollectionRequired(dbname, cmdObj);
 
@@ -515,7 +455,7 @@ namespace mongo {
 
                 int numIndexes = coll->getIndexCatalog()->numIndexesTotal( txn );
 
-                stopIndexBuilds(txn, db, cmdObj);
+                BackgroundOperation::assertNoBgOpInProgForNs(nsToDrop);
 
                 result.append( "ns", nsToDrop );
                 result.append( "nIndexesWas", numIndexes );

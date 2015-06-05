@@ -29,6 +29,7 @@
 */
 
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/db/background.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/database_holder.h"
@@ -70,31 +71,6 @@ namespace mongo {
         }
         virtual void help( stringstream &help ) const {
             help << " example: { renameCollection: foo.a, to: bar.b }";
-        }
-
-        virtual std::vector<BSONObj> stopIndexBuilds(OperationContext* opCtx,
-                                                     Database* db,
-                                                     const BSONObj& cmdObj) {
-            string source = cmdObj.getStringField( name.c_str() );
-            string target = cmdObj.getStringField( "to" );
-
-            IndexCatalog::IndexKillCriteria criteria;
-            criteria.ns = source;
-            std::vector<BSONObj> prelim = 
-                IndexBuilder::killMatchingIndexBuilds(db->getCollection(source), criteria);
-
-            std::vector<BSONObj> indexes;
-
-            for (int i = 0; i < static_cast<int>(prelim.size()); i++) {
-                // Change the ns
-                BSONObj stripped = prelim[i].removeField("ns");
-                BSONObjBuilder builder;
-                builder.appendElements(stripped);
-                builder.append("ns", target);
-                indexes.push_back(builder.obj());
-            }
-
-            return indexes;
         }
 
         static void dropCollection(OperationContext* txn, Database* db, StringData collName) {
@@ -207,11 +183,7 @@ namespace mongo {
                 }
             }
 
-            const std::vector<BSONObj> indexesInProg = stopIndexBuilds(txn, sourceDB, cmdObj);
-            // Dismissed on success
-            ScopeGuard indexBuildRestorer = MakeGuard(IndexBuilder::restoreIndexes,
-                                                      txn,
-                                                      indexesInProg);
+            BackgroundOperation::assertNoBgOpInProgForNs(source);
 
             Database* const targetDB = dbHolder().openDb(txn, nsToDatabase(target));
 
@@ -249,7 +221,6 @@ namespace mongo {
                     }
 
                     wunit.commit();
-                    indexBuildRestorer.Dismiss();
                     return true;
                 }
 
@@ -350,7 +321,6 @@ namespace mongo {
                 wunit.commit();
             }
 
-            indexBuildRestorer.Dismiss();
             targetCollectionDropper.Dismiss();
             return true;
         }

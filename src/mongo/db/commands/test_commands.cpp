@@ -34,6 +34,7 @@
 
 #include "mongo/base/init.h"
 #include "mongo/base/initializer_context.h"
+#include "mongo/db/background.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/index_builder.h"
@@ -192,16 +193,6 @@ namespace mongo {
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {}
 
-        virtual std::vector<BSONObj> stopIndexBuilds(OperationContext* opCtx,
-                                                     Database* db, 
-                                                     const BSONObj& cmdObj) {
-            const std::string ns = parseNsCollectionRequired(db->name(), cmdObj);
-
-            IndexCatalog::IndexKillCriteria criteria;
-            criteria.ns = ns;
-            return IndexBuilder::killMatchingIndexBuilds(db->getCollection(ns), criteria);
-        }
-
         virtual bool run(OperationContext* txn, const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             const std::string ns = parseNsCollectionRequired(dbname, cmdObj);
 
@@ -220,7 +211,7 @@ namespace mongo {
             Collection* collection = db->getCollection(ns);
             massert(28584, "no such collection", collection);
 
-            std::vector<BSONObj> indexes = stopIndexBuilds(txn, db, cmdObj);
+            BackgroundOperation::assertNoBgOpInProgForNs(ns);
 
             WriteUnitOfWork wuow(txn);
 
@@ -228,8 +219,6 @@ namespace mongo {
             if (!status.isOK()) {
                 return appendCommandStatus(result, status);
             }
-
-            IndexBuilder::restoreIndexes(txn, indexes);
 
             if (!fromRepl) {
                 repl::logOp(txn, "c", (dbname + ".$cmd").c_str(), cmdObj);
