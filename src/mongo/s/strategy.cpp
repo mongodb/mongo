@@ -700,5 +700,4 @@ namespace mongo {
         }
     }
 
-    Strategy * STRATEGY = new Strategy();
 }

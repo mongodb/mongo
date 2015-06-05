@@ -1089,7 +1089,7 @@ namespace mongo {
                 Timer timer;
 
                 Strategy::CommandResult singleResult;
-                Status commandStat = STRATEGY->commandOpUnsharded(dbname,
+                Status commandStat = Strategy::commandOpUnsharded(dbname,
                                                                   explainCmdBob.obj(),
                                                                   0,
                                                                   fullns,
@@ -1266,7 +1266,7 @@ namespace mongo {
                     BSONObj finder = BSON("files_id" << cmdObj.firstElement());
 
                     vector<Strategy::CommandResult> results;
-                    STRATEGY->commandOp(dbName, cmdObj, 0, fullns, finder, &results);
+                    Strategy::commandOp(dbName, cmdObj, 0, fullns, finder, &results);
                     verify(results.size() == 1); // querying on shard key so should only talk to one shard
                     BSONObj res = results.begin()->result;
 
@@ -1299,7 +1299,7 @@ namespace mongo {
 
                         vector<Strategy::CommandResult> results;
                         try {
-                            STRATEGY->commandOp(dbName, shardCmd, 0, fullns, finder, &results);
+                            Strategy::commandOp(dbName, shardCmd, 0, fullns, finder, &results);
                         }
                         catch( DBException& e ){
                             //This is handled below and logged

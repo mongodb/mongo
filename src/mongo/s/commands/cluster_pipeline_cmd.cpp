@@ -170,7 +170,7 @@ namespace {
             // Run the command on the shards
             // TODO need to make sure cursors are killed if a retry is needed
             vector<Strategy::CommandResult> shardResults;
-            STRATEGY->commandOp(dbname,
+            Strategy::commandOp(dbname,
                                 shardedCommand,
                                 options,
                                 fullns,

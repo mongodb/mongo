@@ -157,7 +157,7 @@ namespace {
             }
 
             vector<Strategy::CommandResult> countResult;
-            STRATEGY->commandOp(dbname,
+            Strategy::commandOp(dbname,
                                 countCmdBuilder.done(),
                                 options,
                                 fullns,
@@ -223,7 +223,7 @@ namespace {
             Timer timer;
 
             vector<Strategy::CommandResult> shardResults;
-            STRATEGY->commandOp(dbname,
+            Strategy::commandOp(dbname,
                 explainCmdBob.obj(),
                 0,
                 fullns,

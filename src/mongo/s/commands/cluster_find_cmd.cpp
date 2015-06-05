@@ -106,7 +106,7 @@ namespace mongo {
             Timer timer;
 
             vector<Strategy::CommandResult> shardResults;
-            STRATEGY->commandOp(dbname,
+            Strategy::commandOp(dbname,
                                 explainCmdBob.obj(),
                                 lpq->getOptions(),
                                 fullns,
