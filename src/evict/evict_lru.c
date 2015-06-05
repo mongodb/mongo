@@ -1446,7 +1446,7 @@ __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_server)
  * __cache_check --
  *	Return the cache percent-full, and if eviction targets need addressing.
  */
-static inline int
+static inline void
 __cache_check(WT_CONNECTION_IMPL *conn, int *pctp, int *targetp)
 {
 	WT_CACHE *cache;
