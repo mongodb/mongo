@@ -1063,6 +1063,7 @@ namespace mongo {
         // Because the planner doesn't yet set up 2D index bounds, do it ourselves here
         const string s2Field = _nearParams->nearQuery->field;
         const int s2FieldPosition = getFieldPosition(_s2Index, s2Field);
+        fassert(28677, s2FieldPosition >= 0);
         OrderedIntervalList* coveredIntervals = &scanParams.bounds.fields[s2FieldPosition];
         coveredIntervals->intervals.clear();
 
@@ -1266,6 +1267,7 @@ namespace mongo {
         // Because the planner doesn't yet set up 2D index bounds, do it ourselves here
         const string s2Field = _nearParams.nearQuery->field;
         const int s2FieldPosition = getFieldPosition(_s2Index, s2Field);
+        fassert(28678, s2FieldPosition >= 0);
         scanParams.bounds.fields[s2FieldPosition].intervals.clear();
         OrderedIntervalList* coveredIntervals = &scanParams.bounds.fields[s2FieldPosition];
 
