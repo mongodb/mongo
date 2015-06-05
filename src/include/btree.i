@@ -1106,7 +1106,7 @@ __wt_page_can_evict(WT_SESSION_IMPL *session,
 	/*
 	 * If the page was recently split in-memory, don't force it out: we
 	 * hope an eviction thread will find it first.  The check here is
-	 * similar to __wt_txn_visible_all, but ignores the checkpoints
+	 * similar to __wt_txn_visible_all, but ignores the checkpoint's
 	 * transaction.
 	 */
 	if (check_splits &&
