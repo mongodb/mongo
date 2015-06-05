@@ -32,6 +32,7 @@
 #include <boost/thread/condition_variable.hpp>
 #include <boost/thread/mutex.hpp>
 #include <string>
+#include <thread>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
@@ -335,6 +336,11 @@ namespace repl {
          */
         int64_t nextRandomInt64(int64_t limit);
 
+        /**
+         * Returns true if executing in the "run" thread, which should not block with IO
+         */
+        bool isRunThread() const;
+
     private:
         struct Event;
         struct WorkItem;
@@ -448,6 +454,7 @@ namespace repl {
         TaskRunner _dblockTaskRunner;
         TaskRunner _dblockExclusiveLockTaskRunner;
         uint64_t _nextId;
+        std::thread::id _runThreadId;
     };
 
     /**

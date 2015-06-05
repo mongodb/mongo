@@ -72,17 +72,6 @@ env.CppUnitTest(
 )
 
 env.Library(
-    target='data_replicator',
-    source=[
-        'data_replicator.cpp',
-    ],
-    LIBDEPS=[
-        'fetcher',
-        'repl_coordinator_interface',
-    ],
-)
-
-env.Library(
     target='oplog_interface_local',
     source=[
         'oplog_interface_local.cpp',
@@ -262,19 +251,6 @@ env.CppUnitTest('replica_set_config_checks_test',
                     'repl_coordinator_impl',
                     'replmocks'
                 ])
-
-env.CppUnitTest(
-    target='data_replicator_test',
-    source=[
-        'data_replicator_test.cpp',
-    ],
-    LIBDEPS=[
-        'data_replicator',
-        'replica_set_messages',
-        'replication_executor_test_fixture',
-        'repl_coordinator_test_fixture',
-    ],
-)
 
 env.CppUnitTest('scatter_gather_test',
                 'scatter_gather_test.cpp',
@@ -611,6 +587,7 @@ env.Library(
         'applier.cpp',
     ],
     LIBDEPS=[
+        'replication_executor',
     ],
 )
 
@@ -621,6 +598,34 @@ env.CppUnitTest(
         'applier',
         'replication_executor_test_fixture',
         '$BUILD_DIR/mongo/unittest/concurrency',
+    ],
+)
+
+env.Library(
+    target='data_replicator',
+    source=[
+        'data_replicator.cpp',
+    ],
+    LIBDEPS=[
+        'applier',
+        'collection_cloner',
+        'database_cloner',
+        'fetcher',
+        'repl_coordinator_interface',
+    ],
+)
+
+env.CppUnitTest(
+    target='data_replicator_test',
+    source=[
+        'data_replicator_test.cpp',
+    ],
+    LIBDEPS=[
+        'base_cloner_test_fixture',
+        'data_replicator',
+        'replica_set_messages',
+        'replication_executor_test_fixture',
+        'repl_coordinator_test_fixture',
     ],
 )
 

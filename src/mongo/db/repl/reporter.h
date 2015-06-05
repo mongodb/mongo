@@ -69,6 +69,12 @@ namespace repl {
         void cancel();
 
         /**
+         * Waits for last/current executor handle to finish.
+         * Returns immediately if the handle is invalid.
+         */
+        void wait();
+
+        /**
          * Signals to the Reporter that there is new information to be sent to the "_target" server.
          * Returns the _status, indicating any error the Reporter has encountered.
          */
@@ -78,7 +84,7 @@ namespace repl {
          * Returns the previous return status so that the owner can decide whether the Reporter
          * needs a new target to whom it can report.
          */
-        Status previousReturnStatus() const;
+        Status getStatus() const;
 
     private:
         /**

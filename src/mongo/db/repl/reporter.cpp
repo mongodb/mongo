@@ -75,6 +75,13 @@ namespace repl {
         _executor->cancel(_remoteCommandCallbackHandle);
     }
 
+    void Reporter::wait() {
+        boost::unique_lock<boost::mutex> lk(_mutex);
+        if(_remoteCommandCallbackHandle.isValid()) {
+            _executor->wait(_remoteCommandCallbackHandle);
+        }
+    }
+
     Status Reporter::trigger() {
         boost::lock_guard<boost::mutex> lk(_mutex);
         return _schedule_inlock();
@@ -128,7 +135,7 @@ namespace repl {
         }
     }
 
-    Status Reporter::previousReturnStatus() const {
+    Status Reporter::getStatus() const {
         boost::lock_guard<boost::mutex> lk(_mutex);
         return _status;
     }

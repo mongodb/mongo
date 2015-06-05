@@ -70,7 +70,7 @@ namespace repl {
         /**
          * Represents next steps of fetcher.
          */
-        enum class NextAction {
+        enum class NextAction : int {
             kInvalid=0,
             kNoAction=1,
             kGetMore=2

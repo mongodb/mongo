@@ -143,6 +143,18 @@ namespace repl {
 
     class ClonerStorageInterfaceMock : public CollectionCloner::StorageInterface {
     public:
+        using InsertCollectionFn = stdx::function<Status (OperationContext*,
+                                                          const NamespaceString&,
+                                                          const std::vector<BSONObj>&)>;
+        using BeginCollectionFn = stdx::function<Status (OperationContext*,
+                                                         const NamespaceString&,
+                                                         const CollectionOptions&,
+                                                         const std::vector<BSONObj>&)>;
+        using InsertMissingDocFn = stdx::function<Status (OperationContext*,
+                                                          const NamespaceString&,
+                                                          const BSONObj&)>;
+        using DropUserDatabases = stdx::function<Status (OperationContext*)>;
+
         Status beginCollection(OperationContext* txn,
                                const NamespaceString& nss,
                                const CollectionOptions& options,
@@ -155,14 +167,16 @@ namespace repl {
         Status commitCollection(OperationContext* txn,
                                 const NamespaceString& nss) override;
 
-        stdx::function<Status (OperationContext*,
-                               const NamespaceString&,
-                               const CollectionOptions&,
-                               const std::vector<BSONObj>&)> beginCollectionFn;
+        Status insertMissingDoc(OperationContext* txn,
+                                const NamespaceString& nss,
+                                const BSONObj& doc) override;
 
-        stdx::function<Status (OperationContext*,
-                               const NamespaceString&,
-                               const std::vector<BSONObj>&)> insertDocumentsFn;
+        Status dropUserDatabases(OperationContext* txn);
+
+        BeginCollectionFn beginCollectionFn;
+        InsertCollectionFn insertDocumentsFn;
+        InsertMissingDocFn insertMissingDocFn;
+        DropUserDatabases dropUserDatabasesFn;
     };
 
 } // namespace repl

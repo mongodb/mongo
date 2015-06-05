@@ -149,7 +149,7 @@ namespace {
         ASSERT_TRUE(reporter->isActive());
         scheduleNetworkResponse(ErrorCodes::NoSuchKey, "waaaah");
         getNet()->runReadyNetworkOperations();
-        ASSERT_EQUALS(ErrorCodes::NoSuchKey, reporter->previousReturnStatus());
+        ASSERT_EQUALS(ErrorCodes::NoSuchKey, reporter->getStatus());
         ASSERT_EQUALS(ErrorCodes::NoSuchKey, reporter->trigger());
         ASSERT_FALSE(reporter->isActive());
         ASSERT_FALSE(getNet()->hasReadyRequests());
@@ -167,7 +167,7 @@ namespace {
 
         scheduleNetworkResponse(ErrorCodes::NoSuchKey, "waaaah");
         getNet()->runReadyNetworkOperations();
-        ASSERT_EQUALS(ErrorCodes::NoSuchKey, reporter->previousReturnStatus());
+        ASSERT_EQUALS(ErrorCodes::NoSuchKey, reporter->getStatus());
         ASSERT_FALSE(reporter->willRunAgain());
         ASSERT_FALSE(reporter->isActive());
         ASSERT_FALSE(getNet()->hasReadyRequests());
@@ -238,7 +238,7 @@ namespace {
         ASSERT_FALSE(reporter->isActive());
         ASSERT_FALSE(reporter->willRunAgain());
         ASSERT_FALSE(getNet()->hasReadyRequests());
-        ASSERT_EQUALS(ErrorCodes::CallbackCanceled, reporter->previousReturnStatus());
+        ASSERT_EQUALS(ErrorCodes::CallbackCanceled, reporter->getStatus());
 
         ASSERT_EQUALS(ErrorCodes::CallbackCanceled, reporter->trigger());
     }
@@ -262,7 +262,7 @@ namespace {
         ASSERT_FALSE(reporter->isActive());
         ASSERT_FALSE(reporter->willRunAgain());
         ASSERT_FALSE(getNet()->hasReadyRequests());
-        ASSERT_EQUALS(ErrorCodes::CallbackCanceled, reporter->previousReturnStatus());
+        ASSERT_EQUALS(ErrorCodes::CallbackCanceled, reporter->getStatus());
 
         ASSERT_EQUALS(ErrorCodes::CallbackCanceled, reporter->trigger());
     }

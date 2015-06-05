@@ -293,13 +293,14 @@ namespace {
 
     TEST_F(FetcherTest, CursorIdNotLongNumber) {
         ASSERT_OK(fetcher->schedule());
-        processNetworkResponse(BSON("cursor" << BSON("id" << 123 <<
+        processNetworkResponse(BSON("cursor" << BSON("id" << 123.1 <<
                                                      "ns" << "db.coll" <<
                                                      "firstBatch" << BSONArray()) <<
                                     "ok" << 1));
         ASSERT_EQUALS(ErrorCodes::FailedToParse, status.code());
         ASSERT_STRING_CONTAINS(status.reason(),
-                               "'cursor.id' field must be a number of type 'long'");
+                               "'cursor.id' field must be");
+        ASSERT_EQ((int)Fetcher::NextAction::kInvalid, (int)nextAction);
     }
 
     TEST_F(FetcherTest, NamespaceFieldMissing) {

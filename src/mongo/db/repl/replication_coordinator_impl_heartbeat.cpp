@@ -57,7 +57,6 @@ namespace repl {
 
 namespace {
 
-    typedef StatusWith<ReplicationExecutor::CallbackHandle> CBHStatus;
     typedef ReplicationExecutor::CallbackHandle CBHandle;
 
 }  //namespace

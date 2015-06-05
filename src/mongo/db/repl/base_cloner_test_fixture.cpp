@@ -263,5 +263,15 @@ namespace repl {
         return Status::OK();
     }
 
+    Status ClonerStorageInterfaceMock::insertMissingDoc(OperationContext* txn,
+                                                  const NamespaceString& nss,
+                                                  const BSONObj& doc) {
+        return Status::OK();
+    }
+
+    Status ClonerStorageInterfaceMock::dropUserDatabases(OperationContext* txn) {
+        return dropUserDatabasesFn ? dropUserDatabasesFn(txn) : Status::OK();
+    }
+
 } // namespace repl
 } // namespace mongo
