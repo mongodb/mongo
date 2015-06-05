@@ -331,6 +331,20 @@ namespace mutablebson {
         static int testCommandsEnabled;
 
         /**
+         * Returns true if this a request for the 'help' information associated with the command.
+         */
+        static bool isHelpRequest(const rpc::RequestInterface& request);
+
+        /**
+         * Generates a reply from the 'help' information associated with a command. The state of
+         * the passed ReplyBuilder will be in kOutputDocs after calling this method.
+         */
+        static void generateHelpResponse(OperationContext* txn,
+                                         const rpc::RequestInterface& request,
+                                         rpc::ReplyBuilderInterface* replyBuilder,
+                                         const Command& command);
+
+        /**
          * When an assertion is hit during command execution, this method is used to fill the fields
          * of the command reply with the information from the error. In addition, information about
          * the command is logged. This function does not return anything, because there is typically
@@ -340,16 +354,35 @@ namespace mutablebson {
         static void generateErrorResponse(OperationContext* txn,
                                           rpc::ReplyBuilderInterface* replyBuilder,
                                           const DBException& exception,
+                                          const rpc::RequestInterface& request,
+                                          Command* command);
+
+        /**
+         * Generates a command error response. This overload of generateErrorResponse is intended
+         * to be called if the command is successfully parsed, but there is an error before we have
+         * a handle to the actual Command object. This can happen, for example, when the command
+         * is not found.
+         */
+        static void generateErrorResponse(OperationContext* txn,
+                                          rpc::ReplyBuilderInterface* replyBuilder,
+                                          const DBException& exception,
                                           const rpc::RequestInterface& request);
 
         /**
-         * Similar to other overloads of generateErrorResponse, but doesn't print any information
-         * about the specific command being executed. This is neccessary, for example, if there is
+         * Generates a command error response. Similar to other overloads of generateErrorResponse,
+         * but doesn't print any information about the specific command being executed. This is
+         * neccessary, for example, if there is
          * an assertion hit while parsing the command.
          */
         static void generateErrorResponse(OperationContext* txn,
                                           rpc::ReplyBuilderInterface* replyBuilder,
                                           const DBException& exception);
+
+        /**
+         * Records the error on to the OperationContext. This hook is needed because mongos
+         * does not have CurOp linked in to it.
+         */
+        static void registerError(OperationContext* txn, const DBException& exception);
 
     private:
 

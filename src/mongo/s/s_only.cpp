@@ -172,4 +172,7 @@ namespace mongo {
         execCommandClientBasic(txn.get(), c, cc(), queryOptions, ns, jsobj, anObjBuilder);
     }
 
+    void Command::registerError(OperationContext* txn, const DBException& exception) {
+    }
+
 } //namespace mongo

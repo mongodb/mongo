@@ -40,6 +40,7 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/mutable/document.h"
+#include "mongo/client/connpool.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
@@ -47,10 +48,13 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/client.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/rpc/metadata.h"
+#include "mongo/s/stale_exception.h"
 #include "mongo/s/write_ops/wc_error_detail.h"
 #include "mongo/util/log.h"
 
@@ -387,11 +391,126 @@ namespace mongo {
                                     status.code());
         return status;
     }
-}
 
-#include "mongo/client/connpool.h"
+    bool Command::isHelpRequest(const rpc::RequestInterface& request) {
+        return request.getCommandArgs()["help"].trueValue();
+    }
 
-namespace mongo {
+    void Command::generateHelpResponse(OperationContext* txn,
+                                       const rpc::RequestInterface& request,
+                                       rpc::ReplyBuilderInterface* replyBuilder,
+                                       const Command& command) {
+        std::stringstream ss;
+        BSONObjBuilder helpBuilder;
+        ss << "help for: " << command.name << " ";
+        command.help(ss);
+        helpBuilder.append("help", ss.str());
+        helpBuilder.append("lockType", command.isWriteCommandForConfigServer() ? 1 : 0);
+
+        replyBuilder->setMetadata(rpc::makeEmptyMetadata());
+        replyBuilder->setCommandReply(helpBuilder.done());
+    }
+
+namespace {
+
+    void _generateErrorResponse(OperationContext* txn,
+                                rpc::ReplyBuilderInterface* replyBuilder,
+                                const DBException& exception) {
+
+        Command::registerError(txn, exception);
+
+        // No metadata is needed for an error reply.
+        replyBuilder->setMetadata(rpc::makeEmptyMetadata());
+
+        // We need to include some extra information for SendStaleConfig.
+        if (exception.getCode() == ErrorCodes::SendStaleConfig) {
+            const SendStaleConfigException& scex =
+                static_cast<const SendStaleConfigException&>(exception);
+            replyBuilder->setCommandReply(scex.toStatus(),
+                                          BSON("ns" << scex.getns() <<
+                                               "vReceived" << scex.getVersionReceived().toBSON() <<
+                                               "vWanted" << scex.getVersionWanted().toBSON()));
+        }
+        else {
+            replyBuilder->setCommandReply(exception.toStatus());
+        }
+    }
+
+}  // namespace
+
+    void Command::generateErrorResponse(OperationContext* txn,
+                                        rpc::ReplyBuilderInterface* replyBuilder,
+                                        const DBException& exception,
+                                        const rpc::RequestInterface& request,
+                                        Command* command) {
+
+        log() << "assertion while executing command '"
+              << request.getCommandName() << "' "
+              << "on database '"
+              << request.getDatabase() << "' "
+              << "with arguments '"
+              << command->getRedactedCopyForLogging(request.getCommandArgs()) << "' "
+              << "and metadata '"
+              << request.getMetadata() << "': "
+              << exception.toString();
+
+        _generateErrorResponse(txn, replyBuilder, exception);
+    }
+
+    void Command::generateErrorResponse(OperationContext* txn,
+                                        rpc::ReplyBuilderInterface* replyBuilder,
+                                        const DBException& exception,
+                                        const rpc::RequestInterface& request) {
+
+        log() << "assertion while executing command '"
+              << request.getCommandName() << "' "
+              << "on database '"
+              << request.getDatabase() << "': "
+              << exception.toString();
+
+        _generateErrorResponse(txn, replyBuilder, exception);
+    }
+
+    void Command::generateErrorResponse(OperationContext* txn,
+                                        rpc::ReplyBuilderInterface* replyBuilder,
+                                        const DBException& exception) {
+        log() << "assertion while executing command: " << exception.toString();
+        _generateErrorResponse(txn, replyBuilder, exception);
+    }
+
+    void runCommands(OperationContext* txn,
+                     const rpc::RequestInterface& request,
+                     rpc::ReplyBuilderInterface* replyBuilder) {
+
+        try {
+
+            dassert(replyBuilder->getState() == rpc::ReplyBuilderInterface::State::kMetadata);
+
+            Command* c = nullptr;
+            // In the absence of a Command object, no redaction is possible. Therefore
+            // to avoid displaying potentially sensitive information in the logs,
+            // we restrict the log message to the name of the unrecognized command.
+            // However, the complete command object will still be echoed to the client.
+            if (!(c = Command::findCommand(request.getCommandName()))) {
+                Command::unknownCommands.increment();
+                std::string msg = str::stream() << "no such command: '"
+                                                << request.getCommandName() << "'";
+                LOG(2) << msg;
+                uasserted(ErrorCodes::CommandNotFound,
+                          str::stream() << msg << ", bad cmd: '"
+                                        << request.getCommandArgs() << "'");
+            }
+
+            LOG(2) << "run command " << request.getDatabase() << ".$cmd" << ' '
+                   << c->getRedactedCopyForLogging(request.getCommandArgs());
+
+            Command::execCommand(txn, c, request, replyBuilder);
+        }
+
+        catch (const DBException& ex) {
+            Command::generateErrorResponse(txn, replyBuilder, ex, request);
+        }
+    }
 
     extern DBConnectionPool pool;
     // This is mainly used by the internal writes using write commands.
