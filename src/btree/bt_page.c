@@ -155,8 +155,8 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 					WT_STAT_FAST_CONN_INCR(session,
 					    page_forcible_evict_blocked);
 					break;
-				} else
-					WT_RET(ret);
+				}
+				WT_RET(ret);
 
 				/*
 				 * The result of a successful forced eviction
