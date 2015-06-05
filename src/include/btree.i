@@ -1029,11 +1029,12 @@ __wt_page_can_evict(WT_SESSION_IMPL *session,
 	WT_PAGE_MODIFY *mod;
 	WT_TXN_GLOBAL *txn_global;
 
+	if (inmem_splitp != NULL)
+		*inmem_splitp = 0;
+
 	btree = S2BT(session);
 	mod = page->modify;
 	txn_global = &S2C(session)->txn_global;
-	if (inmem_splitp != NULL)
-		*inmem_splitp = 0;
 
 	/* Pages that have never been modified can always be evicted. */
 	if (mod == NULL)
