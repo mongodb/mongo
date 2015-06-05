@@ -6,14 +6,12 @@ import (
 	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/common/options"
-	"github.com/mongodb/mongo-tools/common/signals"
 	"github.com/mongodb/mongo-tools/common/util"
 	"github.com/mongodb/mongo-tools/mongorestore"
 	"os"
 )
 
 func main() {
-	go signals.Handle()
 	// initialize command-line opts
 	opts := options.New("mongorestore", mongorestore.Usage,
 		options.EnabledOptions{Auth: true, Connection: true, Namespace: true})
@@ -68,9 +66,11 @@ func main() {
 		SessionProvider: provider,
 	}
 
-	err = restore.Restore()
-	if err != nil {
+	if err = restore.Restore(); err != nil {
 		log.Logf(log.Always, "Failed: %v", err)
+		if err == util.ErrTerminated {
+			os.Exit(util.ExitKill)
+		}
 		os.Exit(util.ExitError)
 	}
 }

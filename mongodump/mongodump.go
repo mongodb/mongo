@@ -18,15 +18,16 @@ import (
 	"gopkg.in/mgo.v2/bson"
 	"io"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
 	"time"
 )
 
 const (
 	progressBarLength   = 24
 	progressBarWaitTime = time.Second * 3
-
-	defaultPermissions = 0755
+	defaultPermissions  = 0755
 )
 
 // MongoDump is a container for the user-specified options and
@@ -48,6 +49,8 @@ type MongoDump struct {
 	authVersion     int
 	archive         *archive.Writer
 	progressManager *progress.Manager
+	// channel on which to notify if/when a termination signal is received
+	termChan chan struct{}
 }
 
 // ValidateOptions checks for any incompatible sets of options.
@@ -286,7 +289,9 @@ func (dump *MongoDump) Dump() (err error) {
 	dump.progressManager.Start()
 	defer dump.progressManager.Stop()
 
-	// dump all queued collections
+	dump.termChan = make(chan struct{})
+	go dump.handleSignals()
+
 	if err := dump.DumpIntents(); err != nil {
 		return err
 	}
@@ -469,14 +474,14 @@ func (dump *MongoDump) dumpQueryToWriter(
 	dump.progressManager.Attach(bar)
 	defer dump.progressManager.Detach(bar)
 
-	iter := query.Iter()
-	return dump.dumpIterToWriter(iter, intent.BSONFile, dumpProgressor)
+	return dump.dumpIterToWriter(query.Iter(), intent.BSONFile, dumpProgressor)
 }
 
 // dumpIterToWriter takes an mgo iterator, a writer, and a pointer to
 // a counter, and dumps the iterator's contents to the writer.
 func (dump *MongoDump) dumpIterToWriter(
 	iter *mgo.Iter, writer io.Writer, progressCount progress.Updateable) error {
+	var termErr error
 
 	// We run the result iteration in its own goroutine,
 	// this allows disk i/o to not block reads from the db,
@@ -484,18 +489,24 @@ func (dump *MongoDump) dumpIterToWriter(
 	buffChan := make(chan []byte)
 	go func() {
 		for {
-			raw := &bson.Raw{}
-			next := iter.Next(raw)
-			if !next {
-				// we check the iterator for errors below
+			select {
+			case <-dump.termChan:
+				log.Logf(log.DebugHigh, "terminating writes")
 				close(buffChan)
+				termErr = util.ErrTerminated
 				return
+			default:
+				raw := &bson.Raw{}
+				next := iter.Next(raw)
+				if !next {
+					// we check the iterator for errors below
+					close(buffChan)
+					return
+				}
+				nextCopy := make([]byte, len(raw.Data))
+				copy(nextCopy, raw.Data)
+				buffChan <- nextCopy
 			}
-
-			nextCopy := make([]byte, len(raw.Data))
-			copy(nextCopy, raw.Data)
-
-			buffChan <- nextCopy
 		}
 	}()
 
@@ -515,8 +526,7 @@ func (dump *MongoDump) dumpIterToWriter(
 		}
 		progressCount.Inc(1)
 	}
-
-	return nil
+	return termErr
 }
 
 // DumpUsersAndRolesForDB queries and dumps the users and roles tied to the given
@@ -630,7 +640,7 @@ func (*nopCloseWriter) Close() error {
 	return nil
 }
 
-// wrappedWriteCloser implements io.WriteCloser. It wraps up two WriteClosers. The Write methond
+// wrappedWriteCloser implements io.WriteCloser. It wraps up two WriteClosers. The Write method
 // of the io.WriteCloser is implemented by the embedded io.WriteCloser
 type wrappedWriteCloser struct {
 	io.WriteCloser
@@ -676,4 +686,21 @@ func (dump *MongoDump) getArchiveOut() (out io.WriteCloser, err error) {
 		}, nil
 	}
 	return out, nil
+}
+
+// handleSignals listens for either SIGTERM, SIGINT or the
+// SIGHUP signal. It ends restore reads for all goroutines
+// as soon as any of those signals is received.
+func (dump *MongoDump) handleSignals() {
+	log.Log(log.DebugLow, "will listen for SIGTERM, SIGINT and SIGHUP")
+	sigChan := make(chan os.Signal, 2)
+	signal.Notify(sigChan, syscall.SIGTERM, syscall.SIGINT, syscall.SIGHUP)
+	// first signal cleanly terminates dump writes
+	<-sigChan
+	log.Log(log.Always, "ending dump writes")
+	close(dump.termChan)
+	// second signal exits immediately
+	<-sigChan
+	log.Log(log.Always, "forcefully terminating mongodump")
+	os.Exit(util.ExitKill)
 }

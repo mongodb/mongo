@@ -22,26 +22,39 @@ type collectionInfo struct {
 	Options *bson.D `bson:"options"`
 }
 
+// writeFlusher wraps an io.Writer and adds a Flush function.
 type writeFlusher interface {
 	Flush() error
 	io.Writer
 }
 
-// errorReader implements io.Reader
-type errorReader struct{}
-
-// Read on an errorReader already returns an error
-func (errorReader) Read([]byte) (int, error) {
-	return 0, os.ErrInvalid
-}
-
-// writeFlushCloser allows us to treat a bufio.Writer, or any other writeFlusher
-// as a WriteCloser ( which it's not otherwise )
+// writeFlushCloser is a writeFlusher implementation which exposes
+// a Close function which is implemented by calling Flush.
 type writeFlushCloser struct {
 	writeFlusher
 }
 
-// Close calls Flush
+// availableWriteFlusher wraps a writeFlusher and adds an Available function.
+type availableWriteFlusher interface {
+	Available() int
+	writeFlusher
+}
+
+// atomicFlusher is a availableWriteFlusher implementation
+// which guarantees atomic writes.
+type atomicFlusher struct {
+	availableWriteFlusher
+}
+
+// errorReader implements io.Reader.
+type errorReader struct{}
+
+// Read on an errorReader already returns an error.
+func (errorReader) Read([]byte) (int, error) {
+	return 0, os.ErrInvalid
+}
+
+// Close calls Flush.
 func (bwc writeFlushCloser) Close() error {
 	return bwc.Flush()
 }
@@ -82,7 +95,11 @@ func (f *realBSONFile) Open() (err error) {
 		writeCloser = gzip.NewWriter(inner)
 	} else {
 		// wrap writer in buffer to reduce load on disk
-		writeCloser = writeFlushCloser{bufio.NewWriterSize(inner, 32*1024)}
+		writeCloser = writeFlushCloser{
+			atomicFlusher{
+				bufio.NewWriterSize(inner, 32*1024),
+			},
+		}
 	}
 	f.WriteCloser = &wrappedWriteCloser{
 		WriteCloser: writeCloser,
@@ -90,6 +107,21 @@ func (f *realBSONFile) Open() (err error) {
 	}
 
 	return nil
+}
+
+// Write guarantees that when it returns, either the entire
+// contents of buf or none of it, has been flushed by the writer.
+// This is useful in the unlikely case that mongodump crashes.
+func (f atomicFlusher) Write(buf []byte) (int, error) {
+	if len(buf) > f.availableWriteFlusher.Available() {
+		f.availableWriteFlusher.Flush()
+	}
+	if len(buf) > f.availableWriteFlusher.Available() {
+		l, e := f.availableWriteFlusher.Write(buf)
+		f.availableWriteFlusher.Flush()
+		return l, e
+	}
+	return f.availableWriteFlusher.Write(buf)
 }
 
 type realMetadataFile struct {

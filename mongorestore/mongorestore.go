@@ -17,8 +17,10 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"sync"
+	"syscall"
 )
 
 // MongoRestore is a container for the user-specified options and
@@ -55,6 +57,9 @@ type MongoRestore struct {
 	dbCollectionIndexes map[string]collectionIndexes
 
 	archive *archive.Reader
+
+	// channel on which to notify if/when a termination signal is received
+	termChan chan struct{}
 }
 
 type collectionIndexes map[string][]IndexDocument
@@ -281,6 +286,7 @@ func (restore *MongoRestore) Restore() error {
 		// consume the new namespace announcement from the demux for all of the special collections
 		// that get cached when being read out of the archive.
 		// The first regular collection found gets pushed back on to the namespaceChan
+		// consume the new namespace announcement from the demux for all of the collections that get cached
 		for {
 			ns, ok := <-namespaceChan
 			// the archive can have only special collections. In that case we keep reading until
@@ -343,9 +349,11 @@ func (restore *MongoRestore) Restore() error {
 		restore.manager.Finalize(intents.Legacy)
 	}
 
-	err = restore.RestoreIntents()
-	if err != nil {
-		return fmt.Errorf("restore error: %v", err)
+	restore.termChan = make(chan struct{})
+	go restore.handleSignals()
+
+	if err := restore.RestoreIntents(); err != nil {
+		return err
 	}
 
 	// Restore users/roles
@@ -421,4 +429,21 @@ func (restore *MongoRestore) getArchiveReader() (rc io.ReadCloser, err error) {
 		return &wrappedReadCloser{gzrc, rc}, nil
 	}
 	return rc, nil
+}
+
+// handleSignals listens for either SIGTERM, SIGINT or the
+// SIGHUP signal. It ends restore reads for all goroutines
+// as soon as any of those signals is received.
+func (restore *MongoRestore) handleSignals() {
+	log.Log(log.DebugLow, "will listen for SIGTERM, SIGINT and SIGHUP")
+	sigChan := make(chan os.Signal, 2)
+	signal.Notify(sigChan, syscall.SIGTERM, syscall.SIGINT, syscall.SIGHUP)
+	// first signal cleanly terminates restore reads
+	<-sigChan
+	log.Log(log.Always, "ending restore reads")
+	close(restore.termChan)
+	// second signal exits immediately
+	<-sigChan
+	log.Log(log.Always, "forcefully terminating mongorestore")
+	os.Exit(util.ExitKill)
 }

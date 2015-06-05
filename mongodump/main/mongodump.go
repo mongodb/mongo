@@ -4,14 +4,12 @@ package main
 import (
 	"github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/common/options"
-	"github.com/mongodb/mongo-tools/common/signals"
 	"github.com/mongodb/mongo-tools/common/util"
 	"github.com/mongodb/mongo-tools/mongodump"
 	"os"
 )
 
 func main() {
-	go signals.Handle()
 	// initialize command-line opts
 	opts := options.New("mongodump", mongodump.Usage, options.EnabledOptions{true, true, true})
 
@@ -57,15 +55,16 @@ func main() {
 		InputOptions:  inputOpts,
 	}
 
-	err = dump.Init()
-	if err != nil {
+	if err = dump.Init(); err != nil {
 		log.Logf(log.Always, "Failed: %v", err)
 		os.Exit(util.ExitError)
 	}
 
-	err = dump.Dump()
-	if err != nil {
+	if err = dump.Dump(); err != nil {
 		log.Logf(log.Always, "Failed: %v", err)
+		if err == util.ErrTerminated {
+			os.Exit(util.ExitKill)
+		}
 		os.Exit(util.ExitError)
 	}
 }
