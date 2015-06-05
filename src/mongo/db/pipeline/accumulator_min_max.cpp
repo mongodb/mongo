@@ -51,10 +51,8 @@ namespace mongo {
         return _val;
     }
 
-    AccumulatorMinMax::AccumulatorMinMax(int theSense)
-        :_sense(theSense)
-    {
-        verify((_sense == 1) || (_sense == -1));
+    AccumulatorMinMax::AccumulatorMinMax(Sense sense) :
+        _sense(sense) {
         _memUsageBytes = sizeof(*this);
     }
 
@@ -64,11 +62,11 @@ namespace mongo {
     }
 
     intrusive_ptr<Accumulator> AccumulatorMinMax::createMin() {
-        return new AccumulatorMinMax(1);
+        return new AccumulatorMinMax(Sense::MIN);
     }
 
     intrusive_ptr<Accumulator> AccumulatorMinMax::createMax() {
-        return new AccumulatorMinMax(-1);
+        return new AccumulatorMinMax(Sense::MAX);
     }
 
     const char *AccumulatorMinMax::getOpName() const {
