@@ -420,7 +420,7 @@ namespace mongo {
             s << "command ";
         else
             s << opToString( op ) << ' ';
-        s << ns.toString();
+        s << ns;
 
         if ( ! query.isEmpty() ) {
             if ( iscommand ) {
@@ -544,7 +544,7 @@ namespace mongo {
         const size_t maxElementSize = 50 * 1024;
 
         b.append( "op" , iscommand ? "command" : opToString( op ) );
-        b.append( "ns" , ns.toString() );
+        b.append( "ns" , ns );
 
         if (!query.isEmpty()) {
             appendAsObjOrString(iscommand ? "command" : "query", query, maxElementSize, &b);
