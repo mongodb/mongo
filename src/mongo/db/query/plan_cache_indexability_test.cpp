@@ -60,6 +60,11 @@ namespace {
         const IndexabilityDiscriminator& disc = discriminators[0];
         ASSERT_EQ(true, disc(parseMatchExpression(BSON("a" << 1)).get()));
         ASSERT_EQ(false, disc(parseMatchExpression(BSON("a" << BSONNULL)).get()));
+        ASSERT_EQ(true,
+                  disc(parseMatchExpression(BSON("a" << BSON("$in" << BSON_ARRAY(1)))).get()));
+        ASSERT_EQ(false,
+                  disc(parseMatchExpression(BSON("a" <<
+                                                 BSON("$in" << BSON_ARRAY(BSONNULL)))).get()));
     }
 
     // Test sparse index discriminators for a compound sparse index.

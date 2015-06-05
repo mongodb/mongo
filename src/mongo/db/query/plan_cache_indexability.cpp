@@ -45,12 +45,19 @@ namespace mongo {
         for (BSONElement elem : keyPattern) {
             _pathDiscriminatorsMap[elem.fieldNameStringData()].push_back(
                 [] (const MatchExpression* queryExpr) {
-                    if (queryExpr->matchType() != MatchExpression::EQ) {
+                    if (queryExpr->matchType() == MatchExpression::EQ) {
+                        const auto* queryExprEquality =
+                            static_cast<const EqualityMatchExpression*>(queryExpr);
+                        return !queryExprEquality->getData().isNull();
+                    }
+                    else if (queryExpr->matchType() == MatchExpression::MATCH_IN) {
+                        const auto* queryExprIn =
+                            static_cast<const InMatchExpression*>(queryExpr);
+                        return !queryExprIn->getData().hasNull();
+                    }
+                    else {
                         return true;
                     }
-                    const auto* queryExprEquality =
-                        static_cast<const EqualityMatchExpression*>(queryExpr);
-                    return !queryExprEquality->getData().isNull();
                 }
             );
         }

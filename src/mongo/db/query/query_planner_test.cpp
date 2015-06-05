@@ -1307,6 +1307,16 @@ namespace {
                              "node: {ixscan: {pattern: {a: 1}}}}}");
     }
 
+    TEST_F(QueryPlannerTest, InSparseIndex) {
+        addIndex(fromjson("{a: 1}"),
+                 false, // multikey
+                 true); // sparse
+        runQuery(fromjson("{a: {$in: [null]}}"));
+
+        assertNumSolutions(1U);
+        assertSolutionExists("{cscan: {dir: 1, filter: {a: {$in: [null]}}}}");
+    }
+
     TEST_F(QueryPlannerTest, InCompoundIndexFirst) {
         addIndex(fromjson("{a: 1, b: 1}"));
         runQuery(fromjson("{a: {$in: [1, 2]}, b: 3}"));
