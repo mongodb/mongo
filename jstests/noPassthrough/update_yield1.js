@@ -59,8 +59,9 @@ while ( ( (new Date()).getTime() - start ) < ( time * 2 ) ){
 
     if ( num++ == 0 ){
         var x = db.currentOp();
-        // one operation for the update, another for currentOp itself
-        assert.eq( 2 , x.inprog.length , "nothing in prog" );
+        // one operation for the update, another for currentOp itself.  There may be other internal
+        // operations running.
+        assert.gte( 2 , x.inprog.length , "nothing in prog" );
     }
 
     assert.gt( time / 3 , me );
