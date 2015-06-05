@@ -47,7 +47,11 @@ namespace {
         ASSERT(!_executorThread);
         _executorThread.reset(
                 new boost::thread(stdx::bind(&ReplicationExecutor::run, _executor.get())));
-        getNet()->enterNetwork();
+        postExecutorThreadLaunch();
+    }
+
+    void ReplicationExecutorTest::postExecutorThreadLaunch() {
+        _net->enterNetwork();
     }
 
     void ReplicationExecutorTest::joinExecutorThread() {

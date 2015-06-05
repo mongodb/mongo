@@ -244,6 +244,20 @@ namespace repl {
         virtual Status commitCollection(OperationContext* txn,
                                         const NamespaceString& nss) = 0;
 
+        /**
+         * Inserts missing document into a collection (not related to insertDocuments above),
+         * during initial sync retry logic
+         */
+        virtual Status insertMissingDoc(OperationContext* txn,
+                                        const NamespaceString& nss,
+                                        const BSONObj& doc) = 0;
+
+        /**
+         * Inserts missing document into a collection (not related to insertDocuments above),
+         * during initial sync retry logic
+         */
+        virtual Status dropUserDatabases(OperationContext* txn) = 0;
+
     };
 
 } // namespace repl

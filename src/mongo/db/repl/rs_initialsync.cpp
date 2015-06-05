@@ -444,6 +444,10 @@ namespace {
                           str::stream() << "initial sync failed: " << msg);
         }
 
+        // WARNING: If the 3rd oplog sync step is removed we must reset minValid
+        // to the last entry on the source server so that we don't come
+        // out of recovering until we get there (since the previous steps
+        // could have fetched newer document than the oplog entry we were applying from).
         msg = "oplog sync 3 of 3";
         log() << msg;
 

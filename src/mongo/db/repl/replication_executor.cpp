@@ -31,6 +31,7 @@
 #include "mongo/db/repl/replication_executor.h"
 
 #include <limits>
+#include <thread>
 
 #include "mongo/db/repl/database_task.h"
 #include "mongo/db/repl/storage_interface.h"
@@ -57,7 +58,7 @@ namespace {
         _inShutdown(false),
         _dblockWorkers(threadpool::ThreadPool::DoNotStartThreadsTag(),
                        3,
-                       "replCallbackWithGlobalLock-"),
+                       "replExecDBWorker-"),
         _dblockTaskRunner(
             &_dblockWorkers,
             stdx::bind(&StorageInterface::createOperationContext, storageInterface)),
@@ -94,8 +95,13 @@ namespace {
         return _networkInterface->now();
     }
 
+    bool ReplicationExecutor::isRunThread() const {
+        return (_runThreadId == std::this_thread::get_id());
+    }
+
     void ReplicationExecutor::run() {
         setThreadName("ReplicationExecutor");
+        _runThreadId = std::this_thread::get_id();
         _networkInterface->startup();
         _dblockWorkers.startThreads();
         std::pair<WorkItem, CallbackHandle> work;

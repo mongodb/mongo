@@ -78,10 +78,12 @@ namespace {
                           "cursor response must contain '" << kCursorFieldName << "." <<
                           kCursorIdFieldName << "' field: " << obj);
         }
-        if (cursorIdElement.type() != mongo::NumberLong) {
+        if (!(cursorIdElement.type() == mongo::NumberLong ||
+                cursorIdElement.type() == mongo::NumberInt)) {
             return Status(ErrorCodes::FailedToParse, str::stream() <<
                           "'" << kCursorFieldName << "." << kCursorIdFieldName <<
-                          "' field must be a number of type 'long': " << obj);
+                          "' field must be a integral number of type 'int' or 'long' but was a '"
+                          << typeName(cursorIdElement.type()) << "': " << obj);
         }
         batchData->cursorId = cursorIdElement.numberLong();
 

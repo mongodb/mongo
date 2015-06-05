@@ -77,7 +77,6 @@ namespace mongo {
 namespace repl {
 
 namespace {
-    typedef StatusWith<ReplicationExecutor::CallbackHandle> CBHStatus;
     using executor::NetworkInterface;
 
     void lockAndCall(boost::unique_lock<boost::mutex>* lk, const stdx::function<void ()>& fn) {

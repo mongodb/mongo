@@ -60,6 +60,11 @@ namespace repl {
         void launchExecutorThread();
 
         /**
+         * Anything that needs to be done after launchExecutorThread should go in here.
+         */
+        virtual void postExecutorThreadLaunch();
+
+        /**
          * Waits for background ReplicationExecutor to stop running.
          *
          * The executor should be shutdown prior to calling this function
