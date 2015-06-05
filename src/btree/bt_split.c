@@ -1090,7 +1090,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 	 */
 	size = sizeof(WT_PAGE_INDEX) + pindex->entries * sizeof(WT_REF *);
 	WT_TRET(__split_safe_free(session,
-	    split_gen, LF_ISSET(WT_SPLIT_EXCLUSIVE), pindex, size));
+	    split_gen, LF_ISSET(WT_SPLIT_EXCLUSIVE) ? 1 : 0, pindex, size));
 	parent_decr += size;
 
 	/*
@@ -1470,7 +1470,7 @@ __wt_split_rewrite(WT_SESSION_IMPL *session, WT_REF *ref)
  *	Resolve a page split.
  */
 int
-__wt_split_multi(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
+__wt_split_multi(WT_SESSION_IMPL *session, WT_REF *ref, int closing)
 {
 	WT_DECL_RET;
 	WT_PAGE *page;
@@ -1494,9 +1494,12 @@ __wt_split_multi(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 		WT_ERR(__wt_multi_to_ref(session,
 		    page, &mod->mod_multi[i], &ref_new[i], &parent_incr));
 
-	/* Split into the parent. */
+	/*
+	 * Split into the parent; if we're closing the file, we hold it
+	 * exclusively.
+	 */
 	WT_ERR(__split_parent( session, ref, ref_new,
-	    new_entries, parent_incr, exclusive ? WT_SPLIT_EXCLUSIVE : 0));
+	    new_entries, parent_incr, closing ? WT_SPLIT_EXCLUSIVE : 0));
 
 	WT_STAT_FAST_CONN_INCR(session, cache_eviction_split);
 	WT_STAT_FAST_DATA_INCR(session, cache_eviction_split);

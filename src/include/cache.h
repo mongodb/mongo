@@ -44,9 +44,6 @@ struct __wt_evict_worker {
 	uint32_t flags;
 };
 
-#define	WT_EVICT_CHECK_SPLITS	1	/* Boolean to __wt_page_can_evict  */
-#define	WT_EVICT_EXCLUSIVE	1	/* Boolean to __wt_evict */
-
 /*
  * WiredTiger cache structure.
  */

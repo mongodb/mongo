@@ -1224,8 +1224,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 		}
 
 fast:		/* If the page can't be evicted, give up. */
-		if (!__wt_page_can_evict(
-		    session, page, WT_EVICT_CHECK_SPLITS, NULL))
+		if (!__wt_page_can_evict(session, page, 1, NULL))
 			continue;
 
 		/*
