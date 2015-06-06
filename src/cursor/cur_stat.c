@@ -374,21 +374,19 @@ __curstat_file_init(WT_SESSION_IMPL *session,
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 	wt_off_t filesize;
+	const char *filename;
 
 	/*
 	 * If we are only getting the size of the file, we don't need to open
 	 * the tree.
 	 */
 	if (F_ISSET(cst, WT_CONN_STAT_SIZE)) {
-		if (!WT_PREFIX_SKIP(uri, "file:"))
-			WT_RET_MSG(session, EINVAL,
-			    "incorrect URI %s passed to file-specific call",
-			    uri);
-
-		WT_RET(__wt_filesize_name(session, uri, &filesize));
-
+		filename = uri;
+		if (!WT_PREFIX_SKIP(filename, "file:"))
+			return (EINVAL);
 		__wt_stat_init_dsrc_stats(&cst->u.dsrc_stats);
-		cst->u.dsrc_stats.block_size.v = (uint64_t)filesize;
+		WT_RET(__wt_block_manager_size(
+		    session, filename, &cst->u.dsrc_stats));
 		__wt_curstat_dsrc_final(cst);
 		return (0);
 	}
