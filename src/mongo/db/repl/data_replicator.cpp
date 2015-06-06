@@ -887,7 +887,8 @@ namespace {
         }
 
         // Success, cleanup
-        // TODO: re-enable, fetcher is blocking on wait (in _waitOnAll)
+        // TODO: re-enable, find blocking call from tests
+/*
         _cancelAllHandles_inlock();
         _waitOnAll_inlock();
 
@@ -901,7 +902,7 @@ namespace {
         _initialSyncState.reset(nullptr);
         _oplogBuffer.clear();
         _resetState_inlock(_lastTimestampApplied);
-
+*/
         log() << "Initial sync took: " << t.millis() << " milliseconds.";
         return TimestampStatus(_lastTimestampApplied);
     }
