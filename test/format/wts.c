@@ -462,7 +462,7 @@ wts_verify(const char *tag)
 		    "=============== verify start ===============");
 
 	/* Session operations for LSM can return EBUSY. */
-	ret = session->verify(session, g.uri, NULL);
+	ret = session->verify(session, g.uri, "strict");
 	if (ret != 0 && !(ret == EBUSY && DATASOURCE("lsm")))
 		die(ret, "session.verify: %s: %s", g.uri, tag);
 

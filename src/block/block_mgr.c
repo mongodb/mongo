@@ -302,9 +302,10 @@ __bm_salvage_end(WT_BM *bm, WT_SESSION_IMPL *session)
  *	Start a block manager verify.
  */
 static int
-__bm_verify_start(WT_BM *bm, WT_SESSION_IMPL *session, WT_CKPT *ckptbase)
+__bm_verify_start(WT_BM *bm,
+    WT_SESSION_IMPL *session, WT_CKPT *ckptbase, const char *cfg[])
 {
-	return (__wt_block_verify_start(session, bm->block, ckptbase));
+	return (__wt_block_verify_start(session, bm->block, ckptbase, cfg));
 }
 
 /*
