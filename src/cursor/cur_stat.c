@@ -373,7 +373,6 @@ __curstat_file_init(WT_SESSION_IMPL *session,
 {
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
-	wt_off_t filesize;
 	const char *filename;
 
 	/*
