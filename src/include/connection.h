@@ -286,6 +286,7 @@ struct __wt_connection_impl {
 #define	WT_CONN_STAT_FAST	0x04	/* "fast" statistics configured */
 #define	WT_CONN_STAT_NONE	0x08	/* don't gather statistics */
 #define	WT_CONN_STAT_ON_CLOSE	0x10	/* output statistics on close */
+#define	WT_CONN_STAT_SIZE	0x20	/* "size" statistics configured */
 	uint32_t stat_flags;
 
 	WT_CONNECTION_STATS stats;	/* Connection statistics */
