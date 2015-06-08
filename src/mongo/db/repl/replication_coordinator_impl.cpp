@@ -1395,6 +1395,9 @@ namespace {
     }
 
     bool ReplicationCoordinatorImpl::canAcceptWritesFor(const NamespaceString& ns) {
+        if (_memberState.rollback() && ns.isOplog()) {
+            return false;
+        }
         StringData dbName = ns.db();
         return canAcceptWritesForDatabase(dbName);
     }
