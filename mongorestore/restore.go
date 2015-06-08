@@ -6,6 +6,7 @@ import (
 	"github.com/mongodb/mongo-tools/common/intents"
 	"github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/common/progress"
+	"github.com/mongodb/mongo-tools/common/util"
 	"gopkg.in/mgo.v2/bson"
 	"io/ioutil"
 	"strings"
@@ -190,6 +191,7 @@ func (restore *MongoRestore) RestoreIntent(intent *intents.Intent) error {
 func (restore *MongoRestore) RestoreCollectionToDB(dbName, colName string,
 	bsonSource *db.DecodedBSONSource, fileSize int64) error {
 
+	var termErr error
 	session, err := restore.SessionProvider.GetSession()
 	if err != nil {
 		return fmt.Errorf("error establishing connection: %v", err)
@@ -224,6 +226,7 @@ func (restore *MongoRestore) RestoreCollectionToDB(dbName, colName string,
 			select {
 			case <-restore.termChan:
 				log.Logf(log.Always, "terminating read on %v.%v", dbName, colName)
+				termErr = util.ErrTerminated
 				close(docChan)
 				return
 			default:
@@ -290,9 +293,10 @@ func (restore *MongoRestore) RestoreCollectionToDB(dbName, colName string,
 			return fmt.Errorf("insertion error: %v", err)
 		}
 	}
+
 	// final error check
 	if err = bsonSource.Err(); err != nil {
 		return fmt.Errorf("reading bson input: %v", err)
 	}
-	return nil
+	return termErr
 }
