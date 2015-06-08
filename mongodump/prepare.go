@@ -99,7 +99,7 @@ func (f *realBSONFile) Open() (err error) {
 		// wrap writer in buffer to reduce load on disk
 		writeCloser = writeFlushCloser{
 			atomicFlusher{
-				bufio.NewWriterSize(inner, 32*1024),
+				bufio.NewWriterSize(file, 32*1024),
 			},
 		}
 	}
