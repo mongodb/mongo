@@ -101,7 +101,7 @@ namespace mongo {
         _head = _catalogHead( txn );
         _isMultikey = _catalogIsMultikey( txn );
 
-        BSONElement filterElement = _descriptor->getInfoElement("partialFilterExpression");
+        BSONElement filterElement = _descriptor->getInfoElement("filter");
         if ( filterElement.type() ) {
             invariant( filterElement.isABSONObj() );
             BSONObj filter = filterElement.Obj();

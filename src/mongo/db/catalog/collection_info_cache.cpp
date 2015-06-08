@@ -110,7 +110,7 @@ namespace mongo {
                 }
             }
 
-            // handle partial indexes
+            // handle filtered indexes
             const IndexCatalogEntry* entry = i.catalogEntry(descriptor);
             const MatchExpression* filter = entry->getFilterExpression();
             if (filter) {

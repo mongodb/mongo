@@ -5,7 +5,7 @@ t.drop();
 t.insert( { x : 1 } );
 
 function badFilter(filter) {
-    var res = t.ensureIndex( { x : 1 } , { partialFilterExpression : filter } );
+    var res = t.ensureIndex( { x : 1 } , { filter : filter } );
     assert(!res.ok, tojson(res));
     printjson(res);
 }

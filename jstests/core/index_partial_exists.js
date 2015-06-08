@@ -9,7 +9,7 @@ function runTest() {
     t.insert( { _id : 2, a : 2 } )
     t.insert( { _id : 1, a : 1, b : 1 } )
 
-    t.ensureIndex( { a : 1, b : 1 } , { partialFilterExpression : { b : { $exists : 1 } } } )
+    t.ensureIndex( { a : 1, b : 1 } , { filter : { b : { $exists : 1 } } } )
     assert.eq( 2 , t.getIndexes().length , "A1: correct number of indexes was created" )
 
     assert.eq( 3 , t.find().sort( { a : 1, b : 1 } ).count() , "A2: sort().count() returns all records" )
@@ -32,7 +32,7 @@ function runTest() {
 
     // build index first, then insert data + small variation of above
     t.drop()
-    t.ensureIndex( { a : 1, b : 1, c : 1 } , { partialFilterExpression : { a : { $exists : 1 }, b : { $exists : 1 }, c : { $exists : 1 } } } )
+    t.ensureIndex( { a : 1, b : 1, c : 1 } , { filter : { a : { $exists : 1 }, b : { $exists : 1 }, c : { $exists : 1 } } } )
     assert.eq( 2 , t.getIndexes().length , "B1: correct number of indexes was created" )
 
     t.insert( { _id : 4 } )
@@ -79,7 +79,7 @@ function runTest() {
       t.insert( { _id : 3, a : 3 } )
       t.insert( { _id : 4 } )
       t.createIndex( { a : 1, b : 1 } , { name : "a_1_b_1_filtered", 
-      partialFilterExpression : { a : { $exists : 1 }, b : { $exists : 1 }, c : { $exists : 1 } } } )
+      filter : { a : { $exists : 1 }, b : { $exists : 1 }, c : { $exists : 1 } } } )
       assert.eq( 3 , t.getIndexes().length , "C1: correct number of indexes was created" )
 
       // Verify that queries work also with the 2 near-identical indexes
@@ -102,7 +102,7 @@ function runTest() {
 
     // Same tests as in the beginning, but the filtered column is the first one
     t.drop()
-    t.ensureIndex({ b: 1, a: 1 }, { $partialFilterExpression: { b: { $exists: 1 } } })
+    t.ensureIndex({ b: 1, a: 1 }, { $filter: { b: { $exists: 1 } } })
     assert.eq( 2 , t.getIndexes().length , "D1: correct number of indexes was created" )
 
     t.insert( { _id : 4, b : 5 } )
@@ -136,8 +136,8 @@ function runTest() {
 
     // Sub documents, Arrays (multikey index) and regular expressions
     t.drop()
-    t.ensureIndex({ "b.c.d": 1, "a": 1 }, { $partialFilterExpression: { "b.c.d": { $exists: 1 } }, name : "index1" })
-    t.ensureIndex({ "b.e.value": 1, "a": 1 }, { $partialFilterExpression: { "b.e.value": { $exists: 1 } }, name : "index2" })
+    t.ensureIndex({ "b.c.d": 1, "a": 1 }, { $filter: { "b.c.d": { $exists: 1 } }, name : "index1" })
+    t.ensureIndex({ "b.e.value": 1, "a": 1 }, { $filter: { "b.e.value": { $exists: 1 } }, name : "index2" })
     assert.eq( 3 , t.getIndexes().length , "E1: correct number of indexes was created" )
 
     t.insert( 

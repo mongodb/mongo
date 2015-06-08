@@ -9,7 +9,7 @@
 
     // Create TTL partial index.
     assert.commandWorked(coll.ensureIndex({x: 1}, {expireAfterSeconds: 0,
-                                                   partialFilterExpression: {z: {$exists: true}}}));
+                                                   filter: {z: {$exists: true}}}));
 
     var now = new Date();
     assert.writeOK(coll.insert({x: now, z: 2}));
