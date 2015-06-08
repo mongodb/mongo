@@ -30,6 +30,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/commands/copydb_start_commands.h"
+
 #include "mongo/base/status.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/dbclientinterface.h"
@@ -37,6 +39,7 @@
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/client.h"
 #include "mongo/db/cloner.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/copydb.h"
@@ -48,9 +51,14 @@ namespace mongo {
     using std::string;
     using std::stringstream;
 
-    // SERVER-4328 todo review for concurrency
-    // :(
-    thread_specific_ptr<DBClientBase> authConn_;
+    namespace {
+        const auto authConnection =
+            Client::declareDecoration<std::unique_ptr<DBClientBase>>();
+    } // namespace
+
+    std::unique_ptr<DBClientBase>& CopyDbAuthConnection::forClient(Client* client) {
+        return authConnection(client);
+    }
 
     /* Usage:
      * admindb.$cmd.findOne( { copydbgetnonce: 1, fromhost: <connection string> } );
@@ -101,15 +109,17 @@ namespace mongo {
 
             const ConnectionString cs(uassertStatusOK(ConnectionString::parse(fromhost)));
 
-            authConn_.reset(cs.connect(errmsg));
-            if (!authConn_.get()) {
+            auto& authConn = CopyDbAuthConnection::forClient(txn->getClient());
+            authConn.reset(cs.connect(errmsg));
+            if (!authConn) {
                 return false;
             }
 
             BSONObj ret;
 
-            if( !authConn_->runCommand( "admin", BSON( "getnonce" << 1 ), ret ) ) {
+            if( !authConn->runCommand( "admin", BSON( "getnonce" << 1 ), ret ) ) {
                 errmsg = "couldn't get nonce " + ret.toString();
+                authConn.reset();
                 return false;
             }
 
@@ -188,17 +198,19 @@ namespace mongo {
                 return false;
             }
 
-            authConn_.reset(cs.connect(errmsg));
-            if (!authConn_.get()) {
+            auto& authConn = CopyDbAuthConnection::forClient(txn->getClient());
+            authConn.reset(cs.connect(errmsg));
+            if (!authConn.get()) {
                 return false;
             }
 
             BSONObj ret;
-            if( !authConn_->runCommand( fromDb,
-                                        BSON( "saslStart" << 1 <<
-                                              mechanismElement <<
-                                              payloadElement),
-                                        ret ) ) {
+            if( !authConn->runCommand( fromDb,
+                                       BSON( "saslStart" << 1 <<
+                                             mechanismElement <<
+                                             payloadElement),
+                                       ret ) ) {
+                authConn.reset();
                 return appendCommandStatus(result,
                                            Command::getStatusFromCommandResult(ret));
 

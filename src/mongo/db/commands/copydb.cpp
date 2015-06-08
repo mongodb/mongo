@@ -159,29 +159,33 @@ namespace {
             string nonce = cmdObj.getStringField( "nonce" );
             string key = cmdObj.getStringField( "key" );
 
+            auto& authConn = CopyDbAuthConnection::forClient(txn->getClient());
+
             if ( !username.empty() && !nonce.empty() && !key.empty() ) {
-                uassert( 13008, "must call copydbgetnonce first", authConn_.get() );
+                uassert( 13008, "must call copydbgetnonce first", authConn.get() );
                 BSONObj ret;
                 {
-                    if ( !authConn_->runCommand( cloneOptions.fromDB,
-                                                 BSON( "authenticate" << 1 << "user" << username
-                                                       << "nonce" << nonce << "key" << key ), ret ) ) {
+                    if ( !authConn->runCommand( cloneOptions.fromDB,
+                                                BSON( "authenticate" << 1 << "user" << username
+                                                      << "nonce" << nonce << "key" << key ), ret ) ) {
                         errmsg = "unable to login " + ret.toString();
+                        authConn.reset();
                         return false;
                     }
                 }
-                cloner.setConnection( authConn_.release() );
+                cloner.setConnection( authConn.release() );
             }
             else if (cmdObj.hasField(saslCommandConversationIdFieldName) &&
                      cmdObj.hasField(saslCommandPayloadFieldName)) {
-                uassert( 25487, "must call copydbsaslstart first", authConn_.get() );
+                uassert( 25487, "must call copydbsaslstart first", authConn.get() );
                 BSONObj ret;
-                if ( !authConn_->runCommand( cloneOptions.fromDB,
-                                             BSON( "saslContinue" << 1 <<
-                                                   cmdObj[saslCommandConversationIdFieldName] <<
-                                                   cmdObj[saslCommandPayloadFieldName] ),
-                                             ret ) ) {
+                if ( !authConn->runCommand( cloneOptions.fromDB,
+                                            BSON( "saslContinue" << 1 <<
+                                                  cmdObj[saslCommandConversationIdFieldName] <<
+                                                  cmdObj[saslCommandPayloadFieldName] ),
+                                            ret ) ) {
                     errmsg = "unable to login " + ret.toString();
+                    authConn.reset();
                     return false;
                 }
 
@@ -191,7 +195,7 @@ namespace {
                 }
 
                 result.append("done", true);
-                cloner.setConnection( authConn_.release() );
+                cloner.setConnection( authConn.release() );
             }
             else if (!fromSelf) {
                 // If fromSelf leave the cloner's conn empty, it will use a DBDirectClient instead.
@@ -203,6 +207,10 @@ namespace {
                 }
                 cloner.setConnection(conn);
             }
+
+            // Either we didn't need the authConn (if we even had one), or we already moved it
+            // into the cloner so just make sure we don't keep it around if we don't need it.
+            authConn.reset();
 
             if (fromSelf) {
                 // SERVER-4328 todo lock just the two db's not everything for the fromself case
