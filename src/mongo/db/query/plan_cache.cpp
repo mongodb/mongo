@@ -535,10 +535,18 @@ namespace {
         for (std::map<StringData, BSONElement>::const_iterator i = elements.begin();
              i != elements.end(); ++i) {
             const BSONElement& elt = (*i).second;
-            // BSONElement::toString() arguments
-            // includeFieldName - skip field name (appending after toString() result). false.
-            // full: choose less verbose representation of child/data values. false.
-            encodeUserString(elt.toString(false, false), keyBuilder);
+
+            if (elt.isSimpleType()) {
+                // For inclusion/exclusion projections, we encode as "i" or "e".
+                *keyBuilder << (elt.trueValue() ? "i" : "e");
+            }
+            else {
+                // For projection operators, we use the verbatim string encoding of the element.
+                encodeUserString(elt.toString(false, // includeFieldName
+                                              false), // full
+                                 keyBuilder);
+            }
+
             encodeUserString(elt.fieldName(), keyBuilder);
         }
     }
