@@ -255,15 +255,26 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 	/* Page sizes */
 	WT_RET(__btree_page_sizes(session));
 
-	/* Eviction; the metadata file is never evicted. */
-	if (WT_IS_METADATA(btree->dhandle))
+	/* 
+	 * Set special flags for the metadata file.
+	 * Eviction; the metadata file is never evicted.
+	 * Logging; the metadata file is always logged if possible.
+	 */
+	if (WT_IS_METADATA(btree->dhandle)) {
 		F_SET(btree, WT_BTREE_IN_MEMORY | WT_BTREE_NO_EVICTION);
-	else {
+		F_CLR(btree, WT_BTREE_NO_LOGGING);
+	} else {
 		WT_RET(__wt_config_gets(session, cfg, "cache_resident", &cval));
 		if (cval.val)
 			F_SET(btree, WT_BTREE_IN_MEMORY | WT_BTREE_NO_EVICTION);
 		else
 			F_CLR(btree, WT_BTREE_IN_MEMORY | WT_BTREE_NO_EVICTION);
+
+		WT_RET(__wt_config_gets(session, cfg, "log.enabled", &cval));
+		if (cval.val)
+			F_CLR(btree, WT_BTREE_NO_LOGGING);
+		else
+			F_SET(btree, WT_BTREE_NO_LOGGING);
 	}
 
 	/* Checksums */

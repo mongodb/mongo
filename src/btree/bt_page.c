@@ -53,8 +53,7 @@ __evict_force_check(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	__wt_txn_update_oldest(session, 0);
 
 	/* If eviction cannot succeed, don't try. */
-	return (
-	    __wt_page_can_evict(session, page, WT_EVICT_CHECK_SPLITS, NULL));
+	return (__wt_page_can_evict(session, page, 1, NULL));
 }
 
 /*
@@ -95,13 +94,17 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 				return (WT_NOTFOUND);
 			if (LF_ISSET(WT_READ_NO_WAIT))
 				return (WT_NOTFOUND);
+
+			/* Waiting on another thread's read, stall. */
 			WT_STAT_FAST_CONN_INCR(session, page_read_blocked);
-			break;
+			goto stall;
 		case WT_REF_LOCKED:
 			if (LF_ISSET(WT_READ_NO_WAIT))
 				return (WT_NOTFOUND);
+
+			/* Waiting on eviction, stall. */
 			WT_STAT_FAST_CONN_INCR(session, page_locked_blocked);
-			break;
+			goto stall;
 		case WT_REF_SPLIT:
 			return (WT_RESTART);
 		case WT_REF_MEM:
@@ -151,12 +154,11 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 				/* If forced eviction fails, stall. */
 				if (ret == EBUSY) {
 					ret = 0;
-					wait_cnt += 1000;
 					WT_STAT_FAST_CONN_INCR(session,
 					    page_forcible_evict_blocked);
-					break;
-				} else
-					WT_RET(ret);
+					goto stall;
+				}
+				WT_RET(ret);
 
 				/*
 				 * The result of a successful forced eviction
@@ -201,6 +203,9 @@ skip_evict:
 		if (++wait_cnt < 1000)
 			__wt_yield();
 		else {
+			if (0) {
+stall:				wait_cnt += 1000;
+			}
 			sleep_cnt = WT_MIN(wait_cnt, 10000);
 			wait_cnt *= 2;
 			WT_STAT_FAST_CONN_INCRV(session, page_sleep, sleep_cnt);

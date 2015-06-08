@@ -869,21 +869,21 @@ __session_transaction_sync(WT_SESSION *wt_session, const char *config)
 	int forever;
 
 	session = (WT_SESSION_IMPL *)wt_session;
+	SESSION_API_CALL(session, transaction_sync, config, cfg);
+	WT_STAT_FAST_CONN_INCR(session, txn_sync);
+
 	conn = S2C(session);
 	txn = &session->txn;
 	if (F_ISSET(txn, WT_TXN_RUNNING))
-		WT_RET_MSG(session, EINVAL, "transaction in progress");
+		WT_ERR_MSG(session, EINVAL, "transaction in progress");
 
 	/*
 	 * If logging is not enabled there is nothing to do.
 	 */
 	if (!FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED))
-		return (0);
-	SESSION_API_CALL(session, transaction_sync, config, cfg);
-	WT_STAT_FAST_CONN_INCR(session, txn_sync);
+		WT_ERR_MSG(session, EINVAL, "logging not enabled");
 
 	log = conn->log;
-	ret = 0;
 	timeout_ms = waited_ms = 0;
 	forever = 1;
 
@@ -907,7 +907,7 @@ __session_transaction_sync(WT_SESSION *wt_session, const char *config)
 	 */
 	WT_ERR(__wt_config_gets_def(
 	    session, cfg, "timeout_ms", (int)UINT_MAX, &cval));
-	if ((unsigned int)cval.len != UINT_MAX) {
+	if ((unsigned int)cval.val != UINT_MAX) {
 		timeout_ms = (uint64_t)cval.val;
 		forever = 0;
 	}
@@ -1166,7 +1166,7 @@ __wt_open_session(WT_CONNECTION_IMPL *conn,
 	WT_ERR(__wt_cond_alloc(session, "session", 0, &session_ret->cond));
 
 	if (WT_SESSION_FIRST_USE(session_ret))
-		__wt_random_init(session_ret->rnd);
+		__wt_random_init(&session_ret->rnd);
 
 	__wt_event_handler_set(session_ret,
 	    event_handler == NULL ? session->event_handler : event_handler);

@@ -45,6 +45,9 @@ __cache_config_local(WT_SESSION_IMPL *session, int shared, const char *cfg[])
 	WT_RET(__wt_config_gets(session, cfg, "eviction_dirty_target", &cval));
 	cache->eviction_dirty_target = (u_int)cval.val;
 
+	WT_RET(__wt_config_gets(session, cfg, "eviction_dirty_trigger", &cval));
+	cache->eviction_dirty_trigger = (u_int)cval.val;
+
 	/*
 	 * The eviction thread configuration options include the main eviction
 	 * thread and workers. Our implementation splits them out. Adjust for

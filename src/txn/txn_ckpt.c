@@ -349,17 +349,17 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_TXN *txn;
 	WT_TXN_GLOBAL *txn_global;
 	WT_TXN_ISOLATION saved_isolation;
+	void *saved_meta_next;
+	u_int i;
+	int full, fullckpt_logging, idle, tracking;
 	const char *txn_cfg[] = { WT_CONFIG_BASE(session,
 	    WT_SESSION_begin_transaction), "isolation=snapshot", NULL };
-	void *saved_meta_next;
-	int full, idle, logging, tracking;
-	u_int i;
 
 	conn = S2C(session);
+	txn = &session->txn;
 	txn_global = &conn->txn_global;
 	saved_isolation = session->isolation;
-	txn = &session->txn;
-	full = idle = logging = tracking = 0;
+	full = fullckpt_logging = idle = tracking = 0;
 
 	/* Ensure the metadata table is open before taking any locks. */
 	WT_RET(__wt_metadata_open(session));
@@ -369,6 +369,10 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 * kind of checkpoint this is.
 	 */
 	WT_RET(__checkpoint_apply_all(session, cfg, NULL, &full));
+
+	/* Configure logging only if doing a full checkpoint. */
+	fullckpt_logging =
+	    full && FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED);
 
 	/*
 	 * Get a list of handles we want to flush; this may pull closed objects
@@ -418,7 +422,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	tracking = 1;
 
 	/* Tell logging that we are about to start a database checkpoint. */
-	if (FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED) && full)
+	if (fullckpt_logging)
 		WT_ERR(__wt_txn_checkpoint_log(
 		    session, full, WT_TXN_LOG_CKPT_PREPARE, NULL));
 
@@ -455,11 +459,9 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	    txn_checkpoint_generation, txn_global->checkpoint_gen);
 
 	/* Tell logging that we have started a database checkpoint. */
-	if (FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED) && full) {
+	if (fullckpt_logging)
 		WT_ERR(__wt_txn_checkpoint_log(
 		    session, full, WT_TXN_LOG_CKPT_START, NULL));
-		logging = 1;
-	}
 
 	WT_ERR(__checkpoint_apply(session, cfg, __wt_checkpoint));
 
@@ -561,8 +563,8 @@ err:	/*
 	 * Tell logging that we have finished a database checkpoint.  Do not
 	 * write a log record if the database was idle.
 	 */
-	if (logging) {
-		if (ret == 0 && full &&
+	if (fullckpt_logging) {
+		if (ret == 0 &&
 		    F_ISSET((WT_BTREE *)session->meta_dhandle->handle,
 		    WT_BTREE_SKIP_CKPT))
 			idle = 1;

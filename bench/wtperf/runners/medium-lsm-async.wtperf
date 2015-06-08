@@ -7,3 +7,6 @@ report_interval=5
 run_time=120
 populate_threads=1
 threads=((count=5,reads=1,updates=2))
+# Add throughput/latency monitoring
+max_latency=2000
+sample_interval=5

@@ -373,6 +373,22 @@ __curstat_file_init(WT_SESSION_IMPL *session,
 {
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
+	const char *filename;
+
+	/*
+	 * If we are only getting the size of the file, we don't need to open
+	 * the tree.
+	 */
+	if (F_ISSET(cst, WT_CONN_STAT_SIZE)) {
+		filename = uri;
+		if (!WT_PREFIX_SKIP(filename, "file:"))
+			return (EINVAL);
+		__wt_stat_init_dsrc_stats(&cst->u.dsrc_stats);
+		WT_RET(__wt_block_manager_size(
+		    session, filename, &cst->u.dsrc_stats));
+		__wt_curstat_dsrc_final(cst);
+		return (0);
+	}
 
 	WT_RET(__wt_session_get_btree_ckpt(session, uri, cfg, 0));
 	dhandle = session->dhandle;
@@ -508,8 +524,22 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 		}
 		WT_ERR_NOTFOUND_OK(ret);
 		if ((ret = __wt_config_subgets(
-		    session, &cval, "clear", &sval)) == 0 && sval.val != 0)
+		    session, &cval, "size", &sval)) == 0 && sval.val != 0) {
+			if (F_ISSET(cst, WT_CONN_STAT_FAST | WT_CONN_STAT_ALL))
+				WT_ERR_MSG(session, EINVAL,
+				    "only one statistics configuration value "
+				    "may be specified");
+			F_SET(cst, WT_CONN_STAT_SIZE);
+		}
+		WT_ERR_NOTFOUND_OK(ret);
+		if ((ret = __wt_config_subgets(
+		    session, &cval, "clear", &sval)) == 0 && sval.val != 0) {
+			if (F_ISSET(cst, WT_CONN_STAT_SIZE))
+				WT_ERR_MSG(session, EINVAL,
+				    "clear is incompatible with size "
+				    "statistics");
 			F_SET(cst, WT_CONN_STAT_CLEAR);
+		}
 		WT_ERR_NOTFOUND_OK(ret);
 
 		/* If no configuration, use the connection's configuration. */

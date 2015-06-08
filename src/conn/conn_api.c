@@ -1720,7 +1720,12 @@ __conn_write_base_config(WT_SESSION_IMPL *session, const char *cfg[])
 	 * merge the rest to be written.
 	 */
 	WT_ERR(__wt_config_merge(session, cfg + 1,
-	    "create=,encryption=(secretkey=),log=(recover=)", &base_config));
+	    "config_base=,"
+	    "create=,"
+	    "encryption=(secretkey=),"
+	    "exclusive=,"
+	    "log=(recover=),"
+	    "use_environment_priv=,", &base_config));
 	WT_ERR(__wt_config_init(session, &parser, base_config));
 	while ((ret = __wt_config_next(&parser, &k, &v)) == 0) {
 		/* Fix quoting for non-trivial settings. */
@@ -1739,8 +1744,7 @@ __conn_write_base_config(WT_SESSION_IMPL *session, const char *cfg[])
 
 	if (0) {
 		/* Close open file handle, remove any temporary file. */
-err:		if (fp != NULL)
-			WT_TRET(__wt_fclose(&fp, WT_FHANDLE_WRITE));
+err:		WT_TRET(__wt_fclose(&fp, WT_FHANDLE_WRITE));
 		WT_TRET(__wt_remove_if_exists(session, WT_BASECONFIG_SET));
 	}
 
@@ -1820,7 +1824,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	session = conn->default_session = &conn->dummy_session;
 	session->iface.connection = &conn->iface;
 	session->name = "wiredtiger_open";
-	__wt_random_init(session->rnd);
+	__wt_random_init(&session->rnd);
 	__wt_event_handler_set(session, event_handler);
 
 	/* Remaining basic initialization of the connection structure. */
