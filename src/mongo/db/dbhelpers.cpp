@@ -428,7 +428,8 @@ namespace mongo {
                     }
                 }
 
-                if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(ns)) {
+                NamespaceString nss(ns);
+                if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(nss)) {
                     warning() << "stepped down from primary while deleting chunk; "
                               << "orphaning data in " << ns
                               << " in range [" << min << ", " << max << ")";

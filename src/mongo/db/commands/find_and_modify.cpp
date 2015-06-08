@@ -185,7 +185,7 @@ namespace {
     }
 
     Status checkCanAcceptWritesForDatabase(const NamespaceString& nsString) {
-        if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(nsString.db())) {
+        if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(nsString)) {
             return Status(ErrorCodes::NotMaster, str::stream()
                 << "Not primary while running findAndModify command on collection "
                 << nsString.ns());

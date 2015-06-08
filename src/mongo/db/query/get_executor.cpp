@@ -711,7 +711,7 @@ namespace {
         }
 
         bool userInitiatedWritesAndNotPrimary = txn->writesAreReplicated() &&
-            !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(nss.db());
+            !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(nss);
 
         if (userInitiatedWritesAndNotPrimary) {
             return Status(ErrorCodes::NotMaster,
@@ -866,7 +866,7 @@ namespace {
         // however, then we make an exception and let the write proceed. In this case,
         // shouldCallLogOp() will be false.
         bool userInitiatedWritesAndNotPrimary = txn->writesAreReplicated() &&
-            !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(nsString.db());
+            !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(nsString);
 
         if (userInitiatedWritesAndNotPrimary) {
             return Status(ErrorCodes::NotMaster,

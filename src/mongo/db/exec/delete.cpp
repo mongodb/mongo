@@ -275,7 +275,7 @@ namespace mongo {
         massert(28537,
                 str::stream() << "Demoted from primary while removing from " << ns.ns(),
                 !_params.shouldCallLogOp ||
-                repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(ns.db()));
+                repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(ns));
     }
 
     void DeleteStage::invalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {

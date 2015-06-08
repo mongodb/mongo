@@ -96,7 +96,8 @@ namespace mongo {
             ScopedTransaction transaction(txn, MODE_IX);
             AutoGetDb autoDb(txn, dbname, MODE_X);
 
-            if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbname)) {
+            NamespaceString nss(dbname, to);
+            if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(nss)) {
                 return appendCommandStatus(result, Status(ErrorCodes::NotMaster, str::stream()
                     << "Not primary while cloning collection " << from << " to " << to
                     << " (as capped)"));

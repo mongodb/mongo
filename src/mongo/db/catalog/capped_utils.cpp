@@ -57,8 +57,8 @@ namespace mongo {
         AutoGetDb autoDb(txn, collectionName.db(), MODE_X);
 
         bool userInitiatedWritesAndNotPrimary = txn->writesAreReplicated() &&
-            !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(
-                    collectionName.db());
+            !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(
+                    collectionName);
 
         if (userInitiatedWritesAndNotPrimary) {
             return Status(ErrorCodes::NotMaster,
@@ -226,7 +226,7 @@ namespace mongo {
         AutoGetDb autoDb(txn, collectionName.db(), MODE_X);
 
         bool userInitiatedWritesAndNotPrimary = txn->writesAreReplicated() &&
-            !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbname);
+            !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(collectionName);
 
         if (userInitiatedWritesAndNotPrimary) {
             return Status(ErrorCodes::NotMaster,

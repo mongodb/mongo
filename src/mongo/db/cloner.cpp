@@ -133,7 +133,7 @@ namespace mongo {
                     str::stream() << "Not primary while cloning collection " << from_collection.ns()
                                   << " to " << to_collection.ns(),
                     !txn->writesAreReplicated() ||
-                    repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(_dbName));
+                    repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(to_collection));
 
             // Make sure database still exists after we resume from the temp release
             Database* db = dbHolder().openDb(txn, _dbName);
@@ -182,10 +182,10 @@ namespace mongo {
                         // Check if everything is still all right.
                         if (txn->writesAreReplicated()) {
                             uassert(28592,
-                                    str::stream() << "Cannot write to db: " << _dbName
+                                    str::stream() << "Cannot write to ns: " << to_collection.ns()
                                                   << " after yielding",
                                     repl::getGlobalReplicationCoordinator()->
-                                        canAcceptWritesForDatabase(_dbName));
+                                        canAcceptWritesFor(to_collection));
                         }
 
                         // TODO: SERVER-16598 abort if original db or collection is gone.
@@ -283,7 +283,7 @@ namespace mongo {
                               << " to " << to_collection.ns() << " with filter "
                               << query.toString(),
                 !txn->writesAreReplicated() ||
-                repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(toDBName));
+                repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(to_collection));
     }
 
     void Cloner::copyIndexes(OperationContext* txn,
@@ -314,7 +314,7 @@ namespace mongo {
                 str::stream() << "Not primary while copying indexes from " << from_collection.ns()
                               << " to " << to_collection.ns() << " (Cloner)",
                 !txn->writesAreReplicated() ||
-                repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(toDBName));
+                repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(to_collection));
 
 
         if (indexesToBuild.empty())
@@ -381,7 +381,7 @@ namespace mongo {
         uassert(ErrorCodes::NotMaster,
                 str::stream() << "Not primary while copying collection " << ns << " (Cloner)",
                 !txn->writesAreReplicated() ||
-                repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbname));
+                repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(nss));
 
         Database* db = dbHolder().openDb(txn, dbname);
 

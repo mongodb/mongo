@@ -58,7 +58,7 @@ namespace mongo {
         OldClientContext ctx(txn,  ns);
 
         bool userInitiatedWritesAndNotPrimary = txn->writesAreReplicated() &&
-            !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbName);
+            !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(ns);
 
         if (userInitiatedWritesAndNotPrimary) {
             return Status(ErrorCodes::NotMaster,

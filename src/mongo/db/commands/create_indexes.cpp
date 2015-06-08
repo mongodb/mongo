@@ -141,7 +141,7 @@ namespace mongo {
             // Note: createIndexes command does not currently respect shard versioning.
             ScopedTransaction transaction(txn, MODE_IX);
             Lock::DBLock dbLock(txn->lockState(), ns.db(), MODE_X);
-            if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbname)) {
+            if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(ns)) {
                 return appendCommandStatus(result, Status(ErrorCodes::NotMaster, str::stream()
                     << "Not primary while creating indexes in " << ns.ns()));
             }
@@ -203,7 +203,7 @@ namespace mongo {
             if (indexer.getBuildInBackground()) {
                 txn->recoveryUnit()->abandonSnapshot();
                 dbLock.relockWithMode(MODE_IX);
-                if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbname)) {
+                if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(ns)) {
                     return appendCommandStatus(result, Status(ErrorCodes::NotMaster, str::stream()
                         << "Not primary while creating background indexes in " << ns.ns()));
                 }
@@ -223,8 +223,7 @@ namespace mongo {
                         // that day, to avoid data corruption due to lack of index cleanup.
                         txn->recoveryUnit()->abandonSnapshot();
                         dbLock.relockWithMode(MODE_X);
-                        if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(
-                                dbname)) {
+                        if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(ns)) {
                             return appendCommandStatus(
                                 result,
                                 Status(ErrorCodes::NotMaster, str::stream()
@@ -245,8 +244,7 @@ namespace mongo {
                 dbLock.relockWithMode(MODE_X);
                 uassert(ErrorCodes::NotMaster,
                         str::stream() << "Not primary while completing index build in " << dbname,
-                        repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(
-                            dbname));
+                        repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(ns));
 
                 Database* db = dbHolder().get(txn, ns.db());
                 uassert(28551, "database dropped during index build", db);

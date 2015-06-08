@@ -140,7 +140,7 @@ namespace {
             AutoGetDb autoDb(txn, dbName, MODE_X);
 
             bool userInitiatedWritesAndNotPrimary = txn->writesAreReplicated() &&
-                !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbName);
+                !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(ns);
 
             if (userInitiatedWritesAndNotPrimary) {
                 return Status(ErrorCodes::NotMaster,

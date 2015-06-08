@@ -1013,7 +1013,7 @@ namespace mongo {
 
         // We may have stepped down during the yield.
         bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
-            !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(nsString.db());
+            !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(nsString);
 
         if (userInitiatedWritesAndNotPrimary) {
             return Status(ErrorCodes::NotMaster,

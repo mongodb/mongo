@@ -1394,6 +1394,11 @@ namespace {
         return !replAllDead && _settings.master;
     }
 
+    bool ReplicationCoordinatorImpl::canAcceptWritesFor(const NamespaceString& ns) {
+        StringData dbName = ns.db();
+        return canAcceptWritesForDatabase(dbName);
+    }
+
     Status ReplicationCoordinatorImpl::checkCanServeReadsFor(OperationContext* txn,
                                                              const NamespaceString& ns,
                                                              bool slaveOk) {
@@ -1404,7 +1409,7 @@ namespace {
         if (txn->getClient()->isInDirectClient()) {
             return Status::OK();
         }
-        if (canAcceptWritesForDatabase(ns.db())) {
+        if (canAcceptWritesFor(ns)) {
             return Status::OK();
         }
         if (_settings.slave || _settings.master) {

@@ -81,8 +81,7 @@ namespace mongo {
                 Lock::DBLock lk(txn->lockState(), nsString.db(), MODE_X);
 
                 const bool userInitiatedWritesAndNotPrimary = txn->writesAreReplicated() &&
-                        !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(
-                                                                                    nsString.db());
+                        !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(nsString);
 
                 if (userInitiatedWritesAndNotPrimary) {
                     uassertStatusOK(Status(ErrorCodes::NotMaster, str::stream()

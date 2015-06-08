@@ -211,8 +211,7 @@ namespace {
     }
 
     bool OperationContextImpl::isPrimaryFor( StringData ns ) {
-        return repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(
-                NamespaceString(ns).db());
+        return repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(NamespaceString(ns));
     }
 
     void OperationContextImpl::setReplicatedWrites(bool writesAreReplicated) {

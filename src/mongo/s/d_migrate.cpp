@@ -58,6 +58,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/hasher.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/ops/delete.h"
@@ -1954,12 +1955,11 @@ namespace {
             ScopedDbConnection conn(fromShard);
             conn->getLastError(); // just test connection
 
+            NamespaceString nss(ns);
             {
                 // 0. copy system.namespaces entry if collection doesn't already exist
                 OldClientWriteContext ctx(txn,  ns );
-
-                if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(
-                    nsToDatabaseSubstring(ns))) {
+                if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(nss)) {
                     errmsg = str::stream() << "Not primary during migration: " << ns
                                            << ": checking if collection exists";
                     warning() << errmsg;
@@ -2006,8 +2006,7 @@ namespace {
                 ScopedTransaction transaction(txn, MODE_IX);
                 Lock::DBLock lk(txn->lockState(),  nsToDatabaseSubstring(ns), MODE_X);
                 OldClientContext ctx(txn,  ns);
-                if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(
-                    nsToDatabaseSubstring(ns))) {
+                if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(nss)) {
                     errmsg = str::stream() << "Not primary during migration: " << ns;
                     warning() << errmsg;
                     setState(FAIL);

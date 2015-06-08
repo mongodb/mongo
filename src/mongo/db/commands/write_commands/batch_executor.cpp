@@ -443,8 +443,7 @@ namespace mongo {
     }
 
     static bool checkIsMasterForDatabase(const NamespaceString& ns, WriteOpResult* result) {
-        if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(
-                ns.db())) {
+        if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(ns)) {
             WriteErrorDetail* errorDetail = new WriteErrorDetail;
             result->setError(errorDetail);
             errorDetail->setErrCode(ErrorCodes::NotMaster);

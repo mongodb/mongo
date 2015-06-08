@@ -34,6 +34,7 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
@@ -55,7 +56,7 @@ namespace mongo {
             return status;
         }
 
-        const std::string ns = dbName + '.' + firstElt.valuestrsafe();
+        NamespaceString nss(dbName, firstElt.valuestrsafe());
 
         // Build options object from remaining cmdObj elements.
         BSONObjBuilder optionsBuilder;
@@ -72,23 +73,23 @@ namespace mongo {
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
             ScopedTransaction transaction(txn, MODE_IX);
             Lock::DBLock dbXLock(txn->lockState(), dbName, MODE_X);
-            OldClientContext ctx(txn, ns);
+            OldClientContext ctx(txn, nss.ns());
             if (txn->writesAreReplicated() && 
-                    !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbName)) {
-                return Status(ErrorCodes::NotMaster,
-                              str::stream() << "Not primary while creating collection " << ns);
+                    !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(nss)) {
+                return Status(ErrorCodes::NotMaster, str::stream() <<
+                              "Not primary while creating collection " << nss.ns());
             }
 
             WriteUnitOfWork wunit(txn);
 
             // Create collection.
-            status = userCreateNS(txn, ctx.db(), ns.c_str(), options);
+            status = userCreateNS(txn, ctx.db(), nss.ns(), options);
             if (!status.isOK()) {
                 return status;
             }
 
             wunit.commit();
-        } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "create", ns);
+        } MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "create", nss.ns());
         return Status::OK();
     }
 } // namespace mongo

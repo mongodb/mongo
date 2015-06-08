@@ -228,6 +228,14 @@ namespace repl {
         virtual bool canAcceptWritesForDatabase(StringData dbName) = 0;
 
         /**
+         * Returns true if it is valid for this node to accept writes on the given namespace.
+         *
+         * The result of this function should be consistent with canAcceptWritesForDatabase()
+         * for the database the namespace refers to, with additional checks on the collection.
+         */
+        virtual bool canAcceptWritesFor(const NamespaceString& ns) = 0;
+
+        /**
          * Checks if the current replica set configuration can satisfy the given write concern.
          *
          * Things that are taken into consideration include:

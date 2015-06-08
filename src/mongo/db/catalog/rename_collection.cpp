@@ -73,7 +73,7 @@ namespace {
         OldClientContext ctx(txn, source);
 
         bool userInitiatedWritesAndNotPrimary = txn->writesAreReplicated() &&
-            !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(source.db());
+            !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(source);
 
         if (userInitiatedWritesAndNotPrimary) {
             return Status(ErrorCodes::NotMaster, str::stream()

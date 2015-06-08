@@ -244,11 +244,12 @@ namespace {
                 const BSONObj& obj,
                 BSONObj *o2,
                 bool fromMigrate) {
-        if ( strncmp(ns, "local.", 6) == 0 ) {
+        NamespaceString nss(ns);
+        if (nss.db() == "local") {
             return;
         }
 
-        if (NamespaceString(ns).isSystemDotProfile()) {
+        if (nss.isSystemDotProfile()) {
             return;
         }
 
@@ -267,7 +268,7 @@ namespace {
         ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
 
         if (ns[0] && replCoord->getReplicationMode() == ReplicationCoordinator::modeReplSet &&
-                    !replCoord->canAcceptWritesForDatabase(nsToDatabaseSubstring(ns))) {
+                    !replCoord->canAcceptWritesFor(nss)) {
                 severe() << "logOp() but can't accept write to collection " << ns;
                 fassertFailed(17405);
         }

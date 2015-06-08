@@ -31,6 +31,7 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 
 #include "mongo/base/status.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/db/repl/read_after_optime_args.h"
 #include "mongo/db/repl/read_after_optime_response.h"
@@ -118,6 +119,11 @@ namespace repl {
     bool ReplicationCoordinatorMock::canAcceptWritesForDatabase(StringData dbName) {
         // TODO
         return true;
+    }
+
+    bool ReplicationCoordinatorMock::canAcceptWritesFor(const NamespaceString& ns) {
+        // TODO
+        return canAcceptWritesForDatabase(ns.db());
     }
 
     Status ReplicationCoordinatorMock::checkCanServeReadsFor(OperationContext* txn,

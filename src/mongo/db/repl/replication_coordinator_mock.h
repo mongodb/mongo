@@ -82,6 +82,8 @@ namespace repl {
 
         virtual bool canAcceptWritesForDatabase(StringData dbName);
 
+        bool canAcceptWritesFor(const NamespaceString& ns) override;
+
         virtual Status checkIfWriteConcernCanBeSatisfied(
                 const WriteConcernOptions& writeConcern) const;
 

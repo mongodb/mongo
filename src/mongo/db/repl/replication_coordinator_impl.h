@@ -142,6 +142,8 @@ namespace repl {
 
         virtual bool canAcceptWritesForDatabase(StringData dbName);
 
+        bool canAcceptWritesFor(const NamespaceString& ns) override;
+
         virtual Status checkIfWriteConcernCanBeSatisfied(
                 const WriteConcernOptions& writeConcern) const;
 
@@ -1008,8 +1010,8 @@ namespace repl {
         bool _sleptLastElection;                                                          // (X)
 
         // Flag that indicates whether writes to databases other than "local" are allowed.  Used to
-        // answer the canAcceptWritesForDatabase() question.  Always true for standalone nodes and
-        // masters in master-slave relationships.
+        // answer canAcceptWritesForDatabase() and canAcceptWritesFor() questions.
+        // Always true for standalone nodes and masters in master-slave relationships.
         bool _canAcceptNonLocalWrites;                                                    // (GX)
 
         // Flag that indicates whether reads from databases other than "local" are allowed.  Unlike
