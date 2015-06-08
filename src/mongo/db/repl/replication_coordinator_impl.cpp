@@ -1330,30 +1330,11 @@ namespace {
         cmdBuilder->append("replSetUpdatePosition", 1);
         // create an array containing objects each member connected to us and for ourself
         BSONArrayBuilder arrayBuilder(cmdBuilder->subarrayStart("optimes"));
-
-        // put ourselves at the top as a workaround for 2.6 compatability
-        BSONObjBuilder selfEntry(arrayBuilder.subobjStart());
-        SlaveInfo selfInfo = _slaveInfo[_getMyIndexInSlaveInfo_inlock()];
-        selfEntry.append("_id", selfInfo.rid);
-        selfEntry.append("optime", selfInfo.opTime);
-        selfEntry.append("memberId", selfInfo.memberId);
-        selfEntry.append("cfgver", _rsConfig.getConfigVersion());
-        // SERVER-14550 Even though the "config" field isn't used on the other end in 3.0,
-        // we need to keep sending it for 2.6 compatibility.
-        // TODO(spencer): Remove this after 3.0 is released.
-        const MemberConfig* member = _rsConfig.findMemberByID(selfInfo.memberId);
-        fassert(22214, member); // We ensured the member existed in processHandshake.
-        selfEntry.append("config", member->toBSON(_rsConfig.getTagConfig()));
-        selfEntry.doneFast();
-
         {
             for (SlaveInfoVector::const_iterator itr = _slaveInfo.begin();
                     itr != _slaveInfo.end(); ++itr) {
                 if (itr->opTime.isNull()) {
                     // Don't include info on members we haven't heard from yet.
-                    continue;
-                }
-                if (itr->self) {
                     continue;
                 }
                 BSONObjBuilder entry(arrayBuilder.subobjStart());
