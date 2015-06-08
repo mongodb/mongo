@@ -78,18 +78,6 @@ load('jstests/files/util/mongofiles_common.js');
 
     assert.eq(actual, expected, 'mismatched md5 sum - expected ' + expected + ' got ' + actual);
 
-    // test putting from stdin
-    filename = './mongofiles'
-    if ( _isWindows() )
-        filename += '.exe'
-    assert.eq(_runMongoProgram("sh", "-c", "echo hi | " + filename + " --port " + conn.port + " --local - put " + testName + " " + passthrough.args.join(" ")), 0, 'put from stdin failed');
-
-    // test getting file put from stdin
-    assert.eq(runMongoProgram.apply(this, ['mongofiles', '--port', conn.port, '--local', '-', 'get', testName].concat(passthrough.args)), 0, 'get to stdout failed');
-    var match = false;
-    rawMongoProgramOutput().split('\n').forEach(function(line) { if (line.match("hi")) match = true; });
-    assert(match, "stdout get didn't match expected file content");
-
     t.stop();
   };
 
