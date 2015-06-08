@@ -85,7 +85,8 @@ namespace {
                 BSON("_id" << "mySet" <<
                      "version" << 3 <<
                      "members" << BSON_ARRAY(BSON("_id" << 1 << "host" << "h1:1") <<
-                                             BSON("_id" << 2 << "host" << "h2:1"))));
+                                             BSON("_id" << 2 << "host" << "h2:1") <<
+                                             BSON("_id" << 3 << "host" << "h3:1"))));
         init("mySet");
         addSelf(HostAndPort("h2", 1));
         const Date_t startDate = getNet()->now();
@@ -131,35 +132,8 @@ namespace {
                           unittest::assertGet(getExternalState()->loadLocalConfigDocument(&txn))));
         ASSERT_OK(storedConfig.validate());
         ASSERT_EQUALS(3, storedConfig.getConfigVersion());
-        ASSERT_EQUALS(2, storedConfig.getNumMembers());
-
-        // confirm heartbeats update replication progress map
-        const ReplicationExecutor::RemoteCommandRequest& request2 = noi->getRequest();
-        ASSERT_EQUALS(HostAndPort("h1", 1), request2.target);
-        ReplSetHeartbeatArgs hbArgs2;
-        ASSERT_OK(hbArgs2.initialize(request2.cmdObj));
-
-        // process heartbeat response, updating optime
-        ReplSetHeartbeatResponse hbResp2;
-        hbResp2.setSetName("mySet");
-        hbResp2.setState(MemberState::RS_SECONDARY);
-        hbResp2.noteReplSet();
-        hbResp2.setVersion(rsConfig.getConfigVersion());
-        hbResp2.setOpTime(OpTime(100,0));
-        BSONObjBuilder responseBuilder2;
-        responseBuilder2 << "ok" << 1;
-        hbResp2.addToBSON(&responseBuilder2);
-        net->scheduleResponse(noi, startDate + 201, makeResponseStatus(responseBuilder2.obj()));
-        assertRunUntil(startDate + 201);
-
-        // confirm replication progress has been updated by preparing an update position command
-        BSONObjBuilder updatePositionBuilder;
-        getReplCoord()->prepareReplSetUpdatePositionCommand(&updatePositionBuilder);
-        BSONObj updatePositionCommand = updatePositionBuilder.obj();
-        log() << updatePositionCommand.toString();
-        ASSERT_EQ(OpTime(100,0),
-                  updatePositionCommand["optimes"].Array()[0].Obj()["optime"]._opTime());
-        ASSERT_EQ(1, updatePositionCommand["optimes"].Array()[0].Obj()["memberId"].numberInt());
+        ASSERT_EQUALS(3, storedConfig.getNumMembers());
+        exitNetwork();
     }
 
     TEST_F(ReplCoordHBTest, DoNotJoinReplSetIfNotAMember) {
