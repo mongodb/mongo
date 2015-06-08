@@ -4,8 +4,7 @@ t = db.index_filtered2;
 t.drop();
 
 t.ensureIndex( { x : 1 },
-               { filter : { a : { $lt : 5 },
-                            b : { $lt : 5 } } } );
+               { partialFilterExpression : { a : { $lt : 5 }, b : { $lt : 5 } } } );
 
 for ( i = 0; i < 10; i++ ) {
     t.insert( { x : i, a : i, b : i } );

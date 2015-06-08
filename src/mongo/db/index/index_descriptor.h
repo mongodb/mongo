@@ -68,7 +68,7 @@ namespace mongo {
               _isIdIndex(isIdIndexPattern( _keyPattern )),
               _sparse(infoObj["sparse"].trueValue()),
               _unique( _isIdIndex || infoObj["unique"].trueValue() ),
-              _partial(!infoObj["filter"].eoo()),
+              _partial(!infoObj["partialFilterExpression"].eoo()),
               _cachedEntry( NULL )
         {
             _indexNamespace = makeIndexNamespace( _parentNS, _indexName );
