@@ -336,6 +336,7 @@ static const WT_CONFIG_CHECK confchk_WT_SESSION_verify[] = {
 	{ "dump_offsets", "list", NULL, NULL, NULL, 0 },
 	{ "dump_pages", "boolean", NULL, NULL, NULL, 0 },
 	{ "dump_shape", "boolean", NULL, NULL, NULL, 0 },
+	{ "strict", "boolean", NULL, NULL, NULL, 0 },
 	{ NULL, NULL, NULL, NULL, NULL, 0 }
 };
 
@@ -909,8 +910,8 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	},
 	{ "WT_SESSION.verify",
 	  "dump_address=0,dump_blocks=0,dump_offsets=,dump_pages=0,"
-	  "dump_shape=0",
-	  confchk_WT_SESSION_verify, 5
+	  "dump_shape=0,strict=0",
+	  confchk_WT_SESSION_verify, 6
 	},
 	{ "colgroup.meta",
 	  "app_metadata=,collator=,columns=,source=,type=file",
