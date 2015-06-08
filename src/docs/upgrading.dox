@@ -1,5 +1,23 @@
 /*! @page upgrading Upgrading WiredTiger applications
 
+@section version_262 Upgrading to Version 2.6.2
+
+<dl>
+<dt>WT_SESSION.verify</dt>
+<dd>
+The WT_SESSION.verify method in this release has a new configuration
+option, \c strict. By default, with \c strict set to \c false,
+WT_SESSION.verify will no longer return an error for problems that do
+not impact the future use of the object (for example, if a leaked block
+were detected, the application can continue to run).  WT_SESSION.verify
+will continue to output an error message whenever an error is detected,
+only the final return value is affected.  This change allows
+applications to verify objects and continue if at all possible.
+Applications in development should configure \c strict to \c true in
+order to terminate the application whenever an error is detected.
+</dd>
+
+</dl><hr>
 @section version_261 Upgrading to Version 2.6.1
 
 <dl>
