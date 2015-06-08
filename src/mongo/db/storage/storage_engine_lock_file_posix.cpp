@@ -140,7 +140,8 @@ namespace {
         if (::ftruncate(_lockFileHandle->_fd, 0)) {
             int errorcode = errno;
             return Status(ErrorCodes::FileStreamFailed, str::stream()
-                << errnoWithDescription(errorcode));
+                << "Unable to write process id to file (ftruncate failed): "
+                << _filespec << ' ' << errnoWithDescription(errorcode));
         }
 
         ProcessId pid = ProcessId::getCurrent();
@@ -161,7 +162,13 @@ namespace {
                 << _filespec << " no data written.");
         }
 
-        ::fsync(_lockFileHandle->_fd);
+        if (::fsync(_lockFileHandle->_fd)) {
+            int errorcode = errno;
+            return Status(ErrorCodes::FileStreamFailed, str::stream()
+                << "Unable to write process id " << pid.toString() << " to file (fsync failed): "
+                << _filespec << ' ' << errnoWithDescription(errorcode));
+        }
+
         flushMyDirectory(_filespec);
 
         return Status::OK();
