@@ -84,6 +84,8 @@ namespace mongo {
          DocumentSourceMatch::createFromBson},
         {DocumentSourceMergeCursors::name,
          DocumentSourceMergeCursors::createFromBson},
+        {DocumentSourceObjectToArray::objectToArrayName,
+         DocumentSourceObjectToArray::createFromBson},
         {DocumentSourceOut::outName,
          DocumentSourceOut::createFromBson},
         {DocumentSourceProject::projectName,
