@@ -188,7 +188,9 @@ namespace mongo {
 
                 num++;
 
-                logOpForDbHash(ns.c_str());
+                WriteUnitOfWork wuow(txn);
+                logOpForDbHash(txn, ns.c_str());
+                wuow.commit();
             }
 
             result.append( "applied" , num );

@@ -326,6 +326,16 @@ namespace mongo {
                    const BSONObj& obj,
                    BSONObj* patt,
                    bool notInActiveChunk) {
+            const char op = opstr[0];
+
+            if (notInActiveChunk) {
+                // Ignore writes that came from the migration process like cleanup so they
+                // won't be transferred to the recipient shard. Also ignore ops from
+                // _migrateClone and _transferMods since it is impossible to move a chunk
+                // to self.
+                return;
+            }
+
             dassert(txn->lockState()->isWriteLocked()); // Must have Global IX.
 
             if (!_active)
@@ -335,65 +345,47 @@ namespace mongo {
                 return;
 
             // no need to log if this is not an insertion, an update, or an actual deletion
-            // note: opstr 'db' isn't a deletion but a mention that a database exists (for replication
-            // machinery mostly)
-            char op = opstr[0];
-            if ( op == 'n' || op =='c' || ( op == 'd' && opstr[1] == 'b' ) )
+            // note: opstr 'db' isn't a deletion but a mention that a database exists
+            // (for replication machinery mostly).
+            if (op == 'n' || op == 'c' || (op == 'd' && opstr[1] == 'b'))
                 return;
 
             BSONElement ide;
-            if ( patt )
-                ide = patt->getField( "_id" );
+            if (patt)
+                ide = patt->getField("_id");
             else
                 ide = obj["_id"];
 
-            if ( ide.eoo() ) {
-                warning() << "logOpForSharding got mod with no _id, ignoring  obj: " << obj << migrateLog;
+            if (ide.eoo()) {
+                warning() << "logOpForSharding got mod with no _id, ignoring  obj: "
+                          << obj << migrateLog;
                 return;
             }
 
-            BSONObj it;
-
-            switch ( opstr[0] ) {
-
-            case 'd': {
-
-                if (notInActiveChunk) {
-                    // we don't want to xfer things we're cleaning
-                    // as then they'll be deleted on TO
-                    // which is bad
-                    return;
-                }
-
-                scoped_lock sl(_mutex);
-                // can't filter deletes :(
-                _deleted.push_back( ide.wrap() );
-                _memoryUsed += ide.size() + 5;
+            if (op == 'i' && (!isInRange(obj, _min, _max, _shardKeyPattern))) {
                 return;
             }
 
-            case 'i':
-                it = obj;
-                break;
+            BSONObj idObj(ide.wrap());
 
-            case 'u':
+            if (op == 'u') {
+                BSONObj fullDoc;
                 Client::Context ctx(txn, _ns, false);
-                if (!Helpers::findById(txn, ctx.db(), _ns.c_str(), ide.wrap(), it)) {
-                    warning() << "logOpForSharding couldn't find: " << ide
+                if (!Helpers::findById(txn, ctx.db(), _ns.c_str(), idObj, fullDoc)) {
+                    warning() << "logOpForSharding couldn't find: " << idObj
                               << " even though should have" << migrateLog;
+                    dassert(false); // TODO: Abort the migration.
                     return;
                 }
-                break;
 
+                if (!isInRange(fullDoc, _min, _max, _shardKeyPattern)) {
+                    return;
+                }
             }
 
-            if (!isInRange(it, _min, _max, _shardKeyPattern)) {
-                return;
-            }
+            // Note: can't check if delete is in active chunk since the document is gone!
 
-            scoped_lock sl(_mutex);
-            _reload.push_back(ide.wrap());
-            _memoryUsed += ide.size() + 5;
+            txn->recoveryUnit()->registerChange(new LogOpForShardingHandler(this, idObj, op));
         }
 
         /**
@@ -733,6 +725,56 @@ namespace mongo {
     private:
         bool _getActive() const { scoped_lock lk(_mutex); return _active; }
         void _setActive( bool b ) { scoped_lock lk(_mutex); _active = b; }
+
+        /**
+         * Used to commit work for LogOpForSharding. Used to keep track of changes in documents
+         * that are part of a chunk being migrated.
+         */
+        class LogOpForShardingHandler : public RecoveryUnit::Change {
+        public:
+            /**
+             * Invariant: idObj should belong to a document that is part of the active chunk
+             * being migrated.
+             */
+            LogOpForShardingHandler(MigrateFromStatus* migrateFromStatus,
+                                    const BSONObj& idObj,
+                                    const char op):
+                _migrateFromStatus(migrateFromStatus),
+                _idObj(idObj.getOwned()),
+                _op(op) {
+            }
+
+            virtual void commit() {
+                switch (_op) {
+                case 'd': {
+                    scoped_lock sl(_migrateFromStatus->_mutex);
+                    _migrateFromStatus->_deleted.push_back(_idObj);
+                    _migrateFromStatus->_memoryUsed += _idObj.firstElement().size() + 5;
+                    break;
+                }
+
+                case 'i':
+                case 'u':
+                {
+                    scoped_lock sl(_migrateFromStatus->_mutex);
+                    _migrateFromStatus->_reload.push_back(_idObj);
+                    _migrateFromStatus->_memoryUsed += _idObj.firstElement().size() + 5;
+                    break;
+                }
+
+                default:
+                    invariant(false);
+
+                }
+            }
+
+            virtual void rollback() { }
+
+        private:
+            MigrateFromStatus* _migrateFromStatus;
+            const BSONObj _idObj;
+            const char _op;
+        };
 
         /**
          * Used to receive invalidation notifications.

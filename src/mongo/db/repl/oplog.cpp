@@ -363,41 +363,20 @@ namespace {
                BSONObj* patt,
                bool* b,
                bool fromMigrate) {
+
         if ( getGlobalReplicationCoordinator()->isReplEnabled() ) {
             _logOp(txn, opstr, ns, 0, obj, patt, b, fromMigrate);
         }
-
         ensureShardVersionOKOrThrow(ns);
 
-        try {
-            // TODO SERVER-15192 remove this once all listeners are rollback-safe.
-            class RollbackPreventer : public RecoveryUnit::Change {
-                virtual void commit() {}
-                virtual void rollback() {
-                    severe() << "Rollback of logOp not currently allowed (SERVER-15192)";
-                    fassertFailed(18805);
-                }
-            };
-            txn->recoveryUnit()->registerChange(new RollbackPreventer());
-            logOpForSharding(txn, opstr, ns, obj, patt, fromMigrate);
-            logOpForDbHash(ns);
-            getGlobalAuthorizationManager()->logOp(opstr, ns, obj, patt, b);
-
-            if ( strstr( ns, ".system.js" ) ) {
-                Scope::storedFuncMod(); // this is terrible
-            }
-        }
-        catch (const DBException& ex) {
-            severe() << "Fatal DBException in logOp(): " << ex.toString();
-            std::terminate();
-        }
-        catch (const std::exception& ex) {
-            severe() << "Fatal std::exception in logOp(): " << ex.what();
-            std::terminate();
-        }
-        catch (...) {
-            severe() << "Fatal error in logOp()";
-            std::terminate();
+        //
+        // rollback-safe logOp listeners
+        //
+        getGlobalAuthorizationManager()->logOp(txn, opstr, ns, obj, patt, b);
+        logOpForSharding(txn, opstr, ns, obj, patt, fromMigrate);
+        logOpForDbHash(txn, ns);
+        if ( strstr( ns, ".system.js" ) ) {
+            Scope::storedFuncMod(txn);
         }
     }
 
@@ -774,12 +753,19 @@ namespace {
         else {
             throw MsgAssertionException( 14825 , ErrorMsg("error in applyOperation : unknown opType ", *opType) );
         }
+
+        // AuthorizationManager's logOp method registers a RecoveryUnit::Change
+        // and to do so we need to have begun a UnitOfWork
+        WriteUnitOfWork wuow(txn);
         getGlobalAuthorizationManager()->logOp(
+                txn,
                 opType,
                 ns,
                 o,
                 fieldO2.isABSONObj() ? &o2 : NULL,
                 !fieldB.eoo() ? &valueB : NULL );
+        wuow.commit();
+
         return failedUpdate;
     }
 

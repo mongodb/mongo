@@ -34,7 +34,7 @@
 
 namespace mongo {
 
-    void logOpForDbHash( const char* ns );
+    void logOpForDbHash( OperationContext* txn, const char* ns );
 
     class DBHashCmd : public Command {
     public:
@@ -48,11 +48,16 @@ namespace mongo {
 
         virtual bool run(OperationContext* txn, const std::string& dbname , BSONObj& cmdObj, int, std::string& errmsg, BSONObjBuilder& result, bool);
 
-        void wipeCacheForCollection( const StringData& ns );
+        void wipeCacheForCollection(OperationContext* txn, StringData ns);
 
     private:
 
-        bool isCachable( const StringData& ns ) const;
+        /**
+         * RecoveryUnit::Change subclass used to commit work for dbhash logOp listener
+         */
+        class DBHashLogOpHandler;
+
+        bool isCachable( StringData ns ) const;
 
         std::string hashCollection( OperationContext* opCtx, Database* db, const std::string& fullCollectionName, bool* fromCache );
 

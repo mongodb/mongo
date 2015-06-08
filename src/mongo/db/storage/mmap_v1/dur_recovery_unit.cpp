@@ -107,9 +107,14 @@ namespace mongo {
         if (getDur().isDurable())
             markWritesForJournaling();
 
-        for (Changes::const_iterator it = _changes.begin(), end = _changes.end();
+        try {
+            for (Changes::const_iterator it = _changes.begin(), end = _changes.end();
                  it != end; ++it) {
-            (*it)->commit();
+                (*it)->commit();
+            }
+        }
+        catch (...) {
+            std::terminate();
         }
 
         resetChanges();
@@ -223,9 +228,14 @@ namespace mongo {
 
         LOG(2) << "   ***** ROLLING BACK " << (_changes.size()) << " custom changes";
 
-        for (int i = _changes.size() - 1; i >= 0; i--) {
-            LOG(2) << "CUSTOM ROLLBACK " << demangleName(typeid(*_changes[i]));
-            _changes[i]->rollback();
+        try {
+            for (int i = _changes.size() - 1; i >= 0; i--) {
+                LOG(2) << "CUSTOM ROLLBACK " << demangleName(typeid(*_changes[i]));
+                _changes[i]->rollback();
+            }
+        }
+        catch (...) {
+            std::terminate();
         }
 
         resetChanges();

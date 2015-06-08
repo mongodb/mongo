@@ -134,10 +134,15 @@ namespace mongo {
             _commit();
         }
 
-        for (Changes::const_iterator it = _changes.begin(), end = _changes.end(); it != end; ++it) {
-            (*it)->commit();
+        try {
+            for (Changes::const_iterator it = _changes.begin(), end = _changes.end(); it != end; ++it) {
+                (*it)->commit();
+            }
+            _changes.clear();
         }
-        _changes.clear();
+        catch (...) {
+            std::terminate();
+        }
 
         _releaseSnapshot();
     }
@@ -216,11 +221,16 @@ namespace mongo {
     }
 
     void RocksRecoveryUnit::_abort() {
-        for (Changes::const_reverse_iterator it = _changes.rbegin(), end = _changes.rend();
-                it != end; ++it) {
-            (*it)->rollback();
+        try {
+            for (Changes::const_reverse_iterator it = _changes.rbegin(), end = _changes.rend();
+                    it != end; ++it) {
+                (*it)->rollback();
+            }
+            _changes.clear();
         }
-        _changes.clear();
+        catch (...) {
+            std::terminate();
+        }
 
         _deltaCounters.clear();
         _writeBatch.reset();

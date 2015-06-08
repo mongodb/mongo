@@ -111,26 +111,41 @@ namespace mongo {
     }
 
     void WiredTigerRecoveryUnit::_commit() {
-        if ( _session && _active ) {
-            _txnClose( true );
-        }
+        try {
+            if ( _session && _active ) {
+                _txnClose( true );
+            }
 
-        for (Changes::const_iterator it = _changes.begin(), end = _changes.end(); it != end; ++it) {
-            (*it)->commit();
+            for (Changes::const_iterator it = _changes.begin(), end = _changes.end(); it != end;
+                    ++it) {
+                (*it)->commit();
+            }
+            _changes.clear();
+
+            invariant(!_active);
         }
-        _changes.clear();
+        catch (...) {
+            std::terminate();
+        }
     }
 
     void WiredTigerRecoveryUnit::_abort() {
-        if ( _session && _active ) {
-            _txnClose( false );
-        }
+        try {
+            if ( _session && _active ) {
+                _txnClose( false );
+            }
 
-        for (Changes::const_reverse_iterator it = _changes.rbegin(), end = _changes.rend();
-                it != end; ++it) {
-            (*it)->rollback();
+            for (Changes::const_reverse_iterator it = _changes.rbegin(), end = _changes.rend();
+                    it != end; ++it) {
+                (*it)->rollback();
+            }
+            _changes.clear();
+
+            invariant(!_active);
         }
-        _changes.clear();
+        catch (...) {
+            std::terminate();
+        }
     }
 
     void WiredTigerRecoveryUnit::beginUnitOfWork(OperationContext* opCtx) {
