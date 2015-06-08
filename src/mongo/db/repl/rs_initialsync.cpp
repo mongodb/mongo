@@ -492,6 +492,43 @@ namespace {
         bgsync->notify(&txn);
 
         log() << "initial sync done";
+        std::vector<BSONObj> handshakeObjs;
+        replCoord->prepareReplSetUpdatePositionCommandHandshakes(&handshakeObjs);
+        for (std::vector<BSONObj>::iterator it = handshakeObjs.begin();
+                it != handshakeObjs.end();
+                ++it) {
+            BSONObj res;
+            try {
+                if (!r.conn()->runCommand("admin", *it, res)) {
+                    warning() << "InitialSync error reporting sync progress during handshake";
+                    return Status::OK();
+                }
+            }
+            catch (const DBException& e) {
+                warning() << "InitialSync error reporting sync progress during handshake: "
+                          << e.what();
+                return Status::OK();
+            }
+        }
+
+        BSONObjBuilder updateCmd;
+        BSONObj res;
+        if (!replCoord->prepareReplSetUpdatePositionCommand(&updateCmd)) {
+            warning() << "InitialSync couldn't generate updatePosition command";
+            return Status::OK();
+        }
+        try {
+            if (!r.conn()->runCommand("admin", updateCmd.obj(), res)) {
+                warning() << "InitialSync error reporting sync progress during updatePosition";
+                return Status::OK();
+            }
+        }
+        catch (const DBException& e) {
+            warning() << "InitialSync error reporting sync progress during updatePosition: "
+                  << e.what();
+            return Status::OK();
+        }
+
         return Status::OK();
     }
 } // namespace
