@@ -10,6 +10,7 @@ if wiredtiger:
     wtEnv.Library(
         target='storage_wiredtiger_core',
         source= [
+            'wiredtiger_customization_hooks.cpp',
             'wiredtiger_global_options.cpp',
             'wiredtiger_index.cpp',
             'wiredtiger_kv_engine.cpp',

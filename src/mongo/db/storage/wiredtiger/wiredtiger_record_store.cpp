@@ -42,7 +42,9 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/storage/oplog_hack.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
@@ -326,6 +328,8 @@ namespace {
         }
 
         ss << "block_compressor=" << wiredTigerGlobalOptions.collectionBlockCompressor << ",";
+
+        ss << WiredTigerCustomizationHooks::get(getGlobalServiceContext())->getOpenConfig(ns);
 
         ss << extraStrings << ",";
 

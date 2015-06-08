@@ -23,6 +23,21 @@ env.CppUnitTest(
 )
 
 env.Library(
+    target='ssl_manager',
+    source=[
+        'ssl_manager.cpp',
+        'ssl_options.cpp',
+        'ssl_expiration.cpp',
+        ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/util/foundation',
+        '$BUILD_DIR/mongo/db/server_options_core',
+        '$BUILD_DIR/mongo/util/background_job',
+        '$BUILD_DIR/mongo/util/options_parser/options_parser',
+        ],
+)
+
+env.Library(
     target='network',
     source=[
         "httpclient.cpp",
@@ -31,9 +46,6 @@ env.Library(
         "message_port.cpp",
         "sock.cpp",
         "socket_poll.cpp",
-        "ssl_expiration.cpp",
-        "ssl_manager.cpp",
-        "ssl_options.cpp",
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/util/background_job',
@@ -43,6 +55,7 @@ env.Library(
         '$BUILD_DIR/mongo/util/foundation',
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
         'hostandport',
+        'ssl_manager'
     ],
 )
 

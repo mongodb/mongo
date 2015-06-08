@@ -1,7 +1,5 @@
-// wiredtiger_record_store_mock.cpp
-
 /**
- *    Copyright (C) 2014 MongoDB Inc.
+ *    Copyright (C) 2015 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -29,23 +27,47 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include "mongo/base/init.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/service_context_noop.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
-#include "mongo/stdx/memory.h"
+#include <memory>
+#include <string>
+
+#include "mongo/base/disallow_copying.h"
+#include "mongo/db/jsobj.h"
 
 namespace mongo {
+    class StringData;
+    class ServiceContext;
 
-    // static
-    bool WiredTigerKVEngine::initRsOplogBackgroundThread(StringData ns) {
-        return false;
-    }
+    class WiredTigerCustomizationHooks {
+    public:
+        static void set(ServiceContext* service,
+                        std::unique_ptr<WiredTigerCustomizationHooks> custHooks);
 
-    MONGO_INITIALIZER(SetGlobalEnvironment)(InitializerContext* context) {
-        setGlobalServiceContext(stdx::make_unique<ServiceContextNoop>());
-        return Status::OK();
-    }
-}  // namespace mongo
+        static WiredTigerCustomizationHooks* get(ServiceContext* service);
+
+        virtual ~WiredTigerCustomizationHooks() = default;
+
+        /**
+         *  Appends additional configuration sub object(s) to the BSONObjbuilder builder.
+         */
+        virtual void appendUID(BSONObjBuilder* builder) = 0;
+
+        /**
+         *  Gets the WiredTiger encryption configuration string for the
+         *  provided table name
+         */
+        virtual std::string getOpenConfig(StringData tableName) = 0;
+    };
+
+    // Empty default implementation of the abstract class WiredTigerCustomizationHooks
+    class EmptyWiredTigerCustomizationHooks : public WiredTigerCustomizationHooks {
+
+    public:
+        ~EmptyWiredTigerCustomizationHooks() override;
+
+        void appendUID(BSONObjBuilder* builder) override;
+
+        std::string getOpenConfig(StringData tableName) override;
+    };
+} // namespace mongo

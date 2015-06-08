@@ -1,7 +1,5 @@
-// wiredtiger_record_store_mock.cpp
-
 /**
- *    Copyright (C) 2014 MongoDB Inc.
+ *    Copyright (C) 2015 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -31,21 +29,48 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
+
 #include "mongo/base/init.h"
+#include "mongo/base/string_data.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/service_context_noop.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
 
-    // static
-    bool WiredTigerKVEngine::initRsOplogBackgroundThread(StringData ns) {
-        return false;
-    }
+    /* Make a WiredTigerCustomizationHooks pointer a decoration on the global ServiceContext */
+    MONGO_INITIALIZER_WITH_PREREQUISITES(SetWiredTigerCustomizationHooks,
+                                        ("SetGlobalEnvironment"))
+            (InitializerContext* context) {
+        auto customizationHooks = stdx::make_unique<EmptyWiredTigerCustomizationHooks>();
+        WiredTigerCustomizationHooks::set(getGlobalServiceContext(), std::move(customizationHooks));
 
-    MONGO_INITIALIZER(SetGlobalEnvironment)(InitializerContext* context) {
-        setGlobalServiceContext(stdx::make_unique<ServiceContextNoop>());
         return Status::OK();
     }
-}  // namespace mongo
+
+    namespace {
+        const auto getCustomizationHooks =
+            ServiceContext::declareDecoration<std::unique_ptr<WiredTigerCustomizationHooks>>();
+    } // namespace
+
+    void WiredTigerCustomizationHooks::set(
+            ServiceContext* service,
+            std::unique_ptr<WiredTigerCustomizationHooks> custHooks) {
+        auto& hooks = getCustomizationHooks(service);
+        invariant(custHooks);
+        hooks = std::move(custHooks);
+    }
+
+    WiredTigerCustomizationHooks* WiredTigerCustomizationHooks::get(ServiceContext* service) {
+        return getCustomizationHooks(service).get();
+    }
+
+    EmptyWiredTigerCustomizationHooks::~EmptyWiredTigerCustomizationHooks() {}
+
+    void EmptyWiredTigerCustomizationHooks::appendUID(BSONObjBuilder* builder) {}
+
+    std::string EmptyWiredTigerCustomizationHooks::getOpenConfig(StringData tableName) {
+        return "";
+    }
+
+} // namespace mongo

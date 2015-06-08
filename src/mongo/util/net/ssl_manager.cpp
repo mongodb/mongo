@@ -176,8 +176,6 @@ namespace mongo {
                 return _sslConfiguration;
             }
 
-            virtual std::string getSSLErrorMessage(int code);
-
             virtual int SSL_read(SSLConnection* conn, void* buf, int num);
 
             virtual int SSL_write(SSLConnection* conn, const void* buf, int num);
@@ -255,12 +253,6 @@ namespace mongo {
             bool _setupCRL(SSL_CTX* context, const std::string& crlFile);
 
             /*
-             * Activate FIPS 140-2 mode, if the server started with a command line
-             * parameter.
-             */
-            void _setupFIPS();
-
-            /*
              * sub function for checking the result of an SSL operation
              */
             bool _doneWithSSLOp(SSLConnection* conn, int status);
@@ -274,7 +266,7 @@ namespace mongo {
              * match a remote host name to an x.509 host name
              */
             bool _hostNameMatch(const char* nameToMatch, const char* certHostName);
-            
+
             /**
              * Callbacks for SSL functions
              */
@@ -283,17 +275,63 @@ namespace mongo {
 
         };
 
+        void setupFIPS() {
+            // Turn on FIPS mode if requested, OPENSSL_FIPS must be defined by the OpenSSL headers
+#if defined(MONGO_CONFIG_HAVE_FIPS_MODE_SET)
+            int status = FIPS_mode_set(1);
+            if (!status) {
+                severe() << "can't activate FIPS mode: " <<
+                    SSLManagerInterface::getSSLErrorMessage(ERR_get_error()) << endl;
+                fassertFailedNoTrace(16703);
+            }
+            log() << "FIPS 140-2 mode activated" << endl;
+#else
+            severe() << "this version of mongodb was not compiled with FIPS support";
+            fassertFailedNoTrace(17089);
+#endif
+        }
     } // namespace
 
     // Global variable indicating if this is a server or a client instance
     bool isSSLServer = false;
-    
-    MONGO_INITIALIZER(SSLManager)(InitializerContext* context) {
+
+
+    MONGO_INITIALIZER(SetupOpenSSL) (InitializerContext*) {
+        SSL_library_init();
+        SSL_load_error_strings();
+        ERR_load_crypto_strings();
+
+        if (sslGlobalParams.sslFIPSMode) {
+            setupFIPS();
+        }
+
+        // Add all digests and ciphers to OpenSSL's internal table
+        // so that encryption/decryption is backwards compatible
+        OpenSSL_add_all_algorithms();
+
+        // Setup OpenSSL multithreading callbacks
+        CRYPTO_set_id_callback(_ssl_id_callback);
+        CRYPTO_set_locking_callback(_ssl_locking_callback);
+
+        SSLThreadInfo::init();
+        SSLThreadInfo::get();
+
+        return Status::OK();
+    }
+
+    MONGO_INITIALIZER_WITH_PREREQUISITES(SSLManager,
+                                        ("SetupOpenSSL"))
+        (InitializerContext*) {
         SimpleMutex::scoped_lock lck(sslManagerMtx);
         if (sslGlobalParams.sslMode.load() != SSLParams::SSLMode_disabled) {
             theSSLManager = new SSLManager(sslGlobalParams, isSSLServer);
         }
         return Status::OK();
+    }
+
+    std::unique_ptr<SSLManagerInterface> SSLManagerInterface::create(const SSLParams& params,
+                                                                     bool isServer) {
+        return stdx::make_unique<SSLManager>(params, isServer);
     }
 
     SSLManagerInterface* getSSLManager() {
@@ -381,25 +419,6 @@ namespace mongo {
         _allowInvalidCertificates(params.sslAllowInvalidCertificates),
         _allowInvalidHostnames(params.sslAllowInvalidHostnames) {
 
-        SSL_library_init();
-        SSL_load_error_strings();
-        ERR_load_crypto_strings();
-
-        if (params.sslFIPSMode) {
-            _setupFIPS();
-        }
-
-        // Add all digests and ciphers to OpenSSL's internal table
-        // so that encryption/decryption is backwards compatible
-        OpenSSL_add_all_algorithms();
- 
-        // Setup OpenSSL multithreading callbacks
-        CRYPTO_set_id_callback(_ssl_id_callback);
-        CRYPTO_set_locking_callback(_ssl_locking_callback);
- 
-        SSLThreadInfo::init();
-        SSLThreadInfo::get();
- 
         if (!_initSSLContext(&_clientContext, params)) {
             uasserted(16768, "ssl initialization problem"); 
         }
@@ -440,10 +459,6 @@ namespace mongo {
     }
 
     SSLManager::~SSLManager() {
-        CRYPTO_set_id_callback(0);
-        ERR_free_strings();
-        EVP_cleanup();
-
         if (NULL != _serverContext) {
             SSL_CTX_free(_serverContext);
         }
@@ -512,24 +527,6 @@ namespace mongo {
 
     void SSLManager::SSL_free(SSLConnection* conn) {
         return ::SSL_free(conn->ssl);
-    }
-
-    void SSLManager::_setupFIPS() {
-        // Turn on FIPS mode if requested.
-        // OPENSSL_FIPS must be defined by the OpenSSL headers, plus MONGO_CONFIG_SSL_FIPS
-        // must be defined via a MongoDB build flag.
-#if defined(MONGO_CONFIG_HAVE_FIPS_MODE_SET)
-        int status = FIPS_mode_set(1);
-        if (!status) {
-            severe() << "can't activate FIPS mode: " << 
-                getSSLErrorMessage(ERR_get_error()) << endl;
-            fassertFailedNoTrace(16703);
-        }
-        log() << "FIPS 140-2 mode activated" << endl;
-#else
-        severe() << "this version of mongodb was not compiled with FIPS support";
-        fassertFailedNoTrace(17089);
-#endif
     }
 
     bool SSLManager::_initSSLContext(SSL_CTX** context, const SSLParams& params) {
@@ -990,7 +987,7 @@ namespace mongo {
         ERR_remove_state(0);
     }
 
-    std::string SSLManager::getSSLErrorMessage(int code) {
+    std::string SSLManagerInterface::getSSLErrorMessage(int code) {
         // 120 from the SSL documentation for ERR_error_string
         static const size_t msglen = 120;
 

@@ -36,6 +36,8 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_size_storer.h"
@@ -59,8 +61,9 @@ namespace mongo {
                                        "overwrite=true", &_cursor);
         if (ret == ENOENT) {
             // Need to create table.
-            // TODO any config options we want?
-            invariantWTOK(session->create(session, storageUri.c_str(), NULL));
+            std::string config = WiredTigerCustomizationHooks::get(
+                getGlobalServiceContext())->getOpenConfig(storageUri);
+            invariantWTOK(session->create(session, storageUri.c_str(), config.c_str()));
             ret = session->open_cursor(session, storageUri.c_str(), NULL,
                                        "overwrite=true", &_cursor);
         }

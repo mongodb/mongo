@@ -27,6 +27,7 @@
 
 #pragma once
 
+#include <memory>
 #include <string>
 
 #include "mongo/config.h"
@@ -52,6 +53,7 @@ namespace mongo {
 
 #ifdef MONGO_CONFIG_SSL
 namespace mongo {
+    struct SSLParams;
 
     class SSLConnection {
     public:
@@ -87,6 +89,8 @@ namespace mongo {
 
     class SSLManagerInterface {
     public:
+        static std::unique_ptr<SSLManagerInterface> create(const SSLParams& params, bool isServer);
+
         virtual ~SSLManagerInterface();
 
         /**
@@ -126,7 +130,7 @@ namespace mongo {
         /**
         * Fetches the error text for an error code, in a thread-safe manner.
         */
-        virtual std::string getSSLErrorMessage(int code) = 0;
+        static std::string getSSLErrorMessage(int code);
  
         /**
          * ssl.h wrappers 

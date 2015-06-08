@@ -41,7 +41,9 @@
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
@@ -157,6 +159,8 @@ namespace {
         }
 
         ss << "block_compressor=" << wiredTigerGlobalOptions.indexBlockCompressor << ",";
+        ss << WiredTigerCustomizationHooks::get(
+                getGlobalServiceContext())->getOpenConfig(desc.parentNS());
         ss << extraConfig;
 
         // Validate configuration object.

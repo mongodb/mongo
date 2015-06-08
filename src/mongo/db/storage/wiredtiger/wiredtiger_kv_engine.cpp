@@ -38,6 +38,8 @@
 
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_index.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
@@ -109,6 +111,8 @@ namespace mongo {
         ss << "checkpoint=(wait=" << wiredTigerGlobalOptions.checkpointDelaySecs;
         ss << ",log_size=2GB),";
         ss << "statistics_log=(wait=" << wiredTigerGlobalOptions.statisticsLogDelaySecs << "),";
+        ss << WiredTigerCustomizationHooks::get(
+                getGlobalServiceContext())->getOpenConfig("metadata");
         ss << extraOpenOptions;
         string config = ss.str();
         log() << "wiredtiger_open config: " << config;
