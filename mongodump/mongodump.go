@@ -492,8 +492,8 @@ func (dump *MongoDump) dumpIterToWriter(
 			select {
 			case <-dump.termChan:
 				log.Logf(log.DebugHigh, "terminating writes")
-				close(buffChan)
 				termErr = util.ErrTerminated
+				close(buffChan)
 				return
 			default:
 				raw := &bson.Raw{}
