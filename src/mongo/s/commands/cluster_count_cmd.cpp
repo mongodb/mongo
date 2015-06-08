@@ -171,7 +171,7 @@ namespace {
                  iter != countResult.end();
                  ++iter) {
 
-                const string& shardName = iter->shardTarget.getName();
+                const string& shardName = iter->shardTargetId;
 
                 if (iter->result["ok"].trueValue()) {
                     long long shardCount = iter->result["n"].numberLong();

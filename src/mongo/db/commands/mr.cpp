@@ -1677,7 +1677,7 @@ namespace mongo {
 
                     for ( ChunkMap::const_iterator it = chunkMap.begin(); it != chunkMap.end(); ++it ) {
                         ChunkPtr chunk = it->second;
-                        if (chunk->getShard().getName() == shardName) {
+                        if (chunk->getShardId() == shardName) {
                             chunks.push_back(chunk);
                         }
                     }

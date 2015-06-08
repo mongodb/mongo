@@ -175,7 +175,12 @@ namespace {
             }
 
             // The rest of the checks require a connection to the primary db
-            ScopedDbConnection conn(config->getPrimary().getConnString());
+            ConnectionString shardConnString;
+            {
+                const auto& shard = grid.shardRegistry()->findIfExists(config->getPrimaryId());
+                shardConnString = shard->getConnString();
+            }
+            ScopedDbConnection conn(shardConnString);
 
             //check that collection is not capped
             BSONObj res;
@@ -438,13 +443,13 @@ namespace {
                     ChunkPtr chunk = c->second;
 
                     // can't move chunk to shard it's already on
-                    if (*to == chunk->getShard()) {
+                    if (to->getId() == chunk->getShardId()) {
                         continue;
                     }
 
                     BSONObj moveResult;
                     WriteConcernOptions noThrottle;
-                    if (!chunk->moveAndCommit(*to,
+                    if (!chunk->moveAndCommit(to->getId(),
                                               Chunk::MaxChunkSize,
                                               &noThrottle,
                                               true,

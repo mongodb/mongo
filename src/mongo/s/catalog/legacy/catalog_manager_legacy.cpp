@@ -60,11 +60,13 @@
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/dbclient_multi_command.h"
-#include "mongo/s/client/shard_connection.h"
 #include "mongo/s/client/shard.h"
+#include "mongo/s/client/shard_connection.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/config.h"
 #include "mongo/s/catalog/dist_lock_manager.h"
 #include "mongo/s/catalog/legacy/legacy_dist_lock_manager.h"
+#include "mongo/s/grid.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/type_config_version.h"
 #include "mongo/s/write_ops/batched_command_request.h"
@@ -439,12 +441,12 @@ namespace {
         Status status = _checkDbDoesNotExist(dbName);
         if (status.isOK()) {
             // Database does not exist, create a new entry
-            const Shard primary = Shard::pick();
-            if (primary.ok()) {
-                log() << "Placing [" << dbName << "] on: " << primary;
+            const ShardPtr primary = Shard::pick();
+            if (primary) {
+                log() << "Placing [" << dbName << "] on: " << primary->toString();
 
                 db.setName(dbName);
-                db.setPrimary(primary.getName());
+                db.setPrimary(primary->getId());
                 db.setSharded(true);
             }
             else {
@@ -475,7 +477,7 @@ namespace {
                                                  const ShardKeyPattern& fieldsAndOrder,
                                                  bool unique,
                                                  vector<BSONObj>* initPoints,
-                                                 vector<Shard>* initShards) {
+                                                 set<ShardId>* initShardIds) {
 
         StatusWith<DatabaseType> status = getDatabase(nsToDatabase(ns));
         if (!status.isOK()) {
@@ -483,7 +485,7 @@ namespace {
         }
 
         DatabaseType dbt = status.getValue();
-        Shard dbPrimary = Shard::make(dbt.getPrimary());
+        ShardId dbPrimaryShardId = dbt.getPrimary();
 
         // This is an extra safety check that the collection is not getting sharded concurrently by
         // two different mongos instances. It is not 100%-proof, but it reduces the chance that two
@@ -508,15 +510,20 @@ namespace {
         BSONObjBuilder collectionDetail;
         collectionDetail.append("shardKey", fieldsAndOrder.toBSON());
         collectionDetail.append("collection", ns);
-        collectionDetail.append("primary", dbPrimary.toString());
+        string dbPrimaryShardStr;
+        {
+            const auto& shard = grid.shardRegistry()->findIfExists(dbPrimaryShardId);
+            dbPrimaryShardStr = shard->toString();
+        }
+        collectionDetail.append("primary", dbPrimaryShardStr);
 
         BSONArray initialShards;
-        if (initShards == NULL)
+        if (initShardIds == NULL)
             initialShards = BSONArray();
         else {
             BSONArrayBuilder b;
-            for (unsigned i = 0; i < initShards->size(); i++) {
-                b.append((*initShards)[i].getName());
+            for (const ShardId& shardId : *initShardIds) {
+                b.append(shardId);
             }
             initialShards = b.arr();
         }
@@ -527,9 +534,9 @@ namespace {
         logChange(NULL, "shardCollection.start", ns, collectionDetail.obj());
 
         ChunkManagerPtr manager(new ChunkManager(ns, fieldsAndOrder, unique));
-        manager->createFirstChunks(dbPrimary,
+        manager->createFirstChunks(dbPrimaryShardId,
                                    initPoints,
-                                   initShards);
+                                   initShardIds);
         manager->loadExistingRanges(nullptr);
 
         CollectionInfo collInfo;
@@ -543,25 +550,26 @@ namespace {
         for (int i = 0;i < 4;i++) {
             if (i == 3) {
                 warning() << "too many tries updating initial version of " << ns
-                          << " on shard primary " << dbPrimary
+                          << " on shard primary " << dbPrimaryShardStr
                           << ", other mongoses may not see the collection as sharded immediately";
                 break;
             }
 
             try {
-                ShardConnection conn(dbPrimary.getConnString(), ns);
+                const auto& shard = grid.shardRegistry()->findIfExists(dbPrimaryShardId);
+                ShardConnection conn(shard->getConnString(), ns);
                 bool isVersionSet = conn.setVersion();
                 conn.done();
                 if (!isVersionSet) {
                     warning() << "could not update initial version of "
-                              << ns << " on shard primary " << dbPrimary;
+                              << ns << " on shard primary " << dbPrimaryShardStr;
                 } else {
                     break;
                 }
             }
             catch (const DBException& e) {
                 warning() << "could not update initial version of " << ns
-                          << " on shard primary " << dbPrimary
+                          << " on shard primary " << dbPrimaryShardStr
                           << causedBy(e);
             }
 
@@ -602,16 +610,16 @@ namespace {
         }
 
         // Database does not exist, pick a shard and create a new entry
-        const Shard primaryShard = Shard::pick();
-        if (!primaryShard.ok()) {
+        const ShardPtr primaryShard = Shard::pick();
+        if (!primaryShard) {
             return Status(ErrorCodes::ShardNotFound, "can't find a shard to put new db on");
         }
 
-        log() << "Placing [" << dbName << "] on: " << primaryShard;
+        log() << "Placing [" << dbName << "] on: " << primaryShard->toString();
 
         DatabaseType db;
         db.setName(dbName);
-        db.setPrimary(primaryShard.getName());
+        db.setPrimary(primaryShard->getId());
         db.setSharded(false);
 
         BatchedCommandResponse response;
@@ -973,8 +981,8 @@ namespace {
 
         // Delete data from all mongods
         for (vector<ShardType>::const_iterator i = allShards.begin(); i != allShards.end(); i++) {
-            Shard shard = Shard::make(i->getHost());
-            ScopedDbConnection conn(shard.getConnString());
+            const auto& shard = grid.shardRegistry()->findIfExists(i->getHost());
+            ScopedDbConnection conn(shard->getConnString());
 
             BSONObj info;
             if (!conn->dropCollection(collectionNs, &info)) {
@@ -985,7 +993,7 @@ namespace {
                     continue;
                 }
 
-                errors[shard.getConnString().toString()] = info;
+                errors[shard->getConnString().toString()] = info;
             }
 
             conn.done();
@@ -1023,8 +1031,8 @@ namespace {
         LOG(1) << "dropCollection " << collectionNs << " chunk data deleted";
 
         for (vector<ShardType>::const_iterator i = allShards.begin(); i != allShards.end(); i++) {
-            Shard shard = Shard::make(i->getHost());
-            ScopedDbConnection conn(shard.getConnString());
+            const auto& shard = grid.shardRegistry()->findIfExists(i->getHost());
+            ScopedDbConnection conn(shard->getConnString());
 
             BSONObj res;
 

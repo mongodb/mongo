@@ -159,7 +159,7 @@ namespace mongo {
                 }
 
                 BSONObj res;
-                if (c->moveAndCommit(Shard::make(migrateInfo->to),
+                if (c->moveAndCommit(migrateInfo->to,
                                      Chunk::MaxChunkSize,
                                      writeConcern,
                                      waitForDelete,

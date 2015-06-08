@@ -222,11 +222,12 @@ namespace {
                 }
             }
 
-            const Shard& from = chunk->getShard();
-
-            if (from == *to) {
-                errmsg = "that chunk is already on that shard";
-                return false;
+            {
+                const auto& from = grid.shardRegistry()->findIfExists(chunk->getShardId());
+                if (from->getId() == to->getId()) {
+                    errmsg = "that chunk is already on that shard";
+                    return false;
+                }
             }
 
             LOG(0) << "CMD: movechunk: " << cmdObj;
@@ -252,7 +253,7 @@ namespace {
             }
 
             BSONObj res;
-            if (!chunk->moveAndCommit(*to,
+            if (!chunk->moveAndCommit(to->getId(),
                                       maxChunkSizeBytes,
                                       writeConcern.get(),
                                       cmdObj["_waitForDelete"].trueValue(),

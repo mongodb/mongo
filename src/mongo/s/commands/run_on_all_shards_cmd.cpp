@@ -64,17 +64,10 @@ namespace mongo {
         return originalResult;
     }
 
-    void RunOnAllShardsCommand::getShards(const std::string& db,
-                                          BSONObj& cmdObj,
-                                          std::set<Shard>& shards) {
-        std::vector<ShardId> shardIds;
+    void RunOnAllShardsCommand::getShardIds(const std::string& db,
+                                            BSONObj& cmdObj,
+                                            std::vector<ShardId>& shardIds) {
         grid.shardRegistry()->getAllShardIds(&shardIds);
-        for (const ShardId& shardId : shardIds) {
-            const auto& shard = grid.shardRegistry()->findIfExists(shardId);
-            if (shard) {
-                shards.insert(*shard);
-            }
-        }
     }
 
     bool RunOnAllShardsCommand::run(OperationContext* txn,
@@ -85,18 +78,23 @@ namespace mongo {
                                     BSONObjBuilder& output) {
 
         LOG(1) << "RunOnAllShardsCommand db: " << dbName << " cmd:" << cmdObj;
-        std::set<Shard> shards;
-        getShards(dbName, cmdObj, shards);
+        std::vector<ShardId> shardIds;
+        getShardIds(dbName, cmdObj, shardIds);
 
         // TODO: Future is deprecated, replace with commandOp()
         std::list< boost::shared_ptr<Future::CommandResult> > futures;
-        for (std::set<Shard>::const_iterator i=shards.begin(), end=shards.end() ; i != end ; i++) {
-            futures.push_back( Future::spawnCommand( i->getConnString().toString(),
-                                                     dbName,
-                                                     cmdObj,
-                                                     0,
-                                                     NULL,
-                                                     _useShardConn ));
+        for (const ShardId& shardId : shardIds) {
+            const auto& shard = grid.shardRegistry()->findIfExists(shardId);
+            if (!shard) {
+                continue;
+            }
+
+            futures.push_back(Future::spawnCommand(shard->getConnString().toString(),
+                                                   dbName,
+                                                   cmdObj,
+                                                   0,
+                                                   NULL,
+                                                   _useShardConn));
         }
 
         std::vector<ShardAndReply> results;
@@ -105,19 +103,19 @@ namespace mongo {
         int commonErrCode = -1;
 
         std::list< boost::shared_ptr<Future::CommandResult> >::iterator futuresit;
-        std::set<Shard>::const_iterator shardsit;
-        // We iterate over the set of shards and their corresponding futures in parallel.
+        std::vector<ShardId>::const_iterator shardIdsIt;
+        // We iterate over the set of shard ids and their corresponding futures in parallel.
         // TODO: replace with zip iterator if we ever decide to use one from Boost or elsewhere
-        for (futuresit = futures.begin(), shardsit = shards.cbegin();
-              futuresit != futures.end() && shardsit != shards.end();
-              ++futuresit, ++shardsit ) {
+        for (futuresit = futures.begin(), shardIdsIt = shardIds.cbegin();
+              futuresit != futures.end() && shardIdsIt != shardIds.end();
+              ++futuresit, ++shardIdsIt) {
 
             boost::shared_ptr<Future::CommandResult> res = *futuresit;
 
             if ( res->join() ) {
                 // success :)
                 BSONObj result = res->result();
-                results.emplace_back( shardsit->getName(), result );
+                results.emplace_back(*shardIdsIt, result );
                 subobj.append( res->getServer(), result );
                 continue;
             }
@@ -131,7 +129,7 @@ namespace mongo {
                 BSONElement errmsg = result["errmsg"];
                 if ( errmsg.eoo() || errmsg.String().empty() ) {
                     // it was fixed!
-                    results.emplace_back( shardsit->getName(), result );
+                    results.emplace_back(*shardIdsIt, result );
                     subobj.append( res->getServer(), result );
                     continue;
                 }
@@ -155,7 +153,7 @@ namespace mongo {
             else if ( commonErrCode != errCode ) {
                 commonErrCode = 0;
             }
-            results.emplace_back( shardsit->getName(), result );
+            results.emplace_back(*shardIdsIt, result );
             subobj.append( res->getServer(), result );
         }
 

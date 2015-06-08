@@ -32,13 +32,13 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/commands.h"
+#include "mongo/s/client/shard.h"
 
 namespace mongo {
 
     class BSONObj;
     class BSONObjBuilder;
     class OperationContext;
-    class Shard;
 
     /**
      * Logic for commands that simply map out to all shards then fold the results into
@@ -75,9 +75,9 @@ namespace mongo {
                                             const BSONObj& originalResult) const;
 
         // The default implementation uses all shards.
-        virtual void getShards(const std::string& db,
-                               BSONObj& cmdObj,
-                               std::set<Shard>& shards);
+        virtual void getShardIds(const std::string& db,
+                                 BSONObj& cmdObj,
+                                 std::vector<ShardId>& shardIds);
 
         bool run(OperationContext* txn,
                  const std::string& db,

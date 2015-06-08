@@ -62,12 +62,12 @@ namespace mongo {
               _shardChunks(shardToChunksMap) {
 
         for (ShardInfoMap::const_iterator i = _shardInfo.begin(); i != _shardInfo.end(); ++i) {
-            _shards.insert(i->first);
+            _shardIds.insert(i->first);
         }
     }
 
-    const ShardInfo& DistributionStatus::shardInfo( const string& shard ) const {
-        ShardInfoMap::const_iterator i = _shardInfo.find( shard );
+    const ShardInfo& DistributionStatus::shardInfo(const ShardId& shardId) const {
+        ShardInfoMap::const_iterator i = _shardInfo.find(shardId);
         verify( i != _shardInfo.end() );
         return i->second;
     }
@@ -85,8 +85,8 @@ namespace mongo {
         return total;
     }
 
-    unsigned DistributionStatus::numberOfChunksInShard( const string& shard ) const {
-        ShardToChunksMap::const_iterator i = _shardChunks.find(shard);
+    unsigned DistributionStatus::numberOfChunksInShard(const ShardId& shardId) const {
+        ShardToChunksMap::const_iterator i = _shardChunks.find(shardId);
         if (i == _shardChunks.end()) {
             return 0;
         }
@@ -94,8 +94,9 @@ namespace mongo {
         return i->second.size();
     }
 
-    unsigned DistributionStatus::numberOfChunksInShardWithTag( const string& shard , const string& tag ) const {
-        ShardToChunksMap::const_iterator i = _shardChunks.find(shard);
+    unsigned DistributionStatus::numberOfChunksInShardWithTag(const ShardId& shardId,
+                                                              const string& tag) const {
+        ShardToChunksMap::const_iterator i = _shardChunks.find(shardId);
         if (i == _shardChunks.end()) {
             return 0;
         }
@@ -161,8 +162,8 @@ namespace mongo {
         return worst;
     }
 
-    const vector<ChunkType>& DistributionStatus::getChunks(const string& shard) const {
-        ShardToChunksMap::const_iterator i = _shardChunks.find(shard);
+    const vector<ChunkType>& DistributionStatus::getChunks(const ShardId& shardId) const {
+        ShardToChunksMap::const_iterator i = _shardChunks.find(shardId);
         invariant(i != _shardChunks.end());
 
         return i->second;
@@ -308,7 +309,7 @@ namespace mongo {
             chunk.setMax(chunkPtr->getMax().getOwned());
             chunk.setJumbo(chunkPtr->isJumbo()); // TODO: is this reliable?
 
-            const string shardName(chunkPtr->getShard().getName());
+            const string shardName(chunkPtr->getShardId());
             chunk.setShard(shardName);
 
             (*shardToChunksMap)[shardName].push_back(chunk);
@@ -329,20 +330,18 @@ namespace mongo {
 
         // 1) check things we have to move
         {
-            const set<string>& shards = distribution.shards();
-            for ( set<string>::const_iterator z = shards.begin(); z != shards.end(); ++z ) {
-                string shard = *z;
-                const ShardInfo& info = distribution.shardInfo( shard );
+            for (const ShardId& shardId : distribution.shardIds()) {
+                const ShardInfo& info = distribution.shardInfo(shardId);
 
                 if ( ! info.isDraining() )
                     continue;
 
-                if ( distribution.numberOfChunksInShard( shard ) == 0 )
+                if (distribution.numberOfChunksInShard(shardId) == 0)
                     continue;
 
                 // now we know we need to move to chunks off this shard
                 // we will if we are allowed
-                const vector<ChunkType>& chunks = distribution.getChunks( shard );
+                const vector<ChunkType>& chunks = distribution.getChunks(shardId);
                 unsigned numJumboChunks = 0;
 
                 // since we have to move all chunks, lets just do in order
@@ -354,40 +353,37 @@ namespace mongo {
                     }
 
                     string tag = distribution.getTagForChunk( chunkToMove );
-                    string to = distribution.getBestReceieverShard( tag );
+                    const ShardId to = distribution.getBestReceieverShard( tag );
 
                     if ( to.size() == 0 ) {
                         warning() << "want to move chunk: " << chunkToMove
                                   << "(" << tag << ") "
-                                  << "from " << shard
+                                  << "from " << shardId
                                   << " but can't find anywhere to put it";
                         continue;
                     }
 
                     log() << "going to move " << chunkToMove
-                          << " from " << shard
+                          << " from " << shardId
                           << "(" << tag << ")"
                           << " to " << to;
 
-                    return new MigrateInfo(ns, to, shard, chunkToMove.toBSON());
+                    return new MigrateInfo(ns, to, shardId, chunkToMove.toBSON());
                 }
 
-                warning() << "can't find any chunk to move from: " << shard
+                warning() << "can't find any chunk to move from: " << shardId
                           << " but we want to. "
-                          << " numJumboChunks: " << numJumboChunks
-                         ;
+                          << " numJumboChunks: " << numJumboChunks;
             }
         }
 
         // 2) tag violations
         if ( distribution.tags().size() > 0 ) {
-            const set<string>& shards = distribution.shards();
 
-            for ( set<string>::const_iterator i = shards.begin(); i != shards.end(); ++i ) {
-                string shard = *i;
-                const ShardInfo& info = distribution.shardInfo( shard );
+            for (const ShardId& shardId : distribution.shardIds()) {
+                const ShardInfo& info = distribution.shardInfo(shardId);
 
-                const vector<ChunkType>& chunks = distribution.getChunks(shard);
+                const vector<ChunkType>& chunks = distribution.getChunks(shardId);
                 for ( unsigned j = 0; j < chunks.size(); j++ ) {
                     const ChunkType& chunk = chunks[j];
                     string tag = distribution.getTagForChunk(chunk);
@@ -405,14 +401,14 @@ namespace mongo {
                         continue;
                     }
 
-                    string to = distribution.getBestReceieverShard( tag );
+                    const ShardId to = distribution.getBestReceieverShard( tag );
                     if ( to.size() == 0 ) {
                         log() << "no where to put it :(";
                         continue;
                     }
-                    verify( to != shard );
+                    verify(to != shardId);
                     log() << " going to move to: " << to;
-                    return new MigrateInfo(ns, to, shard, chunk.toBSON());
+                    return new MigrateInfo(ns, to, shardId, chunk.toBSON());
                 }
             }
         }
@@ -440,7 +436,7 @@ namespace mongo {
         for ( unsigned i=0; i<tags.size(); i++ ) {
             string tag = tags[i];
 
-            string from = distribution.getMostOverloadedShard( tag );
+            const ShardId from = distribution.getMostOverloadedShard(tag);
             if ( from.size() == 0 )
                 continue;
 

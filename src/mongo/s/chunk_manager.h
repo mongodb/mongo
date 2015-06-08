@@ -56,7 +56,7 @@ namespace mongo {
         ChunkRange(const ChunkRange& min, const ChunkRange& max);
 
         const ChunkManager* getManager() const { return _manager; }
-        Shard getShard() const { return _shard; }
+        ShardId getShardId() const { return _shardId; }
 
         const BSONObj& getMin() const { return _min; }
         const BSONObj& getMax() const { return _max; }
@@ -73,7 +73,7 @@ namespace mongo {
 
     private:
         const ChunkManager* _manager;
-        const Shard _shard;
+        const ShardId _shardId;
         const BSONObj _min;
         const BSONObj _max;
     };
@@ -134,20 +134,20 @@ namespace mongo {
         //
 
         // Creates new chunks based on info in chunk manager
-        void createFirstChunks(const Shard& primary,
+        void createFirstChunks(const ShardId& primaryShardId,
                                const std::vector<BSONObj>* initPoints,
-                               const std::vector<Shard>* initShards);
+                               const std::set<ShardId>* initShardIds);
 
         // Loads existing ranges based on info in chunk manager
         void loadExistingRanges(const ChunkManager* oldManager);
 
 
         // Helpers for load
-        void calcInitSplitsAndShards( const Shard& primary,
-                                      const std::vector<BSONObj>* initPoints,
-                                      const std::vector<Shard>* initShards,
-                                      std::vector<BSONObj>* splitPoints,
-                                      std::vector<Shard>* shards ) const;
+        void calcInitSplitsAndShards(const ShardId& primaryShardId,
+                                     const std::vector<BSONObj>* initPoints,
+                                     const std::set<ShardId>* initShardIds,
+                                     std::vector<BSONObj>* splitPoints,
+                                     std::vector<ShardId>* shardIds) const;
 
         //
         // Methods to use once loaded / created
@@ -165,10 +165,12 @@ namespace mongo {
          */
         ChunkPtr findIntersectingChunk( const BSONObj& shardKey ) const;
 
-        void getShardsForQuery( std::set<Shard>& shards , const BSONObj& query ) const;
-        void getAllShards( std::set<Shard>& all ) const;
-        /** @param shards set to the shards covered by the interval [min, max], see SERVER-4791 */
-        void getShardsForRange( std::set<Shard>& shards, const BSONObj& min, const BSONObj& max ) const;
+        void getShardIdsForQuery(std::set<ShardId>& shardIds, const BSONObj& query) const;
+        void getAllShardIds(std::set<ShardId>* all) const;
+        /** @param shardIds set to the shard ids for shards
+         *         covered by the interval [min, max], see SERVER-4791
+         */
+        void getShardIdsForRange(std::set<ShardId>& shardIds, const BSONObj& min, const BSONObj& max) const;
 
         // Transforms query into bounds for each field in the shard key
         // for example :
@@ -209,7 +211,7 @@ namespace mongo {
     private:
         // returns true if load was consistent
         bool _load(ChunkMap& chunks,
-                   std::set<Shard>& shards,
+                   std::set<ShardId>& shardIds,
                    ShardVersionMap* shardVersions,
                    const ChunkManager* oldManager);
 
@@ -227,7 +229,7 @@ namespace mongo {
         ChunkMap _chunkMap;
         ChunkRangeManager _chunkRanges;
 
-        std::set<Shard> _shards;
+        std::set<ShardId> _shardIds;
 
         // Max known version per shard
         ShardVersionMap _shardVersions;

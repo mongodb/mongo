@@ -33,6 +33,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/client/shard.h"
 
 namespace mongo {
 
@@ -112,8 +113,8 @@ namespace mongo {
 
     struct MigrateInfo {
         MigrateInfo(const std::string& a_ns,
-                    const std::string& a_to,
-                    const std::string& a_from,
+                    const ShardId& a_to,
+                    const ShardId& a_from,
                     const BSONObj& a_chunk)
             : ns(a_ns),
               to(a_to),
@@ -123,13 +124,13 @@ namespace mongo {
         }
 
         const std::string ns;
-        const std::string to;
-        const std::string from;
+        const ShardId to;
+        const ShardId from;
         const ChunkInfo chunk;
     };
 
-    typedef std::map<std::string, ShardInfo> ShardInfoMap;
-    typedef std::map<std::string, std::vector<ChunkType>> ShardToChunksMap;
+    typedef std::map<ShardId, ShardInfo> ShardInfoMap;
+    typedef std::map<ShardId, std::vector<ChunkType>> ShardToChunksMap;
 
 
     class DistributionStatus {
@@ -166,13 +167,13 @@ namespace mongo {
         unsigned totalChunks() const;
 
         /** @return number of chunks in this shard */
-        unsigned numberOfChunksInShard( const std::string& shard ) const;
+        unsigned numberOfChunksInShard(const ShardId& shardId) const;
 
         /** @return number of chunks in this shard with the given tag */
-        unsigned numberOfChunksInShardWithTag( const std::string& shard, const std::string& tag ) const;
+        unsigned numberOfChunksInShardWithTag(const ShardId& shardId, const std::string& tag ) const;
 
         /** @return chunks for the shard */
-        const std::vector<ChunkType>& getChunks(const std::string& shard) const;
+        const std::vector<ChunkType>& getChunks(const ShardId& shardId) const;
 
         /** @return all tags we know about, not include "" */
         const std::set<std::string>& tags() const { return _allTags; }
@@ -180,11 +181,11 @@ namespace mongo {
         /** @return the right tag for chunk, possibly "" */
         std::string getTagForChunk(const ChunkType& chunk) const;
         
-        /** @return all shards we know about */
-        const std::set<std::string>& shards() const { return _shards; }
+        /** @return all shard ids we know about */
+        const std::set<ShardId>& shardIds() const { return _shardIds; }
 
         /** @return the ShardInfo for the shard */
-        const ShardInfo& shardInfo( const std::string& shard ) const;
+        const ShardInfo& shardInfo(const ShardId& shardId) const;
         
         /** writes all state to log() */
         void dump() const;
@@ -207,7 +208,7 @@ namespace mongo {
         const ShardToChunksMap& _shardChunks;
         std::map<BSONObj,TagRange> _tagRanges;
         std::set<std::string> _allTags;
-        std::set<std::string> _shards;
+        std::set<ShardId> _shardIds;
     };
 
 

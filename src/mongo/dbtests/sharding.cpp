@@ -105,18 +105,19 @@ namespace ShardingTests {
             _client.insert( collName(), BSON( "hello" << "world" ) );
             _client.dropCollection( collName() );
 
+            _shardId = "shard0000";
             // Since we've redirected the conns, the host doesn't matter here so long as it's
             // prefixed with a "$"
-            _shard = Shard("shard0000",
-                           ConnectionString(HostAndPort("$hostFooBar:27017")),
-                           0 /* maxSize */,
-                           false /* draining */);
+            Shard shard(_shardId,
+                        ConnectionString(HostAndPort("$hostFooBar:27017")),
+                        0 /* maxSize */,
+                        false /* draining */);
             // Need to run this to ensure the shard is in the global lookup table
-            Shard::installShard(_shard.getName(), _shard);
+            Shard::installShard(_shardId, shard);
             // Add dummy shard to config DB
             _client.insert(ShardType::ConfigNS,
-                           BSON(ShardType::name() << _shard.getName() <<
-                                ShardType::host() << _shard.getConnString().toString()));
+                           BSON(ShardType::name() << _shardId <<
+                                ShardType::host() << shard.getConnString().toString()));
 
             // Create an index so that diffing works correctly, otherwise no cursors from S&O
             ASSERT_OK(dbtests::createIndex(
@@ -133,8 +134,6 @@ namespace ShardingTests {
 
         string collName(){ return "foo.bar"; }
 
-        Shard& shard(){ return _shard; }
-
         virtual DBClientBase* connect( const ConnectionString& connStr,
                                        string& errmsg,
                                        double socketTimeout )
@@ -147,7 +146,7 @@ namespace ShardingTests {
     protected:
         OperationContextImpl _txn;
         CustomDirectClient _client;
-        Shard _shard;
+        ShardId _shardId;
     };
 
     //
@@ -160,7 +159,7 @@ namespace ShardingTests {
 
             ShardKeyPattern shardKeyPattern(BSON("_id" << 1));
             ChunkManager manager(collName(), shardKeyPattern, false);
-            manager.createFirstChunks(shard(), NULL, NULL );
+            manager.createFirstChunks(_shardId, NULL, NULL );
 
             BSONObj firstChunk = _client.findOne(ChunkType::ConfigNS, BSONObj()).getOwned();
 
@@ -212,7 +211,7 @@ namespace ShardingTests {
             ShardKeyPattern shardKeyPattern(BSON(keyName << 1));
             ChunkManager manager(collName(), shardKeyPattern, false);
 
-            manager.createFirstChunks(shard(), &splitKeys, NULL );
+            manager.createFirstChunks(_shardId, &splitKeys, NULL );
         }
 
         void run(){
@@ -243,7 +242,7 @@ namespace ShardingTests {
                 ASSERT( minorVersions.find( version.minorVersion() ) == minorVersions.end() );
                 minorVersions.insert( version.minorVersion() );
 
-                ASSERT(chunk[ChunkType::shard()].String() == shard().getName());
+                ASSERT(chunk[ChunkType::shard()].String() == _shardId);
             }
         }
 

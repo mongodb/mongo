@@ -131,8 +131,8 @@ namespace {
                 return false;
             }
 
-            shared_ptr<Shard> s = grid.shardRegistry()->findIfExists(to);
-            if (!s) {
+            shared_ptr<Shard> toShard = grid.shardRegistry()->findIfExists(to);
+            if (!toShard) {
                 string msg(str::stream() << "Could not move database '" << dbname
                                          << "' to shard '" << to
                                          << "' because the shard does not exist");
@@ -141,18 +141,22 @@ namespace {
                                            Status(ErrorCodes::ShardNotFound, msg));
             }
 
-            if (config->getPrimary().getConnString().sameLogicalEndpoint(s->getConnString())) {
+            shared_ptr<Shard> fromShard =
+                grid.shardRegistry()->findIfExists(config->getPrimaryId());
+            invariant(fromShard);
+
+            if (fromShard->getConnString().sameLogicalEndpoint(toShard->getConnString())) {
                 errmsg = "it is already the primary";
                 return false;
             }
 
-            if (!grid.catalogManager()->isShardHost(s->getConnString())) {
+            if (!grid.catalogManager()->isShardHost(toShard->getConnString())) {
                 errmsg = "that server isn't known to me";
                 return false;
             }
 
             log() << "Moving " << dbname << " primary from: "
-                  << config->getPrimary().toString() << " to: " << s->toString();
+                  << fromShard->toString() << " to: " << toShard->toString();
 
             string whyMessage(str::stream() << "Moving primary shard of " << dbname);
             auto scopedDistLock = grid.catalogManager()->getDistLockManager()->lock(
@@ -167,8 +171,8 @@ namespace {
 
             // Record start in changelog
             BSONObj moveStartDetails = _buildMoveEntry(dbname,
-                                                       config->getPrimary().toString(),
-                                                       s->toString(),
+                                                       fromShard->toString(),
+                                                       toShard->toString(),
                                                        shardedColls);
 
             grid.catalogManager()->logChange(txn, "movePrimary.start", dbname, moveStartDetails);
@@ -176,14 +180,14 @@ namespace {
             BSONArrayBuilder barr;
             barr.append(shardedColls);
 
-            ScopedDbConnection toconn(s->getConnString());
+            ScopedDbConnection toconn(toShard->getConnString());
 
             // TODO ERH - we need a clone command which replays operations from clone start to now
             //            can just use local.oplog.$main
             BSONObj cloneRes;
             bool worked = toconn->runCommand(
                             dbname.c_str(),
-                            BSON("clone" << config->getPrimary().getConnString().toString()
+                            BSON("clone" << fromShard->getConnString().toString()
                                          << "collsToIgnore" << barr.arr()
                                          << bypassDocumentValidationCommandOption() << true),
                             cloneRes);
@@ -195,11 +199,11 @@ namespace {
                 return false;
             }
 
-            const string oldPrimary = config->getPrimary().getConnString().toString();
+            const string oldPrimary = fromShard->getConnString().toString();
 
-            ScopedDbConnection fromconn(config->getPrimary().getConnString());
+            ScopedDbConnection fromconn(fromShard->getConnString());
 
-            config->setPrimary(s->getConnString().toString());
+            config->setPrimary(toShard->getConnString().toString());
 
             if (shardedColls.empty()){
 
@@ -248,12 +252,12 @@ namespace {
 
             fromconn.done();
 
-            result << "primary " << s->toString();
+            result << "primary" << toShard->toString();
 
             // Record finish in changelog
             BSONObj moveFinishDetails = _buildMoveEntry(dbname,
                                                         oldPrimary,
-                                                        s->toString(),
+                                                        toShard->toString(),
                                                         shardedColls);
 
             grid.catalogManager()->logChange(txn, "movePrimary", dbname, moveFinishDetails);

@@ -52,6 +52,7 @@
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard_connection.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_write.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/server.h"
@@ -71,9 +72,6 @@ namespace mongo {
     using std::set;
     using std::stringstream;
     using std::vector;
-
-    Shard Shard::EMPTY;
-
 
     CollectionInfo::CollectionInfo(const CollectionType& coll) {
         _dropped = coll.getDropped();
@@ -155,7 +153,7 @@ namespace mongo {
         : _name(name) {
 
         invariant(_name == dbt.getName());
-        _primary.reset(dbt.getPrimary());
+        _primaryId = dbt.getPrimary();
         _shardingEnabled = dbt.getSharded();
     }
 
@@ -179,12 +177,13 @@ namespace mongo {
         return i->second.isSharded();
     }
 
-    const Shard& DBConfig::getShard( const string& ns ) {
-        if ( isSharded( ns ) )
-            return Shard::EMPTY;
+    const ShardId& DBConfig::getShardId(const string& ns) {
+        uassert(28679, "ns can't be sharded", !isSharded(ns));
 
-        uassert( 10178 ,  "no primary!" , _primary.ok() );
-        return _primary;
+        uassert(10178,
+                "no primary!",
+                grid.shardRegistry()->findIfExists(_primaryId));
+        return _primaryId;
     }
 
     void DBConfig::enableSharding( bool save ) {
@@ -246,7 +245,7 @@ namespace mongo {
             // No namespace
             if( i == _collections.end() ){
                 // If we don't know about this namespace, it's unsharded by default
-                primary.reset( new Shard( _primary ) );
+                primary = grid.shardRegistry()->findIfExists(_primaryId);
             }
             else {
                 CollectionInfo& cInfo = i->second;
@@ -258,8 +257,7 @@ namespace mongo {
                     manager = cInfo.getCM();
                 }
                 else{
-                    // Make a copy, we don't want to be tied to this config object
-                    primary.reset( new Shard( _primary ) );
+                    primary = grid.shardRegistry()->findIfExists(_primaryId);
                 }
             }
         }
@@ -433,9 +431,11 @@ namespace mongo {
         return ci.getCM();
     }
 
-    void DBConfig::setPrimary( const std::string& s ) {
+    void DBConfig::setPrimary(const std::string& s) {
+        const auto& shard = grid.shardRegistry()->findIfExists(s);
+
         boost::lock_guard<boost::mutex> lk( _lock );
-        _primary.reset( s );
+        _primaryId = shard->getId();
         _save();
     }
 
@@ -455,7 +455,7 @@ namespace mongo {
 
         DatabaseType dbt = status.getValue();
         invariant(_name == dbt.getName());
-        _primary.reset(dbt.getPrimary());
+        _primaryId = dbt.getPrimary();
         _shardingEnabled = dbt.getSharded();
 
         // Load all collections
@@ -486,7 +486,7 @@ namespace mongo {
         if (db) {
             DatabaseType dbt;
             dbt.setName(_name);
-            dbt.setPrimary(_primary.getName());
+            dbt.setPrimary(_primaryId);
             dbt.setSharded(_shardingEnabled);
 
             uassertStatusOK(grid.catalogManager()->updateDatabase(_name, dbt));
@@ -554,12 +554,12 @@ namespace mongo {
 
         LOG(1) << "\t removed entry from config server for: " << _name << endl;
 
-        set<Shard> allServers;
+        set<ShardId> shardIds;
 
         // 2
         while ( true ) {
             int num = 0;
-            if (!_dropShardedCollections(num, allServers, errmsg)) {
+            if (!_dropShardedCollections(num, shardIds, errmsg)) {
                 return 0;
             }
 
@@ -573,7 +573,8 @@ namespace mongo {
 
         // 3
         {
-            ScopedDbConnection conn(_primary.getConnString(), 30.0);
+            const auto& shard = grid.shardRegistry()->findIfExists(_primaryId);
+            ScopedDbConnection conn(shard->getConnString(), 30.0);
             BSONObj res;
                 if ( ! conn->dropDatabase( _name , &res ) ) {
                 errmsg = res.toString();
@@ -583,8 +584,13 @@ namespace mongo {
         }
 
         // 4
-        for ( set<Shard>::iterator i=allServers.begin(); i!=allServers.end(); i++ ) {
-            ScopedDbConnection conn(i->getConnString(), 30.0);
+        for (const ShardId& shardId : shardIds) {
+            const auto& shard = grid.shardRegistry()->findIfExists(shardId);
+            if (!shard) {
+                continue;
+            }
+
+            ScopedDbConnection conn(shard->getConnString(), 30.0);
             BSONObj res;
             if ( ! conn->dropDatabase( _name , &res ) ) {
                 errmsg = res.toString();
@@ -600,7 +606,7 @@ namespace mongo {
         return true;
     }
 
-    bool DBConfig::_dropShardedCollections( int& num, set<Shard>& allServers , string& errmsg ) {
+    bool DBConfig::_dropShardedCollections(int& num, set<ShardId>& shardIds, string& errmsg) {
         num = 0;
         set<string> seen;
         while ( true ) {
@@ -622,7 +628,7 @@ namespace mongo {
             seen.insert( i->first );
             LOG(1) << "\t dropping sharded collection: " << i->first << endl;
 
-            i->second.getCM()->getAllShards( allServers );
+            i->second.getCM()->getAllShardIds(&shardIds);
 
             uassertStatusOK(grid.catalogManager()->dropCollection(i->first));
 
@@ -642,12 +648,16 @@ namespace mongo {
         return true;
     }
 
-    void DBConfig::getAllShards(set<Shard>& shards) {
+    void DBConfig::getAllShardIds(set<ShardId>* shardIds) {
+        dassert(shardIds);
+
         boost::lock_guard<boost::mutex> lk(_lock);
-        shards.insert(getPrimary());
-        for (CollectionInfoMap::const_iterator it(_collections.begin()), end(_collections.end()); it != end; ++it) {
+        shardIds->insert(getPrimaryId());
+        for (CollectionInfoMap::const_iterator it(_collections.begin()), end(_collections.end());
+             it != end;
+             ++it) {
             if (it->second.isSharded()) {
-                it->second.getCM()->getAllShards(shards);
+                it->second.getCM()->getAllShardIds(shardIds);
             } // TODO: handle collections on non-primary shard
         }
     }
@@ -775,15 +785,15 @@ namespace mongo {
         Client::initThread("replSetChange");
 
         try {
-            Shard s = Shard::lookupRSName(setName);
-            if (s == Shard::EMPTY) {
+            ShardPtr s = Shard::lookupRSName(setName);
+            if (!s) {
                 LOG(1) << "shard not found for set: " << newConnectionString;
                 return;
             }
 
             Status result = grid.catalogManager()->update(
                                                     ShardType::ConfigNS,
-                                                    BSON(ShardType::name(s.getName())),
+                                                    BSON(ShardType::name(s->getId())),
                                                     BSON("$set" << BSON(ShardType::host(
                                                                             newConnectionString))),
                                                     false, // upsert

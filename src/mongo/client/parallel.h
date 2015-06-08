@@ -35,12 +35,12 @@
 #include <boost/shared_ptr.hpp>
 
 #include "mongo/db/namespace_string.h"
+#include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_connection.h"
 
 namespace mongo {
 
     class DBClientCursorHolder;
-    class Shard;
     class StaleConfigException;
     class ParallelConnectionMetadata;
 
@@ -183,7 +183,7 @@ namespace mongo {
         /**
          * Returns the set of shards with open cursors.
          */
-        void getQueryShards(std::set<Shard>& shards);
+        void getQueryShardIds(std::set<ShardId>& shardIds);
 
         /**
          * Returns the single shard with an open cursor.
@@ -197,8 +197,7 @@ namespace mongo {
          */
         boost::shared_ptr<Shard> getPrimary();
 
-        ChunkManagerPtr getChunkManager( const Shard& shard );
-        DBClientCursorPtr getShardCursor( const Shard& shard );
+        DBClientCursorPtr getShardCursor(const ShardId& shardId);
 
         BSONObj toBSON() const;
         std::string toString() const;
@@ -223,7 +222,7 @@ namespace mongo {
         std::map<std::string,int> _staleNSMap;
         int _totalTries;
 
-        std::map<Shard,PCMData> _cursorMap;
+        std::map<ShardId, PCMData> _cursorMap;
 
         // LEGACY BELOW
         int _numServers;
@@ -239,12 +238,12 @@ namespace mongo {
          * set connection and the primary cannot be reached, the version
          * will not be set if the slaveOk flag is set.
          */
-        void setupVersionAndHandleSlaveOk( PCStatePtr state /* in & out */,
-                           const Shard& shard,
-                           boost::shared_ptr<Shard> primary /* in */,
-                           const NamespaceString& ns,
-                           const std::string& vinfo,
-                           ChunkManagerPtr manager /* in */ );
+        void setupVersionAndHandleSlaveOk(PCStatePtr state /* in & out */,
+                                          const ShardId& shardId,
+                                          boost::shared_ptr<Shard> primary /* in */,
+                                          const NamespaceString& ns,
+                                          const std::string& vinfo,
+                                          ChunkManagerPtr manager /* in */ );
 
         // LEGACY init - Needed for map reduce
         void _oldInit();

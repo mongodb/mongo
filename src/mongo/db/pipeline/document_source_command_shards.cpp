@@ -74,14 +74,14 @@ namespace {
         BSONObj resultObj = result.result;
 
         uassert(16390, str::stream() << "sharded pipeline failed on shard " <<
-                                    result.shardTarget.getName() << ": " <<
+                                    result.shardTargetId << ": " <<
                                     resultObj.toString(),
                 resultObj["ok"].trueValue());
 
         /* grab the result array out of the shard server's response */
         BSONElement resultArray = resultObj["result"];
         massert(16391, str::stream() << "no result array? shard:" <<
-                                    result.shardTarget.getName() << ": " <<
+                                    result.shardTargetId << ": " <<
                                     resultObj.toString(),
                 resultArray.type() == Array);
 

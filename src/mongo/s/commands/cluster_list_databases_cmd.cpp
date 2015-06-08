@@ -124,7 +124,7 @@ namespace {
                         bb.reset(new BSONObjBuilder());
                     }
 
-                    bb->appendNumber(s->getName(), size);
+                    bb->appendNumber(s->getId(), size);
                 }
 
             }

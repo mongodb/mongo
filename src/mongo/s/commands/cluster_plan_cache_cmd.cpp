@@ -139,7 +139,7 @@ namespace mongo {
 
             // Append shard result as a sub object.
             // Name the field after the shard.
-            string shardName = cmdResult.shardTarget.getName();
+            string shardName = cmdResult.shardTargetId;
             result.append(shardName, cmdResult.result);
         }
 

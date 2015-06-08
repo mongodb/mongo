@@ -33,14 +33,14 @@
 #include <string>
 #include <vector>
 
+#include "mongo/s/client/shard.h"
+
 namespace mongo {
 
     class BSONObjBuilder;
     class CatalogManager;
     class Shard;
     class ShardType;
-
-    using ShardId = std::string;
 
     /**
      * Maintains the set of all shards known to the MongoS instance.
@@ -55,11 +55,11 @@ namespace mongo {
         boost::shared_ptr<Shard> findIfExists(const ShardId& id);
 
         /**
-         * Lookup shard by replica set name. Returns Shard::EMTPY if the name can't be found.
+         * Lookup shard by replica set name. Returns nullptr if the name can't be found.
          * Note: this doesn't refresh the table if the name isn't found, so it's possible that a
          * newly added shard/Replica Set may not be found.
          */
-        Shard lookupRSName(const std::string& name);
+        ShardPtr lookupRSName(const std::string& name);
 
         void set(const ShardId& id, const Shard& s);
 

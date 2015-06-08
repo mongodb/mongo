@@ -29,10 +29,12 @@
 #pragma once
 
 #include <boost/shared_ptr.hpp>
+#include <set>
 #include <string>
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/s/client/shard.h"
 
 namespace mongo {
 
@@ -50,7 +52,6 @@ namespace mongo {
     class OperationContext;
     class Query;
     class SettingsType;
-    class Shard;
     class ShardKeyPattern;
     class ShardType;
     class Status;
@@ -108,7 +109,7 @@ namespace mongo {
          * @param fieldsAndOrder: shardKey pattern
          * @param unique: if true, ensure underlying index enforces a unique constraint.
          * @param initPoints: create chunks based on a set of specified split points.
-         * @param initShards: if nullptr, use primary shard as lone shard for DB.
+         * @param initShardIds: if nullptr, use primary shard as lone shard for DB.
          *
          * WARNING: It's not completely safe to place initial chunks onto non-primary
          *          shards using this method because a conflict may result if multiple map-reduce
@@ -119,7 +120,7 @@ namespace mongo {
                                        const ShardKeyPattern& fieldsAndOrder,
                                        bool unique,
                                        std::vector<BSONObj>* initPoints,
-                                       std::vector<Shard>* initShards = nullptr) = 0;
+                                       std::set<ShardId>* initShardIds = nullptr) = 0;
 
         /**
          *

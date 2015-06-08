@@ -73,7 +73,7 @@ namespace mongo {
         Chunk( const ChunkManager * info ,
                const BSONObj& min,
                const BSONObj& max,
-               const Shard& shard,
+               const ShardId& shardId,
                ChunkVersion lastmod = ChunkVersion() );
 
         //
@@ -180,7 +180,7 @@ namespace mongo {
          * @param res the object containing details about the migrate execution
          * @return true if move was successful
          */
-        bool moveAndCommit(const Shard& to,
+        bool moveAndCommit(const ShardId& to,
                            long long chunkSize,
                            const WriteConcernOptions* writeConcern,
                            bool waitForDelete,
@@ -234,11 +234,16 @@ namespace mongo {
         bool operator!=(const Chunk& s) const { return ! ( *this == s ); }
 
         std::string getns() const;
-        Shard getShard() const { return _shard; }
+        ShardId getShardId() const { return _shardId; }
         const ChunkManager* getManager() const { return _manager; }
-        
 
     private:
+
+        /**
+         * Returns the connection string for the shard on which this chunk lives on.
+         */
+        const ConnectionString& _getShardConnectionString() const;
+
         // if min/max key is pos/neg infinity
         bool _minIsInf() const;
         bool _maxIsInf() const;
@@ -248,7 +253,7 @@ namespace mongo {
 
         BSONObj _min;
         BSONObj _max;
-        Shard _shard;
+        ShardId _shardId;
         ChunkVersion _lastmod;
         mutable bool _jumbo;
 

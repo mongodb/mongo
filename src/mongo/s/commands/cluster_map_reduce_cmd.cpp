@@ -48,6 +48,7 @@
 #include "mongo/s/commands/cluster_commands_common.h"
 #include "mongo/s/config.h"
 #include "mongo/s/catalog/dist_lock_manager.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/strategy.h"
 #include "mongo/stdx/chrono.h"
@@ -284,7 +285,8 @@ namespace {
             if (!shardedInput && !shardedOutput && !customOutDB) {
                 LOG(1) << "simple MR, just passthrough";
 
-                ShardConnection conn(confIn->getPrimary().getConnString(), "");
+                const auto& shard = grid.shardRegistry()->findIfExists(confIn->getPrimaryId());
+                ShardConnection conn(shard->getConnString(), "");
 
                 BSONObj res;
                 bool ok = conn->runCommand(dbname, cmdObj, res);
@@ -304,7 +306,6 @@ namespace {
                 q = cmdObj["query"].embeddedObjectUserCheck();
             }
 
-            set<Shard> shards;
             set<string> servers;
             vector<Strategy::CommandResult> mrCommandResults;
 
@@ -329,7 +330,12 @@ namespace {
 
                 for (const auto& mrResult : mrCommandResults) {
                     // Need to gather list of all servers even if an error happened
-                    const string server = mrResult.shardTarget.getConnString().toString();
+                    string server;
+                    {
+                        const auto& shard =
+                            grid.shardRegistry()->findIfExists(mrResult.shardTargetId);
+                        server = shard->getConnString().toString();
+                    }
                     servers.insert(server);
 
                     if (!ok) {
@@ -416,10 +422,11 @@ namespace {
             BSONObj singleResult;
 
             if (!shardedOutput) {
+                const auto& shard = grid.shardRegistry()->findIfExists(confOut->getPrimaryId());
                 LOG(1) << "MR with single shard output, NS=" << finalColLong
-                       << " primary=" << confOut->getPrimary();
+                       << " primary=" << shard->toString();
 
-                ShardConnection conn(confOut->getPrimary().getConnString(), finalColLong);
+                ShardConnection conn(shard->getConnString(), finalColLong);
                 ok = conn->runCommand(outDB, finalCmd.obj(), singleResult);
 
                 BSONObj counts = singleResult.getObjectField("counts");
@@ -452,9 +459,8 @@ namespace {
                     //
                     // TODO: pre-split mapReduce output in a safer way.
 
-                    set<Shard> shardSet;
-                    confOut->getAllShards(shardSet);
-                    vector<Shard> outShards(shardSet.begin(), shardSet.end());
+                    set<ShardId> outShardIds;
+                    confOut->getAllShardIds(&outShardIds);
 
                     BSONObj sortKey = BSON("_id" << 1);
                     ShardKeyPattern sortKeyPattern(sortKey);
@@ -462,7 +468,7 @@ namespace {
                                                                            sortKeyPattern,
                                                                            true,
                                                                            &sortedSplitPts,
-                                                                           &outShards);
+                                                                           &outShardIds);
                     if (!status.isOK()) {
                         return appendCommandStatus(result, status);
                     }
@@ -495,7 +501,12 @@ namespace {
                     }
 
                     for (const auto& mrResult : mrCommandResults) {
-                        const string server = mrResult.shardTarget.getConnString().toString();
+                        string server;
+                        {
+                            const auto& shard =
+                                grid.shardRegistry()->findIfExists(mrResult.shardTargetId);
+                            server = shard->getConnString().toString();
+                        }
                         singleResult = mrResult.result;
 
                         ok = singleResult["ok"].trueValue();

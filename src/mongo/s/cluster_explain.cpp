@@ -28,9 +28,10 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/cluster_explain.h"
-
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/s/client/shard_registry.h"
+#include "mongo/s/cluster_explain.h"
+#include "mongo/s/grid.h"
 
 namespace mongo {
 
@@ -210,9 +211,12 @@ namespace mongo {
             BSONObj queryPlanner = shardResults[i].result["queryPlanner"].Obj();
             BSONObj serverInfo = shardResults[i].result["serverInfo"].Obj();
 
-            singleShardBob.append("shardName", shardResults[i].shardTarget.getName());
-            std::string connStr = shardResults[i].shardTarget.getConnString().toString();
-            singleShardBob.append("connectionString", connStr);
+            singleShardBob.append("shardName", shardResults[i].shardTargetId);
+            {
+                const auto& shard =
+                    grid.shardRegistry()->findIfExists(shardResults[i].shardTargetId);
+                singleShardBob.append("connectionString", shard->getConnString().toString());
+            }
             appendIfRoom(&singleShardBob, serverInfo, "serverInfo");
             appendElementsIfRoom(&singleShardBob, queryPlanner);
 
@@ -282,7 +286,7 @@ namespace mongo {
             BSONObj execStats = shardResults[i].result["executionStats"].Obj();
             BSONObj execStages = execStats["executionStages"].Obj();
 
-            singleShardBob.append("shardName", shardResults[i].shardTarget.getName());
+            singleShardBob.append("shardName", shardResults[i].shardTargetId);
 
             // Append error-related fields, if present.
             if (!execStats["executionSuccess"].eoo()) {
@@ -315,7 +319,7 @@ namespace mongo {
         for (size_t i = 0; i < shardResults.size(); i++) {
             BSONObjBuilder singleShardBob(execShardsBuilder.subobjStart());
 
-            singleShardBob.append("shardName", shardResults[i].shardTarget.getName());
+            singleShardBob.append("shardName", shardResults[i].shardTargetId);
 
             BSONObj execStats = shardResults[i].result["executionStats"].Obj();
             vector<BSONElement> allPlans = execStats["allPlansExecution"].Array();

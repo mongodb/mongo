@@ -46,6 +46,7 @@
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard_connection.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/commands/cluster_commands_common.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
@@ -192,7 +193,7 @@ namespace {
 
                 BSONObjBuilder shardExplains(result.subobjStart("shards"));
                 for (size_t i = 0; i < shardResults.size(); i++) {
-                    shardExplains.append(shardResults[i].shardTarget.getName(),
+                    shardExplains.append(shardResults[i].shardTargetId,
                                          BSON("host" << shardResults[i].target.toString() <<
                                               "stages" << shardResults[i].result["stages"]));
                 }
@@ -230,7 +231,8 @@ namespace {
 
             // Run merging command on primary shard of database. Need to use ShardConnection so
             // that the merging mongod is sent the config servers on connection init.
-            ShardConnection conn(conf->getPrimary().getConnString(), outputNsOrEmpty);
+            const auto& shard = grid.shardRegistry()->findIfExists(conf->getPrimaryId());
+            ShardConnection conn(shard->getConnString(), outputNsOrEmpty);
             BSONObj mergedResults = aggRunCommand(conn.get(),
                                                   dbname,
                                                   mergeCmd.freeze().toBson(),
@@ -289,24 +291,24 @@ namespace {
                     invariant(errCode == result["code"].numberInt() || errCode == 17022);
                     uasserted(errCode, str::stream()
                         << "sharded pipeline failed on shard "
-                        << shardResults[i].shardTarget.getName() << ": "
+                        << shardResults[i].shardTargetId << ": "
                         << result.toString());
                 }
 
                 BSONObj cursor = result["cursor"].Obj();
 
                 massert(17023,
-                        str::stream() << "shard " << shardResults[i].shardTarget.getName()
+                        str::stream() << "shard " << shardResults[i].shardTargetId
                                       << " returned non-empty first batch",
                         cursor["firstBatch"].Obj().isEmpty());
 
                 massert(17024,
-                        str::stream() << "shard " << shardResults[i].shardTarget.getName()
+                        str::stream() << "shard " << shardResults[i].shardTargetId
                                       << " returned cursorId 0",
                         cursor["id"].Long() != 0);
 
                 massert(17025,
-                        str::stream() << "shard " << shardResults[i].shardTarget.getName()
+                        str::stream() << "shard " << shardResults[i].shardTargetId
                                       << " returned different ns: " << cursor["ns"],
                         cursor["ns"].String() == fullns);
 
@@ -412,7 +414,8 @@ namespace {
                                          int queryOptions) {
 
         // Temporary hack. See comment on declaration for details.
-        ShardConnection conn(conf->getPrimary().getConnString(), "");
+        const auto& shard = grid.shardRegistry()->findIfExists(conf->getPrimaryId());
+        ShardConnection conn(shard->getConnString(), "");
         BSONObj result = aggRunCommand(conn.get(), conf->name(), cmd, queryOptions);
         conn.done();
         out.appendElements(result);

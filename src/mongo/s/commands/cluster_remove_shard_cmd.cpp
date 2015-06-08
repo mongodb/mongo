@@ -99,13 +99,13 @@ namespace {
             }
 
             StatusWith<ShardDrainingStatus> removeShardResult =
-                grid.catalogManager()->removeShard(txn, s->getName());
+                grid.catalogManager()->removeShard(txn, s->getId());
             if (!removeShardResult.isOK()) {
                 return appendCommandStatus(result, removeShardResult.getStatus());
             }
 
             vector<string> databases;
-            grid.catalogManager()->getDatabasesForShard(s->getName(), &databases);
+            grid.catalogManager()->getDatabasesForShard(s->getId(), &databases);
 
             // Get BSONObj containing:
             // 1) note about moving or dropping databases in a shard
@@ -132,13 +132,13 @@ namespace {
             case ShardDrainingStatus::STARTED:
                 result.append("msg", "draining started successfully");
                 result.append("state", "started");
-                result.append("shard", s->getName());
+                result.append("shard", s->getId());
                 result.appendElements(dbInfo);
                 break;
             case ShardDrainingStatus::ONGOING: {
                 vector<ChunkType> chunks;
                 Status status = grid.catalogManager()->getChunks(
-                                            Query(BSON(ChunkType::shard(s->getName()))),
+                                            Query(BSON(ChunkType::shard(s->getId()))),
                                             0,  // return all
                                             &chunks);
                 if (!status.isOK()) {
@@ -160,7 +160,7 @@ namespace {
             case ShardDrainingStatus::COMPLETED:
                 result.append("msg", "removeshard completed successfully");
                 result.append("state", "completed");
-                result.append("shard", s->getName());
+                result.append("shard", s->getId());
             }
 
             return true;

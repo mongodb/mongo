@@ -532,9 +532,13 @@ namespace {
         cmdBuilder.append("setShardVersion", ns);
         cmdBuilder.append("configdb", configServerPrimary);
 
-        Shard s = Shard::make(conn.getServerAddress());
-        cmdBuilder.append("shard", s.getName());
-        cmdBuilder.append("shardHost", s.getConnString().toString());
+        ShardId shardId;
+        {
+            const auto& shard = grid.shardRegistry()->findIfExists(conn.getServerAddress());
+            shardId = shard->getId();
+            cmdBuilder.append("shard", shardId);
+            cmdBuilder.append("shardHost", shard->getConnString().toString());
+        }
 
         if (ns.size() > 0) {
             version.addToBSON(cmdBuilder);
@@ -549,7 +553,7 @@ namespace {
 
         BSONObj cmd = cmdBuilder.obj();
 
-        LOG(1) << "    setShardVersion  " << s.getName() << " " << conn.getServerAddress()
+        LOG(1) << "    setShardVersion  " << shardId << " " << conn.getServerAddress()
                << "  " << ns << "  " << cmd
                << (manager ? string(str::stream() << " " << manager->getSequenceNumber()) : "");
 

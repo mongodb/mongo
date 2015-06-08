@@ -40,6 +40,7 @@
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/chunk_manager.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
 
@@ -163,7 +164,6 @@ namespace {
 
             ChunkPtr firstChunk = manager->findIntersectingChunk(minKey);
             verify(firstChunk);
-            Shard shard = firstChunk->getShard();
 
             BSONObjBuilder remoteCmdObjB;
             remoteCmdObjB.append( cmdObj[ ClusterMergeChunksCommand::nsField() ] );
@@ -171,13 +171,21 @@ namespace {
             remoteCmdObjB.append( ClusterMergeChunksCommand::configField(),
                                   grid.catalogManager()->connectionString().toString() );
             remoteCmdObjB.append( ClusterMergeChunksCommand::shardNameField(),
-                                  shard.getName() );
+                                  firstChunk->getShardId() );
 
             BSONObj remoteResult;
 
             // Throws, but handled at level above.  Don't want to rewrap to preserve exception
             // formatting.
-            ScopedDbConnection conn(shard.getConnString());
+            const auto& shard = grid.shardRegistry()->findIfExists(firstChunk->getShardId());
+            if (!shard) {
+                return appendCommandStatus(result,
+                                           Status(ErrorCodes::ShardNotFound,
+                                                  str::stream() << "Can't find shard for chunk: "
+                                                                << firstChunk->toString()));
+            }
+
+            ScopedDbConnection conn(shard->getConnString());
             bool ok = conn->runCommand( "admin", remoteCmdObjB.obj(), remoteResult );
             conn.done();
 

@@ -261,7 +261,7 @@ namespace {
             invariant(chunk.get());
             log() << "splitting chunk [" << chunk->getMin() << "," << chunk->getMax() << ")"
                   << " in collection " << nss.ns()
-                  << " on shard " << chunk->getShard().getName();
+                  << " on shard " << chunk->getShardId();
 
             BSONObj res;
             if (middle.isEmpty()) {

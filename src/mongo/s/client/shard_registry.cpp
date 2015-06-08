@@ -38,7 +38,6 @@
 #include "mongo/client/connection_string.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/client/shard.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -101,15 +100,18 @@ namespace mongo {
         return _findUsingLookUp(id);
     }
 
-    Shard ShardRegistry::lookupRSName(const string& name) {
+    shared_ptr<Shard> ShardRegistry::lookupRSName(const string& name) {
         boost::lock_guard<boost::mutex> lk(_mutex);
         ShardMap::iterator i = _rsLookup.find(name);
 
-        return (i == _rsLookup.end()) ? Shard::EMPTY : *(i->second.get());
+        return (i == _rsLookup.end()) ? nullptr : i->second;
     }
 
     void ShardRegistry::set(const ShardId& id, const Shard& s) {
-        shared_ptr<Shard> ss(boost::make_shared<Shard>(s));
+        shared_ptr<Shard> ss(boost::make_shared<Shard>(s.getId(),
+                                                       s.getConnString(),
+                                                       s.getMaxSizeMB(),
+                                                       s.isDraining()));
 
         boost::lock_guard<boost::mutex> lk(_mutex);
         _lookup[id] = ss;
@@ -120,7 +122,7 @@ namespace mongo {
 
         for (ShardMap::iterator i = _lookup.begin(); i != _lookup.end();) {
             shared_ptr<Shard> s = i->second;
-            if (s->getName() == id) {
+            if (s->getId() == id) {
                 _lookup.erase(i++);
             }
             else {
@@ -130,7 +132,7 @@ namespace mongo {
 
         for (ShardMap::iterator i = _rsLookup.begin(); i != _rsLookup.end();) {
             shared_ptr<Shard> s = i->second;
-            if (s->getName() == id) {
+            if (s->getId() == id) {
                 _rsLookup.erase(i++);
             }
             else {
@@ -146,14 +148,14 @@ namespace mongo {
             boost::lock_guard<boost::mutex> lk(_mutex);
             for (ShardMap::const_iterator i = _lookup.begin(); i != _lookup.end(); ++i) {
                 const shared_ptr<Shard>& s = i->second;
-                if (s->getName() == "config") {
+                if (s->getId() == "config") {
                     continue;
                 }
 
-                if (seen.count(s->getName())) {
+                if (seen.count(s->getId())) {
                     continue;
                 }
-                seen.insert(s->getName());
+                seen.insert(s->getId());
             }
         }
 

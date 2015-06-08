@@ -53,18 +53,18 @@ namespace mongo {
             mySplitPoints.push_back( _keyPattern.getKeyPattern().globalMax() );
             
             for (unsigned i = 1; i < mySplitPoints.size(); ++i) {
-                const string name = str::stream() << (i - 1);
+                const string shardId = str::stream() << (i - 1);
+                _shardIds.insert(shardId);
 
-                Shard shard(name,
-                            ConnectionString(HostAndPort(name)),
+                Shard shard(shardId,
+                            ConnectionString(HostAndPort(shardId)),
                             0 /* maxSize */,
                             false /* draining */);
-                _shards.insert(shard);
-
+                Shard::installShard(shardId, shard);
                 boost::shared_ptr<Chunk> chunk(new Chunk(this,
                                                          mySplitPoints[i - 1],
                                                          mySplitPoints[i],
-                                                         shard));
+                                                         shardId));
                 _chunkMap[mySplitPoints[i]] = chunk;
             }
             
@@ -88,12 +88,12 @@ namespace ChunkTests {
                 ChunkManager chunkManager("", shardKeyPattern, false);
                 chunkManager.setSingleChunkForShards( splitPointsVector() );
                 
-                set<Shard> shards;
-                chunkManager.getShardsForQuery( shards, query() );
+                set<ShardId> shardIds;
+                chunkManager.getShardIdsForQuery(shardIds, query());
                 
                 BSONArrayBuilder b;
-                for( set<Shard>::const_iterator i = shards.begin(); i != shards.end(); ++i ) {
-                    b << i->getName();
+                for (const ShardId& shardId : shardIds) {
+                    b << shardId;
                 }
                 ASSERT_EQUALS( expectedShardNames(), b.arr() );
             }
@@ -193,7 +193,7 @@ namespace ChunkTests {
         class Unsatisfiable : public BASE {
             /**
              * SERVER-4914 For now the first shard is returned for unsatisfiable queries, as some
-             * clients of getShardsForQuery() expect at least one shard.
+             * clients of getShardIdsForQuery() expect at least one shard.
              */
             virtual BSONArray expectedShardNames() const {
                 return BSON_ARRAY( "0" ) /* BSONArray() */;

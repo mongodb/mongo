@@ -116,8 +116,12 @@ namespace mongo {
             }
 
         private:
-            bool _passthrough(const string& db, DBConfigPtr conf, const BSONObj& cmdObj, int options, BSONObjBuilder& result) {
-                ShardConnection conn(conf->getPrimary().getConnString(), "");
+            bool _passthrough(const string& db,
+                              DBConfigPtr conf,
+                              const BSONObj& cmdObj,
+                              int options, BSONObjBuilder& result) {
+                const auto& shard = grid.shardRegistry()->findIfExists(conf->getPrimaryId());
+                ShardConnection conn(shard->getConnString(), "");
 
                 BSONObj res;
                 bool ok = conn->runCommand(db, cmdObj, res, passOptions() ? options : 0);
@@ -136,7 +140,9 @@ namespace mongo {
                                            RunOnAllShardsCommand(n, oldname, useShardConn) {
             }
 
-            virtual void getShards(const string& dbName , BSONObj& cmdObj, set<Shard>& shards) {
+            virtual void getShardIds(const string& dbName,
+                                     BSONObj& cmdObj,
+                                     vector<ShardId>& shardIds) {
                 const string fullns = dbName + '.' + cmdObj.firstElement().valuestrsafe();
 
                 auto status = grid.catalogCache()->getDatabase(dbName);
@@ -145,18 +151,10 @@ namespace mongo {
                 shared_ptr<DBConfig> conf = status.getValue();
 
                 if (!conf->isShardingEnabled() || !conf->isSharded(fullns)) {
-                    shards.insert(conf->getShard(fullns));
+                    shardIds.push_back(conf->getShardId(fullns));
                 }
                 else {
-                    vector<ShardId> shardIds;
                     grid.shardRegistry()->getAllShardIds(&shardIds);
-
-                    for (const ShardId& shardId : shardIds) {
-                        const auto& shard = grid.shardRegistry()->findIfExists(shardId);
-                        if (shard) {
-                            shards.insert(*shard);
-                        }
-                    }
                 }
             }
         };
@@ -587,10 +585,12 @@ namespace mongo {
                 uassert(13138, "You can't rename a sharded collection", !confFrom->isSharded(fullnsFrom));
                 uassert(13139, "You can't rename to a sharded collection", !confTo->isSharded(fullnsTo));
 
-                const Shard& shardTo = confTo->getShard(fullnsTo);
-                const Shard& shardFrom = confFrom->getShard(fullnsFrom);
+                const ShardId& shardTo = confTo->getShardId(fullnsTo);
+                const ShardId& shardFrom = confFrom->getShardId(fullnsFrom);
 
-                uassert(13137, "Source and destination collections must be on same shard", shardFrom == shardTo);
+                uassert(13137,
+                        "Source and destination collections must be on same shard",
+                        shardFrom == shardTo);
 
                 return adminPassthrough( confFrom , cmdObj , result );
             }
@@ -645,7 +645,11 @@ namespace mongo {
                         }
                     }
 
-                    b.append("fromhost", confFrom->getPrimary().getConnString().toString());
+                    {
+                        const auto& shard =
+                            grid.shardRegistry()->findIfExists(confFrom->getPrimaryId());
+                        b.append("fromhost", shard->getConnString().toString());
+                    }
                     BSONObj fixed = b.obj();
 
                     return adminPassthrough( confTo , fixed , result );
@@ -677,7 +681,7 @@ namespace mongo {
                 auto conf = uassertStatusOK(grid.catalogCache()->getDatabase(dbName));
                 if (!conf->isShardingEnabled() || !conf->isSharded(fullns)) {
                     result.appendBool("sharded", false);
-                    result.append( "primary" , conf->getPrimary().getName() );
+                    result.append("primary", conf->getPrimaryId());
 
                     return passthrough( conf , cmdObj , result);
                 }
@@ -686,9 +690,6 @@ namespace mongo {
 
                 ChunkManagerPtr cm = conf->getChunkManager( fullns );
                 massert( 12594 ,  "how could chunk manager be null!" , cm );
-
-                set<Shard> servers;
-                cm->getAllShards(servers);
 
                 BSONObjBuilder shardStats;
                 map<string,long long> counts;
@@ -700,10 +701,19 @@ namespace mongo {
                 */
                 int nindexes=0;
                 bool warnedAboutIndexes = false;
-                for ( set<Shard>::iterator i=servers.begin(); i!=servers.end(); i++ ) {
+
+                set<ShardId> shardIds;
+                cm->getAllShardIds(&shardIds);
+
+                for (const ShardId& shardId : shardIds) {
+                    const auto& shard = grid.shardRegistry()->findIfExists(shardId);
+                    if (!shard) {
+                        continue;
+                    }
+
                     BSONObj res;
                     {
-                        ScopedDbConnection conn(i->getConnString());
+                        ScopedDbConnection conn(shard->getConnString());
                         if ( ! conn->runCommand( dbName , cmdObj , res ) ) {
                             if ( !res["code"].eoo() ) {
                                 result.append( res["code"] );
@@ -793,7 +803,7 @@ namespace mongo {
                         }
                         
                     }
-                    shardStats.append(i->getName(), res);
+                    shardStats.append(shardId, res);
                 }
 
                 result.append("ns", fullns);
@@ -842,9 +852,9 @@ namespace mongo {
                 uassertStatusOK(status);
                 DBConfigPtr conf = status.getValue();
 
-                Shard shard;
+                ShardPtr shard;
                 if (!conf->isShardingEnabled() || !conf->isSharded(ns)) {
-                    shard = conf->getPrimary();
+                    shard = grid.shardRegistry()->findIfExists(conf->getPrimaryId());
                 }
                 else {
                     ChunkManagerPtr chunkMgr = getChunkManager(conf, ns);
@@ -857,7 +867,7 @@ namespace mongo {
 
                     BSONObj shardKey = status.getValue();
                     ChunkPtr chunk = chunkMgr->findIntersectingChunk(shardKey);
-                    shard = chunk->getShard();
+                    shard = grid.shardRegistry()->findIfExists(chunk->getShardId());
                 }
 
                 BSONObjBuilder explainCmd;
@@ -867,7 +877,7 @@ namespace mongo {
                 Timer timer;
 
                 BSONObjBuilder result;
-                bool ok = runCommand(conf, shard, ns, explainCmd.obj(), result);
+                bool ok = runCommand(conf, shard->getId(), ns, explainCmd.obj(), result);
                 long long millisElapsed = timer.millis();
 
                 if (!ok) {
@@ -877,8 +887,8 @@ namespace mongo {
                 }
 
                 Strategy::CommandResult cmdResult;
-                cmdResult.shardTarget = shard;
-                cmdResult.target = shard.getConnString();
+                cmdResult.shardTargetId = shard->getId();
+                cmdResult.target = shard->getConnString();
                 cmdResult.result = result.obj();
 
                 vector<Strategy::CommandResult> shardResults;
@@ -903,8 +913,7 @@ namespace mongo {
                 // would require that the parsing be pulled into this function.
                 auto conf = uassertStatusOK(grid.implicitCreateDb(dbName));
                 if (!conf->isShardingEnabled() || !conf->isSharded(ns)) {
-                    Shard shard = conf->getPrimary();
-                    return runCommand(conf, shard, ns, cmdObj, result);
+                    return runCommand(conf, conf->getPrimaryId(), ns, cmdObj, result);
                 }
 
                 ChunkManagerPtr chunkMgr = getChunkManager(conf, ns);
@@ -918,9 +927,8 @@ namespace mongo {
 
                 BSONObj shardKey = status.getValue();
                 ChunkPtr chunk = chunkMgr->findIntersectingChunk(shardKey);
-                Shard shard = chunk->getShard();
 
-                bool ok = runCommand(conf, shard, ns, cmdObj, result);
+                bool ok = runCommand(conf, chunk->getShardId(), ns, cmdObj, result);
 
                 if (ok) {
                     // check whether split is necessary (using update object for size heuristic)
@@ -955,13 +963,14 @@ namespace mongo {
             }
 
             bool runCommand(DBConfigPtr conf,
-                            const Shard& shard,
+                            const ShardId& shardId,
                             const string& ns,
                             const BSONObj& cmdObj,
                             BSONObjBuilder& result) const {
                 BSONObj res;
 
-                ShardConnection conn(shard.getConnString(), ns);
+                const auto& shard = grid.shardRegistry()->findIfExists(shardId);
+                ShardConnection conn(shard->getConnString(), ns);
                 bool ok = conn->runCommand(conf->name(), cmdObj, res);
                 conn.done();
 
@@ -1022,10 +1031,15 @@ namespace mongo {
                 double numObjects = 0;
                 int millis = 0;
 
-                set<Shard> shards;
-                cm->getShardsForRange(shards, min, max);
-                for ( set<Shard>::iterator i=shards.begin(), end=shards.end() ; i != end; ++i ) {
-                    ScopedDbConnection conn(i->getConnString());
+                set<ShardId> shardIds;
+                cm->getShardIdsForRange(shardIds, min, max);
+                for (const ShardId& shardId : shardIds) {
+                    const auto& shard = grid.shardRegistry()->findIfExists(shardId);
+                    if (!shard) {
+                        continue;
+                    }
+
+                    ScopedDbConnection conn(shard->getConnString());
                     BSONObj res;
                     bool ok = conn->runCommand( conf->name() , cmdObj , res );
                     conn.done();
@@ -1038,7 +1052,6 @@ namespace mongo {
                     size       += res["size"].number();
                     numObjects += res["numObjects"].number();
                     millis     += res["millis"].numberInt();
-
                 }
 
                 result.append( "size", size );
@@ -1195,14 +1208,19 @@ namespace mongo {
                 massert( 10420 ,  "how could chunk manager be null!" , cm );
 
                 BSONObj query = getQuery(cmdObj);
-                set<Shard> shards;
-                cm->getShardsForQuery(shards, query);
+                set<ShardId> shardIds;
+                cm->getShardIdsForQuery(shardIds, query);
 
                 set<BSONObj,BSONObjCmp> all;
                 int size = 32;
 
-                for ( set<Shard>::iterator i=shards.begin(), end=shards.end() ; i != end; ++i ) {
-                    ShardConnection conn(i->getConnString(), fullns);
+                for (const ShardId& shardId : shardIds) {
+                    const auto& shard = grid.shardRegistry()->findIfExists(shardId);
+                    if (!shard) {
+                        continue;
+                    }
+
+                    ShardConnection conn(shard->getConnString(), fullns);
                     BSONObj res;
                     bool ok = conn->runCommand( conf->name() , cmdObj , res, options );
                     conn.done();
@@ -1311,7 +1329,7 @@ namespace mongo {
                         catch( DBException& e ){
                             //This is handled below and logged
                             Strategy::CommandResult errResult;
-                            errResult.shardTarget = Shard();
+                            errResult.shardTargetId = "";
                             errResult.result = BSON("errmsg" << e.what() << "ok" << 0 );
                             results.push_back( errResult );
                         }
@@ -1390,8 +1408,8 @@ namespace mongo {
                 massert( 13500 ,  "how could chunk manager be null!" , cm );
 
                 BSONObj query = getQuery(cmdObj);
-                set<Shard> shards;
-                cm->getShardsForQuery(shards, query);
+                set<ShardId> shardIds;
+                cm->getShardIdsForQuery(shardIds, query);
 
                 // We support both "num" and "limit" options to control limit
                 int limit = 100;
@@ -1401,12 +1419,17 @@ namespace mongo {
 
                 list< shared_ptr<Future::CommandResult> > futures;
                 BSONArrayBuilder shardArray;
-                for ( set<Shard>::const_iterator i=shards.begin(), end=shards.end() ; i != end ; i++ ) {
-                    futures.push_back(Future::spawnCommand(i->getConnString().toString(),
+                for (const ShardId& shardId : shardIds) {
+                    const auto& shard = grid.shardRegistry()->findIfExists(shardId);
+                    if (!shard) {
+                        continue;
+                    }
+
+                    futures.push_back(Future::spawnCommand(shard->getConnString().toString(),
                                                            dbName,
                                                            cmdObj,
                                                            options));
-                    shardArray.append(i->getName());
+                    shardArray.append(shardId);
                 }
 
                 multimap<double, BSONObj> results; // TODO: maybe use merge-sort instead
@@ -1589,9 +1612,9 @@ namespace mongo {
                 shared_ptr<DBConfig> conf = status.getValue();
                 bool retval = passthrough( conf, cmdObj, result );
 
-                Status storeCursorStatus =
-                        storePossibleCursor(conf->getPrimary().getConnString().toString(),
-                                            result.asTempObj());
+                const auto& shard = grid.shardRegistry()->findIfExists(conf->getPrimaryId());
+                Status storeCursorStatus = storePossibleCursor(shard->getConnString().toString(),
+                                                               result.asTempObj());
                 if (!storeCursorStatus.isOK()) {
                     return appendCommandStatus(result, storeCursorStatus);
                 }
@@ -1622,9 +1645,9 @@ namespace mongo {
                 auto conf = uassertStatusOK(grid.catalogCache()->getDatabase(dbName));
                 bool retval = passthrough( conf, cmdObj, result );
 
-                Status storeCursorStatus =
-                        storePossibleCursor(conf->getPrimary().getConnString().toString(),
-                                            result.asTempObj());
+                const auto& shard = grid.shardRegistry()->findIfExists(conf->getPrimaryId());
+                Status storeCursorStatus = storePossibleCursor(shard->getConnString().toString(),
+                                                               result.asTempObj());
                 if (!storeCursorStatus.isOK()) {
                     return appendCommandStatus(result, storeCursorStatus);
                 }

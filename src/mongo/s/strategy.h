@@ -50,7 +50,7 @@ namespace mongo {
         static void writeOp(int op , Request& r);
 
         struct CommandResult {
-            Shard shardTarget;
+            ShardId shardTargetId;
             ConnectionString target;
             BSONObj result;
         };

@@ -91,7 +91,7 @@ namespace {
                 }
 
                 BSONObj x = s->runCommand("admin", "fsync");
-                sub.append(s->getName(), x);
+                sub.append(s->getId(), x);
 
                 if (!x["ok"].trueValue()) {
                     ok = false;

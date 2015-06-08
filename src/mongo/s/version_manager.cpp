@@ -308,13 +308,18 @@ namespace mongo {
             officialSequenceNumber = manager->getSequenceNumber();
         }
 
+        const auto& shard =
+            grid.shardRegistry()->findIfExists(conn->getServerAddress());
+        uassert(ErrorCodes::ShardNotFound,
+                str::stream() << conn->getServerAddress() << " is not recognized as a shard",
+                shard);
+
         // Check this manager against the reference manager
         if (manager) {
-            const Shard shard = Shard::make(conn->getServerAddress());
 
-            if (refManager && !refManager->compatibleWith(*manager, shard.getName())) {
-                const ChunkVersion refVersion(refManager->getVersion(shard.getName()));
-                const ChunkVersion currentVersion(manager->getVersion(shard.getName()));
+            if (refManager && !refManager->compatibleWith(*manager, shard->getId())) {
+                const ChunkVersion refVersion(refManager->getVersion(shard->getId()));
+                const ChunkVersion currentVersion(manager->getVersion(shard->getId()));
 
                 string msg(str::stream() << "manager ("
                                          << currentVersion.toString()
@@ -322,8 +327,8 @@ namespace mongo {
                                          << "not compatible with reference manager ("
                                          << refVersion.toString()
                                          << " : " << refManager->getSequenceNumber() << ") "
-                                         << "on shard " << shard.getName()
-                                         << " (" << shard.getConnString().toString() << ")");
+                                         << "on shard " << shard->getId()
+                                         << " (" << shard->getConnString().toString() << ")");
 
                 throw SendStaleConfigException(ns,
                                                msg,
@@ -332,7 +337,6 @@ namespace mongo {
             }
         }
         else if (refManager) {
-            const Shard shard = Shard::make(conn->getServerAddress());
 
             string msg( str::stream() << "not sharded ("
                         << ( (manager.get() == 0) ? string( "<none>" ) :
@@ -344,14 +348,14 @@ namespace mongo {
 
             throw SendStaleConfigException(ns,
                                            msg,
-                                           refManager->getVersion(shard.getName()),
+                                           refManager->getVersion(shard->getId()),
                                            ChunkVersion::UNSHARDED());
         }
 
         // Do not send setShardVersion to collections on the config servers - this causes problems
         // when config servers are also shards and get SSV with conflicting names.
         // TODO: Make config servers regular shards
-        if (primary && primary->getName() == "config") {
+        if (primary && primary->getId() == "config") {
             return false;
         }
 
@@ -364,15 +368,13 @@ namespace mongo {
             }
         }
 
-        const Shard shard = Shard::make(conn->getServerAddress());
-
         ChunkVersion version = ChunkVersion(0, 0, OID());
         if (manager) {
-            version = manager->getVersion(shard.getName());
+            version = manager->getVersion(shard->getId());
         }
 
         LOG(1) << "setting shard version of " << version << " for " << ns << " on shard "
-               << shard.toString();
+               << shard->toString();
 
         LOG(3) << "last version sent with chunk manager iteration " << sequenceNumber
                << ", current chunk manager iteration is " << officialSequenceNumber;
@@ -421,7 +423,7 @@ namespace mongo {
         const int maxNumTries = 7;
         if ( tryNumber < maxNumTries ) {
             LOG( tryNumber < ( maxNumTries / 2 ) ? 1 : 0 ) 
-                << "going to retry checkShardVersion shard: " << shard.toString() << " " << result;
+                << "going to retry checkShardVersion shard: " << shard->toString() << " " << result;
             sleepmillis( 10 * tryNumber );
             // use the original connection and get a fresh versionable connection
             // since conn can be invalidated (or worse, freed) after the failure
@@ -429,7 +431,7 @@ namespace mongo {
             return true;
         }
         
-        string errmsg = str::stream() << "setShardVersion failed shard: " << shard.toString()
+        string errmsg = str::stream() << "setShardVersion failed shard: " << shard->toString()
                                           << " " << result;
         log() << "     " << errmsg << endl;
         massert( 10429 , errmsg , 0 );

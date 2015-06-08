@@ -77,7 +77,7 @@ namespace mongo {
                                        const ShardKeyPattern& fieldsAndOrder,
                                        bool unique,
                                        std::vector<BSONObj>* initPoints,
-                                       std::vector<Shard>* initShards);
+                                       std::set<ShardId>* initShardIds);
 
         virtual StatusWith<std::string> addShard(const std::string& name,
                                                  const ConnectionString& shardConnectionString,
