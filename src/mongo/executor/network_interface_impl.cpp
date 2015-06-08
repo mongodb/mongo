@@ -197,7 +197,7 @@ namespace {
             ++_numActiveNetworkRequests;
             --_numIdleThreads;
             lk.unlock();
-            repl::ResponseStatus result = _commandRunner.runCommand(todo.request);
+            TaskExecutor::ResponseStatus result = _commandRunner.runCommand(todo.request);
             LOG(2) << "Network status of sending " << todo.request.cmdObj.firstElementFieldName() <<
                 " to " << todo.request.target << " was " << result.getStatus();
             todo.onFinish(result);
@@ -227,7 +227,7 @@ namespace {
     }
 
     void NetworkInterfaceImpl::startCommand(
-            const repl::ReplicationExecutor::CallbackHandle& cbHandle,
+            const TaskExecutor::CallbackHandle& cbHandle,
             const RemoteCommandRequest& request,
             const RemoteCommandCompletionFn& onFinish) {
         LOG(2) << "Scheduling " << request.cmdObj.firstElementFieldName() << " to " <<
@@ -248,7 +248,7 @@ namespace {
     }
 
     void NetworkInterfaceImpl::cancelCommand(
-            const repl::ReplicationExecutor::CallbackHandle& cbHandle) {
+            const TaskExecutor::CallbackHandle& cbHandle) {
         boost::unique_lock<boost::mutex> lk(_mutex);
         CommandDataList::iterator iter;
         for (iter = _pending.begin(); iter != _pending.end(); ++iter) {
@@ -264,7 +264,7 @@ namespace {
             iter->request.target;
         _pending.erase(iter);
         lk.unlock();
-        onFinish(repl::ResponseStatus(ErrorCodes::CallbackCanceled, "Callback canceled"));
+        onFinish(TaskExecutor::ResponseStatus(ErrorCodes::CallbackCanceled, "Callback canceled"));
         lk.lock();
         _signalWorkAvailable_inlock();
     }

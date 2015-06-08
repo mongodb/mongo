@@ -33,6 +33,7 @@
 #include <map>
 
 #include "mongo/executor/network_interface.h"
+#include "mongo/stdx/list.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -81,10 +82,10 @@ namespace executor {
         virtual void waitForWorkUntil(Date_t when);
         virtual void signalWorkAvailable();
         virtual Date_t now();
-        virtual void startCommand(const repl::ReplicationExecutor::CallbackHandle& cbHandle,
+        virtual void startCommand(const TaskExecutor::CallbackHandle& cbHandle,
                                   const RemoteCommandRequest& request,
                                   const RemoteCommandCompletionFn& onFinish);
-        virtual void cancelCommand(const repl::ReplicationExecutor::CallbackHandle& cbHandle);
+        virtual void cancelCommand(const TaskExecutor::CallbackHandle& cbHandle);
 
 
         ////////////////////////////////////////////////////////////////////////////////
@@ -130,7 +131,7 @@ namespace executor {
         void scheduleResponse(
                 NetworkOperationIterator noi,
                 Date_t when,
-                const repl::ResponseStatus& response);
+                const TaskExecutor::ResponseStatus& response);
 
         /**
          * Swallows "noi", causing the network interface to not respond to it until
@@ -249,10 +250,6 @@ namespace executor {
 
         // List of network operations that will not be responded to until shutdown() is called.
         NetworkOperationList _blackHoled;                        // (M)
-
-        // Pointer to the executor into which this mock is installed.  Used to signal the executor
-        // when the clock changes.
-        repl::ReplicationExecutor* _executor;                    // (R)
     };
 
     /**
@@ -261,7 +258,7 @@ namespace executor {
     class NetworkInterfaceMock::NetworkOperation {
     public:
         NetworkOperation();
-        NetworkOperation(const repl::ReplicationExecutor::CallbackHandle& cbHandle,
+        NetworkOperation(const TaskExecutor::CallbackHandle& cbHandle,
                          const RemoteCommandRequest& theRequest,
                          Date_t theRequestDate,
                          const RemoteCommandCompletionFn& onFinish);
@@ -276,13 +273,13 @@ namespace executor {
         /**
          * Sets the response and thet virtual time at which it will be delivered.
          */
-        void setResponse(Date_t responseDate, const repl::ResponseStatus& response);
+        void setResponse(Date_t responseDate, const TaskExecutor::ResponseStatus& response);
 
         /**
          * Predicate that returns true if cbHandle equals the executor's handle for this network
          * operation.  Used for searching lists of NetworkOperations.
          */
-        bool isForCallback(const repl::ReplicationExecutor::CallbackHandle& cbHandle) const {
+        bool isForCallback(const TaskExecutor::CallbackHandle& cbHandle) const {
             return cbHandle == _cbHandle;
         }
 
@@ -317,9 +314,9 @@ namespace executor {
         Date_t _requestDate;
         Date_t _nextConsiderationDate;
         Date_t _responseDate;
-        repl::ReplicationExecutor::CallbackHandle _cbHandle;
+        TaskExecutor::CallbackHandle _cbHandle;
         RemoteCommandRequest _request;
-        repl::ResponseStatus _response;
+        TaskExecutor::ResponseStatus _response;
         RemoteCommandCompletionFn _onFinish;
     };
 

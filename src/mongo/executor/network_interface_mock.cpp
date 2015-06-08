@@ -30,8 +30,6 @@
 
 #include "mongo/executor/network_interface_mock.h"
 
-#include "mongo/db/repl/operation_context_repl_mock.h"
-#include "mongo/db/repl/replication_executor.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/time_support.h"
 
@@ -65,7 +63,7 @@ namespace executor {
     }
 
     void NetworkInterfaceMock::startCommand(
-            const repl::ReplicationExecutor::CallbackHandle& cbHandle,
+            const TaskExecutor::CallbackHandle& cbHandle,
             const RemoteCommandRequest& request,
             const RemoteCommandCompletionFn& onFinish) {
 
@@ -92,13 +90,13 @@ namespace executor {
             return false;
         }
         scheduled->splice(scheduled->begin(), *other, noi);
-        noi->setResponse(now, repl::ResponseStatus(ErrorCodes::CallbackCanceled,
-                                                   "Network operation canceled"));
+        noi->setResponse(now, TaskExecutor::ResponseStatus(ErrorCodes::CallbackCanceled,
+                                                           "Network operation canceled"));
         return true;
     }
 
     void NetworkInterfaceMock::cancelCommand(
-            const repl::ReplicationExecutor::CallbackHandle& cbHandle) {
+            const TaskExecutor::CallbackHandle& cbHandle) {
         boost::lock_guard<boost::mutex> lk(_mutex);
         invariant(!_inShutdown);
         stdx::function<bool (const NetworkOperation&)> matchesHandle = stdx::bind(
@@ -142,8 +140,8 @@ namespace executor {
         _waitingToRunMask |= kExecutorThread;  // Prevents network thread from scheduling.
         lk.unlock();
         for (NetworkOperationIterator iter = todo.begin(); iter != todo.end(); ++iter) {
-            iter->setResponse(now, repl::ResponseStatus(ErrorCodes::ShutdownInProgress,
-                                                        "Shutting down mock network"));
+            iter->setResponse(now, TaskExecutor::ResponseStatus(ErrorCodes::ShutdownInProgress,
+                                                                "Shutting down mock network"));
             iter->finishResponse();
         }
         lk.lock();
@@ -204,7 +202,7 @@ namespace executor {
     void NetworkInterfaceMock::scheduleResponse(
             NetworkOperationIterator noi,
             Date_t when,
-            const repl::ResponseStatus& response) {
+            const TaskExecutor::ResponseStatus& response) {
 
         boost::lock_guard<boost::mutex> lk(_mutex);
         invariant(_currentlyRunning == kNetworkThread);
@@ -360,7 +358,7 @@ namespace executor {
     }
 
     NetworkInterfaceMock::NetworkOperation::NetworkOperation(
-            const repl::ReplicationExecutor::CallbackHandle& cbHandle,
+            const TaskExecutor::CallbackHandle& cbHandle,
             const RemoteCommandRequest& theRequest,
             Date_t theRequestDate,
             const RemoteCommandCompletionFn& onFinish)
@@ -384,7 +382,7 @@ namespace executor {
 
     void NetworkInterfaceMock::NetworkOperation::setResponse(
             Date_t responseDate,
-            const repl::ResponseStatus& response) {
+            const TaskExecutor::ResponseStatus& response) {
 
         invariant(responseDate >= _requestDate);
         _responseDate = responseDate;

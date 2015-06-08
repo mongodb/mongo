@@ -31,16 +31,14 @@
 #include <string>
 
 #include "mongo/base/disallow_copying.h"
-#include "mongo/db/repl/replication_executor.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/stdx/functional.h"
 
 namespace mongo {
 namespace executor {
 
     /**
-     * Interface to networking used by ReplicationExecutor.
-     *
-     * TODO(spencer): Change to use a TaskExecutor once that interface is available.
+     * Interface to networking for use by TaskExecutor implementations.
      */
     class NetworkInterface {
         MONGO_DISALLOW_COPYING(NetworkInterface);
@@ -49,8 +47,9 @@ namespace executor {
         // A flag to keep replication MessagingPorts open when all other sockets are disconnected.
         static const unsigned int kMessagingPortKeepOpen = 1;
 
-        typedef RemoteCommandResponse Response;
-        typedef stdx::function<void (const repl::ResponseStatus&)> RemoteCommandCompletionFn;
+        using Response = RemoteCommandResponse;
+        using RemoteCommandCompletionFn =
+                stdx::function<void (const TaskExecutor::ResponseStatus&)>;
 
         virtual ~NetworkInterface();
 
@@ -103,7 +102,7 @@ namespace executor {
         /**
          * Starts asynchronous execution of the command described by "request".
          */
-        virtual void startCommand(const repl::ReplicationExecutor::CallbackHandle& cbHandle,
+        virtual void startCommand(const TaskExecutor::CallbackHandle& cbHandle,
                                   const RemoteCommandRequest& request,
                                   const RemoteCommandCompletionFn& onFinish) = 0;
 
@@ -111,7 +110,7 @@ namespace executor {
          * Requests cancelation of the network activity associated with "cbHandle" if it has not yet
          * completed.
          */
-        virtual void cancelCommand(const repl::ReplicationExecutor::CallbackHandle& cbHandle) = 0;
+        virtual void cancelCommand(const TaskExecutor::CallbackHandle& cbHandle) = 0;
 
     protected:
         NetworkInterface();

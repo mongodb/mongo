@@ -79,10 +79,10 @@ namespace executor {
         virtual void signalWorkAvailable();
         virtual Date_t now();
         virtual void startCommand(
-                const repl::ReplicationExecutor::CallbackHandle& cbHandle,
+                const TaskExecutor::CallbackHandle& cbHandle,
                 const RemoteCommandRequest& request,
                 const RemoteCommandCompletionFn& onFinish);
-        virtual void cancelCommand(const repl::ReplicationExecutor::CallbackHandle& cbHandle);
+        virtual void cancelCommand(const TaskExecutor::CallbackHandle& cbHandle);
 
     private:
 
@@ -90,7 +90,7 @@ namespace executor {
          * Information describing an in-flight command.
          */
         struct CommandData {
-            repl::ReplicationExecutor::CallbackHandle cbHandle;
+            TaskExecutor::CallbackHandle cbHandle;
             RemoteCommandRequest request;
             RemoteCommandCompletionFn onFinish;
         };
