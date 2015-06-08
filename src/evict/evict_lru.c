@@ -8,17 +8,18 @@
 
 #include "wt_internal.h"
 
-static int   __evict_clear_all_walks(WT_SESSION_IMPL *);
-static int   __evict_clear_walks(WT_SESSION_IMPL *);
-static int   __evict_has_work(WT_SESSION_IMPL *, uint32_t *);
-static int   WT_CDECL __evict_lru_cmp(const void *, const void *);
-static int   __evict_lru_pages(WT_SESSION_IMPL *, int);
-static int   __evict_lru_walk(WT_SESSION_IMPL *, uint32_t);
-static int   __evict_pass(WT_SESSION_IMPL *);
-static int   __evict_walk(WT_SESSION_IMPL *, uint32_t);
-static int   __evict_walk_file(WT_SESSION_IMPL *, u_int *, uint32_t);
+static int  __evict_clear_all_walks(WT_SESSION_IMPL *);
+static int  __evict_clear_walks(WT_SESSION_IMPL *);
+static int  __evict_has_work(WT_SESSION_IMPL *, uint32_t *);
+static int  WT_CDECL __evict_lru_cmp(const void *, const void *);
+static int  __evict_lru_pages(WT_SESSION_IMPL *, int);
+static int  __evict_lru_walk(WT_SESSION_IMPL *, uint32_t);
+static int  __evict_page(WT_SESSION_IMPL *, int);
+static int  __evict_pass(WT_SESSION_IMPL *);
+static int  __evict_walk(WT_SESSION_IMPL *, uint32_t);
+static int  __evict_walk_file(WT_SESSION_IMPL *, u_int *, uint32_t);
 static WT_THREAD_RET __evict_worker(void *);
-static int __evict_server_work(WT_SESSION_IMPL *);
+static int  __evict_server_work(WT_SESSION_IMPL *);
 
 /*
  * __evict_read_gen --
@@ -779,8 +780,7 @@ __evict_lru_pages(WT_SESSION_IMPL *session, int is_server)
 	 * Reconcile and discard some pages: EBUSY is returned if a page fails
 	 * eviction because it's unavailable, continue in that case.
 	 */
-	while ((ret = __wt_evict_lru_page(session, is_server)) == 0 ||
-	    ret == EBUSY)
+	while ((ret = __evict_page(session, is_server)) == 0 || ret == EBUSY)
 		;
 	return (ret);
 }
@@ -1374,11 +1374,11 @@ __evict_get_ref(
 }
 
 /*
- * __wt_evict_lru_page --
+ * __evict_page --
  *	Called by both eviction and application threads to evict a page.
  */
-int
-__wt_evict_lru_page(WT_SESSION_IMPL *session, int is_server)
+static int
+__evict_page(WT_SESSION_IMPL *session, int is_server)
 {
 	WT_BTREE *btree;
 	WT_CACHE *cache;
@@ -1506,7 +1506,7 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, int busy, int pct_full)
 
 		/* Evict a page. */
 		q_found = 0;
-		switch (ret = __wt_evict_lru_page(session, 0)) {
+		switch (ret = __evict_page(session, 0)) {
 		case 0:
 			if (--count == 0)
 				return (0);
