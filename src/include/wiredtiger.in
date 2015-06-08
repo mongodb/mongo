@@ -1360,6 +1360,10 @@ struct __wt_session {
 	 * @config{dump_shape, Display the shape of the tree after
 	 * verification\, using the application's message handler\, intended for
 	 * debugging., a boolean flag; default \c false.}
+	 * @config{strict, Treat any verification problem as an error; by
+	 * default\, verify will warn\, but not fail\, in the case of errors
+	 * that won't affect future behavior (for example\, a leaked block)., a
+	 * boolean flag; default \c false.}
 	 * @configend
 	 * @ebusy_errors
 	 */

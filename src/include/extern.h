@@ -50,6 +50,7 @@ extern int __wt_block_open(WT_SESSION_IMPL *session, const char *filename, const
 extern int __wt_block_close(WT_SESSION_IMPL *session, WT_BLOCK *block);
 extern int __wt_desc_init(WT_SESSION_IMPL *session, WT_FH *fh, uint32_t allocsize);
 extern void __wt_block_stat(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_DSRC_STATS *stats);
+extern int __wt_block_manager_size( WT_SESSION_IMPL *session, const char *filename, WT_DSRC_STATS *stats);
 extern int __wt_bm_preload(WT_BM *bm, WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_size);
 extern int __wt_bm_read(WT_BM *bm, WT_SESSION_IMPL *session, WT_ITEM *buf, const uint8_t *addr, size_t addr_size);
 extern int __wt_block_read_off_blind( WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, wt_off_t offset);
@@ -65,7 +66,7 @@ extern int __wt_block_salvage_end(WT_SESSION_IMPL *session, WT_BLOCK *block);
 extern int __wt_block_offset_invalid(WT_BLOCK *block, wt_off_t offset, uint32_t size);
 extern int __wt_block_salvage_next(WT_SESSION_IMPL *session, WT_BLOCK *block, uint8_t *addr, size_t *addr_sizep, int *eofp);
 extern int __wt_block_salvage_valid(WT_SESSION_IMPL *session, WT_BLOCK *block, uint8_t *addr, size_t addr_size, int valid);
-extern int __wt_block_verify_start( WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckptbase);
+extern int __wt_block_verify_start(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckptbase, const char *cfg[]);
 extern int __wt_block_verify_end(WT_SESSION_IMPL *session, WT_BLOCK *block);
 extern int __wt_verify_ckpt_load( WT_SESSION_IMPL *session, WT_BLOCK *block, WT_BLOCK_CKPT *ci);
 extern int __wt_verify_ckpt_unload(WT_SESSION_IMPL *session, WT_BLOCK *block);

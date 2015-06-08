@@ -1720,7 +1720,12 @@ __conn_write_base_config(WT_SESSION_IMPL *session, const char *cfg[])
 	 * merge the rest to be written.
 	 */
 	WT_ERR(__wt_config_merge(session, cfg + 1,
-	    "create=,encryption=(secretkey=),log=(recover=)", &base_config));
+	    "config_base=,"
+	    "create=,"
+	    "encryption=(secretkey=),"
+	    "exclusive=,"
+	    "log=(recover=),"
+	    "use_environment_priv=,", &base_config));
 	WT_ERR(__wt_config_init(session, &parser, base_config));
 	while ((ret = __wt_config_next(&parser, &k, &v)) == 0) {
 		/* Fix quoting for non-trivial settings. */
