@@ -3,7 +3,7 @@ function runTest() {
     t = db.index_filtered4;
     t.drop();
 
-    t.ensureIndex( { x : 1 } , { filter : { a : 1 } } );
+    t.ensureIndex( { x : 1 } , { partialFilterExpression : { a : 1 } } );
 
     function getNumKeys() {
         var res = t.validate(true);
