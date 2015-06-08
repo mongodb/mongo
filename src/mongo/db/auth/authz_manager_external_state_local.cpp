@@ -141,13 +141,12 @@ bool AuthzManagerExternalStateLocal::hasAnyPrivilegeDocuments(OperationContext* 
 Status AuthzManagerExternalStateLocal::getUserDescription(OperationContext* txn,
                                                           const UserName& userName,
                                                           BSONObj* result) {
-    BSONObj userDoc;
-    Status status = _getUserDocument(txn, userName, &userDoc);
+    Status status = _getUserDocument(txn, userName, result);
     if (!status.isOK())
         return status;
 
     BSONElement directRolesElement;
-    status = bsonExtractTypedField(userDoc, "roles", Array, &directRolesElement);
+    status = bsonExtractTypedField(*result, "roles", Array, &directRolesElement);
     if (!status.isOK())
         return status;
     std::vector<RoleName> directRoles;
@@ -156,6 +155,15 @@ Status AuthzManagerExternalStateLocal::getUserDescription(OperationContext* txn,
     if (!status.isOK())
         return status;
 
+    mutablebson::Document resultDoc(*result, mutablebson::Document::kInPlaceDisabled);
+    resolveUserRoles(&resultDoc, directRoles);
+    *result = resultDoc.getObject();
+
+    return Status::OK();
+}
+
+void AuthzManagerExternalStateLocal::resolveUserRoles(mutablebson::Document* userDoc,
+                                                      const std::vector<RoleName>& directRoles) {
     unordered_set<RoleName> indirectRoles;
     PrivilegeVector allPrivileges;
     bool isRoleGraphInconsistent;
@@ -184,12 +192,11 @@ Status AuthzManagerExternalStateLocal::getUserDescription(OperationContext* txn,
         }
     }
 
-    mutablebson::Document resultDoc(userDoc, mutablebson::Document::kInPlaceDisabled);
-    mutablebson::Element inheritedRolesElement = resultDoc.makeElementArray("inheritedRoles");
-    mutablebson::Element privilegesElement = resultDoc.makeElementArray("inheritedPrivileges");
-    mutablebson::Element warningsElement = resultDoc.makeElementArray("warnings");
-    fassert(17159, resultDoc.root().pushBack(inheritedRolesElement));
-    fassert(17158, resultDoc.root().pushBack(privilegesElement));
+    mutablebson::Element inheritedRolesElement = userDoc->makeElementArray("inheritedRoles");
+    mutablebson::Element privilegesElement = userDoc->makeElementArray("inheritedPrivileges");
+    mutablebson::Element warningsElement = userDoc->makeElementArray("warnings");
+    fassert(17159, userDoc->root().pushBack(inheritedRolesElement));
+    fassert(17158, userDoc->root().pushBack(privilegesElement));
     if (!isRoleGraphInconsistent) {
         fassert(17160,
                 warningsElement.appendString(
@@ -199,10 +206,8 @@ Status AuthzManagerExternalStateLocal::getUserDescription(OperationContext* txn,
                                      makeRoleNameIteratorForContainer(indirectRoles));
     addPrivilegeObjectsOrWarningsToArrayElement(privilegesElement, warningsElement, allPrivileges);
     if (warningsElement.hasChildren()) {
-        fassert(17161, resultDoc.root().pushBack(warningsElement));
+        fassert(17161, userDoc->root().pushBack(warningsElement));
     }
-    *result = resultDoc.getObject();
-    return Status::OK();
 }
 
 Status AuthzManagerExternalStateLocal::_getUserDocument(OperationContext* txn,
