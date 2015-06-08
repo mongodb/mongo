@@ -1443,11 +1443,12 @@ __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_server)
 }
 
 /*
- * __cache_check --
- *	Return the cache percent-full, and if eviction targets need addressing.
+ * __eviction_needed --
+ *	Return the cache percent-full, and if an application thread should do
+ * some eviction.
  */
-static inline void
-__cache_check(WT_CONNECTION_IMPL *conn, int *pctp, int *targetp)
+static int
+__eviction_needed(WT_CONNECTION_IMPL *conn, int *pct_fullp)
 {
 	WT_CACHE *cache;
 	uint64_t bytes_inuse, bytes_max;
@@ -1461,17 +1462,24 @@ __cache_check(WT_CONNECTION_IMPL *conn, int *pctp, int *targetp)
 	bytes_inuse = __wt_cache_bytes_inuse(cache);
 	bytes_max = conn->cache_size + 1;
 
-	/* Return the cache full percentage. */
-	*pctp = (int)((100 * bytes_inuse) / bytes_max);
+	/*
+	 * Return the cache full percentage; anything over 95% means we involve
+	 * the application thread.
+	 */
+	*pct_fullp = (int)((100 * bytes_inuse) / bytes_max);
+	if (*pct_fullp >= 95)
+		return (1);
 
 	/*
 	 * Return if we're over the trigger cache size or there are too many
 	 * dirty pages.
 	 */
-	*targetp =
-	    bytes_inuse > (cache->eviction_trigger * bytes_max) / 100 ||
-	    __wt_cache_dirty_inuse(cache) >
-	    (cache->eviction_dirty_trigger * bytes_max) / 100;
+	if (bytes_inuse > (cache->eviction_trigger * bytes_max) / 100)
+		return (1);
+	if (__wt_cache_dirty_inuse(cache) >
+	    (cache->eviction_dirty_trigger * bytes_max) / 100)
+		return (1);
+	return (0);
 }
 
 /*
@@ -1487,7 +1495,7 @@ __wt_cache_full_check(WT_SESSION_IMPL *session, int busy, int *didworkp)
 	WT_DECL_RET;
 	WT_TXN_GLOBAL *txn_global;
 	WT_TXN_STATE *txn_state;
-	int count, full, q_found, target, txn_busy;
+	int count, pct_full, q_found, txn_busy;
 
 	if (didworkp != NULL)
 		*didworkp = 0;
@@ -1516,8 +1524,7 @@ __wt_cache_full_check(WT_SESSION_IMPL *session, int busy, int *didworkp)
 	 * If the cache is less than 95% full and the eviction targets are OK,
 	 * return immediately.
 	 */
-	__cache_check(conn, &full, &target);
-	if (full < 95 && !target)
+	if (!__eviction_needed(conn, &pct_full))
 		return (0);
 
 	/*
@@ -1534,7 +1541,7 @@ __wt_cache_full_check(WT_SESSION_IMPL *session, int busy, int *didworkp)
 	    (txn_state->snap_min != WT_TXN_NONE &&
 	    txn_global->current != txn_global->oldest_id);
 	if (txn_busy) {
-		if (full < 100)
+		if (pct_full < 100)
 			return (0);
 		busy = 1;
 	}
@@ -1588,8 +1595,7 @@ __wt_cache_full_check(WT_SESSION_IMPL *session, int busy, int *didworkp)
 		}
 
 		/* See if the cache is clean enough to just return. */
-		__cache_check(conn, &full, &target);
-		if (full < 95 && !target)
+		if (!__eviction_needed(conn, &pct_full))
 			return (0);
 
 		/* If we found pages in the eviction queue, continue there. */
