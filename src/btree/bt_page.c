@@ -84,7 +84,7 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 			 * The page isn't in memory, attempt to read it.
 			 * Make sure there is space in the cache.
 			 */
-			WT_RET(__wt_cache_full_check(session, 1, NULL));
+			WT_RET(__wt_cache_eviction_check(session, 1, NULL));
 			WT_RET(__wt_cache_read(session, ref));
 			oldgen = LF_ISSET(WT_READ_WONT_NEED) ||
 			    F_ISSET(session, WT_SESSION_NO_CACHE);
@@ -211,7 +211,8 @@ stall:				wait_cnt += 1000;
 			 * If stalling, check if the cache needs help. If we do
 			 * work for the cache, substitute that for a sleep.
 			 */
-			WT_RET(__wt_cache_full_check(session, 1, &cache_work));
+			WT_RET(
+			    __wt_cache_eviction_check(session, 1, &cache_work));
 			if (!cache_work) {
 				sleep_cnt = WT_MIN(wait_cnt, 10000);
 				wait_cnt *= 2;

@@ -158,3 +158,92 @@ __wt_session_can_wait(WT_SESSION_IMPL *session)
 
 	return (1);
 }
+
+/*
+ * __wt_eviction_needed --
+ *	Return if an application thread should do eviction, and the cache full
+ * percentage as a side-effect.
+ */
+static inline int
+__wt_eviction_needed(WT_SESSION_IMPL *session, int *pct_fullp)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_CACHE *cache;
+	uint64_t bytes_inuse, bytes_max;
+	int pct_full;
+
+	conn = S2C(session);
+	cache = conn->cache;
+
+	/*
+	 * Avoid division by zero if the cache size has not yet been set in a
+	 * shared cache.
+	 */
+	bytes_inuse = __wt_cache_bytes_inuse(cache);
+	bytes_max = conn->cache_size + 1;
+
+	/*
+	 * Return the cache full percentage; anything over 95% means we involve
+	 * the application thread.
+	 */
+	pct_full = (int)((100 * bytes_inuse) / bytes_max);
+	if (pct_fullp != NULL)
+		*pct_fullp = pct_full;
+	if (pct_full >= 95)
+		return (1);
+
+	/*
+	 * Return if we're over the trigger cache size or there are too many
+	 * dirty pages.
+	 */
+	if (bytes_inuse > (cache->eviction_trigger * bytes_max) / 100)
+		return (1);
+	if (__wt_cache_dirty_inuse(cache) >
+	    (cache->eviction_dirty_trigger * bytes_max) / 100)
+		return (1);
+	return (0);
+}
+
+/*
+ * __wt_cache_eviction_check --
+ *	Evict pages if the cache crosses its boundaries.
+ */
+static inline int
+__wt_cache_eviction_check(WT_SESSION_IMPL *session, int busy, int *didworkp)
+{
+	WT_BTREE *btree;
+	int pct_full;
+
+	if (didworkp != NULL)
+		*didworkp = 0;
+
+	/*
+	 * LSM sets the no-cache-check flag when holding the LSM tree lock, in
+	 * that case, or when holding the schema or handle list locks (which
+	 * block eviction), we don't want to highjack the thread for eviction.
+	 */
+	if (F_ISSET(session, WT_SESSION_NO_CACHE_CHECK |
+	    WT_SESSION_LOCKED_HANDLE_LIST | WT_SESSION_LOCKED_SCHEMA))
+		return (0);
+
+	/*
+	 * Threads operating on trees that cannot be evicted are ignored,
+	 * mostly because they're not contributing to the problem.
+	 */
+	btree = S2BT_SAFE(session);
+	if (btree != NULL && F_ISSET(btree, WT_BTREE_NO_EVICTION))
+		return (0);
+
+	/* Check if eviction is needed. */
+	if (!__wt_eviction_needed(session, &pct_full))
+		return (0);
+
+	/*
+	 * Some callers (those waiting for slow operations), will sleep if there
+	 * was no cache work to do. After this point, let them skip the sleep.
+	 */
+	if (didworkp != NULL)
+		*didworkp = 1;
+
+	return (__wt_cache_eviction_worker(session, busy, pct_full));
+}

@@ -1443,89 +1443,25 @@ __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_server)
 }
 
 /*
- * __eviction_needed --
- *	Return the cache percent-full, and if an application thread should do
- * some eviction.
- */
-static int
-__eviction_needed(WT_CONNECTION_IMPL *conn, int *pct_fullp)
-{
-	WT_CACHE *cache;
-	uint64_t bytes_inuse, bytes_max;
-
-	cache = conn->cache;
-
-	/*
-	 * Avoid division by zero if the cache size has not yet been set in a
-	 * shared cache.
-	 */
-	bytes_inuse = __wt_cache_bytes_inuse(cache);
-	bytes_max = conn->cache_size + 1;
-
-	/*
-	 * Return the cache full percentage; anything over 95% means we involve
-	 * the application thread.
-	 */
-	*pct_fullp = (int)((100 * bytes_inuse) / bytes_max);
-	if (*pct_fullp >= 95)
-		return (1);
-
-	/*
-	 * Return if we're over the trigger cache size or there are too many
-	 * dirty pages.
-	 */
-	if (bytes_inuse > (cache->eviction_trigger * bytes_max) / 100)
-		return (1);
-	if (__wt_cache_dirty_inuse(cache) >
-	    (cache->eviction_dirty_trigger * bytes_max) / 100)
-		return (1);
-	return (0);
-}
-
-/*
- * __wt_cache_full_check --
- *	Evict pages if the cache crosses its boundaries.
+ * __wt_cache_eviction_worker --
+ *	Worker function for __wt_cache_eviction_check: evict pages if the cache
+ * crosses its boundaries.
  */
 int
-__wt_cache_full_check(WT_SESSION_IMPL *session, int busy, int *didworkp)
+__wt_cache_eviction_worker(WT_SESSION_IMPL *session, int busy, int pct_full)
 {
-	WT_BTREE *btree;
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_TXN_GLOBAL *txn_global;
 	WT_TXN_STATE *txn_state;
-	int count, pct_full, q_found, txn_busy;
-
-	if (didworkp != NULL)
-		*didworkp = 0;
+	int count, q_found, txn_busy;
 
 	conn = S2C(session);
 	cache = conn->cache;
 
-	/*
-	 * LSM sets the no-cache-check flag when holding the LSM tree lock, in
-	 * that case, or when holding the schema or handle list locks (which
-	 * block eviction), we don't want to highjack the thread for eviction.
-	 */
-	if (F_ISSET(session, WT_SESSION_NO_CACHE_CHECK |
-	    WT_SESSION_LOCKED_HANDLE_LIST | WT_SESSION_LOCKED_SCHEMA))
-		return (0);
-
-	/*
-	 * Threads operating on trees that cannot be evicted are ignored,
-	 * mostly because they're not contributing to the problem.
-	 */
-	btree = S2BT_SAFE(session);
-	if (btree != NULL && F_ISSET(btree, WT_BTREE_NO_EVICTION))
-		return (0);
-
-	/*
-	 * If the cache is less than 95% full and the eviction targets are OK,
-	 * return immediately.
-	 */
-	if (!__eviction_needed(conn, &pct_full))
-		return (0);
+	/* First, wake the eviction server. */
+	WT_RET(__wt_evict_server_wake(session));
 
 	/*
 	 * If the current transaction is keeping the oldest ID pinned, it is in
@@ -1554,16 +1490,6 @@ __wt_cache_full_check(WT_SESSION_IMPL *session, int busy, int *didworkp)
 	 */
 	count = busy ? 1 : 10;
 
-	/* Wake the eviction server. */
-	WT_RET(__wt_evict_server_wake(session));
-
-	/*
-	 * Some callers (those waiting for slow operations), will sleep if there
-	 * was no cache work to do. After this point, they can skip the sleep.
-	 */
-	if (didworkp != NULL)
-		*didworkp = 1;
-
 	for (;;) {
 		/*
 		 * A pathological case: if we're the oldest transaction in the
@@ -1578,6 +1504,7 @@ __wt_cache_full_check(WT_SESSION_IMPL *session, int busy, int *didworkp)
 			return (WT_ROLLBACK);
 		}
 
+		/* Evict a page. */
 		q_found = 0;
 		switch (ret = __wt_evict_lru_page(session, 0)) {
 		case 0:
@@ -1594,8 +1521,8 @@ __wt_cache_full_check(WT_SESSION_IMPL *session, int busy, int *didworkp)
 			return (ret);
 		}
 
-		/* See if the cache is clean enough to just return. */
-		if (!__eviction_needed(conn, &pct_full))
+		/* See if eviction is still needed. */
+		if (!__wt_eviction_needed(session, NULL))
 			return (0);
 
 		/* If we found pages in the eviction queue, continue there. */
