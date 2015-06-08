@@ -930,7 +930,7 @@ namespace {
                         last = getLastSetTimestamp();
                     }
                     else {
-                        repl::waitForTimestampChange(last, Seconds(1));
+                        repl::waitUpToOneSecondForTimestampChange(last);
                     }
                 }
 
