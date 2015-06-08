@@ -1025,7 +1025,8 @@ namespace mongo {
             // we have to start to find documents at most S2::kMaxCellLevel - 1. Thus the finest
             // search area is 16 * finest cell area at S2::kMaxCellLevel, which is less than
             // (1.4 inch X 1.4 inch) on the earth.
-            _currentLevel = std::max(0, params.finestQueryLevel - 1);
+            int level = _nearParams->nearQuery->centroid->cell.id().level() - 1;
+            _currentLevel = std::max(0, level);
         }
 
         // Search for a document in neighbors at current level.
