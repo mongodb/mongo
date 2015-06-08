@@ -868,11 +868,11 @@ namespace {
         return Status::OK();
     }
 
-    void waitForTimestampChange(const Timestamp& referenceTime, Microseconds timeout) {
+    void waitUpToOneSecondForTimestampChange(const Timestamp& referenceTime) {
         boost::unique_lock<boost::mutex> lk(newOpMutex);
 
         while (referenceTime == getLastSetTimestamp()) {
-            if (boost::cv_status::timeout == newTimestampNotifier.wait_for(lk, timeout))
+            if (!newTimestampNotifier.timed_wait(lk, boost::posix_time::seconds(1)))
                 return;
         }
     }

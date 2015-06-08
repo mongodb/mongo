@@ -111,9 +111,9 @@ namespace repl {
     Status applyCommand_inlock(OperationContext* txn, const BSONObj& op);
 
     /**
-     * Waits up to 'timeout' microseconds for the Timestamp from the oplog to change.
+     * Waits up to one second for the Timestamp from the oplog to change.
      */
-    void waitForTimestampChange(const Timestamp& referenceTime, Microseconds timeout);
+    void waitUpToOneSecondForTimestampChange(const Timestamp& referenceTime);
 
     /**
      * Initializes the global Timestamp with the value from the timestamp of the last oplog entry.
