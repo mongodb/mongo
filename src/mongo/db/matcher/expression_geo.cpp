@@ -148,6 +148,10 @@ namespace mongo {
     GeoNearExpression::GeoNearExpression()
         : minDistance(0),
           maxDistance(std::numeric_limits<double>::max()),
+          finestLevel(30),
+          coarsestLevel(0),
+          finestLevelPresent(false),
+          coarsestLevelPresent(false),
           isNearSphere(false),
           unitsAreRadians(false),
           isWrappingQuery(false) { }
@@ -156,6 +160,10 @@ namespace mongo {
         : field(f),
           minDistance(0),
           maxDistance(std::numeric_limits<double>::max()),
+          finestLevel(30),
+          coarsestLevel(0),
+          finestLevelPresent(false),
+          coarsestLevelPresent(false),
           isNearSphere(false),
           unitsAreRadians(false),
           isWrappingQuery(false) { }
@@ -234,13 +242,70 @@ namespace mongo {
             if (equals(e.fieldName(), "$geometry")) {
                 if (e.isABSONObj()) {
                     BSONObj embeddedObj = e.embeddedObject();
-                    Status status = GeoParser::parseQueryPoint(e, centroid.get());
-                    if (!status.isOK()) {
+                    GeoParser::GeoJSONType t = GeoParser::parseGeoJSONType(embeddedObj);
+
+                    // The passed geometry can be:
+                    // 1. A single GeoJSON point
+                    // 2. A GeoJSON MultiPoint containing a single point
+                    // 3. A GeoJSON GeometryCollection containing a single point
+                    if(GeoParser::GEOJSON_POINT == t){
+                        Status status = GeoParser::parseQueryPoint(e, centroid.get());
+                        if (!status.isOK()) {
+                            return Status(ErrorCodes::BadValue,
+                                          str::stream()
+                                                  << "invalid point in geo near query $geometry argument: "
+                                                  << embeddedObj << "  " << status.reason());
+                        }
+                    }
+                    else if(GeoParser::GEOJSON_MULTI_POINT == t){
+                        boost::scoped_ptr<MultiPointWithCRS> multi(new MultiPointWithCRS());
+                        Status status = GeoParser::parseMultiPoint(embeddedObj, multi.get());
+                        if (!status.isOK()){
+                            return Status(ErrorCodes::BadValue,
+                                          str::stream()
+                                                  << "invalid point in geo near query $geometry argument:"
+                                                  << embeddedObj << " " << status.reason());
+                        }
+                        if(multi->points.size() != 1){
+                            return Status(ErrorCodes::BadValue,
+                                          str::stream()
+                                                  << "invalid point in geo near query $geometry argument:"
+                                                  << embeddedObj << " must contain exactly "
+                                                  << "1 point for geo near query and nothing else");
+                        }
+                        //copy over first point, we need not set oldPoint since this only accepts geojson
+                        centroid->point = multi->points[0];
+                        centroid->cell = multi->cells[0];
+                        centroid->crs = multi->crs;
+                    }
+                    else if (GeoParser::GEOJSON_GEOMETRY_COLLECTION) {
+                        boost::scoped_ptr<GeometryCollection> coll(new GeometryCollection());
+                        Status status = GeoParser::parseGeometryCollection(embeddedObj, coll.get());
+                        if (!status.isOK()){
+                            return Status(ErrorCodes::BadValue,
+                                          str::stream()
+                                                  << "invalid point in geo near query $geometry argument:"
+                                                  << embeddedObj << " " << status.reason());
+                        }
+                        if(coll->points.size() != 1 || coll->lines.size() > 0 || coll->multiLines.size() > 0
+                                || coll->multiPolygons.size() > 0 || coll->multiPoints.size() > 0){
+                            return Status(ErrorCodes::BadValue,
+                                          str::stream()
+                                                  << "invalid point in geo near query $geometry argument:"
+                                                  << embeddedObj << " must contain exactly "
+                                                  << "1 point for geo near query");
+                        }
+                        //copy over first point
+                        *(centroid.get()) = coll->points[0];
+                    }
+                    else {
                         return Status(ErrorCodes::BadValue,
                                       str::stream()
-                                              << "invalid point in geo near query $geometry argument: "
-                                              << embeddedObj << "  " << status.reason());
+                                              << "invalid input in geo near query $geometry argument: "
+                                              << embeddedObj << "  " << " should be a GeoJSON point");
                     }
+
+
                     uassert(16681, "$near requires geojson point, given " + embeddedObj.toString(),
                             (SPHERE == centroid->crs));
                     hasGeometry = true;
@@ -253,6 +318,16 @@ namespace mongo {
                 uassert(16899, "$maxDistance must be a number", e.isNumber());
                 maxDistance = e.Number();
                 uassert(16900, "$maxDistance must be non-negative", maxDistance >= 0.0);
+            } else if (equals(e.fieldName(), "$finestLevel")) {
+                uassert(28679, "$finestLevel must be a number", e.isNumber());
+                finestLevel = e.Number();
+                finestLevelPresent = true;
+                uassert(28680, "$finestLevel must be in the range [0,30]", finestLevel >= 0 && finestLevel <= 30);
+            } else if (equals(e.fieldName(), "$coarsestLevel")) {
+                uassert(28681, "$coarsestLevel must be a number", e.isNumber());
+                coarsestLevel = e.Number();
+                coarsestLevelPresent = true;
+                uassert(28682, "$coarsestLevel must be in the range [0,30]", coarsestLevel >= 0 && coarsestLevel <= 30);
             }
         }
 

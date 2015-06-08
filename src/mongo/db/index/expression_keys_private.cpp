@@ -93,7 +93,18 @@ namespace {
         if (!status.isOK()) return status;
 
         S2RegionCoverer coverer;
-        params.configureCoverer(&coverer);
+        //is there a better way to check the type of GeoJSON/Legacy passed?
+        if(geoContainer.getDebugType() == "pt"){
+            //copy and override params to force indexing of point at the finest level
+            S2IndexingParams params_point = params;
+            params_point.coarsestIndexedLevel = 30;
+            params_point.finestIndexedLevel = 30;
+            params_point.configureCoverer(&coverer);
+            log() << "Overriding indexing coverer for points";
+            log() << params_point;
+        } else {
+            params.configureCoverer(&coverer);
+        }
 
         // Don't index big polygon
         if (geoContainer.getNativeCRS() == STRICT_SPHERE) {
@@ -119,6 +130,10 @@ namespace {
         invariant(geoContainer.hasS2Region());
 
         S2KeysFromRegion(&coverer, geoContainer.getS2Region(), out);
+
+        for(std::string s : *out){
+            log() << "Got key " << s << " of length " << s.length();
+        }
         return Status::OK();
     }
 

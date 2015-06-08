@@ -1025,7 +1025,8 @@ namespace mongo {
             // we have to start to find documents at most S2::kMaxCellLevel - 1. Thus the finest
             // search area is 16 * finest cell area at S2::kMaxCellLevel, which is less than
             // (1.4 inch X 1.4 inch) on the earth.
-            _currentLevel = std::max(0, params.finestIndexedLevel - 1);
+            int level = _nearParams->nearQuery->centroid->cell.id().level() - 1;
+            _currentLevel = std::max(0, level);
         }
 
         // Search for a document in neighbors at current level.
@@ -1063,6 +1064,7 @@ namespace mongo {
         // Because the planner doesn't yet set up 2D index bounds, do it ourselves here
         const string s2Field = _nearParams->nearQuery->field;
         const int s2FieldPosition = getFieldPosition(_s2Index, s2Field);
+        fassert(28677, s2FieldPosition >= 0);
         OrderedIntervalList* coveredIntervals = &scanParams.bounds.fields[s2FieldPosition];
         coveredIntervals->intervals.clear();
 
@@ -1266,15 +1268,27 @@ namespace mongo {
         // Because the planner doesn't yet set up 2D index bounds, do it ourselves here
         const string s2Field = _nearParams.nearQuery->field;
         const int s2FieldPosition = getFieldPosition(_s2Index, s2Field);
+        fassert(28678, s2FieldPosition >= 0);
         scanParams.bounds.fields[s2FieldPosition].intervals.clear();
         OrderedIntervalList* coveredIntervals = &scanParams.bounds.fields[s2FieldPosition];
 
         TwoDSphereKeyInRegionExpression* keyMatcher =
             new TwoDSphereKeyInRegionExpression(_currBounds, s2Field);
 
-        ExpressionMapping::cover2dsphere(keyMatcher->getRegion(),
-                                         _s2Index->infoObj(),
-                                         coveredIntervals);
+        const GeoNearExpression * query = _nearParams.nearQuery;
+        if ( query->finestLevelPresent && query->coarsestLevelPresent ) {
+            ExpressionMapping::cover2dsphere( keyMatcher->getRegion(),
+                                              _s2Index->infoObj(),
+                                              query->coarsestLevel,
+                                              query->finestLevel,
+                                              coveredIntervals );
+        }
+        else {
+            ExpressionMapping::cover2dsphere( keyMatcher->getRegion(),
+                                              _s2Index->infoObj(),
+                                              coveredIntervals );
+        }
+
 
         // IndexScan owns the hash matcher
         IndexScan* scan = new IndexScanWithMatch(txn, scanParams, workingSet, keyMatcher);

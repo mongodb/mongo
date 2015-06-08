@@ -108,10 +108,6 @@ namespace mongo {
                 return false;
             }
 
-            PointWithCRS point;
-            uassert(17304, "'near' field must be point",
-                    GeoParser::parseQueryPoint(cmdObj["near"], &point).isOK());
-
             bool isSpherical = cmdObj["spherical"].trueValue();
             if (!using2DIndex) {
                 uassert(17301, "2dsphere index must have spherical: true", isSpherical);
@@ -175,20 +171,19 @@ namespace mongo {
 
             BSONObj projObj = BSON("$pt" << BSON("$meta" << LiteParsedQuery::metaGeoNearPoint) <<
                                    "$dis" << BSON("$meta" << LiteParsedQuery::metaGeoNearDistance));
-
             CanonicalQuery* cq;
             const WhereCallbackReal whereCallback(txn, nss.db());
-
-            if (!CanonicalQuery::canonicalize(nss,
-                                              rewritten,
-                                              BSONObj(),
-                                              projObj,
-                                              0,
-                                              numWanted,
-                                              BSONObj(),
-                                              &cq,
-                                              whereCallback).isOK()) {
-                errmsg = "Can't parse filter / create query";
+            Status status = CanonicalQuery::canonicalize(nss,
+                                                     rewritten,
+                                                     BSONObj(),
+                                                     projObj,
+                                                     0,
+                                                     numWanted,
+                                                     BSONObj(),
+                                                     &cq,
+                                                     whereCallback);
+            if (!status.isOK()) {
+                errmsg = status.reason();
                 return false;
             }
 
