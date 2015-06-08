@@ -36,13 +36,18 @@
 #include <iostream>
 #include <string>
 #include <sys/utsname.h>
+#include <ucontext.h>
 
 #include "mongo/base/init.h"
+#include "mongo/config.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/platform/backtrace.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/log.h"
 #include "mongo/util/version.h"
+
+#if defined(MONGO_CONFIG_HAVE_EXECINFO_BACKTRACE)
+#include <execinfo.h>
+#endif
 
 namespace mongo {
 
@@ -67,8 +72,68 @@ namespace {
         return path.substr(lastSlash + 1);
     }
 
+// All platforms we build on have execinfo.h and we use backtrace() directly, with one exception
+#if defined(MONGO_CONFIG_HAVE_EXECINFO_BACKTRACE)
+    using ::backtrace;
+
+// On Solaris 10, there is no execinfo.h, so we need to emulate it.
+// Solaris 11 has execinfo.h, and this code doesn't get used.
+#elif defined(__sun)
+    class WalkcontextCallback {
+    public:
+        WalkcontextCallback(uintptr_t* array, int size)
+            : _position(0),
+              _count(size),
+              _addresses(array) {}
+
+        // This callback function is called from C code, and so must not throw exceptions
+        //
+        static int callbackFunction(uintptr_t address,
+                                    int signalNumber,
+                                    WalkcontextCallback* thisContext) {
+            if (thisContext->_position < thisContext->_count) {
+                thisContext->_addresses[thisContext->_position++] = address;
+                return 0;
+            }
+            return 1;
+        }
+        int getCount() const { return static_cast<int>(_position); }
+    private:
+        size_t _position;
+        size_t _count;
+        uintptr_t* _addresses;
+    };
+
+    typedef int (*WalkcontextCallbackFunc)(uintptr_t address, int signalNumber, void* thisContext);
+
+    int backtrace(void** array, int size) {
+        WalkcontextCallback walkcontextCallback(reinterpret_cast<uintptr_t*>(array), size);
+        ucontext_t context;
+        if (getcontext(&context) != 0) {
+            return 0;
+        }
+        int wcReturn = walkcontext(
+                &context,
+                reinterpret_cast<WalkcontextCallbackFunc>(WalkcontextCallback::callbackFunction),
+                static_cast<void*>(&walkcontextCallback));
+        if (wcReturn == 0) {
+            return walkcontextCallback.getCount();
+        }
+        return 0;
+    }
+#else
+// On unsupported platforms, we print an error instead of printing a stacktrace.
+#define MONGO_NO_BACKTRACE
+#endif
+
 }  // namespace
 
+#if defined(MONGO_NO_BACKTRACE)
+    void printStackTrace(std::ostream& os) {
+        os << "This platform does not support printing stacktraces" << std::endl;
+    }
+
+#else
     /**
      * Prints a stack backtrace for the current thread to the specified ostream.
      *
@@ -173,6 +238,8 @@ namespace {
         os << std::dec << std::nouppercase;
         os << "-----  END BACKTRACE  -----" << std::endl;
     }
+
+#endif
 
 namespace {
 
