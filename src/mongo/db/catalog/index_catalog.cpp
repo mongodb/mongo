@@ -450,7 +450,7 @@ namespace {
             case MatchExpression::AND:
                 if (level > 0)
                     return Status(ErrorCodes::CannotCreateIndex,
-                                  "$and only supported in filter at top level");
+                                  "$and only supported in partialFilterExpression at top level");
                 for (size_t i = 0; i < expression->numChildren(); i++) {
                     Status status = _checkValidFilterExpressions(expression->getChild(i),
                                                                  level + 1 );
@@ -468,7 +468,7 @@ namespace {
                 return Status::OK();
             default:
                 return Status(ErrorCodes::CannotCreateIndex,
-                              str::stream() << "unsupported expression in filtered index: "
+                              str::stream() << "unsupported expression in partial index: "
                               << expression->toString());
             }
         }
@@ -554,16 +554,16 @@ namespace {
         const bool isSparse = spec["sparse"].trueValue();
 
         // Ensure if there is a filter, its valid.
-        BSONElement filterElement = spec.getField("filter");
+        BSONElement filterElement = spec.getField("partialFilterExpression");
         if ( filterElement ) {
             if ( isSparse ) {
                 return Status( ErrorCodes::CannotCreateIndex,
-                               "cannot mix \"filter\" and \"sparse\" options" );
+                               "cannot mix \"partialFilterExpression\" and \"sparse\" options" );
             }
 
             if ( filterElement.type() != Object ) {
                 return Status(ErrorCodes::CannotCreateIndex,
-                              "'filter' for an index has to be a document");
+                              "'partialFilterExpression' for an index has to be a document");
             }
             StatusWithMatchExpression res = MatchExpressionParser::parse( filterElement.Obj() );
             if ( !res.isOK() ) {
