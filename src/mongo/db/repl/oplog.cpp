@@ -564,7 +564,7 @@ namespace {
             {
                 [](OperationContext* txn, const char* ns, BSONObj& cmd) -> Status {
                     BSONObjBuilder resultWeDontCareAbout;
-                    return applyOps(txn, ns, cmd, &resultWeDontCareAbout);
+                    return applyOps(txn, nsToDatabase(ns), cmd, &resultWeDontCareAbout);
                 },
                 {ErrorCodes::UnknownError}
             }
