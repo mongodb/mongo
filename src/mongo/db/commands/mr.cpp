@@ -659,9 +659,9 @@ namespace mongo {
 
                     bool found;
                     {
-                        OldClientContext tx(txn, _config.outputOptions.finalNamespace);
-                        Collection* coll =
-                            tx.db()->getCollection(_config.outputOptions.finalNamespace);
+                        const std::string& finalNamespace = _config.outputOptions.finalNamespace;
+                        OldClientContext tx(txn, finalNamespace);
+                        Collection* coll = getCollectionOrUassert(tx.db(), finalNamespace);
                         found = Helpers::findOne(_txn,
                                                  coll,
                                                  temp["_id"].wrap(),
