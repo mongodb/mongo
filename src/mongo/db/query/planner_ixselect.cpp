@@ -34,6 +34,7 @@
 
 #include "mongo/db/geo/hash.h"
 #include "mongo/db/index_names.h"
+#include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/matcher/expression_text.h"
@@ -365,6 +366,8 @@ void QueryPlannerIXSelect::stripInvalidAssignments(MatchExpression* node,
         MatchExpression::GEO_NEAR != node->matchType()) {
         stripInvalidAssignmentsTo2dsphereIndices(node, indices);
     }
+
+    stripInvalidAssignmentsToPartialIndices(node, indices);
 }
 
 namespace {
@@ -453,6 +456,72 @@ static void removeIndexRelevantTag(MatchExpression* node, size_t idx) {
         std::find(tag->notFirst.begin(), tag->notFirst.end(), idx);
     if (notFirstIt != tag->notFirst.end()) {
         tag->notFirst.erase(notFirstIt);
+    }
+}
+
+namespace {
+
+bool nodeIsNegationOrElemMatchObj(const MatchExpression* node) {
+    return (node->matchType() == MatchExpression::NOT ||
+            node->matchType() == MatchExpression::NOR ||
+            node->matchType() == MatchExpression::ELEM_MATCH_OBJECT);
+}
+
+void stripInvalidAssignmentsToPartialIndexNode(MatchExpression* node,
+                                               size_t idxNo,
+                                               const IndexEntry& idxEntry,
+                                               bool inNegationOrElemMatchObj) {
+    if (node->getTag()) {
+        removeIndexRelevantTag(node, idxNo);
+    }
+    inNegationOrElemMatchObj |= nodeIsNegationOrElemMatchObj(node);
+    for (size_t i = 0; i < node->numChildren(); ++i) {
+        // If 'node' is an OR and our current clause satisfies the filter expression, then we may be
+        // able to spare this clause from being stripped.  We only support such sparing if we're not
+        // in a negation or ELEM_MATCH_OBJECT, though:
+        // - If we're in a negation, then we're looking for documents that describe the inverse of
+        //   the current predicate.  For example, suppose we have an index with key pattern {a: 1}
+        //   and filter expression {a: {$gt: 0}}, and our OR is inside a negation and the current
+        //   clause we're evaluating is {a: 10}.  If we allow use of this index, then we'd end up
+        //   generating bounds corresponding to the predicate {a: {$ne: 10}}, which does not satisfy
+        //   the filter expression (note also that the match expression parser currently does not
+        //   generate trees with OR inside NOT, but we may consider changing it to allow this in the
+        //   future).
+        // - If we're in an ELEM_MATCH_OBJECT, then every predicate in the current clause has an
+        //   implicit prefix of the elemMatch's path, so it can't be compared outright to the filter
+        //   expression.  For example, suppose we have an index with key pattern {"a.b": 1} and
+        //   filter expression {f: 1}, and we are evaluating the first clause of the $or in the
+        //   query {a: {$elemMatch: {$or: [{b: 1, f: 1}, ...]}}}.  Even though {b: 1, f: 1}
+        //   satisfies the filter expression {f: 1}, the former is referring to fields "a.b" and
+        //   "a.f" while the latter is referring to field "f", so the clause does not actually
+        //   satisfy the filter expression and should not be spared.
+        if (!inNegationOrElemMatchObj && node->matchType() == MatchExpression::OR &&
+            expression::isSubsetOf(node->getChild(i), idxEntry.filterExpr)) {
+            continue;
+        }
+        stripInvalidAssignmentsToPartialIndexNode(
+            node->getChild(i), idxNo, idxEntry, inNegationOrElemMatchObj);
+    }
+}
+
+void stripInvalidAssignmentsToPartialIndexRoot(MatchExpression* root,
+                                               size_t idxNo,
+                                               const IndexEntry& idxEntry) {
+    if (expression::isSubsetOf(root, idxEntry.filterExpr)) {
+        return;
+    }
+    const bool inNegationOrElemMatchObj = nodeIsNegationOrElemMatchObj(root);
+    stripInvalidAssignmentsToPartialIndexNode(root, idxNo, idxEntry, inNegationOrElemMatchObj);
+}
+
+}  // namespace
+
+void QueryPlannerIXSelect::stripInvalidAssignmentsToPartialIndices(
+    MatchExpression* node, const vector<IndexEntry>& indices) {
+    for (size_t i = 0; i < indices.size(); ++i) {
+        if (indices[i].filterExpr) {
+            stripInvalidAssignmentsToPartialIndexRoot(node, i, indices[i]);
+        }
     }
 }
 

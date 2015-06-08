@@ -52,7 +52,6 @@
 #include "mongo/db/exec/update.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/ops/update_lifecycle.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/explain.h"
@@ -117,20 +116,6 @@ void filterAllowedIndexEntries(const AllowedIndices& allowedIndices,
 namespace {
 // The body is below in the "count hack" section but getExecutor calls it.
 bool turnIxscanIntoCount(QuerySolution* soln);
-
-bool filteredIndexBad(const MatchExpression* filter, CanonicalQuery* query) {
-    if (!filter)
-        return false;
-
-    MatchExpression* queryPredicates = query->root();
-    if (!queryPredicates) {
-        // Index is filtered, but query has none.
-        // Impossible to use index.
-        return true;
-    }
-
-    return !expression::isSubsetOf(queryPredicates, filter);
-}
 }  // namespace
 
 
@@ -142,12 +127,7 @@ void fillOutPlannerParams(OperationContext* txn,
     IndexCatalog::IndexIterator ii = collection->getIndexCatalog()->getIndexIterator(txn, false);
     while (ii.more()) {
         const IndexDescriptor* desc = ii.next();
-
         IndexCatalogEntry* ice = ii.catalogEntry(desc);
-        if (filteredIndexBad(ice->getFilterExpression(), canonicalQuery)) {
-            continue;
-        }
-
         plannerParams->indices.push_back(IndexEntry(desc->keyPattern(),
                                                     desc->getAccessMethodName(),
                                                     desc->isMultikey(txn),

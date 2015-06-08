@@ -91,6 +91,16 @@ void QueryPlannerTest::addIndex(BSONObj keyPattern, BSONObj infoObj) {
                                         infoObj));
 }
 
+void QueryPlannerTest::addIndex(BSONObj keyPattern, MatchExpression* filterExpr) {
+    params.indices.push_back(IndexEntry(keyPattern,
+                                        false,  // multikey
+                                        false,  // sparse
+                                        false,  // unique
+                                        "foo",
+                                        filterExpr,
+                                        BSONObj()));
+}
+
 void QueryPlannerTest::runQuery(BSONObj query) {
     runQuerySortProjSkipLimit(query, BSONObj(), BSONObj(), 0, 0);
 }
@@ -322,6 +332,15 @@ void QueryPlannerTest::assertHasOneSolutionOf(const std::vector<std::string>& so
        << " but got " << matches << " instead. all solutions generated: " << '\n';
     dumpSolutions(ss);
     FAIL(ss);
+}
+
+std::unique_ptr<MatchExpression> QueryPlannerTest::parseMatchExpression(const BSONObj& obj) {
+    StatusWithMatchExpression status = MatchExpressionParser::parse(obj);
+    if (!status.isOK()) {
+        FAIL(str::stream() << "failed to parse query: " << obj.toString()
+                           << ". Reason: " << status.getStatus().toString());
+    }
+    return std::unique_ptr<MatchExpression>(status.getValue());
 }
 
 }  // namespace mongo

@@ -311,6 +311,16 @@ env.CppUnitTest(
     ],
 )
 
+env.CppUnitTest(
+    target="query_planner_partialidx_test",
+    source=[
+        "query_planner_partialidx_test.cpp"
+    ],
+    LIBDEPS=[
+        "query_planner_test_fixture",
+    ],
+)
+
 # $text pulls in a lot of stuff so we test it here.
 env.CppUnitTest(
     target="query_planner_text_test",

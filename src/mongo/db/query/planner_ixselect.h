@@ -177,6 +177,39 @@ private:
      */
     static void stripInvalidAssignmentsTo2dsphereIndices(MatchExpression* node,
                                                          const std::vector<IndexEntry>& indices);
+
+    /**
+     * This function strips RelevantTag assignments to partial indices, where the assignment is
+     * incompatible with the index's filter expression.
+     *
+     * For example, suppose there exists a partial index in 'indices' with key pattern {a: 1} and
+     * filter expression {f: {$exists: true}}.  If 'node' is {a: 1}, this function would strip the
+     * EQ predicate's assignment to the partial index (because if it did not, plans that use this
+     * index would miss documents that don't satisfy the filter expression).  On the other hand, if
+     * 'node' is {a: 1, f: 1}, then the partial index could be used, and so this function would not
+     * strip the assignment.
+     *
+     * Special note about OR clauses: if 'node' contains a leaf with an assignment to a partial
+     * index inside an OR, this function will look both inside and outside the OR clause in an
+     * attempt to find predicates that could satisfy the partial index, but these predicates must be
+     * wholly contained either inside or outside.
+     *
+     * To illustrate, given a partial index {a: 1} with filter expression {f: true, g: true}, the
+     * assignment of the "a" predicate would not be stripped for either of the following
+     * expressions:
+     * - {f: true, g: true, $or: [{a: 0}, {a: 1}]}
+     * - {$or: [{a: 1, f: true, g: true}, {_id: 1}]}
+     *
+     * However, the assignment of the "a" predicate would be stripped in the following expression:
+     * - {f: true, $or: [{a: 1, g: true}, {_id: 1}]}
+     *
+     * For the last case, the assignment is stripped is because the {f: true} predicate and the
+     * {g: true} predicate are both needed for the {a: 1} predicate to be compatible with the
+     * partial index, but the {f: true} predicate is outside the OR while the {g: true} predicate is
+     * contained within the OR.
+     */
+    static void stripInvalidAssignmentsToPartialIndices(MatchExpression* node,
+                                                        const std::vector<IndexEntry>& indices);
 };
 
 }  // namespace mongo

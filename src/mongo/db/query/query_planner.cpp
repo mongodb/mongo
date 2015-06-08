@@ -35,6 +35,7 @@
 #include <vector>
 
 #include "mongo/client/dbclientinterface.h"  // For QueryOption_foobar
+#include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/matcher/expression_text.h"
 #include "mongo/db/query/canonical_query.h"
@@ -814,15 +815,9 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
         if (!usingIndexToSort) {
             for (size_t i = 0; i < params.indices.size(); ++i) {
                 const IndexEntry& index = params.indices[i];
-                // Only regular (non-plugin) indexes can be used to provide a sort.
-                if (index.type != INDEX_BTREE) {
-                    continue;
-                }
-                // Only non-sparse indexes can be used to provide a sort.
-                if (index.sparse) {
-                    continue;
-                }
-
+                // Only regular (non-plugin) indexes can be used to provide a sort, and only
+                // non-sparse indexes can be used to provide a sort.
+                //
                 // TODO: Sparse indexes can't normally provide a sort, because non-indexed
                 // documents could potentially be missing from the result set.  However, if the
                 // query predicate can be used to guarantee that all documents to be returned
@@ -834,6 +829,18 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
                 // - Index {a: 1, b: "2dsphere"} (which is "geo-sparse", if
                 //   2dsphereIndexVersion=2) should be able to provide a sort for
                 //   find({b: GEO}).sort({a:1}).  SERVER-10801.
+                if (index.type != INDEX_BTREE) {
+                    continue;
+                }
+                if (index.sparse) {
+                    continue;
+                }
+
+                // Partial indexes can only be used to provide a sort only if the query predicate is
+                // compatible.
+                if (index.filterExpr && !expression::isSubsetOf(query.root(), index.filterExpr)) {
+                    continue;
+                }
 
                 const BSONObj kp = QueryPlannerAnalysis::getSortPattern(index.keyPattern);
                 if (providesSort(query, kp)) {
