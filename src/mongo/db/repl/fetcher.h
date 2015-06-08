@@ -37,7 +37,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/repl/replication_executor.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
@@ -112,7 +112,7 @@ namespace repl {
          * The callback function 'work' is not allowed to call into the Fetcher instance. This
          * behavior is undefined and may result in a deadlock.
          */
-        Fetcher(ReplicationExecutor* executor,
+        Fetcher(executor::TaskExecutor* executor,
                 const HostAndPort& source,
                 const std::string& dbname,
                 const BSONObj& cmdObj,
@@ -158,7 +158,7 @@ namespace repl {
         /**
          * Callback for remote command.
          */
-        void _callback(const ReplicationExecutor::RemoteCommandCallbackArgs& rcbd,
+        void _callback(const executor::TaskExecutor::RemoteCommandCallbackArgs& rcbd,
                        const char* batchFieldName);
 
         /**
@@ -167,7 +167,7 @@ namespace repl {
         void _finishCallback();
 
         // Not owned by us.
-        ReplicationExecutor* _executor;
+        executor::TaskExecutor* _executor;
 
         HostAndPort _source;
         std::string _dbname;
@@ -182,7 +182,7 @@ namespace repl {
         // _active is true when Fetcher is scheduled to be run by the executor.
         bool _active;
         // Callback handle to the scheduled remote command.
-        ReplicationExecutor::CallbackHandle _remoteCommandCallbackHandle;
+        executor::TaskExecutor::CallbackHandle _remoteCommandCallbackHandle;
     };
 
 } // namespace repl

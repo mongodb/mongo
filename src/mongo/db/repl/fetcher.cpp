@@ -32,7 +32,6 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/repl/replication_executor.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
@@ -145,7 +144,7 @@ namespace {
           nss(theNss),
           documents(theDocuments) { }
 
-    Fetcher::Fetcher(ReplicationExecutor* executor,
+    Fetcher::Fetcher(executor::TaskExecutor* executor,
                      const HostAndPort& source,
                      const std::string& dbname,
                      const BSONObj& findCmdObj,
@@ -197,7 +196,7 @@ namespace {
     }
 
     void Fetcher::cancel() {
-        ReplicationExecutor::CallbackHandle remoteCommandCallbackHandle;
+        executor::TaskExecutor::CallbackHandle remoteCommandCallbackHandle;
         {
             stdx::lock_guard<stdx::mutex> lk(_mutex);
 
@@ -218,7 +217,7 @@ namespace {
     }
 
     Status Fetcher::_schedule_inlock(const BSONObj& cmdObj, const char* batchFieldName) {
-        StatusWith<ReplicationExecutor::CallbackHandle> scheduleResult =
+        StatusWith<executor::TaskExecutor::CallbackHandle> scheduleResult =
             _executor->scheduleRemoteCommand(
                 RemoteCommandRequest(_source, _dbname, cmdObj),
                 stdx::bind(&Fetcher::_callback, this, stdx::placeholders::_1, batchFieldName));
@@ -232,7 +231,7 @@ namespace {
         return Status::OK();
     }
 
-    void Fetcher::_callback(const ReplicationExecutor::RemoteCommandCallbackArgs& rcbd,
+    void Fetcher::_callback(const executor::TaskExecutor::RemoteCommandCallbackArgs& rcbd,
                             const char* batchFieldName) {
 
         if (!rcbd.response.isOK()) {
