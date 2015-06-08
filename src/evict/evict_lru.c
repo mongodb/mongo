@@ -824,9 +824,6 @@ __evict_lru_walk(WT_SESSION_IMPL *session, uint32_t flags)
 
 	cache->evict_entries = entries;
 
-	/* Track the oldest read generation we have in the queue. */
-	cache->read_gen_oldest = cache->evict[0].ref->page->read_gen;
-
 	if (entries == 0) {
 		/*
 		 * If there are no entries, there cannot be any candidates.
@@ -840,6 +837,9 @@ __evict_lru_walk(WT_SESSION_IMPL *session, uint32_t flags)
 	}
 
 	WT_ASSERT(session, cache->evict[0].ref != NULL);
+
+	/* Track the oldest read generation we have in the queue. */
+	cache->read_gen_oldest = cache->evict[0].ref->page->read_gen;
 
 	if (LF_ISSET(WT_EVICT_PASS_AGGRESSIVE | WT_EVICT_PASS_WOULD_BLOCK))
 		/*
