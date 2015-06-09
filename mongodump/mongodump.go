@@ -94,16 +94,28 @@ func (dump *MongoDump) Init() error {
 	if err != nil {
 		return fmt.Errorf("can't create session: %v", err)
 	}
-	// ensure we allow secondary reads and disable TCP timeouts
-	dump.sessionProvider.SetFlags(db.Monotonic | db.DisableSocketTimeout)
+
+	// allow secondary reads for the isMongos check
+	dump.sessionProvider.SetFlags(db.Monotonic)
 	dump.isMongos, err = dump.sessionProvider.IsMongos()
 	if err != nil {
 		return err
 	}
-	// return a helpful error message for mongos
+
+	// ensure we allow secondary reads on mongods and disable TCP timeouts
+	flags := db.DisableSocketTimeout
+	if dump.isMongos {
+		log.Logf(log.Info, "connecting to mongos; secondary reads disabled")
+	} else {
+		flags |= db.Monotonic
+	}
+	dump.sessionProvider.SetFlags(flags)
+
+	// return a helpful error message for mongos --repair
 	if dump.OutputOptions.Repair && dump.isMongos {
 		return fmt.Errorf("--repair flag cannot be used on a mongos")
 	}
+
 	dump.manager = intents.NewIntentManager()
 	dump.progressManager = progress.NewProgressBarManager(log.Writer(0), progressBarWaitTime)
 	return nil
