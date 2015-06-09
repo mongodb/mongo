@@ -90,9 +90,17 @@ namespace mongo {
 
             // Initialize _defaultLanguage.  Note that the FTSLanguage constructor requires
             // textIndexVersion, since language parsing is version-specific.
-            StatusWithFTSLanguage swl =
-                FTSLanguage::make( indexInfo["default_language"].String(), _textIndexVersion );
-            verify( swl.getStatus().isOK() ); // should not fail, since validated by fixSpec().
+            auto indexLanguage = indexInfo["default_language"].String();
+            auto swl = FTSLanguage::make(indexLanguage , _textIndexVersion );
+            
+            // This can fail if the user originally created the text index under an instance of
+            // MongoDB that supports different languages then the current instance
+            // TODO: consder propagating the index ns to here to improve the error message
+            uassert(28682,
+                    str::stream() << "Unrecognized language " << indexLanguage <<
+                        " found for text index. Verify mongod was started with the"
+                        " correct options.",
+                    swl.getStatus().isOK());
             _defaultLanguage = swl.getValue();
 
             _languageOverrideField = indexInfo["language_override"].valuestrsafe();
