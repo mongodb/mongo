@@ -31,6 +31,7 @@
 
 #include <boost/thread/tss.hpp>
 
+#include "mongo/base/init.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -39,18 +40,43 @@ namespace mongo {
     using std::string;
 
 namespace {
-    boost::thread_specific_ptr<std::string> _threadName;
 
+    boost::thread_specific_ptr<std::string> threadName;
     AtomicInt64 nextUnnamedThreadId{1};
+
+    // It is unsafe to access threadName before its dynamic initialization has completed. Use
+    // the execution of mongo initializers (which only happens once we have entered main, and
+    // therefore after dynamic initialization is complete) to signal that it is safe to use
+    // 'threadName'.
+    bool mongoInitializersHaveRun{};
+    MONGO_INITIALIZER(ThreadNameInitializer)(InitializerContext*) {
+        mongoInitializersHaveRun = true;
+        // The global initializers should only ever be run from main, so setting thread name
+        // here makes sense.
+        setThreadName("main");
+        return Status::OK();
+    }
+
 }  // namespace
 
     void setThreadName(StringData name) {
-        _threadName.reset(new string(name.rawData(), name.size()));
+        invariant(mongoInitializersHaveRun);
+        threadName.reset(new string(name.toString()));
     }
 
-    const std::string& getThreadName() {
+    const string& getThreadName() {
+
+        if (MONGO_unlikely(!mongoInitializersHaveRun)) {
+            // 'getThreadName' has been called before dynamic initialization for this
+            // translation unit has completed, so return a fallback value rather than accessing
+            // the 'threadName' variable, which requires dynamic initialization. We assume that
+            // we are in the 'main' thread.
+            static const std::string kFallback = "main";
+            return kFallback;
+        }
+
         std::string* s;
-        while (!(s = _threadName.get())) {
+        while (!(s = threadName.get())) {
             setThreadName(
                     std::string(str::stream() << "thread" << nextUnnamedThreadId.fetchAndAdd(1)));
         }
