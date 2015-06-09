@@ -132,7 +132,8 @@ namespace mongo {
                << "targetMinOS" << targetMinOS()
 #endif
                << "allocator" << allocator()
-               << "javascriptEngine" << compiledJSEngine();
+               << "javascriptEngine" << compiledJSEngine()
+               << "sysInfo" << "deprecated";
 
         BSONArrayBuilder versionArray(result.subarrayStart("versionArray"));
         versionArray << kMongoVersionMajor
