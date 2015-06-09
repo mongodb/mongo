@@ -179,8 +179,7 @@ namespace mongo {
     };
 
     struct AndSortedStats : public SpecificStats {
-        AndSortedStats() : flagged(0),
-                           matchTested(0) { }
+        AndSortedStats() : flagged(0) { }
 
         virtual ~AndSortedStats() { }
 
@@ -194,9 +193,6 @@ namespace mongo {
 
         // How many results were flagged via invalidation?
         size_t flagged;
-
-        // Fails == common.advanced - matchTested
-        size_t matchTested;
     };
 
     struct CachedPlanStats : public SpecificStats {
@@ -304,7 +300,6 @@ namespace mongo {
     struct FetchStats : public SpecificStats {
         FetchStats() : alreadyHasObj(0),
                        forcedFetches(0),
-                       matchTested(0),
                        docsExamined(0) { }
 
         virtual ~FetchStats() { }
@@ -319,9 +314,6 @@ namespace mongo {
 
         // How many records were we forced to fetch as the result of an invalidation?
         size_t forcedFetches;
-
-        // We know how many passed (it's the # of advanced) and therefore how many failed.
-        size_t matchTested;
 
         // The total number of full documents touched by the fetch stage.
         size_t docsExamined;
@@ -367,7 +359,6 @@ namespace mongo {
                            dupsTested(0),
                            dupsDropped(0),
                            seenInvalidated(0),
-                           matchTested(0),
                            keysExamined(0) { }
 
         virtual ~IndexScanStats() { }
@@ -406,9 +397,6 @@ namespace mongo {
 
         size_t seenInvalidated;
         // TODO: we could track key sizes here.
-
-        // We know how many passed (it's the # of advanced) and therefore how many failed.
-        size_t matchTested;
 
         // Number of entries retrieved from the index during the scan.
         size_t keysExamined;
@@ -459,9 +447,6 @@ namespace mongo {
 
         // How many calls to invalidate(...) actually removed a RecordId from our deduping map?
         size_t locsForgotten;
-
-        // We know how many passed (it's the # of advanced) and therefore how many failed.
-        std::vector<size_t> matchTested;
     };
 
     struct ProjectionStats : public SpecificStats {

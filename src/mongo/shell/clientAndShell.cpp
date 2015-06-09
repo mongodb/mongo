@@ -44,6 +44,7 @@ namespace mongo {
     using std::string;
     using std::vector;
 
+    class Client;
     class DBClientBase;
     class OperationContext;
 
@@ -70,7 +71,7 @@ namespace mongo {
         return dbexitCalled;
     }
 
-    bool haveLocalShardingInfo( const string& ns ) {
+    bool haveLocalShardingInfo( Client* client, const string& ns ) {
         return false;
     }
 

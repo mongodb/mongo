@@ -231,6 +231,8 @@ namespace {
             const FindAndModifyRequest& args = parseStatus.getValue();
             const NamespaceString& nsString = args.getNamespaceString();
 
+            auto client = txn->getClient();
+
             if (args.isRemove()) {
                 DeleteRequest request(nsString);
                 const bool isExplain = true;
@@ -247,7 +249,7 @@ namespace {
                 AutoGetDb autoDb(txn, dbName, MODE_IX);
                 Lock::CollectionLock collLock(txn->lockState(), nsString.ns(), MODE_IX);
 
-                ensureShardVersionOKOrThrow(nsString.ns());
+                ensureShardVersionOKOrThrow(client, nsString.ns());
 
                 Collection* collection = nullptr;
                 if (autoDb.getDb()) {
@@ -286,7 +288,7 @@ namespace {
                 AutoGetDb autoDb(txn, dbName, MODE_IX);
                 Lock::CollectionLock collLock(txn->lockState(), nsString.ns(), MODE_IX);
 
-                ensureShardVersionOKOrThrow(nsString.ns());
+                ensureShardVersionOKOrThrow(client, nsString.ns());
 
                 Collection* collection = nullptr;
                 if (autoDb.getDb()) {
@@ -344,6 +346,8 @@ namespace {
             if (shouldBypassDocumentValidationForCommand(cmdObj))
                 maybeDisableValidation.emplace(txn);
 
+            auto client = txn->getClient();
+
             // We may encounter a WriteConflictException when creating a collection during an
             // upsert, even when holding the exclusive lock on the database (due to other load on
             // the system). The query framework should handle all other WriteConflictExceptions,
@@ -368,7 +372,7 @@ namespace {
                     Lock::CollectionLock collLock(txn->lockState(), nsString.ns(), MODE_IX);
                     Collection* collection = autoDb.getDb()->getCollection(nsString.ns());
 
-                    ensureShardVersionOKOrThrow(nsString.ns());
+                    ensureShardVersionOKOrThrow(client, nsString.ns());
 
                     Status isPrimary = checkCanAcceptWritesForDatabase(nsString);
                     if (!isPrimary.isOK()) {
@@ -410,7 +414,7 @@ namespace {
                     Lock::CollectionLock collLock(txn->lockState(), nsString.ns(), MODE_IX);
                     Collection* collection = autoDb.getDb()->getCollection(nsString.ns());
 
-                    ensureShardVersionOKOrThrow(nsString.ns());
+                    ensureShardVersionOKOrThrow(client, nsString.ns());
 
                     Status isPrimary = checkCanAcceptWritesForDatabase(nsString);
                     if (!isPrimary.isOK()) {

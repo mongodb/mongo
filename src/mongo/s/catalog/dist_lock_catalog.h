@@ -83,8 +83,9 @@ namespace mongo {
          * - time: the time when this is attempted.
          * - why: reason for taking the lock.
          *
-         * Returns the result of the operation. If the lock acquisition fails, the
-         * returned LocksType object returns false for isValid().
+         * Returns the result of the operation.
+         * Returns LockStateChangeFailed if the lock acquisition cannot be done because lock
+         * is already held elsewhere.
          *
          * Common status errors include socket and duplicate key errors.
          */
@@ -105,8 +106,8 @@ namespace mongo {
          * - time: the time when this is attempted.
          * - why: reason for taking the lock.
          *
-         * Returns the result of the operation. If the lock acquisition fails, the
-         * returned LocksType object returns false for isValid().
+         * Returns the result of the operation.
+         * Returns LockStateChangeFailed if the lock acquisition fails.
          *
          * Common status errors include socket errors.
          */
@@ -132,9 +133,16 @@ namespace mongo {
 
         /**
          * Returns the lock document.
+         * Returns LockNotFound if lock document doesn't exist.
          * Common status errors include socket errors.
          */
-        virtual StatusWith<LocksType> getLockByTS(const OID& ts) = 0;
+        virtual StatusWith<LocksType> getLockByTS(const OID& lockSessionID) = 0;
+
+        /**
+         * Attempts to delete the ping document corresponding to the given processId.
+         * Common status errors include socket errors.
+         */
+        virtual Status stopPing(StringData processId) = 0;
 
     };
 }

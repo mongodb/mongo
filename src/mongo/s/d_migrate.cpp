@@ -316,7 +316,7 @@ namespace {
                    const BSONObj& obj,
                    BSONObj* patt,
                    bool notInActiveChunk) {
-            ensureShardVersionOKOrThrow(ns);
+            ensureShardVersionOKOrThrow(txn->getClient(), ns);
 
             const char op = opstr[0];
 

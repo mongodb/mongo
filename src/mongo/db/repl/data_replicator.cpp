@@ -1232,13 +1232,13 @@ namespace {
     }
 
     Status DataReplicator::_scheduleApplyBatch_inlock(const Operations& ops) {
-        auto lambda = [&] (const TimestampStatus& ts, const Operations& ops) {
+        auto lambda = [this] (const TimestampStatus& ts, const Operations& theOps) {
             CBHStatus status = _exec->scheduleWork(stdx::bind(&DataReplicator::_onApplyBatchFinish,
                                                               this,
                                                               stdx::placeholders::_1,
                                                               ts,
-                                                              ops,
-                                                              ops.size()));
+                                                              theOps,
+                                                              theOps.size()));
            if (!status.isOK()) {
                LockGuard lk(_mutex);
                _initialSyncState->setStatus(status);

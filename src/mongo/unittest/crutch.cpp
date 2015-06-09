@@ -41,6 +41,8 @@
 
 namespace mongo {
 
+    class Client;
+
     bool inShutdown() {
         return false;
     }
@@ -52,7 +54,7 @@ namespace mongo {
         return NULL;
     }
 
-    bool haveLocalShardingInfo(const std::string& ns) {
+    bool haveLocalShardingInfo(Client* client, const std::string& ns) {
         return false;
     }
 

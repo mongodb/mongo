@@ -72,7 +72,7 @@ namespace mongo {
         template <typename T>
         class Decoration {
         public:
-            Decoration() = default;
+            Decoration() = delete;
 
             T& operator()(D& d) const {
                 return static_cast<Decorable&>(d)._decorations.getDecoration(_raw);

@@ -36,6 +36,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/s/catalog/dist_lock_catalog.h"
 #include "mongo/s/type_locks.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -48,19 +49,72 @@ namespace mongo {
     using stdx::chrono::milliseconds;
 
     ReplSetDistLockManager::ReplSetDistLockManager(StringData processID,
-                                                   unique_ptr<DistLockCatalog> catalog):
+                                                   unique_ptr<DistLockCatalog> catalog,
+                                                   milliseconds pingInterval):
         _processID(processID.toString()),
-        _catalog(std::move(catalog)) {
+        _catalog(std::move(catalog)),
+        _pingInterval(pingInterval) {
     }
 
     ReplSetDistLockManager::~ReplSetDistLockManager() = default;
 
     void ReplSetDistLockManager::startUp() {
-        // TODO
+        _execThread = stdx::make_unique<stdx::thread>(&ReplSetDistLockManager::doTask, this);
     }
 
     void ReplSetDistLockManager::shutDown() {
-        // TODO
+        {
+            stdx::lock_guard<stdx::mutex> sl(_mutex);
+            _isShutDown = true;
+            _shutDownCV.notify_all();
+        }
+
+        // Don't grab _mutex, otherwise will deadlock trying to join. Safe to read
+        // _execThread since it is modified only at statrUp().
+        if (_execThread && _execThread->joinable()) {
+            _execThread->join();
+            _execThread.reset();
+        }
+
+        auto status = _catalog->stopPing(_processID);
+        if (!status.isOK()) {
+            warning() << "error encountered while cleaning up distributed ping entry for "
+                      << _processID << causedBy(status);
+        }
+    }
+
+    bool ReplSetDistLockManager::isShutDown() {
+        stdx::lock_guard<stdx::mutex> sl(_mutex);
+        return _isShutDown;
+    }
+
+    void ReplSetDistLockManager::doTask() {
+        while (!isShutDown()) {
+            _catalog->ping(_processID, Date_t::now());
+
+            std::deque<DistLockHandle> toUnlockBatch;
+            {
+                stdx::unique_lock<stdx::mutex> ul(_mutex);
+                toUnlockBatch.swap(_unlockList);
+            }
+
+            for (const auto& toUnlock : toUnlockBatch) {
+                auto unlockStatus = _catalog->unlock(toUnlock);
+
+                if (!unlockStatus.isOK()) {
+                    warning() << "Failed to unlock lock with " << LocksType::lockID()
+                              << ": " << toUnlock << causedBy(unlockStatus);
+                    queueUnlock(toUnlock);
+                }
+
+                if (isShutDown()) {
+                    return;
+                }
+            }
+
+            stdx::unique_lock<stdx::mutex> ul(_mutex);
+            _shutDownCV.wait_for(ul, _pingInterval);
+        }
     }
 
     StatusWith<DistLockManager::ScopedDistLock> ReplSetDistLockManager::lock(
@@ -83,18 +137,17 @@ namespace mongo {
 
             auto status = lockResult.getStatus();
 
-            if (!status.isOK()) {
+            if (status.isOK()) {
+                // Lock is acquired since findAndModify was able to successfully modify
+                // the lock document.
+                return ScopedDistLock(lockSessionID, this);
+            }
+
+            if (status != ErrorCodes::LockStateChangeFailed) {
                 // An error occurred but the write might have actually been applied on the
                 // other side. Schedule an unlock to clean it up just in case.
                 queueUnlock(lockSessionID);
                 return status;
-            }
-
-            const auto& lockDoc = lockResult.getValue();
-            if (lockDoc.isValid(nullptr)) {
-                // Lock is acquired since findAndModify was able to successfully modify
-                // the lock document.
-                return ScopedDistLock(lockSessionID, this);
             }
 
             // TODO: implement lock overtaking here.
@@ -128,11 +181,22 @@ namespace mongo {
     }
 
     Status ReplSetDistLockManager::checkStatus(const DistLockHandle& lockHandle) {
-        invariant(false);
+        auto lockStatus = _catalog->getLockByTS(lockHandle);
+
+        if (!lockStatus.isOK()) {
+            return lockStatus.getStatus();
+        }
+
+        auto lockDoc = lockStatus.getValue();
+        if (!lockDoc.isValid(nullptr)) {
+            return {ErrorCodes::LockNotFound, "lock owner changed"};
+        }
+
+        return Status::OK();
     }
 
-    void ReplSetDistLockManager::queueUnlock(const OID& lockSessionID) {
-        // TODO: implement
-        invariant(false);
+    void ReplSetDistLockManager::queueUnlock(const DistLockHandle& lockSessionID) {
+        stdx::unique_lock<stdx::mutex> ul(_mutex);
+        _unlockList.push_back(lockSessionID);
     }
 }

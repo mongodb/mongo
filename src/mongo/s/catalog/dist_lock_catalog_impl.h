@@ -71,7 +71,9 @@ namespace mongo {
 
         virtual StatusWith<ServerInfo> getServerInfo() override;
 
-        virtual StatusWith<LocksType> getLockByTS(const OID& ts) override;
+        virtual StatusWith<LocksType> getLockByTS(const OID& lockSessionID) override;
+
+        virtual Status stopPing(StringData processId) override;
 
     private:
         RemoteCommandRunner* _cmdRunner;

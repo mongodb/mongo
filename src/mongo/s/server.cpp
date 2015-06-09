@@ -109,7 +109,7 @@ namespace mongo {
         return dbexitCalled;
     }
 
-    bool haveLocalShardingInfo( const string& ns ) {
+    bool haveLocalShardingInfo( Client* client, const string& ns ) {
         verify( 0 );
         return false;
     }

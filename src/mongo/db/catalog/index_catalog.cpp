@@ -862,10 +862,6 @@ namespace {
                                                                             << indexName 
                                                                             << "' dropped");
 
-        // wipe out stats
-        _collection->infoCache()->reset(txn);
-
-
         // --------- START REAL WORK ----------
 
         audit::logDropIndex( &cc(), indexName, _collection->ns().ns() );
@@ -878,6 +874,10 @@ namespace {
         _deleteIndexFromDisk(txn, indexName, indexNamespace);
 
         _checkMagic();
+
+        // Now that we've dropped the index, ask the info cache to rebuild its cached view of
+        // collection state.
+        _collection->infoCache()->reset(txn);
 
         return Status::OK();
     }

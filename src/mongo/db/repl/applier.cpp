@@ -198,7 +198,7 @@ namespace {
                         str::stream() << "Operation missing 'ts' field': " << left,
                         left.hasField("ts"));
                 uassert(ErrorCodes::FailedToParse,
-                        str::stream() << "Operation missing 'ts' field': " << left,
+                        str::stream() << "Operation missing 'ts' field': " << right,
                         right.hasField("ts"));
                 return left["ts"].timestamp() < right["ts"].timestamp();
             };

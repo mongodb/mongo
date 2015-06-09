@@ -635,7 +635,7 @@ namespace {
         }
 
         size_t options = QueryPlannerParams::DEFAULT;
-        if (shardingState.needCollectionMetadata(nss.ns())) {
+        if (shardingState.needCollectionMetadata(txn->getClient(), nss.ns())) {
             options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
         }
         return getExecutor(txn, collection, cq.release(), PlanExecutor::YIELD_AUTO, out, options);

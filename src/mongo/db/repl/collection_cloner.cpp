@@ -295,10 +295,10 @@ namespace repl {
 
     void CollectionCloner::_finishCallback(OperationContext* txn, const Status& status) {
         if (status.isOK()) {
-            auto status = _storageInterface->commitCollection(txn, _destNss);
-            if (!status.isOK()) {
+            auto commitStatus = _storageInterface->commitCollection(txn, _destNss);
+            if (!commitStatus.isOK()) {
                 warning() << "Failed to commit changes to collection " << _destNss.ns()
-                          << ": " << status;
+                          << ": " << commitStatus;
             }
         }
         _onCompletion(status);

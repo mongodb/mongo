@@ -43,7 +43,13 @@ function runTest() {
     t.ensureIndex( { x : 1 }, { partialFilterExpression : { a : { $lt : 5 } } } );
     assert.eq( 5, getNumKeys() );
 
+    // SERVER-18858: Verify that query compatible w/ partial index succeeds after index drop.
     t.dropIndex( { x : 1 } );
+    assert.eq( 1, t.getIndexes().length );
+    t.ensureIndex( { x : 1 }, { filter : { a : { $lt : 5 } } } );
+    t.dropIndex( { x : 1 } );
+    assert.eq( 1, t.find( { x : 0, a : 0 } ).itcount() );
+
     assert.eq( 1, t.getIndexes().length );
     t.ensureIndex( { x : 1 } );
     assert.eq( 10, getNumKeys() );

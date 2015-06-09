@@ -205,10 +205,8 @@ namespace mongo {
                 ++_commonStats.needTime;
                 return PlanStage::NEED_TIME;
             }
-
-            ++_specificStats.matchTested;
         }
-        
+
         if (!kv->key.isOwned()) kv->key = kv->key.getOwned();
 
         // We found something to return, so fill out the WSM.
