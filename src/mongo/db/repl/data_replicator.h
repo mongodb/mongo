@@ -41,7 +41,6 @@
 #include "mongo/db/repl/applier.h"
 #include "mongo/db/repl/collection_cloner.h"
 #include "mongo/db/repl/database_cloner.h"
-#include "mongo/db/repl/fetcher.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/reporter.h"
@@ -49,6 +48,9 @@
 #include "mongo/util/queue.h"
 
 namespace mongo {
+
+class QueryFetcher;
+
 namespace repl {
 
 using Operations = Applier::Operations;
@@ -65,7 +67,6 @@ using Response = RemoteCommandResponse;
 using TimestampStatus = StatusWith<Timestamp>;
 using UniqueLock = stdx::unique_lock<stdx::mutex>;
 
-class QueryFetcher;
 class OplogFetcher;
 struct InitialSyncState;
 

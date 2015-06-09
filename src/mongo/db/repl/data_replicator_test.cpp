@@ -32,10 +32,10 @@
 
 #include <memory>
 
+#include "mongo/client/fetcher.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/base_cloner_test_fixture.h"
 #include "mongo/db/repl/data_replicator.h"
-#include "mongo/db/repl/fetcher.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_impl.h"
 #include "mongo/db/repl/replica_set_config.h"

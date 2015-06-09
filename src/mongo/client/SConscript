@@ -217,3 +217,26 @@ env.Library(
     LIBDEPS=[
     ],
 )
+
+env.Library(
+    target='fetcher',
+    source=[
+        'fetcher.cpp',
+        'query_fetcher.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/executor/task_executor_interface',
+        '$BUILD_DIR/mongo/logger/logger',
+        '$BUILD_DIR/mongo/db/namespace_string',
+        '$BUILD_DIR/mongo/rpc/command_status',
+    ],
+)
+
+env.CppUnitTest(
+    target='fetcher_test',
+    source='fetcher_test.cpp',
+    LIBDEPS=[
+        'fetcher',
+        '$BUILD_DIR/mongo/db/repl/replication_executor_test_fixture',
+    ],
+)

@@ -30,8 +30,8 @@
 
 #include <memory>
 
+#include "mongo/client/fetcher.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/repl/fetcher.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/replication_executor_test_fixture.h"
 #include "mongo/executor/network_interface_mock.h"

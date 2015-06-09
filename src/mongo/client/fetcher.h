@@ -44,8 +44,6 @@
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
-namespace repl {
-
     class Fetcher {
         MONGO_DISALLOW_COPYING(Fetcher);
     public:
@@ -185,5 +183,4 @@ namespace repl {
         executor::TaskExecutor::CallbackHandle _remoteCommandCallbackHandle;
     };
 
-} // namespace repl
 } // namespace mongo

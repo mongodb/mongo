@@ -28,7 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/repl/fetcher.h"
+#include "mongo/client/fetcher.h"
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
@@ -37,7 +37,6 @@
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
-namespace repl {
 
 namespace {
 
@@ -297,5 +296,4 @@ namespace {
         _condition.notify_all();
     }
 
-} // namespace repl
 } // namespace mongo
