@@ -2672,7 +2672,7 @@ buildvariants:
   expansions:
     push_path: osx
     push_bucket: downloads.mongodb.org
-    push_name: osx
+    push_name: osx-ssl
     push_arch: x86_64
     tooltags: "-tags ssl"
     compile_flags: --ssl --allocator=system -j$(sysctl -n hw.logicalcpu) --release --osx-version-min=10.7 --libc++
