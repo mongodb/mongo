@@ -89,7 +89,7 @@ namespace mongo {
         if (NULL == _iter) {
             if (_params.collection == NULL) {
                 _isDead = true;
-                Status status(ErrorCodes::InternalError, 
+                Status status(ErrorCodes::InternalError,
                               "CollectionScan died: collection pointer was null");
                 *out = WorkingSetCommon::allocateStatusMember(_workingSet, status);
                 return PlanStage::DEAD;

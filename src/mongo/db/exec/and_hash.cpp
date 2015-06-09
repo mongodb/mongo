@@ -156,7 +156,7 @@ namespace mongo {
                         if (WorkingSet::INVALID_ID == *out) {
                             mongoutils::str::stream ss;
                             ss << "hashed AND stage failed to read in look ahead results "
-                               << "from child " << i 
+                               << "from child " << i
                                << ", childStatus: " << PlanStage::stateStr(childStatus);
                             Status status(ErrorCodes::InternalError, ss);
                             *out = WorkingSetCommon::allocateStatusMember( _ws, status);

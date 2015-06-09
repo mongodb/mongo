@@ -117,7 +117,7 @@ namespace mongo {
     }
 
     PlanStageStats* PipelineProxyStage::getStats() {
-        std::unique_ptr<PlanStageStats> ret(new PlanStageStats(CommonStats(kStageType), 
+        std::unique_ptr<PlanStageStats> ret(new PlanStageStats(CommonStats(kStageType),
                                                                STAGE_PIPELINE_PROXY));
         ret->specific.reset(new CollectionScanStats());
         return ret.release();

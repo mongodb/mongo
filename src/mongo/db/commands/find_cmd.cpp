@@ -316,7 +316,7 @@ namespace mongo {
             if (PlanExecutor::FAILURE == state || PlanExecutor::DEAD == state) {
                 const std::unique_ptr<PlanStageStats> stats(exec->getStats());
                 error() << "Plan executor error during find command: "
-                        << PlanExecutor::statestr(state) 
+                        << PlanExecutor::statestr(state)
                         << ", stats: " << Explain::statsToBSON(*stats);
 
                 return appendCommandStatus(result,

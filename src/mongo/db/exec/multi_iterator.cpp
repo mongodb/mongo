@@ -60,7 +60,7 @@ namespace mongo {
 
     PlanStage::StageState MultiIteratorStage::work(WorkingSetID* out) {
         if (_collection == NULL) {
-            Status status(ErrorCodes::InternalError, 
+            Status status(ErrorCodes::InternalError,
                           "MultiIteratorStage died on null collection");
             *out = WorkingSetCommon::allocateStatusMember(_ws, status);
             return PlanStage::DEAD;
@@ -158,7 +158,7 @@ namespace mongo {
     }
 
     PlanStageStats* MultiIteratorStage::getStats() {
-        std::unique_ptr<PlanStageStats> ret(new PlanStageStats(CommonStats(kStageType), 
+        std::unique_ptr<PlanStageStats> ret(new PlanStageStats(CommonStats(kStageType),
                                                                STAGE_MULTI_ITERATOR));
         ret->specific.reset(new CollectionScanStats());
         return ret.release();

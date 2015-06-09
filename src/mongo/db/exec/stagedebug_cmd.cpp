@@ -181,13 +181,13 @@ namespace mongo {
             if (PlanExecutor::FAILURE == state || PlanExecutor::DEAD == state) {
                 const std::unique_ptr<PlanStageStats> stats(exec->getStats());
                 error() << "Plan executor error during StageDebug command: "
-                        << PlanExecutor::statestr(state) 
+                        << PlanExecutor::statestr(state)
                         << ", stats: " << Explain::statsToBSON(*stats);
 
                 return appendCommandStatus(result,
                                            Status(ErrorCodes::OperationFailed,
                                                   str::stream()
-                                                      << "Executor error during " 
+                                                      << "Executor error during "
                                                       << "StageDebug command: "
                                                       << WorkingSetCommon::toStatusString(obj)));
             }

@@ -123,10 +123,10 @@ namespace mongo {
         _exec.reset();
 
         uassert(16028, str::stream() << "collection or index disappeared when cursor yielded: "
-                                     << WorkingSetCommon::toStatusString(obj), 
+                                     << WorkingSetCommon::toStatusString(obj),
                 state != PlanExecutor::DEAD);
 
-        uassert(17285, str::stream() << "cursor encountered an error: " 
+        uassert(17285, str::stream() << "cursor encountered an error: "
                                      << WorkingSetCommon::toStatusString(obj),
                 state != PlanExecutor::FAILURE);
 

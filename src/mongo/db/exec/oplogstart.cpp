@@ -200,7 +200,7 @@ namespace mongo {
     }
 
     PlanStageStats* OplogStart::getStats() {
-        std::unique_ptr<PlanStageStats> ret(new PlanStageStats(CommonStats(kStageType), 
+        std::unique_ptr<PlanStageStats> ret(new PlanStageStats(CommonStats(kStageType),
                                                                STAGE_OPLOG_START));
         ret->specific.reset(new CollectionScanStats());
         return ret.release();

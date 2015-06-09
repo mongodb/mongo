@@ -162,7 +162,7 @@ namespace mongo {
                        << " status: "
                        << statusObj;
 
-                return WorkingSetCommon::getMemberObjectStatus(statusObj); 
+                return WorkingSetCommon::getMemberObjectStatus(statusObj);
             }
             else {
                 invariant(PlanStage::NEED_TIME == state);
