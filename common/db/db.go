@@ -82,14 +82,10 @@ type Oplog struct {
 // Returns a session connected to the database server for which the
 // session provider is configured.
 func (self *SessionProvider) GetSession() (*mgo.Session, error) {
-	// The master session is initialized
-	if self.masterSession != nil {
-		return self.masterSession.Copy(), nil
-	}
-
 	self.masterSessionLock.Lock()
 	defer self.masterSessionLock.Unlock()
 
+	// The master session is initialized
 	if self.masterSession != nil {
 		return self.masterSession.Copy(), nil
 	}
@@ -100,28 +96,41 @@ func (self *SessionProvider) GetSession() (*mgo.Session, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error connecting to db server: %v", err)
 	}
-	// handle session flags
-	if (self.flags & Monotonic) > 0 {
-		self.masterSession.SetMode(mgo.Monotonic, true)
-	}
-	if (self.flags & DisableSocketTimeout) > 0 {
-		self.masterSession.SetSocketTimeout(0)
-	}
+
+	// update masterSession based on flags
+	self.refreshFlags()
+
 	// copy the provider's master session, for connection pooling
 	return self.masterSession.Copy(), nil
 }
 
-// SetFlags allows certain modifications to the masterSession after
-// initial creation.
+// refreshFlags is a helper for modifying the session based on the
+// session provider flags passed in with SetFlags.
+// This helper assumes a lock is already taken.
+func (self *SessionProvider) refreshFlags() {
+	// handle slaveOK
+	if (self.flags & Monotonic) > 0 {
+		self.masterSession.SetMode(mgo.Monotonic, true)
+	} else {
+		self.masterSession.SetMode(mgo.Strong, true)
+	}
+	// disable timeouts
+	if (self.flags & DisableSocketTimeout) > 0 {
+		self.masterSession.SetSocketTimeout(0)
+	}
+}
+
+// SetFlags allows certain modifications to the masterSession after initial creation.
 func (self *SessionProvider) SetFlags(flagBits sessionFlag) {
 	self.masterSessionLock.Lock()
 	defer self.masterSessionLock.Unlock()
 
-	// make sure this is not done after initial creation
-	if self.masterSession != nil {
-		panic("cannot set session provider flags after calling GetSession()")
-	}
 	self.flags = flagBits
+
+	// make sure we update the master session if one already exists
+	if self.masterSession != nil {
+		self.refreshFlags()
+	}
 }
 
 // NewSessionProvider constructs a session provider but does not attempt to
