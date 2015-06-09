@@ -130,28 +130,32 @@ func (f *stdinFile) Write(p []byte) (n int, err error) {
 // getInfoFromFilename pulls the base collection name and FileType from a given file.
 func (restore *MongoRestore) getInfoFromFilename(filename string) (string, FileType) {
 	baseFileName := filepath.Base(filename)
-	switch {
-	case strings.HasSuffix(baseFileName, ".metadata.json") && !restore.InputOptions.Gzip:
-		// this logic can't be simple because technically
-		// "x.metadata.json" is a valid collection name
-		baseName := strings.TrimSuffix(baseFileName, ".metadata.json")
-		return baseName, MetadataFileType
-	case strings.HasSuffix(baseFileName, ".metadata.json.gz") && restore.InputOptions.Gzip:
-		baseName := strings.TrimSuffix(baseFileName, ".metadata.json.gz")
-		return baseName, MetadataFileType
-	case strings.HasSuffix(baseFileName, ".bin"):
-		// .bin supported for legacy reasons
+	// .bin supported for legacy reasons
+	if strings.HasSuffix(baseFileName, ".bin") {
 		baseName := strings.TrimSuffix(baseFileName, ".bin")
 		return baseName, BSONFileType
-	case strings.HasSuffix(baseFileName, ".bson") && !restore.InputOptions.Gzip:
-		baseName := strings.TrimSuffix(baseFileName, ".bson")
-		return baseName, BSONFileType
-	case strings.HasSuffix(baseFileName, ".bson.gz") && restore.InputOptions.Gzip:
-		baseName := strings.TrimSuffix(baseFileName, ".bson.gz")
-		return baseName, BSONFileType
-	default:
+	}
+	// Gzip indicates that files in a dump directory should have a .gz suffix
+	// but it does not indicate that the "files" provided by the archive should,
+	// compressed or otherwise.
+	if restore.InputOptions.Gzip && restore.InputOptions.Archive == "" {
+		if strings.HasSuffix(baseFileName, ".metadata.json.gz") {
+			baseName := strings.TrimSuffix(baseFileName, ".metadata.json.gz")
+			return baseName, MetadataFileType
+		} else if strings.HasSuffix(baseFileName, ".bson.gz") {
+			baseName := strings.TrimSuffix(baseFileName, ".bson.gz")
+			return baseName, BSONFileType
+		}
 		return "", UnknownFileType
 	}
+	if strings.HasSuffix(baseFileName, ".metadata.json") {
+		baseName := strings.TrimSuffix(baseFileName, ".metadata.json")
+		return baseName, MetadataFileType
+	} else if strings.HasSuffix(baseFileName, ".bson") {
+		baseName := strings.TrimSuffix(baseFileName, ".bson")
+		return baseName, BSONFileType
+	}
+	return "", UnknownFileType
 }
 
 // CreateAllIntents drills down into a dump folder, creating intents for all of
