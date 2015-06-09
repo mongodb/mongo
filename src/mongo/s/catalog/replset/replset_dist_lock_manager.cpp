@@ -35,6 +35,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/s/catalog/dist_lock_catalog.h"
+#include "mongo/s/type_lockpings.h"
 #include "mongo/s/type_locks.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/concurrency/thread_name.h"
@@ -50,10 +51,12 @@ namespace mongo {
 
     ReplSetDistLockManager::ReplSetDistLockManager(StringData processID,
                                                    unique_ptr<DistLockCatalog> catalog,
-                                                   milliseconds pingInterval):
+                                                   milliseconds pingInterval,
+                                                   milliseconds lockExpiration):
         _processID(processID.toString()),
         _catalog(std::move(catalog)),
-        _pingInterval(pingInterval) {
+        _pingInterval(pingInterval),
+        _lockExpiration(lockExpiration) {
     }
 
     ReplSetDistLockManager::~ReplSetDistLockManager() = default;
@@ -64,7 +67,7 @@ namespace mongo {
 
     void ReplSetDistLockManager::shutDown() {
         {
-            stdx::lock_guard<stdx::mutex> sl(_mutex);
+            stdx::lock_guard<stdx::mutex> lk(_mutex);
             _isShutDown = true;
             _shutDownCV.notify_all();
         }
@@ -84,7 +87,7 @@ namespace mongo {
     }
 
     bool ReplSetDistLockManager::isShutDown() {
-        stdx::lock_guard<stdx::mutex> sl(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         return _isShutDown;
     }
 
@@ -94,7 +97,7 @@ namespace mongo {
 
             std::deque<DistLockHandle> toUnlockBatch;
             {
-                stdx::unique_lock<stdx::mutex> ul(_mutex);
+                stdx::unique_lock<stdx::mutex> lk(_mutex);
                 toUnlockBatch.swap(_unlockList);
             }
 
@@ -112,9 +115,89 @@ namespace mongo {
                 }
             }
 
-            stdx::unique_lock<stdx::mutex> ul(_mutex);
-            _shutDownCV.wait_for(ul, _pingInterval);
+            stdx::unique_lock<stdx::mutex> lk(_mutex);
+            _shutDownCV.wait_for(lk, _pingInterval);
         }
+    }
+
+    StatusWith<bool> ReplSetDistLockManager::canOvertakeLock(LocksType lockDoc) {
+        const auto& processID = lockDoc.getProcess();
+        auto pingStatus = _catalog->getPing(processID);
+        if (!pingStatus.isOK()) {
+            return pingStatus.getStatus();
+        }
+
+        const auto& pingDoc = pingStatus.getValue();
+        string errMsg;
+        if (!pingDoc.isValid(&errMsg)) {
+            return {ErrorCodes::UnsupportedFormat,
+                    str::stream() << "invalid ping document for " << processID
+                                  << ": " << errMsg};
+        }
+
+        Timer timer;
+        auto serverInfoStatus = _catalog->getServerInfo();
+        if (!serverInfoStatus.isOK()) {
+            return serverInfoStatus.getStatus();
+        }
+
+        // Be conservative when determining that lock expiration has elapsed by
+        // taking into account the roundtrip delay of trying to get the local
+        // time from the config server.
+        milliseconds delay(timer.millis() / 2); // Assuming symmetrical delay.
+
+        Date_t pingValue = pingDoc.getPing();
+        const auto& serverInfo = serverInfoStatus.getValue();
+
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        auto pingIter = _pingHistory.find(lockDoc.getName());
+
+        if (pingIter == _pingHistory.end()) {
+            // We haven't seen this lock before so we don't have any point of reference
+            // to compare and determine the elapsed time. Save the current ping info
+            // for this lock.
+            _pingHistory.emplace(std::piecewise_construct,
+                                 std::forward_as_tuple(lockDoc.getName()),
+                                 std::forward_as_tuple(processID,
+                                                       pingValue,
+                                                       serverInfo.serverTime,
+                                                       lockDoc.getLockID(),
+                                                       serverInfo.electionId));
+            return false;
+        }
+
+        auto configServerLocalTime = serverInfo.serverTime - delay;
+
+        auto* pingInfo = &pingIter->second;
+        if (pingInfo->lastPing != pingValue || // ping is active
+
+                // Owner of this lock is now different from last time so we can't
+                // use the ping data.
+                pingInfo->lockSessionId != lockDoc.getLockID() ||
+
+                // Primary changed, we can't trust that clocks are synchronized so
+                // treat as if this is a new entry.
+                pingInfo->electionId != serverInfo.electionId) {
+            pingInfo->lastPing = pingValue;
+            pingInfo->electionId = serverInfo.electionId;
+            pingInfo->configLocalTime = configServerLocalTime;
+            pingInfo->lockSessionId = lockDoc.getLockID();
+            return false;
+        }
+
+        if (configServerLocalTime < pingInfo->configLocalTime) {
+            warning() << "config server local time went backwards, from last seen: "
+                      << pingInfo->configLocalTime
+                      << " to " << configServerLocalTime;
+            return false;
+        }
+
+        milliseconds elapsedSinceLastPing(configServerLocalTime - pingInfo->configLocalTime);
+        if (elapsedSinceLastPing >= _lockExpiration) {
+            return true;
+        }
+
+        return false;
     }
 
     StatusWith<DistLockManager::ScopedDistLock> ReplSetDistLockManager::lock(
@@ -150,7 +233,49 @@ namespace mongo {
                 return status;
             }
 
-            // TODO: implement lock overtaking here.
+            // Get info from current lock and check if we can overtake it.
+            auto getLockStatusResult = _catalog->getLockByName(name);
+            const auto& getLockStatus = getLockStatusResult.getStatus();
+
+            if (!getLockStatusResult.isOK() && getLockStatus != ErrorCodes::LockNotFound) {
+                return getLockStatus;
+            }
+
+            // Note: Only attempt to overtake locks that actually exists. If lock was not
+            // found, use the normal grab lock path to acquire it.
+            if (getLockStatusResult.isOK()) {
+                auto currentLock = getLockStatusResult.getValue();
+                auto canOvertakeResult = canOvertakeLock(currentLock);
+
+                if (!canOvertakeResult.isOK()) {
+                    return canOvertakeResult.getStatus();
+                }
+
+                if (canOvertakeResult.getValue()) {
+                    auto overtakeResult = _catalog->overtakeLock(name,
+                                                                 lockSessionID,
+                                                                 currentLock.getLockID(),
+                                                                 who,
+                                                                 _processID,
+                                                                 Date_t::now(),
+                                                                 whyMessage);
+
+                    const auto& overtakeStatus = overtakeResult.getStatus();
+
+                    if (overtakeResult.isOK()) {
+                        // Lock is acquired since findAndModify was able to successfully modify
+                        // the lock document.
+                        return ScopedDistLock(lockSessionID, this);
+                    }
+
+                    if (overtakeStatus != ErrorCodes::LockStateChangeFailed) {
+                        // An error occurred but the write might have actually been applied on the
+                        // other side. Schedule an unlock to clean it up just in case.
+                        queueUnlock(lockSessionID);
+                        return overtakeStatus;
+                    }
+                }
+            }
 
             if (waitFor == milliseconds::zero()) {
                 break;
@@ -196,7 +321,7 @@ namespace mongo {
     }
 
     void ReplSetDistLockManager::queueUnlock(const DistLockHandle& lockSessionID) {
-        stdx::unique_lock<stdx::mutex> ul(_mutex);
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
         _unlockList.push_back(lockSessionID);
     }
 }

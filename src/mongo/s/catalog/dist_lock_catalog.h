@@ -53,10 +53,10 @@ namespace mongo {
             ServerInfo(Date_t time, OID electionId);
 
             // The local time of the server at the time this was created.
-            const Date_t serverTime;
+            Date_t serverTime;
 
             // The election id of the replica set member at the time this was created.
-            const OID electionId;
+            OID electionId;
         };
 
         virtual ~DistLockCatalog() = default;
@@ -137,6 +137,12 @@ namespace mongo {
          * Common status errors include socket errors.
          */
         virtual StatusWith<LocksType> getLockByTS(const OID& lockSessionID) = 0;
+
+        /**
+         * Returns the lock document.
+         * Common status errors include socket errors.
+         */
+        virtual StatusWith<LocksType> getLockByName(StringData name) = 0;
 
         /**
          * Attempts to delete the ping document corresponding to the given processId.

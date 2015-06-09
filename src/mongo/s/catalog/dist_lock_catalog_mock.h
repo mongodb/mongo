@@ -74,10 +74,20 @@ namespace mongo {
                                                   StringData processId,
                                                   Date_t time,
                                                   StringData why)>;
+        using OvertakeLockFunc = stdx::function<void (StringData lockID,
+                                                      const OID& lockSessionID,
+                                                      const OID& currentHolderTS,
+                                                      StringData who,
+                                                      StringData processId,
+                                                      Date_t time,
+                                                      StringData why)>;
         using UnlockFunc = stdx::function<void (const OID& lockSessionID)>;
         using PingFunc = stdx::function<void (StringData processID, Date_t ping)>;
         using StopPingFunc = stdx::function<void (StringData processID)>;
+        using GetPingFunc = StopPingFunc;
         using GetLockByTSFunc = stdx::function<void (const OID& ts)>;
+        using GetLockByNameFunc = stdx::function<void (StringData name)>;
+        using GetServerInfoFunc = stdx::function<void ()>;
 
         virtual StatusWith<LockpingsType> getPing(StringData processID) override;
 
@@ -92,7 +102,7 @@ namespace mongo {
 
         virtual StatusWith<LocksType> overtakeLock(StringData lockID,
                                                    const OID& lockSessionID,
-                                                   const OID& lockTS,
+                                                   const OID& currentHolderTS,
                                                    StringData who,
                                                    StringData processId,
                                                    Date_t time,
@@ -103,6 +113,8 @@ namespace mongo {
         virtual StatusWith<ServerInfo> getServerInfo() override;
 
         virtual StatusWith<LocksType> getLockByTS(const OID& lockSessionID) override;
+
+        virtual StatusWith<LocksType> getLockByName(StringData name) override;
 
         virtual Status stopPing(StringData processId) override;
 
@@ -125,21 +137,50 @@ namespace mongo {
         void setSucceedingExpectedUnLock(UnlockFunc checkerFunc, Status returnThis);
 
         /**
-         * Sets the checker method to use and it's return value the every time ping is called.
+         * Sets the checker method to use and its return value the every time ping is called.
          */
         void setSucceedingExpectedPing(PingFunc checkerFunc, Status returnThis);
 
         /**
-         * Sets the checker method to use and it's return value the every time stopPing is called.
+         * Sets the checker method to use and its return value the every time stopPing is called.
          */
         void setSucceedingExpectedStopPing(StopPingFunc checkerFunc, Status returnThis);
 
         /**
-         * Sets the checker method to use and it's return value the every time
+         * Sets the checker method to use and its return value the every time
          * getLockByTS is called.
          */
         void setSucceedingExpectedGetLockByTS(GetLockByTSFunc checkerFunc,
                                               StatusWith<LocksType> returnThis);
+
+        /**
+         * Sets the checker method to use and its return value the every time
+         * getLockByName is called.
+         */
+        void setSucceedingExpectedGetLockByName(GetLockByNameFunc checkerFunc,
+                                                StatusWith<LocksType> returnThis);
+
+        /**
+         * Sets the checker method to use and its return value the every time
+         * overtakeLock is called.
+         */
+        void setSucceedingExpectedOvertakeLock(OvertakeLockFunc checkerFunc,
+                                               StatusWith<LocksType> returnThis);
+
+        /**
+         * Sets the checker method to use and its return value the every time
+         * getPing is called.
+         */
+        void setSucceedingExpectedGetPing(GetPingFunc checkerFunc,
+                                          StatusWith<LockpingsType> returnThis);
+
+        /**
+         * Sets the checker method to use and its return value the every time
+         * getServerInfo is called.
+         */
+        void setSucceedingExpectedGetServerInfo(
+                GetServerInfoFunc checkerFunc,
+                StatusWith<DistLockCatalog::ServerInfo> returnThis);
 
     private:
         // Protects all the member variables.
@@ -159,5 +200,17 @@ namespace mongo {
 
         GetLockByTSFunc _getLockByTSChecker;
         StatusWith<LocksType> _getLockByTSReturnValue;
+
+        GetLockByNameFunc _getLockByNameChecker;
+        StatusWith<LocksType> _getLockByNameReturnValue;
+
+        OvertakeLockFunc _overtakeLockChecker;
+        StatusWith<LocksType> _overtakeLockReturnValue;
+
+        GetPingFunc _getPingChecker;
+        StatusWith<LockpingsType> _getPingReturnValue;
+
+        GetServerInfoFunc _getServerInfoChecker;
+        StatusWith<DistLockCatalog::ServerInfo> _getServerInfoReturnValue;
     };
 }

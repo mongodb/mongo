@@ -73,6 +73,8 @@ namespace mongo {
 
         virtual StatusWith<LocksType> getLockByTS(const OID& lockSessionID) override;
 
+        virtual StatusWith<LocksType> getLockByName(StringData name) override;
+
         virtual Status stopPing(StringData processId) override;
 
     private:

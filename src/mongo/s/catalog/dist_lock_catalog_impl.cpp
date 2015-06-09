@@ -157,8 +157,7 @@ namespace {
     DistLockCatalogImpl::~DistLockCatalogImpl() = default;
 
     StatusWith<LockpingsType> DistLockCatalogImpl::getPing(StringData processID) {
-        invariant(false);
-        return {ErrorCodes::InternalError, "not yet implemented"};
+        invariant(false); // TODO
     }
 
     Status DistLockCatalogImpl::ping(StringData processID, Date_t ping) {
@@ -405,8 +404,11 @@ namespace {
     }
 
     StatusWith<LocksType> DistLockCatalogImpl::getLockByTS(const OID& lockSessionID) {
-        invariant(false);
-        return {ErrorCodes::InternalError, "not yet implemented"};
+        invariant(false); // TODO
+    }
+
+    StatusWith<LocksType> DistLockCatalogImpl::getLockByName(StringData name) {
+        invariant(false); // TODO
     }
 
     Status DistLockCatalogImpl::stopPing(StringData processId) {

@@ -31,22 +31,24 @@
 #include <deque>
 #include <memory>
 #include <string>
+#include <unordered_map>
 
 #include "mongo/base/string_data.h"
+#include "mongo/s/catalog/dist_lock_catalog.h"
 #include "mongo/s/catalog/dist_lock_manager.h"
+#include "mongo/s/catalog/dist_lock_ping_info.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 
 namespace mongo {
 
-    class DistLockCatalog;
-
     class ReplSetDistLockManager: public DistLockManager {
     public:
         ReplSetDistLockManager(StringData processID,
                                std::unique_ptr<DistLockCatalog> catalog,
-                               stdx::chrono::milliseconds pingInterval);
+                               stdx::chrono::milliseconds pingInterval,
+                               stdx::chrono::milliseconds lockExpiration);
 
         virtual ~ReplSetDistLockManager();
 
@@ -82,6 +84,12 @@ namespace mongo {
          */
         bool isShutDown();
 
+        /**
+         * Returns true if the current process that owns the lock has no fresh pings since
+         * the lock expiration threshold.
+         */
+        StatusWith<bool> canOvertakeLock(const LocksType lockDoc);
+
         //
         // All member variables are labeled with one of the following codes indicating the
         // synchronization rules for accessing them.
@@ -94,6 +102,7 @@ namespace mongo {
         const std::string _processID;                                                   // (I)
         const std::unique_ptr<DistLockCatalog> _catalog;                                // (I)
         const stdx::chrono::milliseconds _pingInterval;                                 // (I)
+        const stdx::chrono::milliseconds _lockExpiration;                               // (I)
 
         stdx::mutex _mutex;
         std::unique_ptr<stdx::thread> _execThread;                                      // (S)
@@ -108,5 +117,8 @@ namespace mongo {
 
         bool _isShutDown = false;                                                       // (M)
         stdx::condition_variable _shutDownCV;                                           // (M)
+
+        // Map of lockName to last ping information.
+        std::unordered_map<std::string, DistLockPingInfo> _pingHistory;                 // (M)
     };
 }
