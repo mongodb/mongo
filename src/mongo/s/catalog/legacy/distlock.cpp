@@ -128,14 +128,17 @@ namespace mongo {
 
     }
 
-    DistributedLock::PingData DistributedLock::LastPings::getLastPing( const ConnectionString& conn, const string& lockName ){
-        boost::lock_guard<boost::mutex> lock( _mutex );
-        return _lastPings[ std::pair< string, string >( conn.toString(), lockName ) ];
+    DistLockPingInfo DistributedLock::LastPings::getLastPing(const ConnectionString& conn,
+                                                             const string& lockName) {
+        boost::lock_guard<boost::mutex> lock(_mutex);
+        return _lastPings[std::make_pair(conn.toString(), lockName)];
     }
 
-    void DistributedLock::LastPings::setLastPing( const ConnectionString& conn, const string& lockName, const PingData& pd ){
-        boost::lock_guard<boost::mutex> lock( _mutex );
-        _lastPings[ std::pair< string, string >( conn.toString(), lockName ) ] = pd;
+    void DistributedLock::LastPings::setLastPing(const ConnectionString& conn,
+                                                 const string& lockName,
+                                                 const DistLockPingInfo& pd) {
+        boost::lock_guard<boost::mutex> lock(_mutex);
+        _lastPings[std::make_pair(conn.toString(), lockName)] = pd;
     }
 
     Date_t DistributedLock::getRemoteTime() const {
@@ -393,37 +396,45 @@ namespace mongo {
 
                 unsigned long long elapsed = 0;
                 unsigned long long takeover = _lockTimeout;
-                PingData _lastPingCheck = getLastPing();
+                DistLockPingInfo lastPingEntry = getLastPing();
 
-                LOG( logLvl ) << "checking last ping for lock '" << lockName << "'" << " against process " << _lastPingCheck.id << " and ping " << _lastPingCheck.lastPing << endl;
+                LOG(logLvl) << "checking last ping for lock '" << lockName
+                            << "' against process " << lastPingEntry.processId
+                            << " and ping " << lastPingEntry.lastPing;
 
                 try {
 
                     Date_t remote = remoteTime( _conn );
 
+                    auto pingDocProcessId = lastPing[LockpingsType::process()].String();
+                    auto pingDocPingValue = lastPing[LockpingsType::ping()].Date();
+
                     // Timeout the elapsed time using comparisons of remote clock
                     // For non-finalized locks, timeout 15 minutes since last seen (ts)
                     // For finalized locks, timeout 15 minutes since last ping
-                    bool recPingChange = o[LocksType::state()].numberInt() == 2 &&
-                                         ( _lastPingCheck.id != lastPing[LockpingsType::process()].String() ||
-                                           _lastPingCheck.lastPing != lastPing[LockpingsType::ping()].Date() );
-                    bool recTSChange = _lastPingCheck.ts != o[LocksType::lockID()].OID();
+                    bool recPingChange =
+                            o[LocksType::state()].numberInt() == 2 &&
+                            (lastPingEntry.processId != pingDocProcessId ||
+                                    lastPingEntry.lastPing != pingDocPingValue);
+                    bool recTSChange = lastPingEntry.lockSessionId != o[LocksType::lockID()].OID();
 
-                    if( recPingChange || recTSChange ) {
+                    if (recPingChange || recTSChange) {
                         // If the ping has changed since we last checked, mark the current date and time
-                        setLastPing( PingData( lastPing[LockpingsType::process()].String().c_str(),
-                                               lastPing[LockpingsType::ping()].Date(),
-                                               remote, o[LocksType::lockID()].OID() ) );
+                        setLastPing(DistLockPingInfo(pingDocProcessId,
+                                                     pingDocPingValue,
+                                                     remote,
+                                                     o[LocksType::lockID()].OID(),
+                                                     OID()));
                     }
                     else {
 
                         // GOTCHA!  Due to network issues, it is possible that the current time
                         // is less than the remote time.  We *have* to check this here, otherwise
                         // we overflow and our lock breaks.
-                        if(_lastPingCheck.remote >= remote)
+                        if (lastPingEntry.configLocalTime >= remote)
                             elapsed = 0;
                         else
-                            elapsed = (remote - _lastPingCheck.remote).count();
+                            elapsed = (remote - lastPingEntry.configLocalTime).count();
                     }
                 }
                 catch( LockException& e ) {

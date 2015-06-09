@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include "mongo/platform/basic.h"
 #include "mongo/client/connpool.h"
 #include "mongo/client/syncclusterconnection.h"
 #include "mongo/logger/labeled_level.h"
 #include "mongo/s/catalog/dist_lock_manager.h"
+#include "mongo/s/catalog/dist_lock_ping_info.h"
 
 namespace mongo {
 
@@ -123,27 +123,16 @@ namespace mongo {
 
         static logger::LabeledLevel logLvl;
 
-        struct PingData {
-
-            PingData( const std::string& _id , Date_t _lastPing , Date_t _remote , OID _ts )
-                : id(_id), lastPing(_lastPing), remote(_remote), ts(_ts){
-            }
-
-            PingData() : id(""), ts() {}
-
-            std::string id;
-            Date_t lastPing;
-            Date_t remote;
-            OID ts;
-        };
-
         class LastPings {
         public:
-            PingData getLastPing( const ConnectionString& conn, const std::string& lockName );
-            void setLastPing( const ConnectionString& conn, const std::string& lockName, const PingData& pd );
+            DistLockPingInfo getLastPing(const ConnectionString& conn,
+                                         const std::string& lockName);
+            void setLastPing(const ConnectionString& conn,
+                             const std::string& lockName,
+                             const DistLockPingInfo& pd);
 
             mongo::mutex _mutex;
-            std::map< std::pair<std::string, std::string>, PingData > _lastPings;
+            std::map< std::pair<std::string, std::string>, DistLockPingInfo > _lastPings;
         };
 
         static LastPings lastPings;
@@ -229,9 +218,17 @@ namespace mongo {
 
     private:
 
-        void resetLastPing(){ lastPings.setLastPing( _conn, _name, PingData() ); }
-        void setLastPing( const PingData& pd ){ lastPings.setLastPing( _conn, _name, pd ); }
-        PingData getLastPing(){ return lastPings.getLastPing( _conn, _name ); }
+        void resetLastPing() {
+            lastPings.setLastPing(_conn, _name, DistLockPingInfo());
+        }
+
+        void setLastPing(const DistLockPingInfo& pd) {
+            lastPings.setLastPing(_conn, _name, pd);
+        }
+
+        DistLockPingInfo getLastPing() {
+            return lastPings.getLastPing(_conn, _name);
+        }
     };
 
 }
