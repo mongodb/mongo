@@ -362,6 +362,12 @@ namespace mongo {
     };
 
 
+    class ExpressionAbs final : public ExpressionFixedArity<ExpressionAbs, 1> {
+        Value evaluateInternal(Variables* vars) const final;
+        const char* getOpName() const final;
+    };
+
+
     class ExpressionAdd : public ExpressionVariadic<ExpressionAdd> {
     public:
         // virtuals from Expression

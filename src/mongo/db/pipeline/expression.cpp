@@ -375,6 +375,39 @@ namespace {
         }
     }
 
+
+     /* ----------------------- ExpressionAbs ---------------------------- */
+
+    Value ExpressionAbs::evaluateInternal(Variables* vars) const {
+        Value val = vpOperand[0]->evaluateInternal(vars);
+
+        if (val.numeric()) {
+            BSONType type = val.getType();
+            if (type == NumberDouble) {
+                return Value(std::abs(val.getDouble()));
+            }
+            else {
+                long long num = val.getLong();
+                uassert(28680, "can't take $abs of long long min",
+                        num != std::numeric_limits<long long>::min());
+                long long absVal = std::abs(num);
+                return type == NumberLong ? Value(absVal) : Value::createIntOrLong(absVal);
+            }
+        }
+        else if (val.nullish()) {
+            return Value(BSONNULL);
+        }
+        else {
+            uasserted(28681, str::stream() << "$abs only supports numeric types, not "
+                                           << typeName(val.getType()));
+        }
+    }
+
+    REGISTER_EXPRESSION("$abs", ExpressionAbs::parse);
+    const char* ExpressionAbs::getOpName() const {
+        return "$abs";
+    }
+
     /* ------------------------- ExpressionAdd ----------------------------- */
 
     Value ExpressionAdd::evaluateInternal(Variables* vars) const {
