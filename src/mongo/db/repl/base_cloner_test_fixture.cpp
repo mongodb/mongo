@@ -129,18 +129,6 @@ namespace repl {
         return _status;
     }
 
-    void BaseClonerTest::waitForStatus() {
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
-        if (_status == getDetectableErrorStatus()) {
-            try {
-                _setStatusCondition.wait_for(lk, Milliseconds(1000));
-            }
-            catch (const boost::thread_interrupted&) {
-            }
-
-        }
-    }
-
     void BaseClonerTest::scheduleNetworkResponse(NetworkOperationIterator noi,
                                                     const BSONObj& obj) {
         auto net = getNet();

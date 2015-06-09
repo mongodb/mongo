@@ -108,7 +108,6 @@ namespace repl {
 
         void setStatus(const Status& status);
         const Status& getStatus() const;
-        void waitForStatus();
 
         void scheduleNetworkResponse(NetworkOperationIterator noi,
                                      const BSONObj& obj);
