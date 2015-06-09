@@ -40,11 +40,12 @@ __curstat_lsm_init(
 	/* Propagate all, fast and/or clear to the cursors we open. */
 	if (!F_ISSET(cst, WT_CONN_STAT_NONE)) {
 		(void)snprintf(config, sizeof(config),
-		    "statistics=(%s%s%s)",
-		    F_ISSET(cst, WT_CONN_STAT_CLEAR) ? "clear," : "",
+		    "statistics=(%s%s%s%s)",
 		    F_ISSET(cst, WT_CONN_STAT_ALL) ? "all," : "",
+		    F_ISSET(cst, WT_CONN_STAT_CLEAR) ? "clear," : "",
 		    !F_ISSET(cst, WT_CONN_STAT_ALL) &&
-		    F_ISSET(cst, WT_CONN_STAT_FAST) ? "fast," : "");
+		    F_ISSET(cst, WT_CONN_STAT_FAST) ? "fast," : "",
+		    F_ISSET(cst, WT_CONN_STAT_SIZE) ? "size," : "");
 		cfg[1] = disk_cfg[1] = config;
 	}
 

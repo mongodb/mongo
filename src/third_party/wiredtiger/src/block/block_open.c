@@ -388,7 +388,7 @@ err:	__wt_scr_free(session, &buf);
 
 /*
  * __wt_block_stat --
- *	Block statistics
+ *	Set the statistics for a live block handle.
  */
 void
 __wt_block_stat(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_DSRC_STATS *stats)
@@ -408,4 +408,20 @@ __wt_block_stat(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_DSRC_STATS *stats)
 	WT_STAT_SET(stats, block_reuse_bytes, block->live.avail.bytes);
 	WT_STAT_SET(stats, block_size, block->fh->size);
 	__wt_spin_unlock(session, &block->live_lock);
+}
+
+/*
+ * __wt_block_manager_size --
+ *	Set the size statistic for a file.
+ */
+int
+__wt_block_manager_size(
+    WT_SESSION_IMPL *session, const char *filename, WT_DSRC_STATS *stats)
+{
+	wt_off_t filesize;
+
+	WT_RET(__wt_filesize_name(session, filename, &filesize));
+	WT_STAT_SET(stats, block_size, filesize);
+
+	return (0);
 }

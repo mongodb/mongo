@@ -1022,18 +1022,19 @@ __wt_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
  *	Check whether a page can be evicted.
  */
 static inline int
-__wt_page_can_evict(
-    WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags, int *inmem_splitp)
+__wt_page_can_evict(WT_SESSION_IMPL *session,
+    WT_PAGE *page, int check_splits, int *inmem_splitp)
 {
 	WT_BTREE *btree;
 	WT_PAGE_MODIFY *mod;
 	WT_TXN_GLOBAL *txn_global;
 
+	if (inmem_splitp != NULL)
+		*inmem_splitp = 0;
+
 	btree = S2BT(session);
 	mod = page->modify;
 	txn_global = &S2C(session)->txn_global;
-	if (inmem_splitp != NULL)
-		*inmem_splitp = 0;
 
 	/* Pages that have never been modified can always be evicted. */
 	if (mod == NULL)
@@ -1048,7 +1049,7 @@ __wt_page_can_evict(
 	 * a transaction value, once that's globally visible, we know we can
 	 * evict the created page.
 	 */
-	if (LF_ISSET(WT_EVICT_CHECK_SPLITS) && WT_PAGE_IS_INTERNAL(page) &&
+	if (check_splits && WT_PAGE_IS_INTERNAL(page) &&
 	    !__wt_txn_visible_all(session, mod->mod_split_txn))
 		return (0);
 
@@ -1105,10 +1106,10 @@ __wt_page_can_evict(
 	/*
 	 * If the page was recently split in-memory, don't force it out: we
 	 * hope an eviction thread will find it first.  The check here is
-	 * similar to __wt_txn_visible_all, but ignores the checkpoints
+	 * similar to __wt_txn_visible_all, but ignores the checkpoint's
 	 * transaction.
 	 */
-	if (LF_ISSET(WT_EVICT_CHECK_SPLITS) &&
+	if (check_splits &&
 	    WT_TXNID_LE(txn_global->oldest_id, mod->inmem_split_txn))
 		return (0);
 
@@ -1117,7 +1118,7 @@ __wt_page_can_evict(
 
 /*
  * __wt_page_release_evict --
- *	Attempt to release and immediately evict a page.
+ *	Release a reference to a page, and attempt to immediately evict it.
  */
 static inline int
 __wt_page_release_evict(WT_SESSION_IMPL *session, WT_REF *ref)
@@ -1166,7 +1167,7 @@ __wt_page_release_evict(WT_SESSION_IMPL *session, WT_REF *ref)
 
 /*
  * __wt_page_release --
- *	Release a reference to a page, fail if busy during forced eviction.
+ *	Release a reference to a page.
  */
 static inline int
 __wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
@@ -1196,17 +1197,14 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 	 * memory_page_max setting, when we see many deleted items, and when we
 	 * are attempting to scan without trashing the cache.
 	 *
-	 * Skip this if eviction is disabled for this operation or this tree,
-	 * or if there is no chance of eviction succeeding for dirty pages due
-	 * to a checkpoint or because we've already tried writing this page and
-	 * it contains an update that isn't stable.  Also skip forced eviction
-	 * if we just did an in-memory split.
+	 * Fast checks if eviction is disabled for this operation or this tree,
+	 * then perform a general check if eviction will be possible.
 	 */
 	page = ref->page;
-	if (F_ISSET(btree, WT_BTREE_NO_EVICTION) ||
+	if (page->read_gen != WT_READGEN_OLDEST ||
 	    LF_ISSET(WT_READ_NO_EVICT) ||
-	    page->read_gen != WT_READGEN_OLDEST ||
-	    !__wt_page_can_evict(session, page, WT_EVICT_CHECK_SPLITS, NULL))
+	    F_ISSET(btree, WT_BTREE_NO_EVICTION) ||
+	    !__wt_page_can_evict(session, page, 1, NULL))
 		return (__wt_hazard_clear(session, page));
 
 	WT_RET_BUSY_OK(__wt_page_release_evict(session, ref));
@@ -1314,7 +1312,7 @@ __wt_skip_choose_depth(WT_SESSION_IMPL *session)
 	u_int d;
 
 	for (d = 1; d < WT_SKIP_MAXDEPTH &&
-	    __wt_random(session->rnd) < WT_SKIP_PROBABILITY; d++)
+	    __wt_random(&session->rnd) < WT_SKIP_PROBABILITY; d++)
 		;
 	return (d);
 }

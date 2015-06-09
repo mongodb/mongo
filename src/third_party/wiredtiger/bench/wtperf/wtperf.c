@@ -32,6 +32,7 @@
 static const CONFIG default_cfg = {
 	"WT_TEST",			/* home */
 	"WT_TEST",			/* monitor dir */
+	NULL,				/* partial logging */
 	NULL,				/* base_uri */
 	NULL,				/* uris */
 	NULL,				/* helium_mount */
@@ -119,13 +120,13 @@ randomize_value(CONFIG_THREAD *thread, char *value_buf)
 	 * randomly chosen byte (other than the trailing NUL).
 	 * Make sure we don't write a NUL: keep the value the same length.
 	 */
-	i = __wt_random(thread->rnd) % (thread->cfg->value_sz - 1);
+	i = __wt_random(&thread->rnd) % (thread->cfg->value_sz - 1);
 	while (value_buf[i] == '\0' && i > 0)
 		--i;
 	if (i > 0) {
 		vb = (uint8_t *)value_buf;
-		vb[0] = (__wt_random(thread->rnd) % 255) + 1;
-		vb[i] = (__wt_random(thread->rnd) % 255) + 1;
+		vb[0] = (__wt_random(&thread->rnd) % 255) + 1;
+		vb[i] = (__wt_random(&thread->rnd) % 255) + 1;
 	}
 }
 
@@ -1673,7 +1674,14 @@ create_tables(CONFIG *cfg)
 	}
 
 	for (i = 0; i < cfg->table_count; i++) {
-		if ((ret = session->create(
+		if (cfg->log_partial && i > 0) {
+			if (((ret = session->create(session,
+			    cfg->uris[i], cfg->partial_config)) != 0)) {
+				lprintf(cfg, ret, 0,
+				    "Error creating table %s", cfg->uris[i]);
+				return (ret);
+			}
+		} else if ((ret = session->create(
 		    session, cfg->uris[i], cfg->table_config)) != 0) {
 			lprintf(cfg, ret, 0,
 			    "Error creating table %s", cfg->uris[i]);
@@ -2155,6 +2163,16 @@ main(int argc, char *argv[])
 		if ((ret = config_opt_str(cfg, "table_config", tc_buf)) != 0)
 			goto err;
 	}
+	if (cfg->log_partial && cfg->table_count > 1) {
+		req_len = strlen(cfg->table_config) +
+		    strlen(LOG_PARTIAL_CONFIG) + 1;
+		if ((cfg->partial_config = calloc(req_len, 1)) == NULL) {
+			ret = enomem(cfg);
+			goto err;
+		}
+		snprintf((char *)cfg->partial_config, req_len, "%s%s",
+		    (char *)cfg->table_config, LOG_PARTIAL_CONFIG);
+	}
 
 	/* Sanity-check the configuration. */
 	if ((ret = config_sanity(cfg)) != 0)
@@ -2198,13 +2216,11 @@ start_threads(CONFIG *cfg,
 		 * new RNG state further along in the sequence.
 		 */
 		if (i == 0)
-			__wt_random_init(thread->rnd);
-		else {
-			thread->rnd[0] = (thread - 1)->rnd[0];
-			thread->rnd[1] = (thread - 1)->rnd[1];
-		}
+			__wt_random_init(&thread->rnd);
+		else
+			thread->rnd = (thread - 1)->rnd;
 		for (j = 0; j < 1000; ++j)
-			(void)__wt_random(thread->rnd);
+			(void)__wt_random(&thread->rnd);
 
 		/*
 		 * Every thread gets a key/data buffer because we don't bother
@@ -2362,7 +2378,7 @@ wtperf_rand(CONFIG_THREAD *thread)
 	 * Use WiredTiger's random number routine: it's lock-free and fairly
 	 * good.
 	 */
-	rval = (uint64_t)__wt_random(thread->rnd);
+	rval = __wt_random(&thread->rnd);
 
 	/* Use Pareto distribution to give 80/20 hot/cold values. */
 	if (cfg->pareto != 0) {

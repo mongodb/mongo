@@ -418,30 +418,22 @@ __evict_has_work(WT_SESSION_IMPL *session, uint32_t *flagsp)
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
 	uint32_t flags;
-	uint64_t bytes_inuse, bytes_max, dirty_inuse;
+	int evict, dirty;
 
 	conn = S2C(session);
 	cache = conn->cache;
-	flags = 0;
-	*flagsp = 0;
+	*flagsp = flags = 0;
 
 	if (!F_ISSET(conn, WT_CONN_EVICTION_RUN))
 		return (0);
 
-	/*
-	 * Figure out whether the cache usage exceeds either the eviction
-	 * target or the dirty target.
-	 */
-	bytes_inuse = __wt_cache_bytes_inuse(cache);
-	dirty_inuse = __wt_cache_dirty_inuse(cache);
-	bytes_max = conn->cache_size;
-
 	/* Check to see if the eviction server should run. */
-	if (bytes_inuse > (cache->eviction_target * bytes_max) / 100)
+	__wt_cache_status(session, &evict, &dirty);
+	if (evict)
+		/* The cache is too small. */
 		LF_SET(WT_EVICT_PASS_ALL);
-	else if (dirty_inuse >
-	    (cache->eviction_dirty_target * bytes_max) / 100)
-		/* Ignore clean pages unless the cache is too large */
+	else if (dirty)
+		/* Too many dirty pages, ignore clean pages. */
 		LF_SET(WT_EVICT_PASS_DIRTY);
 	else if (F_ISSET(cache, WT_CACHE_WOULD_BLOCK)) {
 		/*
@@ -1232,8 +1224,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 		}
 
 fast:		/* If the page can't be evicted, give up. */
-		if (!__wt_page_can_evict(
-		    session, page, WT_EVICT_CHECK_SPLITS, NULL))
+		if (!__wt_page_can_evict(session, page, 1, NULL))
 			continue;
 
 		/*
@@ -1513,7 +1504,12 @@ __wt_cache_wait(WT_SESSION_IMPL *session, int full)
 		WT_RET(__wt_eviction_check(session, &full, 0));
 		if (full < 100)
 			return (0);
-		else if (ret == 0)
+		/*
+		 * The value of ret is set in the switch statement above (and
+		 * not altered by WT_RET), so it's 0 or WT_NOTFOUND depending
+		 * on whether or not there was a page to evict in the queue.
+		 */
+		if (ret == 0)
 			continue;
 
 		/*
@@ -1539,6 +1535,7 @@ __wt_cache_wait(WT_SESSION_IMPL *session, int full)
 			busy = count = 1;
 	}
 }
+
 #ifdef HAVE_DIAGNOSTIC
 /*
  * __wt_cache_dump --

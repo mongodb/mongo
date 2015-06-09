@@ -946,14 +946,16 @@ struct __wt_session {
 	 * configured when the database is configured with "all"\, but the
 	 * cursor open will fail if "all" is specified when the database is
 	 * configured with "fast"\, and the cursor open will fail in all cases
-	 * when the database is configured with "none". If \c statistics is not
+	 * when the database is configured with "none". If "size" is
+	 * configured\, only the underlying size of the object on disk is filled
+	 * in and the object is not opened.  If \c statistics is not
 	 * configured\, the default configuration is the database configuration.
 	 * The "clear" configuration resets statistics after gathering them\,
 	 * where appropriate (for example\, a cache size statistic is not
 	 * cleared\, while the count of cursor insert operations will be
 	 * cleared). See @ref statistics for more information., a list\, with
 	 * values chosen from the following options: \c "all"\, \c "fast"\, \c
-	 * "clear"; default empty.}
+	 * "clear"\, \c "size"; default empty.}
 	 * @config{target, if non-empty\, backup the list of objects; valid only
 	 * for a backup data source., a list of strings; default empty.}
 	 * @configend
@@ -1104,6 +1106,12 @@ struct __wt_session {
 	 * temporarily ignored when large values are written.  The default is
 	 * one-half the size of a newly split leaf page., an integer greater
 	 * than or equal to 0; default \c 0.}
+	 * @config{log = (, the transaction log configuration for this object.
+	 * Only valid if log is enabled in ::wiredtiger_open., a set of related
+	 * configuration options defined below.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, if false\, this object has
+	 * checkpoint-level durability., a boolean flag; default \c true.}
+	 * @config{ ),,}
 	 * @config{lsm = (, options only relevant for LSM data sources., a set
 	 * of related configuration options defined below.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;auto_throttle, Throttle inserts into
@@ -1674,7 +1682,11 @@ struct __wt_connection {
 	 * @config{eviction_dirty_target, continue evicting until the cache has
 	 * less dirty memory than the value\, as a percentage of the total cache
 	 * size.  Dirty pages will only be evicted if the cache is full enough
-	 * to trigger eviction., an integer between 10 and 99; default \c 80.}
+	 * to trigger eviction., an integer between 5 and 99; default \c 80.}
+	 * @config{eviction_dirty_trigger, trigger eviction when the cache is
+	 * using this much memory for dirty content\, as a percentage of the
+	 * total cache size.  This setting only alters behavior if it is lower
+	 * than eviction_trigger., an integer between 5 and 99; default \c 95.}
 	 * @config{eviction_target, continue evicting until the cache has less
 	 * total memory than the value\, as a percentage of the total cache
 	 * size.  Must be less than \c eviction_trigger., an integer between 10
@@ -1768,11 +1780,11 @@ struct __wt_connection {
 	 * as a list\, such as <code>"verbose=[evictserver\,read]"</code>., a
 	 * list\, with values chosen from the following options: \c "api"\, \c
 	 * "block"\, \c "checkpoint"\, \c "compact"\, \c "evict"\, \c
-	 * "evictserver"\, \c "fileops"\, \c "log"\, \c "lsm"\, \c "metadata"\,
-	 * \c "mutex"\, \c "overflow"\, \c "read"\, \c "reconcile"\, \c
-	 * "recovery"\, \c "salvage"\, \c "shared_cache"\, \c "split"\, \c
-	 * "temporary"\, \c "transaction"\, \c "verify"\, \c "version"\, \c
-	 * "write"; default empty.}
+	 * "evictserver"\, \c "fileops"\, \c "log"\, \c "lsm"\, \c
+	 * "lsm_manager"\, \c "metadata"\, \c "mutex"\, \c "overflow"\, \c
+	 * "read"\, \c "reconcile"\, \c "recovery"\, \c "salvage"\, \c
+	 * "shared_cache"\, \c "split"\, \c "temporary"\, \c "transaction"\, \c
+	 * "verify"\, \c "version"\, \c "write"; default empty.}
 	 * @configend
 	 * @errors
 	 */
@@ -2068,7 +2080,7 @@ struct __wt_connection {
  * string; default \c none.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;secretkey, A string
  * that is passed to the WT_ENCRYPTOR::customize function.  It is never stored
- * in clear text\, so must be given to any subsequent wiredtiger_open calls to
+ * in clear text\, so must be given to any subsequent ::wiredtiger_open calls to
  * reopen the database.  It must also be provided to any "wt" commands used with
  * this database., a string; default empty.}
  * @config{ ),,}
@@ -2090,7 +2102,11 @@ struct __wt_connection {
  * @config{eviction_dirty_target, continue evicting until the cache has less
  * dirty memory than the value\, as a percentage of the total cache size.  Dirty
  * pages will only be evicted if the cache is full enough to trigger eviction.,
- * an integer between 10 and 99; default \c 80.}
+ * an integer between 5 and 99; default \c 80.}
+ * @config{eviction_dirty_trigger, trigger eviction when the cache is using this
+ * much memory for dirty content\, as a percentage of the total cache size.
+ * This setting only alters behavior if it is lower than eviction_trigger., an
+ * integer between 5 and 99; default \c 95.}
  * @config{eviction_target, continue evicting until the cache has less total
  * memory than the value\, as a percentage of the total cache size.  Must be
  * less than \c eviction_trigger., an integer between 10 and 99; default \c 80.}
@@ -2238,10 +2254,10 @@ struct __wt_connection {
  * list\, such as <code>"verbose=[evictserver\,read]"</code>., a list\, with
  * values chosen from the following options: \c "api"\, \c "block"\, \c
  * "checkpoint"\, \c "compact"\, \c "evict"\, \c "evictserver"\, \c "fileops"\,
- * \c "log"\, \c "lsm"\, \c "metadata"\, \c "mutex"\, \c "overflow"\, \c
- * "read"\, \c "reconcile"\, \c "recovery"\, \c "salvage"\, \c "shared_cache"\,
- * \c "split"\, \c "temporary"\, \c "transaction"\, \c "verify"\, \c "version"\,
- * \c "write"; default empty.}
+ * \c "log"\, \c "lsm"\, \c "lsm_manager"\, \c "metadata"\, \c "mutex"\, \c
+ * "overflow"\, \c "read"\, \c "reconcile"\, \c "recovery"\, \c "salvage"\, \c
+ * "shared_cache"\, \c "split"\, \c "temporary"\, \c "transaction"\, \c
+ * "verify"\, \c "version"\, \c "write"; default empty.}
  * @configend
  * Additionally, if files named \c WiredTiger.config or \c WiredTiger.basecfg
  * appear in the WiredTiger home directory, they are read for configuration
