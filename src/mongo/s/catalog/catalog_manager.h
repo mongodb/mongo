@@ -357,6 +357,9 @@ namespace mongo {
         /**
          * Updates a document in the specified namespace on the config server (only the config or
          * admin databases).
+         *
+         * NOTE: Should not be used in new code. Instead add a new metadata operation to the
+         *       interface.
          */
         Status update(const std::string& ns,
                       const BSONObj& query,

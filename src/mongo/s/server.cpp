@@ -58,6 +58,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_noop.h"
 #include "mongo/db/startup_warnings_common.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/platform/process_id.h"
 #include "mongo/s/balance.h"
 #include "mongo/s/catalog/legacy/catalog_manager_legacy.h"
@@ -255,6 +256,7 @@ static ExitCode runMongosServer( bool doUpgrade ) {
     auto shardRegistry = stdx::make_unique<ShardRegistry>(
                             stdx::make_unique<RemoteCommandTargeterFactoryImpl>(),
                             stdx::make_unique<RemoteCommandRunnerImpl>(0),
+                            std::unique_ptr<executor::TaskExecutor>{nullptr},
                             catalogManager.get());
 
     grid.init(std::move(catalogManager), std::move(shardRegistry));

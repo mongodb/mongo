@@ -901,7 +901,7 @@ namespace {
                                coll.toBSON(),
                                true,    // upsert
                                false,   // multi
-                               NULL);
+                               &response);
         if (!status.isOK()) {
             return Status(status.code(),
                           str::stream() << "collection metadata write failed: "

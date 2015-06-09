@@ -228,6 +228,7 @@ env.Install(
         ],
         LIBDEPS=[
             's/catalog/legacy/catalog_manager_legacy',
+            's/catalog/replset/catalog_manager_rs',
             's/client/sharding_connection_hook',
             's/commands/cluster_commands',
             "s/mongoscore",

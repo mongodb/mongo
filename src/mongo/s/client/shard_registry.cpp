@@ -39,6 +39,7 @@
 #include "mongo/client/remote_command_runner_impl.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/client/remote_command_targeter_factory.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard.h"
@@ -54,9 +55,11 @@ namespace mongo {
 
     ShardRegistry::ShardRegistry(std::unique_ptr<RemoteCommandTargeterFactory> targeterFactory,
                                  std::unique_ptr<RemoteCommandRunner> commandRunner,
+                                 std::unique_ptr<executor::TaskExecutor> executor,
                                  CatalogManager* catalogManager)
         :  _targeterFactory(std::move(targeterFactory)),
            _commandRunner(std::move(commandRunner)),
+           _executor(std::move(executor)),
            _catalogManager(catalogManager) {
 
     }

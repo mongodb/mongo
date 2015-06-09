@@ -83,7 +83,7 @@ namespace {
 
         BatchedCommandRequest request(insert.release());
         request.setNS(ns);
-        request.setWriteConcern(WriteConcernOptions::Acknowledged);
+        request.setWriteConcern(WriteConcernOptions::Majority);
 
         BatchedCommandResponse dummyResponse;
         if (response == NULL) {
@@ -115,7 +115,7 @@ namespace {
 
         auto_ptr<BatchedUpdateRequest> updateRequest(new BatchedUpdateRequest());
         updateRequest->addToUpdates(updateDoc.release());
-        updateRequest->setWriteConcern(WriteConcernOptions::Acknowledged);
+        updateRequest->setWriteConcern(WriteConcernOptions::Majority);
 
         BatchedCommandRequest request(updateRequest.release());
         request.setNS(ns);
@@ -140,7 +140,7 @@ namespace {
 
         auto_ptr<BatchedDeleteRequest> deleteRequest(new BatchedDeleteRequest());
         deleteRequest->addToDeletes(deleteDoc.release());
-        deleteRequest->setWriteConcern(WriteConcernOptions::Acknowledged);
+        deleteRequest->setWriteConcern(WriteConcernOptions::Majority);
 
         BatchedCommandRequest request(deleteRequest.release());
         request.setNS(ns);

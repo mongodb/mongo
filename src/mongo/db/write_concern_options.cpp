@@ -53,11 +53,12 @@ namespace {
 
 } // namespace
 
+    const char WriteConcernOptions::kMajority[] = "majority";
+
     const BSONObj WriteConcernOptions::Default = BSONObj();
     const BSONObj WriteConcernOptions::Acknowledged(BSON("w" << W_NORMAL));
     const BSONObj WriteConcernOptions::Unacknowledged(BSON("w" << W_NONE));
-
-    const char WriteConcernOptions::kMajority[] = "majority";
+    const BSONObj WriteConcernOptions::Majority(BSON("w" << WriteConcernOptions::kMajority));
 
 
     WriteConcernOptions::WriteConcernOptions(int numNodes,

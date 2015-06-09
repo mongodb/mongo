@@ -45,6 +45,10 @@ namespace mongo {
     class Shard;
     class ShardType;
 
+namespace executor {
+    class TaskExecutor;
+} // namespace executor
+
     /**
      * Maintains the set of all shards known to the MongoS instance.
      */
@@ -52,6 +56,7 @@ namespace mongo {
     public:
         ShardRegistry(std::unique_ptr<RemoteCommandTargeterFactory> targeterFactory,
                       std::unique_ptr<RemoteCommandRunner> commandRunner,
+                      std::unique_ptr<executor::TaskExecutor> executor,
                       CatalogManager* catalogManager);
 
         ~ShardRegistry();
@@ -59,6 +64,8 @@ namespace mongo {
         boost::shared_ptr<RemoteCommandTargeter> getTargeterForShard(const std::string& shardId);
 
         RemoteCommandRunner* getCommandRunner() const { return _commandRunner.get(); }
+
+        executor::TaskExecutor* getExecutor() const { return _executor.get(); }
 
         void reload();
 
@@ -95,8 +102,12 @@ namespace mongo {
         // Factory to obtain remote command targeters for shards
         const std::unique_ptr<RemoteCommandTargeterFactory> _targeterFactory;
 
-        // API to run remote commands to shards
+        // API to run remote commands to shards in a synchronous manner
         const std::unique_ptr<RemoteCommandRunner> _commandRunner;
+
+        // Executor for scheduling work and remote commands to shards that run in an asynchronous
+        // manner.
+        const std::unique_ptr<executor::TaskExecutor> _executor;
 
         // Catalog manager from which to load the shard information. Not owned and must outlive
         // the shard registry object.

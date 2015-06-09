@@ -54,6 +54,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/wire_version.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/s/catalog/legacy/catalog_manager_legacy.h"
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/client/shard_registry.h"
@@ -498,6 +499,7 @@ namespace mongo {
         auto shardRegistry = stdx::make_unique<ShardRegistry>(
                                 stdx::make_unique<RemoteCommandTargeterFactoryImpl>(),
                                 stdx::make_unique<RemoteCommandRunnerImpl>(0),
+                                std::unique_ptr<executor::TaskExecutor>{nullptr},
                                 catalogManager.get());
 
         grid.init(std::move(catalogManager), std::move(shardRegistry));

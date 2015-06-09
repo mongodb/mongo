@@ -46,6 +46,7 @@ namespace mongo {
         static const BSONObj Default;
         static const BSONObj Acknowledged;
         static const BSONObj Unacknowledged;
+        static const BSONObj Majority;
 
         static const char kMajority[]; // = "majority"
 
