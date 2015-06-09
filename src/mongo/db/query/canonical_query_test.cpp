@@ -42,18 +42,9 @@ namespace {
     static const char* ns = "somebogusns";
 
     /**
-     * Utility function to parse the given JSON as a MatchExpression and normalize the expression
-     * tree.  Returns the resulting tree, or an error Status.
+     * Helper function to parse the given BSON object as a MatchExpression, checks the status,
+     * and return the MatchExpression*.
      */
-    StatusWithMatchExpression parseNormalize(const std::string& queryStr) {
-        // TODO Parsing a MatchExpression from a temporary BSONObj is invalid.  SERVER-18086.
-        StatusWithMatchExpression swme = MatchExpressionParser::parse(fromjson(queryStr));
-        if (!swme.getStatus().isOK()) {
-            return swme;
-        }
-        return StatusWithMatchExpression(CanonicalQuery::normalizeTree(swme.getValue()));
-    }
-
     MatchExpression* parseMatchExpression(const BSONObj& obj) {
         StatusWithMatchExpression status = MatchExpressionParser::parse(obj);
         if (!status.isOK()) {
@@ -63,6 +54,18 @@ namespace {
             FAIL(ss);
         }
         return status.getValue();
+    }
+
+    /**
+     * Helper function which parses and normalizes 'queryStr', and returns whether the given
+     * (expression tree, lite parsed query) tuple passes CanonicalQuery::isValid().
+     * Returns Status::OK() if the tuple is valid, else returns an error Status.
+     */
+    Status isValid(const std::string& queryStr, const LiteParsedQuery& lpqRaw) {
+        BSONObj queryObj = fromjson(queryStr);
+        std::unique_ptr<MatchExpression> me(
+            CanonicalQuery::normalizeTree(parseMatchExpression(queryObj)));
+        return CanonicalQuery::isValid(me.get(), lpqRaw);
     }
 
     void assertEquivalent(const char* queryStr,
@@ -110,64 +113,48 @@ namespace {
                                             BSONObj(),
                                             false,      // snapshot
                                             false)));   // explain
-        unique_ptr<MatchExpression> me;
 
         // Valid: regular TEXT.
-        auto swme = parseNormalize("{$text: {$search: 's'}}");
-        ASSERT_OK(swme.getStatus());
-        me.reset(swme.getValue());
-        ASSERT_OK(CanonicalQuery::isValid(me.get(), *lpq));
+        ASSERT_OK(isValid("{$text: {$search: 's'}}", *lpq));
 
         // Valid: TEXT inside OR.
-        swme = parseNormalize(
+        ASSERT_OK(isValid(
             "{$or: ["
             "    {$text: {$search: 's'}},"
             "    {a: 1}"
-            "]}"
-        );
-        ASSERT_OK(swme.getStatus());
-        me.reset(swme.getValue());
-        ASSERT_OK(CanonicalQuery::isValid(me.get(), *lpq));
+            "]}",
+            *lpq
+        ));
 
         // Valid: TEXT outside NOR.
-        swme = parseNormalize("{$text: {$search: 's'}, $nor: [{a: 1}, {b: 1}]}");
-        ASSERT_OK(swme.getStatus());
-        me.reset(swme.getValue());
-        ASSERT_OK(CanonicalQuery::isValid(me.get(), *lpq));
+        ASSERT_OK(isValid("{$text: {$search: 's'}, $nor: [{a: 1}, {b: 1}]}", *lpq));
 
         // Invalid: TEXT inside NOR.
-        swme = parseNormalize("{$nor: [{$text: {$search: 's'}}, {a: 1}]}");
-        ASSERT_OK(swme.getStatus());
-        me.reset(swme.getValue());
-        ASSERT_NOT_OK(CanonicalQuery::isValid(me.get(), *lpq));
+        ASSERT_NOT_OK(isValid("{$nor: [{$text: {$search: 's'}}, {a: 1}]}", *lpq));
 
         // Invalid: TEXT inside NOR.
-        swme = parseNormalize(
+        ASSERT_NOT_OK(isValid(
             "{$nor: ["
             "    {$or: ["
             "        {$text: {$search: 's'}},"
             "        {a: 1}"
             "    ]},"
             "    {a: 2}"
-            "]}"
-        );
-        ASSERT_OK(swme.getStatus());
-        me.reset(swme.getValue());
-        ASSERT_NOT_OK(CanonicalQuery::isValid(me.get(), *lpq));
+            "]}",
+            *lpq
+        ));
 
         // Invalid: >1 TEXT.
-        swme = parseNormalize(
+        ASSERT_NOT_OK(isValid(
             "{$and: ["
             "    {$text: {$search: 's'}},"
             "    {$text: {$search: 't'}}"
-            "]}"
-        );
-        ASSERT_OK(swme.getStatus());
-        me.reset(swme.getValue());
-        ASSERT_NOT_OK(CanonicalQuery::isValid(me.get(), *lpq));
+            "]}",
+            *lpq
+        ));
 
         // Invalid: >1 TEXT.
-        swme = parseNormalize(
+        ASSERT_NOT_OK(isValid(
             "{$and: ["
             "    {$or: ["
             "        {$text: {$search: 's'}},"
@@ -177,11 +164,9 @@ namespace {
             "        {$text: {$search: 't'}},"
             "        {b: 1}"
             "    ]}"
-            "]}"
-        );
-        ASSERT_OK(swme.getStatus());
-        me.reset(swme.getValue());
-        ASSERT_NOT_OK(CanonicalQuery::isValid(me.get(), *lpq));
+            "]}",
+            *lpq
+        ));
     }
 
     TEST(CanonicalQueryTest, IsValidGeo) {
@@ -200,52 +185,42 @@ namespace {
                                             BSONObj(),
                                             false,      // snapshot
                                             false)));   // explain
-        unique_ptr<MatchExpression> me;
 
         // Valid: regular GEO_NEAR.
-        auto swme = parseNormalize("{a: {$near: [0, 0]}}");
-        ASSERT_OK(swme.getStatus());
-        me.reset(swme.getValue());
-        ASSERT_OK(CanonicalQuery::isValid(me.get(), *lpq));
+        ASSERT_OK(isValid("{a: {$near: [0, 0]}}", *lpq));
 
         // Valid: GEO_NEAR inside nested AND.
-        swme = parseNormalize(
+        ASSERT_OK(isValid(
             "{$and: ["
             "    {$and: ["
             "        {a: {$near: [0, 0]}},"
             "        {b: 1}"
             "    ]},"
             "    {c: 1}"
-            "]}"
-        );
-        ASSERT_OK(swme.getStatus());
-        me.reset(swme.getValue());
-        ASSERT_OK(CanonicalQuery::isValid(me.get(), *lpq));
+            "]}",
+            *lpq
+        ));
 
         // Invalid: >1 GEO_NEAR.
-        swme = parseNormalize(
+        ASSERT_NOT_OK(isValid(
             "{$and: ["
             "    {a: {$near: [0, 0]}},"
             "    {b: {$near: [0, 0]}}"
-            "]}"
-        );
-        ASSERT_OK(swme.getStatus());
-        me.reset(swme.getValue());
-        ASSERT_NOT_OK(CanonicalQuery::isValid(me.get(), *lpq));
+            "]}",
+            *lpq
+        ));
 
         // Invalid: >1 GEO_NEAR.
-        swme = parseNormalize(
+        ASSERT_NOT_OK(isValid(
             "{$and: ["
             "    {a: {$geoNear: [0, 0]}},"
             "    {b: {$near: [0, 0]}}"
-            "]}"
-        );
-        ASSERT_OK(swme.getStatus());
-        me.reset(swme.getValue());
-        ASSERT_NOT_OK(CanonicalQuery::isValid(me.get(), *lpq));
+            "]}",
+            *lpq
+        ));
 
         // Invalid: >1 GEO_NEAR.
-        swme = parseNormalize(
+        ASSERT_NOT_OK(isValid(
             "{$and: ["
             "    {$and: ["
             "        {a: {$near: [0, 0]}},"
@@ -255,33 +230,27 @@ namespace {
             "        {c: {$near: [0, 0]}},"
             "        {d: 1}"
             "    ]}"
-            "]}"
-        );
-        ASSERT_OK(swme.getStatus());
-        me.reset(swme.getValue());
-        ASSERT_NOT_OK(CanonicalQuery::isValid(me.get(), *lpq));
+            "]}",
+            *lpq
+        ));
 
         // Invalid: GEO_NEAR inside NOR.
-        swme = parseNormalize(
+        ASSERT_NOT_OK(isValid(
             "{$nor: ["
             "    {a: {$near: [0, 0]}},"
             "    {b: 1}"
-            "]}"
-        );
-        ASSERT_OK(swme.getStatus());
-        me.reset(swme.getValue());
-        ASSERT_NOT_OK(CanonicalQuery::isValid(me.get(), *lpq));
+            "]}",
+            *lpq
+        ));
 
         // Invalid: GEO_NEAR inside OR.
-        swme = parseNormalize(
+        ASSERT_NOT_OK(isValid(
             "{$or: ["
             "    {a: {$near: [0, 0]}},"
             "    {b: 1}"
-            "]}"
-        );
-        ASSERT_OK(swme.getStatus());
-        me.reset(swme.getValue());
-        ASSERT_NOT_OK(CanonicalQuery::isValid(me.get(), *lpq));
+            "]}",
+            *lpq
+        ));
     }
 
     TEST(CanonicalQueryTest, IsValidTextAndGeo) {
@@ -300,31 +269,22 @@ namespace {
                                             BSONObj(),
                                             false,      // snapshot
                                             false)));   // explain
-        unique_ptr<MatchExpression> me;
 
         // Invalid: TEXT and GEO_NEAR.
-        auto swme = parseNormalize("{$text: {$search: 's'}, a: {$near: [0, 0]}}");
-        ASSERT_OK(swme.getStatus());
-        me.reset(swme.getValue());
-        ASSERT_NOT_OK(CanonicalQuery::isValid(me.get(), *lpq));
+        ASSERT_NOT_OK(isValid("{$text: {$search: 's'}, a: {$near: [0, 0]}}", *lpq));
 
         // Invalid: TEXT and GEO_NEAR.
-        swme = parseNormalize("{$text: {$search: 's'}, a: {$geoNear: [0, 0]}}");
-        ASSERT_OK(swme.getStatus());
-        me.reset(swme.getValue());
-        ASSERT_NOT_OK(CanonicalQuery::isValid(me.get(), *lpq));
+        ASSERT_NOT_OK(isValid("{$text: {$search: 's'}, a: {$geoNear: [0, 0]}}", *lpq));
 
         // Invalid: TEXT and GEO_NEAR.
-        swme = parseNormalize(
+        ASSERT_NOT_OK(isValid(
             "{$or: ["
             "    {$text: {$search: 's'}},"
             "    {a: 1}"
             " ],"
-            " b: {$near: [0, 0]}}"
-        );
-        ASSERT_OK(swme.getStatus());
-        me.reset(swme.getValue());
-        ASSERT_NOT_OK(CanonicalQuery::isValid(me.get(), *lpq));
+            " b: {$near: [0, 0]}}",
+            *lpq
+        ));
     }
 
     TEST(CanonicalQueryTest, IsValidTextAndNaturalAscending) {
@@ -344,13 +304,9 @@ namespace {
                                             BSONObj(),
                                             false,      // snapshot
                                             false)));   // explain
-        unique_ptr<MatchExpression> me;
 
         // Invalid: TEXT and {$natural: 1} sort order.
-        auto swme = parseNormalize("{$text: {$search: 's'}}");
-        ASSERT_OK(swme.getStatus());
-        me.reset(swme.getValue());
-        ASSERT_NOT_OK(CanonicalQuery::isValid(me.get(), *lpq));
+        ASSERT_NOT_OK(isValid("{$text: {$search: 's'}}", *lpq));
     }
 
     TEST(CanonicalQueryTest, IsValidTextAndNaturalDescending) {
@@ -370,13 +326,9 @@ namespace {
                                             BSONObj(),
                                             false,      // snapshot
                                             false)));   // explain
-        unique_ptr<MatchExpression> me;
 
         // Invalid: TEXT and {$natural: -1} sort order.
-        auto swme = parseNormalize("{$text: {$search: 's'}}");
-        ASSERT_OK(swme.getStatus());
-        me.reset(swme.getValue());
-        ASSERT_NOT_OK(CanonicalQuery::isValid(me.get(), *lpq));
+        ASSERT_NOT_OK(isValid("{$text: {$search: 's'}}", *lpq));
     }
 
     TEST(CanonicalQueryTest, IsValidTextAndHint) {
@@ -396,13 +348,9 @@ namespace {
                                             BSONObj(),
                                             false,      // snapshot
                                             false)));   // explain
-        unique_ptr<MatchExpression> me;
 
         // Invalid: TEXT and {$natural: -1} sort order.
-        auto swme = parseNormalize("{$text: {$search: 's'}}");
-        ASSERT_OK(swme.getStatus());
-        me.reset(swme.getValue());
-        ASSERT_NOT_OK(CanonicalQuery::isValid(me.get(), *lpq));
+        ASSERT_NOT_OK(isValid("{$text: {$search: 's'}}", *lpq));
     }
 
     // SERVER-14366
@@ -423,13 +371,10 @@ namespace {
                                             BSONObj(),
                                             false,      // snapshot
                                             false)));   // explain
-        unique_ptr<MatchExpression> me;
 
         // Invalid: GEO_NEAR and {$natural: 1} sort order.
-        auto swme = parseNormalize("{a: {$near: {$geometry: {type: 'Point', coordinates: [0, 0]}}}}");
-        ASSERT_OK(swme.getStatus());
-        me.reset(swme.getValue());
-        ASSERT_NOT_OK(CanonicalQuery::isValid(me.get(), *lpq));
+        ASSERT_NOT_OK(isValid("{a: {$near: {$geometry: {type: 'Point', coordinates: [0, 0]}}}}",
+                              *lpq));
     }
 
     // SERVER-14366
@@ -450,13 +395,10 @@ namespace {
                                             BSONObj(),
                                             false,      // snapshot
                                             false)));   // explain
-        unique_ptr<MatchExpression> me;
 
         // Invalid: GEO_NEAR and {$natural: 1} hint.
-        auto swme = parseNormalize("{a: {$near: {$geometry: {type: 'Point', coordinates: [0, 0]}}}}");
-        ASSERT_OK(swme.getStatus());
-        me.reset(swme.getValue());
-        ASSERT_NOT_OK(CanonicalQuery::isValid(me.get(), *lpq));
+        ASSERT_NOT_OK(isValid("{a: {$near: {$geometry: {type: 'Point', coordinates: [0, 0]}}}}",
+                              *lpq));
     }
 
     TEST(CanonicalQueryTest, IsValidTextAndSnapshot) {
@@ -476,13 +418,9 @@ namespace {
                                             BSONObj(),
                                             snapshot,
                                             false)));   // explain
-        unique_ptr<MatchExpression> me;
 
         // Invalid: TEXT and snapshot.
-        auto swme = parseNormalize("{$text: {$search: 's'}}");
-        ASSERT_OK(swme.getStatus());
-        me.reset(swme.getValue());
-        ASSERT_NOT_OK(CanonicalQuery::isValid(me.get(), *lpq));
+        ASSERT_NOT_OK(isValid("{$text: {$search: 's'}}", *lpq));
     }
 
     //
