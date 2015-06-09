@@ -36,8 +36,6 @@ functions:
           chmod +x mongod
           chmod +x mongo
           git clone https://github.com/mongodb/mongo-perf perf
-          pwd 
-          ls
           cd perf
           git checkout evergreen
     - command: shell.exec
@@ -55,10 +53,19 @@ functions:
       params:
         working_dir: src
         script: |
+          set -e
+          set -v
+          virtualenv ./venv
+          source ./venv/bin/activate
+          pip install argparse
+
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
           set -e 
           set -v
-          pwd 
-          ls
+          source ./venv/bin/activate
           cd perf
           #  give mongod a few seconds to start up so that we can connect.
           sleep 5
@@ -139,7 +146,7 @@ buildvariants:
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release --variant-dir="linux2/release"
 
   run_on:
-  - "ubuntu1404-test"
+  - "centos6-perf"
   tasks:
   - name: compile
     distros:
