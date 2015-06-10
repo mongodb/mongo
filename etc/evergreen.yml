@@ -2183,23 +2183,6 @@ buildvariants:
     distros:
     - rhel55-test
 
-# This build variant was introduced in BUILD-374 to ensure we maintain
-# compatibility with C++03 after turning on C++11 for all build varaints.
-- name: linux-64-cxx03
-  display_name: C++03 Enterprise RHEL 5.5 SSL/Debug 64-bit
-  modules:
-  - enterprise
-  run_on:
-  - rhel55
-  expansions:
-    gitvars: LD_LIBRARY_PATH=/opt/openssl/lib64 #needed to workaround the old openSSL on rhel55 builders.
-    gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
-    compile_flags: --dbg=on --ssl --ssl-fips-capability -j$(grep -c ^processor /proc/cpuinfo) --cc=/opt/mongodbtoolchain/bin/gcc --cxx=/opt/mongodbtoolchain/bin/g++ --variant-dir="linux2/release" --c++11=off
-    test_flags: --continue-on-failure
-    has_debugsymbols: false
-  tasks:
-  - name: compile
-
 - name: linux-64-debug
   display_name: Linux 64-bit DEBUG
   modules: ~
