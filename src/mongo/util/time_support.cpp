@@ -46,6 +46,7 @@
 #ifdef _WIN32
 #include <boost/date_time/filetime_functions.hpp>
 #include "mongo/util/concurrency/mutex.h"
+#include "mongo/util/system_tick_source.h"
 #include "mongo/util/timer.h"
 
 // NOTE(schwerin): MSVC's _snprintf is not a drop-in replacement for C99's snprintf().  In
@@ -972,7 +973,7 @@ namespace {
         SimpleMutex::scoped_lock lkRead(_curTimeMicros64ReadMutex);
         baseFiletime = ftNew;
         basePerfCounter = newPerfCounter;
-        resyncInterval = 60 * Timer::getCountsPerSecond();
+        resyncInterval = 60 * SystemTickSource::get()->getTicksPerSecond();
         return newPerfCounter;
     }
 
@@ -1010,7 +1011,8 @@ namespace {
         // truncation while using only integer instructions.
         //
         unsigned long long computedTime = baseFiletime +
-                ((perfCounter - basePerfCounter) * 10 * 1000 * 1000) / Timer::getCountsPerSecond();
+                ((perfCounter - basePerfCounter) * 10 * 1000 * 1000) /
+                SystemTickSource::get()->getTicksPerSecond();
 
         // Convert the computed FILETIME into microseconds since the Unix epoch (1/1/1970).
         //
@@ -1025,7 +1027,7 @@ namespace {
         return secs*1000000 + t;
     }
 #else
-#  include <sys/time.h>
+#include <sys/time.h>
     unsigned long long curTimeMillis64() {
         timeval tv;
         gettimeofday(&tv, NULL);

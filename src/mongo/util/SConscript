@@ -105,6 +105,7 @@ env.Library(
         'file.cpp',
         'log.cpp',
         'platform_init.cpp',
+        'system_tick_source.cpp',
         'text.cpp',
         'thread_safe_string.cpp',
         'time_support.cpp',
