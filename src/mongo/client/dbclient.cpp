@@ -286,28 +286,30 @@ namespace {
             maybeInterposedCommand = hookInterposedBob.obj();
         }
 
-        auto requestBuilder =
-            rpc::makeRequestBuilder(getClientRPCProtocols(), getServerRPCProtocols());
+    rpc::UniqueReply DBClientWithCommands::runCommandWithMetadata(StringData database,
+                                                                  StringData command,
+                                                                  const BSONObj& metadata,
+                                                                  const BSONObj& commandArgs) {
+        BSONObjBuilder metadataBob;
+        metadataBob.appendElements(metadata);
 
         // upconvert command and metadata to new format
         // right now this only handles slaveOk
         BSONObj upconvertedCmd;
         BSONObj upconvertedMetadata;
 
-        // TODO: This will be downconverted immediately if the underlying
-        // requestBuilder is a legacyRequest builder. Not sure what the best
-        // way to get around that is without breaking the abstraction.
-        std::tie(upconvertedCmd, upconvertedMetadata) = uassertStatusOK(
-            rpc::upconvertRequestMetadata(maybeInterposedCommand, options)
-        );
+        uassert(ErrorCodes::InvalidNamespace, str::stream() << "Database name '" << database
+                                                            << "' is not valid.",
+                NamespaceString::validDBName(database));
 
-        auto commandName = upconvertedCmd.firstElementFieldName();
+        auto requestBuilder = rpc::makeRequestBuilder(getClientRPCProtocols(),
+                                                      getServerRPCProtocols());
 
-        auto requestMsg = requestBuilder->setDatabase(dbname)
-                                         .setCommandName(commandName)
-                                         .setMetadata(upconvertedMetadata)
-                                         .setCommandArgs(upconvertedCmd)
-                                         .done();
+        requestBuilder->setDatabase(database);
+        requestBuilder->setCommandName(command);
+        requestBuilder->setMetadata(metadataBob.done());
+        requestBuilder->setCommandArgs(commandArgs);
+        auto requestMsg = requestBuilder->done();
 
         auto replyMsg = stdx::make_unique<Message>();
         // call oddly takes this by pointer, so we need to put it on the stack.
@@ -318,10 +320,8 @@ namespace {
         // more helpful error message. Note that call() can itself throw a socket exception.
         uassert(ErrorCodes::HostUnreachable,
                 str::stream() << "network error while attempting to run "
-                              << "command '" << commandName << "' "
-                              << "on host '" << host << "' "
-                              << "with arguments '" << upconvertedCmd << "' "
-                              << "and metadata '" << upconvertedMetadata << "' ",
+                              << "command '" << command << "' "
+                              << "on host '" << host << "' ",
                 call(*requestMsg, *replyMsg, false, &host));
 
         auto commandReply = rpc::makeReply(replyMsg.get(),
@@ -339,6 +339,32 @@ namespace {
         if (_postRunCommandHook) {
             _postRunCommandHook(info, host);
         }
+
+        return rpc::UniqueReply(std::move(replyMsg), std::move(commandReply));
+    }
+
+    bool DBClientWithCommands::runCommand(const string& dbname,
+                                          const BSONObj& cmd,
+                                          BSONObj &info,
+                                          int options) {
+        BSONObj upconvertedCmd;
+        BSONObj upconvertedMetadata;
+
+        // TODO: This will be downconverted immediately if the underlying
+        // requestBuilder is a legacyRequest builder. Not sure what the best
+        // way to get around that is without breaking the abstraction.
+        std::tie(upconvertedCmd, upconvertedMetadata) = uassertStatusOK(
+            rpc::upconvertRequestMetadata(cmd, options)
+        );
+
+        auto commandName = upconvertedCmd.firstElementFieldName();
+
+        auto result = runCommandWithMetadata(dbname,
+                                             commandName,
+                                             upconvertedMetadata,
+                                             upconvertedCmd);
+
+        info = result->getCommandReply().getOwned();
 
         return isOk(info);
     }

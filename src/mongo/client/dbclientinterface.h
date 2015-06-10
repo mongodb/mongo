@@ -37,6 +37,8 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/cstdint.h"
 #include "mongo/rpc/protocol.h"
+#include "mongo/rpc/metadata.h"
+#include "mongo/rpc/unique_message.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/message.h"
@@ -435,9 +437,17 @@ namespace mongo {
 
         void setClientRPCProtocols(rpc::ProtocolSet clientProtocols);
 
-        // TODO: add variant of runCommand that takes a RequestInterface when we have
-        // an owned Reply type
-        // virtual StatusWith<OwnedReply> runCommand(const RequestInterface& request);
+
+        /**
+         * Runs a database command. This variant allows the caller to manually specify the metadata
+         * for the request, and receive it for the reply.
+         *
+         * TODO: rename this to runCommand, and change the old one to runCommandLegacy.
+         */
+        virtual rpc::UniqueReply runCommandWithMetadata(StringData database,
+                                                        StringData command,
+                                                        const BSONObj& metadata,
+                                                        const BSONObj& commandArgs);
 
         /** Run a database command.  Database commands are represented as BSON objects.  Common database
             commands have prebuilt helper functions -- see below.  If a helper is not available you can
