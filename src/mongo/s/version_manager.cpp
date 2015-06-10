@@ -283,8 +283,7 @@ namespace mongo {
             return initShardVersionEmptyNS(conn_in);
         }
 
-        const NamespaceString nss(ns);
-        auto status = grid.catalogCache()->getDatabase(nss.db().toString());
+        auto status = grid.catalogCache()->getDatabase(nsToDatabase(ns));
         if (!status.isOK()) {
             return false;
         }

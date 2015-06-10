@@ -87,7 +87,11 @@ namespace mongo {
     static bool doShardedIndexQuery(Request& r, const QuerySpec& qSpec) {
         // Extract the ns field from the query, which may be embedded within the "query" or
         // "$query" field.
-        const NamespaceString indexNSSQuery(qSpec.filter()["ns"].str());
+        auto nsField = qSpec.filter()["ns"];
+        if (nsField.eoo()) {
+            return false;
+        }
+        const NamespaceString indexNSSQuery(nsField.str());
 
         auto status = grid.catalogCache()->getDatabase(indexNSSQuery.db().toString());
         if (!status.isOK()) {

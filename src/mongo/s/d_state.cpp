@@ -1083,7 +1083,7 @@ namespace mongo {
 
             // we can run on a slave up to here
             if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(
-                        NamespaceString(ns).db())) {
+                        nsToDatabase(ns))) {
                 result.append( "errmsg" , "not master" );
                 result.append( "note" , "from post init in setShardVersion" );
                 return false;
@@ -1362,7 +1362,7 @@ namespace mongo {
             return true;
 
         if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(
-                NamespaceString(ns).db()))  {
+                nsToDatabase(ns)))  {
             // right now connections to secondaries aren't versioned at all
             return true;
         }

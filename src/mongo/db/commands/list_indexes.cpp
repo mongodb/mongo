@@ -99,12 +99,13 @@ namespace mongo {
                 str::stream() << "Argument to listIndexes must be of type String, not "
                               << typeName(first.type()),
                 first.type() == String);
-            const NamespaceString ns(parseNs(dbname, cmdObj));
+            StringData collectionName = first.valueStringData();
             uassert(
                 28529,
                 str::stream() << "Argument to listIndexes must be a collection name, "
                               << "not the empty string",
-                !ns.coll().empty());
+                !collectionName.empty());
+            const NamespaceString ns(dbname, collectionName);
 
             const long long defaultBatchSize = std::numeric_limits<long long>::max();
             long long batchSize;

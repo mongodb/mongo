@@ -48,7 +48,7 @@ namespace {
     using std::string;
     using std::vector;
 
-    static const char* ns = "somebogusns";
+    static const char* ns = "test.t";
 
     /**
      * Utility function to get list of index filters from the query settings.

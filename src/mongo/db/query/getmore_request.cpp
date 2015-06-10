@@ -31,9 +31,11 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/query/getmore_request.h"
+#include "mongo/db/namespace_string.h"
 
 #include <boost/optional.hpp>
 
+#include "mongo/util/assert_util.h"
 #include "mongo/util/stringutils.h"
 
 namespace mongo {
@@ -80,6 +82,8 @@ namespace mongo {
     // static
     StatusWith<GetMoreRequest> GetMoreRequest::parseFromBSON(const std::string& dbname,
                                                              const BSONObj& cmdObj) {
+        invariant(!dbname.empty());
+
         // Required fields.
         boost::optional<CursorId> cursorid;
         boost::optional<std::string> fullns;

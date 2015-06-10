@@ -89,14 +89,6 @@ namespace {
         ASSERT_EQUALS(ErrorCodes::TypeMismatch, result.getStatus().code());
     }
 
-    TEST(GetMoreRequestTest, parseFromBSONInvalidDbName) {
-        StatusWith<GetMoreRequest> result = GetMoreRequest::parseFromBSON(
-            "",
-            BSON("getMore" << CursorId(123) << "collection" << "coll"));
-        ASSERT_NOT_OK(result.getStatus());
-        ASSERT_EQUALS(ErrorCodes::BadValue, result.getStatus().code());
-    }
-
     TEST(GetMoreRequestTest, parseFromBSONInvalidCursorId) {
         StatusWith<GetMoreRequest> result = GetMoreRequest::parseFromBSON(
             "db",
