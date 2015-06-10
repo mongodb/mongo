@@ -85,6 +85,15 @@ namespace mongo {
         ASSERT_FALSE(expression::isSubsetOf(a1C3.get(), a1BNullC3.get()));
     }
 
+    TEST(ExpressionAlgoIsSubsetOf, NullAndIn) {
+        ParsedMatchExpression eqNull("{x: null}");
+        ParsedMatchExpression inNull("{x: {$in: [null]}}");
+        ParsedMatchExpression inNullOr2("{x: {$in: [null, 2]}}");
+
+        ASSERT_TRUE(expression::isSubsetOf(inNull.get(), eqNull.get()));
+        ASSERT_FALSE(expression::isSubsetOf(inNullOr2.get(), eqNull.get()));
+    }
+
     TEST(ExpressionAlgoIsSubsetOf, NullAndExists) {
         ParsedMatchExpression null("{x: null}");
         ParsedMatchExpression exists("{x: {$exists: true}}");
@@ -98,6 +107,7 @@ namespace mongo {
         ParsedMatchExpression lte("{x: {$lte: 5}}");
         ParsedMatchExpression gte("{x: {$gte: 5}}");
         ParsedMatchExpression gt("{x: {$gt: 5}}");
+        ParsedMatchExpression in("{x: {$in: [5]}}");
 
         ASSERT_TRUE(expression::isSubsetOf(nan.get(), nan.get()));
         ASSERT_FALSE(expression::isSubsetOf(nan.get(), lt.get()));
@@ -108,6 +118,8 @@ namespace mongo {
         ASSERT_FALSE(expression::isSubsetOf(gte.get(), nan.get()));
         ASSERT_FALSE(expression::isSubsetOf(nan.get(), gt.get()));
         ASSERT_FALSE(expression::isSubsetOf(gt.get(), nan.get()));
+        ASSERT_FALSE(expression::isSubsetOf(nan.get(), in.get()));
+        ASSERT_FALSE(expression::isSubsetOf(in.get(), nan.get()));
     }
 
     TEST(ExpressionAlgoIsSubsetOf, Compare_EQ) {
@@ -240,6 +252,17 @@ namespace mongo {
         ASSERT_FALSE(expression::isSubsetOf(filter.get(), query.get()));
     }
 
+    TEST(ExpressionAlgoIsSubsetOf, MultiplePointsInBoundedRange) {
+        ParsedMatchExpression filter("{a: {$gt: 5, $lt: 10}}");
+        ParsedMatchExpression queryAllInside("{a: {$in: [6, 7, 8]}}");
+        ParsedMatchExpression queryStraddleLower("{a: {$in: [4.9, 5.1]}}");
+        ParsedMatchExpression queryStraddleUpper("{a: {$in: [9.9, 10.1]}}");
+
+        ASSERT_TRUE(expression::isSubsetOf(queryAllInside.get(), filter.get()));
+        ASSERT_FALSE(expression::isSubsetOf(queryStraddleLower.get(), filter.get()));
+        ASSERT_FALSE(expression::isSubsetOf(queryStraddleUpper.get(), filter.get()));
+    }
+
     TEST(ExpressionAlgoIsSubsetOf, PointInCompoundRange) {
         ParsedMatchExpression filter("{a: {$gt: 5}, b: {$gt: 6}, c: {$gt: 7}}");
         ParsedMatchExpression query("{a: 10, b: 10, c: 10}");
@@ -310,6 +333,143 @@ namespace mongo {
         ASSERT_FALSE(expression::isSubsetOf(onlyA.get(), filter.get()));
         ASSERT_FALSE(expression::isSubsetOf(onlyB.get(), filter.get()));
         ASSERT_TRUE(expression::isSubsetOf(both.get(), filter.get()));
+    }
+
+    TEST(ExpressionAlgoIsSubsetOf, Compare_LT_In) {
+        ParsedMatchExpression lt("{a: {$lt: 5}}");
+
+        ParsedMatchExpression inLt("{a: {$in: [4.9]}}");
+        ParsedMatchExpression inEq("{a: {$in: [5]}}");
+        ParsedMatchExpression inGt("{a: {$in: [5.1]}}");
+        ParsedMatchExpression inNull("{a: {$in: [null]}}");
+
+        ParsedMatchExpression inAllEq("{a: {$in: [5, 5.0]}}");
+        ParsedMatchExpression inAllLte("{a: {$in: [4.9, 5]}}");
+        ParsedMatchExpression inAllLt("{a: {$in: [2, 3, 4]}}");
+        ParsedMatchExpression inStraddle("{a: {$in: [4, 6]}}");
+        ParsedMatchExpression inLtAndNull("{a: {$in: [1, null]}}");
+
+        ASSERT_TRUE(expression::isSubsetOf(inLt.get(), lt.get()));
+        ASSERT_FALSE(expression::isSubsetOf(inEq.get(), lt.get()));
+        ASSERT_FALSE(expression::isSubsetOf(inGt.get(), lt.get()));
+
+        ASSERT_FALSE(expression::isSubsetOf(inAllEq.get(), lt.get()));
+        ASSERT_FALSE(expression::isSubsetOf(inAllLte.get(), lt.get()));
+        ASSERT_TRUE(expression::isSubsetOf(inAllLt.get(), lt.get()));
+        ASSERT_FALSE(expression::isSubsetOf(inStraddle.get(), lt.get()));
+        ASSERT_FALSE(expression::isSubsetOf(inLtAndNull.get(), lt.get()));
+    }
+
+    TEST(ExpressionAlgoIsSubsetOf, Compare_LTE_In) {
+        ParsedMatchExpression lte("{a: {$lte: 5}}");
+
+        ParsedMatchExpression inLt("{a: {$in: [4.9]}}");
+        ParsedMatchExpression inEq("{a: {$in: [5]}}");
+        ParsedMatchExpression inGt("{a: {$in: [5.1]}}");
+        ParsedMatchExpression inNull("{a: {$in: [null]}}");
+
+        ParsedMatchExpression inAllEq("{a: {$in: [5, 5.0]}}");
+        ParsedMatchExpression inAllLte("{a: {$in: [4.9, 5]}}");
+        ParsedMatchExpression inAllLt("{a: {$in: [2, 3, 4]}}");
+        ParsedMatchExpression inStraddle("{a: {$in: [4, 6]}}");
+        ParsedMatchExpression inLtAndNull("{a: {$in: [1, null]}}");
+
+        ASSERT_TRUE(expression::isSubsetOf(inLt.get(), lte.get()));
+        ASSERT_TRUE(expression::isSubsetOf(inEq.get(), lte.get()));
+        ASSERT_FALSE(expression::isSubsetOf(inGt.get(), lte.get()));
+
+        ASSERT_TRUE(expression::isSubsetOf(inAllEq.get(), lte.get()));
+        ASSERT_TRUE(expression::isSubsetOf(inAllLte.get(), lte.get()));
+        ASSERT_TRUE(expression::isSubsetOf(inAllLt.get(), lte.get()));
+        ASSERT_FALSE(expression::isSubsetOf(inStraddle.get(), lte.get()));
+        ASSERT_FALSE(expression::isSubsetOf(inLtAndNull.get(), lte.get()));
+    }
+
+    TEST(ExpressionAlgoIsSubsetOf, Compare_EQ_In) {
+        ParsedMatchExpression eq("{a: 5}");
+
+        ParsedMatchExpression inLt("{a: {$in: [4.9]}}");
+        ParsedMatchExpression inEq("{a: {$in: [5]}}");
+        ParsedMatchExpression inGt("{a: {$in: [5.1]}}");
+        ParsedMatchExpression inNull("{a: {$in: [null]}}");
+
+        ParsedMatchExpression inAllEq("{a: {$in: [5, 5.0]}}");
+        ParsedMatchExpression inStraddle("{a: {$in: [4, 6]}}");
+        ParsedMatchExpression inEqAndNull("{a: {$in: [5, null]}}");
+
+        ASSERT_FALSE(expression::isSubsetOf(inLt.get(), eq.get()));
+        ASSERT_TRUE(expression::isSubsetOf(inEq.get(), eq.get()));
+        ASSERT_FALSE(expression::isSubsetOf(inGt.get(), eq.get()));
+
+        ASSERT_TRUE(expression::isSubsetOf(inAllEq.get(), eq.get()));
+        ASSERT_FALSE(expression::isSubsetOf(inStraddle.get(), eq.get()));
+        ASSERT_FALSE(expression::isSubsetOf(inEqAndNull.get(), eq.get()));
+    }
+
+    TEST(ExpressionAlgoIsSubsetOf, Compare_GT_In) {
+        ParsedMatchExpression gt("{a: {$gt: 5}}");
+
+        ParsedMatchExpression inLt("{a: {$in: [4.9]}}");
+        ParsedMatchExpression inEq("{a: {$in: [5]}}");
+        ParsedMatchExpression inGt("{a: {$in: [5.1]}}");
+        ParsedMatchExpression inNull("{a: {$in: [null]}}");
+
+        ParsedMatchExpression inAllEq("{a: {$in: [5, 5.0]}}");
+        ParsedMatchExpression inAllGte("{a: {$in: [5, 5.1]}}");
+        ParsedMatchExpression inAllGt("{a: {$in: [6, 7, 8]}}");
+        ParsedMatchExpression inStraddle("{a: {$in: [4, 6]}}");
+        ParsedMatchExpression inGtAndNull("{a: {$in: [9, null]}}");
+
+        ASSERT_FALSE(expression::isSubsetOf(inLt.get(), gt.get()));
+        ASSERT_FALSE(expression::isSubsetOf(inEq.get(), gt.get()));
+        ASSERT_TRUE(expression::isSubsetOf(inGt.get(), gt.get()));
+
+        ASSERT_FALSE(expression::isSubsetOf(inAllEq.get(), gt.get()));
+        ASSERT_FALSE(expression::isSubsetOf(inAllGte.get(), gt.get()));
+        ASSERT_TRUE(expression::isSubsetOf(inAllGt.get(), gt.get()));
+        ASSERT_FALSE(expression::isSubsetOf(inStraddle.get(), gt.get()));
+        ASSERT_FALSE(expression::isSubsetOf(inGtAndNull.get(), gt.get()));
+    }
+
+    TEST(ExpressionAlgoIsSubsetOf, Compare_GTE_In) {
+        ParsedMatchExpression gte("{a: {$gte: 5}}");
+
+        ParsedMatchExpression inLt("{a: {$in: [4.9]}}");
+        ParsedMatchExpression inEq("{a: {$in: [5]}}");
+        ParsedMatchExpression inGt("{a: {$in: [5.1]}}");
+        ParsedMatchExpression inNull("{a: {$in: [null]}}");
+
+        ParsedMatchExpression inAllEq("{a: {$in: [5, 5.0]}}");
+        ParsedMatchExpression inAllGte("{a: {$in: [5, 5.1]}}");
+        ParsedMatchExpression inAllGt("{a: {$in: [6, 7, 8]}}");
+        ParsedMatchExpression inStraddle("{a: {$in: [4, 6]}}");
+        ParsedMatchExpression inGtAndNull("{a: {$in: [9, null]}}");
+
+        ASSERT_FALSE(expression::isSubsetOf(inLt.get(), gte.get()));
+        ASSERT_TRUE(expression::isSubsetOf(inEq.get(), gte.get()));
+        ASSERT_TRUE(expression::isSubsetOf(inGt.get(), gte.get()));
+
+        ASSERT_TRUE(expression::isSubsetOf(inAllEq.get(), gte.get()));
+        ASSERT_TRUE(expression::isSubsetOf(inAllGte.get(), gte.get()));
+        ASSERT_TRUE(expression::isSubsetOf(inAllGt.get(), gte.get()));
+        ASSERT_FALSE(expression::isSubsetOf(inStraddle.get(), gte.get()));
+        ASSERT_FALSE(expression::isSubsetOf(inGtAndNull.get(), gte.get()));
+    }
+
+    TEST(ExpressionAlgoIsSubsetOf, RegexAndIn) {
+        ParsedMatchExpression eq1("{x: 1}");
+        ParsedMatchExpression eqA("{x: 'a'}");
+        ParsedMatchExpression inRegexA("{x: {$in: [/a/]}}");
+        ParsedMatchExpression inRegexAbc("{x: {$in: [/abc/]}}");
+        ParsedMatchExpression inRegexAOrEq1("{x: {$in: [/a/, 1]}}");
+        ParsedMatchExpression inRegexAOrNull("{x: {$in: [/a/, null]}}");
+
+        ASSERT_TRUE(expression::isSubsetOf(inRegexA.get(), inRegexA.get()));
+        ASSERT_FALSE(expression::isSubsetOf(inRegexAbc.get(), inRegexA.get()));
+        ASSERT_FALSE(expression::isSubsetOf(inRegexA.get(), inRegexAOrEq1.get()));
+        ASSERT_FALSE(expression::isSubsetOf(inRegexAOrEq1.get(), eq1.get()));
+        ASSERT_FALSE(expression::isSubsetOf(inRegexA.get(), eqA.get()));
+        ASSERT_FALSE(expression::isSubsetOf(inRegexAOrNull.get(), eqA.get()));
     }
 
     TEST(ExpressionAlgoIsSubsetOf, Exists) {

@@ -130,6 +130,40 @@ namespace {
      * Returns true if the documents matched by 'lhs' are a subset of the documents matched by
      * 'rhs', i.e. a document matched by 'lhs' must also be matched by 'rhs', and false otherwise.
      */
+    bool _isSubsetOf(const MatchExpression* lhs, const ComparisonMatchExpression* rhs) {
+        // An expression can only match a subset of the documents matched by another if they are
+        // comparing the same field.
+        if (lhs->path() != rhs->path()) {
+            return false;
+        }
+
+        if (isComparisonMatchExpression(lhs)) {
+            return _isSubsetOf(static_cast<const ComparisonMatchExpression*>(lhs), rhs);
+        }
+
+        if (lhs->matchType() == MatchExpression::MATCH_IN) {
+            const InMatchExpression* ime = static_cast<const InMatchExpression*>(lhs);
+            const ArrayFilterEntries& arrayEntries = ime->getData();
+            if (arrayEntries.numRegexes() > 0) {
+                return false;
+            }
+            for (BSONElement elem : arrayEntries.equalities()) {
+                // Each element in the $in-array represents an equality predicate.
+                EqualityMatchExpression equality;
+                equality.init(lhs->path(), elem);
+                if (!_isSubsetOf(&equality, rhs)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Returns true if the documents matched by 'lhs' are a subset of the documents matched by
+     * 'rhs', i.e. a document matched by 'lhs' must also be matched by 'rhs', and false otherwise.
+     */
     bool _isSubsetOf(const MatchExpression* lhs, const ExistsMatchExpression* rhs) {
         // An expression can only match a subset of the documents matched by another if they are
         // comparing the same field. Defer checking the path for $not expressions until the
@@ -228,9 +262,8 @@ namespace expression {
             return true;
         }
 
-        if (isComparisonMatchExpression(lhs) && isComparisonMatchExpression(rhs)) {
-            return _isSubsetOf(static_cast<const ComparisonMatchExpression*>(lhs),
-                               static_cast<const ComparisonMatchExpression*>(rhs));
+        if (isComparisonMatchExpression(rhs)) {
+            return _isSubsetOf(lhs, static_cast<const ComparisonMatchExpression*>(rhs));
         }
 
         if (rhs->matchType() == MatchExpression::EXISTS) {
