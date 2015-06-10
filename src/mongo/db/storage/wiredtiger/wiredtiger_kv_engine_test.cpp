@@ -57,7 +57,7 @@ namespace mongo {
 
     private:
         unittest::TempDir _dbpath;
-        boost::scoped_ptr<WiredTigerKVEngine> _engine;
+        std::unique_ptr<WiredTigerKVEngine> _engine;
     };
 
     KVHarnessHelper* KVHarnessHelper::create() {

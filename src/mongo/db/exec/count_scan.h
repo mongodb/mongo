@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/index/index_access_method.h"

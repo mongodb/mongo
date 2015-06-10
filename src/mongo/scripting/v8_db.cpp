@@ -429,7 +429,7 @@ namespace mongo {
         std::string hashedPwd = DBClientWithCommands::createPasswordDigest(user,
                                                                            toSTLString(args[4]));
 
-        boost::scoped_ptr<SaslClientSession> session(new NativeSaslClientSession());
+        std::unique_ptr<SaslClientSession> session(new NativeSaslClientSession());
 
         session->setParameter(SaslClientSession::parameterMechanism, "SCRAM-SHA-1");
         session->setParameter(SaslClientSession::parameterUser, user);

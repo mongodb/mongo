@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
 #include <string>
 #include <vector>
 
@@ -141,7 +140,7 @@ namespace mongo {
         bool _isOrderedSet;
 
         // (O)  metadata associated with this request for internal use.
-        boost::scoped_ptr<BatchedRequestMetadata> _metadata;
+        std::unique_ptr<BatchedRequestMetadata> _metadata;
 
         // (O)  cached copied of target ns
         NamespaceString _targetNSS;

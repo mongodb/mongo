@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/base/status.h"
 #include "mongo/db/index/index_access_method.h"
@@ -52,7 +51,7 @@ namespace mongo {
         virtual void getKeys(const BSONObj& obj, BSONObjSet* keys) const;
 
         // Our keys differ for V0 and V1.
-        boost::scoped_ptr<BtreeKeyGenerator> _keyGenerator;
+        std::unique_ptr<BtreeKeyGenerator> _keyGenerator;
     };
 
 }  // namespace mongo

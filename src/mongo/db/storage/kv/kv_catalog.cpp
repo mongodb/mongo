@@ -32,7 +32,6 @@
 
 #include "mongo/db/storage/kv/kv_catalog.h"
 
-#include <boost/scoped_ptr.hpp>
 #include <stdlib.h>
 
 #include "mongo/db/concurrency/d_concurrency.h"
@@ -54,7 +53,7 @@ namespace {
     const ResourceId resourceIdCatalogMetadata(RESOURCE_METADATA, 1ULL);
 }
 
-    using boost::scoped_ptr;
+    using std::unique_ptr;
     using std::string;
 
     class KVCatalog::AddIdentChange : public RecoveryUnit::Change {
@@ -107,7 +106,7 @@ namespace {
 
     std::string KVCatalog::_newRand() {
         return str::stream()
-            << boost::scoped_ptr<SecureRandom>(SecureRandom::create())->nextInt64();
+            << std::unique_ptr<SecureRandom>(SecureRandom::create())->nextInt64();
     }
 
     bool KVCatalog::_hasEntryCollidingWithRand() const {
@@ -162,7 +161,7 @@ namespace {
         invariant( opCtx->lockState() == NULL ||
                    opCtx->lockState()->isDbLockedForMode( nsToDatabaseSubstring(ns), MODE_X ) );
 
-        boost::scoped_ptr<Lock::ResourceLock> rLk;
+        std::unique_ptr<Lock::ResourceLock> rLk;
         if (!_isRsThreadSafe && opCtx->lockState()) {
             rLk.reset(new Lock::ResourceLock(opCtx->lockState(),
                                              resourceIdCatalogMetadata,
@@ -219,7 +218,7 @@ namespace {
                                    StringData ns,
                                    RecordId* out ) const {
 
-        boost::scoped_ptr<Lock::ResourceLock> rLk;
+        std::unique_ptr<Lock::ResourceLock> rLk;
         if (!_isRsThreadSafe && opCtx->lockState()) {
             rLk.reset(new Lock::ResourceLock(opCtx->lockState(),
                                              resourceIdCatalogMetadata,
@@ -266,7 +265,7 @@ namespace {
                                  StringData ns,
                                  BSONCollectionCatalogEntry::MetaData& md ) {
 
-        boost::scoped_ptr<Lock::ResourceLock> rLk;
+        std::unique_ptr<Lock::ResourceLock> rLk;
         if (!_isRsThreadSafe && opCtx->lockState()) {
             rLk.reset(new Lock::ResourceLock(opCtx->lockState(),
                                              resourceIdCatalogMetadata,
@@ -320,7 +319,7 @@ namespace {
                                         StringData toNS,
                                         bool stayTemp ) {
 
-        boost::scoped_ptr<Lock::ResourceLock> rLk;
+        std::unique_ptr<Lock::ResourceLock> rLk;
         if (!_isRsThreadSafe && opCtx->lockState()) {
             rLk.reset(new Lock::ResourceLock(opCtx->lockState(),
                                              resourceIdCatalogMetadata,
@@ -371,7 +370,7 @@ namespace {
                                       StringData ns ) {
         invariant( opCtx->lockState() == NULL ||
                    opCtx->lockState()->isDbLockedForMode( nsToDatabaseSubstring(ns), MODE_X ) );
-        boost::scoped_ptr<Lock::ResourceLock> rLk;
+        std::unique_ptr<Lock::ResourceLock> rLk;
         if (!_isRsThreadSafe && opCtx->lockState()) {
             rLk.reset(new Lock::ResourceLock(opCtx->lockState(),
                                              resourceIdCatalogMetadata,

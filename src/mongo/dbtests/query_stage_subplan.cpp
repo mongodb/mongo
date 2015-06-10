@@ -85,7 +85,7 @@ namespace QueryStageSubplan {
 
             CanonicalQuery* rawCq;
             ASSERT_OK(CanonicalQuery::canonicalize(ns(), query, &rawCq));
-            boost::scoped_ptr<CanonicalQuery> cq(rawCq);
+            std::unique_ptr<CanonicalQuery> cq(rawCq);
 
             Collection* collection = ctx.getCollection();
 
@@ -94,7 +94,7 @@ namespace QueryStageSubplan {
             fillOutPlannerParams(&_txn, collection, cq.get(), &plannerParams);
 
             WorkingSet ws;
-            boost::scoped_ptr<SubplanStage> subplan(new SubplanStage(&_txn, collection, &ws,
+            std::unique_ptr<SubplanStage> subplan(new SubplanStage(&_txn, collection, &ws,
                                                                      plannerParams, cq.get()));
 
             // Plan selection should succeed due to falling back on regular planning.
@@ -128,14 +128,14 @@ namespace QueryStageSubplan {
 
             CanonicalQuery* rawCq;
             ASSERT_OK(CanonicalQuery::canonicalize(ns(), query, &rawCq));
-            boost::scoped_ptr<CanonicalQuery> cq(rawCq);
+            std::unique_ptr<CanonicalQuery> cq(rawCq);
 
             // Get planner params.
             QueryPlannerParams plannerParams;
             fillOutPlannerParams(&_txn, collection, cq.get(), &plannerParams);
 
             WorkingSet ws;
-            boost::scoped_ptr<SubplanStage> subplan(new SubplanStage(&_txn, collection, &ws,
+            std::unique_ptr<SubplanStage> subplan(new SubplanStage(&_txn, collection, &ws,
                                                                      plannerParams, cq.get()));
 
             PlanYieldPolicy yieldPolicy(NULL, PlanExecutor::YIELD_MANUAL);

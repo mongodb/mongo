@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
 #include <v8.h>
 #include <set>
@@ -126,7 +125,7 @@ namespace mongo {
          * @param  data        Weak callback data. Contains pointer to the TrackedPtr instance.
          */
         static void deleteOnCollect(const v8::WeakCallbackData<v8::Value, TrackedPtr>& data) {
-            boost::scoped_ptr<TrackedPtr> trackedPtr(data.GetParameter());
+            std::unique_ptr<TrackedPtr> trackedPtr(data.GetParameter());
             invariant(trackedPtr.get());
 
             trackedPtr->_tracker->_container.erase(trackedPtr.get());

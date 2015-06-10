@@ -30,7 +30,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/index_catalog_entry.h"

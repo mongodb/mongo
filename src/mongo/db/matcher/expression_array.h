@@ -90,7 +90,7 @@ namespace mongo {
         virtual MatchExpression* getChild( size_t i ) const { return _sub.get(); }
 
     private:
-        boost::scoped_ptr<MatchExpression> _sub;
+        std::unique_ptr<MatchExpression> _sub;
     };
 
     class ElemMatchValueMatchExpression : public ArrayMatchingMatchExpression {

@@ -30,22 +30,21 @@
 
 #include "mongo/db/storage/record_store_test_harness.h"
 
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/db/storage/record_store.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
 
-    using boost::scoped_ptr;
+    using std::unique_ptr;
     using std::string;
 
     TEST( RecordStoreTestHarness, Simple1 ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
+        unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
+        unique_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( 0, rs->numRecords( opCtx.get() ) );
         }
 
@@ -54,7 +53,7 @@ namespace mongo {
         RecordId loc1;
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
                 StatusWith<RecordId> res = rs->insertRecord( opCtx.get(), s.c_str(), s.size() + 1, false );
@@ -67,7 +66,7 @@ namespace mongo {
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( s, rs->dataFor( opCtx.get(), loc1 ).data() );
             ASSERT_EQUALS( 1, rs->numRecords( opCtx.get() ) );
 
@@ -80,7 +79,7 @@ namespace mongo {
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
                 StatusWith<RecordId> res = rs->insertRecord( opCtx.get(), s.c_str(), s.size() + 1, false );
@@ -91,7 +90,7 @@ namespace mongo {
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( 2, rs->numRecords( opCtx.get() ) );
         }
     }
@@ -111,13 +110,13 @@ namespace mongo {
 
 
     TEST( RecordStoreTestHarness, Simple1InsertDocWroter ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
+        unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
+        unique_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
         
         RecordId loc1;
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
 
             {
                 WriteUnitOfWork uow( opCtx.get() );
@@ -133,11 +132,11 @@ namespace mongo {
     }
 
     TEST( RecordStoreTestHarness, Delete1 ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
+        unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
+        unique_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( 0, rs->numRecords( opCtx.get() ) );
         }
 
@@ -145,7 +144,7 @@ namespace mongo {
 
         RecordId loc;
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
 
             {
                 WriteUnitOfWork uow( opCtx.get() );
@@ -160,12 +159,12 @@ namespace mongo {
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( 1, rs->numRecords( opCtx.get() ) );
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
 
             {
                 WriteUnitOfWork uow( opCtx.get() );
@@ -179,11 +178,11 @@ namespace mongo {
     }
 
     TEST( RecordStoreTestHarness, Delete2 ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
+        unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
+        unique_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( 0, rs->numRecords( opCtx.get() ) );
         }
 
@@ -191,7 +190,7 @@ namespace mongo {
 
         RecordId loc;
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
 
             {
                 WriteUnitOfWork uow( opCtx.get() );
@@ -206,13 +205,13 @@ namespace mongo {
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( s, rs->dataFor( opCtx.get(), loc ).data() );
             ASSERT_EQUALS( 2, rs->numRecords( opCtx.get() ) );
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
                 rs->deleteRecord( opCtx.get(), loc );
@@ -222,11 +221,11 @@ namespace mongo {
     }
 
     TEST( RecordStoreTestHarness, Update1 ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
+        unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
+        unique_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( 0, rs->numRecords( opCtx.get() ) );
         }
 
@@ -235,7 +234,7 @@ namespace mongo {
 
         RecordId loc;
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
                 StatusWith<RecordId> res = rs->insertRecord( opCtx.get(),
@@ -249,12 +248,12 @@ namespace mongo {
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( s1, rs->dataFor( opCtx.get(), loc ).data() );
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
                 StatusWith<RecordId> res = rs->updateRecord( opCtx.get(), loc,
@@ -268,7 +267,7 @@ namespace mongo {
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( 1, rs->numRecords( opCtx.get() ) );
             ASSERT_EQUALS( s2, rs->dataFor( opCtx.get(), loc ).data() );
         }
@@ -276,8 +275,8 @@ namespace mongo {
     }
 
     TEST( RecordStoreTestHarness, UpdateInPlace1 ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
+        unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
+        unique_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
 
         if (!rs->updateWithDamagesSupported())
             return;
@@ -288,7 +287,7 @@ namespace mongo {
         RecordId loc;
         const RecordData s1Rec(s1.c_str(), s1.size() + 1);
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
                 StatusWith<RecordId> res = rs->insertRecord( opCtx.get(),
@@ -303,12 +302,12 @@ namespace mongo {
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( s1, rs->dataFor( opCtx.get(), loc ).data() );
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
                 const char* damageSource = "222";
@@ -328,18 +327,18 @@ namespace mongo {
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( s2, rs->dataFor( opCtx.get(), loc ).data() );
         }
     }
 
 
     TEST( RecordStoreTestHarness, Truncate1 ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
+        unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
+        unique_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( 0, rs->numRecords( opCtx.get() ) );
         }
 
@@ -347,7 +346,7 @@ namespace mongo {
 
         RecordId loc;
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
                 StatusWith<RecordId> res = rs->insertRecord( opCtx.get(), s.c_str(), s.size() + 1, false );
@@ -360,17 +359,17 @@ namespace mongo {
 
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( s, rs->dataFor( opCtx.get(), loc ).data() );
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( 1, rs->numRecords( opCtx.get() ) );
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
                 rs->truncate( opCtx.get() );
@@ -380,7 +379,7 @@ namespace mongo {
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( 0, rs->numRecords( opCtx.get() ) );
         }
 
@@ -389,16 +388,16 @@ namespace mongo {
     TEST( RecordStoreTestHarness, Cursor1 ) {
         const int N = 10;
 
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
+        unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
+        unique_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( 0, rs->numRecords( opCtx.get() ) );
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
                 for ( int i = 0; i < N; i++ ) {
@@ -410,13 +409,13 @@ namespace mongo {
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( N, rs->numRecords( opCtx.get() ) );
         }
 
         {
             int x = 0;
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             auto cursor = rs->getCursor(opCtx.get());
             while (auto record = cursor->next()) {
                 string s = str::stream() << "eliot" << x++;
@@ -428,7 +427,7 @@ namespace mongo {
 
         {
             int x = N;
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             auto cursor = rs->getCursor(opCtx.get(), false);
             while (auto record = cursor->next()) {
                 string s = str::stream() << "eliot" << --x;

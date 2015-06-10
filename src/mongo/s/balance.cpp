@@ -33,7 +33,6 @@
 #include "mongo/s/balance.h"
 
 #include <algorithm>
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/client.h"
@@ -65,7 +64,7 @@
 
 namespace mongo {
 
-    using boost::scoped_ptr;
+    using std::unique_ptr;
     using boost::shared_ptr;
     using std::unique_ptr;
     using std::map;

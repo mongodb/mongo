@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
 #include <boost/thread/thread.hpp>
 
 #include "mongo/unittest/unittest.h"

@@ -30,7 +30,6 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
@@ -203,7 +202,7 @@ namespace mongo {
 
     private:
         MatchType _matchType;
-        boost::scoped_ptr<TagData> _tagData;
+        std::unique_ptr<TagData> _tagData;
     };
 
     /**

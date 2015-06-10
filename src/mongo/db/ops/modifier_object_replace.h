@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
@@ -93,7 +92,7 @@ namespace mongo {
         // was issued and until a log() is issued. The document this mod is being prepared
         // against must e live throughout all the calls.
         struct PreparedState;
-        boost::scoped_ptr<PreparedState> _preparedState;
+        std::unique_ptr<PreparedState> _preparedState;
     };
 
 } // namespace mongo

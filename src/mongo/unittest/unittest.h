@@ -42,7 +42,6 @@
 
 #include <boost/config.hpp>
 #include <boost/noncopyable.hpp>
-#include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
 
 #include "mongo/base/status_with.h"

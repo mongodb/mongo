@@ -30,7 +30,6 @@
 
 #include "mongo/db/commands/group.h"
 
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
@@ -45,7 +44,7 @@
 
 namespace mongo {
 
-    using boost::scoped_ptr;
+    using std::unique_ptr;
     using std::string;
 
     static GroupCommand cmdGroup;
@@ -152,7 +151,7 @@ namespace mongo {
             return appendCommandStatus(out, getExecStatus);
         }
 
-        scoped_ptr<PlanExecutor> planExecutor(rawPlanExecutor);
+        unique_ptr<PlanExecutor> planExecutor(rawPlanExecutor);
 
         // Group executors return ADVANCED exactly once, with the entire group result.
         BSONObj retval;
@@ -211,7 +210,7 @@ namespace mongo {
             return getExecStatus;
         }
 
-        scoped_ptr<PlanExecutor> planExecutor(rawPlanExecutor);
+        unique_ptr<PlanExecutor> planExecutor(rawPlanExecutor);
 
         Explain::explainStages(planExecutor.get(), verbosity, out);
         return Status::OK();

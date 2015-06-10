@@ -27,7 +27,6 @@
  */
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/client.h"
@@ -113,7 +112,7 @@ namespace mongo {
 
     private:
         std::unique_ptr<RecoveryUnit> _recoveryUnit;
-        boost::scoped_ptr<Locker> _locker;
+        std::unique_ptr<Locker> _locker;
         ProgressMeter _pm;
     };
 

@@ -30,7 +30,6 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
@@ -62,7 +61,7 @@ namespace mongo {
     private:
         BSONObj _pattern;
 
-        boost::scoped_ptr<MatchExpression> _expression;
+        std::unique_ptr<MatchExpression> _expression;
     };
 
 }  // namespace mongo

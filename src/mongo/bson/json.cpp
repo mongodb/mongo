@@ -29,7 +29,6 @@
 
 #include "mongo/bson/json.h"
 
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/base/parse_number.h"
 #include "mongo/db/jsobj.h"
@@ -43,7 +42,7 @@
 
 namespace mongo {
 
-    using boost::scoped_ptr;
+    using std::unique_ptr;
     using std::ostringstream;
     using std::string;
 
@@ -325,7 +324,7 @@ namespace mongo {
 
             // Only create a sub builder if this is not the base object
             BSONObjBuilder* objBuilder = &builder;
-            scoped_ptr<BSONObjBuilder> subObjBuilder;
+            unique_ptr<BSONObjBuilder> subObjBuilder;
             if (subObject) {
                 subObjBuilder.reset(new BSONObjBuilder(builder.subobjStart(fieldName)));
                 objBuilder = subObjBuilder.get();
@@ -710,7 +709,7 @@ namespace mongo {
         }
 
         BSONObjBuilder* arrayBuilder = &builder;
-        scoped_ptr<BSONObjBuilder> subObjBuilder;
+        unique_ptr<BSONObjBuilder> subObjBuilder;
         if (subObject) {
             subObjBuilder.reset(new BSONObjBuilder(builder.subarrayStart(fieldName)));
             arrayBuilder = subObjBuilder.get();

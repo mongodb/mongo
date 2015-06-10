@@ -32,7 +32,6 @@
 #include "mongo/bson/oid.h"
 
 #include <boost/functional/hash.hpp>
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/base/init.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -43,7 +42,7 @@
 namespace mongo {
 
 namespace {
-    boost::scoped_ptr<AtomicUInt32> counter;
+    std::unique_ptr<AtomicUInt32> counter;
 
     const std::size_t kTimestampOffset = 0;
     const std::size_t kInstanceUniqueOffset = kTimestampOffset +
@@ -55,7 +54,7 @@ namespace {
 
     MONGO_INITIALIZER_GENERAL(OIDGeneration, MONGO_NO_PREREQUISITES, ("default"))
         (InitializerContext* context) {
-        boost::scoped_ptr<SecureRandom> entropy(SecureRandom::create());
+        std::unique_ptr<SecureRandom> entropy(SecureRandom::create());
         counter.reset(new AtomicUInt32(uint32_t(entropy->nextInt64())));
         _instanceUnique = OID::InstanceUnique::generate(*entropy);
         return Status::OK();
@@ -120,7 +119,7 @@ namespace {
     }
 
     void OID::regenMachineId() {
-        boost::scoped_ptr<SecureRandom> entropy(SecureRandom::create());
+        std::unique_ptr<SecureRandom> entropy(SecureRandom::create());
         _instanceUnique = InstanceUnique::generate(*entropy);
     }
 

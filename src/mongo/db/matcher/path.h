@@ -30,7 +30,6 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
@@ -158,13 +157,13 @@ namespace mongo {
 
             BSONElement _theArray;
             BSONElement _current;
-            boost::scoped_ptr<BSONObjIterator> _iterator;
+            std::unique_ptr<BSONObjIterator> _iterator;
         };
 
         ArrayIterationState _arrayIterationState;
 
-        boost::scoped_ptr<ElementIterator> _subCursor;
-        boost::scoped_ptr<ElementPath> _subCursorPath;
+        std::unique_ptr<ElementIterator> _subCursor;
+        std::unique_ptr<ElementPath> _subCursorPath;
     };
 
 }

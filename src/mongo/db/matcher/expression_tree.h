@@ -32,7 +32,6 @@
 
 #include "mongo/db/matcher/expression.h"
 
-#include <boost/scoped_ptr.hpp>
 
 /**
  * this contains all Expessions that define the structure of the tree

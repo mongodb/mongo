@@ -32,7 +32,6 @@
 
 #include "mongo/dbtests/config_server_fixture.h"
 
-#include <boost/scoped_ptr.hpp>
 #include <list>
 
 #include "mongo/dbtests/dbtests.h"
@@ -45,7 +44,7 @@
 
 namespace mongo {
 
-    using boost::scoped_ptr;
+    using std::unique_ptr;
     using std::endl;
     using std::list;
     using std::string;
@@ -100,7 +99,7 @@ namespace mongo {
         {
             const string& collection = *it;
 
-            scoped_ptr<DBClientCursor> cursor(_client.query(collection, BSONObj()).release());
+            unique_ptr<DBClientCursor> cursor(_client.query(collection, BSONObj()).release());
             ASSERT(cursor.get() != NULL);
 
             log() << "Dumping collection " << collection << endl;

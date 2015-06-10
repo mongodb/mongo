@@ -32,7 +32,6 @@
 
 #include "mongo/db/commands/write_commands/batch_executor.h"
 
-#include <boost/scoped_ptr.hpp>
 #include <memory>
 
 #include "mongo/base/error_codes.h"
@@ -84,7 +83,7 @@
 
 namespace mongo {
 
-    using boost::scoped_ptr;
+    using std::unique_ptr;
     using std::unique_ptr;
     using std::endl;
     using std::string;
@@ -1319,7 +1318,7 @@ namespace mongo {
                 invariant(collection);
                 PlanExecutor* rawExec;
                 uassertStatusOK(getExecutorUpdate(txn, collection, &parsedUpdate, debug, &rawExec));
-                boost::scoped_ptr<PlanExecutor> exec(rawExec);
+                std::unique_ptr<PlanExecutor> exec(rawExec);
 
                 uassertStatusOK(exec->executePlan());
                 UpdateResult res = UpdateStage::makeUpdateResult(exec.get(), debug);
@@ -1423,7 +1422,7 @@ namespace mongo {
                                                   autoDb.getDb()->getCollection(nss),
                                                   &parsedDelete,
                                                   &rawExec));
-                boost::scoped_ptr<PlanExecutor> exec(rawExec);
+                std::unique_ptr<PlanExecutor> exec(rawExec);
 
                 // Execute the delete and retrieve the number deleted.
                 uassertStatusOK(exec->executePlan());

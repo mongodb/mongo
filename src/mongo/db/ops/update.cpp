@@ -101,7 +101,7 @@ namespace mongo {
 
         PlanExecutor* rawExec;
         uassertStatusOK(getExecutorUpdate(txn, collection, &parsedUpdate, opDebug, &rawExec));
-        boost::scoped_ptr<PlanExecutor> exec(rawExec);
+        std::unique_ptr<PlanExecutor> exec(rawExec);
 
         uassertStatusOK(exec->executePlan());
         return UpdateStage::makeUpdateResult(exec.get(), opDebug);

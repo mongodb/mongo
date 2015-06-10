@@ -159,7 +159,7 @@ namespace QueryStageMergeSortTests {
             Status status = PlanExecutor::make(&_txn, ws, new FetchStage(&_txn, ws, ms, NULL, coll),
                                                coll, PlanExecutor::YIELD_MANUAL, &rawExec);
             ASSERT_OK(status);
-            boost::scoped_ptr<PlanExecutor> exec(rawExec);
+            std::unique_ptr<PlanExecutor> exec(rawExec);
 
             for (int i = 0; i < N; ++i) {
                 BSONObj first, second;
@@ -227,7 +227,7 @@ namespace QueryStageMergeSortTests {
             Status status = PlanExecutor::make(&_txn, ws, new FetchStage(&_txn, ws, ms, NULL, coll),
                                                coll, PlanExecutor::YIELD_MANUAL, &rawExec);
             ASSERT_OK(status);
-            boost::scoped_ptr<PlanExecutor> exec(rawExec);
+            std::unique_ptr<PlanExecutor> exec(rawExec);
 
             for (int i = 0; i < N; ++i) {
                 BSONObj first, second;
@@ -295,7 +295,7 @@ namespace QueryStageMergeSortTests {
             Status status = PlanExecutor::make(&_txn, ws, new FetchStage(&_txn, ws, ms, NULL, coll),
                                                coll, PlanExecutor::YIELD_MANUAL, &rawExec);
             ASSERT_OK(status);
-            boost::scoped_ptr<PlanExecutor> exec(rawExec);
+            std::unique_ptr<PlanExecutor> exec(rawExec);
 
             for (int i = 0; i < N; ++i) {
                 BSONObj first, second;
@@ -366,7 +366,7 @@ namespace QueryStageMergeSortTests {
             Status status = PlanExecutor::make(&_txn, ws, new FetchStage(&_txn, ws, ms, NULL, coll),
                                                coll, PlanExecutor::YIELD_MANUAL, &rawExec);
             ASSERT_OK(status);
-            boost::scoped_ptr<PlanExecutor> exec(rawExec);
+            std::unique_ptr<PlanExecutor> exec(rawExec);
 
             for (int i = 0; i < N; ++i) {
                 BSONObj first, second;
@@ -436,7 +436,7 @@ namespace QueryStageMergeSortTests {
             Status status = PlanExecutor::make(&_txn, ws, new FetchStage(&_txn, ws, ms, NULL, coll),
                                                coll, PlanExecutor::YIELD_MANUAL, &rawExec);
             ASSERT_OK(status);
-            boost::scoped_ptr<PlanExecutor> exec(rawExec);
+            std::unique_ptr<PlanExecutor> exec(rawExec);
 
             // Only getting results from the a:1 index scan.
             for (int i = 0; i < N; ++i) {
@@ -494,7 +494,7 @@ namespace QueryStageMergeSortTests {
             Status status = PlanExecutor::make(&_txn, ws, new FetchStage(&_txn, ws, ms, NULL, coll),
                                                coll, PlanExecutor::YIELD_MANUAL, &rawExec);
             ASSERT_OK(status);
-            boost::scoped_ptr<PlanExecutor> exec(rawExec);
+            std::unique_ptr<PlanExecutor> exec(rawExec);
 
             for (int i = 0; i < numIndices; ++i) {
                 BSONObj obj;

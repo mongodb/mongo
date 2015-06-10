@@ -63,7 +63,7 @@ namespace {
 
     // Should not be able to queue deletes if deleter workers were not started.
     TEST(QueueDelete, CantAfterStop) {
-        boost::scoped_ptr<mongo::repl::ReplicationCoordinatorMock> mock(
+        std::unique_ptr<mongo::repl::ReplicationCoordinatorMock> mock(
             new mongo::repl::ReplicationCoordinatorMock(replSettings));
 
         mongo::repl::setGlobalReplicationCoordinator(mock.get());
@@ -93,7 +93,7 @@ namespace {
     TEST(QueuedDelete, ShouldWaitCursor) {
         const string ns("test.user");
 
-        boost::scoped_ptr<mongo::repl::ReplicationCoordinatorMock> mock(
+        std::unique_ptr<mongo::repl::ReplicationCoordinatorMock> mock(
             new mongo::repl::ReplicationCoordinatorMock(replSettings));
 
         mongo::repl::setGlobalReplicationCoordinator(mock.get());
@@ -144,7 +144,7 @@ namespace {
     TEST(QueuedDelete, StopWhileWaitingCursor) {
         const string ns("test.user");
 
-        boost::scoped_ptr<mongo::repl::ReplicationCoordinatorMock> mock(
+        std::unique_ptr<mongo::repl::ReplicationCoordinatorMock> mock(
             new mongo::repl::ReplicationCoordinatorMock(replSettings));
 
         mongo::repl::setGlobalReplicationCoordinator(mock.get());
@@ -188,7 +188,7 @@ namespace {
     TEST(ImmediateDelete, ShouldWaitCursor) {
         const string ns("test.user");
 
-        boost::scoped_ptr<mongo::repl::ReplicationCoordinatorMock> mock(
+        std::unique_ptr<mongo::repl::ReplicationCoordinatorMock> mock(
             new mongo::repl::ReplicationCoordinatorMock(replSettings));
 
         mongo::repl::setGlobalReplicationCoordinator(mock.get());
@@ -245,7 +245,7 @@ namespace {
     TEST(ImmediateDelete, StopWhileWaitingCursor) {
         const string ns("test.user");
 
-        boost::scoped_ptr<mongo::repl::ReplicationCoordinatorMock> mock(
+        std::unique_ptr<mongo::repl::ReplicationCoordinatorMock> mock(
             new mongo::repl::ReplicationCoordinatorMock(replSettings));
 
         mongo::repl::setGlobalReplicationCoordinator(mock.get());
@@ -297,7 +297,7 @@ namespace {
         const string blockedNS("foo.bar");
         const string ns("test.user");
 
-        boost::scoped_ptr<mongo::repl::ReplicationCoordinatorMock> mock(
+        std::unique_ptr<mongo::repl::ReplicationCoordinatorMock> mock(
             new mongo::repl::ReplicationCoordinatorMock(replSettings));
 
         mongo::repl::setGlobalReplicationCoordinator(mock.get());

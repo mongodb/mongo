@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
 #include <string>
 #include <vector>
 
@@ -175,7 +174,7 @@ namespace mongo {
 
         // (O)  Array of upserted items' _id's
         //      Should only be present if _singleUpserted is not.
-        boost::scoped_ptr<std::vector<BatchedUpsertDetail*> >_upsertDetails;
+        std::unique_ptr<std::vector<BatchedUpsertDetail*> >_upsertDetails;
 
         // (O)  Timestamp assigned to the write op when it was written to the oplog.
         //      Normally, getLastError can use Client::_lastOp, but this is not valid for
@@ -192,10 +191,10 @@ namespace mongo {
         bool _isElectionIdSet;
 
         // (O)  Array of item-level error information
-        boost::scoped_ptr<std::vector<WriteErrorDetail*> >_writeErrorDetails;
+        std::unique_ptr<std::vector<WriteErrorDetail*> >_writeErrorDetails;
 
         // (O)  errors that occurred while trying to satisfy the write concern.
-        boost::scoped_ptr<WCErrorDetail> _wcErrDetails;
+        std::unique_ptr<WCErrorDetail> _wcErrDetails;
     };
 
 } // namespace mongo

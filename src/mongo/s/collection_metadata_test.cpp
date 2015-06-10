@@ -28,7 +28,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <boost/scoped_ptr.hpp>
 #include <string>
 #include <vector>
 
@@ -48,7 +47,7 @@ namespace {
 
     using namespace mongo;
 
-    using boost::scoped_ptr;
+    using std::unique_ptr;
     using std::unique_ptr;
     using std::make_pair;
     using std::string;
@@ -112,7 +111,7 @@ namespace {
         }
 
     private:
-        scoped_ptr<MockRemoteDBServer> _dummyConfig;
+        unique_ptr<MockRemoteDBServer> _dummyConfig;
         CollectionMetadata _metadata;
     };
 
@@ -144,7 +143,7 @@ namespace {
 
         string errMsg;
         const ChunkVersion version( 99, 0, OID() );
-        scoped_ptr<CollectionMetadata> cloned( getCollMetadata().clonePlusChunk( chunk,
+        unique_ptr<CollectionMetadata> cloned( getCollMetadata().clonePlusChunk( chunk,
                                                                                  version,
                                                                                  &errMsg ) );
 
@@ -161,7 +160,7 @@ namespace {
         chunk.setMax( BSON("a" << 20) );
 
         string errMsg;
-        scoped_ptr<CollectionMetadata> cloned( getCollMetadata() // br
+        unique_ptr<CollectionMetadata> cloned( getCollMetadata() // br
                 .clonePlusChunk( chunk, ChunkVersion( 0, 0, OID() ), &errMsg ) );
 
         ASSERT( cloned == NULL );
@@ -177,7 +176,7 @@ namespace {
 
         string errMsg;
         ChunkType chunk;
-        scoped_ptr<CollectionMetadata> cloned;
+        unique_ptr<CollectionMetadata> cloned;
 
         chunk.setMin( BSON("a" << 10) );
         chunk.setMax( BSON("a" << 20) );
@@ -197,7 +196,7 @@ namespace {
 
         string errMsg;
         ChunkType chunk;
-        scoped_ptr<CollectionMetadata> cloned;
+        unique_ptr<CollectionMetadata> cloned;
 
         chunk.setMin( BSON("a" << 10) );
         chunk.setMax( BSON("a" << 20) );
@@ -225,7 +224,7 @@ namespace {
 
         string errMsg;
         ChunkType chunk;
-        scoped_ptr<CollectionMetadata> cloned;
+        unique_ptr<CollectionMetadata> cloned;
 
         chunk.setMin( BSON("a" << 10) );
         chunk.setMax( BSON("a" << 20) );
@@ -248,7 +247,7 @@ namespace {
 
         string errMsg;
         ChunkType chunk;
-        scoped_ptr<CollectionMetadata> cloned;
+        unique_ptr<CollectionMetadata> cloned;
 
         chunk.setMin( BSON("a" << 10) );
         chunk.setMax( BSON("a" << 30) );
@@ -276,7 +275,7 @@ namespace {
 
         string errMsg;
         ChunkType chunk;
-        scoped_ptr<CollectionMetadata> cloned;
+        unique_ptr<CollectionMetadata> cloned;
 
         chunk.setMin( BSON("a" << 10) );
         chunk.setMax( BSON("a" << 30) );
@@ -312,7 +311,7 @@ namespace {
 
         string errMsg;
         ChunkType chunk;
-        scoped_ptr<CollectionMetadata> cloned;
+        unique_ptr<CollectionMetadata> cloned;
 
         chunk.setMin( BSON("a" << 10) );
         chunk.setMax( BSON("a" << 30) );
@@ -327,7 +326,7 @@ namespace {
 
         string errMsg;
         ChunkType chunk;
-        scoped_ptr<CollectionMetadata> cloned;
+        unique_ptr<CollectionMetadata> cloned;
 
         chunk.setMin( BSON("a" << 10) );
         chunk.setMax( BSON("a" << 30) );
@@ -350,7 +349,7 @@ namespace {
 
         string errMsg;
         ChunkType chunk;
-        scoped_ptr<CollectionMetadata> cloned;
+        unique_ptr<CollectionMetadata> cloned;
 
         chunk.setMin( BSON("a" << 10) );
         chunk.setMax( BSON("a" << 20) );
@@ -382,7 +381,7 @@ namespace {
     TEST_F(NoChunkFixture, MergeChunkEmpty) {
 
         string errMsg;
-        scoped_ptr<CollectionMetadata> cloned;
+        unique_ptr<CollectionMetadata> cloned;
 
         cloned.reset( getCollMetadata().cloneMerge( BSON( "a" << 15 ),
                                                     BSON( "a" << 25 ),
@@ -436,7 +435,7 @@ namespace {
 
         string errMsg;
         ChunkType chunk;
-        scoped_ptr<CollectionMetadata> cloned;
+        unique_ptr<CollectionMetadata> cloned;
 
         chunk.setMin( BSON("a" << 10) );
         chunk.setMax( BSON("a" << 20) );
@@ -514,7 +513,7 @@ namespace {
         }
 
     private:
-        scoped_ptr<MockRemoteDBServer> _dummyConfig;
+        unique_ptr<MockRemoteDBServer> _dummyConfig;
         CollectionMetadata _metadata;
     };
 
@@ -556,7 +555,7 @@ namespace {
 
         string errMsg;
         const ChunkVersion zeroVersion( 0, 0, getCollMetadata().getShardVersion().epoch() );
-        scoped_ptr<CollectionMetadata> cloned( getCollMetadata().cloneMigrate( chunk,
+        unique_ptr<CollectionMetadata> cloned( getCollMetadata().cloneMigrate( chunk,
                                                                                zeroVersion,
                                                                                &errMsg ) );
 
@@ -575,7 +574,7 @@ namespace {
 
         string errMsg;
         ChunkVersion version( 99, 0, OID() );
-        scoped_ptr<CollectionMetadata> cloned( getCollMetadata().cloneMigrate( chunk,
+        unique_ptr<CollectionMetadata> cloned( getCollMetadata().cloneMigrate( chunk,
                                                                                version,
                                                                                &errMsg ) );
 
@@ -587,7 +586,7 @@ namespace {
 
         string errMsg;
         ChunkType chunk;
-        scoped_ptr<CollectionMetadata> cloned;
+        unique_ptr<CollectionMetadata> cloned;
 
         chunk.setMin( BSON("a" << 20) );
         chunk.setMax( BSON("a" << 30) );
@@ -607,7 +606,7 @@ namespace {
 
         string errMsg;
         ChunkType chunk;
-        scoped_ptr<CollectionMetadata> cloned;
+        unique_ptr<CollectionMetadata> cloned;
 
         chunk.setMin( BSON("a" << 10) );
         chunk.setMax( BSON("a" << 20) );
@@ -622,7 +621,7 @@ namespace {
 
         string errMsg;
         ChunkType chunk;
-        scoped_ptr<CollectionMetadata> cloned;
+        unique_ptr<CollectionMetadata> cloned;
 
         chunk.setMin( BSON("a" << 20) );
         chunk.setMax( BSON("a" << 30) );
@@ -662,7 +661,7 @@ namespace {
         splitPoints.push_back(BSON("a" << 14));
 
         string errMsg;
-        scoped_ptr<CollectionMetadata> cloned(getCollMetadata().cloneSplit(chunk,
+        unique_ptr<CollectionMetadata> cloned(getCollMetadata().cloneSplit(chunk,
                                                                            splitPoints,
                                                                            version,
                                                                            &errMsg));
@@ -688,7 +687,7 @@ namespace {
     TEST_F(SingleChunkFixture, MultiSplit) {
         string errMsg;
         ChunkType chunk;
-        scoped_ptr<CollectionMetadata> cloned;
+        unique_ptr<CollectionMetadata> cloned;
 
         chunk.setMin( BSON("a" << 10) );
         chunk.setMax( BSON("a" << 20) );
@@ -733,7 +732,7 @@ namespace {
 
         string errMsg;
         ChunkType chunk;
-        scoped_ptr<CollectionMetadata> cloned;
+        unique_ptr<CollectionMetadata> cloned;
 
         chunk.setMin( BSON("a" << 20) );
         chunk.setMax( BSON("a" << 30) );
@@ -771,7 +770,7 @@ namespace {
     TEST_F(SingleChunkFixture, MergeChunkSingle) {
 
         string errMsg;
-        scoped_ptr<CollectionMetadata> cloned;
+        unique_ptr<CollectionMetadata> cloned;
 
         cloned.reset( getCollMetadata().cloneMerge( BSON( "a" << 10 ),
                                                     BSON( "a" << 20 ),
@@ -854,7 +853,7 @@ namespace {
         }
 
     private:
-        scoped_ptr<MockRemoteDBServer> _dummyConfig;
+        unique_ptr<MockRemoteDBServer> _dummyConfig;
         CollectionMetadata _metadata;
     };
 
@@ -935,7 +934,7 @@ namespace {
         }
 
     private:
-        scoped_ptr<MockRemoteDBServer> _dummyConfig;
+        unique_ptr<MockRemoteDBServer> _dummyConfig;
         CollectionMetadata _metadata;
     };
 
@@ -946,7 +945,7 @@ namespace {
 
         string errMsg;
         ChunkVersion version( 1, 0, getCollMetadata().getShardVersion().epoch() );
-        scoped_ptr<CollectionMetadata> cloned( getCollMetadata().clonePlusChunk( chunk,
+        unique_ptr<CollectionMetadata> cloned( getCollMetadata().clonePlusChunk( chunk,
                                                                                  version,
                                                                                  &errMsg ) );
 
@@ -970,7 +969,7 @@ namespace {
         chunk.setMax( BSON("a" << 25 << "b" << 0) );
 
         string errMsg;
-        scoped_ptr<CollectionMetadata> cloned( getCollMetadata().clonePlusChunk( chunk,
+        unique_ptr<CollectionMetadata> cloned( getCollMetadata().clonePlusChunk( chunk,
                                                                                  ChunkVersion( 1,
                                                                                                0,
                                                                                                OID() ),
@@ -987,7 +986,7 @@ namespace {
 
         string errMsg;
         ChunkVersion version( 2, 0, OID() );
-        scoped_ptr<CollectionMetadata> cloned( getCollMetadata().cloneMigrate( chunk,
+        unique_ptr<CollectionMetadata> cloned( getCollMetadata().cloneMigrate( chunk,
                                                                                version,
                                                                                &errMsg ) );
 
@@ -1010,7 +1009,7 @@ namespace {
         chunk.setMax( BSON("a" << 28 << "b" << 0) );
 
         string errMsg;
-        scoped_ptr<CollectionMetadata> cloned( getCollMetadata().cloneMigrate( chunk,
+        unique_ptr<CollectionMetadata> cloned( getCollMetadata().cloneMigrate( chunk,
                                                                                ChunkVersion( 1,
                                                                                              0,
                                                                                              OID() ),
@@ -1036,7 +1035,7 @@ namespace {
         ChunkVersion version( 1, 99, OID() ); // first chunk 1|99 , second 1|100
 
         string errMsg;
-        scoped_ptr<CollectionMetadata> cloned( getCollMetadata().cloneSplit( chunk,
+        unique_ptr<CollectionMetadata> cloned( getCollMetadata().cloneSplit( chunk,
                                                                              splitKeys,
                                                                              version,
                                                                              &errMsg ) );
@@ -1062,7 +1061,7 @@ namespace {
         splitKeys.push_back( BSON("a" << 5 << "b" << 0) );
 
         string errMsg;
-        scoped_ptr<CollectionMetadata> cloned( getCollMetadata().cloneSplit( chunk,
+        unique_ptr<CollectionMetadata> cloned( getCollMetadata().cloneSplit( chunk,
                                                                              splitKeys,
                                                                              ChunkVersion( 1,
                                                                                            0,
@@ -1086,7 +1085,7 @@ namespace {
         splitKeys.push_back( BSON("a" << 15 << "b" << 0) );
 
         string errMsg;
-        scoped_ptr<CollectionMetadata> cloned( getCollMetadata().cloneSplit( chunk,
+        unique_ptr<CollectionMetadata> cloned( getCollMetadata().cloneSplit( chunk,
                                                                              splitKeys,
                                                                              ChunkVersion( 1,
                                                                                            0,
@@ -1123,7 +1122,7 @@ namespace {
 
         string errMsg;
         ChunkType chunk;
-        scoped_ptr<CollectionMetadata> cloned;
+        unique_ptr<CollectionMetadata> cloned;
 
         chunk.setMin( BSON( "a" << 20 << "b" << 0 ) );
         chunk.setMax( BSON( "a" << 30 << "b" << 0 ) );
@@ -1228,7 +1227,7 @@ namespace {
         }
 
     private:
-        scoped_ptr<MockRemoteDBServer> _dummyConfig;
+        unique_ptr<MockRemoteDBServer> _dummyConfig;
         CollectionMetadata _metadata;
     };
 
@@ -1266,7 +1265,7 @@ namespace {
     TEST_F(ThreeChunkWithRangeGapFixture, MergeChunkHoleInRange) {
 
         string errMsg;
-        scoped_ptr<CollectionMetadata> cloned;
+        unique_ptr<CollectionMetadata> cloned;
 
         // Try to merge with hole in range
         ChunkVersion newShardVersion( 5, 0, getCollMetadata().getShardVersion().epoch() );
@@ -1282,7 +1281,7 @@ namespace {
     TEST_F(ThreeChunkWithRangeGapFixture, MergeChunkDiffEndKey) {
 
         string errMsg;
-        scoped_ptr<CollectionMetadata> cloned;
+        unique_ptr<CollectionMetadata> cloned;
 
         // Try to merge with different end key
         ChunkVersion newShardVersion( 5, 0, getCollMetadata().getShardVersion().epoch() );
@@ -1298,7 +1297,7 @@ namespace {
     TEST_F(ThreeChunkWithRangeGapFixture, MergeChunkMinKey) {
 
         string errMsg;
-        scoped_ptr<CollectionMetadata> cloned;
+        unique_ptr<CollectionMetadata> cloned;
 
         ASSERT_EQUALS( getCollMetadata().getNumChunks(), 3u );
 
@@ -1319,7 +1318,7 @@ namespace {
     TEST_F(ThreeChunkWithRangeGapFixture, MergeChunkMaxKey) {
         
         string errMsg;
-        scoped_ptr<CollectionMetadata> cloned;
+        unique_ptr<CollectionMetadata> cloned;
         ChunkVersion newShardVersion( 5, 0, getCollMetadata().getShardVersion().epoch() );
 
         // Add one chunk to complete the range
@@ -1350,7 +1349,7 @@ namespace {
     TEST_F(ThreeChunkWithRangeGapFixture, MergeChunkFullRange) {
 
         string errMsg;
-        scoped_ptr<CollectionMetadata> cloned;
+        unique_ptr<CollectionMetadata> cloned;
         ChunkVersion newShardVersion( 5, 0, getCollMetadata().getShardVersion().epoch() );
 
         // Add one chunk to complete the range
@@ -1382,7 +1381,7 @@ namespace {
     TEST_F(ThreeChunkWithRangeGapFixture, MergeChunkMiddleRange) {
 
         string errMsg;
-        scoped_ptr<CollectionMetadata> cloned;
+        unique_ptr<CollectionMetadata> cloned;
         ChunkVersion newShardVersion( 5, 0, getCollMetadata().getShardVersion().epoch() );
 
         // Add one chunk to complete the range

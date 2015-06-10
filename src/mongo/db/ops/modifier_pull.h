@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/bson/mutable/document.h"
@@ -78,11 +77,11 @@ namespace mongo {
         BSONObj _exprObj;
 
         // If we are using the matcher, this is the match expression we built around _exprObj.
-        boost::scoped_ptr<MatchExpression> _matchExpr;
+        std::unique_ptr<MatchExpression> _matchExpr;
         bool _matcherOnPrimitive;
 
         struct PreparedState;
-        boost::scoped_ptr<PreparedState> _preparedState;
+        std::unique_ptr<PreparedState> _preparedState;
     };
 
 } // namespace mongo

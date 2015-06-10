@@ -30,7 +30,6 @@
 
 #include <list>
 #include <vector>
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/client/connpool.h"
 #include "mongo/db/commands/server_status.h"

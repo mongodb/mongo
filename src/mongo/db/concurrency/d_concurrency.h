@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
 #include <climits> // For UINT_MAX
 
 #include "mongo/db/concurrency/locker.h"

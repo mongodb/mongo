@@ -309,7 +309,7 @@ namespace {
         if (!parseResult.isOK()) {
             return parseResult.getStatus();
         }
-        const boost::scoped_ptr<MatchExpression> matcher(parseResult.getValue());
+        const std::unique_ptr<MatchExpression> matcher(parseResult.getValue());
 
         NamespaceDocumentMap::iterator mapIt = _documents.find(collectionName);
         if (mapIt == _documents.end())

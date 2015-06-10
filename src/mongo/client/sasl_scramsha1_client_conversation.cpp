@@ -31,7 +31,6 @@
 #include "mongo/client/sasl_scramsha1_client_conversation.h"
 
 #include <boost/algorithm/string/replace.hpp>
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/base/parse_number.h"
 #include "mongo/client/sasl_client_session.h"
@@ -43,7 +42,7 @@
 
 namespace mongo {
 
-    using boost::scoped_ptr;
+    using std::unique_ptr;
     using std::string;
 
     SaslSCRAMSHA1ClientConversation::SaslSCRAMSHA1ClientConversation(
@@ -103,7 +102,7 @@ namespace mongo {
         const int nonceLenQWords = 3;
         uint64_t binaryNonce[nonceLenQWords];
 
-        scoped_ptr<SecureRandom> sr(SecureRandom::create());
+        unique_ptr<SecureRandom> sr(SecureRandom::create());
 
         binaryNonce[0] = sr->nextInt64();
         binaryNonce[1] = sr->nextInt64();

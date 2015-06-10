@@ -97,7 +97,7 @@ namespace {
             if (elem.fieldNameStringData() == ReplicaSetConfig::kVersionFieldName &&
                 elem.isNumber()) {
 
-                boost::scoped_ptr<SecureRandom> generator(SecureRandom::create());
+                std::unique_ptr<SecureRandom> generator(SecureRandom::create());
                 const int random = std::abs(static_cast<int>(generator->nextInt64()) % 100000);
                 builder.appendIntOrLL(ReplicaSetConfig::kVersionFieldName,
                                       elem.numberLong() + 10000 + random);
@@ -185,7 +185,7 @@ namespace {
             return;
         }
 
-        boost::scoped_ptr<SecureRandom> rbidGenerator(SecureRandom::create());
+        std::unique_ptr<SecureRandom> rbidGenerator(SecureRandom::create());
         _rbid = static_cast<int>(rbidGenerator->nextInt64());
         if (_rbid < 0) {
             // Ensure _rbid is always positive

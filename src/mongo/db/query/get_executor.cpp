@@ -166,7 +166,7 @@ namespace mongo {
         // Filter index catalog if index filters are specified for query.
         // Also, signal to planner that application hint should be ignored.
         if (querySettings->getAllowedIndices(planCacheKey, &allowedIndicesRaw)) {
-            boost::scoped_ptr<AllowedIndices> allowedIndices(allowedIndicesRaw);
+            std::unique_ptr<AllowedIndices> allowedIndices(allowedIndicesRaw);
             filterAllowedIndexEntries(*allowedIndices, &plannerParams->indices);
             plannerParams->indexFiltersApplied = true;
         }
@@ -319,7 +319,7 @@ namespace mongo {
             if (PlanCache::shouldCacheQuery(*canonicalQuery) &&
                 collection->infoCache()->getPlanCache()->get(*canonicalQuery, &rawCS).isOK()) {
                 // We have a CachedSolution.  Have the planner turn it into a QuerySolution.
-                boost::scoped_ptr<CachedSolution> cs(rawCS);
+                std::unique_ptr<CachedSolution> cs(rawCS);
                 QuerySolution *qs;
                 Status status = QueryPlanner::planFromCache(*canonicalQuery, plannerParams, *cs,
                                                             &qs);

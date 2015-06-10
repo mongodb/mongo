@@ -26,7 +26,6 @@
  *    then also delete it in the license file.
  */
 
-#include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
 
 #include "mongo/db/catalog/collection.h"
@@ -51,7 +50,7 @@
 
 namespace QueryPlanExecutor {
 
-    using boost::scoped_ptr;
+    using std::unique_ptr;
     using boost::shared_ptr;
     using std::unique_ptr;
     using std::string;
@@ -210,7 +209,7 @@ namespace QueryPlanExecutor {
             BSONObj filterObj = fromjson("{_id: {$gt: 0}}");
 
             Collection* coll = ctx.getCollection();
-            scoped_ptr<PlanExecutor> exec(makeCollScanExec(coll, filterObj));
+            unique_ptr<PlanExecutor> exec(makeCollScanExec(coll, filterObj));
             registerExec(exec.get());
 
             BSONObj objOut;
@@ -239,7 +238,7 @@ namespace QueryPlanExecutor {
             BSONObj indexSpec = BSON("a" << 1);
             addIndex(indexSpec);
 
-            scoped_ptr<PlanExecutor> exec(makeIndexScanExec(ctx.db(), indexSpec, 7, 10));
+            unique_ptr<PlanExecutor> exec(makeIndexScanExec(ctx.db(), indexSpec, 7, 10));
             registerExec(exec.get());
 
             BSONObj objOut;
@@ -293,7 +292,7 @@ namespace QueryPlanExecutor {
             Status status = PlanExecutor::make(&_txn, ws.release(), proxy.release(), collection,
                                                PlanExecutor::YIELD_MANUAL, &rawExec);
             ASSERT_OK(status);
-            boost::scoped_ptr<PlanExecutor> outerExec(rawExec);
+            std::unique_ptr<PlanExecutor> outerExec(rawExec);
 
             // Only the outer executor gets registered.
             registerExec(outerExec.get());
@@ -363,7 +362,7 @@ namespace QueryPlanExecutor {
             BSONObj filterObj = fromjson("{a: {$gte: 2}}");
 
             Collection* coll = ctx.getCollection();
-            scoped_ptr<PlanExecutor> exec(makeCollScanExec(coll, filterObj));
+            unique_ptr<PlanExecutor> exec(makeCollScanExec(coll, filterObj));
 
             BSONObj objOut;
             ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&objOut, NULL));
@@ -390,7 +389,7 @@ namespace QueryPlanExecutor {
             addIndex(indexSpec);
 
             BSONObj filterObj = fromjson("{a: {$gte: 2}}");
-            scoped_ptr<PlanExecutor> exec(makeIndexScanExec(ctx.db(), indexSpec, 2, 5));
+            unique_ptr<PlanExecutor> exec(makeIndexScanExec(ctx.db(), indexSpec, 2, 5));
 
             BSONObj objOut;
             ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&objOut, NULL));

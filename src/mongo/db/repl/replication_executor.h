@@ -435,8 +435,8 @@ namespace repl {
         // PRNG; seeded at class construction time.
         PseudoRandom _random;
 
-        boost::scoped_ptr<executor::NetworkInterface> _networkInterface;
-        boost::scoped_ptr<StorageInterface> _storageInterface;
+        std::unique_ptr<executor::NetworkInterface> _networkInterface;
+        std::unique_ptr<StorageInterface> _storageInterface;
         boost::mutex _mutex;
         boost::mutex _terribleExLockSyncMutex;
         boost::condition_variable _noMoreWaitingThreads;

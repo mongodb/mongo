@@ -44,7 +44,7 @@ namespace mongo {
 
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
-        boost::scoped_ptr<MatchExpression> destroy(result.getValue());
+        std::unique_ptr<MatchExpression> destroy(result.getValue());
 
         ASSERT(!result.getValue()->matchesBSON(fromjson("{a: [3,4]}")));
         ASSERT(result.getValue()->matchesBSON(fromjson("{a: [4,4]}")));
@@ -60,7 +60,7 @@ namespace mongo {
 
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
-        boost::scoped_ptr<MatchExpression> destroy(result.getValue());
+        std::unique_ptr<MatchExpression> destroy(result.getValue());
 
         MatchExpression* exp = result.getValue();
         ASSERT_EQUALS(MatchExpression::GEO_NEAR, exp->matchType());

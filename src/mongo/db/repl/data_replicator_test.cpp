@@ -146,7 +146,7 @@ namespace {
 
     private:
         std::unique_ptr<DataReplicator> _dr;
-        boost::scoped_ptr<ReplicationCoordinatorImpl> _repl;
+        std::unique_ptr<ReplicationCoordinatorImpl> _repl;
         // Owned by ReplicationCoordinatorImpl
         TopologyCoordinatorImpl* _topo;
         // Owned by ReplicationCoordinatorImpl
@@ -198,7 +198,7 @@ namespace {
 
         DataReplicator* _dr;
         TimestampStatus _result;
-        boost::scoped_ptr<boost::thread> _thread;
+        std::unique_ptr<boost::thread> _thread;
     };
 
     class InitialSyncTest : public DataReplicatorTest {

@@ -34,7 +34,6 @@
 
 #include "mongo/db/cloner.h"
 
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
@@ -67,7 +66,7 @@
 
 namespace mongo {
 
-    using boost::scoped_ptr;
+    using std::unique_ptr;
     using std::unique_ptr;
     using std::list;
     using std::set;
@@ -127,8 +126,8 @@ namespace mongo {
             invariant(from_collection.coll() != "system.indexes");
 
             // XXX: can probably take dblock instead
-            scoped_ptr<ScopedTransaction> scopedXact(new ScopedTransaction(txn, MODE_X));
-            scoped_ptr<Lock::GlobalWrite> globalWriteLock(new Lock::GlobalWrite(txn->lockState()));
+            unique_ptr<ScopedTransaction> scopedXact(new ScopedTransaction(txn, MODE_X));
+            unique_ptr<Lock::GlobalWrite> globalWriteLock(new Lock::GlobalWrite(txn->lockState()));
             uassert(ErrorCodes::NotMaster,
                     str::stream() << "Not primary while cloning collection " << from_collection.ns()
                                   << " to " << to_collection.ns(),

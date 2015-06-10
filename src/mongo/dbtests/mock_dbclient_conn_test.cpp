@@ -35,7 +35,6 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/timer.h"
 
-#include <boost/scoped_ptr.hpp>
 #include <ctime>
 #include <string>
 #include <vector>

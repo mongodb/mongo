@@ -258,7 +258,7 @@ namespace mongo {
             const Settings _settings;
             bool _done;
             boost::scoped_array<char> _buffer;
-            boost::scoped_ptr<BufReader> _reader;
+            std::unique_ptr<BufReader> _reader;
             std::string _fileName;
             boost::shared_ptr<FileDeleter> _fileDeleter; // Must outlive _file
             std::ifstream _file;

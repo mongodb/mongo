@@ -28,7 +28,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <boost/scoped_ptr.hpp>
 #include <boost/thread/locks.hpp>
 
 #include "mongo/bson/bsonobjbuilder.h"
@@ -47,7 +46,7 @@
 
 namespace mongo {
 
-    using boost::scoped_ptr;
+    using std::unique_ptr;
     using std::string;
 
 namespace {
@@ -169,7 +168,7 @@ namespace {
                   string& errmsg,
                   BSONObjBuilder& result) {
 
-            scoped_ptr<MatchExpression> filter;
+            unique_ptr<MatchExpression> filter;
             if ( cmdObj["filter"].isABSONObj() ) {
                 StatusWithMatchExpression res =
                     MatchExpressionParser::parse( cmdObj["filter"].Obj() );

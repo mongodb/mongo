@@ -33,7 +33,6 @@
 #include "mongo/db/commands/authentication_commands.h"
 
 #include <boost/algorithm/string.hpp>
-#include <boost/scoped_ptr.hpp>
 #include <string>
 #include <vector>
 
@@ -136,7 +135,7 @@ namespace mongo {
         }
 
         SimpleMutex _randMutex;  // Synchronizes accesses to _random.
-        boost::scoped_ptr<SecureRandom> _random;
+        std::unique_ptr<SecureRandom> _random;
     } cmdGetNonce;
 
     void CmdAuthenticate::redactForLogging(mutablebson::Document* cmdObj) {

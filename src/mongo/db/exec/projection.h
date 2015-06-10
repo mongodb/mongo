@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/projection_exec.h"
@@ -124,11 +123,11 @@ namespace mongo {
     private:
         Status transform(WorkingSetMember* member);
 
-        boost::scoped_ptr<ProjectionExec> _exec;
+        std::unique_ptr<ProjectionExec> _exec;
 
         // _ws is not owned by us.
         WorkingSet* _ws;
-        boost::scoped_ptr<PlanStage> _child;
+        std::unique_ptr<PlanStage> _child;
 
         // Stats
         CommonStats _commonStats;

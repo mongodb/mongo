@@ -34,7 +34,6 @@
 
 #include "mongo/db/catalog/collection.h"
 
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/base/counter.h"
 #include "mongo/base/owned_pointer_map.h"
@@ -89,7 +88,7 @@ namespace {
     }
 }
 
-    using boost::scoped_ptr;
+    using std::unique_ptr;
     using std::endl;
     using std::string;
     using std::vector;
@@ -778,7 +777,7 @@ namespace {
             int idxn = 0;
             try  {
                 // Only applicable when 'full' validation is requested.
-                boost::scoped_ptr<BSONObjBuilder> indexDetails(full ? new BSONObjBuilder() : NULL);
+                std::unique_ptr<BSONObjBuilder> indexDetails(full ? new BSONObjBuilder() : NULL);
                 BSONObjBuilder indexes; // not using subObjStart to be exception safe
 
                 IndexCatalog::IndexIterator i = _indexCatalog.getIndexIterator(txn, false);
@@ -788,7 +787,7 @@ namespace {
                     IndexAccessMethod* iam = _indexCatalog.getIndex( descriptor );
                     invariant( iam );
 
-                    boost::scoped_ptr<BSONObjBuilder> bob(
+                    std::unique_ptr<BSONObjBuilder> bob(
                         indexDetails.get() ? new BSONObjBuilder(
                             indexDetails->subobjStart(descriptor->indexNamespace())) :
                         NULL);

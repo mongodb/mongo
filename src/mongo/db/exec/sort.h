@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
 #include <vector>
 #include <set>
 
@@ -128,10 +127,10 @@ namespace mongo {
         IndexBounds _bounds;
 
         // Helper to extract sorting keys from documents.
-        boost::scoped_ptr<BtreeKeyGenerator> _keyGen;
+        std::unique_ptr<BtreeKeyGenerator> _keyGen;
 
         // Helper to filter keys, ensuring keys generated with _keyGen are within _bounds.
-        boost::scoped_ptr<IndexBoundsChecker> _boundsChecker;
+        std::unique_ptr<IndexBoundsChecker> _boundsChecker;
     };
 
     /**
@@ -180,7 +179,7 @@ namespace mongo {
         WorkingSet* _ws;
 
         // Where we're reading data to sort from.
-        boost::scoped_ptr<PlanStage> _child;
+        std::unique_ptr<PlanStage> _child;
 
         // The raw sort _pattern as expressed by the user
         BSONObj _pattern;
@@ -194,7 +193,7 @@ namespace mongo {
         //
         // Sort key generation
         //
-        boost::scoped_ptr<SortStageKeyGenerator> _sortKeyGen;
+        std::unique_ptr<SortStageKeyGenerator> _sortKeyGen;
 
         //
         // Data storage
@@ -242,7 +241,7 @@ namespace mongo {
 
         // Comparator for data buffer
         // Initialization follows sort key generator
-        boost::scoped_ptr<WorkingSetComparator> _sortKeyComparator;
+        std::unique_ptr<WorkingSetComparator> _sortKeyComparator;
 
         // The data we buffer and sort.
         // _data will contain sorted data when all data is gathered
@@ -253,7 +252,7 @@ namespace mongo {
         // be used to provide the results of this stage through _resultIterator.
         std::vector<SortableDataItem> _data;
         typedef std::set<SortableDataItem, WorkingSetComparator> SortableDataItemSet;
-        boost::scoped_ptr<SortableDataItemSet> _dataSet;
+        std::unique_ptr<SortableDataItemSet> _dataSet;
 
         // Iterates through _data post-sort returning it.
         std::vector<SortableDataItem>::iterator _resultIterator;

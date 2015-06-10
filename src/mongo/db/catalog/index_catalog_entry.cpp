@@ -185,7 +185,7 @@ namespace mongo {
         OperationContext::RecoveryUnitState const _oldRecoveryUnitState;
 
         // Owned and life-time is controlled
-        const boost::scoped_ptr<RecoveryUnit> _newRecoveryUnit;
+        const std::unique_ptr<RecoveryUnit> _newRecoveryUnit;
     };
 
     void IndexCatalogEntry::setMultikey(OperationContext* txn) {

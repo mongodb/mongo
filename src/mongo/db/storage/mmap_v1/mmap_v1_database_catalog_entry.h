@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
 #include <map>
 #include <string>
 
@@ -137,8 +136,8 @@ namespace mongo {
         // RecoveryUnit to ensure correct handling of rollback.
 
         struct Entry {
-            boost::scoped_ptr<CollectionCatalogEntry> catalogEntry;
-            boost::scoped_ptr<RecordStoreV1Base> recordStore;
+            std::unique_ptr<CollectionCatalogEntry> catalogEntry;
+            std::unique_ptr<RecordStoreV1Base> recordStore;
         };
 
         typedef std::map<std::string, Entry*> CollectionMap;

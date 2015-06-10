@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
 #include <string>
 
 #include "mongo/base/disallow_copying.h"
@@ -66,6 +65,6 @@ namespace mongo {
 
     private:
         std::string _mechanism;
-        boost::scoped_ptr<SaslServerConversation> _saslConversation;
+        std::unique_ptr<SaslServerConversation> _saslConversation;
     };
 }  // namespace mongo

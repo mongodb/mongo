@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
 #include <utility>
 
@@ -269,7 +268,7 @@ namespace mongo {
         std::string _setName;
 
         HostAndPort _masterHost;
-        boost::scoped_ptr<DBClientConnection> _master;
+        std::unique_ptr<DBClientConnection> _master;
 
         // Last used host in a slaveOk query (can be a primary).
         HostAndPort _lastSlaveOkHost;

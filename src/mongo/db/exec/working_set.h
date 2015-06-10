@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
@@ -338,7 +337,7 @@ namespace mongo {
         size_t getMemUsage() const;
 
     private:
-        boost::scoped_ptr<WorkingSetComputedData> _computed[WSM_COMPUTED_NUM_TYPES];
+        std::unique_ptr<WorkingSetComputedData> _computed[WSM_COMPUTED_NUM_TYPES];
 
         std::unique_ptr<RecordFetcher> _fetcher;
     };

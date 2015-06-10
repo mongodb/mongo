@@ -46,7 +46,7 @@ namespace mongo {
         ASSERT_TRUE( result.isOK() );
 
         ASSERT_EQUALS( MatchExpression::TEXT, result.getValue()->matchType() );
-        boost::scoped_ptr<TextMatchExpression> textExp(
+        std::unique_ptr<TextMatchExpression> textExp(
                 static_cast<TextMatchExpression*>( result.getValue() ) );
         ASSERT_EQUALS( textExp->getQuery(), "awesome" );
         ASSERT_EQUALS( textExp->getLanguage(), "english" );
@@ -67,7 +67,7 @@ namespace mongo {
         ASSERT_TRUE( result.isOK() );
 
         ASSERT_EQUALS( MatchExpression::TEXT, result.getValue()->matchType() );
-        boost::scoped_ptr<TextMatchExpression> textExp(
+        std::unique_ptr<TextMatchExpression> textExp(
                 static_cast<TextMatchExpression*>( result.getValue() ) );
         ASSERT_EQUALS( textExp->getCaseSensitive(), true );
     }
@@ -79,7 +79,7 @@ namespace mongo {
         ASSERT_TRUE( result.isOK() );
 
         ASSERT_EQUALS( MatchExpression::TEXT, result.getValue()->matchType() );
-        boost::scoped_ptr<TextMatchExpression> textExp(
+        std::unique_ptr<TextMatchExpression> textExp(
                 static_cast<TextMatchExpression*>( result.getValue() ) );
         ASSERT_EQUALS( textExp->getCaseSensitive(), false );
     }

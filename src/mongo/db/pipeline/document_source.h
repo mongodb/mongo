@@ -32,7 +32,6 @@
 
 #include <boost/optional.hpp>
 #include <boost/intrusive_ptr.hpp>
-#include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/unordered_map.hpp>
 #include <deque>
@@ -550,7 +549,7 @@ namespace mongo {
         bool _spilled;
         const bool _extSortAllowed;
         const int _maxMemoryUsageBytes;
-        boost::scoped_ptr<Variables> _variables;
+        std::unique_ptr<Variables> _variables;
         std::vector<std::string> _idFieldNames; // used when id is a document
         std::vector<boost::intrusive_ptr<Expression> > _idExpressions;
 
@@ -558,7 +557,7 @@ namespace mongo {
         GroupsMap::iterator groupsIterator;
 
         // only used when _spilled
-        boost::scoped_ptr<Sorter<Value, Value>::Iterator> _sorterIterator;
+        std::unique_ptr<Sorter<Value, Value>::Iterator> _sorterIterator;
         std::pair<Value, Value> _firstPartOfNextGroup;
         Value _currentId;
         Accumulators _currentAccumulators;
@@ -609,7 +608,7 @@ namespace mongo {
         DocumentSourceMatch(const BSONObj &query,
             const boost::intrusive_ptr<ExpressionContext> &pExpCtx);
 
-        boost::scoped_ptr<Matcher> matcher;
+        std::unique_ptr<Matcher> matcher;
         bool _isTextQuery;
     };
 
@@ -759,7 +758,7 @@ namespace mongo {
                               const boost::intrusive_ptr<ExpressionObject>& exprObj);
 
         // configuration state
-        boost::scoped_ptr<Variables> _variables;
+        std::unique_ptr<Variables> _variables;
         boost::intrusive_ptr<ExpressionObject> pEO;
         BSONObj _raw;
     };
@@ -788,7 +787,7 @@ namespace mongo {
         Value redactValue(const Value& in);
 
         Variables::Id _currentId;
-        boost::scoped_ptr<Variables> _variables;
+        std::unique_ptr<Variables> _variables;
         boost::intrusive_ptr<Expression> _expression;
     };
 
@@ -904,7 +903,7 @@ namespace mongo {
 
         bool _done;
         bool _mergingPresorted;
-        boost::scoped_ptr<MySorter::Iterator> _output;
+        std::unique_ptr<MySorter::Iterator> _output;
     };
 
     class DocumentSourceLimit : public DocumentSource
@@ -1052,11 +1051,11 @@ namespace mongo {
         void unwindPath(const FieldPath &fieldPath);
 
         // Configuration state.
-        boost::scoped_ptr<FieldPath> _unwindPath;
+        std::unique_ptr<FieldPath> _unwindPath;
 
         // Iteration state.
         class Unwinder;
-        boost::scoped_ptr<Unwinder> _unwinder;
+        std::unique_ptr<Unwinder> _unwinder;
     };
 
     class DocumentSourceGeoNear : public DocumentSource
@@ -1098,16 +1097,16 @@ namespace mongo {
         // coords and distanceField are required, rest are optional
         BSONObj coords; // "near" option, but near is a reserved keyword on windows
         bool coordsIsArray;
-        boost::scoped_ptr<FieldPath> distanceField; // Using scoped_ptr because FieldPath can't be empty
+        std::unique_ptr<FieldPath> distanceField; // Using unique_ptr because FieldPath can't be empty
         long long limit;
         double maxDistance;
         BSONObj query;
         bool spherical;
         double distanceMultiplier;
-        boost::scoped_ptr<FieldPath> includeLocs;
+        std::unique_ptr<FieldPath> includeLocs;
 
         // these fields are used while processing the results
         BSONObj cmdOutput;
-        boost::scoped_ptr<BSONObjIterator> resultsIterator; // iterator over cmdOutput["results"]
+        std::unique_ptr<BSONObjIterator> resultsIterator; // iterator over cmdOutput["results"]
     };
 }

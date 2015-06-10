@@ -129,7 +129,7 @@ namespace mongo {
                          std::vector<std::string>& headers);
 
 
-        const boost::scoped_ptr<AdminAccess> _webUsers;
+        const std::unique_ptr<AdminAccess> _webUsers;
     };
 
     void webServerListenThread(boost::shared_ptr<DbWebServer> dbWebServer);

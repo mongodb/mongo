@@ -105,7 +105,7 @@ namespace mongo {
 
         // This ensures that our MmapV1RecordHeader* does not drop out from under our feet before
         // we dereference it.
-        boost::scoped_ptr<LockMongoFilesShared> _filesLock;
+        std::unique_ptr<LockMongoFilesShared> _filesLock;
     };
 
     MmapV1ExtentManager::MmapV1ExtentManager(StringData dbname,

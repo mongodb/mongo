@@ -28,7 +28,6 @@
  *    then also delete it in the license file.
  */
 
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/index_catalog.h"
@@ -45,7 +44,7 @@
 
 namespace IndexUpdateTests {
 
-    using boost::scoped_ptr;
+    using std::unique_ptr;
 
     static const char* const _ns = "unittests.indexupdate";
 
@@ -248,7 +247,7 @@ namespace IndexUpdateTests {
             // The index's root is set after the build is complete.
             ASSERT( !id->getHead().isNull() );
             // Create a cursor over the index.
-            scoped_ptr<BtreeCursor> cursor(
+            unique_ptr<BtreeCursor> cursor(
                     BtreeCursor::make( nsdetails( _ns ),
                                        id->getOnDisk(),
                                        BSON( "" << -1 ),    // startKey below minimum key.

@@ -30,7 +30,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <boost/scoped_ptr.hpp>
 #include <string>
 #include <sstream>
 
@@ -49,7 +48,7 @@
 
 namespace {
 
-    using boost::scoped_ptr;
+    using std::unique_ptr;
     using std::string;
     using namespace mongo;
 
@@ -116,7 +115,7 @@ namespace mongo {
     using std::string;
     using std::stringstream;
     using std::vector;
-    using boost::scoped_ptr;
+    using std::unique_ptr;
 
     PlanCacheCommand::PlanCacheCommand(const string& name, const string& helpText,
                                        ActionType actionType)
@@ -309,7 +308,7 @@ namespace mongo {
                 return status;
             }
 
-            scoped_ptr<CanonicalQuery> cq(cqRaw);
+            unique_ptr<CanonicalQuery> cq(cqRaw);
 
             if (!planCache->contains(*cq)) {
                 // Log if asked to clear non-existent query shape.
@@ -379,7 +378,7 @@ namespace mongo {
             return status;
         }
 
-        scoped_ptr<CanonicalQuery> cq(cqRaw);
+        unique_ptr<CanonicalQuery> cq(cqRaw);
 
         if (!planCache.contains(*cq)) {
             // Return empty plans in results if query shape does not
@@ -394,7 +393,7 @@ namespace mongo {
         if (!result.isOK()) {
             return result;
         }
-        scoped_ptr<PlanCacheEntry> entry(entryRaw);
+        unique_ptr<PlanCacheEntry> entry(entryRaw);
 
         BSONArrayBuilder plansBuilder(bob->subarrayStart("plans"));
         size_t numPlans = entry->plannerData.size();

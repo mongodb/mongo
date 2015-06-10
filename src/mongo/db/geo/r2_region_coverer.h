@@ -29,7 +29,6 @@
 #pragma once
 
 #include <boost/noncopyable.hpp>
-#include <boost/scoped_ptr.hpp>
 #include <queue>
 
 #include "mongo/db/geo/hash.h"
@@ -109,8 +108,8 @@ namespace mongo {
         typedef std::pair<int, Candidate*> QueueEntry;
         typedef std::priority_queue<QueueEntry, std::vector<QueueEntry>,
                                     CompareQueueEntries> CandidateQueue;
-        boost::scoped_ptr<CandidateQueue> _candidateQueue;  // Priority queue owns candidate pointers.
-        boost::scoped_ptr<std::vector<GeoHash> > _results;
+        std::unique_ptr<CandidateQueue> _candidateQueue;  // Priority queue owns candidate pointers.
+        std::unique_ptr<std::vector<GeoHash> > _results;
     };
 
 

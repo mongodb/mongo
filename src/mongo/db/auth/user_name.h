@@ -28,9 +28,9 @@
 #pragma once
 
 #include <iosfwd>
+#include <memory>
 #include <string>
 
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
@@ -106,7 +106,7 @@ namespace mongo {
             virtual Impl* doClone() const = 0;
         };
 
-        UserNameIterator() : _impl(NULL) {}
+        UserNameIterator() : _impl(nullptr) {}
         UserNameIterator(const UserNameIterator& other) : _impl(Impl::clone(other._impl.get())) {}
         explicit UserNameIterator(Impl* impl) : _impl(impl) {}
 
@@ -124,7 +124,7 @@ namespace mongo {
         const UserName* operator->() const { return &get(); }
 
     private:
-        boost::scoped_ptr<Impl> _impl;
+        std::unique_ptr<Impl> _impl;
     };
 
 

@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
 #include <vector>
 
 #include "mongo/db/service_context.h"
@@ -103,7 +102,7 @@ namespace mongo {
         // protected by parent class's _mutex
         std::vector<KillOpListenerInterface*> _killOpListeners;
 
-        boost::scoped_ptr<StorageEngineLockFile> _lockFile;
+        std::unique_ptr<StorageEngineLockFile> _lockFile;
 
         // logically owned here, but never deleted by anyone.
         StorageEngine* _storageEngine;

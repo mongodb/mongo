@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/index/index_access_method.h"
@@ -167,7 +166,7 @@ namespace mongo {
         //    In this case, _checker will be non-NULL.
         //
 
-        boost::scoped_ptr<IndexBoundsChecker> _checker;
+        std::unique_ptr<IndexBoundsChecker> _checker;
         IndexSeekPoint _seekPoint;
 
         //

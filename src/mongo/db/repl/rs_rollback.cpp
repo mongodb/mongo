@@ -475,7 +475,7 @@ namespace {
                     removeSaver.reset(new Helpers::RemoveSaver("rollback", "", *it));
 
                 // perform a collection scan and write all documents in the collection to disk
-                boost::scoped_ptr<PlanExecutor> exec(
+                std::unique_ptr<PlanExecutor> exec(
                         InternalPlanner::collectionScan(txn,
                                                         *it,
                                                         db->getCollection(*it)));

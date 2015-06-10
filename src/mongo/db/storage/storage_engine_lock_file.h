@@ -28,7 +28,7 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
+#include <memory>
 #include <string>
 
 #include "mongo/base/disallow_copying.h"
@@ -89,7 +89,7 @@ namespace mongo {
         bool _uncleanShutdown;
 
         class LockFileHandle;
-        boost::scoped_ptr<LockFileHandle> _lockFileHandle;
+        std::unique_ptr<LockFileHandle> _lockFileHandle;
     };
 
 }  // namespace mongo

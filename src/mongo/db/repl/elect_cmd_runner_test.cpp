@@ -28,7 +28,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <boost/scoped_ptr.hpp>
 #include <boost/thread.hpp>
 
 #include "mongo/base/status.h"
@@ -43,7 +42,7 @@
 #include "mongo/unittest/unittest.h"
 
 
-using boost::scoped_ptr;
+using std::unique_ptr;
 
 namespace mongo {
 namespace repl {
@@ -69,8 +68,8 @@ namespace {
 
         NetworkInterfaceMock* _net;
         StorageInterfaceMock* _storage;
-        boost::scoped_ptr<ReplicationExecutor> _executor;
-        boost::scoped_ptr<boost::thread> _executorThread;
+        std::unique_ptr<ReplicationExecutor> _executor;
+        std::unique_ptr<boost::thread> _executorThread;
 
     private:
         void setUp();
@@ -337,7 +336,7 @@ namespace {
         }
 
     private:
-        scoped_ptr<ElectCmdRunner::Algorithm> _checker;
+        unique_ptr<ElectCmdRunner::Algorithm> _checker;
     };
 
     TEST_F(ElectScatterGatherTest, NodeRespondsWithBadVoteType) {

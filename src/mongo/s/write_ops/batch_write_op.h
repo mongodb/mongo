@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
 #include <set>
 #include <vector>
 
@@ -180,7 +179,7 @@ namespace mongo {
         OwnedPointerVector<BatchedUpsertDetail> _upsertedIds;
 
         // Stats for the entire batch op
-        boost::scoped_ptr<BatchWriteStats> _stats;
+        std::unique_ptr<BatchWriteStats> _stats;
     };
 
     struct BatchWriteStats {

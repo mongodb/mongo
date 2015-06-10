@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
@@ -232,10 +231,10 @@ namespace mongo {
          * Associates indices with predicates.
          */
         struct NodeAssignment {
-            boost::scoped_ptr<PredicateAssignment> pred;
-            boost::scoped_ptr<OrAssignment> orAssignment;
-            boost::scoped_ptr<AndAssignment> andAssignment;
-            boost::scoped_ptr<ArrayAssignment> arrayAssignment;
+            std::unique_ptr<PredicateAssignment> pred;
+            std::unique_ptr<OrAssignment> orAssignment;
+            std::unique_ptr<AndAssignment> andAssignment;
+            std::unique_ptr<ArrayAssignment> arrayAssignment;
             std::string toString() const;
         };
 

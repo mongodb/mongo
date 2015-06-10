@@ -28,7 +28,6 @@
 
 #include "mongo/s/write_ops/batch_write_exec.h"
 
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/s/client/mock_multi_write_command.h"
@@ -40,7 +39,7 @@
 
 namespace {
 
-    using boost::scoped_ptr;
+    using std::unique_ptr;
     using std::string;
     using std::vector;
 
@@ -81,7 +80,7 @@ namespace {
         MockShardResolver resolver;
         MockMultiWriteCommand dispatcher;
 
-        scoped_ptr<BatchWriteExec> exec;
+        unique_ptr<BatchWriteExec> exec;
     };
 
     //

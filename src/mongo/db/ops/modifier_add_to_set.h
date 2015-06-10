@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/bson/mutable/document.h"
@@ -80,7 +79,7 @@ namespace mongo {
         mutablebson::Element _val;
 
         struct PreparedState;
-        boost::scoped_ptr<PreparedState> _preparedState;
+        std::unique_ptr<PreparedState> _preparedState;
     };
 
 } // namespace mongo

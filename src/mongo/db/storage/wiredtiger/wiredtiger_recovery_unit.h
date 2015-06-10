@@ -34,7 +34,6 @@
 
 #include <memory.h>
 
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/operation_context.h"

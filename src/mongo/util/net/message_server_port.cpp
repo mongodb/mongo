@@ -31,7 +31,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <boost/scoped_ptr.hpp>
 #include <boost/thread/thread.hpp>
 #include <memory>
 
@@ -65,7 +64,7 @@
 
 namespace mongo {
 
-    using boost::scoped_ptr;
+    using std::unique_ptr;
     using std::endl;
 
 namespace {
@@ -197,7 +196,7 @@ namespace {
             TicketHolderReleaser connTicketReleaser( &Listener::globalTicketHolder );
 
             invariant(arg);
-            scoped_ptr<MessagingPortWithHandler> portWithHandler(
+            unique_ptr<MessagingPortWithHandler> portWithHandler(
                 static_cast<MessagingPortWithHandler*>(arg));
             MessageHandler* const handler = portWithHandler->getHandler();
 

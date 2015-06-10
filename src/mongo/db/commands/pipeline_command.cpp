@@ -28,7 +28,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
 #include <vector>
 
@@ -57,7 +56,7 @@
 namespace mongo {
 
     using boost::intrusive_ptr;
-    using boost::scoped_ptr;
+    using std::unique_ptr;
     using boost::shared_ptr;
     using std::unique_ptr;
     using std::string;
@@ -218,7 +217,7 @@ namespace mongo {
             }
 
             PlanExecutor* exec = NULL;
-            scoped_ptr<ClientCursorPin> pin; // either this OR the execHolder will be non-null
+            unique_ptr<ClientCursorPin> pin; // either this OR the execHolder will be non-null
             unique_ptr<PlanExecutor> execHolder;
             {
                 // This will throw if the sharding version for this connection is out of date. The

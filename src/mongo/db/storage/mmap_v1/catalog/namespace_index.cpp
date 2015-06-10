@@ -54,7 +54,7 @@ namespace mongo {
     NamespaceIndex::NamespaceIndex(const std::string& dir, const std::string& database)
         : _dir(dir),
           _database(database),
-          _ht(NULL) {
+          _ht(nullptr) {
 
     }
 

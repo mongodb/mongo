@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
 #include <string>
 #include <vector>
 
@@ -119,8 +118,8 @@ namespace repl {
         Status getStatus() const;
 
     private:
-        boost::scoped_ptr<Algorithm> _algorithm;
-        boost::scoped_ptr<ScatterGatherRunner> _runner;
+        std::unique_ptr<Algorithm> _algorithm;
+        std::unique_ptr<ScatterGatherRunner> _runner;
         bool _isCanceled = false;
     };
 

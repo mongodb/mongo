@@ -28,7 +28,6 @@
 
 #include "mongo/db/ops/update_driver.h"
 
-#include <boost/scoped_ptr.hpp>
 
 #include <map>
 
@@ -156,8 +155,8 @@ namespace {
         }
 
     private:
-        boost::scoped_ptr<UpdateDriver> _driverOps;
-        boost::scoped_ptr<UpdateDriver> _driverRepl;
+        std::unique_ptr<UpdateDriver> _driverOps;
+        std::unique_ptr<UpdateDriver> _driverRepl;
         Document _doc;
     };
 

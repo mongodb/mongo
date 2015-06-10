@@ -31,7 +31,6 @@
 #include "mongo/db/storage/record_store_test_harness.h"
 
 #include <algorithm>
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/record_id.h"
@@ -39,7 +38,7 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/unittest/unittest.h"
 
-using boost::scoped_ptr;
+using std::unique_ptr;
 using std::string;
 using std::stringstream;
 
@@ -49,11 +48,11 @@ namespace mongo {
     // When curr() or getNext() is called on an iterator positioned at EOF,
     // the iterator returns RecordId() and stays at EOF.
     TEST( RecordStoreTestHarness, IterateOverMultipleRecords ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
+        unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
+        unique_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( 0, rs->numRecords( opCtx.get() ) );
         }
 
@@ -61,7 +60,7 @@ namespace mongo {
         RecordId locs[nToInsert];
         std::string datas[nToInsert];
         for ( int i = 0; i < nToInsert; i++ ) {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 stringstream ss;
                 ss << "record " << i;
@@ -80,13 +79,13 @@ namespace mongo {
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( nToInsert, rs->numRecords( opCtx.get() ) );
         }
 
         std::sort( locs, locs + nToInsert ); // inserted records may not be in RecordId order
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             auto cursor = rs->getCursor(opCtx.get());
             for ( int i = 0; i < nToInsert; i++ ) {
                 const auto record = cursor->next();
@@ -102,11 +101,11 @@ namespace mongo {
     // When curr() or getNext() is called on an iterator positioned at EOF,
     // the iterator returns RecordId() and stays at EOF.
     TEST( RecordStoreTestHarness, IterateOverMultipleRecordsReversed ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
+        unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
+        unique_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( 0, rs->numRecords( opCtx.get() ) );
         }
 
@@ -114,7 +113,7 @@ namespace mongo {
         RecordId locs[nToInsert];
         std::string datas[nToInsert];
         for ( int i = 0; i < nToInsert; i++ ) {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 stringstream ss;
                 ss << "record " << i;
@@ -133,13 +132,13 @@ namespace mongo {
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( nToInsert, rs->numRecords( opCtx.get() ) );
         }
 
         std::sort( locs, locs + nToInsert ); // inserted records may not be in RecordId order
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
 
             auto cursor = rs->getCursor(opCtx.get(), false);
             for ( int i = nToInsert - 1; i >= 0; i-- ) {
@@ -155,11 +154,11 @@ namespace mongo {
     // Insert multiple records and try to create a forward iterator
     // starting at an interior position.
     TEST( RecordStoreTestHarness, IterateStartFromMiddle ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
+        unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
+        unique_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( 0, rs->numRecords( opCtx.get() ) );
         }
 
@@ -167,7 +166,7 @@ namespace mongo {
         RecordId locs[nToInsert];
         std::string datas[nToInsert];
         for ( int i = 0; i < nToInsert; i++ ) {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 stringstream ss;
                 ss << "record " << i;
@@ -186,13 +185,13 @@ namespace mongo {
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( nToInsert, rs->numRecords( opCtx.get() ) );
         }
 
         std::sort( locs, locs + nToInsert ); // inserted records may not be in RecordId order
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
 
             int start = nToInsert / 2;
             auto cursor = rs->getCursor(opCtx.get());
@@ -209,11 +208,11 @@ namespace mongo {
     // Insert multiple records and try to create a reverse iterator
     // starting at an interior position.
     TEST( RecordStoreTestHarness, IterateStartFromMiddleReversed ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
+        unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
+        unique_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( 0, rs->numRecords( opCtx.get() ) );
         }
 
@@ -221,7 +220,7 @@ namespace mongo {
         RecordId locs[nToInsert];
         std::string datas[nToInsert];
         for ( int i = 0; i < nToInsert; i++ ) {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 stringstream ss;
                 ss << "record " << i;
@@ -240,13 +239,13 @@ namespace mongo {
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( nToInsert, rs->numRecords( opCtx.get() ) );
         }
 
         std::sort( locs, locs + nToInsert ); // inserted records may not be in RecordId order
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
 
             int start = nToInsert / 2;
             auto cursor = rs->getCursor(opCtx.get(), false);
@@ -264,11 +263,11 @@ namespace mongo {
     // is EOF. Add an additional record, saving and restoring the iterator state, and check
     // that the iterator remains EOF.
     TEST( RecordStoreTestHarness, RecordIteratorEOF ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
+        unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
+        unique_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( 0, rs->numRecords( opCtx.get() ) );
         }
 
@@ -276,7 +275,7 @@ namespace mongo {
         RecordId locs[nToInsert];
         std::string datas[nToInsert];
         for ( int i = 0; i < nToInsert; i++ ) {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 StringBuilder sb;
                 sb << "record " << i;
@@ -295,12 +294,12 @@ namespace mongo {
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( nToInsert, rs->numRecords( opCtx.get() ) );
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
 
             // Get a forward iterator starting at the beginning of the record store.
             auto cursor = rs->getCursor(opCtx.get());
@@ -339,11 +338,11 @@ namespace mongo {
 
     // Test calling savePositioned and restore after each call to next
     TEST( RecordStoreTestHarness, RecordIteratorSavePositionedRestore ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
+        unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
+        unique_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( 0, rs->numRecords( opCtx.get() ) );
         }
 
@@ -351,7 +350,7 @@ namespace mongo {
         RecordId locs[nToInsert];
         std::string datas[nToInsert];
         for ( int i = 0; i < nToInsert; i++ ) {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 StringBuilder sb;
                 sb << "record " << i;
@@ -370,12 +369,12 @@ namespace mongo {
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( nToInsert, rs->numRecords( opCtx.get() ) );
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
 
             // Get a forward iterator starting at the beginning of the record store.
             auto cursor = rs->getCursor(opCtx.get());

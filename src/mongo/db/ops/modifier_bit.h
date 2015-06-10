@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
 #include <string>
 #include <vector>
 
@@ -94,7 +93,7 @@ namespace mongo {
         OpEntries _ops;
 
         struct PreparedState;
-        boost::scoped_ptr<PreparedState> _preparedState;
+        std::unique_ptr<PreparedState> _preparedState;
     };
 
 } // namespace mongo

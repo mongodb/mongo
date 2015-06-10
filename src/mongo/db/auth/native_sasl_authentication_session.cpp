@@ -30,7 +30,6 @@
 
 #include "mongo/db/auth/native_sasl_authentication_session.h"
 
-#include <boost/scoped_ptr.hpp>
 #include <boost/range/size.hpp>
 
 #include "mongo/base/init.h"
@@ -53,7 +52,7 @@
 
 namespace mongo {
 
-    using boost::scoped_ptr;
+    using std::unique_ptr;
 
 namespace {
     SaslAuthenticationSession* createNativeSaslAuthenticationSession(
@@ -87,7 +86,7 @@ namespace {
                 // Not a SASL mechanism; no need to smoke test built-in mechanisms.
                 continue;
             }
-            scoped_ptr<SaslAuthenticationSession>
+            unique_ptr<SaslAuthenticationSession>
                 session(SaslAuthenticationSession::create(authzSession.get(), mechanism));
             Status status = session->start("test",
                                            mechanism,

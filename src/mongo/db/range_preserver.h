@@ -26,7 +26,6 @@
  *    it in the license file.
  */
 
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/clientcursor.h"
@@ -66,7 +65,7 @@ namespace mongo {
         }
 
     private:
-        boost::scoped_ptr<ClientCursorPin> _pin;
+        std::unique_ptr<ClientCursorPin> _pin;
     };
 
 }  // namespace mongo

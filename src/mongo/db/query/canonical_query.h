@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/base/status.h"
 #include "mongo/db/dbmessage.h"
@@ -215,12 +214,12 @@ namespace mongo {
                     const MatchExpressionParser::WhereCallback& whereCallback,
                     MatchExpression* root);
 
-        boost::scoped_ptr<LiteParsedQuery> _pq;
+        std::unique_ptr<LiteParsedQuery> _pq;
 
         // _root points into _pq->getFilter()
-        boost::scoped_ptr<MatchExpression> _root;
+        std::unique_ptr<MatchExpression> _root;
 
-        boost::scoped_ptr<ParsedProjection> _proj;
+        std::unique_ptr<ParsedProjection> _proj;
     };
 
 }  // namespace mongo

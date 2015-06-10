@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/db/exec/plan_stage.h"
 
@@ -123,7 +122,7 @@ namespace mongo {
         // by us.
         WorkingSet* _ws;
 
-        boost::scoped_ptr<PlanStage> _child;
+        std::unique_ptr<PlanStage> _child;
 
         CommonStats _commonStats;
         CountStats _specificStats;

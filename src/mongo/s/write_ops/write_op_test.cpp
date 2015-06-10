@@ -28,7 +28,6 @@
 
 #include "mongo/s/write_ops/write_op.h"
 
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/owned_pointer_vector.h"
@@ -40,7 +39,7 @@
 
 namespace {
 
-    using boost::scoped_ptr;
+    using std::unique_ptr;
     using std::string;
     using std::vector;
 
@@ -69,7 +68,7 @@ namespace {
         WriteOp writeOp( BatchItemRef( &request, 0 ) );
         ASSERT_EQUALS( writeOp.getWriteState(), WriteOpState_Ready );
 
-        scoped_ptr<WriteErrorDetail> error( buildError( ErrorCodes::UnknownError,
+        unique_ptr<WriteErrorDetail> error( buildError( ErrorCodes::UnknownError,
                                                           BSON( "data" << 12345 ),
                                                           "some message" ) );
 
@@ -294,7 +293,7 @@ namespace {
         ASSERT_EQUALS( targeted.size(), 1u );
         assertEndpointsEqual( targeted.front()->endpoint, endpoint );
 
-        scoped_ptr<WriteErrorDetail> error( buildError( ErrorCodes::UnknownError,
+        unique_ptr<WriteErrorDetail> error( buildError( ErrorCodes::UnknownError,
                                                           BSON( "data" << 12345 ),
                                                           "some message" ) );
 
@@ -392,7 +391,7 @@ namespace {
 
         // Stale exception
 
-        scoped_ptr<WriteErrorDetail> error( buildError( ErrorCodes::StaleShardVersion,
+        unique_ptr<WriteErrorDetail> error( buildError( ErrorCodes::StaleShardVersion,
                                                           BSON( "data" << 12345 ),
                                                           "some message" ) );
 

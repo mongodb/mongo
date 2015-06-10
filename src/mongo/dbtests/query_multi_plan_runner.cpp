@@ -26,7 +26,6 @@
  *    then also delete it in the license file.
  */
 
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
@@ -57,7 +56,7 @@ namespace mongo {
 
 namespace QueryMultiPlanRunner {
 
-    using boost::scoped_ptr;
+    using std::unique_ptr;
     using std::unique_ptr;
     using std::vector;
 
@@ -170,7 +169,7 @@ namespace QueryMultiPlanRunner {
             Status status = PlanExecutor::make(&_txn, sharedWs.release(), mps, cq, coll,
                                                PlanExecutor::YIELD_MANUAL, &rawExec);
             ASSERT_OK(status);
-            boost::scoped_ptr<PlanExecutor> exec(rawExec);
+            std::unique_ptr<PlanExecutor> exec(rawExec);
 
             // Get all our results out.
             int results = 0;
@@ -207,7 +206,7 @@ namespace QueryMultiPlanRunner {
                                                 BSONObj(), // proj
                                                 &cq).isOK());
             ASSERT(NULL != cq);
-            boost::scoped_ptr<CanonicalQuery> killCq(cq);
+            std::unique_ptr<CanonicalQuery> killCq(cq);
 
             // Force index intersection.
             bool forceIxisectOldValue = internalQueryForceIntersectionPlans;
@@ -229,8 +228,8 @@ namespace QueryMultiPlanRunner {
             ASSERT_EQUALS(solutions.size(), 3U);
 
             // Fill out the MultiPlanStage.
-            scoped_ptr<MultiPlanStage> mps(new MultiPlanStage(&_txn, collection, cq));
-            scoped_ptr<WorkingSet> ws(new WorkingSet());
+            unique_ptr<MultiPlanStage> mps(new MultiPlanStage(&_txn, collection, cq));
+            unique_ptr<WorkingSet> ws(new WorkingSet());
             // Put each solution from the planner into the MPR.
             for (size_t i = 0; i < solutions.size(); ++i) {
                 PlanStage* root;

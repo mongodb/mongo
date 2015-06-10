@@ -32,7 +32,6 @@
 
 #include "mongo/db/commands/dbhash.h"
 
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
@@ -47,7 +46,7 @@
 
 namespace mongo {
 
-    using boost::scoped_ptr;
+    using std::unique_ptr;
     using std::unique_ptr;
     using std::list;
     using std::endl;

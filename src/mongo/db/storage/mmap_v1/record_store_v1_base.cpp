@@ -32,7 +32,6 @@
 
 #include "mongo/db/storage/mmap_v1/record_store_v1_base.h"
 
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/client.h"
@@ -49,7 +48,7 @@
 
 namespace mongo {
 
-    using boost::scoped_ptr;
+    using std::unique_ptr;
     using std::set;
     using std::string;
 

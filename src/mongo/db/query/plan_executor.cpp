@@ -333,7 +333,7 @@ namespace mongo {
         // to use to pull the record into memory. We take ownership of the RecordFetcher here,
         // deleting it after we've had a chance to do the fetch. For timing-based yields, we
         // just pass a NULL fetcher.
-        boost::scoped_ptr<RecordFetcher> fetcher;
+        std::unique_ptr<RecordFetcher> fetcher;
 
         // Incremented on every writeConflict, reset to 0 on any successful call to _root->work.
         size_t writeConflictsInARow = 0;

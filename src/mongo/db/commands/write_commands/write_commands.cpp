@@ -235,7 +235,7 @@ namespace mongo {
 
             PlanExecutor* rawExec;
             uassertStatusOK(getExecutorUpdate(txn, collection, &parsedUpdate, debug, &rawExec));
-            boost::scoped_ptr<PlanExecutor> exec(rawExec);
+            std::unique_ptr<PlanExecutor> exec(rawExec);
 
             // Explain the plan tree.
             Explain::explainStages( exec.get(), verbosity, out );
@@ -275,7 +275,7 @@ namespace mongo {
 
             PlanExecutor* rawExec;
             uassertStatusOK(getExecutorDelete(txn, collection, &parsedDelete, &rawExec));
-            boost::scoped_ptr<PlanExecutor> exec(rawExec);
+            std::unique_ptr<PlanExecutor> exec(rawExec);
 
             // Explain the plan tree.
             Explain::explainStages(exec.get(), verbosity, out);

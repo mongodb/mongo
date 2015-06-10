@@ -29,7 +29,6 @@
 #include "mongo/platform/basic.h"
 
 #include <boost/filesystem.hpp>
-#include <boost/scoped_ptr.hpp>
 #include <fstream>
 #include <ostream>
 

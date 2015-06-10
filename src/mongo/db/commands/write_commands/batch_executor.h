@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
 #include <string>
 
 #include "mongo/base/disallow_copying.h"
@@ -149,7 +148,7 @@ namespace mongo {
         LastError* _le;
 
         // Stats
-        boost::scoped_ptr<WriteBatchStats> _stats;
+        std::unique_ptr<WriteBatchStats> _stats;
     };
 
     /**

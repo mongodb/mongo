@@ -32,7 +32,6 @@
 
 #include "mongo/db/index/haystack_access_method.h"
 
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/base/status.h"
 #include "mongo/db/geo/hash.h"
@@ -45,7 +44,7 @@
 
 namespace mongo {
 
-    using boost::scoped_ptr;
+    using std::unique_ptr;
 
     HaystackAccessMethod::HaystackAccessMethod(IndexCatalogEntry* btreeState, SortedDataInterface* btree)
         : IndexAccessMethod(btreeState, btree) {
@@ -104,7 +103,7 @@ namespace mongo {
                 unordered_set<RecordId, RecordId::Hasher> thisPass;
 
 
-                scoped_ptr<PlanExecutor> exec(InternalPlanner::indexScan(txn,  collection,
+                unique_ptr<PlanExecutor> exec(InternalPlanner::indexScan(txn,  collection,
                                                                      _descriptor, key, key, true));
                 PlanExecutor::ExecState state;
                 RecordId loc;

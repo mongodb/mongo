@@ -53,7 +53,7 @@ namespace {
             SaslClientSession(),
             _step(0),
             _done(false),
-            _saslConversation(NULL) {
+            _saslConversation(nullptr) {
     }
 
     NativeSaslClientSession::~NativeSaslClientSession() {}

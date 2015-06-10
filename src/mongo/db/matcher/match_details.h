@@ -30,8 +30,7 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
-
+#include <memory>
 #include <string>
 
 namespace mongo {
@@ -69,6 +68,6 @@ namespace mongo {
     private:
         bool _loadedRecord;
         bool _elemMatchKeyRequested;
-        boost::scoped_ptr<std::string> _elemMatchKey;
+        std::unique_ptr<std::string> _elemMatchKey;
     };
 }

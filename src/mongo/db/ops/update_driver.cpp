@@ -28,7 +28,6 @@
 
 #include "mongo/db/ops/update_driver.h"
 
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
@@ -48,7 +47,7 @@ namespace mongo {
     namespace str = mongoutils::str;
     namespace mb = mongo::mutablebson;
 
-    using boost::scoped_ptr;
+    using std::unique_ptr;
     using std::unique_ptr;
     using std::vector;
 
@@ -181,7 +180,7 @@ namespace mongo {
         Status s = CanonicalQuery::canonicalize("", query, &rawCG, WhereCallbackNoop());
         if (!s.isOK())
             return s;
-        scoped_ptr<CanonicalQuery> cq(rawCG);
+        unique_ptr<CanonicalQuery> cq(rawCG);
         return populateDocumentWithQueryFields(rawCG, immutablePaths, doc);
     }
 
@@ -232,8 +231,8 @@ namespace mongo {
         FieldRefSet* targetFields = updatedFields;
 
         // If we didn't get a FieldRefSet* from the caller, allocate storage and use
-        // the scoped_ptr for lifecycle management
-        scoped_ptr<FieldRefSet> targetFieldScopedPtr;
+        // the unique_ptr for lifecycle management
+        unique_ptr<FieldRefSet> targetFieldScopedPtr;
         if (!targetFields) {
             targetFieldScopedPtr.reset(new FieldRefSet());
             targetFields = targetFieldScopedPtr.get();

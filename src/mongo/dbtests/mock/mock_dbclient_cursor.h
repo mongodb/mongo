@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/client/dbclientmockcursor.h"
@@ -54,7 +53,7 @@ namespace mongo {
         mongo::BSONObj next();
 
     private:
-        boost::scoped_ptr<mongo::DBClientMockCursor> _cursor;
+        std::unique_ptr<mongo::DBClientMockCursor> _cursor;
         mongo::BSONObj _resultSet;
     };
 }

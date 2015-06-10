@@ -27,7 +27,6 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
 #include <boost/thread/mutex.hpp>
 #include <string>
 
@@ -122,7 +121,7 @@ namespace logger {
         friend class RotatableFileWriter::Use;
         boost::mutex _mutex;
         std::string _fileName;
-        boost::scoped_ptr<std::ostream> _stream;
+        std::unique_ptr<std::ostream> _stream;
     };
 
 }  // namespace logger

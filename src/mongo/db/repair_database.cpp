@@ -32,7 +32,6 @@
 
 #include "mongo/db/repair_database.h"
 
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/db/background.h"
 #include "mongo/base/status.h"
@@ -85,8 +84,8 @@ namespace {
         // Skip the rest if there are no indexes to rebuild.
         if (indexSpecs.empty()) return Status::OK();
 
-        boost::scoped_ptr<Collection> collection;
-        boost::scoped_ptr<MultiIndexBlock> indexer;
+        std::unique_ptr<Collection> collection;
+        std::unique_ptr<MultiIndexBlock> indexer;
         {
             // These steps are combined into a single WUOW to ensure there are no commits without
             // the indexes.

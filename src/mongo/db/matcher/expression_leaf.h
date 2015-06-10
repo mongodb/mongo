@@ -30,7 +30,6 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonmisc.h"
@@ -221,7 +220,7 @@ namespace mongo {
     private:
         std::string _regex;
         std::string _flags;
-        boost::scoped_ptr<pcrecpp::RE> _re;
+        std::unique_ptr<pcrecpp::RE> _re;
     };
 
     class ModMatchExpression : public LeafMatchExpression {

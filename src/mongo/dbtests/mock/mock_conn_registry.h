@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/base/status.h"
 #include "mongo/client/dbclientinterface.h"
@@ -111,7 +110,7 @@ namespace mongo {
 
         MockConnRegistry();
 
-        static boost::scoped_ptr<MockConnRegistry> _instance;
+        static std::unique_ptr<MockConnRegistry> _instance;
 
         MockConnHook _mockConnStrHook;
 

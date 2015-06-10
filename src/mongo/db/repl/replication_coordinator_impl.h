@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
 #include <boost/thread.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/condition_variable.hpp>
@@ -918,7 +917,7 @@ namespace repl {
         const Mode _replMode;                                                             // (R)
 
         // Pointer to the TopologyCoordinator owned by this ReplicationCoordinator.
-        boost::scoped_ptr<TopologyCoordinator> _topCoord;                                 // (X)
+        std::unique_ptr<TopologyCoordinator> _topCoord;                                 // (X)
 
         // If the executer is owned then this will be set, but should not be used.
         // This is only used to clean up and destroy the replExec if owned
@@ -927,11 +926,11 @@ namespace repl {
         ReplicationExecutor& _replExecutor;                                               // (S)
 
         // Pointer to the ReplicationCoordinatorExternalState owned by this ReplicationCoordinator.
-        boost::scoped_ptr<ReplicationCoordinatorExternalState> _externalState;            // (PS)
+        std::unique_ptr<ReplicationCoordinatorExternalState> _externalState;            // (PS)
 
         // Thread that drives actions in the topology coordinator
         // Set in startReplication() and thereafter accessed in shutdown.
-        boost::scoped_ptr<boost::thread> _topCoordDriverThread;                           // (I)
+        std::unique_ptr<boost::thread> _topCoordDriverThread;                           // (I)
 
         // Our RID, used to identify us to our sync source when sending replication progress
         // updates upstream.  Set once in startReplication() and then never modified again.
@@ -994,9 +993,9 @@ namespace repl {
         // currently in progress. When using the V1 protocol, a non-null _voteRequester pointer
         // indicates this instead.
         // Only one election is allowed at a time.
-        boost::scoped_ptr<FreshnessChecker> _freshnessChecker;                            // (X)
+        std::unique_ptr<FreshnessChecker> _freshnessChecker;                            // (X)
 
-        boost::scoped_ptr<ElectCmdRunner> _electCmdRunner;                                // (X)
+        std::unique_ptr<ElectCmdRunner> _electCmdRunner;                                // (X)
 
         std::unique_ptr<VoteRequester> _voteRequester;                                    // (X)
 

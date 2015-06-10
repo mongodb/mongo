@@ -28,7 +28,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <boost/scoped_ptr.hpp>
 #include <iostream>
 
 #include "mongo/db/repl/heartbeat_response_action.h"
@@ -48,7 +47,7 @@
 #define ASSERT_NO_ACTION(EXPRESSION) \
     ASSERT_EQUALS(mongo::repl::HeartbeatResponseAction::NoAction, (EXPRESSION))
 
-using boost::scoped_ptr;
+using std::unique_ptr;
 
 namespace mongo {
 namespace repl {
@@ -211,8 +210,8 @@ namespace {
         }
 
     private:
-        scoped_ptr<TopologyCoordinatorImpl> _topo;
-        scoped_ptr<ReplicationExecutor::CallbackData> _cbData;
+        unique_ptr<TopologyCoordinatorImpl> _topo;
+        unique_ptr<ReplicationExecutor::CallbackData> _cbData;
         Date_t _now;
         int _selfIndex;
     };

@@ -28,7 +28,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <boost/scoped_ptr.hpp>
 #include <boost/thread.hpp>
 
 #include "mongo/db/repl/replication_executor.h"
@@ -116,8 +115,8 @@ namespace {
         // owned by _executor
         NetworkInterfaceMock* _net;
         StorageInterfaceMock* _storage;
-        boost::scoped_ptr<ReplicationExecutor> _executor;
-        boost::scoped_ptr<boost::thread> _executorThread;
+        std::unique_ptr<ReplicationExecutor> _executor;
+        std::unique_ptr<boost::thread> _executorThread;
     };
 
     void ScatterGatherTest::setUp() {
@@ -164,7 +163,7 @@ namespace {
         ScatterGatherRunner* _sgr;
         ReplicationExecutor* _executor;
         Status _result;
-        boost::scoped_ptr<boost::thread> _thread;
+        std::unique_ptr<boost::thread> _thread;
     };
 
     // Simple onCompletion function which will toggle a bool, so that we can check the logs to

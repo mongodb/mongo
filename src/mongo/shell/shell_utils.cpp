@@ -315,7 +315,7 @@ namespace mongo {
                 const ConnectionString cs(status.getValue());
 
                 string errmsg;
-                boost::scoped_ptr<DBClientWithCommands> conn( cs.connect( errmsg ) );
+                std::unique_ptr<DBClientWithCommands> conn( cs.connect( errmsg ) );
                 if ( !conn ) {
                     continue;
                 }

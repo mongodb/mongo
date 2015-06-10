@@ -35,7 +35,6 @@
 #include "mongo/db/catalog/index_create.h"
 
 #include <boost/make_shared.hpp>
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/client/dbclientinterface.h"
@@ -56,7 +55,7 @@
 
 namespace mongo {
 
-    using boost::scoped_ptr;
+    using std::unique_ptr;
     using std::string;
     using std::endl;
 
@@ -237,7 +236,7 @@ namespace mongo {
 
         unsigned long long n = 0;
 
-        scoped_ptr<PlanExecutor> exec(InternalPlanner::collectionScan(_txn,
+        unique_ptr<PlanExecutor> exec(InternalPlanner::collectionScan(_txn,
                                                                       _collection->ns().ns(),
                                                                       _collection));
         if (_buildInBackground) {

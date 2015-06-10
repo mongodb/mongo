@@ -29,7 +29,6 @@
 
 #ifndef _WIN32  // TODO(schwerin): Should be #if MONGO_CONFIG_HAVE_SYSLOG_H?
 
-#include <boost/scoped_ptr.hpp>
 #include <sstream>
 #include <syslog.h>
 
@@ -74,7 +73,7 @@ namespace logger {
             // Info() and Log().
             return LOG_INFO;
         }
-        boost::scoped_ptr<EventEncoder> _encoder;
+        std::unique_ptr<EventEncoder> _encoder;
     };
 
 }  // namespace logger

@@ -113,7 +113,7 @@ namespace mongo {
 
         // Owned here.
         HeadManager* _headManager;
-        boost::scoped_ptr<MatchExpression> _filterExpression;
+        std::unique_ptr<MatchExpression> _filterExpression;
 
         // cached stuff
 

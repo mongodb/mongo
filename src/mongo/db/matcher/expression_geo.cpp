@@ -45,7 +45,7 @@ namespace mongo {
     // GeoExpression
     //
 
-    // Put simple constructors here for scoped_ptr.
+    // Put simple constructors here for unique_ptr.
     GeoExpression::GeoExpression() : field(""), predicate(INVALID) {}
     GeoExpression::GeoExpression(const std::string& f) : field(f), predicate(INVALID) {}
 

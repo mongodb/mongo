@@ -264,7 +264,7 @@ namespace mongo {
 
         TEST(BSONTemplateEvaluatorTest, SEQ_INT) {
 
-            boost::scoped_ptr<BsonTemplateEvaluator> t(new BsonTemplateEvaluator(131415));
+            std::unique_ptr<BsonTemplateEvaluator> t(new BsonTemplateEvaluator(131415));
             BSONObj seqObj;
             BSONObj expectedObj;
 

@@ -30,7 +30,6 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
 #include "mongo/util/concurrency/spin_lock.h"
 #include "mongo/platform/unordered_set.h"
 
@@ -307,7 +306,7 @@ namespace mongo {
                                             int len,
                                             bool enforceQuota );
 
-        boost::scoped_ptr<RecordStoreV1MetaData> _details;
+        std::unique_ptr<RecordStoreV1MetaData> _details;
         ExtentManager* _extentManager;
         bool _isSystemIndexes;
 

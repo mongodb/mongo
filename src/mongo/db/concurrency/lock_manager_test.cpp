@@ -135,7 +135,7 @@ namespace mongo {
         LockManager lockMgr;
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
 
-        boost::scoped_ptr<MMAPV1LockerImpl> locker[6];
+        std::unique_ptr<MMAPV1LockerImpl> locker[6];
         for (int i = 0; i < 6; i++) {
             locker[i].reset(new MMAPV1LockerImpl());
         }

@@ -48,7 +48,7 @@ namespace {
     unique_ptr<ParsedProjection> createParsedProjection(const BSONObj& query, const BSONObj& projObj) {
         StatusWithMatchExpression swme = MatchExpressionParser::parse(query);
         ASSERT(swme.isOK());
-        boost::scoped_ptr<MatchExpression> queryMatchExpr(swme.getValue());
+        std::unique_ptr<MatchExpression> queryMatchExpr(swme.getValue());
         ParsedProjection* out = NULL;
         Status status = ParsedProjection::make(projObj, queryMatchExpr.get(), &out);
         if (!status.isOK()) {
@@ -74,10 +74,10 @@ namespace {
         BSONObj projObj = fromjson(projStr);
         StatusWithMatchExpression swme = MatchExpressionParser::parse(query);
         ASSERT(swme.isOK());
-        boost::scoped_ptr<MatchExpression> queryMatchExpr(swme.getValue());
+        std::unique_ptr<MatchExpression> queryMatchExpr(swme.getValue());
         ParsedProjection* out = NULL;
         Status status = ParsedProjection::make(projObj, queryMatchExpr.get(), &out);
-        boost::scoped_ptr<ParsedProjection> destroy(out);
+        std::unique_ptr<ParsedProjection> destroy(out);
         ASSERT(!status.isOK());
     }
 
@@ -184,7 +184,7 @@ namespace {
         BSONObj projObj = fromjson("{'a.$': 1}");
         Status status = ParsedProjection::make(projObj, queryMatchExpr.get(), &out);
         ASSERT(!status.isOK());
-        boost::scoped_ptr<ParsedProjection> destroy(out);
+        std::unique_ptr<ParsedProjection> destroy(out);
 
         // Projecting onto empty field should fail.
         BSONObj emptyFieldProjObj = fromjson("{'.$': 1}");

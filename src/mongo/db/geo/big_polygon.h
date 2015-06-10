@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
 #include <vector>
 
 #include "mongo/db/geo/s2.h"
@@ -104,7 +103,7 @@ namespace mongo {
 
     private:
 
-        boost::scoped_ptr<S2Loop> _loop;
+        std::unique_ptr<S2Loop> _loop;
 
         // Cache whether the loop area is at most 2*Pi (the area of hemisphere).
         //
@@ -114,8 +113,8 @@ namespace mongo {
         bool _isNormalized;
 
         // Cached to do Intersects() and Contains() with S2Polylines.
-        mutable boost::scoped_ptr<S2Polyline> _borderLine;
-        mutable boost::scoped_ptr<S2Polygon> _borderPoly;
+        mutable std::unique_ptr<S2Polyline> _borderLine;
+        mutable std::unique_ptr<S2Polygon> _borderPoly;
     };
 
 }

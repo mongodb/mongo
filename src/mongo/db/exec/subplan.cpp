@@ -62,7 +62,7 @@ namespace mongo {
           _ws(ws),
           _plannerParams(params),
           _query(cq),
-          _child(NULL),
+          _child(nullptr),
           _commonStats(kStageType) {
         invariant(_collection);
     }

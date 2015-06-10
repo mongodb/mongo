@@ -30,20 +30,19 @@
 
 #include "mongo/db/storage/record_store_test_harness.h"
 
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/db/storage/record_store.h"
 #include "mongo/unittest/unittest.h"
 
-using boost::scoped_ptr;
+using std::unique_ptr;
 using std::string;
 
 namespace mongo {
 
     // Verify that the name of the record store is not NULL and nonempty.
     TEST ( RecordStoreTestHarness, RecordStoreName ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
+        unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
+        unique_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
 
         {
             const char *name = rs->name();
@@ -53,8 +52,8 @@ namespace mongo {
 
     // Verify that the namespace of the record store is nonempty.
     TEST( RecordStoreTestHarness, Namespace ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
+        unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
+        unique_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
 
         {
             string ns = rs->ns();
@@ -64,8 +63,8 @@ namespace mongo {
 
     // Call isCapped() on a non-capped collection and verify the result is false.
     TEST( RecordStoreTestHarness, IsNotCapped ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
+        unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
+        unique_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
         ASSERT( !rs->isCapped() );
     }
 

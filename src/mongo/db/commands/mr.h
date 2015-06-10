@@ -31,7 +31,6 @@
 #pragma once
 
 #include <boost/noncopyable.hpp>
-#include <boost/scoped_ptr.hpp>
 #include <string>
 #include <vector>
 
@@ -193,9 +192,9 @@ namespace mongo {
 
             // functions
 
-            boost::scoped_ptr<Mapper> mapper;
-            boost::scoped_ptr<Reducer> reducer;
-            boost::scoped_ptr<Finalizer> finalizer;
+            std::unique_ptr<Mapper> mapper;
+            std::unique_ptr<Reducer> reducer;
+            std::unique_ptr<Finalizer> finalizer;
 
             BSONObj mapParams;
             BSONObj scopeSetup;
@@ -352,10 +351,10 @@ namespace mongo {
             int _add(InMemory* im , const BSONObj& a);
 
             OperationContext* _txn;
-            boost::scoped_ptr<Scope> _scope;
+            std::unique_ptr<Scope> _scope;
             bool _onDisk; // if the end result of this map reduce is disk or not
 
-            boost::scoped_ptr<InMemory> _temp;
+            std::unique_ptr<InMemory> _temp;
             long _size; // bytes in _temp
             long _dupCount; // number of duplicate key entries
 

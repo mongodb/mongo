@@ -33,8 +33,6 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_server_status.h"
 
-#include "boost/scoped_ptr.hpp"
-
 #include "mongo/base/checked_cast.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"

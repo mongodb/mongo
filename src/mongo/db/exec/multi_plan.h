@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/catalog/collection.h"
@@ -223,7 +222,7 @@ namespace mongo {
         // to use to pull the record into memory. We take ownership of the RecordFetcher here,
         // deleting it after we've had a chance to do the fetch. For timing-based yields, we
         // just pass a NULL fetcher.
-        boost::scoped_ptr<RecordFetcher> _fetcher;
+        std::unique_ptr<RecordFetcher> _fetcher;
 
         // Stats
         CommonStats _commonStats;

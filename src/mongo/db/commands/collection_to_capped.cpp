@@ -30,7 +30,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/db/background.h"
 #include "mongo/db/catalog/capped_utils.h"
@@ -47,7 +46,7 @@
 
 namespace mongo {
 
-    using boost::scoped_ptr;
+    using std::unique_ptr;
     using std::string;
     using std::stringstream;
 

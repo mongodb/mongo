@@ -750,7 +750,7 @@ namespace mongo {
                 // The tagged tree produced by the plan enumerator is not guaranteed
                 // to be canonically sorted. In order to be compatible with the cached
                 // data, sort the tagged tree according to CanonicalQuery ordering.
-                boost::scoped_ptr<MatchExpression> clone(rawTree->shallowClone());
+                std::unique_ptr<MatchExpression> clone(rawTree->shallowClone());
                 CanonicalQuery::sortTree(clone.get());
 
                 PlanCacheIndexTree* cacheData;

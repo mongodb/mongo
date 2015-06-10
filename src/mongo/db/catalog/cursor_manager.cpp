@@ -121,13 +121,13 @@ namespace mongo {
         Map _idToNS;
         unsigned _nextId;
 
-        boost::scoped_ptr<SecureRandom> _secureRandom;
+        std::unique_ptr<SecureRandom> _secureRandom;
     };
 
     // Note that "globalCursorIdCache" must be declared before "globalCursorManager", as the latter
     // calls into the former during destruction.
-    boost::scoped_ptr<GlobalCursorIdCache> globalCursorIdCache;
-    boost::scoped_ptr<CursorManager> globalCursorManager;
+    std::unique_ptr<GlobalCursorIdCache> globalCursorIdCache;
+    std::unique_ptr<CursorManager> globalCursorManager;
 
     MONGO_INITIALIZER(GlobalCursorIdCache)(InitializerContext* context) {
         globalCursorIdCache.reset(new GlobalCursorIdCache());

@@ -30,7 +30,6 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
 #include <list>
 #include <string>
 
@@ -87,7 +86,7 @@ namespace mongo {
         const std::string _database;
 
         DurableMappedFile _f;
-        boost::scoped_ptr<NamespaceHashTable> _ht;
+        std::unique_ptr<NamespaceHashTable> _ht;
     };
 
 }

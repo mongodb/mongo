@@ -32,7 +32,6 @@
 
 #include "mongo/s/config.h"
 
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/client/connpool.h"
 #include "mongo/db/client.h"
@@ -57,7 +56,7 @@
 
 namespace mongo {
 
-    using boost::scoped_ptr;
+    using std::unique_ptr;
     using std::unique_ptr;
     using std::endl;
     using std::set;

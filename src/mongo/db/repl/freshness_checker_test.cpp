@@ -28,7 +28,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <boost/scoped_ptr.hpp>
 #include <boost/thread.hpp>
 
 #include "mongo/base/status.h"
@@ -44,7 +43,7 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/mongoutils/str.h"
 
-using boost::scoped_ptr;
+using std::unique_ptr;
 
 namespace mongo {
 namespace repl {
@@ -76,8 +75,8 @@ namespace {
 
         NetworkInterfaceMock* _net;
         StorageInterfaceMock* _storage;
-        boost::scoped_ptr<ReplicationExecutor> _executor;
-        boost::scoped_ptr<boost::thread> _executorThread;
+        std::unique_ptr<ReplicationExecutor> _executor;
+        std::unique_ptr<boost::thread> _executorThread;
 
     private:
         void freshnessCheckerRunner(const ReplicationExecutor::CallbackData& data,
@@ -88,7 +87,7 @@ namespace {
         void setUp();
         void tearDown();
 
-        boost::scoped_ptr<FreshnessChecker> _checker;
+        std::unique_ptr<FreshnessChecker> _checker;
         ReplicationExecutor::EventHandle _checkerDoneEvent;
     };
 
@@ -933,7 +932,7 @@ namespace {
                                         Milliseconds(0));
         }
     private:
-        scoped_ptr<FreshnessChecker::Algorithm> _checker;
+        unique_ptr<FreshnessChecker::Algorithm> _checker;
     };
 
     TEST_F(FreshnessScatterGatherTest, BothNodesLessFresh) {

@@ -28,7 +28,6 @@
 
 #include "mongo/db/geo/big_polygon.h"
 
-#include <boost/scoped_ptr.hpp>
 #include <map>
 
 #include "mongo/base/owned_pointer_vector.h"
@@ -36,7 +35,7 @@
 
 namespace mongo {
 
-    using boost::scoped_ptr;
+    using std::unique_ptr;
     using std::unique_ptr;
     using std::vector;
 

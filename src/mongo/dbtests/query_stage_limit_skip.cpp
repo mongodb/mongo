@@ -30,7 +30,6 @@
  * This file tests db/exec/limit.cpp and db/exec/skip.cpp.
  */
 
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/exec/limit.h"
@@ -45,7 +44,7 @@ using namespace mongo;
 
 namespace {
 
-    using boost::scoped_ptr;
+    using std::unique_ptr;
     using std::unique_ptr;
     using std::max;
     using std::min;
@@ -89,10 +88,10 @@ namespace {
             for (int i = 0; i < 2 * N; ++i) {
                 WorkingSet ws;
 
-                scoped_ptr<PlanStage> skip(new SkipStage(i, &ws, getMS(&ws)));
+                unique_ptr<PlanStage> skip(new SkipStage(i, &ws, getMS(&ws)));
                 ASSERT_EQUALS(max(0, N - i), countResults(skip.get()));
 
-                scoped_ptr<PlanStage> limit(new LimitStage(i, &ws, getMS(&ws)));
+                unique_ptr<PlanStage> limit(new LimitStage(i, &ws, getMS(&ws)));
                 ASSERT_EQUALS(min(N, i), countResults(limit.get()));
             }
         }

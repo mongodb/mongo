@@ -33,7 +33,6 @@
 #include <map>
 #include <string>
 
-#include <boost/scoped_ptr.hpp>
 #include <boost/thread/mutex.hpp>
 
 #include "mongo/base/string_data.h"

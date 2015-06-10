@@ -30,7 +30,6 @@
  * This file tests db/exec/delete.cpp.
  */
 
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
@@ -47,7 +46,7 @@
 
 namespace QueryStageDelete {
 
-    using boost::scoped_ptr;
+    using std::unique_ptr;
     using std::vector;
 
     //
@@ -86,7 +85,7 @@ namespace QueryStageDelete {
             params.direction = direction;
             params.tailable = false;
 
-            scoped_ptr<CollectionScan> scan(new CollectionScan(&_txn, params, &ws, NULL));
+            unique_ptr<CollectionScan> scan(new CollectionScan(&_txn, params, &ws, NULL));
             while (!scan->isEOF()) {
                 WorkingSetID id = WorkingSet::INVALID_ID;
                 PlanStage::StageState state = scan->work(&id);

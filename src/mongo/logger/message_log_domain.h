@@ -27,7 +27,6 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
 #include <memory>
 #include <string>
 #include <vector>

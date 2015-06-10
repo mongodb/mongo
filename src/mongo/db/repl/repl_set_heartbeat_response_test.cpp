@@ -28,7 +28,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
 #include "mongo/unittest/unittest.h"
@@ -38,7 +37,7 @@ namespace mongo {
 namespace repl {
 namespace {
 
-    using boost::scoped_ptr;
+    using std::unique_ptr;
     using std::unique_ptr;
 
     bool stringContains(const std::string &haystack, const std::string& needle) {

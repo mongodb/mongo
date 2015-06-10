@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
 #include <string>
 
 #include "mongo/base/disallow_copying.h"
@@ -86,7 +85,7 @@ namespace mongo {
         bool _isShardNameSet;
 
         // (O)  version for this collection on a given shard
-        boost::scoped_ptr<ChunkVersion> _shardVersion;
+        std::unique_ptr<ChunkVersion> _shardVersion;
 
         // (O)  session number the inserts belong to
         long long _session;

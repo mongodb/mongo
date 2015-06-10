@@ -90,7 +90,7 @@ namespace QueryStageTests {
                                                PlanExecutor::YIELD_MANUAL,
                                                &rawExec);
             ASSERT_OK(status);
-            boost::scoped_ptr<PlanExecutor> exec(rawExec);
+            std::unique_ptr<PlanExecutor> exec(rawExec);
 
             int count = 0;
             for (RecordId dl; PlanExecutor::ADVANCED == exec->getNext(NULL, &dl); ) {

@@ -31,7 +31,6 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
 
 #include "mongo/db/namespace_string.h"
@@ -336,10 +335,10 @@ namespace mongo {
             int _options;
             BSONObj _cmd;
             DBClientBase * _conn;
-            boost::scoped_ptr<AScopedConnection> _connHolder; // used if not provided a connection
+            std::unique_ptr<AScopedConnection> _connHolder; // used if not provided a connection
             bool _useShardConn;
 
-            boost::scoped_ptr<DBClientCursor> _cursor;
+            std::unique_ptr<DBClientCursor> _cursor;
 
             BSONObj _res;
             bool _ok;

@@ -30,7 +30,6 @@
 
 #include "mongo/db/storage/record_store_test_updaterecord.h"
 
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/record_data.h"
@@ -38,7 +37,7 @@
 #include "mongo/db/storage/record_store_test_harness.h"
 #include "mongo/unittest/unittest.h"
 
-using boost::scoped_ptr;
+using std::unique_ptr;
 using std::string;
 using std::stringstream;
 
@@ -46,18 +45,18 @@ namespace mongo {
 
     // Insert a record and try to update it.
     TEST( RecordStoreTestHarness, UpdateRecord ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
+        unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
+        unique_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( 0, rs->numRecords( opCtx.get() ) );
         }
 
         string data = "my record";
         RecordId loc;
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
                 StatusWith<RecordId> res = rs->insertRecord( opCtx.get(),
@@ -71,13 +70,13 @@ namespace mongo {
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( 1, rs->numRecords( opCtx.get() ) );
         }
 
         data = "updated record-";
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
                 StatusWith<RecordId> res = rs->updateRecord( opCtx.get(),
@@ -93,7 +92,7 @@ namespace mongo {
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 RecordData record = rs->dataFor( opCtx.get(), loc );
                 ASSERT_EQUALS( data.size() + 1, static_cast<size_t>( record.size() ) );
@@ -104,18 +103,18 @@ namespace mongo {
 
     // Insert multiple records and try to update them.
     TEST( RecordStoreTestHarness, UpdateMultipleRecords ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
+        unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
+        unique_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( 0, rs->numRecords( opCtx.get() ) );
         }
 
         const int nToInsert = 10;
         RecordId locs[nToInsert];
         for ( int i = 0; i < nToInsert; i++ ) {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 stringstream ss;
                 ss << "record " << i;
@@ -133,12 +132,12 @@ namespace mongo {
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( nToInsert, rs->numRecords( opCtx.get() ) );
         }
 
         for ( int i = 0; i < nToInsert; i++ ) {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 stringstream ss;
                 ss << "update record-" << i;
@@ -158,7 +157,7 @@ namespace mongo {
         }
 
         for ( int i = 0; i < nToInsert; i++ ) {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 stringstream ss;
                 ss << "update record-" << i;
@@ -173,18 +172,18 @@ namespace mongo {
 
     // Insert a record, try to update it, and examine how the UpdateNotifier is called.
     TEST( RecordStoreTestHarness, UpdateRecordWithMoveNotifier ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
+        unique_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
+        unique_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( 0, rs->numRecords( opCtx.get() ) );
         }
 
         string oldData = "my record";
         RecordId loc;
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
                 StatusWith<RecordId> res = rs->insertRecord( opCtx.get(),
@@ -198,13 +197,13 @@ namespace mongo {
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( 1, rs->numRecords( opCtx.get() ) );
         }
 
         string newData = "my updated record--";
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 UpdateNotifierSpy umn( opCtx.get(), loc, oldData.c_str(), oldData.size() );
 
@@ -233,7 +232,7 @@ namespace mongo {
         }
 
         {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            unique_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 RecordData record = rs->dataFor( opCtx.get(), loc );
                 ASSERT_EQUALS( newData.size() + 1, static_cast<size_t>( record.size() ) );

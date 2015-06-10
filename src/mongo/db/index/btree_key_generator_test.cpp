@@ -28,14 +28,13 @@
 
 #include "mongo/db/index/btree_key_generator.h"
 
-#include <boost/scoped_ptr.hpp>
 #include <iostream>
 
 #include "mongo/db/json.h"
 #include "mongo/unittest/unittest.h"
 
 using namespace mongo;
-using boost::scoped_ptr;
+using std::unique_ptr;
 using std::cout;
 using std::endl;
 using std::vector;
@@ -87,7 +86,7 @@ namespace {
             fixed.push_back(BSONElement());
         }
 
-        scoped_ptr<BtreeKeyGenerator> keyGen(
+        unique_ptr<BtreeKeyGenerator> keyGen(
             new BtreeKeyGeneratorV1(fieldNames, fixed, sparse));
 
         //

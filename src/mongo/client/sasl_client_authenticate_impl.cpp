@@ -36,7 +36,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <boost/scoped_ptr.hpp>
 #include <string>
 
 #include "mongo/base/init.h"
@@ -207,7 +206,7 @@ namespace {
             return status;
         }
 
-        boost::scoped_ptr<SaslClientSession> session(SaslClientSession::create(mechanism));
+        std::unique_ptr<SaslClientSession> session(SaslClientSession::create(mechanism));
         status = configureSession(session.get(), client, targetDatabase, saslParameters);
        
         if (!status.isOK())

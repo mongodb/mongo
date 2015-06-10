@@ -30,7 +30,6 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
 
 #include "mongo/util/background.h"
@@ -73,7 +72,7 @@ namespace mongo {
         int _balancedLastTime;
 
         // decide which chunks to move; owned here.
-        boost::scoped_ptr<BalancerPolicy> _policy;
+        std::unique_ptr<BalancerPolicy> _policy;
         
         /**
          * Checks that the balancer can connect to all servers it needs to do its job.

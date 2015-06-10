@@ -46,7 +46,7 @@ namespace mongo {
         virtual KVEngine* getEngine() { return _engine.get(); }
 
     private:
-        boost::scoped_ptr<InMemoryEngine> _engine;
+        std::unique_ptr<InMemoryEngine> _engine;
     };
 
     KVHarnessHelper* KVHarnessHelper::create() {

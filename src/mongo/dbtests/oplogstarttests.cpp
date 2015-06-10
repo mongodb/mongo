@@ -22,7 +22,6 @@
 
 #include "mongo/dbtests/dbtests.h"
 
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/db.h"
@@ -37,7 +36,7 @@
 
 namespace OplogStartTests {
 
-    using boost::scoped_ptr;
+    using std::unique_ptr;
     using std::string;
 
     class Base {
@@ -98,9 +97,9 @@ namespace OplogStartTests {
             ASSERT_EQUALS(idEl.numberInt(), expectedId);
         }
 
-        scoped_ptr<CanonicalQuery> _cq;
-        scoped_ptr<WorkingSet> _oplogws;
-        scoped_ptr<OplogStart> _stage;
+        unique_ptr<CanonicalQuery> _cq;
+        unique_ptr<WorkingSet> _oplogws;
+        unique_ptr<OplogStart> _stage;
 
     private:
         // The order of these is important in order to ensure order of destruction

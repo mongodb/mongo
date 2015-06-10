@@ -28,7 +28,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/db/service_context.h"
 #include "mongo/db/json.h"
@@ -49,7 +48,7 @@ namespace {
             ServiceContext* globalEnv = getGlobalServiceContext();
             ASSERT_TRUE(globalEnv);
             ASSERT_TRUE(getGlobalServiceContext()->isRegisteredStorageEngine(kWiredTigerEngineName));
-            boost::scoped_ptr<StorageFactoriesIterator> sfi(getGlobalServiceContext()->
+            std::unique_ptr<StorageFactoriesIterator> sfi(getGlobalServiceContext()->
                                                             makeStorageFactoriesIterator());
             ASSERT_TRUE(sfi);
             bool found = false;

@@ -86,7 +86,7 @@ namespace mongo {
                     << "' has to be an embedded document.");
             }
 
-            boost::scoped_ptr<StorageFactoriesIterator> sfi(getGlobalServiceContext()->
+            std::unique_ptr<StorageFactoriesIterator> sfi(getGlobalServiceContext()->
                                                             makeStorageFactoriesIterator());
             invariant(sfi);
             bool found = false;
@@ -231,7 +231,7 @@ namespace mongo {
         if (!hasGlobalServiceContext())
             return BSONArray();
 
-        boost::scoped_ptr<StorageFactoriesIterator> sfi(
+        std::unique_ptr<StorageFactoriesIterator> sfi(
             getGlobalServiceContext()->makeStorageFactoriesIterator());
 
         if (!sfi)

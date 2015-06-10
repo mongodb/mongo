@@ -32,7 +32,6 @@
 
 #include "mongo/s/strategy.h"
 
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/base/status.h"
 #include "mongo/base/owned_pointer_vector.h"
@@ -70,7 +69,7 @@
 
 namespace mongo {
 
-    using boost::scoped_ptr;
+    using std::unique_ptr;
     using boost::shared_ptr;
     using std::endl;
     using std::set;
@@ -241,7 +240,7 @@ namespace mongo {
             // Only one shard is used
 
             // Remote cursors are stored remotely, we shouldn't need this around.
-            scoped_ptr<ParallelSortClusteredCursor> cursorDeleter( cursor );
+            unique_ptr<ParallelSortClusteredCursor> cursorDeleter( cursor );
 
             ShardPtr shard = cursor->getQueryShard();
             verify( shard.get() );

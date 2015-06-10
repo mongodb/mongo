@@ -28,7 +28,6 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
 
-#include <boost/scoped_ptr.hpp>
 #include <vector>
 
 #include "mongo/db/auth/action_set.h"
@@ -54,7 +53,7 @@
 
 namespace mongo {
 
-    using boost::scoped_ptr;
+    using std::unique_ptr;
     using std::stringstream;
 
     class Geo2dFindNearCmd : public Command {
@@ -202,7 +201,7 @@ namespace mongo {
                 return false;
             }
 
-            scoped_ptr<PlanExecutor> exec(rawExec);
+            unique_ptr<PlanExecutor> exec(rawExec);
 
             double totalDistance = 0;
             BSONObjBuilder resultBuilder(result.subarrayStart("results"));

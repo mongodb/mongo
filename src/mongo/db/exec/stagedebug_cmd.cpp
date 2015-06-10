@@ -166,7 +166,7 @@ namespace mongo {
             Status execStatus = PlanExecutor::make(txn, ws.release(), rootFetch, collection,
                                                    PlanExecutor::YIELD_AUTO, &rawExec);
             fassert(28536, execStatus);
-            boost::scoped_ptr<PlanExecutor> exec(rawExec);
+            std::unique_ptr<PlanExecutor> exec(rawExec);
 
             BSONArrayBuilder resultBuilder(result.subarrayStart("results"));
 

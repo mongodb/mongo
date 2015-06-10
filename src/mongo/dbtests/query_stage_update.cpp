@@ -30,7 +30,6 @@
  * This file tests db/exec/update.cpp (UpdateStage).
  */
 
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
@@ -54,7 +53,7 @@
 
 namespace QueryStageUpdate {
 
-    using boost::scoped_ptr;
+    using std::unique_ptr;
     using std::unique_ptr;
     using std::vector;
 
@@ -120,7 +119,7 @@ namespace QueryStageUpdate {
             params.direction = CollectionScanParams::FORWARD;
             params.tailable = false;
 
-            scoped_ptr<CollectionScan> scan(new CollectionScan(&_txn, params, &ws, NULL));
+            unique_ptr<CollectionScan> scan(new CollectionScan(&_txn, params, &ws, NULL));
             while (!scan->isEOF()) {
                 WorkingSetID id = WorkingSet::INVALID_ID;
                 PlanStage::StageState state = scan->work(&id);
@@ -142,7 +141,7 @@ namespace QueryStageUpdate {
             params.direction = direction;
             params.tailable = false;
 
-            scoped_ptr<CollectionScan> scan(new CollectionScan(&_txn, params, &ws, NULL));
+            unique_ptr<CollectionScan> scan(new CollectionScan(&_txn, params, &ws, NULL));
             while (!scan->isEOF()) {
                 WorkingSetID id = WorkingSet::INVALID_ID;
                 PlanStage::StageState state = scan->work(&id);
@@ -215,13 +214,13 @@ namespace QueryStageUpdate {
 
                 // Setup update params.
                 UpdateStageParams params(&request, &driver, opDebug);
-                scoped_ptr<CanonicalQuery> cq(canonicalize(query));
+                unique_ptr<CanonicalQuery> cq(canonicalize(query));
                 params.canonicalQuery = cq.get();
 
-                scoped_ptr<WorkingSet> ws(new WorkingSet());
+                unique_ptr<WorkingSet> ws(new WorkingSet());
                 unique_ptr<EOFStage> eofStage(new EOFStage());
 
-                scoped_ptr<UpdateStage> updateStage(
+                unique_ptr<UpdateStage> updateStage(
                     new UpdateStage(&_txn, params, ws.get(), collection, eofStage.release()));
 
                 runUpdate(updateStage.get());
@@ -292,14 +291,14 @@ namespace QueryStageUpdate {
 
                 // Configure the update.
                 UpdateStageParams updateParams(&request, &driver, opDebug);
-                scoped_ptr<CanonicalQuery> cq(canonicalize(query));
+                unique_ptr<CanonicalQuery> cq(canonicalize(query));
                 updateParams.canonicalQuery = cq.get();
 
-                scoped_ptr<WorkingSet> ws(new WorkingSet());
+                unique_ptr<WorkingSet> ws(new WorkingSet());
                 unique_ptr<CollectionScan> cs(
                     new CollectionScan(&_txn, collScanParams, ws.get(), cq->root()));
 
-                scoped_ptr<UpdateStage> updateStage(
+                unique_ptr<UpdateStage> updateStage(
                     new UpdateStage(&_txn, updateParams, ws.get(), coll, cs.release()));
 
                 const UpdateStats* stats =

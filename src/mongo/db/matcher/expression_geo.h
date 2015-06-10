@@ -71,7 +71,7 @@ namespace mongo {
 
         // Name of the field in the query.
         std::string field;
-        boost::scoped_ptr<GeometryContainer> geoContainer;
+        std::unique_ptr<GeometryContainer> geoContainer;
         Predicate predicate;
     };
 
@@ -120,7 +120,7 @@ namespace mongo {
         std::string field;
 
         // The starting point of the near search. Use forward declaration of geometries.
-        boost::scoped_ptr<PointWithCRS> centroid;
+        std::unique_ptr<PointWithCRS> centroid;
 
         // Min and max distance from centroid that we're willing to search.
         // Distance is in units of the geometry's CRS, except SPHERE and isNearSphere => radians

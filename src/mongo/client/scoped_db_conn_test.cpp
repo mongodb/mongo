@@ -41,7 +41,6 @@
 #include "mongo/unittest/unittest.h"
 
 #include <vector>
-#include <boost/scoped_ptr.hpp>
 #include <boost/thread/thread.hpp>
 
 /**
@@ -51,7 +50,7 @@
  * connection).
  */
 
-using boost::scoped_ptr;
+using std::unique_ptr;
 using mongo::DBClientBase;
 using mongo::FailPoint;
 using mongo::ScopedDbConnection;

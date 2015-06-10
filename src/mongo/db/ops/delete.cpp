@@ -69,7 +69,7 @@ namespace mongo {
 
         PlanExecutor* rawExec;
         uassertStatusOK(getExecutorDelete(txn, collection, &parsedDelete, &rawExec));
-        boost::scoped_ptr<PlanExecutor> exec(rawExec);
+        std::unique_ptr<PlanExecutor> exec(rawExec);
 
         uassertStatusOK(exec->executePlan());
         return DeleteStage::getNumDeleted(exec.get());

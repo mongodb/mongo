@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
 #include <string>
 
 #include "mongo/base/disallow_copying.h"
@@ -78,7 +77,7 @@ namespace mongo {
         // The instance of the field in the provided doc.
         // This data is valid after prepare, for use by log and apply
         struct PreparedState;
-        boost::scoped_ptr<PreparedState> _preparedState;
+        std::unique_ptr<PreparedState> _preparedState;
 
         // User specified elements to remove
         std::vector<BSONElement> _elementsToFind;

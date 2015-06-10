@@ -30,7 +30,6 @@
 
 #include "mongo/util/fail_point.h"
 
-#include <boost/scoped_ptr.hpp>
 #include <boost/thread.hpp>
 
 #include "mongo/platform/random.h"
@@ -49,7 +48,7 @@ namespace {
     class FailPointPRNG {
     public:
         FailPointPRNG() :
-            _prng(boost::scoped_ptr<SecureRandom>(SecureRandom::create())->nextInt64()) {}
+            _prng(std::unique_ptr<SecureRandom>(SecureRandom::create())->nextInt64()) {}
 
         void resetSeed(int32_t seed) {
             _prng = PseudoRandom(seed);

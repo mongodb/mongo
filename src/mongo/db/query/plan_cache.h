@@ -30,7 +30,6 @@
 
 #include <set>
 #include <boost/optional/optional.hpp>
-#include <boost/scoped_ptr.hpp>
 #include <boost/thread/mutex.hpp>
 
 #include "mongo/db/exec/plan_stats.h"
@@ -56,7 +55,7 @@ namespace mongo {
      */
     struct PlanCacheEntryFeedback {
         // How well did the cached plan perform?
-        boost::scoped_ptr<PlanStageStats> stats;
+        std::unique_ptr<PlanStageStats> stats;
 
         // The "goodness" score produced by the plan ranker
         // corresponding to 'stats'.
@@ -87,7 +86,7 @@ namespace mongo {
      *   This is done by QueryPlanner::tagAccordingToCache.
      */
     struct PlanCacheIndexTree {
-        PlanCacheIndexTree() : entry(NULL), index_pos(0) { }
+        PlanCacheIndexTree() : entry(nullptr), index_pos(0) { }
 
         ~PlanCacheIndexTree() {
             for (std::vector<PlanCacheIndexTree*>::const_iterator it = children.begin();
@@ -115,7 +114,7 @@ namespace mongo {
         std::vector<PlanCacheIndexTree*> children;
 
         // Owned here.
-        boost::scoped_ptr<IndexEntry> entry;
+        std::unique_ptr<IndexEntry> entry;
 
         size_t index_pos;
     };
@@ -128,7 +127,7 @@ namespace mongo {
      */
     struct SolutionCacheData {
         SolutionCacheData() :
-            tree(NULL),
+            tree(nullptr),
             solnType(USE_INDEX_TAGS_SOLN),
             wholeIXSolnDir(1),
             indexFilterApplied(false) {
@@ -144,7 +143,7 @@ namespace mongo {
         // can be used to tag an isomorphic match expression. If 'wholeIXSoln'
         // is true, then 'tree' is used to store the relevant IndexEntry.
         // If 'collscanSoln' is true, then 'tree' should be NULL.
-        boost::scoped_ptr<PlanCacheIndexTree> tree;
+        std::unique_ptr<PlanCacheIndexTree> tree;
 
         enum SolutionType {
             // Indicates that the plan should use
@@ -252,7 +251,7 @@ namespace mongo {
 
         // Information that went into picking the winning plan and also why
         // the other plans lost.
-        boost::scoped_ptr<PlanRankingDecision> decision;
+        std::unique_ptr<PlanRankingDecision> decision;
 
         // Annotations from cached runs.  The CachedPlanStage provides these stats about its
         // runs when they complete.

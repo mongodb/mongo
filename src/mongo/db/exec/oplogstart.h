@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/exec/collection_scan.h"
@@ -107,7 +106,7 @@ namespace mongo {
         OperationContext* _txn;
 
         // If we're backwards scanning we just punt to a collscan.
-        boost::scoped_ptr<CollectionScan> _cs;
+        std::unique_ptr<CollectionScan> _cs;
 
         // This is only used for the extent hopping scan.
         std::vector<std::unique_ptr<RecordCursor>> _subIterators;

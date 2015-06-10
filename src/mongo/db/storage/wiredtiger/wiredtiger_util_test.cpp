@@ -30,7 +30,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <boost/scoped_ptr.hpp>
 #include <sstream>
 #include <string>
 
@@ -116,8 +115,8 @@ namespace mongo {
             ASSERT_OK(wtRCToStatus(wtSession->create(wtSession, getURI(), config)));
         }
     private:
-        boost::scoped_ptr<WiredTigerUtilHarnessHelper> _harnessHelper;
-        boost::scoped_ptr<OperationContext> _opCtx;
+        std::unique_ptr<WiredTigerUtilHarnessHelper> _harnessHelper;
+        std::unique_ptr<OperationContext> _opCtx;
     };
 
     TEST_F(WiredTigerUtilMetadataTest, GetConfigurationStringInvalidURI) {

@@ -518,7 +518,7 @@ namespace mongo {
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
 
-        boost::scoped_ptr<MatchExpression> expr( result.getValue() );
+        std::unique_ptr<MatchExpression> expr( result.getValue() );
 
         // Root node should be an AND with one child.
         ASSERT_EQUALS( MatchExpression::AND, expr->matchType() );

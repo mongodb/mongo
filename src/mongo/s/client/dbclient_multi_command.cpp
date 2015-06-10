@@ -30,7 +30,6 @@
 
 #include "mongo/s/client/dbclient_multi_command.h"
 
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/db/audit.h"
 #include "mongo/db/dbmessage.h"
@@ -41,7 +40,7 @@
 
 namespace mongo {
 
-    using boost::scoped_ptr;
+    using std::unique_ptr;
     using std::deque;
     using std::string;
 
@@ -172,7 +171,7 @@ namespace mongo {
 
     Status DBClientMultiCommand::recvAny( ConnectionString* endpoint, BSONSerializable* response ) {
 
-        scoped_ptr<PendingCommand> command( _pendingCommands.front() );
+        unique_ptr<PendingCommand> command( _pendingCommands.front() );
         _pendingCommands.pop_front();
 
         *endpoint = command->endpoint;

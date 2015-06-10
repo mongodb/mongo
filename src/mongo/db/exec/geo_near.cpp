@@ -47,12 +47,11 @@
 #include "mongo/db/index/expression_params.h"
 #include "mongo/util/log.h"
 
-#include <boost/scoped_ptr.hpp>
 #include <algorithm>
 
 namespace mongo {
 
-    using boost::scoped_ptr;
+    using std::unique_ptr;
     using std::abs;
     using std::unique_ptr;
 
@@ -312,8 +311,8 @@ namespace mongo {
 
         const IndexDescriptor* _twoDIndex;  // Not owned here.
         const GeoNearParams* _nearParams;  // Not owned here.
-        scoped_ptr<IndexScan> _indexScan;
-        scoped_ptr<GeoHashConverter> _converter;
+        unique_ptr<IndexScan> _indexScan;
+        unique_ptr<GeoHashConverter> _converter;
         GeoHash _centroidCell;
         unsigned _currentLevel;
     };
@@ -624,7 +623,7 @@ namespace mongo {
 
         private:
 
-            const scoped_ptr<R2Region> _region;
+            const unique_ptr<R2Region> _region;
             const GeoHashConverter _unhasher;
         };
 
@@ -645,7 +644,7 @@ namespace mongo {
         private:
 
             // Owns matcher
-            const scoped_ptr<MatchExpression> _matcher;
+            const unique_ptr<MatchExpression> _matcher;
         };
 
         // Helper class to maintain ownership of a match expression alongside an index scan
@@ -666,7 +665,7 @@ namespace mongo {
         private:
 
             // Owns matcher
-            const scoped_ptr<MatchExpression> _matcher;
+            const unique_ptr<MatchExpression> _matcher;
         };
     }
 
@@ -1009,7 +1008,7 @@ namespace mongo {
 
         private:
 
-            const scoped_ptr<S2Region> _region;
+            const unique_ptr<S2Region> _region;
         };
     }
 
@@ -1046,7 +1045,7 @@ namespace mongo {
         const IndexDescriptor* _s2Index; // Not owned here.
         const GeoNearParams* _nearParams; // Not owned here.
         int _currentLevel;
-        scoped_ptr<IndexScan> _indexScan;
+        unique_ptr<IndexScan> _indexScan;
     };
 
     // Setup the index scan stage for neighbors at this level.

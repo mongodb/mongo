@@ -32,7 +32,6 @@
 
 #include "mongo/db/storage/mmap_v1/mmap_v1_database_catalog_entry.h"
 
-#include <boost/scoped_ptr.hpp>
 #include <utility>
 
 #include "mongo/db/catalog/index_catalog_entry.h"
@@ -56,7 +55,7 @@
 
 namespace mongo {
 
-    using boost::scoped_ptr;
+    using std::unique_ptr;
     using std::unique_ptr;
 
 namespace {

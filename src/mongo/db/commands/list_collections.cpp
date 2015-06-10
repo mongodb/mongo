@@ -30,7 +30,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
@@ -49,7 +48,7 @@
 
 namespace mongo {
 
-    using boost::scoped_ptr;
+    using std::unique_ptr;
     using std::list;
     using std::string;
     using std::stringstream;
@@ -93,7 +92,7 @@ namespace mongo {
                  int,
                  string& errmsg,
                  BSONObjBuilder& result) {
-            boost::scoped_ptr<MatchExpression> matcher;
+            std::unique_ptr<MatchExpression> matcher;
             BSONElement filterElt = jsobj["filter"];
             if (!filterElt.eoo()) {
                 if (filterElt.type() != mongo::Object) {

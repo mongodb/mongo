@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
 #include <boost/thread.hpp>
 
 #include "mongo/base/disallow_copying.h"
@@ -81,13 +80,13 @@ namespace repl {
         SyncSourceFeedback _syncSourceFeedback;
 
         // Thread running SyncSourceFeedback::run().
-        boost::scoped_ptr<boost::thread> _syncSourceFeedbackThread;
+        std::unique_ptr<boost::thread> _syncSourceFeedbackThread;
 
         // Thread running runSyncThread().
-        boost::scoped_ptr<boost::thread> _applierThread;
+        std::unique_ptr<boost::thread> _applierThread;
 
         // Thread running BackgroundSync::producerThread().
-        boost::scoped_ptr<boost::thread> _producerThread;
+        std::unique_ptr<boost::thread> _producerThread;
 
         // Mutex guarding the _nextThreadId value to prevent concurrent incrementing.
         boost::mutex _nextThreadIdMutex;

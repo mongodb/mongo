@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
 #include <string>
 
 #include "mongo/db/repl/repl_settings.h"
@@ -182,7 +181,7 @@ namespace repl {
         int64_t countLogLinesContaining(const std::string& needle);
 
     private:
-        boost::scoped_ptr<ReplicationCoordinatorImpl> _repl;
+        std::unique_ptr<ReplicationCoordinatorImpl> _repl;
         // Owned by ReplicationCoordinatorImpl
         TopologyCoordinatorImpl* _topo;
         // Owned by ReplicationCoordinatorImpl

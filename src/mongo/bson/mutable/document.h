@@ -27,7 +27,6 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
@@ -509,7 +508,7 @@ namespace mutablebson {
         Element makeRootElement(const BSONObj& value);
         Element makeElement(ConstElement element, const StringData* fieldName);
 
-        const boost::scoped_ptr<Impl> _impl;
+        const std::unique_ptr<Impl> _impl;
 
         // The root element of this document.
         const Element _root;

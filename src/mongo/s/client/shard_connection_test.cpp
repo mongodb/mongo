@@ -41,7 +41,6 @@
 #include "mongo/unittest/unittest.h"
 
 #include <vector>
-#include <boost/scoped_ptr.hpp>
 #include <boost/thread/thread.hpp>
 
 /**

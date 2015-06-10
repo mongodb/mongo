@@ -28,7 +28,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
 
 #include "mongo/base/status_with.h"
@@ -39,7 +38,7 @@
 namespace {
 
     using namespace mongo;
-    using boost::scoped_ptr;
+    using std::unique_ptr;
     using boost::shared_ptr;
     using std::make_pair;
     using std::map;
@@ -399,12 +398,12 @@ namespace {
             Notification* nextHostActiveNotify;
 
             ConnectionString prevHost;
-            scoped_ptr<Notification> prevHostActiveNotify;
+            unique_ptr<Notification> prevHostActiveNotify;
             bool waitForPrevHostIdle;
 
             int queryTimeMillis;
 
-            scoped_ptr<DBClientConnection> conn;
+            unique_ptr<DBClientConnection> conn;
             Notification* hangUntilNotify;
             Status error;
         };
@@ -738,7 +737,7 @@ namespace {
         Notification unhangNotify;
 
         // Create a thread pool which detaches itself from outstanding work on cleanup
-        scoped_ptr<HostThreadPools> threadPool(new HostThreadPools(1, false));
+        unique_ptr<HostThreadPools> threadPool(new HostThreadPools(1, false));
         MockSystemEnv mockSystem(threadPool.get());
 
         ConnectionString hostA = uassertStatusOK(ConnectionString::parse("$hostA:1000"));

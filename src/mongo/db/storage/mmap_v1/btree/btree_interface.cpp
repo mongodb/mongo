@@ -30,7 +30,6 @@
 
 #include "mongo/db/storage/sorted_data_interface.h"
 
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/mmap_v1/btree/btree_logic.h"
@@ -40,7 +39,7 @@
 namespace mongo {
 namespace {
 
-    using boost::scoped_ptr;
+    using std::unique_ptr;
     using std::string;
     using std::vector;
 
@@ -56,7 +55,7 @@ namespace {
         }
 
     private:
-        boost::scoped_ptr<typename BtreeLogic<OnDiskFormat>::Builder> _builder;
+        std::unique_ptr<typename BtreeLogic<OnDiskFormat>::Builder> _builder;
 
         // Not owned here.
         OperationContext* _trans;
@@ -349,7 +348,7 @@ namespace {
         }
 
     private:
-        scoped_ptr<BtreeLogic<OnDiskFormat> > _btree;
+        unique_ptr<BtreeLogic<OnDiskFormat> > _btree;
     };
 } // namespace
 

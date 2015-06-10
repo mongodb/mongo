@@ -34,13 +34,12 @@
 
 #include <boost/optional.hpp>
 #include <boost/optional/optional_io.hpp>
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/db/json.h"
 #include "mongo/unittest/unittest.h"
 
 using namespace mongo;
-using boost::scoped_ptr;
+using std::unique_ptr;
 
 namespace {
 
@@ -149,7 +148,7 @@ namespace {
                                               false, // explain
                                               &lpqRaw);
         if (result.isOK()) {
-            boost::scoped_ptr<LiteParsedQuery> lpq(lpqRaw);
+            std::unique_ptr<LiteParsedQuery> lpq(lpqRaw);
         }
 
         return result;
@@ -278,7 +277,7 @@ namespace {
         bool isExplain = false;
         Status status = LiteParsedQuery::make("testns", cmdObj, isExplain, &rawLpq);
         ASSERT_OK(status);
-        scoped_ptr<LiteParsedQuery> lpq(rawLpq);
+        unique_ptr<LiteParsedQuery> lpq(rawLpq);
     }
 
     TEST(LiteParsedQueryTest, ParseFromCommandWithOptions) {
@@ -293,7 +292,7 @@ namespace {
         bool isExplain = false;
         Status status = LiteParsedQuery::make("testns", cmdObj, isExplain, &rawLpq);
         ASSERT_OK(status);
-        scoped_ptr<LiteParsedQuery> lpq(rawLpq);
+        unique_ptr<LiteParsedQuery> lpq(rawLpq);
 
         // Make sure the values from the command BSON are reflected in the LPQ.
         ASSERT(lpq->showRecordId());
@@ -309,7 +308,7 @@ namespace {
         bool isExplain = false;
         Status status = LiteParsedQuery::make("testns", cmdObj, isExplain, &rawLpq);
         ASSERT_OK(status);
-        scoped_ptr<LiteParsedQuery> lpq(rawLpq);
+        unique_ptr<LiteParsedQuery> lpq(rawLpq);
 
         BSONObj hintObj = lpq->getHint();
         ASSERT_EQUALS(BSON("$hint" << "foo_1"), hintObj);
@@ -323,7 +322,7 @@ namespace {
         bool isExplain = false;
         Status status = LiteParsedQuery::make("testns", cmdObj, isExplain, &rawLpq);
         ASSERT_OK(status);
-        scoped_ptr<LiteParsedQuery> lpq(rawLpq);
+        unique_ptr<LiteParsedQuery> lpq(rawLpq);
     }
 
     TEST(LiteParsedQueryTest, ParseFromCommandValidSortProjMeta) {
@@ -334,7 +333,7 @@ namespace {
         bool isExplain = false;
         Status status = LiteParsedQuery::make("testns", cmdObj, isExplain, &rawLpq);
         ASSERT_OK(status);
-        scoped_ptr<LiteParsedQuery> lpq(rawLpq);
+        unique_ptr<LiteParsedQuery> lpq(rawLpq);
     }
 
     TEST(LiteParsedQueryTest, ParseFromCommandAllFlagsTrue) {
@@ -350,7 +349,7 @@ namespace {
         bool isExplain = false;
         Status status = LiteParsedQuery::make("testns", cmdObj, isExplain, &rawLpq);
         ASSERT_OK(status);
-        scoped_ptr<LiteParsedQuery> lpq(rawLpq);
+        unique_ptr<LiteParsedQuery> lpq(rawLpq);
 
         // Test that all the flags got set to true.
         ASSERT(lpq->isTailable());
@@ -371,7 +370,7 @@ namespace {
         bool isExplain = false;
         Status status = LiteParsedQuery::make("testns", cmdObj, isExplain, &rawLpq);
         ASSERT_OK(status);
-        scoped_ptr<LiteParsedQuery> lpq(rawLpq);
+        unique_ptr<LiteParsedQuery> lpq(rawLpq);
 
         ASSERT_EQUALS("the comment", lpq->getComment());
         BSONObj expectedMin = BSON("a" << 1);
@@ -395,7 +394,7 @@ namespace {
         bool isExplain = false;
         Status status = LiteParsedQuery::make("testns", cmdObj, isExplain, &rawLpq);
         ASSERT_OK(status);
-        scoped_ptr<LiteParsedQuery> lpq(rawLpq);
+        unique_ptr<LiteParsedQuery> lpq(rawLpq);
 
         // Check the values inside the LPQ.
         BSONObj expectedQuery = BSON("a" << 1);
@@ -696,7 +695,7 @@ namespace {
         const bool isExplain = false;
         Status status = LiteParsedQuery::make("testns", cmdObj, isExplain, &rawLpq);
         ASSERT_OK(status);
-        boost::scoped_ptr<LiteParsedQuery> lpq(rawLpq);
+        std::unique_ptr<LiteParsedQuery> lpq(rawLpq);
 
         ASSERT(lpq->getBatchSize());
         ASSERT_EQ(0, lpq->getBatchSize());
@@ -711,7 +710,7 @@ namespace {
         const bool isExplain = false;
         Status status = LiteParsedQuery::make("testns", cmdObj, isExplain, &rawLpq);
         ASSERT_OK(status);
-        boost::scoped_ptr<LiteParsedQuery> lpq(rawLpq);
+        std::unique_ptr<LiteParsedQuery> lpq(rawLpq);
 
         ASSERT(!lpq->getBatchSize());
         ASSERT(!lpq->getLimit());
@@ -771,7 +770,7 @@ namespace {
                            "sort: {b: 1}}");
         status = LiteParsedQuery::make("testns", cmdObj, isExplain, &rawLpq);
         ASSERT_OK(status);
-        scoped_ptr<LiteParsedQuery> lpq(rawLpq);
+        unique_ptr<LiteParsedQuery> lpq(rawLpq);
     }
 
     TEST(LiteParsedQueryTest, ParseCommandForbidMetaSortOnFieldWithoutMetaProject) {
@@ -810,7 +809,7 @@ namespace {
         Status status = LiteParsedQuery::make("testns", cmdObj, isExplain, &rawLpq);
         ASSERT_OK(status);
 
-        boost::scoped_ptr<LiteParsedQuery> lpq(rawLpq);
+        std::unique_ptr<LiteParsedQuery> lpq(rawLpq);
         ASSERT(lpq->fromFindCommand());
     }
 
@@ -824,7 +823,7 @@ namespace {
                                               &rawLpq);
         ASSERT_OK(status);
 
-        boost::scoped_ptr<LiteParsedQuery> lpq(rawLpq);
+        std::unique_ptr<LiteParsedQuery> lpq(rawLpq);
         ASSERT(!lpq->fromFindCommand());
     }
 
@@ -844,7 +843,7 @@ namespace {
         Status status = LiteParsedQuery::make("testns", cmdObj, false, &rawLpq);
         ASSERT_OK(status);
 
-        boost::scoped_ptr<LiteParsedQuery> lpq(rawLpq);
+        std::unique_ptr<LiteParsedQuery> lpq(rawLpq);
 
         ASSERT_EQUALS(0, lpq->getSkip());
         ASSERT_EQUALS(true, lpq->wantMore());

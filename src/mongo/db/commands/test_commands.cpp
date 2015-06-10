@@ -183,7 +183,7 @@ namespace mongo {
 
             RecordId end;
             {
-                boost::scoped_ptr<PlanExecutor> exec(InternalPlanner::collectionScan(txn,
+                std::unique_ptr<PlanExecutor> exec(InternalPlanner::collectionScan(txn,
                                                                                      nss.ns(),
                                                                                      collection,
                                                                                      InternalPlanner::BACKWARD));

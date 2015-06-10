@@ -30,7 +30,6 @@
  * This file contains tests for mongo/db/exec/working_set.cpp
  */
 
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/json.h"
@@ -59,7 +58,7 @@ namespace {
             member = NULL;
         }
 
-        boost::scoped_ptr<WorkingSet> ws;
+        std::unique_ptr<WorkingSet> ws;
         WorkingSetMember* member;
     };
 

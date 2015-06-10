@@ -32,7 +32,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <boost/scoped_ptr.hpp>
 #include <boost/thread/thread.hpp>
 #include <fstream>
 #include <memory>
@@ -110,7 +109,7 @@
 
 namespace mongo {
 
-    using boost::scoped_ptr;
+    using std::unique_ptr;
     using logger::LogComponent;
     using std::unique_ptr;
     using std::endl;
@@ -752,7 +751,7 @@ namespace {
                                                       &parsedUpdate,
                                                       &op.debug(),
                                                       &rawExec));
-                    boost::scoped_ptr<PlanExecutor> exec(rawExec);
+                    std::unique_ptr<PlanExecutor> exec(rawExec);
 
                     // Run the plan and get stats out.
                     uassertStatusOK(exec->executePlan());
@@ -806,7 +805,7 @@ namespace {
                                               &parsedUpdate,
                                               &op.debug(),
                                               &rawExec));
-            boost::scoped_ptr<PlanExecutor> exec(rawExec);
+            std::unique_ptr<PlanExecutor> exec(rawExec);
 
             // Run the plan and get stats out.
             uassertStatusOK(exec->executePlan());
@@ -869,7 +868,7 @@ namespace {
                                                   ctx.db()->getCollection(nsString),
                                                   &parsedDelete,
                                                   &rawExec));
-                boost::scoped_ptr<PlanExecutor> exec(rawExec);
+                std::unique_ptr<PlanExecutor> exec(rawExec);
 
                 // Run the plan and get the number of docs deleted.
                 uassertStatusOK(exec->executePlan());
@@ -904,8 +903,8 @@ namespace {
         curop.debug().ntoreturn = ntoreturn;
         curop.debug().cursorid = cursorid;
 
-        scoped_ptr<AssertionException> ex;
-        scoped_ptr<Timer> timer;
+        unique_ptr<AssertionException> ex;
+        unique_ptr<Timer> timer;
         int pass = 0;
         bool exhaust = false;
         QueryResult::View msgdata = 0;

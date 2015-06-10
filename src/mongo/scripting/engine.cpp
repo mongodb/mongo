@@ -36,7 +36,6 @@
 #include <cctype>
 #include <boost/filesystem/operations.hpp>
 #include <boost/scoped_array.hpp>
-#include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
 
 #include "mongo/client/dbclientcursor.h"
@@ -50,7 +49,7 @@
 
 namespace mongo {
 
-    using boost::scoped_ptr;
+    using std::unique_ptr;
     using boost::shared_ptr;
     using std::unique_ptr;
     using std::endl;
@@ -221,7 +220,7 @@ namespace {
         _loadedVersion = lastVersion;
         string coll = _localDBName + ".system.js";
 
-        scoped_ptr<DBClientBase> directDBClient(createDirectClient(txn));
+        unique_ptr<DBClientBase> directDBClient(createDirectClient(txn));
         unique_ptr<DBClientCursor> c = directDBClient->query(coll, Query(), 0, 0, NULL,
             QueryOption_SlaveOk, 0);
         massert(16669, "unable to get db client cursor from query", c.get());

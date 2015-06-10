@@ -34,14 +34,13 @@
 
 #include "mongo/db/hasher.h"
 
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/db/jsobj.h"
 #include "mongo/util/startup_test.h"
 
 namespace mongo {
 
-    using boost::scoped_ptr;
+    using std::unique_ptr;
 
     Hasher::Hasher( HashSeed seed ) : _seed( seed ) {
         md5_init( &_md5State );
@@ -57,7 +56,7 @@ namespace mongo {
     }
 
     long long int BSONElementHasher::hash64( const BSONElement& e , HashSeed seed ){
-        scoped_ptr<Hasher> h( HasherFactory::createHasher( seed ) );
+        unique_ptr<Hasher> h( HasherFactory::createHasher( seed ) );
         recursiveHash( h.get() , e , false );
         HashDigest d;
         h->finish(d);

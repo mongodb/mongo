@@ -29,7 +29,6 @@
 #pragma once
 
 #include <boost/noncopyable.hpp>
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/base/string_data.h"
 #include "mongo/client/connection_string.h"
@@ -1111,8 +1110,8 @@ namespace mongo {
         virtual void _auth(const BSONObj& params);
         virtual void sayPiggyBack( Message &toSend );
 
-        boost::scoped_ptr<MessagingPort> p;
-        boost::scoped_ptr<SockAddr> server;
+        std::unique_ptr<MessagingPort> p;
+        std::unique_ptr<SockAddr> server;
         bool _failed;
         const bool autoReconnect;
         Backoff autoReconnectBackoff;

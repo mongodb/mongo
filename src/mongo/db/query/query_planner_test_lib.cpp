@@ -54,9 +54,9 @@ namespace {
         if (!swme.isOK()) {
             return false;
         }
-        const boost::scoped_ptr<MatchExpression> root(swme.getValue());
+        const std::unique_ptr<MatchExpression> root(swme.getValue());
         CanonicalQuery::sortTree(root.get());
-        boost::scoped_ptr<MatchExpression> trueFilter(trueFilterNode->filter->shallowClone());
+        std::unique_ptr<MatchExpression> trueFilter(trueFilterNode->filter->shallowClone());
         CanonicalQuery::sortTree(trueFilter.get());
         return trueFilter->equivalent(root.get());
     }

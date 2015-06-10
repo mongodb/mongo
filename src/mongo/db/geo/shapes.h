@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
 #include <cmath>
 #include <string>
 #include <vector>
@@ -191,8 +190,8 @@ namespace mongo {
         std::vector<Point> _points;
 
         // Cached attributes of the polygon
-        mutable boost::scoped_ptr<Box> _bounds;
-        mutable boost::scoped_ptr<Point> _centroid;
+        mutable std::unique_ptr<Box> _bounds;
+        mutable std::unique_ptr<Point> _centroid;
     };
 
     class R2Region {
@@ -301,10 +300,10 @@ namespace mongo {
 
         PolygonWithCRS() : crs(UNSET) {}
 
-        boost::scoped_ptr<S2Polygon> s2Polygon;
+        std::unique_ptr<S2Polygon> s2Polygon;
         // Simple polygons with strict winding order may be bigger or smaller than a hemisphere.
         // Only used for query. We don't support storing/indexing big polygons.
-        boost::scoped_ptr<BigSimplePolygon> bigPolygon;
+        std::unique_ptr<BigSimplePolygon> bigPolygon;
 
         Polygon oldPolygon;
         CRS crs;
@@ -339,7 +338,7 @@ namespace mongo {
 
         std::vector<PointWithCRS> points;
 
-        // The amount of indirection here is painful but we can't operator= scoped_ptr or
+        // The amount of indirection here is painful but we can't operator= unique_ptr or
         // OwnedPointerVector.
         OwnedPointerVector<LineWithCRS> lines;
         OwnedPointerVector<PolygonWithCRS> polygons;

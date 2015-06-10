@@ -30,7 +30,6 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
@@ -81,13 +80,13 @@ namespace {
 
         void setUp() {
             {
-                boost::scoped_ptr<OperationContext> opCtx( newOperationContext() );
+                std::unique_ptr<OperationContext> opCtx( newOperationContext() );
                 ASSERT_EQUALS( 0, _rs->numRecords( opCtx.get() ) );
             }
 
             int nToInsert = 10;
             for ( int i = 0; i < nToInsert; i++ ) {
-                boost::scoped_ptr<OperationContext> opCtx( newOperationContext() );
+                std::unique_ptr<OperationContext> opCtx( newOperationContext() );
                 {
                     std::stringstream ss;
                     ss << "record " << i;
@@ -105,14 +104,14 @@ namespace {
             }
 
             {
-                boost::scoped_ptr<OperationContext> opCtx( newOperationContext() );
+                std::unique_ptr<OperationContext> opCtx( newOperationContext() );
                 ASSERT_EQUALS( nToInsert, _rs->numRecords( opCtx.get() ) );
             }
         }
 
     private:
-        boost::scoped_ptr<HarnessHelper> _harnessHelper;
-        boost::scoped_ptr<RecordStore> _rs;
+        std::unique_ptr<HarnessHelper> _harnessHelper;
+        std::unique_ptr<RecordStore> _rs;
         std::set<std::string> _remain;
     };
 

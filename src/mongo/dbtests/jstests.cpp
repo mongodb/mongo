@@ -33,7 +33,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <boost/scoped_ptr.hpp>
 #include <iostream>
 #include <limits>
 
@@ -47,7 +46,7 @@
 #include "mongo/util/log.h"
 #include "mongo/util/timer.h"
 
-using boost::scoped_ptr;
+using std::unique_ptr;
 using std::unique_ptr;
 using std::cout;
 using std::endl;
@@ -68,7 +67,7 @@ namespace JSTests {
     class BasicScope {
     public:
         void run() {
-            scoped_ptr<Scope> s;
+            unique_ptr<Scope> s;
             s.reset( globalScriptEngine->newScope() );
 
             s->setNumber( "x" , 5 );
@@ -108,7 +107,7 @@ namespace JSTests {
     public:
         void run() {
             // Test falsy javascript values
-            scoped_ptr<Scope> s;
+            unique_ptr<Scope> s;
             s.reset( globalScriptEngine->newScope() );
 
             ASSERT( ! s->getBoolean( "notSet" ) );
@@ -838,7 +837,7 @@ namespace JSTests {
     class ExecTimeout {
     public:
         void run() {
-            scoped_ptr<Scope> scope(globalScriptEngine->newScope());
+            unique_ptr<Scope> scope(globalScriptEngine->newScope());
 
             // assert timeout occurred
             ASSERT(!scope->exec("var a = 1; while (true) { ; }",
@@ -852,7 +851,7 @@ namespace JSTests {
     class ExecNoTimeout {
     public:
         void run() {
-            scoped_ptr<Scope> scope(globalScriptEngine->newScope());
+            unique_ptr<Scope> scope(globalScriptEngine->newScope());
 
             // assert no timeout occurred
             ASSERT(scope->exec("var a = function() { return 1; }",
@@ -866,7 +865,7 @@ namespace JSTests {
     class InvokeTimeout {
     public:
         void run() {
-            scoped_ptr<Scope> scope(globalScriptEngine->newScope());
+            unique_ptr<Scope> scope(globalScriptEngine->newScope());
 
             // scope timeout after 500ms
             bool caught = false;
@@ -888,7 +887,7 @@ namespace JSTests {
     class InvokeNoTimeout {
     public:
         void run() {
-            scoped_ptr<Scope> scope(globalScriptEngine->newScope());
+            unique_ptr<Scope> scope(globalScriptEngine->newScope());
 
             // invoke completes before timeout
             scope->invokeSafe("function() { "
@@ -2004,7 +2003,7 @@ namespace JSTests {
             DBDirectClient client(&txn);
             client.update( "test.system.js" , query.obj() , update.obj() , true /* upsert */ );
 
-            scoped_ptr<Scope> s( globalScriptEngine->newScope() );
+            unique_ptr<Scope> s( globalScriptEngine->newScope() );
             client.eval( "test" , "invalidstoredjs1()" );
             
             BSONObj info;

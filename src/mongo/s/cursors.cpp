@@ -33,7 +33,6 @@
 
 #include "mongo/s/cursors.h"
 
-#include <boost/scoped_ptr.hpp>
 #include <string>
 #include <vector>
 
@@ -55,7 +54,7 @@
 
 namespace mongo {
 
-    using boost::scoped_ptr;
+    using std::unique_ptr;
     using std::endl;
     using std::string;
     using std::stringstream;
@@ -227,7 +226,7 @@ namespace mongo {
                                                                 true, true);
 
     unsigned getCCRandomSeed() {
-        scoped_ptr<SecureRandom> sr( SecureRandom::create() );
+        unique_ptr<SecureRandom> sr( SecureRandom::create() );
         return sr->nextInt64();
     }
 

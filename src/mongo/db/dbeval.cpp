@@ -48,7 +48,7 @@
 
 namespace mongo {
 
-    using boost::scoped_ptr;
+    using std::unique_ptr;
     using std::dec;
     using std::endl;
     using std::string;
@@ -93,7 +93,7 @@ namespace {
             return false;
         }
 
-        scoped_ptr<Scope> s(globalScriptEngine->newScope());
+        unique_ptr<Scope> s(globalScriptEngine->newScope());
         s->registerOperation(txn);
 
         ScriptingFunction f = s->createFunction(code);

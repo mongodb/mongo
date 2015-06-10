@@ -29,7 +29,6 @@
 
 #include "mongo/bson/mutable/document.h"
 
-#include <boost/scoped_ptr.hpp>
 #include <boost/static_assert.hpp>
 #include <cstdlib>
 #include <cstring>
@@ -2651,7 +2650,7 @@ namespace mutablebson {
     }
 
     inline Document::Impl& Document::getImpl() {
-        // Don't use scoped_ptr<Impl>::operator* since it may generate assertions that the
+        // Don't use unique_ptr<Impl>::operator* since it may generate assertions that the
         // pointer is non-null, but we already know that to be always and forever true, and
         // otherwise the assertion code gets spammed into every method that inlines the call to
         // this function. We just dereference the pointer returned from 'get' ourselves.

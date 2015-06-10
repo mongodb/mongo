@@ -34,7 +34,6 @@
 #include <set>
 #include <string>
 
-#include <boost/scoped_ptr.hpp>
 #include <boost/thread/mutex.hpp>
 
 #include <wiredtiger.h>
@@ -140,7 +139,7 @@ namespace mongo {
 
         WT_CONNECTION* _conn;
         WT_EVENT_HANDLER _eventHandler;
-        boost::scoped_ptr<WiredTigerSessionCache> _sessionCache;
+        std::unique_ptr<WiredTigerSessionCache> _sessionCache;
         std::string _path;
         bool _durable;
 
@@ -150,7 +149,7 @@ namespace mongo {
         std::set<std::string> _identToDrop;
         mutable boost::mutex _identToDropMutex;
 
-        boost::scoped_ptr<WiredTigerSizeStorer> _sizeStorer;
+        std::unique_ptr<WiredTigerSizeStorer> _sizeStorer;
         std::string _sizeStorerUri;
         mutable ElapsedTracker _sizeStorerSyncTracker;
     };

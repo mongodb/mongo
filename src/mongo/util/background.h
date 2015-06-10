@@ -29,8 +29,8 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
 #include <boost/noncopyable.hpp>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -127,7 +127,7 @@ namespace mongo {
         const bool _selfDelete;
 
         struct JobStatus;
-        const boost::scoped_ptr<JobStatus> _status;
+        const std::unique_ptr<JobStatus> _status;
 
         void jobBody();
     };

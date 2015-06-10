@@ -161,7 +161,7 @@ namespace QueryStageSortTests {
                                                   new SortStage(params, ws, ms), NULL, coll),
                                    coll, PlanExecutor::YIELD_MANUAL, &rawExec);
             ASSERT_OK(status);
-            boost::scoped_ptr<PlanExecutor> exec(rawExec);
+            std::unique_ptr<PlanExecutor> exec(rawExec);
 
             // Look at pairs of objects to make sure that the sort order is pairwise (and therefore
             // totally) correct.
@@ -533,7 +533,7 @@ namespace QueryStageSortTests {
                                                   ws,
                                                   new SortStage(params, ws, ms), NULL, coll),
                                    coll, PlanExecutor::YIELD_MANUAL, &rawExec);
-            boost::scoped_ptr<PlanExecutor> exec(rawExec);
+            std::unique_ptr<PlanExecutor> exec(rawExec);
 
             PlanExecutor::ExecState runnerState = exec->getNext(NULL, NULL);
             ASSERT_EQUALS(PlanExecutor::FAILURE, runnerState);

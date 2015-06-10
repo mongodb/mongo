@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/plan_stage.h"
@@ -187,7 +186,7 @@ namespace mongo {
         Collection* _collection;
 
         // Owned by us.
-        boost::scoped_ptr<PlanStage> _child;
+        std::unique_ptr<PlanStage> _child;
 
         // If not WorkingSet::INVALID_ID, we use this rather than asking our child what to do next.
         WorkingSetID _idRetrying;
@@ -212,7 +211,7 @@ namespace mongo {
         //
         // So, no matter what, we keep track of where the doc wound up.
         typedef unordered_set<RecordId, RecordId::Hasher> DiskLocSet;
-        const boost::scoped_ptr<DiskLocSet> _updatedLocs;
+        const std::unique_ptr<DiskLocSet> _updatedLocs;
 
         // These get reused for each update.
         mutablebson::Document& _doc;

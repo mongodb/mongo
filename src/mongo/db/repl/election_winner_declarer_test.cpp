@@ -28,7 +28,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <boost/scoped_ptr.hpp>
 #include <boost/thread.hpp>
 
 #include "mongo/base/status.h"
@@ -40,7 +39,7 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/mongoutils/str.h"
 
-using boost::scoped_ptr;
+using std::unique_ptr;
 
 namespace mongo {
 namespace repl {
@@ -149,7 +148,7 @@ namespace {
         }
 
     private:
-        scoped_ptr<ElectionWinnerDeclarer::Algorithm> _declarer;
+        unique_ptr<ElectionWinnerDeclarer::Algorithm> _declarer;
 
     };
 

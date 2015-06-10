@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/jsobj.h"
@@ -127,7 +126,7 @@ namespace mongo {
         // stage.
         Collection* _collection;
 
-        boost::scoped_ptr<PlanStage> _child;
+        std::unique_ptr<PlanStage> _child;
 
         // If not WorkingSet::INVALID_ID, we use this rather than asking our child what to do next.
         WorkingSetID _idRetrying;

@@ -29,7 +29,6 @@
 #include "mongo/platform/basic.h"
 
 #include <map>
-#include <boost/scoped_ptr.hpp>
 #include <boost/thread/thread.hpp>
 
 #include "mongo/db/namespace_string.h"

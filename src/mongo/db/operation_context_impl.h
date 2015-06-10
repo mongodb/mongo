@@ -27,7 +27,6 @@
  */
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
 #include <string>
 
 #include "mongo/db/operation_context.h"

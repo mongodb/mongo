@@ -29,7 +29,6 @@
 #pragma once
 
 #include <boost/noncopyable.hpp>
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/plan_executor.h"
@@ -272,7 +271,7 @@ namespace mongo {
         //
         // The underlying execution machinery.
         //
-        boost::scoped_ptr<PlanExecutor> _exec;
+        std::unique_ptr<PlanExecutor> _exec;
     };
 
     /**

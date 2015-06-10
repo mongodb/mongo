@@ -32,7 +32,6 @@
 #include "mongo/scripting/v8-3.25_utils.h"
 
 #include <boost/make_shared.hpp>
-#include <boost/scoped_ptr.hpp>
 #include <boost/thread/condition_variable.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/shared_ptr.hpp>
@@ -50,7 +49,7 @@
 #include "mongo/util/mongoutils/str.h"
 
 using namespace std;
-using boost::scoped_ptr;
+using std::unique_ptr;
 
 namespace mongo {
 
@@ -180,7 +179,7 @@ namespace mongo {
 
             void operator()() {
                 try {
-                    scoped_ptr<V8Scope> scope(
+                    unique_ptr<V8Scope> scope(
                         static_cast<V8Scope*>(globalScriptEngine->newScope()));
                     v8::Locker v8lock(scope->getIsolate());
                     v8::Isolate::Scope iscope(scope->getIsolate());
@@ -241,7 +240,7 @@ namespace mongo {
 
         bool _started;
         bool _done;
-        scoped_ptr<boost::thread> _thread;
+        unique_ptr<boost::thread> _thread;
         boost::shared_ptr<SharedData> _sharedData;
     };
 

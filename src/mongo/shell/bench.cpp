@@ -738,7 +738,7 @@ namespace mongo {
     void BenchRunWorker::run() {
         try {
             BenchRunWorkerStateGuard _workerStateGuard( _brState );
-            boost::scoped_ptr<DBClientBase> conn( _config->createConnection() );
+            std::unique_ptr<DBClientBase> conn( _config->createConnection() );
             if ( !_config->username.empty() ) {
                 string errmsg;
                 if (!conn->auth("admin", _config->username, _config->password, errmsg)) {
@@ -776,7 +776,7 @@ namespace mongo {
      void BenchRunner::start( ) {
 
          {
-             boost::scoped_ptr<DBClientBase> conn( _config->createConnection() );
+             std::unique_ptr<DBClientBase> conn( _config->createConnection() );
              // Must authenticate to admin db in order to run serverStatus command
              if (_config->username != "") {
                  string errmsg;
@@ -814,7 +814,7 @@ namespace mongo {
          delete _brTimer;
 
          {
-             boost::scoped_ptr<DBClientBase> conn( _config->createConnection() );
+             std::unique_ptr<DBClientBase> conn( _config->createConnection() );
              if (_config->username != "") {
                  string errmsg;
                  // this can only fail if admin access was revoked since start of run

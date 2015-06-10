@@ -138,7 +138,7 @@ namespace mongo {
 
         long long excessSize = fromCollection->dataSize(txn) - allocatedSpaceGuess;
 
-        boost::scoped_ptr<PlanExecutor> exec(InternalPlanner::collectionScan(
+        std::unique_ptr<PlanExecutor> exec(InternalPlanner::collectionScan(
                     txn,
                     fromNs,
                     fromCollection,

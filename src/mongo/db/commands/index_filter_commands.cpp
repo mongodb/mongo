@@ -28,7 +28,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <boost/scoped_ptr.hpp>
 #include <string>
 #include <sstream>
 
@@ -120,7 +119,7 @@ namespace mongo {
     using std::string;
     using std::stringstream;
     using std::vector;
-    using boost::scoped_ptr;
+    using std::unique_ptr;
 
     IndexFilterCommand::IndexFilterCommand(const string& name, const string& helpText)
         : Command(name),
@@ -274,7 +273,7 @@ namespace mongo {
                 return status;
             }
 
-            scoped_ptr<CanonicalQuery> cq(cqRaw);
+            unique_ptr<CanonicalQuery> cq(cqRaw);
             querySettings->removeAllowedIndices(planCache->computeKey(*cq));
 
             // Remove entry from plan cache
@@ -320,7 +319,7 @@ namespace mongo {
             Status result = CanonicalQuery::canonicalize(
                     ns, entry->query, entry->sort, entry->projection, &cqRaw, whereCallback);
             invariant(result.isOK());
-            scoped_ptr<CanonicalQuery> cq(cqRaw);
+            unique_ptr<CanonicalQuery> cq(cqRaw);
 
             // Remove plan cache entry.
             planCache->remove(*cq);
@@ -388,7 +387,7 @@ namespace mongo {
         if (!status.isOK()) {
             return status;
         }
-        scoped_ptr<CanonicalQuery> cq(cqRaw);
+        unique_ptr<CanonicalQuery> cq(cqRaw);
 
         // Add allowed indices to query settings, overriding any previous entries.
         querySettings->setAllowedIndices(*cq, planCache->computeKey(*cq), indexes);

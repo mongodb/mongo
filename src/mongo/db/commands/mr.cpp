@@ -32,7 +32,6 @@
 
 #include "mongo/db/commands/mr.h"
 
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/client/connpool.h"
 #include "mongo/client/parallel.h"
@@ -72,7 +71,7 @@
 
 namespace mongo {
 
-    using boost::scoped_ptr;
+    using std::unique_ptr;
     using boost::shared_ptr;
     using std::unique_ptr;
     using std::endl;
@@ -205,7 +204,7 @@ namespace mongo {
 
             // need to build the reduce args: ( key, [values] )
             BSONObjBuilder reduceArgs( sizeEstimate );
-            boost::scoped_ptr<BSONArrayBuilder>  valueBuilder;
+            std::unique_ptr<BSONArrayBuilder>  valueBuilder;
             unsigned n = 0;
             for ( ; n<tuples.size(); n++ ) {
                 BSONObjIterator j(tuples[n]);
@@ -1025,7 +1024,7 @@ namespace mongo {
                 wuow.commit();
             }
 
-            scoped_ptr<AutoGetCollectionForRead> ctx(new AutoGetCollectionForRead(_txn, _config.incLong));
+            unique_ptr<AutoGetCollectionForRead> ctx(new AutoGetCollectionForRead(_txn, _config.incLong));
 
             BSONObj prev;
             BSONList all;
@@ -1061,7 +1060,7 @@ namespace mongo {
                                &rawExec,
                                QueryPlannerParams::NO_TABLE_SCAN).isOK());
 
-            scoped_ptr<PlanExecutor> exec(rawExec);
+            unique_ptr<PlanExecutor> exec(rawExec);
 
             // iterate over all sorted objects
             BSONObj o;
@@ -1400,9 +1399,9 @@ namespace mongo {
                         const NamespaceString nss(config.ns);
 
                         // Need lock and context to use it
-                        scoped_ptr<ScopedTransaction> scopedXact(
+                        unique_ptr<ScopedTransaction> scopedXact(
                                                         new ScopedTransaction(txn, MODE_IS));
-                        scoped_ptr<AutoGetDb> scopedAutoDb(new AutoGetDb(txn, nss.db(), MODE_S));
+                        unique_ptr<AutoGetDb> scopedAutoDb(new AutoGetDb(txn, nss.db(), MODE_S));
 
                         const WhereCallbackReal whereCallback(txn, nss.db());
 
@@ -1433,7 +1432,7 @@ namespace mongo {
                             return 0;
                         }
 
-                        scoped_ptr<PlanExecutor> exec(rawExec);
+                        unique_ptr<PlanExecutor> exec(rawExec);
 
                         Timer mt;
 

@@ -89,7 +89,7 @@ namespace mongo {
         KVEngine* _engine; // not owned
         KVCatalog* _catalog; // not owned
         std::string _ident;
-        boost::scoped_ptr<RecordStore> _recordStore; // owned
+        std::unique_ptr<RecordStore> _recordStore; // owned
     };
 
 }

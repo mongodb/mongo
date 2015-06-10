@@ -33,7 +33,6 @@
 #include <map>
 #include <string>
 
-#include <boost/scoped_ptr.hpp>
 #include <boost/thread/mutex.hpp>
 
 #include "mongo/db/storage/kv/kv_catalog.h"
@@ -103,12 +102,12 @@ namespace mongo {
         KVStorageEngineOptions _options;
 
         // This must be the first member so it is destroyed last.
-        boost::scoped_ptr<KVEngine> _engine;
+        std::unique_ptr<KVEngine> _engine;
 
         const bool _supportsDocLocking;
 
-        boost::scoped_ptr<RecordStore> _catalogRecordStore;
-        boost::scoped_ptr<KVCatalog> _catalog;
+        std::unique_ptr<RecordStore> _catalogRecordStore;
+        std::unique_ptr<KVCatalog> _catalog;
 
         typedef std::map<std::string,KVDatabaseCatalogEntry*> DBMap;
         DBMap _dbs;

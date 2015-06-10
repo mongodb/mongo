@@ -34,7 +34,6 @@
 #include <set>
 #include <string>
 
-#include <boost/scoped_ptr.hpp>
 #include <boost/thread/mutex.hpp>
 
 #include "mongo/db/catalog/collection_options.h"

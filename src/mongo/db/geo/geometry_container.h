@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
 #include <string>
 
 #include "mongo/base/disallow_copying.h"
@@ -143,20 +142,20 @@ namespace mongo {
         // Only one of these shared_ptrs should be non-NULL.  S2Region is a
         // superclass but it only supports testing against S2Cells.  We need
         // the most specific class we can get.
-        boost::scoped_ptr<PointWithCRS> _point;
-        boost::scoped_ptr<LineWithCRS> _line;
-        boost::scoped_ptr<BoxWithCRS> _box;
-        boost::scoped_ptr<PolygonWithCRS> _polygon;
-        boost::scoped_ptr<CapWithCRS> _cap;
-        boost::scoped_ptr<MultiPointWithCRS> _multiPoint;
-        boost::scoped_ptr<MultiLineWithCRS> _multiLine;
-        boost::scoped_ptr<MultiPolygonWithCRS> _multiPolygon;
-        boost::scoped_ptr<GeometryCollection> _geometryCollection;
+        std::unique_ptr<PointWithCRS> _point;
+        std::unique_ptr<LineWithCRS> _line;
+        std::unique_ptr<BoxWithCRS> _box;
+        std::unique_ptr<PolygonWithCRS> _polygon;
+        std::unique_ptr<CapWithCRS> _cap;
+        std::unique_ptr<MultiPointWithCRS> _multiPoint;
+        std::unique_ptr<MultiLineWithCRS> _multiLine;
+        std::unique_ptr<MultiPolygonWithCRS> _multiPolygon;
+        std::unique_ptr<GeometryCollection> _geometryCollection;
 
         // Cached for use during covering calculations
         // TODO: _s2Region is currently generated immediately - don't necessarily need to do this
-        boost::scoped_ptr<S2RegionUnion> _s2Region;
-        boost::scoped_ptr<R2Region> _r2Region;
+        std::unique_ptr<S2RegionUnion> _s2Region;
+        std::unique_ptr<R2Region> _r2Region;
     };
 
 } // namespace mongo

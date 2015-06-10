@@ -33,7 +33,6 @@
 #include "mongo/db/query/plan_cache.h"
 
 #include <algorithm>
-#include <boost/scoped_ptr.hpp>
 #include <ostream>
 #include <memory>
 
@@ -51,7 +50,7 @@ using namespace mongo;
 
 namespace {
 
-    using boost::scoped_ptr;
+    using std::unique_ptr;
     using std::unique_ptr;
     using std::string;
     using std::unique_ptr;
@@ -363,7 +362,7 @@ namespace {
         PlanCache planCache;
         unique_ptr<CanonicalQuery> cq(canonicalize("{a: 1}"));
         std::vector<QuerySolution*> solns;
-        boost::scoped_ptr<PlanRankingDecision> decision(createDecision(1U));
+        std::unique_ptr<PlanRankingDecision> decision(createDecision(1U));
         ASSERT_NOT_OK(planCache.add(*cq, solns, decision.get()));
     }
 
@@ -637,7 +636,7 @@ namespace {
             CanonicalQuery* cq;
             Status s = CanonicalQuery::canonicalize(ns, query, sort, proj, &cq);
             ASSERT_OK(s);
-            scoped_ptr<CanonicalQuery> scopedCq(cq);
+            unique_ptr<CanonicalQuery> scopedCq(cq);
             cq = NULL;
 
             // Create a CachedSolution the long way..

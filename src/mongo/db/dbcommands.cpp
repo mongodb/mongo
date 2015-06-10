@@ -32,7 +32,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <boost/scoped_ptr.hpp>
 #include <boost/optional.hpp>
 #include <time.h>
 
@@ -109,7 +108,7 @@
 
 namespace mongo {
 
-    using boost::scoped_ptr;
+    using std::unique_ptr;
     using std::unique_ptr;
     using std::endl;
     using std::ostringstream;
@@ -588,7 +587,7 @@ namespace mongo {
                 // Check shard version at startup.
                 // This will throw before we've done any work if shard version is outdated
                 // We drop and re-acquire these locks every document because md5'ing is expensive
-                scoped_ptr<AutoGetCollectionForRead> ctx(new AutoGetCollectionForRead(txn, ns));
+                unique_ptr<AutoGetCollectionForRead> ctx(new AutoGetCollectionForRead(txn, ns));
                 Collection* coll = ctx->getCollection();
 
                 PlanExecutor* rawExec;
@@ -1195,7 +1194,7 @@ namespace {
             BSONObj interposedCmd = request.getCommandArgs();
 
             std::string dbname = request.getDatabase().toString();
-            scoped_ptr<MaintenanceModeSetter> mmSetter;
+            unique_ptr<MaintenanceModeSetter> mmSetter;
 
             if (isHelpRequest(request)) {
                 CurOp::get(txn)->ensureStarted();

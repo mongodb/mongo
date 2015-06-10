@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
 #include <string>
 
 #include "mongo/base/owned_pointer_vector.h"
@@ -129,13 +128,13 @@ namespace mongo {
             BranchPlanningResult() { }
 
             // A parsed version of one branch of the $or.
-            boost::scoped_ptr<CanonicalQuery> canonicalQuery;
+            std::unique_ptr<CanonicalQuery> canonicalQuery;
 
             // If there is cache data available, then we store it here rather than generating
             // a set of alternate plans for the branch. The index tags from the cache data
             // can be applied directly to the parent $or MatchExpression when generating the
             // composite solution.
-            boost::scoped_ptr<CachedSolution> cachedSolution;
+            std::unique_ptr<CachedSolution> cachedSolution;
 
             // Query solutions resulting from planning the $or branch.
             OwnedPointerVector<QuerySolution> solutions;
@@ -180,9 +179,9 @@ namespace mongo {
 
         // If we successfully create a "composite solution" by planning each $or branch
         // independently, that solution is owned here.
-        boost::scoped_ptr<QuerySolution> _compositeSolution;
+        std::unique_ptr<QuerySolution> _compositeSolution;
 
-        boost::scoped_ptr<PlanStage> _child;
+        std::unique_ptr<PlanStage> _child;
 
         // Holds a list of the results from planning each branch.
         OwnedPointerVector<BranchPlanningResult> _branchResults;

@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
 #include <queue>
 
 #include "mongo/base/string_data.h"
@@ -193,14 +192,14 @@ namespace mongo {
         unordered_map<RecordId, WorkingSetID, RecordId::Hasher> _nextIntervalSeen;
 
         // Stats for the stage covering this interval
-        boost::scoped_ptr<IntervalStats> _nextIntervalStats;
+        std::unique_ptr<IntervalStats> _nextIntervalStats;
 
         // Sorted buffered results to be returned - the current interval
         struct SearchResult;
         std::priority_queue<SearchResult> _resultBuffer;
 
         // Stats
-        boost::scoped_ptr<PlanStageStats> _stats;
+        std::unique_ptr<PlanStageStats> _stats;
 
         // The current stage from which this stage should buffer results
         // Pointer to the last interval in _childrenIntervals. Owned by _childrenIntervals.
@@ -225,7 +224,7 @@ namespace mongo {
                         bool inclusiveMax);
 
         // Owned by NearStage
-        boost::scoped_ptr<PlanStage> const covering;
+        std::unique_ptr<PlanStage> const covering;
         const bool dedupCovering;
 
         const double minDistance;

@@ -32,7 +32,6 @@
 #include <string>
 #include <vector>
 
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
@@ -118,7 +117,7 @@ namespace mongo {
             virtual Impl* doClone() const = 0;
         };
 
-        RoleNameIterator() : _impl(NULL) {}
+        RoleNameIterator() : _impl(nullptr) {}
         RoleNameIterator(const RoleNameIterator& other) : _impl(Impl::clone(other._impl.get())) {}
         explicit RoleNameIterator(Impl* impl) : _impl(impl) {}
 
@@ -136,7 +135,7 @@ namespace mongo {
         const RoleName* operator->() const { return &get(); }
 
     private:
-        boost::scoped_ptr<Impl> _impl;
+        std::unique_ptr<Impl> _impl;
     };
 
 } // namespace mongo

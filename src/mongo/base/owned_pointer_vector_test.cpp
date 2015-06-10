@@ -272,7 +272,7 @@ namespace {
     TEST(OwnedPointerVectorTest, ReleaseAt) {
         DestructionLogger::destroyedNames().clear();
 
-        boost::scoped_ptr<DestructionLogger> holder;
+        std::unique_ptr<DestructionLogger> holder;
         {
             // names are order of deletion
             OwnedPointerVector<DestructionLogger> owned;
@@ -315,7 +315,7 @@ namespace {
 
             {
                 // transfer ownership of "third" to holder
-                boost::scoped_ptr<DestructionLogger> holder(owned.popAndReleaseBack());
+                std::unique_ptr<DestructionLogger> holder(owned.popAndReleaseBack());
                 ASSERT_EQUALS( 0U, DestructionLogger::destroyedNames().size() );
                 ASSERT_EQUALS( 2U, owned.size() );
                 // holder destroyed

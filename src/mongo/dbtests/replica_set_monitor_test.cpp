@@ -35,7 +35,6 @@
 #include "mongo/dbtests/mock/mock_replica_set.h"
 #include "mongo/unittest/unittest.h"
 
-#include <boost/scoped_ptr.hpp>
 #include <set>
 #include <vector>
 
@@ -47,7 +46,7 @@ namespace {
     using std::vector;
     using std::set;
     using std::string;
-    using boost::scoped_ptr;
+    using std::unique_ptr;
 
     // TODO: Port these existing tests here: replmonitor_bad_seed.js, repl_monitor_refresh.js
 
@@ -77,7 +76,7 @@ namespace {
 
     private:
         ConnectionString::ConnectionHook* _originalConnectionHook;
-        boost::scoped_ptr<MockReplicaSet> _replSet;
+        std::unique_ptr<MockReplicaSet> _replSet;
     };
 
     TEST_F(ReplicaSetMonitorTest, SeedWithPriOnlySecDown) {
@@ -245,7 +244,7 @@ namespace {
 
     private:
         ConnectionString::ConnectionHook* _originalConnectionHook;
-        boost::scoped_ptr<MockReplicaSet> _replSet;
+        std::unique_ptr<MockReplicaSet> _replSet;
     };
 
     // Tests the case where the connection to secondary went bad and the replica set

@@ -32,7 +32,6 @@
 
 #include "mongo/s/catalog/legacy/config_upgrade.h"
 
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclientcursor.h"
@@ -53,7 +52,7 @@
 
 namespace mongo {
 
-    using boost::scoped_ptr;
+    using std::unique_ptr;
     using std::make_pair;
     using std::map;
     using std::string;
@@ -362,7 +361,7 @@ namespace {
 
             ScopedDbConnection conn(catalogManager->connectionString(), 30);
 
-            scoped_ptr<DBClientCursor> cursor(_safeCursor(conn->query("config.version",
+            unique_ptr<DBClientCursor> cursor(_safeCursor(conn->query("config.version",
                                                                       BSONObj())));
 
             bool hasConfigData = conn->count(ShardType::ConfigNS)

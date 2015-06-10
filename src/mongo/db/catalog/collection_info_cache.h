@@ -30,7 +30,6 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/query_settings.h"
@@ -96,11 +95,11 @@ namespace mongo {
         UpdateIndexData _indexedPaths;
 
         // A cache for query plans.
-        boost::scoped_ptr<PlanCache> _planCache;
+        std::unique_ptr<PlanCache> _planCache;
 
         // Query settings.
         // Includes index filters.
-        boost::scoped_ptr<QuerySettings> _querySettings;
+        std::unique_ptr<QuerySettings> _querySettings;
 
         /**
          * Must be called under exclusive DB lock.

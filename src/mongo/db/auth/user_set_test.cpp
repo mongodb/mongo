@@ -46,9 +46,9 @@ namespace {
         User* p2 = new User(UserName("George", "test"));
         User* p3 = new User(UserName("Bob", "test2"));
 
-        const boost::scoped_ptr<User> delp1(p1);
-        const boost::scoped_ptr<User> delp2(p2);
-        const boost::scoped_ptr<User> delp3(p3);
+        const std::unique_ptr<User> delp1(p1);
+        const std::unique_ptr<User> delp2(p2);
+        const std::unique_ptr<User> delp3(p3);
 
         ASSERT_NULL(set.lookup(UserName("Bob", "test")));
         ASSERT_NULL(set.lookup(UserName("George", "test")));
@@ -102,7 +102,7 @@ namespace {
         UserNameIterator iter = pset.getNames();
         ASSERT(!iter.more());
 
-        boost::scoped_ptr<User> user(new User(UserName("bob", "test")));
+        std::unique_ptr<User> user(new User(UserName("bob", "test")));
         ASSERT_NULL(pset.add(user.get()));
 
         iter = pset.getNames();

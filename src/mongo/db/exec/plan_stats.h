@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
 #include <cstdlib>
 #include <string>
 #include <vector>
@@ -134,7 +133,7 @@ namespace mongo {
         CommonStats common;
 
         // Per-stage place to stash additional information
-        boost::scoped_ptr<SpecificStats> specific;
+        std::unique_ptr<SpecificStats> specific;
 
         // The stats of the node's children.
         std::vector<PlanStageStats*> children;

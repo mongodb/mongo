@@ -31,7 +31,6 @@
  * so we cannot test it outside of a dbtest.
  */
 
-#include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
 
 #include "mongo/client/dbclientcursor.h"
@@ -54,7 +53,7 @@
 
 namespace QueryStageAnd {
 
-    using boost::scoped_ptr;
+    using std::unique_ptr;
     using boost::shared_ptr;
     using std::unique_ptr;
     using std::set;
@@ -179,7 +178,7 @@ namespace QueryStageAnd {
             addIndex(BSON("bar" << 1));
 
             WorkingSet ws;
-            scoped_ptr<AndHashStage> ah(new AndHashStage(&ws, NULL, coll));
+            unique_ptr<AndHashStage> ah(new AndHashStage(&ws, NULL, coll));
 
             // Foo <= 20
             IndexScanParams params;
@@ -283,7 +282,7 @@ namespace QueryStageAnd {
             addIndex(BSON("baz" << 1));
 
             WorkingSet ws;
-            scoped_ptr<AndHashStage> ah(new AndHashStage(&ws, NULL, coll));
+            unique_ptr<AndHashStage> ah(new AndHashStage(&ws, NULL, coll));
 
             // Foo <= 20 (descending)
             IndexScanParams params;
@@ -370,7 +369,7 @@ namespace QueryStageAnd {
             addIndex(BSON("bar" << 1));
 
             WorkingSet ws;
-            scoped_ptr<AndHashStage> ah(new AndHashStage(&ws, NULL, coll));
+            unique_ptr<AndHashStage> ah(new AndHashStage(&ws, NULL, coll));
 
             // Foo <= 20
             IndexScanParams params;
@@ -425,7 +424,7 @@ namespace QueryStageAnd {
             // before hashed AND is done reading the first child (stage has to
             // hold 21 keys in buffer for Foo <= 20).
             WorkingSet ws;
-            scoped_ptr<AndHashStage> ah(new AndHashStage(&ws, NULL, coll, 20 * big.size()));
+            unique_ptr<AndHashStage> ah(new AndHashStage(&ws, NULL, coll, 20 * big.size()));
 
             // Foo <= 20
             IndexScanParams params;
@@ -478,7 +477,7 @@ namespace QueryStageAnd {
             // keys in last child's index are not buffered. There are 6 keys
             // that satisfy the criteria Foo <= 20 and Bar >= 10 and 5 <= baz <= 15.
             WorkingSet ws;
-            scoped_ptr<AndHashStage> ah(new AndHashStage(&ws, NULL, coll, 5 * big.size()));
+            unique_ptr<AndHashStage> ah(new AndHashStage(&ws, NULL, coll, 5 * big.size()));
 
             // Foo <= 20
             IndexScanParams params;
@@ -526,7 +525,7 @@ namespace QueryStageAnd {
             addIndex(BSON("baz" << 1));
 
             WorkingSet ws;
-            scoped_ptr<AndHashStage> ah(new AndHashStage(&ws, NULL, coll));
+            unique_ptr<AndHashStage> ah(new AndHashStage(&ws, NULL, coll));
 
             // Foo <= 20
             IndexScanParams params;
@@ -593,7 +592,7 @@ namespace QueryStageAnd {
             // before hashed AND is done reading the second child (stage has to
             // hold 11 keys in buffer for Foo <= 20 and Bar >= 10).
             WorkingSet ws;
-            scoped_ptr<AndHashStage> ah(new AndHashStage(&ws, NULL, coll, 10 * big.size()));
+            unique_ptr<AndHashStage> ah(new AndHashStage(&ws, NULL, coll, 10 * big.size()));
 
             // Foo <= 20
             IndexScanParams params;
@@ -647,7 +646,7 @@ namespace QueryStageAnd {
             addIndex(BSON("bar" << 1));
 
             WorkingSet ws;
-            scoped_ptr<AndHashStage> ah(new AndHashStage(&ws, NULL, coll));
+            unique_ptr<AndHashStage> ah(new AndHashStage(&ws, NULL, coll));
 
             // Foo <= 20
             IndexScanParams params;
@@ -708,7 +707,7 @@ namespace QueryStageAnd {
             addIndex(BSON("bar" << 1));
 
             WorkingSet ws;
-            scoped_ptr<AndHashStage> ah(new AndHashStage(&ws, NULL, coll));
+            unique_ptr<AndHashStage> ah(new AndHashStage(&ws, NULL, coll));
 
             // Foo >= 100
             IndexScanParams params;
@@ -760,7 +759,7 @@ namespace QueryStageAnd {
             StatusWithMatchExpression swme = MatchExpressionParser::parse(filter);
             verify(swme.isOK());
             unique_ptr<MatchExpression> filterExpr(swme.getValue());
-            scoped_ptr<AndHashStage> ah(new AndHashStage(&ws, filterExpr.get(), coll));
+            unique_ptr<AndHashStage> ah(new AndHashStage(&ws, filterExpr.get(), coll));
 
             // Foo <= 20
             IndexScanParams params;
@@ -809,7 +808,7 @@ namespace QueryStageAnd {
             addIndex(BSON("bar" << 1));
 
             WorkingSet ws;
-            scoped_ptr<AndHashStage> ah(new AndHashStage(&ws, NULL, coll));
+            unique_ptr<AndHashStage> ah(new AndHashStage(&ws, NULL, coll));
 
             // Foo <= 20
             IndexScanParams params;
@@ -868,7 +867,7 @@ namespace QueryStageAnd {
             addIndex(BSON("bar" << 1));
 
             WorkingSet ws;
-            scoped_ptr<AndHashStage> ah(new AndHashStage(&ws, NULL, coll));
+            unique_ptr<AndHashStage> ah(new AndHashStage(&ws, NULL, coll));
 
             // Foo <= 20
             IndexScanParams params;
@@ -1069,7 +1068,7 @@ namespace QueryStageAnd {
             addIndex(BSON("bar" << 1));
 
             WorkingSet ws;
-            scoped_ptr<AndSortedStage> ah(new AndSortedStage(&ws, NULL, coll));
+            unique_ptr<AndSortedStage> ah(new AndSortedStage(&ws, NULL, coll));
 
             // Scan over foo == 1
             IndexScanParams params;
@@ -1196,7 +1195,7 @@ namespace QueryStageAnd {
             addIndex(BSON("baz" << 1));
 
             WorkingSet ws;
-            scoped_ptr<AndSortedStage> ah(new AndSortedStage(&ws, NULL, coll));
+            unique_ptr<AndSortedStage> ah(new AndSortedStage(&ws, NULL, coll));
 
             // Scan over foo == 1
             IndexScanParams params;
@@ -1241,7 +1240,7 @@ namespace QueryStageAnd {
             addIndex(BSON("bar" << 1));
 
             WorkingSet ws;
-            scoped_ptr<AndSortedStage> ah(new AndSortedStage(&ws, NULL, coll));
+            unique_ptr<AndSortedStage> ah(new AndSortedStage(&ws, NULL, coll));
 
             // Foo == 7.  Should be EOF.
             IndexScanParams params;
@@ -1290,7 +1289,7 @@ namespace QueryStageAnd {
             addIndex(BSON("bar" << 1));
 
             WorkingSet ws;
-            scoped_ptr<AndSortedStage> ah(new AndSortedStage(&ws, NULL, coll));
+            unique_ptr<AndSortedStage> ah(new AndSortedStage(&ws, NULL, coll));
 
             // foo == 7.
             IndexScanParams params;
@@ -1339,7 +1338,7 @@ namespace QueryStageAnd {
             StatusWithMatchExpression swme = MatchExpressionParser::parse(filterObj);
             verify(swme.isOK());
             unique_ptr<MatchExpression> filterExpr(swme.getValue());
-            scoped_ptr<AndSortedStage> ah(new AndSortedStage(&ws, filterExpr.get(), coll));
+            unique_ptr<AndSortedStage> ah(new AndSortedStage(&ws, filterExpr.get(), coll));
 
             // Scan over foo == 1
             IndexScanParams params;
@@ -1381,7 +1380,7 @@ namespace QueryStageAnd {
             addIndex(BSON("bar" << 1));
 
             WorkingSet ws;
-            scoped_ptr<AndHashStage> ah(new AndHashStage(&ws, NULL, coll));
+            unique_ptr<AndHashStage> ah(new AndHashStage(&ws, NULL, coll));
 
             // Scan over foo == 1
             IndexScanParams params;
@@ -1445,7 +1444,7 @@ namespace QueryStageAnd {
             addIndex(BSON("bar" << 1));
 
             WorkingSet ws;
-            scoped_ptr<AndSortedStage> as(new AndSortedStage(&ws, NULL, coll));
+            unique_ptr<AndSortedStage> as(new AndSortedStage(&ws, NULL, coll));
 
             // Scan over foo == 1
             IndexScanParams params;
@@ -1499,7 +1498,7 @@ namespace QueryStageAnd {
             addIndex(BSON("bar" << 1));
 
             WorkingSet ws;
-            scoped_ptr<AndSortedStage> as(new AndSortedStage(&ws, NULL, coll));
+            unique_ptr<AndSortedStage> as(new AndSortedStage(&ws, NULL, coll));
 
             // Scan over foo == 1
             IndexScanParams params;

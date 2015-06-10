@@ -31,7 +31,6 @@
 #include "mongo/platform/basic.h"
 
 #include <boost/thread.hpp>
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/base/status.h"
 #include "mongo/db/jsobj.h"
@@ -75,7 +74,7 @@ namespace {
 
         NetworkInterfaceMock* _net;
         StorageInterfaceMock* _storage;
-        boost::scoped_ptr<ReplicationExecutor> _executor;
+        std::unique_ptr<ReplicationExecutor> _executor;
 
     private:
         void setUp();
@@ -84,8 +83,8 @@ namespace {
         void _runQuorumCheck(const ReplicaSetConfig& config, int myIndex);
         virtual Status _runQuorumCheckImpl(const ReplicaSetConfig& config, int myIndex) = 0;
 
-        boost::scoped_ptr<boost::thread> _executorThread;
-        boost::scoped_ptr<boost::thread> _quorumCheckThread;
+        std::unique_ptr<boost::thread> _executorThread;
+        std::unique_ptr<boost::thread> _quorumCheckThread;
         Status _quorumCheckStatus;
         boost::mutex _mutex;
         bool _isQuorumCheckDone;

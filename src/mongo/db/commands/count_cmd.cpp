@@ -30,7 +30,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
@@ -45,7 +44,7 @@
 namespace mongo {
 namespace {
 
-    using boost::scoped_ptr;
+    using std::unique_ptr;
     using std::string;
     using std::stringstream;
 
@@ -103,7 +102,7 @@ namespace {
                 return getExecStatus;
             }
 
-            scoped_ptr<PlanExecutor> exec(rawExec);
+            unique_ptr<PlanExecutor> exec(rawExec);
 
             Explain::explainStages(exec.get(), verbosity, out);
             return Status::OK();
@@ -139,7 +138,7 @@ namespace {
                 return appendCommandStatus(result, getExecStatus);
             }
 
-            scoped_ptr<PlanExecutor> exec(rawExec);
+            unique_ptr<PlanExecutor> exec(rawExec);
 
             // Store the plan summary string in CurOp.
             if (NULL != CurOp::get(txn)) {

@@ -31,7 +31,6 @@
  * the DBClientReplicaSet talks to, so the tests only covers the client side logic.
  */
 
-#include <boost/scoped_ptr.hpp>
 #include <map>
 #include <memory>
 #include <string>
@@ -48,7 +47,7 @@
 #include "mongo/util/assert_util.h"
 
 namespace {
-    using boost::scoped_ptr;
+    using std::unique_ptr;
     using std::unique_ptr;
     using std::map;
     using std::make_pair;
@@ -98,7 +97,7 @@ namespace {
         }
 
     private:
-        boost::scoped_ptr<MockReplicaSet> _replSet;
+        std::unique_ptr<MockReplicaSet> _replSet;
     };
 
     TEST_F(BasicRS, ReadFromPrimary) {
@@ -189,7 +188,7 @@ namespace {
         }
 
     private:
-        boost::scoped_ptr<MockReplicaSet> _replSet;
+        std::unique_ptr<MockReplicaSet> _replSet;
     };
 
     TEST_F(AllNodesDown, ReadFromPrimary) {
@@ -262,7 +261,7 @@ namespace {
         }
 
     private:
-        boost::scoped_ptr<MockReplicaSet> _replSet;
+        std::unique_ptr<MockReplicaSet> _replSet;
     };
 
     TEST_F(PrimaryDown, ReadFromPrimary) {
@@ -350,7 +349,7 @@ namespace {
         }
 
     private:
-        boost::scoped_ptr<MockReplicaSet> _replSet;
+        std::unique_ptr<MockReplicaSet> _replSet;
     };
 
     TEST_F(SecondaryDown, ReadFromPrimary) {
@@ -528,7 +527,7 @@ namespace {
 
     private:
         ConnectionString::ConnectionHook* _originalConnectionHook;
-        boost::scoped_ptr<MockReplicaSet> _replSet;
+        std::unique_ptr<MockReplicaSet> _replSet;
     };
 
     TEST_F(TaggedFiveMemberRS, ConnShouldPinIfSameSettings) {

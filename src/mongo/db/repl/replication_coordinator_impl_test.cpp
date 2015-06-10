@@ -30,7 +30,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <boost/scoped_ptr.hpp>
 #include <boost/thread.hpp>
 #include <future>
 #include <iostream>
@@ -699,7 +698,7 @@ namespace {
         OpTime _optime;
         WriteConcernOptions _writeConcern;
         ReplicationCoordinator::StatusAndDuration _result;
-        boost::scoped_ptr<boost::thread> _thread;
+        std::unique_ptr<boost::thread> _thread;
     };
 
     TEST_F(ReplCoordTest, AwaitReplicationNumberOfNodesBlocking) {
@@ -1118,7 +1117,7 @@ namespace {
         ReplicationCoordinatorImpl* _replCoord;
         bool _finished;
         Status _result;
-        boost::scoped_ptr<boost::thread> _thread;
+        std::unique_ptr<boost::thread> _thread;
         bool _force;
         Milliseconds _waitTime;
         Milliseconds _stepDownTime;

@@ -46,7 +46,7 @@
 
 namespace mongo {
 
-    using boost::scoped_ptr;
+    using std::unique_ptr;
     using std::endl;
     using std::string;
 
@@ -112,7 +112,7 @@ namespace {
             while (true) {
                 ScopedTransaction scopedXact(txn, MODE_IX);
 
-                boost::scoped_ptr<AutoGetDb> autoGetDb;
+                std::unique_ptr<AutoGetDb> autoGetDb;
                 if (acquireDbXLock) {
                     autoGetDb.reset(new AutoGetDb(txn, dbName, MODE_X));
                     if (autoGetDb->getDb()) {

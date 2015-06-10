@@ -25,7 +25,6 @@
  *    then also delete it in the license file.
  */
 
-#include <boost/scoped_ptr.hpp>
 
 #include "mongo/client/sasl_client_session.h"
 
@@ -58,7 +57,7 @@ namespace mongo {
         bool _done;
 
         /// The client side of a SASL authentication conversation.
-        boost::scoped_ptr<SaslClientConversation> _saslConversation;
+        std::unique_ptr<SaslClientConversation> _saslConversation;
     };
 
 }  // namespace mongo
