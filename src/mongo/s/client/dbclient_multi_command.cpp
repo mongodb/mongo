@@ -34,6 +34,8 @@
 #include "mongo/db/audit.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/wire_version.h"
+#include "mongo/rpc/factory.h"
+#include "mongo/rpc/request_builder_interface.h"
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/util/net/message.h"
@@ -87,22 +89,29 @@ namespace mongo {
 
     // THROWS
     static void sayAsCmd( DBClientBase* conn, StringData dbName, const BSONObj& cmdObj ) {
-        Message toSend;
-        BSONObjBuilder usersBuilder;
-        usersBuilder.appendElements(cmdObj);
-        audit::appendImpersonatedUsers(&usersBuilder);
-        
-        // see query.h for the protocol we are using here.
-        BufBuilder bufB;
-        bufB.appendNum( 0 ); // command/query options
-        bufB.appendStr( dbName.toString() + ".$cmd" ); // write command ns
-        bufB.appendNum( 0 ); // ntoskip (0 for command)
-        bufB.appendNum( 1 ); // ntoreturn (1 for command)
-        usersBuilder.obj().appendSelfToBufBuilder( bufB );
-        toSend.setData( dbQuery, bufB.buf(), bufB.len() );
+        auto requestBuilder = rpc::makeRequestBuilder(conn->getClientRPCProtocols(),
+                                                      conn->getServerRPCProtocols());
+        BSONObj upconvertedCmd;
+        BSONObj upconvertedMetadata;
 
+        // Previous implementation had hardcoded flags of 0 - more specifically, writes
+        // are never secondaryOk.
+        std::tie(upconvertedCmd, upconvertedMetadata) = uassertStatusOK(
+            rpc::upconvertRequestMetadata(cmdObj, 0)
+        );
+
+        BSONObjBuilder metadataBob;
+        metadataBob.appendElements(upconvertedMetadata);
+        if (conn->getRequestMetadataWriter()) {
+            conn->getRequestMetadataWriter()(&metadataBob);
+        }
+
+        requestBuilder->setDatabase(dbName);
+        requestBuilder->setCommandName(upconvertedCmd.firstElementFieldName());
+        requestBuilder->setMetadata(metadataBob.done());
+        requestBuilder->setCommandArgs(upconvertedCmd);
         // Send our command
-        conn->say( toSend );
+        conn->say(*requestBuilder->done());
     }
 
     // THROWS
@@ -114,9 +123,13 @@ namespace mongo {
                        "possible socket exception - see logs" );
         }
 
-        // A query result is returned from commands
-        QueryResult::View recvdQuery = toRecv->singleData().view2ptr();
-        *result = BSONObj( recvdQuery.data() );
+        auto reply = rpc::makeReply(toRecv);
+
+        if (conn->getReplyMetadataReader()) {
+            conn->getReplyMetadataReader()(reply->getMetadata(), conn->getServerAddress());
+        }
+
+        *result = reply->getCommandReply();
     }
 
     void DBClientMultiCommand::sendAll() {
