@@ -530,6 +530,8 @@ DBCommandCursor.prototype.next = function() {
         return this._firstBatch.pop();
     }
     else {
+        if (!this._cursor.hasNext()) throw Error("error hasNext: false");
+
         var ret = this._cursor.next();
         if ( ret.$err )
             throw Error( "error: " + tojson( ret ) );
