@@ -30,7 +30,6 @@
 
 #include <string>
 
-#include <boost/shared_ptr.hpp>
 #include <boost/thread/condition.hpp>
 #include <boost/noncopyable.hpp>
 #include <boost/thread/mutex.hpp>
@@ -108,10 +107,10 @@ namespace mongo {
         bool handleErrors;
         bool hideErrors;
 
-        boost::shared_ptr< pcrecpp::RE > trapPattern;
-        boost::shared_ptr< pcrecpp::RE > noTrapPattern;
-        boost::shared_ptr< pcrecpp::RE > watchPattern;
-        boost::shared_ptr< pcrecpp::RE > noWatchPattern;
+        std::shared_ptr< pcrecpp::RE > trapPattern;
+        std::shared_ptr< pcrecpp::RE > noTrapPattern;
+        std::shared_ptr< pcrecpp::RE > watchPattern;
+        std::shared_ptr< pcrecpp::RE > noWatchPattern;
 
         /**
          * Operation description.  A BSON array of objects, each describing a single

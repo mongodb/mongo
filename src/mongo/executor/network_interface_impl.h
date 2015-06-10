@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include <boost/shared_ptr.hpp>
 #include <boost/thread.hpp>
 #include <boost/thread/condition_variable.hpp>
 #include <boost/thread/mutex.hpp>
@@ -96,7 +95,7 @@ namespace executor {
             RemoteCommandCompletionFn onFinish;
         };
         typedef stdx::list<CommandData> CommandDataList;
-        typedef std::vector<boost::shared_ptr<boost::thread> > ThreadList;
+        typedef std::vector<std::shared_ptr<boost::thread> > ThreadList;
 
         /**
          * Thread body for threads that synchronously perform network requests from

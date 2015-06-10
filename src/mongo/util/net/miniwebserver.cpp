@@ -33,7 +33,6 @@
 
 #include "mongo/util/net/miniwebserver.h"
 
-#include <boost/shared_ptr.hpp>
 #include <pcrecpp.h>
 
 #include "mongo/config.h"
@@ -42,7 +41,7 @@
 
 namespace mongo {
 
-    using boost::shared_ptr;
+    using std::shared_ptr;
     using std::endl;
     using std::stringstream;
     using std::vector;
@@ -132,7 +131,7 @@ namespace mongo {
         return false;
     }
 
-    void MiniWebServer::accepted(boost::shared_ptr<Socket> psock, long long connectionId ) {
+    void MiniWebServer::accepted(std::shared_ptr<Socket> psock, long long connectionId ) {
         char buf[4096];
         int len = 0;
         try {

@@ -35,7 +35,6 @@
 #include "mongo/db/storage/mmap_v1/durop.h"
 
 #include <boost/filesystem/operations.hpp>
-#include <boost/shared_ptr.hpp>
 
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/storage/mmap_v1/aligned_builder.h"
@@ -49,7 +48,7 @@
 namespace mongo {
 
     using std::unique_ptr;
-    using boost::shared_ptr;
+    using std::shared_ptr;
     using std::endl;
     using std::string;
 

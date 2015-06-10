@@ -31,7 +31,6 @@
  * so we cannot test it outside of a dbtest.
  */
 
-#include <boost/shared_ptr.hpp>
 
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/catalog/collection.h"
@@ -54,7 +53,7 @@
 namespace QueryStageAnd {
 
     using std::unique_ptr;
-    using boost::shared_ptr;
+    using std::shared_ptr;
     using std::unique_ptr;
     using std::set;
 

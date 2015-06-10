@@ -30,7 +30,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <boost/shared_ptr.hpp>
 
 #include "mongo/base/status.h"
 #include "mongo/db/commands.h"
@@ -41,7 +40,7 @@
 
 namespace mongo {
 
-    using boost::shared_ptr;
+    using std::shared_ptr;
 
 namespace {
 

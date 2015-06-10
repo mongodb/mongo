@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include <boost/shared_ptr.hpp>
 #include <v8.h>
 #include <vector>
 
@@ -107,7 +106,7 @@ namespace mongo {
             TrackedPtr(_ObjType* instance, ObjTracker<_ObjType>* tracker) :
                 _objPtr(instance),
                 _tracker(tracker) { }
-            boost::shared_ptr<_ObjType> _objPtr;
+            std::shared_ptr<_ObjType> _objPtr;
             ObjTracker<_ObjType>* _tracker;
         };
 
@@ -329,10 +328,10 @@ namespace mongo {
         // Track both cursor and connection.
         // This ensures the connection outlives the cursor.
         struct DBConnectionAndCursor {
-            boost::shared_ptr<DBClientBase> conn;
-            boost::shared_ptr<DBClientCursor> cursor;
-            DBConnectionAndCursor(boost::shared_ptr<DBClientBase> conn,
-                                  boost::shared_ptr<DBClientCursor> cursor)
+            std::shared_ptr<DBClientBase> conn;
+            std::shared_ptr<DBClientCursor> cursor;
+            DBConnectionAndCursor(std::shared_ptr<DBClientBase> conn,
+                                  std::shared_ptr<DBClientCursor> cursor)
                 : conn(conn), cursor(cursor) { }
         };
         ObjTracker<DBConnectionAndCursor> dbConnectionAndCursor;

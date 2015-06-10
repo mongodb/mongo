@@ -30,7 +30,6 @@
 
 #pragma once
 
-#include <boost/shared_ptr.hpp>
 #include <boost/thread/mutex.hpp>
 
 #include "mongo/db/storage/kv/kv_engine.h"
@@ -88,7 +87,7 @@ namespace mongo {
 
         std::vector<std::string> getAllIdents( OperationContext* opCtx ) const;
     private:
-        typedef StringMap<boost::shared_ptr<void> > DataMap;
+        typedef StringMap<std::shared_ptr<void> > DataMap;
 
         mutable boost::mutex _mutex;
         DataMap _dataMap; // All actual data is owned in here

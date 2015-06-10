@@ -30,8 +30,6 @@
 
 #include "mongo/db/pipeline/pipeline_d.h"
 
-#include <boost/make_shared.hpp>
-#include <boost/shared_ptr.hpp>
 
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/catalog/collection.h"
@@ -48,7 +46,7 @@
 namespace mongo {
 
     using boost::intrusive_ptr;
-    using boost::shared_ptr;
+    using std::shared_ptr;
     using std::string;
 
 namespace {
@@ -109,7 +107,7 @@ namespace {
                 dynamic_cast<DocumentSourceNeedsMongod*>(sources[i].get());
             if (needsMongod) {
                 needsMongod->injectMongodInterface(
-                    boost::make_shared<MongodImplementation>(pExpCtx));
+                    std::make_shared<MongodImplementation>(pExpCtx));
             }
         }
 
@@ -121,7 +119,7 @@ namespace {
                 // on secondaries, this is needed.
                 ShardedConnectionInfo::addHook();
             }
-            return boost::shared_ptr<PlanExecutor>(); // don't need a cursor
+            return std::shared_ptr<PlanExecutor>(); // don't need a cursor
         }
 
 
@@ -181,7 +179,7 @@ namespace {
                                    | QueryPlannerParams::INCLUDE_SHARD_FILTER
                                    | QueryPlannerParams::NO_BLOCKING_SORT
                                    ;
-        boost::shared_ptr<PlanExecutor> exec;
+        std::shared_ptr<PlanExecutor> exec;
         bool sortInRunner = false;
 
         const WhereCallbackReal whereCallback(pExpCtx->opCtx, pExpCtx->ns.db());

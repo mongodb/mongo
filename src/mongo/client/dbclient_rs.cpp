@@ -32,7 +32,6 @@
 #include "mongo/client/dbclient_rs.h"
 
 #include <memory>
-#include <boost/shared_ptr.hpp>
 #include <utility>
 
 #include "mongo/bson/util/builder.h"
@@ -46,7 +45,7 @@
 
 namespace mongo {
 
-    using boost::shared_ptr;
+    using std::shared_ptr;
     using std::unique_ptr;
     using std::endl;
     using std::map;

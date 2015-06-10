@@ -28,7 +28,6 @@
  *    it in the license file.
  */
 
-#include <boost/shared_ptr.hpp>
 
 #include "mongo/db/storage/sorted_data_interface.h"
 
@@ -43,6 +42,6 @@ namespace mongo {
      * All permanent data will be stored and fetch from dataInOut.
      */
     SortedDataInterface* getInMemoryBtreeImpl(const Ordering& ordering,
-                                              boost::shared_ptr<void>* dataInOut);
+                                              std::shared_ptr<void>* dataInOut);
 
 }  // namespace mongo

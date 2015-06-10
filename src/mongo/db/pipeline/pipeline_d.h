@@ -29,7 +29,7 @@
 #pragma once
 
 #include <boost/intrusive_ptr.hpp>
-#include <boost/shared_ptr.hpp>
+#include <memory>
 
 namespace mongo {
     class Collection;
@@ -72,7 +72,7 @@ namespace mongo {
          * @param pPipeline the logical "this" for this operation
          * @param pExpCtx the expression context for this pipeline
          */
-        static boost::shared_ptr<PlanExecutor> prepareCursorSource(
+        static std::shared_ptr<PlanExecutor> prepareCursorSource(
             OperationContext* txn,
             Collection* collection,
             const boost::intrusive_ptr<Pipeline> &pPipeline,

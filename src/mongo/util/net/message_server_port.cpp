@@ -73,7 +73,7 @@ namespace {
         MONGO_DISALLOW_COPYING(MessagingPortWithHandler);
 
     public:
-        MessagingPortWithHandler(const boost::shared_ptr<Socket>& socket,
+        MessagingPortWithHandler(const std::shared_ptr<Socket>& socket,
                                  MessageHandler* handler,
                                  long long connectionId)
             : MessagingPort(socket), _handler(handler) {
@@ -102,7 +102,7 @@ namespace {
             Listener( "" , opts.ipList, opts.port ), _handler(handler) {
         }
 
-        virtual void accepted(boost::shared_ptr<Socket> psocket, long long connectionId ) {
+        virtual void accepted(std::shared_ptr<Socket> psocket, long long connectionId ) {
             ScopeGuard sleepAfterClosingPort = MakeGuard(sleepmillis, 2);
             std::unique_ptr<MessagingPortWithHandler> portWithHandler(
                 new MessagingPortWithHandler(psocket, _handler, connectionId));

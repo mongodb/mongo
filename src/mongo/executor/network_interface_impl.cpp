@@ -32,7 +32,6 @@
 
 #include "mongo/executor/network_interface_impl.h"
 
-#include <boost/make_shared.hpp>
 #include <memory>
 
 #include "mongo/client/connection_pool.h"
@@ -95,7 +94,7 @@ namespace {
         const std::string threadName(str::stream() << "ReplExecNetThread-" << _nextThreadId++);
         try {
             _threads.push_back(
-                    boost::make_shared<boost::thread>(
+                    std::make_shared<boost::thread>(
                             stdx::bind(&NetworkInterfaceImpl::_requestProcessorThreadBody,
                                        this,
                                        threadName)));

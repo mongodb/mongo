@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/shared_ptr.hpp>
 #include <boost/thread/condition_variable.hpp>
 #include <boost/thread/mutex.hpp>
 #include <string>
@@ -572,7 +571,7 @@ namespace repl {
         uint64_t generation;
         bool isSignaled;
         WorkQueue waiters;
-        boost::shared_ptr<boost::condition_variable> isSignaledCondition;
+        std::shared_ptr<boost::condition_variable> isSignaledCondition;
     };
 
 }  // namespace repl

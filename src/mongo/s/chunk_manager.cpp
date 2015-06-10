@@ -55,7 +55,7 @@
 
 namespace mongo {
 
-    using boost::shared_ptr;
+    using std::shared_ptr;
 
     using std::make_pair;
     using std::map;

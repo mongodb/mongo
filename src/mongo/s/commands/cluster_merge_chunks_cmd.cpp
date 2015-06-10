@@ -28,7 +28,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <boost/shared_ptr.hpp>
 
 #include "mongo/client/connpool.h"
 #include "mongo/db/auth/action_type.h"
@@ -46,7 +45,7 @@
 
 namespace mongo {
 
-    using boost::shared_ptr;
+    using std::shared_ptr;
     using std::string;
     using std::stringstream;
     using std::vector;
@@ -138,7 +137,7 @@ namespace {
                 return appendCommandStatus(result, status.getStatus());
             }
 
-            boost::shared_ptr<DBConfig> config = status.getValue();
+            std::shared_ptr<DBConfig> config = status.getValue();
             if (!config->isSharded(nss.ns())) {
                 return appendCommandStatus(result, Status(ErrorCodes::NamespaceNotSharded,
                                                    "ns [" + nss.ns() + " is not sharded."));

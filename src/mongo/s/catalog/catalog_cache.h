@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/shared_ptr.hpp>
 #include <boost/thread/mutex.hpp>
 #include <map>
 #include <string>
@@ -61,7 +60,7 @@ namespace mongo {
          * @param dbname The name of the database (must not contain dots, etc).
          * @return The database if it exists, NULL otherwise.
          */
-        StatusWith<boost::shared_ptr<DBConfig>> getDatabase(const std::string& dbName);
+        StatusWith<std::shared_ptr<DBConfig>> getDatabase(const std::string& dbName);
 
         /**
          * Removes the database information for the specified name from the cache, so that the
@@ -75,7 +74,7 @@ namespace mongo {
         void invalidateAll();
 
     private:
-        typedef std::map<std::string, boost::shared_ptr<DBConfig>> ShardedDatabasesMap;
+        typedef std::map<std::string, std::shared_ptr<DBConfig>> ShardedDatabasesMap;
 
 
         // Reference to the catalog manager. Not owned.

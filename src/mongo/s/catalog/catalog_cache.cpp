@@ -30,7 +30,6 @@
 
 #include "mongo/s/catalog/catalog_cache.h"
 
-#include <boost/make_shared.hpp>
 
 #include "mongo/base/status_with.h"
 #include "mongo/s/catalog/catalog_manager.h"
@@ -39,7 +38,7 @@
 
 namespace mongo {
 
-    using boost::shared_ptr;
+    using std::shared_ptr;
     using std::string;
 
 
@@ -63,7 +62,7 @@ namespace mongo {
             return status.getStatus();
         }
 
-        shared_ptr<DBConfig> db = boost::make_shared<DBConfig>(dbName, status.getValue());
+        shared_ptr<DBConfig> db = std::make_shared<DBConfig>(dbName, status.getValue());
         db->load();
 
         invariant(_databases.insert(std::make_pair(dbName, db)).second);

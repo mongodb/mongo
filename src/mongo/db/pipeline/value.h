@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/shared_ptr.hpp>
 
 #include "mongo/db/pipeline/value_internal.h"
 #include "mongo/platform/unordered_set.h"

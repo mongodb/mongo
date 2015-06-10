@@ -26,7 +26,6 @@
  *    then also delete it in the license file.
  */
 
-#include <boost/shared_ptr.hpp>
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
@@ -51,7 +50,7 @@
 namespace QueryPlanExecutor {
 
     using std::unique_ptr;
-    using boost::shared_ptr;
+    using std::shared_ptr;
     using std::unique_ptr;
     using std::string;
 
@@ -269,7 +268,7 @@ namespace QueryPlanExecutor {
             addIndex(indexSpec);
 
             // Create the PlanExecutor which feeds the aggregation pipeline.
-            boost::shared_ptr<PlanExecutor> innerExec(
+            std::shared_ptr<PlanExecutor> innerExec(
                 makeIndexScanExec(ctx.db(), indexSpec, 7, 10));
 
             // Create the aggregation pipeline.

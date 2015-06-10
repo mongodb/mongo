@@ -31,7 +31,6 @@
 
 #pragma once
 
-#include <boost/shared_ptr.hpp>
 
 #include "mongo/client/constants.h"
 #include "mongo/client/dbclientcursor.h"
@@ -62,8 +61,8 @@ namespace repl {
 
     class OplogReader {
     private:
-        boost::shared_ptr<DBClientConnection> _conn;
-        boost::shared_ptr<DBClientCursor> cursor;
+        std::shared_ptr<DBClientConnection> _conn;
+        std::shared_ptr<DBClientCursor> cursor;
         int _tailingQueryOptions;
 
         // If _conn was actively connected, _host represents the current HostAndPort of the

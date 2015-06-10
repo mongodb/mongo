@@ -59,7 +59,7 @@ namespace mongo {
                 Shard shard(shardId, ConnectionString(HostAndPort(shardId)));
                 Shard::installShard(shardId, shard);
 
-                boost::shared_ptr<Chunk> chunk(new Chunk(this,
+                std::shared_ptr<Chunk> chunk(new Chunk(this,
                                                          mySplitPoints[i - 1],
                                                          mySplitPoints[i],
                                                          shardId));

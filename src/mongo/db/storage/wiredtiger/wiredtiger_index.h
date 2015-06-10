@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/shared_ptr.hpp>
 #include <wiredtiger.h>
 
 #include "mongo/base/status_with.h"

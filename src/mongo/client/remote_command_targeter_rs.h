@@ -28,7 +28,7 @@
 
 #pragma once
 
-#include <boost/shared_ptr.hpp>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -58,7 +58,7 @@ namespace mongo {
         const std::string _rsName;
 
         // Monitor for this replica set
-        boost::shared_ptr<ReplicaSetMonitor> _rsMonitor;
+        std::shared_ptr<ReplicaSetMonitor> _rsMonitor;
     };
 
 } // namespace mongo

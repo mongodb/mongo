@@ -42,7 +42,6 @@
 
 #include <boost/config.hpp>
 #include <boost/noncopyable.hpp>
-#include <boost/shared_ptr.hpp>
 
 #include "mongo/base/status_with.h"
 #include "mongo/logger/logstream_builder.h"
@@ -382,7 +381,7 @@ namespace mongo {
 
         private:
             // TODO(C++11): Make this hold unique_ptrs.
-            typedef std::vector< boost::shared_ptr<TestHolder> > TestHolderList;
+            typedef std::vector< std::shared_ptr<TestHolder> > TestHolderList;
 
             template <typename T>
             static void runTestObject() {
@@ -491,7 +490,7 @@ namespace mongo {
             TestAssertionFailure failure() { return *_assertion; }     \
         private:                                                        \
             void comparison_failed() const {}                           \
-            boost::shared_ptr<TestAssertionFailure> _assertion;         \
+            std::shared_ptr<TestAssertionFailure> _assertion;         \
     }
 
 DECLARE_COMPARISON_ASSERTION(EQ, ==);

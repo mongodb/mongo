@@ -32,7 +32,6 @@
 
 #include "mongo/db/background.h"
 
-#include <boost/shared_ptr.hpp>
 #include <boost/thread.hpp>
 #include <iostream>
 #include <string>
@@ -45,7 +44,7 @@
 
 namespace mongo {
 
-    using boost::shared_ptr;
+    using std::shared_ptr;
 
 namespace {
 
@@ -65,7 +64,7 @@ namespace {
         boost::condition_variable _noOpsInProg;
     };
 
-    typedef StringMap<boost::shared_ptr<BgInfo> > BgInfoMap;
+    typedef StringMap<std::shared_ptr<BgInfo> > BgInfoMap;
     typedef BgInfoMap::const_iterator BgInfoMapIterator;
 
     boost::mutex m;
@@ -91,7 +90,7 @@ namespace {
     }
 
     void recordBeginAndInsert(BgInfoMap* bgiMap, StringData key) {
-        boost::shared_ptr<BgInfo>& bgInfo = bgiMap->get(key);
+        std::shared_ptr<BgInfo>& bgInfo = bgiMap->get(key);
         if (!bgInfo)
             bgInfo.reset(new BgInfo);
         bgInfo->recordBegin();
@@ -110,8 +109,8 @@ namespace {
             BgInfoMap* bgiMap,
             StringData key) {
 
-        boost::shared_ptr<BgInfo> bgInfo = mapFindWithDefault(
-                *bgiMap, key, boost::shared_ptr<BgInfo>());
+        std::shared_ptr<BgInfo> bgInfo = mapFindWithDefault(
+                *bgiMap, key, std::shared_ptr<BgInfo>());
         if (!bgInfo)
             return;
         bgInfo->awaitNoBgOps(lk);

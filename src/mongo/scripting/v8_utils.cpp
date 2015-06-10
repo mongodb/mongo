@@ -31,10 +31,8 @@
 
 #include "mongo/scripting/v8_utils.h"
 
-#include <boost/make_shared.hpp>
 #include <boost/thread/condition_variable.hpp>
 #include <boost/thread/mutex.hpp>
-#include <boost/shared_ptr.hpp>
 #include <boost/thread/thread.hpp>
 #include <boost/thread/xtime.hpp>
 #include <iostream>
@@ -232,13 +230,13 @@ namespace mongo {
             }
 
         private:
-            boost::shared_ptr<SharedData> _sharedData;
+            std::shared_ptr<SharedData> _sharedData;
         };
 
         bool _started;
         bool _done;
         unique_ptr<boost::thread> _thread;
-        boost::shared_ptr<SharedData> _sharedData;
+        std::shared_ptr<SharedData> _sharedData;
     };
 
     class CountDownLatchHolder {
@@ -250,14 +248,14 @@ namespace mongo {
             int32_t count;
         };
 
-        boost::shared_ptr<Latch> get(int32_t desc) {
+        std::shared_ptr<Latch> get(int32_t desc) {
             boost::lock_guard<boost::mutex> lock(_mutex);
             Map::iterator iter = _latches.find(desc);
             jsassert(iter != _latches.end(), "not a valid CountDownLatch descriptor");
             return iter->second;
         }
 
-        typedef std::map< int32_t, boost::shared_ptr<Latch> > Map;
+        typedef std::map< int32_t, std::shared_ptr<Latch> > Map;
         Map _latches;
         boost::mutex _mutex;
         int32_t _counter;
@@ -267,18 +265,18 @@ namespace mongo {
             jsassert(count >= 0, "argument must be >= 0");
             boost::lock_guard<boost::mutex> lock(_mutex);
             int32_t desc = ++_counter;
-            _latches.insert(std::make_pair(desc, boost::make_shared<Latch>(count)));
+            _latches.insert(std::make_pair(desc, std::make_shared<Latch>(count)));
             return desc;
         }
         void await(int32_t desc) {
-            boost::shared_ptr<Latch> latch = get(desc);
+            std::shared_ptr<Latch> latch = get(desc);
             boost::unique_lock<boost::mutex> lock(latch->mutex);
             while (latch->count != 0) {
                 latch->cv.wait(lock);
             }
         }
         void countDown(int32_t desc) {
-            boost::shared_ptr<Latch> latch = get(desc);
+            std::shared_ptr<Latch> latch = get(desc);
             boost::unique_lock<boost::mutex> lock(latch->mutex);
             if (latch->count > 0) {
                 latch->count--;
@@ -288,7 +286,7 @@ namespace mongo {
             }
         }
         int32_t getCount(int32_t desc) {
-            boost::shared_ptr<Latch> latch = get(desc);
+            std::shared_ptr<Latch> latch = get(desc);
             boost::unique_lock<boost::mutex> lock(latch->mutex);
             return latch->count;
         }
@@ -327,7 +325,7 @@ namespace mongo {
     JSThreadConfig *thisConfig(V8Scope* scope, const v8::Arguments& args) {
         v8::Local<v8::External> c = v8::External::Cast(
                 *(args.This()->GetHiddenValue(v8::String::New("_JSThreadConfig"))));
-        JSThreadConfig *config = static_cast<boost::shared_ptr<JSThreadConfig>*>(c->Value())->get();
+        JSThreadConfig *config = static_cast<std::shared_ptr<JSThreadConfig>*>(c->Value())->get();
         return config;
     }
 

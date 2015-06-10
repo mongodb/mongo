@@ -30,7 +30,6 @@
 
 #pragma once
 
-#include <boost/shared_ptr.hpp>
 #include <string>
 
 #include "mongo/base/disallow_copying.h"
@@ -92,7 +91,7 @@ namespace mongo {
 
     };
 
-    typedef boost::shared_ptr<ShardedClientCursor> ShardedClientCursorPtr;
+    typedef std::shared_ptr<ShardedClientCursor> ShardedClientCursorPtr;
 
     class CursorCache {
     public:

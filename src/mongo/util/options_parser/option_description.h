@@ -27,7 +27,6 @@
 
 #pragma once
 
-#include <boost/shared_ptr.hpp>
 #include <vector>
 
 #include "mongo/base/status.h"
@@ -225,7 +224,7 @@ namespace optionenvironment {
         // these classes.  Note that the Environment (the storage for results of option parsing) has
         // to know about the constraints for all the options, which is another factor to consider
         // when thinking about ownership.
-        std::vector<boost::shared_ptr<Constraint> > _constraints; // Constraints that must be met
+        std::vector<std::shared_ptr<Constraint> > _constraints; // Constraints that must be met
                                                                   // for this option to be valid
 
         // Deprecated dotted names - aliases for '_dottedName'.

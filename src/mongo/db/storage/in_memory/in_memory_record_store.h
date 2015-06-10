@@ -31,7 +31,6 @@
 #pragma once
 
 #include <boost/shared_array.hpp>
-#include <boost/shared_ptr.hpp>
 #include <map>
 
 #include "mongo/db/storage/capped_callback.h"
@@ -47,7 +46,7 @@ namespace mongo {
     class InMemoryRecordStore : public RecordStore {
     public:
         explicit InMemoryRecordStore(StringData ns,
-                                     boost::shared_ptr<void>* dataInOut,
+                                     std::shared_ptr<void>* dataInOut,
                                      bool isCapped = false,
                                      int64_t cappedMaxSize = -1,
                                      int64_t cappedMaxDocs = -1,

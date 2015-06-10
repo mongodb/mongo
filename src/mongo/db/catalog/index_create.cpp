@@ -34,7 +34,6 @@
 
 #include "mongo/db/catalog/index_create.h"
 
-#include <boost/make_shared.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/client/dbclientinterface.h"

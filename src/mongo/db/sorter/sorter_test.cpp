@@ -31,8 +31,6 @@
 #include "mongo/db/sorter/sorter.h"
 
 #include <boost/filesystem.hpp>
-#include <boost/make_shared.hpp>
-#include <boost/shared_ptr.hpp>
 #include <boost/thread.hpp>
 
 #include "mongo/config.h"
@@ -45,7 +43,7 @@
 
 namespace mongo {
     using namespace mongo::sorter;
-    using boost::make_shared;
+    using std::make_shared;
     using std::pair;
 
     // Stub to avoid including the server_options library
@@ -124,7 +122,7 @@ namespace mongo {
 
     class LimitIterator : public IWIterator {
     public:
-        LimitIterator(long long limit, boost::shared_ptr<IWIterator> source)
+        LimitIterator(long long limit, std::shared_ptr<IWIterator> source)
             : _remaining(limit)
             , _source(source)
         { verify(limit > 0); }
@@ -138,7 +136,7 @@ namespace mongo {
 
     private:
         long long _remaining;
-        boost::shared_ptr<IWIterator> _source;
+        std::shared_ptr<IWIterator> _source;
     };
 
     template <typename It1, typename It2>
@@ -166,21 +164,21 @@ namespace mongo {
 #define ASSERT_ITERATORS_EQUIVALENT(it1, it2) _assertIteratorsEquivalent(it1, it2, __LINE__)
 
     template <int N>
-    boost::shared_ptr<IWIterator> makeInMemIterator(const int (&array)[N]) {
+    std::shared_ptr<IWIterator> makeInMemIterator(const int (&array)[N]) {
         std::vector<IWPair> vec;
         for (int i=0; i<N; i++)
             vec.push_back(IWPair(array[i], -array[i]));
-        return boost::make_shared<sorter::InMemIterator<IntWrapper, IntWrapper> >(vec);
+        return std::make_shared<sorter::InMemIterator<IntWrapper, IntWrapper> >(vec);
     }
 
     template <typename IteratorPtr, int N>
-    boost::shared_ptr<IWIterator> mergeIterators(IteratorPtr (&array)[N],
+    std::shared_ptr<IWIterator> mergeIterators(IteratorPtr (&array)[N],
                                                  Direction Dir=ASC,
                                                  const SortOptions& opts=SortOptions()) {
-        std::vector<boost::shared_ptr<IWIterator> > vec;
+        std::vector<std::shared_ptr<IWIterator> > vec;
         for (int i=0; i<N; i++)
-            vec.push_back(boost::shared_ptr<IWIterator>(array[i]));
-        return boost::shared_ptr<IWIterator>(IWIterator::merge(vec, opts, IWComparator(Dir)));
+            vec.push_back(std::shared_ptr<IWIterator>(array[i]));
+        return std::shared_ptr<IWIterator>(IWIterator::merge(vec, opts, IWComparator(Dir)));
     }
 
     //
@@ -233,7 +231,7 @@ namespace mongo {
                 sorter.addAlreadySorted(2,-2);
                 sorter.addAlreadySorted(3,-3);
                 sorter.addAlreadySorted(4,-4);
-                ASSERT_ITERATORS_EQUIVALENT(boost::shared_ptr<IWIterator>(sorter.done()),
+                ASSERT_ITERATORS_EQUIVALENT(std::shared_ptr<IWIterator>(sorter.done()),
                                             make_shared<IntIterator>(0,5));
             }
             { // big
@@ -241,7 +239,7 @@ namespace mongo {
                 for (int i=0; i< 10*1000*1000; i++)
                     sorter.addAlreadySorted(i,-i);
 
-                ASSERT_ITERATORS_EQUIVALENT(boost::shared_ptr<IWIterator>(sorter.done()),
+                ASSERT_ITERATORS_EQUIVALENT(std::shared_ptr<IWIterator>(sorter.done()),
                                             make_shared<IntIterator>(0,10*1000*1000));
             }
 
@@ -255,15 +253,15 @@ namespace mongo {
     public:
         void run() {
             { // test empty (no inputs)
-                std::vector<boost::shared_ptr<IWIterator> > vec;
-                boost::shared_ptr<IWIterator> mergeIter (IWIterator::merge(vec,
+                std::vector<std::shared_ptr<IWIterator> > vec;
+                std::shared_ptr<IWIterator> mergeIter (IWIterator::merge(vec,
                                                                            SortOptions(),
                                                                            IWComparator()));
                 ASSERT_ITERATORS_EQUIVALENT(mergeIter,
                                             make_shared<EmptyIterator>());
             }
             { // test empty (only empty inputs)
-                boost::shared_ptr<IWIterator> iterators[] =
+                std::shared_ptr<IWIterator> iterators[] =
                     { make_shared<EmptyIterator>()
                     , make_shared<EmptyIterator>()
                     , make_shared<EmptyIterator>()
@@ -274,7 +272,7 @@ namespace mongo {
             }
 
             { // test ASC
-                boost::shared_ptr<IWIterator> iterators[] =
+                std::shared_ptr<IWIterator> iterators[] =
                     { make_shared<IntIterator>(1, 20, 2) // 1, 3, ... 19
                     , make_shared<IntIterator>(0, 20, 2) // 0, 2, ... 18
                     };
@@ -284,7 +282,7 @@ namespace mongo {
             }
 
             { // test DESC with an empty source
-                boost::shared_ptr<IWIterator> iterators[] =
+                std::shared_ptr<IWIterator> iterators[] =
                     { make_shared<IntIterator>(30, 0, -3) // 30, 27, ... 3
                     , make_shared<IntIterator>(29, 0, -3) // 29, 26, ... 2
                     , make_shared<IntIterator>(28, 0, -3) // 28, 25, ... 1
@@ -295,7 +293,7 @@ namespace mongo {
                                             make_shared<IntIterator>(30,0,-1));
             }
             { // test Limit
-                boost::shared_ptr<IWIterator> iterators[] =
+                std::shared_ptr<IWIterator> iterators[] =
                     { make_shared<IntIterator>(1, 20, 2) // 1, 3, ... 19
                     , make_shared<IntIterator>(0, 20, 2) // 0, 2, ... 18
                     };
@@ -330,12 +328,12 @@ namespace mongo {
                 }
 
                 { // test all data ASC
-                    boost::shared_ptr<IWSorter> sorter = makeSorter(opts, IWComparator(ASC));
+                    std::shared_ptr<IWSorter> sorter = makeSorter(opts, IWComparator(ASC));
                     addData(sorter);
                     ASSERT_ITERATORS_EQUIVALENT(done(sorter), correct());
                 }
                 { // test all data DESC
-                    boost::shared_ptr<IWSorter> sorter = makeSorter(opts, IWComparator(DESC));
+                    std::shared_ptr<IWSorter> sorter = makeSorter(opts, IWComparator(DESC));
                     addData(sorter);
                     ASSERT_ITERATORS_EQUIVALENT(done(sorter), correctReverse());
                 }
@@ -344,7 +342,7 @@ namespace mongo {
                 // Among other things, MSVC++ makes all heap functions O(N) not O(logN).
 #if !defined(MONGO_CONFIG_DEBUG_BUILD)
                 { // merge all data ASC
-                    boost::shared_ptr<IWSorter> sorters[] = {
+                    std::shared_ptr<IWSorter> sorters[] = {
                         makeSorter(opts, IWComparator(ASC)),
                         makeSorter(opts, IWComparator(ASC))
                     };
@@ -352,13 +350,13 @@ namespace mongo {
                     addData(sorters[0]);
                     addData(sorters[1]);
 
-                    boost::shared_ptr<IWIterator> iters1[] = {done(sorters[0]), done(sorters[1])};
-                    boost::shared_ptr<IWIterator> iters2[] = {correct(), correct()};
+                    std::shared_ptr<IWIterator> iters1[] = {done(sorters[0]), done(sorters[1])};
+                    std::shared_ptr<IWIterator> iters2[] = {correct(), correct()};
                     ASSERT_ITERATORS_EQUIVALENT(mergeIterators(iters1, ASC),
                                                 mergeIterators(iters2, ASC));
                 }
                 { // merge all data DESC and use multiple threads to insert
-                    boost::shared_ptr<IWSorter> sorters[] = {
+                    std::shared_ptr<IWSorter> sorters[] = {
                         makeSorter(opts, IWComparator(DESC)),
                         makeSorter(opts, IWComparator(DESC))
                     };
@@ -367,8 +365,8 @@ namespace mongo {
                     addData(sorters[1]);
                     inBackground.join();
 
-                    boost::shared_ptr<IWIterator> iters1[] = {done(sorters[0]), done(sorters[1])};
-                    boost::shared_ptr<IWIterator> iters2[] = {correctReverse(), correctReverse()};
+                    std::shared_ptr<IWIterator> iters1[] = {done(sorters[0]), done(sorters[1])};
+                    std::shared_ptr<IWIterator> iters2[] = {correctReverse(), correctReverse()};
                     ASSERT_ITERATORS_EQUIVALENT(mergeIterators(iters1, DESC),
                                                 mergeIterators(iters2, DESC));
                 }
@@ -386,12 +384,12 @@ namespace mongo {
             }
 
             // returns an iterator with the correct results
-            virtual boost::shared_ptr<IWIterator> correct() {
+            virtual std::shared_ptr<IWIterator> correct() {
                 return make_shared<IntIterator>(0,5); // 0, 1, ... 4
             }
 
             // like correct but with opposite sort direction
-            virtual boost::shared_ptr<IWIterator> correctReverse() {
+            virtual std::shared_ptr<IWIterator> correctReverse() {
                 return make_shared<IntIterator>(4,-1,-1); // 4, 3, ... 0
             }
 
@@ -403,13 +401,13 @@ namespace mongo {
         private:
 
             // Make a new sorter with desired opts and comp. Opts may be ignored but not comp
-            boost::shared_ptr<IWSorter> makeSorter(SortOptions opts,
+            std::shared_ptr<IWSorter> makeSorter(SortOptions opts,
                                                    IWComparator comp=IWComparator(ASC)) {
-                return boost::shared_ptr<IWSorter>(IWSorter::make(adjustSortOptions(opts), comp));
+                return std::shared_ptr<IWSorter>(IWSorter::make(adjustSortOptions(opts), comp));
             }
 
-            boost::shared_ptr<IWIterator> done(unowned_ptr<IWSorter> sorter) {
-                return boost::shared_ptr<IWIterator>(sorter->done());
+            std::shared_ptr<IWIterator> done(unowned_ptr<IWSorter> sorter) {
+                return std::shared_ptr<IWIterator>(sorter->done());
             }
         };
 
@@ -425,10 +423,10 @@ namespace mongo {
                 sorter->add(1,-1);
                 sorter->add(-1,1);
             }
-            virtual boost::shared_ptr<IWIterator> correct() {
+            virtual std::shared_ptr<IWIterator> correct() {
                 return make_shared<IntIterator>(-1,4);
             }
-            virtual boost::shared_ptr<IWIterator> correctReverse() {
+            virtual std::shared_ptr<IWIterator> correctReverse() {
                 return make_shared<IntIterator>(4,-1,-1);
             }
         };
@@ -446,11 +444,11 @@ namespace mongo {
                 sorter->add(2,-2);
                 sorter->add(3,-3);
             }
-            virtual boost::shared_ptr<IWIterator> correct() {
+            virtual std::shared_ptr<IWIterator> correct() {
                 const int array[] = {-1,-1,-1, 0, 1,1,1, 2,2, 3};
                 return makeInMemIterator(array);
             }
-            virtual boost::shared_ptr<IWIterator> correctReverse() {
+            virtual std::shared_ptr<IWIterator> correctReverse() {
                 const int array[] = {3, 2,2, 1,1,1, 0, -1,-1,-1};
                 return makeInMemIterator(array);
             }
@@ -486,10 +484,10 @@ namespace mongo {
                 }
             }
 
-            virtual boost::shared_ptr<IWIterator> correct() {
+            virtual std::shared_ptr<IWIterator> correct() {
                 return make_shared<IntIterator>(0, NUM_ITEMS);
             }
-            virtual boost::shared_ptr<IWIterator> correctReverse() {
+            virtual std::shared_ptr<IWIterator> correctReverse() {
                 return make_shared<IntIterator>(NUM_ITEMS-1, -1, -1);
             }
 
@@ -516,10 +514,10 @@ namespace mongo {
 
                 return opts.MaxMemoryUsageBytes(MEM_LIMIT).ExtSortAllowed().Limit(Limit);
             }
-            virtual boost::shared_ptr<IWIterator> correct() {
+            virtual std::shared_ptr<IWIterator> correct() {
                 return make_shared<LimitIterator>(Limit, Parent::correct());
             }
-            virtual boost::shared_ptr<IWIterator> correctReverse() {
+            virtual std::shared_ptr<IWIterator> correctReverse() {
                 return make_shared<LimitIterator>(Limit, Parent::correctReverse());
             }
             enum { MEM_LIMIT = 32*1024 };

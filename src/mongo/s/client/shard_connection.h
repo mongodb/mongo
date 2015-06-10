@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/shared_ptr.hpp>
 #include <string>
 
 #include "mongo/client/connpool.h"
@@ -37,14 +36,14 @@
 namespace mongo {
 
     class ChunkManager;
-    typedef boost::shared_ptr<ChunkManager> ChunkManagerPtr;
+    typedef std::shared_ptr<ChunkManager> ChunkManagerPtr;
 
     
     class ShardConnection : public AScopedConnection {
     public:
         ShardConnection(const ConnectionString& connectionString,
                         const std::string& ns,
-                        boost::shared_ptr<ChunkManager> manager = nullptr);
+                        std::shared_ptr<ChunkManager> manager = nullptr);
 
         ~ShardConnection();
 
@@ -86,7 +85,7 @@ namespace mongo {
             return _ns;
         }
 
-        boost::shared_ptr<ChunkManager> getManager() const {
+        std::shared_ptr<ChunkManager> getManager() const {
             return _manager;
         }
 
@@ -131,7 +130,7 @@ namespace mongo {
         const ConnectionString _cs;
         const std::string _ns;
 
-        boost::shared_ptr<ChunkManager> _manager;
+        std::shared_ptr<ChunkManager> _manager;
 
         bool _finishedInit;
 
@@ -152,7 +151,7 @@ namespace mongo {
                          BSONObj& result);
 
 
-    typedef boost::shared_ptr<ShardConnection> ShardConnectionPtr;
+    typedef std::shared_ptr<ShardConnection> ShardConnectionPtr;
 
     extern DBConnectionPool shardConnectionPool;
 

@@ -32,7 +32,6 @@
 
 #include "mongo/s/client/shard_registry.h"
 
-#include <boost/make_shared.hpp>
 #include <boost/thread/lock_guard.hpp>
 
 #include "mongo/client/connection_string.h"
@@ -49,7 +48,7 @@
 
 namespace mongo {
 
-    using boost::shared_ptr;
+    using std::shared_ptr;
     using std::string;
     using std::vector;
 
@@ -132,7 +131,7 @@ namespace mongo {
     }
 
     void ShardRegistry::set(const ShardId& id, const Shard& s) {
-        shared_ptr<Shard> ss(boost::make_shared<Shard>(s.getId(), s.getConnString()));
+        shared_ptr<Shard> ss(std::make_shared<Shard>(s.getId(), s.getConnString()));
 
         boost::lock_guard<boost::mutex> lk(_mutex);
         _lookup[id] = ss;
@@ -207,7 +206,7 @@ namespace mongo {
 
         const ConnectionString& shardHost(shardHostStatus.getValue());
 
-        shared_ptr<Shard> shard = boost::make_shared<Shard>(shardType.getName(), shardHost);
+        shared_ptr<Shard> shard = std::make_shared<Shard>(shardType.getName(), shardHost);
         _lookup[shardType.getName()] = shard;
 
         // Sync cluster connections (legacy config server) do not go through the normal targeting
@@ -251,7 +250,7 @@ namespace mongo {
         return nullptr;
     }
 
-    boost::shared_ptr<RemoteCommandTargeter> ShardRegistry::_findTargeter(const string& shardId) {
+    std::shared_ptr<RemoteCommandTargeter> ShardRegistry::_findTargeter(const string& shardId) {
         boost::lock_guard<boost::mutex> lk(_mutex);
 
         TargeterMap::iterator it = _targeters.find(shardId);

@@ -30,7 +30,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <boost/shared_ptr.hpp>
 #include <vector>
 
 #include "mongo/config.h"
@@ -287,7 +286,7 @@ namespace {
 
     TEST(Locker, PerformanceLocker) {
         for (int numLockers = 1; numLockers <= 64; numLockers = numLockers * 2) {
-            std::vector<boost::shared_ptr<LockerForTests> > lockers(numLockers);
+            std::vector<std::shared_ptr<LockerForTests> > lockers(numLockers);
             for (int i = 0; i < numLockers; i++) {
                 lockers[i].reset(new LockerForTests(MODE_S));
             }

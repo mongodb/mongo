@@ -30,7 +30,6 @@
 
 #include "mongo/db/pipeline/document_source.h"
 
-#include <boost/shared_ptr.hpp>
 
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/db_raii.h"
@@ -45,7 +44,7 @@
 namespace mongo {
 
     using boost::intrusive_ptr;
-    using boost::shared_ptr;
+    using std::shared_ptr;
     using std::string;
 
     DocumentSourceCursor::~DocumentSourceCursor() {
@@ -198,7 +197,7 @@ namespace mongo {
     }
 
     DocumentSourceCursor::DocumentSourceCursor(const string& ns,
-                                               const boost::shared_ptr<PlanExecutor>& exec,
+                                               const std::shared_ptr<PlanExecutor>& exec,
                                                const intrusive_ptr<ExpressionContext> &pCtx)
         : DocumentSource(pCtx)
         , _docsAddedToBatches(0)
@@ -208,7 +207,7 @@ namespace mongo {
 
     intrusive_ptr<DocumentSourceCursor> DocumentSourceCursor::create(
             const string& ns,
-            const boost::shared_ptr<PlanExecutor>& exec,
+            const std::shared_ptr<PlanExecutor>& exec,
             const intrusive_ptr<ExpressionContext> &pExpCtx) {
         return new DocumentSourceCursor(ns, exec, pExpCtx);
     }

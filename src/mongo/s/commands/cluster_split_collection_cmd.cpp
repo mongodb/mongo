@@ -30,7 +30,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <boost/shared_ptr.hpp>
 #include <string>
 #include <vector>
 
@@ -50,7 +49,7 @@
 
 namespace mongo {
 
-    using boost::shared_ptr;
+    using std::shared_ptr;
     using std::string;
     using std::vector;
 
@@ -118,7 +117,7 @@ namespace {
                 return appendCommandStatus(result, status.getStatus());
             }
 
-            boost::shared_ptr<DBConfig> config = status.getValue();
+            std::shared_ptr<DBConfig> config = status.getValue();
             if (!config->isSharded(nss.ns())) {
                 config->reload();
 

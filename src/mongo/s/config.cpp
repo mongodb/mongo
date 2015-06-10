@@ -217,8 +217,8 @@ namespace mongo {
 
     // Handles weird logic related to getting *either* a chunk manager *or* the collection primary shard
     void DBConfig::getChunkManagerOrPrimary(const string& ns,
-                                            boost::shared_ptr<ChunkManager>& manager,
-                                            boost::shared_ptr<Shard>& primary) {
+                                            std::shared_ptr<ChunkManager>& manager,
+                                            std::shared_ptr<Shard>& primary) {
 
         // The logic here is basically that at any time, our collection can become sharded or unsharded
         // via a command.  If we're not sharded, we want to send data to the primary, if sharded, we want
@@ -274,7 +274,7 @@ namespace mongo {
         }
     }
 
-    boost::shared_ptr<ChunkManager> DBConfig::getChunkManager(const string& ns,
+    std::shared_ptr<ChunkManager> DBConfig::getChunkManager(const string& ns,
                                                               bool shouldReload,
                                                               bool forceReload) {
         BSONObj key;

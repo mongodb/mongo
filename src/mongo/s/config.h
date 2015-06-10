@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/shared_ptr.hpp>
 #include <set>
 
 #include "mongo/db/jsobj.h"
@@ -42,7 +41,7 @@ namespace mongo {
     class DatabaseType;
     class DBConfig;
 
-    typedef boost::shared_ptr<DBConfig> DBConfigPtr;
+    typedef std::shared_ptr<DBConfig> DBConfigPtr;
 
     struct CollectionInfo {
         CollectionInfo() {
@@ -57,7 +56,7 @@ namespace mongo {
             return _cm.get();
         }
 
-        boost::shared_ptr<ChunkManager> getCM() const {
+        std::shared_ptr<ChunkManager> getCM() const {
             return _cm;
         }
 
@@ -71,7 +70,7 @@ namespace mongo {
 
         void save(const std::string& ns);
 
-        void useChunkManager(boost::shared_ptr<ChunkManager> manager);
+        void useChunkManager(std::shared_ptr<ChunkManager> manager);
 
         bool unique() const { return _unique; }
         BSONObj key() const { return _key; }
@@ -79,7 +78,7 @@ namespace mongo {
     private:
         BSONObj _key;
         bool _unique;
-        boost::shared_ptr<ChunkManager> _cm;
+        std::shared_ptr<ChunkManager> _cm;
         bool _dirty;
         bool _dropped;
     };
@@ -118,11 +117,11 @@ namespace mongo {
         // Atomically returns *either* the chunk manager *or* the primary shard for the collection,
         // neither if the collection doesn't exist.
         void getChunkManagerOrPrimary(const std::string& ns,
-                                      boost::shared_ptr<ChunkManager>& manager,
-                                      boost::shared_ptr<Shard>& primary);
+                                      std::shared_ptr<ChunkManager>& manager,
+                                      std::shared_ptr<Shard>& primary);
 
-        boost::shared_ptr<ChunkManager> getChunkManager(const std::string& ns, bool reload = false, bool forceReload = false);
-        boost::shared_ptr<ChunkManager> getChunkManagerIfExists(const std::string& ns, bool reload = false, bool forceReload = false);
+        std::shared_ptr<ChunkManager> getChunkManager(const std::string& ns, bool reload = false, bool forceReload = false);
+        std::shared_ptr<ChunkManager> getChunkManagerIfExists(const std::string& ns, bool reload = false, bool forceReload = false);
 
         /**
          * Returns shard id for primary shard for the database for which this DBConfig represents.

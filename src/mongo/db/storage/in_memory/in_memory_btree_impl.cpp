@@ -32,8 +32,6 @@
 
 #include "mongo/db/storage/in_memory/in_memory_btree_impl.h"
 
-#include <boost/make_shared.hpp>
-#include <boost/shared_ptr.hpp>
 #include <set>
 
 #include "mongo/db/catalog/index_catalog_entry.h"
@@ -44,7 +42,7 @@
 
 namespace mongo {
 
-    using boost::shared_ptr;
+    using std::shared_ptr;
     using std::string;
     using std::vector;
 
@@ -480,10 +478,10 @@ namespace {
     // IndexCatalogEntry argument taken by non-const pointer for consistency with other Btree
     // factories. We don't actually modify it.
     SortedDataInterface* getInMemoryBtreeImpl(const Ordering& ordering,
-                                              boost::shared_ptr<void>* dataInOut) {
+                                              std::shared_ptr<void>* dataInOut) {
         invariant(dataInOut);
         if (!*dataInOut) {
-            *dataInOut = boost::make_shared<IndexSet>(IndexEntryComparison(ordering));
+            *dataInOut = std::make_shared<IndexSet>(IndexEntryComparison(ordering));
         }
         return new InMemoryBtreeImpl(static_cast<IndexSet*>(dataInOut->get()));
     }

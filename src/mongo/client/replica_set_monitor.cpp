@@ -32,7 +32,6 @@
 #include "mongo/client/replica_set_monitor.h"
 
 #include <algorithm>
-#include <boost/make_shared.hpp>
 #include <boost/thread.hpp>
 #include <boost/thread/condition.hpp>
 #include <limits>
@@ -50,7 +49,7 @@
 
 namespace mongo {
 
-    using boost::shared_ptr;
+    using std::shared_ptr;
     using std::numeric_limits;
     using std::set;
     using std::string;
@@ -264,7 +263,7 @@ namespace {
     bool ReplicaSetMonitor::useDeterministicHostSelection = false;
 
     ReplicaSetMonitor::ReplicaSetMonitor(StringData name, const std::set<HostAndPort>& seeds)
-            : _state(boost::make_shared<SetState>(name, seeds)) {
+            : _state(std::make_shared<SetState>(name, seeds)) {
 
         log() << "starting new replica set monitor for replica set " << name << " with seeds ";
 
@@ -360,7 +359,7 @@ namespace {
         boost::lock_guard<boost::mutex> lk(setsLock);
         ReplicaSetMonitorPtr& m = sets[name];
         if (!m) {
-            m = boost::make_shared<ReplicaSetMonitor>(name, servers);
+            m = std::make_shared<ReplicaSetMonitor>(name, servers);
         }
 
         replicaSetMonitorWatcher.safeGo();
@@ -589,7 +588,7 @@ namespace {
     }
 
     ScanStatePtr Refresher::startNewScan(const SetState* set) {
-        const ScanStatePtr scan = boost::make_shared<ScanState>();
+        const ScanStatePtr scan = std::make_shared<ScanState>();
 
         // The heuristics we use in deciding the order to contact hosts are designed to find a
         // master as quickly as possible. This is because we can't use any hosts we find until

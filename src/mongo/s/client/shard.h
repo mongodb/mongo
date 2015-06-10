@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/shared_ptr.hpp>
 #include <string>
 
 #include "mongo/base/disallow_copying.h"
@@ -62,7 +61,7 @@ namespace mongo {
     };
 
     class Shard;
-    using ShardPtr = boost::shared_ptr<Shard>;
+    using ShardPtr = std::shared_ptr<Shard>;
 
     /*
      * Maintains the targeting and command execution logic for a single shard. Performs polling of

@@ -35,7 +35,6 @@
 
 #include <cctype>
 #include <boost/filesystem/operations.hpp>
-#include <boost/shared_ptr.hpp>
 
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/client/dbclientinterface.h"
@@ -49,7 +48,7 @@
 namespace mongo {
 
     using std::unique_ptr;
-    using boost::shared_ptr;
+    using std::shared_ptr;
     using std::unique_ptr;
     using std::endl;
     using std::set;
@@ -314,7 +313,7 @@ namespace {
 namespace {
     class ScopeCache {
     public:
-        void release(const string& poolName, const boost::shared_ptr<Scope>& scope) {
+        void release(const string& poolName, const std::shared_ptr<Scope>& scope) {
             boost::lock_guard<boost::mutex> lk(_mutex);
 
             if (scope->hasOutOfMemoryException()) {
@@ -340,12 +339,12 @@ namespace {
             _pools.push_front(toStore);
         }
 
-        boost::shared_ptr<Scope> tryAcquire(OperationContext* txn, const string& poolName) {
+        std::shared_ptr<Scope> tryAcquire(OperationContext* txn, const string& poolName) {
             boost::lock_guard<boost::mutex> lk(_mutex);
 
             for (Pools::iterator it = _pools.begin(); it != _pools.end(); ++it) {
                 if (it->poolName == poolName) {
-                    boost::shared_ptr<Scope> scope = it->scope;
+                    std::shared_ptr<Scope> scope = it->scope;
                     _pools.erase(it);
                     scope->incTimesUsed();
                     scope->reset();
@@ -354,12 +353,12 @@ namespace {
                 }
             }
 
-            return boost::shared_ptr<Scope>();
+            return std::shared_ptr<Scope>();
         }
 
     private:
         struct ScopeAndPool {
-            boost::shared_ptr<Scope> scope;
+            std::shared_ptr<Scope> scope;
             string poolName;
         };
 
@@ -377,7 +376,7 @@ namespace {
 
     class PooledScope : public Scope {
     public:
-        PooledScope(const std::string& pool, const boost::shared_ptr<Scope>& real)
+        PooledScope(const std::string& pool, const std::shared_ptr<Scope>& real)
             : _pool(pool)
             , _real(real) {
 
@@ -452,7 +451,7 @@ namespace {
 
     private:
         string _pool;
-        boost::shared_ptr<Scope> _real;
+        std::shared_ptr<Scope> _real;
     };
 
     /** Get a scope from the pool of scopes matching the supplied pool name */
@@ -460,7 +459,7 @@ namespace {
                                                  const string& db,
                                                  const string& scopeType) {
         const string fullPoolName = db + scopeType;
-        boost::shared_ptr<Scope> s = scopeCache.tryAcquire(txn, fullPoolName);
+        std::shared_ptr<Scope> s = scopeCache.tryAcquire(txn, fullPoolName);
         if (!s) {
             s.reset(newScope());
             s->registerOperation(txn);

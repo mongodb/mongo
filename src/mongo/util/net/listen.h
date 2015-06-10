@@ -30,7 +30,6 @@
 #pragma once
 
 #include <boost/noncopyable.hpp>
-#include <boost/shared_ptr.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/condition_variable.hpp>
 #include <set>
@@ -58,7 +57,7 @@ namespace mongo {
         void initAndListen(); // never returns unless error (start a thread)
 
         /* spawn a thread, etc., then return */
-        virtual void accepted(boost::shared_ptr<Socket> psocket, long long connectionId );
+        virtual void accepted(std::shared_ptr<Socket> psocket, long long connectionId );
         virtual void acceptedMP(MessagingPort *mp);
 
         const int _port;

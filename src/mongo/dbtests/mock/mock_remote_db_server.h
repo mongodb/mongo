@@ -27,7 +27,6 @@
 
 #pragma once
 
-#include <boost/shared_ptr.hpp>
 #include <string>
 #include <vector>
 
@@ -210,7 +209,7 @@ namespace mongo {
          */
         void checkIfUp(InstanceID id) const;
 
-        typedef unordered_map<std::string, boost::shared_ptr<CircularBSONIterator> > CmdToReplyObj;
+        typedef unordered_map<std::string, std::shared_ptr<CircularBSONIterator> > CmdToReplyObj;
         typedef unordered_map<std::string, std::vector<BSONObj> > MockDataMgr;
 
         bool _isRunning;

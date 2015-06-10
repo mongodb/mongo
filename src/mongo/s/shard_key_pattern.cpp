@@ -28,7 +28,6 @@
 
 #include "mongo/s/shard_key_pattern.h"
 
-#include <boost/shared_ptr.hpp>
 #include <vector>
 
 #include "mongo/db/field_ref.h"
@@ -42,7 +41,7 @@
 namespace mongo {
 
     using std::unique_ptr;
-    using boost::shared_ptr;
+    using std::shared_ptr;
     using std::unique_ptr;
     using std::pair;
     using std::make_pair;

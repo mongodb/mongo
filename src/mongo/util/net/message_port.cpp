@@ -33,7 +33,6 @@
 
 #include "mongo/util/net/message_port.h"
 
-#include <boost/shared_ptr.hpp>
 #include <fcntl.h>
 #include <time.h>
 
@@ -58,7 +57,7 @@
 
 namespace mongo {
 
-    using boost::shared_ptr;
+    using std::shared_ptr;
     using std::string;
 
 // if you want trace output:
@@ -154,7 +153,7 @@ namespace mongo {
         piggyBackData = 0;
     }
 
-    MessagingPort::MessagingPort( boost::shared_ptr<Socket> sock )
+    MessagingPort::MessagingPort( std::shared_ptr<Socket> sock )
         : psock( sock ), piggyBackData( 0 ) {
         ports.insert(this);
     }

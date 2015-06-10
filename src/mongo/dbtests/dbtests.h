@@ -31,14 +31,13 @@
 
 #pragma once
 
-#include <boost/shared_ptr.hpp>
 
 #include "mongo/db/instance.h"
 #include "mongo/unittest/unittest.h"
 
 using namespace mongo;
 using namespace mongo::unittest;
-using boost::shared_ptr;
+using std::shared_ptr;
 
 namespace mongo {
     class BSONObj;

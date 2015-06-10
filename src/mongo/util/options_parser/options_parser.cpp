@@ -30,7 +30,6 @@
 #include "mongo/util/options_parser/options_parser.h"
 
 #include <boost/program_options.hpp>
-#include <boost/shared_ptr.hpp>
 #include <algorithm>
 #include <cerrno>
 #include <fstream>
@@ -53,7 +52,7 @@ namespace mongo {
 namespace optionenvironment {
 
     using namespace std;
-    using boost::shared_ptr;
+    using std::shared_ptr;
 
     namespace po = boost::program_options;
 
@@ -606,14 +605,14 @@ namespace optionenvironment {
         * they run when the environment gets validated.
         */
         Status addConstraints(const OptionSection& options, Environment* dest) {
-            std::vector<boost::shared_ptr<Constraint> > constraints_vector;
+            std::vector<std::shared_ptr<Constraint> > constraints_vector;
 
             Status ret = options.getConstraints(&constraints_vector);
             if (!ret.isOK()) {
                 return ret;
             }
 
-            std::vector<boost::shared_ptr<Constraint> >::const_iterator citerator;
+            std::vector<std::shared_ptr<Constraint> >::const_iterator citerator;
             for (citerator = constraints_vector.begin();
                     citerator != constraints_vector.end(); citerator++) {
                 dest->addConstraint(citerator->get());

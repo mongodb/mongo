@@ -30,7 +30,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <boost/shared_ptr.hpp>
 #include <boost/thread/thread.hpp>
 #include <boost/thread/condition.hpp>
 
@@ -49,7 +48,7 @@
 namespace DocumentSourceTests {
 
     using boost::intrusive_ptr;
-    using boost::shared_ptr;
+    using std::shared_ptr;
     using std::map;
     using std::set;
     using std::string;
@@ -204,7 +203,7 @@ namespace DocumentSourceTests {
 
         private:
             // It is important that these are ordered to ensure correct destruction order.
-            boost::shared_ptr<PlanExecutor> _exec;
+            std::shared_ptr<PlanExecutor> _exec;
             intrusive_ptr<ExpressionContext> _ctx;
             intrusive_ptr<DocumentSourceCursor> _source;
         };

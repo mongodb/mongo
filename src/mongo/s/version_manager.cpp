@@ -34,7 +34,6 @@
 
 #include "mongo/s/version_manager.h"
 
-#include <boost/shared_ptr.hpp>
 
 #include "mongo/client/dbclient_rs.h"
 #include "mongo/db/namespace_string.h"
@@ -52,7 +51,7 @@
 
 namespace mongo {
 
-    using boost::shared_ptr;
+    using std::shared_ptr;
     using std::endl;
     using std::map;
     using std::string;

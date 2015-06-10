@@ -44,7 +44,6 @@
 #undef max
 #endif
 
-#include <boost/shared_ptr.hpp>
 #include <ctype.h>
 #include <errno.h>
 #include <iostream>
@@ -72,7 +71,7 @@
 #include "mongo/util/text.h"
 
 using namespace std;
-using boost::shared_ptr;
+using std::shared_ptr;
 using mongo::Message;
 using mongo::DbMessage;
 using mongo::BSONObj;
@@ -164,9 +163,9 @@ struct Connection {
 
 map< Connection, bool > seen;
 map< Connection, int > bytesRemainingInMessage;
-map< Connection, boost::shared_ptr< BufBuilder > > messageBuilder;
+map< Connection, std::shared_ptr< BufBuilder > > messageBuilder;
 map< Connection, unsigned > expectedSeq;
-map< Connection, boost::shared_ptr<DBClientConnection> > forwarder;
+map< Connection, std::shared_ptr<DBClientConnection> > forwarder;
 map< Connection, long long > lastCursor;
 map< Connection, map< long long, long long > > mapCursor;
 
@@ -364,7 +363,7 @@ void processMessage( Connection& c , Message& m ) {
 
     if ( !forwardAddress.empty() ) {
         if ( m.operation() != mongo::opReply ) {
-            boost::shared_ptr<DBClientConnection> conn = forwarder[ c ];
+            std::shared_ptr<DBClientConnection> conn = forwarder[ c ];
             if ( !conn ) {
                 conn.reset(new DBClientConnection( true ));
                 conn->connect( forwardAddress );

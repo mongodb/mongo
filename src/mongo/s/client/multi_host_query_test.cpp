@@ -28,7 +28,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <boost/shared_ptr.hpp>
 
 #include "mongo/base/status_with.h"
 #include "mongo/s/client/multi_host_query.h"
@@ -39,7 +38,7 @@ namespace {
 
     using namespace mongo;
     using std::unique_ptr;
-    using boost::shared_ptr;
+    using std::shared_ptr;
     using std::make_pair;
     using std::map;
     using std::string;

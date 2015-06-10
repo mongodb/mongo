@@ -33,7 +33,6 @@
 
 #include "mongo/db/storage/in_memory/in_memory_record_store.h"
 
-#include <boost/shared_ptr.hpp>
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
@@ -47,7 +46,7 @@
 
 namespace mongo {
 
-    using boost::shared_ptr;
+    using std::shared_ptr;
 
     class InMemoryRecordStore::InsertChange : public RecoveryUnit::Change {
     public:
@@ -262,7 +261,7 @@ namespace mongo {
     //
 
     InMemoryRecordStore::InMemoryRecordStore(StringData ns,
-                                             boost::shared_ptr<void>* dataInOut,
+                                             std::shared_ptr<void>* dataInOut,
                                              bool isCapped,
                                              int64_t cappedMaxSize,
                                              int64_t cappedMaxDocs,

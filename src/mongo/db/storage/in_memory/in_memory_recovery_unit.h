@@ -30,7 +30,6 @@
 
 #pragma once
 
-#include <boost/shared_ptr.hpp>
 #include <vector>
 
 #include "mongo/db/record_id.h"
@@ -65,7 +64,7 @@ namespace mongo {
         virtual SnapshotId getSnapshotId() const { return SnapshotId(); }
 
     private:
-        typedef boost::shared_ptr<Change> ChangePtr;
+        typedef std::shared_ptr<Change> ChangePtr;
         typedef std::vector<ChangePtr> Changes;
 
         Changes _changes;

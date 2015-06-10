@@ -29,7 +29,6 @@
 #include "mongo/util/options_parser/option_description.h"
 
 #include <boost/program_options.hpp>
-#include <boost/shared_ptr.hpp>
 #include <list>
 
 #include "mongo/base/status.h"
@@ -155,7 +154,7 @@ namespace optionenvironment {
          * Populates the given vector with all the constraints for all options in this section and
          * sub sections.
          */
-        Status getConstraints(std::vector<boost::shared_ptr<Constraint > >* constraints) const;
+        Status getConstraints(std::vector<std::shared_ptr<Constraint > >* constraints) const;
 
         std::string positionalHelpString(const std::string& execName) const;
         std::string helpString() const;

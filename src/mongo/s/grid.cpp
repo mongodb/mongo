@@ -57,7 +57,7 @@ namespace mongo {
         _shardRegistry = std::move(shardRegistry);
     }
 
-    StatusWith<boost::shared_ptr<DBConfig>> Grid::implicitCreateDb(const std::string& dbName) {
+    StatusWith<std::shared_ptr<DBConfig>> Grid::implicitCreateDb(const std::string& dbName) {
         auto status = catalogCache()->getDatabase(dbName);
         if (status.isOK()) {
             return status;

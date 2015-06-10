@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/shared_ptr.hpp>
 #include <boost/thread/mutex.hpp>
 #include <string>
 #include <vector>
@@ -61,7 +60,7 @@ namespace executor {
 
         ~ShardRegistry();
 
-        boost::shared_ptr<RemoteCommandTargeter> getTargeterForShard(const std::string& shardId);
+        std::shared_ptr<RemoteCommandTargeter> getTargeterForShard(const std::string& shardId);
 
         RemoteCommandRunner* getCommandRunner() const { return _commandRunner.get(); }
 
@@ -69,7 +68,7 @@ namespace executor {
 
         void reload();
 
-        boost::shared_ptr<Shard> findIfExists(const ShardId& id);
+        std::shared_ptr<Shard> findIfExists(const ShardId& id);
 
         /**
          * Lookup shard by replica set name. Returns nullptr if the name can't be found.
@@ -87,17 +86,17 @@ namespace executor {
         void toBSON(BSONObjBuilder* result) const;
 
     private:
-        typedef std::map<ShardId, boost::shared_ptr<Shard>> ShardMap;
-        typedef std::map<ShardId, boost::shared_ptr<RemoteCommandTargeter>> TargeterMap;
+        typedef std::map<ShardId, std::shared_ptr<Shard>> ShardMap;
+        typedef std::map<ShardId, std::shared_ptr<RemoteCommandTargeter>> TargeterMap;
 
         /**
          * Creates a shard based on the specified information and puts it into the lookup maps.
          */
         void _addShard_inlock(const ShardType& shardType);
 
-        boost::shared_ptr<Shard> _findUsingLookUp(const ShardId& shardId);
+        std::shared_ptr<Shard> _findUsingLookUp(const ShardId& shardId);
 
-        boost::shared_ptr<RemoteCommandTargeter> _findTargeter(const std::string& shardId);
+        std::shared_ptr<RemoteCommandTargeter> _findTargeter(const std::string& shardId);
 
         // Factory to obtain remote command targeters for shards
         const std::unique_ptr<RemoteCommandTargeterFactory> _targeterFactory;

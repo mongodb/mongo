@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/shared_ptr.hpp>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/owned_pointer_vector.h"
@@ -43,7 +42,7 @@ namespace mongo {
     class MetadataLoader;
     class CollectionMetadata;
 
-    typedef boost::shared_ptr<const CollectionMetadata> CollectionMetadataPtr;
+    typedef std::shared_ptr<const CollectionMetadata> CollectionMetadataPtr;
 
     /**
      * The collection metadata has metadata information about a collection, in particular the

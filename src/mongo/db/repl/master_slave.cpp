@@ -43,7 +43,6 @@
 #include "mongo/db/repl/master_slave.h"
 
 #include <pcrecpp.h>
-#include <boost/shared_ptr.hpp>
 #include <boost/thread/thread.hpp>
 
 #include "mongo/db/auth/authorization_manager.h"
@@ -250,7 +249,7 @@ namespace repl {
             }
         }
 
-        v.push_back( boost::shared_ptr< ReplSource >( new ReplSource( s ) ) );
+        v.push_back( std::shared_ptr< ReplSource >( new ReplSource( s ) ) );
     }
 
     /* we reuse our existing objects so that we can keep our existing connection

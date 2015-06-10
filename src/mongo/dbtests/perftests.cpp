@@ -39,7 +39,6 @@
 #include "mongo/platform/basic.h"
 
 #include <boost/filesystem/operations.hpp>
-#include <boost/shared_ptr.hpp>
 #include <boost/thread/thread.hpp>
 #include <boost/thread/condition.hpp>
 #include <boost/version.hpp>
@@ -73,7 +72,7 @@
 
 namespace PerfTests {
 
-    using boost::shared_ptr;
+    using std::shared_ptr;
     using std::cout;
     using std::endl;
     using std::fixed;
@@ -120,7 +119,7 @@ namespace PerfTests {
         in ./../settings.py:
             pstatspassword="<pwd>"
     */
-    static boost::shared_ptr<DBClientConnection> conn;
+    static std::shared_ptr<DBClientConnection> conn;
     static string _perfhostname;
     void pstatsConnect() {
         // no writing to perf db if this is a debug build
@@ -154,7 +153,7 @@ namespace PerfTests {
                     }
                 }
 
-                boost::shared_ptr<DBClientConnection> c(new DBClientConnection(false, 60));
+                std::shared_ptr<DBClientConnection> c(new DBClientConnection(false, 60));
                 string err;
                 if( c->connect(HostAndPort("perfdb.10gen.cc"), err) ) {
                     if( !c->auth("perf", "perf", pwd, err) ) {

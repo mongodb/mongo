@@ -75,7 +75,6 @@
 
 #include <boost/thread/condition_variable.hpp>
 #include <boost/thread/mutex.hpp>
-#include <boost/shared_ptr.hpp>
 #include <boost/thread/thread.hpp>
 #include <iomanip>
 #include <utility>
@@ -527,7 +526,7 @@ namespace {
     }
 
     void DurableImpl::createdFile(const std::string& filename, unsigned long long len) {
-        boost::shared_ptr<DurOp> op(new FileCreatedOp(filename, len));
+        std::shared_ptr<DurOp> op(new FileCreatedOp(filename, len));
         commitJob.noteOp(op);
     }
 

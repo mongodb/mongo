@@ -28,7 +28,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <boost/make_shared.hpp>
 
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/replica_set_monitor_internal.h"
@@ -64,7 +63,7 @@ namespace {
     // NOT something that non-test code should do.
 
     TEST(ReplicaSetMonitor, InitialState) {
-        SetStatePtr state = boost::make_shared<SetState>("name", basicSeedsSet);
+        SetStatePtr state = std::make_shared<SetState>("name", basicSeedsSet);
         ASSERT_EQUALS(state->name, "name");
         ASSERT(state->seedNodes == basicSeedsSet);
         ASSERT(state->lastSeenMaster.empty());
@@ -247,7 +246,7 @@ namespace {
     }
 
     TEST(ReplicaSetMonitor, CheckAllSeedsSerial) {
-        SetStatePtr state = boost::make_shared<SetState>("name", basicSeedsSet);
+        SetStatePtr state = std::make_shared<SetState>("name", basicSeedsSet);
         Refresher refresher(state);
 
         set<HostAndPort> seen;
@@ -287,7 +286,7 @@ namespace {
     }
 
     TEST(ReplicaSetMonitor, CheckAllSeedsParallel) {
-        SetStatePtr state = boost::make_shared<SetState>("name", basicSeedsSet);
+        SetStatePtr state = std::make_shared<SetState>("name", basicSeedsSet);
         Refresher refresher(state);
 
         set<HostAndPort> seen;
@@ -337,7 +336,7 @@ namespace {
     }
 
     TEST(ReplicaSetMonitor, NoMasterInitAllUp) {
-        SetStatePtr state = boost::make_shared<SetState>("name", basicSeedsSet);
+        SetStatePtr state = std::make_shared<SetState>("name", basicSeedsSet);
         Refresher refresher(state);
 
         set<HostAndPort> seen;
@@ -376,7 +375,7 @@ namespace {
     }
 
     TEST(ReplicaSetMonitor, MasterNotInSeeds_NoPrimaryInIsMaster) {
-        SetStatePtr state = boost::make_shared<SetState>("name", basicSeedsSet);
+        SetStatePtr state = std::make_shared<SetState>("name", basicSeedsSet);
         Refresher refresher(state);
 
         set<HostAndPort> seen;
@@ -435,7 +434,7 @@ namespace {
     }
 
     TEST(ReplicaSetMonitor, MasterNotInSeeds_PrimaryInIsMaster) {
-        SetStatePtr state = boost::make_shared<SetState>("name", basicSeedsSet);
+        SetStatePtr state = std::make_shared<SetState>("name", basicSeedsSet);
         Refresher refresher(state);
 
         set<HostAndPort> seen;
@@ -492,7 +491,7 @@ namespace {
     TEST(ReplicaSetMonitor, SlavesUsableEvenIfNoMaster) {
         std::set<HostAndPort> seeds;
         seeds.insert(HostAndPort("a"));
-        SetStatePtr state = boost::make_shared<SetState>("name", seeds);
+        SetStatePtr state = std::make_shared<SetState>("name", seeds);
         Refresher refresher(state);
 
         const ReadPreferenceSetting secondary(ReadPreference::SecondaryOnly, TagSet());
@@ -528,7 +527,7 @@ namespace {
 
     // Test multiple nodes that claim to be master (we use a last-wins policy)
     TEST(ReplicaSetMonitor, MultipleMasterLastNodeWins) {
-        SetStatePtr state = boost::make_shared<SetState>("name", basicSeedsSet);
+        SetStatePtr state = std::make_shared<SetState>("name", basicSeedsSet);
         Refresher refresher(state);
 
         set<HostAndPort> seen;
@@ -583,7 +582,7 @@ namespace {
 
     // Test nodes disagree about who is in the set, master is source of truth
     TEST(ReplicaSetMonitor, MasterIsSourceOfTruth) {
-        SetStatePtr state = boost::make_shared<SetState>("name", basicSeedsSet);
+        SetStatePtr state = std::make_shared<SetState>("name", basicSeedsSet);
         Refresher refresher(state);
 
         BSONArray primaryHosts = BSON_ARRAY("a" << "b" << "d");
@@ -614,7 +613,7 @@ namespace {
 
     // Test multiple master nodes that disagree about set membership
     TEST(ReplicaSetMonitor, MultipleMastersDisagree) {
-        SetStatePtr state = boost::make_shared<SetState>("name", basicSeedsSet);
+        SetStatePtr state = std::make_shared<SetState>("name", basicSeedsSet);
         Refresher refresher(state);
 
         BSONArray hostsForSeed[3];
@@ -695,7 +694,7 @@ namespace {
 
     // Ensure getMatchingHost returns hosts even if scan is ongoing
     TEST(ReplicaSetMonitor, GetMatchingDuringScan) {
-        SetStatePtr state = boost::make_shared<SetState>("name", basicSeedsSet);
+        SetStatePtr state = std::make_shared<SetState>("name", basicSeedsSet);
         Refresher refresher(state);
 
         const ReadPreferenceSetting primaryOnly(ReadPreference::PrimaryOnly, TagSet());
@@ -746,8 +745,8 @@ namespace {
 
     // Ensure nothing breaks when out-of-band failedHost is called during scan
     TEST(ReplicaSetMonitor, OutOfBandFailedHost) {
-        SetStatePtr state = boost::make_shared<SetState>("name", basicSeedsSet);
-        ReplicaSetMonitorPtr rsm = boost::make_shared<ReplicaSetMonitor>(state);
+        SetStatePtr state = std::make_shared<SetState>("name", basicSeedsSet);
+        ReplicaSetMonitorPtr rsm = std::make_shared<ReplicaSetMonitor>(state);
         Refresher refresher = rsm->startOrContinueRefresh();
 
         for (size_t i = 0; i != basicSeeds.size(); ++i) {
@@ -784,7 +783,7 @@ namespace {
 
     // Newly elected primary with electionId >= maximum electionId seen by the Refresher
     TEST(ReplicaSetMonitorTests, NewPrimaryWithMaxElectionId) {
-        SetStatePtr state = boost::make_shared<SetState>("name", basicSeedsSet);
+        SetStatePtr state = std::make_shared<SetState>("name", basicSeedsSet);
         Refresher refresher(state);
 
         set<HostAndPort> seen;
@@ -840,7 +839,7 @@ namespace {
 
     // Ignore electionId of secondaries
     TEST(ReplicaSetMonitorTests, IgnoreElectionIdFromSecondaries) {
-        SetStatePtr state = boost::make_shared<SetState>("name", basicSeedsSet);
+        SetStatePtr state = std::make_shared<SetState>("name", basicSeedsSet);
         Refresher refresher(state);
 
         set<HostAndPort> seen;
@@ -879,7 +878,7 @@ namespace {
 
     // Stale Primary with obsolete electionId
     TEST(ReplicaSetMonitorTests, StalePrimaryWithObsoleteElectionId) {
-        SetStatePtr state = boost::make_shared<SetState>("name", basicSeedsSet);
+        SetStatePtr state = std::make_shared<SetState>("name", basicSeedsSet);
         Refresher refresher(state);
 
         const OID firstElectionId = OID::gen();

@@ -30,7 +30,6 @@
  * This file tests near search functionality.
  */
 
-#include <boost/shared_ptr.hpp>
 
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/exec/near.h"
@@ -40,7 +39,7 @@
 namespace {
 
     using namespace mongo;
-    using boost::shared_ptr;
+    using std::shared_ptr;
     using std::vector;
 
     /**

@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/smart_ptr/shared_ptr.hpp>
 #include <boost/thread/condition_variable.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/thread.hpp>
@@ -169,7 +168,7 @@ namespace mongo {
         HostThreadPools* _hostThreads;
 
         // Outstanding requests
-        typedef std::map<ConnectionString, boost::shared_ptr<PendingQueryContext> > PendingMap;
+        typedef std::map<ConnectionString, std::shared_ptr<PendingQueryContext> > PendingMap;
         PendingMap _pending;
 
         // Synchronizes below
@@ -316,7 +315,7 @@ namespace mongo {
         /**
          * Worker loop run by each thread.
          */
-        static void doWork(boost::shared_ptr<PoolContext> context);
+        static void doWork(std::shared_ptr<PoolContext> context);
 
         const bool _scopeAllWork;
 
@@ -324,6 +323,6 @@ namespace mongo {
         std::vector<boost::thread*> _threads;
 
         // Shared work and worker activity information
-        boost::shared_ptr<PoolContext> _context;
+        std::shared_ptr<PoolContext> _context;
     };
 }

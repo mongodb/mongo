@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/shared_ptr.hpp>
 #include <boost/static_assert.hpp>
 #include <memory>
 #include <type_traits>
@@ -70,9 +69,6 @@ namespace mongo {
 
         template<typename U, typename = IfConvertibleFrom<U>>
         unowned_ptr(const std::shared_ptr<U>& p) : _p(p.get()) {}
-
-        template<typename U, typename = IfConvertibleFrom<U>>
-        unowned_ptr(const boost::shared_ptr<U>& p) : _p(p.get()) {}
 
         //
         // Modifiers

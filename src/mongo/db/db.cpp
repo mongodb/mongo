@@ -35,7 +35,6 @@
 #include <boost/thread/thread.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <boost/optional.hpp>
-#include <boost/shared_ptr.hpp>
 #include <fstream>
 #include <iostream>
 #include <limits>
@@ -415,7 +414,7 @@ namespace mongo {
         // do not want connections to just hang if recovery takes a very long time.
         server->setupSockets();
 
-        boost::shared_ptr<DbWebServer> dbWebServer;
+        std::shared_ptr<DbWebServer> dbWebServer;
         if (serverGlobalParams.isHttpInterfaceEnabled) {
             dbWebServer.reset(new DbWebServer(serverGlobalParams.bind_ip,
                                               serverGlobalParams.port + 1000,

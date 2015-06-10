@@ -416,7 +416,7 @@ namespace {
 
     ShardConnection::ShardConnection(const ConnectionString& connectionString,
                                      const string& ns,
-                                     boost::shared_ptr<ChunkManager> manager)
+                                     std::shared_ptr<ChunkManager> manager)
         : _cs(connectionString),
           _ns(ns),
           _manager(manager) {

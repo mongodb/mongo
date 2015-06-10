@@ -38,7 +38,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <boost/shared_ptr.hpp>
 #include <boost/thread.hpp>
 
 #include "mongo/db/storage/mmap_v1/aligned_builder.h"
@@ -181,8 +180,8 @@ namespace mongo {
             h.fileId = j.curFileId();
 
             // Ops other than basic writes (DurOp's) go first
-            const std::vector<boost::shared_ptr<DurOp> >& durOps = commitJob.ops();
-            for (std::vector<boost::shared_ptr<DurOp> >::const_iterator i = durOps.begin();
+            const std::vector<std::shared_ptr<DurOp> >& durOps = commitJob.ops();
+            for (std::vector<std::shared_ptr<DurOp> >::const_iterator i = durOps.begin();
                  i != durOps.end();
                  i++) {
 

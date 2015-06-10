@@ -27,7 +27,6 @@
 
 #pragma once
 
-#include <boost/shared_ptr.hpp>
 #include <set>
 #include <string>
 
@@ -41,7 +40,7 @@ namespace mongo {
     class BSONObj;
     class ReplicaSetMonitor;
     struct ReadPreferenceSetting;
-    typedef boost::shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorPtr;
+    typedef std::shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorPtr;
 
     /**
      * Holds state about a replica set and provides a means to refresh the local view.
@@ -145,7 +144,7 @@ namespace mongo {
          * it will return none. If createFromSeed is true, it will try to look up the last known
          * servers list for this set and will create a new monitor using that as the seed list.
          */
-        static boost::shared_ptr<ReplicaSetMonitor> get(const std::string& name);
+        static std::shared_ptr<ReplicaSetMonitor> get(const std::string& name);
 
         /**
          * Returns all the currently tracked replica set names.
@@ -191,8 +190,8 @@ namespace mongo {
         struct IsMasterReply;
         struct ScanState;
         struct SetState;
-        typedef boost::shared_ptr<ScanState> ScanStatePtr;
-        typedef boost::shared_ptr<SetState> SetStatePtr;
+        typedef std::shared_ptr<ScanState> ScanStatePtr;
+        typedef std::shared_ptr<SetState> SetStatePtr;
 
         //
         // FOR TESTING ONLY

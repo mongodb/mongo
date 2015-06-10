@@ -28,7 +28,6 @@
 
 #include "mongo/db/query/plan_executor.h"
 
-#include <boost/shared_ptr.hpp>
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -49,7 +48,7 @@
 
 namespace mongo {
 
-    using boost::shared_ptr;
+    using std::shared_ptr;
     using std::string;
     using std::vector;
 

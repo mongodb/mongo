@@ -31,7 +31,6 @@
 #include "mongo/platform/basic.h"
 
 #include <boost/intrusive_ptr.hpp>
-#include <boost/shared_ptr.hpp>
 #include <string>
 #include <utility>
 #include <vector>
@@ -56,7 +55,7 @@ namespace mongo {
 
     using boost::intrusive_ptr;
     using std::unique_ptr;
-    using boost::shared_ptr;
+    using std::shared_ptr;
     using std::string;
     using std::vector;
 

@@ -41,7 +41,7 @@
 
 namespace mongo {
 
-    using boost::shared_ptr;
+    using std::shared_ptr;
     using mongoutils::str::stream;
     using std::map;
     using std::set;

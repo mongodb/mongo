@@ -58,7 +58,7 @@
 
 namespace mongo {
 
-    using boost::shared_ptr;
+    using std::shared_ptr;
     using std::unique_ptr;
     using std::endl;
     using std::hex;
@@ -99,7 +99,7 @@ namespace mongo {
             const JEntry *e;  // local db sentinel is already parsed out here into dbName
 
             // if not one of the two simple JEntry's above, this is the operation:
-            boost::shared_ptr<DurOp> op;
+            std::shared_ptr<DurOp> op;
         };
 
 
@@ -190,7 +190,7 @@ namespace mongo {
                     case JEntry::OpCode_FileCreated:
                     case JEntry::OpCode_DropDb: {
                         e.dbName = 0;
-                        boost::shared_ptr<DurOp> op = DurOp::read(lenOrOpCode, *_entries);
+                        std::shared_ptr<DurOp> op = DurOp::read(lenOrOpCode, *_entries);
                         if (_doDurOps) {
                             e.op = op;
                         }
@@ -302,7 +302,7 @@ namespace mongo {
                     log() << "journal error applying writes, file " << fn << " is not open" << endl;
                     verify(false);
                 }
-                boost::shared_ptr<DurableMappedFile> sp (new DurableMappedFile);
+                std::shared_ptr<DurableMappedFile> sp (new DurableMappedFile);
                 verify(sp->open(fn, false));
                 rj._mmfs.push_back(sp);
                 mmf = sp.get();

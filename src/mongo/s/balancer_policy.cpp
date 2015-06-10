@@ -255,7 +255,7 @@ namespace mongo {
             }
 
             for (const ShardType& shardData : shards) {
-                boost::shared_ptr<Shard> shard =
+                std::shared_ptr<Shard> shard =
                     grid.shardRegistry()->findIfExists(shardData.getName());
 
                 // The shard must still exist in the registry. If it doesn't, which may happen in

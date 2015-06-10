@@ -32,7 +32,6 @@
 
 #include "mongo/db/repl/oplogreader.h"
 
-#include <boost/shared_ptr.hpp>
 #include <string>
 
 #include "mongo/base/counter.h"
@@ -53,7 +52,7 @@
 
 namespace mongo {
 
-    using boost::shared_ptr;
+    using std::shared_ptr;
     using std::endl;
     using std::string;
 

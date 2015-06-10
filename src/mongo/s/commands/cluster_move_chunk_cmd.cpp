@@ -30,7 +30,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <boost/shared_ptr.hpp>
 
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/action_set.h"
@@ -51,7 +50,7 @@
 
 namespace mongo {
 
-    using boost::shared_ptr;
+    using std::shared_ptr;
     using std::unique_ptr;
     using std::string;
 
@@ -113,7 +112,7 @@ namespace {
 
             const NamespaceString nss(parseNs(dbname, cmdObj));
 
-            boost::shared_ptr<DBConfig> config;
+            std::shared_ptr<DBConfig> config;
 
             {
                 if (nss.size() == 0) {

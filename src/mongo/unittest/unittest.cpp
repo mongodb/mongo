@@ -32,7 +32,6 @@
 
 #include "mongo/unittest/unittest.h"
 
-#include <boost/shared_ptr.hpp>
 #include <iostream>
 #include <map>
 
@@ -48,7 +47,7 @@
 
 namespace mongo {
 
-    using boost::shared_ptr;
+    using std::shared_ptr;
     using std::string;
 
     namespace unittest {
@@ -57,7 +56,7 @@ namespace mongo {
             logger::MessageLogDomain* unittestOutput =
                 logger::globalLogManager()->getNamedDomain("unittest");
 
-            typedef std::map<std::string, boost::shared_ptr<Suite> > SuiteMap;
+            typedef std::map<std::string, std::shared_ptr<Suite> > SuiteMap;
 
             inline SuiteMap& _allSuites() {
                 static SuiteMap allSuites;
@@ -193,7 +192,7 @@ namespace {
         Suite::~Suite() {}
 
         void Suite::add(const std::string& name, const TestFunction& testFn) {
-            _tests.push_back(boost::shared_ptr<TestHolder>(new TestHolder(name, testFn)));
+            _tests.push_back(std::shared_ptr<TestHolder>(new TestHolder(name, testFn)));
         }
 
         Result * Suite::run( const std::string& filter, int runsPerTest ) {
@@ -206,9 +205,9 @@ namespace {
             Result * r = new Result( _name );
             Result::cur = r;
 
-            for ( std::vector< boost::shared_ptr<TestHolder> >::iterator i=_tests.begin();
+            for ( std::vector< std::shared_ptr<TestHolder> >::iterator i=_tests.begin();
                   i!=_tests.end(); i++ ) {
-                boost::shared_ptr<TestHolder>& tc = *i;
+                std::shared_ptr<TestHolder>& tc = *i;
                 if ( filter.size() && tc->getName().find( filter ) == std::string::npos ) {
                     LOG(1) << "\t skipping test: " << tc->getName() << " because doesn't match filter" << std::endl;
                     continue;
@@ -288,7 +287,7 @@ namespace {
 
             for ( std::vector<std::string>::iterator i=torun.begin(); i!=torun.end(); i++ ) {
                 std::string name = *i;
-                boost::shared_ptr<Suite>& s = _allSuites()[name];
+                std::shared_ptr<Suite>& s = _allSuites()[name];
                 fassert( 16145, s != NULL );
 
                 log() << "going to run suite: " << name << std::endl;
@@ -353,13 +352,13 @@ namespace {
         }
 
         void Suite::registerSuite( const std::string& name , Suite* s ) {
-            boost::shared_ptr<Suite>& m = _allSuites()[name];
+            std::shared_ptr<Suite>& m = _allSuites()[name];
             fassert( 10162, !m );
             m.reset(s);
         }
 
         Suite* Suite::getSuite(const std::string& name) {
-            boost::shared_ptr<Suite>& result = _allSuites()[name];
+            std::shared_ptr<Suite>& result = _allSuites()[name];
             if (!result) {
                 // Suites are self-registering.
                 new Suite(name);

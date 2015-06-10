@@ -48,8 +48,6 @@
 #include "mongo/db/sorter/sorter.h"
 
 #include <boost/filesystem/operations.hpp>
-#include <boost/make_shared.hpp>
-#include <boost/shared_ptr.hpp>
 #include <snappy.h>
 
 #include "mongo/base/string_data.h"
@@ -67,7 +65,7 @@
 namespace mongo {
     namespace sorter {
 
-        using boost::shared_ptr;
+        using std::shared_ptr;
         using namespace mongoutils;
 
         // We need to use the "real" errno everywhere, not GetLastError() on Windows
@@ -164,7 +162,7 @@ namespace mongo {
 
             FileIterator(const std::string& fileName,
                          const Settings& settings,
-                         boost::shared_ptr<FileDeleter> fileDeleter)
+                         std::shared_ptr<FileDeleter> fileDeleter)
                 : _settings(settings)
                 , _done(false)
                 , _fileName(fileName)
@@ -260,7 +258,7 @@ namespace mongo {
             std::unique_ptr<char[]> _buffer;
             std::unique_ptr<BufReader> _reader;
             std::string _fileName;
-            boost::shared_ptr<FileDeleter> _fileDeleter; // Must outlive _file
+            std::shared_ptr<FileDeleter> _fileDeleter; // Must outlive _file
             std::ifstream _file;
         };
 
@@ -272,7 +270,7 @@ namespace mongo {
             typedef std::pair<Key, Value> Data;
 
 
-            MergeIterator(const std::vector<boost::shared_ptr<Input> >& iters,
+            MergeIterator(const std::vector<std::shared_ptr<Input> >& iters,
                           const SortOptions& opts,
                           const Comparator& comp)
                 : _opts(opts)
@@ -283,7 +281,7 @@ namespace mongo {
                 for (size_t i = 0; i < iters.size(); i++) {
                     if (iters[i]->more()) {
                         _heap.push_back(
-                            boost::make_shared<Stream>(i, iters[i]->next(), iters[i]));
+                            std::make_shared<Stream>(i, iters[i]->next(), iters[i]));
                     }
                 }
 
@@ -340,7 +338,7 @@ namespace mongo {
         private:
             class Stream { // Data + Iterator
             public:
-                Stream(size_t fileNum, const Data& first, boost::shared_ptr<Input> rest)
+                Stream(size_t fileNum, const Data& first, std::shared_ptr<Input> rest)
                     : fileNum(fileNum)
                     , _current(first)
                     , _rest(rest)
@@ -359,7 +357,7 @@ namespace mongo {
                 const size_t fileNum;
             private:
                 Data _current;
-                boost::shared_ptr<Input> _rest;
+                std::shared_ptr<Input> _rest;
             };
 
             class STLComparator { // uses greater rather than less-than to maintain a MinHeap
@@ -383,8 +381,8 @@ namespace mongo {
             SortOptions _opts;
             unsigned long long _remaining;
             bool _first;
-            boost::shared_ptr<Stream> _current;
-            std::vector<boost::shared_ptr<Stream> > _heap; // MinHeap
+            std::shared_ptr<Stream> _current;
+            std::vector<std::shared_ptr<Stream> > _heap; // MinHeap
             STLComparator _greater; // named so calls make sense
         };
 
@@ -474,7 +472,7 @@ namespace mongo {
                     writer.addAlreadySorted(_data.front().first, _data.front().second);
                 }
 
-                _iters.push_back(boost::shared_ptr<Iterator>(writer.done()));
+                _iters.push_back(std::shared_ptr<Iterator>(writer.done()));
 
                 _memUsed = 0;
             }
@@ -484,7 +482,7 @@ namespace mongo {
             SortOptions _opts;
             size_t _memUsed;
             std::deque<Data> _data; // the "current" data
-            std::vector<boost::shared_ptr<Iterator> > _iters; // data that has already been spilled
+            std::vector<std::shared_ptr<Iterator> > _iters; // data that has already been spilled
         };
 
         template <typename Key, typename Value, typename Comparator>
@@ -749,7 +747,7 @@ namespace mongo {
                 // clear _data and release backing array's memory
                 std::vector<Data>().swap(_data);
 
-                _iters.push_back(boost::shared_ptr<Iterator>(writer.done()));
+                _iters.push_back(std::shared_ptr<Iterator>(writer.done()));
 
                 _memUsed = 0;
             }
@@ -759,7 +757,7 @@ namespace mongo {
             SortOptions _opts;
             size_t _memUsed;
             std::vector<Data> _data; // the "current" data. Organized as max-heap if size == limit.
-            std::vector<boost::shared_ptr<Iterator> > _iters; // data that has already been spilled
+            std::vector<std::shared_ptr<Iterator> > _iters; // data that has already been spilled
 
             // See updateCutoff() for a full description of how these members are used.
             bool _haveCutoff;
@@ -809,7 +807,7 @@ namespace mongo {
                                      << sorter::myErrnoWithDescription(),
                 _file.good());
 
-        _fileDeleter = boost::make_shared<sorter::FileDeleter>(_fileName);
+        _fileDeleter = std::make_shared<sorter::FileDeleter>(_fileName);
 
         // throw on failure
         _file.exceptions(std::ios::failbit | std::ios::badbit | std::ios::eofbit);
@@ -867,7 +865,7 @@ namespace mongo {
     template <typename Key, typename Value>
     template <typename Comparator>
     SortIteratorInterface<Key, Value>* SortIteratorInterface<Key, Value>::merge(
-            const std::vector<boost::shared_ptr<SortIteratorInterface> >& iters,
+            const std::vector<std::shared_ptr<SortIteratorInterface> >& iters,
             const SortOptions& opts,
             const Comparator& comp) {
         return new sorter::MergeIterator<Key, Value, Comparator>(iters, opts, comp);

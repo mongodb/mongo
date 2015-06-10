@@ -32,7 +32,6 @@
 
 #include <boost/optional.hpp>
 #include <boost/intrusive_ptr.hpp>
-#include <boost/shared_ptr.hpp>
 #include <boost/unordered_map.hpp>
 #include <deque>
 
@@ -240,7 +239,7 @@ namespace mongo {
             // Add new methods as needed.
         };
 
-        void injectMongodInterface(boost::shared_ptr<MongodInterface> mongod) {
+        void injectMongodInterface(std::shared_ptr<MongodInterface> mongod) {
             _mongod = mongod;
         }
 
@@ -249,7 +248,7 @@ namespace mongo {
         virtual ~DocumentSourceNeedsMongod() {}
 
         // Gives subclasses access to a MongodInterface implementation
-        boost::shared_ptr<MongodInterface> _mongod;
+        std::shared_ptr<MongodInterface> _mongod;
     };
 
 
@@ -369,7 +368,7 @@ namespace mongo {
          */
         static boost::intrusive_ptr<DocumentSourceCursor> create(
             const std::string& ns,
-            const boost::shared_ptr<PlanExecutor>& exec,
+            const std::shared_ptr<PlanExecutor>& exec,
             const boost::intrusive_ptr<ExpressionContext> &pExpCtx);
 
         /*
@@ -413,7 +412,7 @@ namespace mongo {
     private:
         DocumentSourceCursor(
             const std::string& ns,
-            const boost::shared_ptr<PlanExecutor>& exec,
+            const std::shared_ptr<PlanExecutor>& exec,
             const boost::intrusive_ptr<ExpressionContext> &pExpCtx);
 
         void loadBatch();
@@ -429,7 +428,7 @@ namespace mongo {
         long long _docsAddedToBatches; // for _limit enforcement
 
         const std::string _ns;
-        boost::shared_ptr<PlanExecutor> _exec; // PipelineProxyStage holds a weak_ptr to this.
+        std::shared_ptr<PlanExecutor> _exec; // PipelineProxyStage holds a weak_ptr to this.
     };
 
 
@@ -491,7 +490,7 @@ namespace mongo {
         DocumentSourceGroup(const boost::intrusive_ptr<ExpressionContext> &pExpCtx);
 
         /// Spill groups map to disk and returns an iterator to the file.
-        boost::shared_ptr<Sorter<Value, Value>::Iterator> spill();
+        std::shared_ptr<Sorter<Value, Value>::Iterator> spill();
 
         // Only used by spill. Would be function-local if that were legal in C++03.
         class SpillSTLComparator;
@@ -656,7 +655,7 @@ namespace mongo {
         };
 
         // using list to enable removing arbitrary elements
-        typedef std::list<boost::shared_ptr<CursorAndConnection> > Cursors;
+        typedef std::list<std::shared_ptr<CursorAndConnection> > Cursors;
 
         DocumentSourceMergeCursors(
             const CursorIds& cursorIds,

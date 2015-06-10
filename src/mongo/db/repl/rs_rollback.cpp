@@ -33,7 +33,6 @@
 
 #include "mongo/db/repl/rs_rollback.h"
 
-#include <boost/shared_ptr.hpp>
 #include <memory>
 
 #include "mongo/db/auth/authorization_manager_global.h"
@@ -103,7 +102,7 @@
 
 namespace mongo {
 
-    using boost::shared_ptr;
+    using std::shared_ptr;
     using std::unique_ptr;
     using std::endl;
     using std::list;

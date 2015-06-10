@@ -604,7 +604,7 @@ namespace {
 
     vector<DbWebHandler*> * DbWebHandler::_handlers = 0;
 
-    void webServerListenThread(boost::shared_ptr<DbWebServer> dbWebServer) {
+    void webServerListenThread(std::shared_ptr<DbWebServer> dbWebServer) {
         Client::initThread("websvr");
 
         dbWebServer->initAndListen();

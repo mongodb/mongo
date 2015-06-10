@@ -30,7 +30,6 @@
 
 #pragma once
 
-#include <boost/shared_ptr.hpp>
 
 #include "mongo/db/storage/mmap_v1/dur_journalformat.h"
 #include "mongo/db/storage/paths.h"
@@ -64,7 +63,7 @@ namespace mongo {
             /** read a durop from journal file referenced by br.
                 @param opcode the opcode which has already been written from the bufreader
             */
-            static boost::shared_ptr<DurOp> read(unsigned opcode, BufReader& br);
+            static std::shared_ptr<DurOp> read(unsigned opcode, BufReader& br);
 
             /** replay the operation (during recovery)
                 throws

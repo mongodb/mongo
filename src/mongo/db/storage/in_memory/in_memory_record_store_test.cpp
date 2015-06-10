@@ -30,7 +30,6 @@
 
 #include "mongo/db/storage/in_memory/in_memory_record_store.h"
 
-#include <boost/shared_ptr.hpp>
 
 #include "mongo/db/storage/in_memory/in_memory_recovery_unit.h"
 #include "mongo/db/storage/record_store_test_harness.h"
@@ -51,7 +50,7 @@ namespace mongo {
             return new InMemoryRecoveryUnit();
         }
 
-        boost::shared_ptr<void> data;
+        std::shared_ptr<void> data;
     };
 
     HarnessHelper* newHarnessHelper() {

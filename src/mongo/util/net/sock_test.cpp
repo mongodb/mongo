@@ -30,7 +30,6 @@
 
 #include "mongo/util/net/sock.h"
 
-#include <boost/shared_ptr.hpp>
 #include <boost/thread.hpp>
 
 #ifndef _WIN32
@@ -47,9 +46,9 @@
 namespace {
 
     using namespace mongo;
-    using boost::shared_ptr;
+    using std::shared_ptr;
 
-    typedef boost::shared_ptr<Socket> SocketPtr;
+    typedef std::shared_ptr<Socket> SocketPtr;
     typedef std::pair<SocketPtr, SocketPtr> SocketPair;
 
     // On UNIX, make a connected pair of PF_LOCAL (aka PF_UNIX) sockets via the native 'socketpair'

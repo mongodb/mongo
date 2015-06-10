@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/shared_ptr.hpp>
 #include <string>
 #include <vector>
 
@@ -67,7 +66,7 @@ namespace mongo {
         /**
          * Implicitly creates the specified database as non-sharded.
          */
-        StatusWith<boost::shared_ptr<DBConfig>> implicitCreateDb(const std::string& dbName);
+        StatusWith<std::shared_ptr<DBConfig>> implicitCreateDb(const std::string& dbName);
 
         /**
          * @return true if shards and config servers are allowed to use 'localhost' in address

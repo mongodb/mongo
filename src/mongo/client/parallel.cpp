@@ -34,7 +34,6 @@
 
 #include "mongo/client/parallel.h"
 
-#include <boost/shared_ptr.hpp>
 
 #include "mongo/client/connpool.h"
 #include "mongo/client/constants.h"
@@ -53,7 +52,7 @@
 
 namespace mongo {
 
-    using boost::shared_ptr;
+    using std::shared_ptr;
     using std::endl;
     using std::list;
     using std::map;
@@ -560,7 +559,7 @@ namespace mongo {
     void ParallelSortClusteredCursor::setupVersionAndHandleSlaveOk(
         PCStatePtr state,
         const ShardId& shardId,
-        boost::shared_ptr<Shard> primary,
+        std::shared_ptr<Shard> primary,
         const NamespaceString& ns,
         const string& vinfo,
         ChunkManagerPtr manager ) {
@@ -1187,7 +1186,7 @@ namespace mongo {
         return _cursorMap.size();
     }
 
-    boost::shared_ptr<Shard> ParallelSortClusteredCursor::getQueryShard() {
+    std::shared_ptr<Shard> ParallelSortClusteredCursor::getQueryShard() {
         return grid.shardRegistry()->findIfExists(_cursorMap.begin()->first);
     }
 
@@ -1199,9 +1198,9 @@ namespace mongo {
         }
     }
 
-    boost::shared_ptr<Shard> ParallelSortClusteredCursor::getPrimary() {
+    std::shared_ptr<Shard> ParallelSortClusteredCursor::getPrimary() {
         if (isSharded())
-            return boost::shared_ptr<Shard>();
+            return std::shared_ptr<Shard>();
         return _cursorMap.begin()->second.pcState->primary;
     }
 

@@ -40,7 +40,7 @@
 namespace mongo {
 
     using boost::intrusive_ptr;
-    using boost::shared_ptr;
+    using std::shared_ptr;
     using std::pair;
     using std::vector;
 

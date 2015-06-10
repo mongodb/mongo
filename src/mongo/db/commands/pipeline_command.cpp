@@ -28,7 +28,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <boost/shared_ptr.hpp>
 #include <vector>
 
 #include "mongo/db/auth/action_set.h"
@@ -57,7 +56,7 @@ namespace mongo {
 
     using boost::intrusive_ptr;
     using std::unique_ptr;
-    using boost::shared_ptr;
+    using std::shared_ptr;
     using std::unique_ptr;
     using std::string;
     using std::stringstream;
@@ -232,7 +231,7 @@ namespace mongo {
 
                 // This does mongod-specific stuff like creating the input PlanExecutor and adding
                 // it to the front of the pipeline if needed.
-                boost::shared_ptr<PlanExecutor> input = PipelineD::prepareCursorSource(txn,
+                std::shared_ptr<PlanExecutor> input = PipelineD::prepareCursorSource(txn,
                                                                                        collection,
                                                                                        pPipeline,
                                                                                        pCtx);

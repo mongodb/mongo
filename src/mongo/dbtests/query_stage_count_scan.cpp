@@ -26,7 +26,6 @@
  *    then also delete it in the license file.
  */
 
-#include <boost/shared_ptr.hpp>
 
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/catalog/collection.h"
@@ -47,7 +46,7 @@
 
 namespace QueryStageCountScan {
 
-    using boost::shared_ptr;
+    using std::shared_ptr;
 
     class CountBase {
     public:

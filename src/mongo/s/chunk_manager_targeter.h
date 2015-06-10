@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/shared_ptr.hpp>
 #include <map>
 
 #include "mongo/bson/bsonobj.h"
@@ -156,8 +155,8 @@ namespace mongo {
 
         // Zero or one of these are filled at all times
         // If sharded, _manager, if unsharded, _primary, on error, neither
-        boost::shared_ptr<ChunkManager> _manager;
-        boost::shared_ptr<Shard> _primary;
+        std::shared_ptr<ChunkManager> _manager;
+        std::shared_ptr<Shard> _primary;
 
         // Map of shard->remote shard version reported from stale errors
         ShardVersionMap _remoteShardVersions;

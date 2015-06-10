@@ -32,7 +32,6 @@
 
 #include "mongo/s/chunk_diff.h"
 
-#include <boost/shared_ptr.hpp>
 
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/s/catalog/type_chunk.h"
@@ -260,6 +259,6 @@ namespace mongo {
 
     // Ensures that these instances of the template are compiled
     template class ConfigDiffTracker<BSONObj, std::string>;
-    template class ConfigDiffTracker<boost::shared_ptr<Chunk>, std::string>;
+    template class ConfigDiffTracker<std::shared_ptr<Chunk>, std::string>;
 
 } // namespace mongo

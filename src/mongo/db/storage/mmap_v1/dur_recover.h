@@ -31,7 +31,6 @@
 #pragma once
 
 #include <boost/filesystem/operations.hpp>
-#include <boost/shared_ptr.hpp>
 #include <list>
 
 #include "mongo/db/storage/mmap_v1/dur_journalformat.h"
@@ -87,7 +86,7 @@ namespace mongo {
 
             // Set of memory mapped files and a mutex to protect them
             mongo::mutex _mx;
-            std::list<boost::shared_ptr<DurableMappedFile> > _mmfs;
+            std::list<std::shared_ptr<DurableMappedFile> > _mmfs;
 
             // Are we in recovery or WRITETODATAFILES
             bool _recovering;

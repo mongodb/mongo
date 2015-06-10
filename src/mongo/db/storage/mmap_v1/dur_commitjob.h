@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/shared_ptr.hpp>
 
 #include "mongo/db/storage/mmap_v1/durop.h"
 #include "mongo/util/concurrency/mutex.h"
@@ -36,7 +35,7 @@
 namespace mongo {
 namespace dur {
 
-    typedef std::vector<boost::shared_ptr<DurOp> > DurOpsVector;
+    typedef std::vector<std::shared_ptr<DurOp> > DurOpsVector;
 
     /**
      * Declaration of an intent to write to a region of a memory mapped view. We store the end
@@ -141,7 +140,7 @@ namespace dur {
         /**
             * Note an operation other than a "basic write".
             */
-        void noteOp(boost::shared_ptr<DurOp> p);
+        void noteOp(std::shared_ptr<DurOp> p);
 
         /**
             * Record/note an intent to write.

@@ -37,7 +37,6 @@
 #include <pcrecpp.h>
 
 #include <boost/noncopyable.hpp>
-#include <boost/shared_ptr.hpp>
 #include <boost/thread/thread.hpp>
 #include <iostream>
 
@@ -198,25 +197,25 @@ namespace mongo {
         if ( ! args["trapPattern"].eoo() ){
             const char* regex = args["trapPattern"].regex();
             const char* flags = args["trapPattern"].regexFlags();
-            this->trapPattern = boost::shared_ptr< pcrecpp::RE >( new pcrecpp::RE( regex, flags2options( flags ) ) );
+            this->trapPattern = std::shared_ptr< pcrecpp::RE >( new pcrecpp::RE( regex, flags2options( flags ) ) );
         }
 
         if ( ! args["noTrapPattern"].eoo() ){
             const char* regex = args["noTrapPattern"].regex();
             const char* flags = args["noTrapPattern"].regexFlags();
-            this->noTrapPattern = boost::shared_ptr< pcrecpp::RE >( new pcrecpp::RE( regex, flags2options( flags ) ) );
+            this->noTrapPattern = std::shared_ptr< pcrecpp::RE >( new pcrecpp::RE( regex, flags2options( flags ) ) );
         }
 
         if ( ! args["watchPattern"].eoo() ){
             const char* regex = args["watchPattern"].regex();
             const char* flags = args["watchPattern"].regexFlags();
-            this->watchPattern = boost::shared_ptr< pcrecpp::RE >( new pcrecpp::RE( regex, flags2options( flags ) ) );
+            this->watchPattern = std::shared_ptr< pcrecpp::RE >( new pcrecpp::RE( regex, flags2options( flags ) ) );
         }
 
         if ( ! args["noWatchPattern"].eoo() ){
             const char* regex = args["noWatchPattern"].regex();
             const char* flags = args["noWatchPattern"].regexFlags();
-            this->noWatchPattern = boost::shared_ptr< pcrecpp::RE >( new pcrecpp::RE( regex, flags2options( flags ) ) );
+            this->noWatchPattern = std::shared_ptr< pcrecpp::RE >( new pcrecpp::RE( regex, flags2options( flags ) ) );
         }
 
         this->ops = args["ops"].Obj().getOwned();

@@ -27,7 +27,6 @@
 
 #include "mongo/util/options_parser/environment.h"
 
-#include <boost/shared_ptr.hpp>
 #include <iostream>
 
 #include "mongo/bson/util/builder.h"
@@ -37,7 +36,7 @@
 namespace mongo {
 namespace optionenvironment {
 
-    using boost::shared_ptr;
+    using std::shared_ptr;
     using std::string;
     using std::type_info;
 

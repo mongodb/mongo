@@ -28,7 +28,6 @@
 #include "mongo/util/options_parser/option_section.h"
 
 #include <algorithm>
-#include <boost/shared_ptr.hpp>
 #include <iostream>
 #include <sstream>
 
@@ -39,7 +38,7 @@
 namespace mongo {
 namespace optionenvironment {
 
-    using boost::shared_ptr;
+    using std::shared_ptr;
 
     // Registration interface
 
@@ -544,11 +543,11 @@ namespace optionenvironment {
     }
 
     Status OptionSection::getConstraints(
-            std::vector<boost::shared_ptr<Constraint > >* constraints) const {
+            std::vector<std::shared_ptr<Constraint > >* constraints) const {
 
         std::list<OptionDescription>::const_iterator oditerator;
         for (oditerator = _options.begin(); oditerator != _options.end(); oditerator++) {
-            std::vector<boost::shared_ptr<Constraint> >::const_iterator citerator;
+            std::vector<std::shared_ptr<Constraint> >::const_iterator citerator;
             for (citerator = oditerator->_constraints.begin();
                  citerator != oditerator->_constraints.end(); citerator++) {
                 constraints->push_back(*citerator);

@@ -30,7 +30,6 @@
 
 #pragma once
 
-#include <boost/shared_ptr.hpp>
 
 #include "mongo/db/keypattern.h"
 #include "mongo/platform/atomic_word.h"
@@ -288,6 +287,6 @@ namespace mongo {
         static int mkDataWritten();
     };
 
-    typedef boost::shared_ptr<const Chunk> ChunkPtr;
+    typedef std::shared_ptr<const Chunk> ChunkPtr;
 
 } // namespace mongo

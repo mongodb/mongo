@@ -30,7 +30,6 @@
 
 #include "mongo/db/pipeline/document_source.h"
 
-#include <boost/make_shared.hpp>
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/document.h"
@@ -265,9 +264,9 @@ namespace mongo {
     };
 
     void DocumentSourceSort::populateFromCursors(const vector<DBClientCursor*>& cursors) {
-        vector<boost::shared_ptr<MySorter::Iterator> > iterators;
+        vector<std::shared_ptr<MySorter::Iterator> > iterators;
         for (size_t i = 0; i < cursors.size(); i++) {
-            iterators.push_back(boost::make_shared<IteratorFromCursor>(this, cursors[i]));
+            iterators.push_back(std::make_shared<IteratorFromCursor>(this, cursors[i]));
         }
 
         _output.reset(MySorter::Iterator::merge(iterators, makeSortOptions(), Comparator(*this)));
@@ -291,9 +290,9 @@ namespace mongo {
     };
 
     void DocumentSourceSort::populateFromBsonArrays(const vector<BSONArray>& arrays) {
-        vector<boost::shared_ptr<MySorter::Iterator> > iterators;
+        vector<std::shared_ptr<MySorter::Iterator> > iterators;
         for (size_t i = 0; i < arrays.size(); i++) {
-            iterators.push_back(boost::make_shared<IteratorFromBsonArray>(this, arrays[i]));
+            iterators.push_back(std::make_shared<IteratorFromBsonArray>(this, arrays[i]));
         }
 
         _output.reset(MySorter::Iterator::merge(iterators, makeSortOptions(), Comparator(*this)));

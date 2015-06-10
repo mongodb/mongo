@@ -30,7 +30,6 @@
  * This file tests db/exec/keep_mutations.cpp.
  */
 
-#include <boost/shared_ptr.hpp>
 
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/catalog/collection.h"
@@ -52,7 +51,7 @@
 
 namespace QueryStageKeep {
 
-    using boost::shared_ptr;
+    using std::shared_ptr;
     using std::set;
 
     class QueryStageKeepBase {
