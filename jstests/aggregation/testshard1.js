@@ -206,10 +206,12 @@ testSortLimit(100, -1);
 
 function testAvgStdDev() {
     jsTestLog('testing $avg and $stdDevPop in sharded $group');
-    var res = aggregateOrdered(db.ts1, [{$group: {_id: null,
-                                                  avg: {$avg: '$counter'},
-                                                  stdDevPop: {$stdDevPop: '$counter'},
-                                                 }}]);
+    // Note: not using aggregateOrdered since it requires exact results. $stdDevPop can vary
+    // slightly between runs if a migration occurs. This is why we use assert.close below.
+    var res = db.ts1.aggregate([{$group: {_id: null,
+                                          avg: {$avg: '$counter'},
+                                          stdDevPop: {$stdDevPop: '$counter'},
+                                         }}]).toArray()
     // http://en.wikipedia.org/wiki/Arithmetic_progression#Sum
     var avg = (1 + nItems) / 2
     assert.close(res[0].avg, avg, '', 10 /*decimal places*/);

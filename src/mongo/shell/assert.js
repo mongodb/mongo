@@ -327,11 +327,22 @@ assert.close = function(a, b, msg, places){
     if (places === undefined) {
         places = 4;
     }
-    if (Math.round((a - b) * Math.pow(10, places)) === 0) {
+
+    // This treats 'places' as digits past the decimal point.
+    var absoluteError = Math.abs(a - b);
+    if (Math.round(absoluteError * Math.pow(10, places)) === 0) {
         return;
     }
+
+    // This treats 'places' as significant figures.
+    var relativeError = Math.abs(absoluteError / b);
+    if (Math.round(relativeError * Math.pow(10, places)) === 0) {
+        return;
+    }
+
     doassert(a + " is not equal to " + b + " within " + places +
-              " places, diff: " + (a-b) + " : " + msg);
+              " places, absolute error: " + absoluteError +
+              ", relative error: " + relativeError + " : " + msg);
 };
 
 /**
