@@ -66,7 +66,7 @@ extern int __wt_block_salvage_end(WT_SESSION_IMPL *session, WT_BLOCK *block);
 extern int __wt_block_offset_invalid(WT_BLOCK *block, wt_off_t offset, uint32_t size);
 extern int __wt_block_salvage_next(WT_SESSION_IMPL *session, WT_BLOCK *block, uint8_t *addr, size_t *addr_sizep, int *eofp);
 extern int __wt_block_salvage_valid(WT_SESSION_IMPL *session, WT_BLOCK *block, uint8_t *addr, size_t addr_size, int valid);
-extern int __wt_block_verify_start( WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckptbase);
+extern int __wt_block_verify_start(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckptbase, const char *cfg[]);
 extern int __wt_block_verify_end(WT_SESSION_IMPL *session, WT_BLOCK *block);
 extern int __wt_verify_ckpt_load( WT_SESSION_IMPL *session, WT_BLOCK *block, WT_BLOCK_CKPT *ci);
 extern int __wt_verify_ckpt_unload(WT_SESSION_IMPL *session, WT_BLOCK *block);
