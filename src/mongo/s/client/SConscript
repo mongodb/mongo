@@ -36,7 +36,6 @@ env.CppUnitTest(
     source=[
         'multi_host_query_test.cpp',
         'shard_connection_test.cpp',
-        'shard_test.cpp',
     ],
     LIBDEPS=[
         'sharding_client',

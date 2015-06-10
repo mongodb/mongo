@@ -93,17 +93,13 @@ namespace {
 
 } // namespace
 
-    Shard::Shard(const ShardId& id,
-                 const ConnectionString& connStr,
-                 long long maxSizeMB,
-                 bool isDraining)
+    Shard::Shard(const ShardId& id, const ConnectionString& connStr)
         : _id(id),
-          _cs(connStr),
-          _maxSizeMB(maxSizeMB),
-          _isDraining(isDraining) {
+          _cs(connStr) {
 
-        invariant(_cs.isValid());
     }
+
+    Shard::~Shard() = default;
 
     RemoteCommandTargeter* Shard::getTargeter() const {
         return grid.shardRegistry()->getTargeterForShard(getId()).get();

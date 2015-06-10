@@ -75,10 +75,8 @@ namespace mongo {
          * Instantiates a new shard connection management object for the specified shard and
          * connection string.
          */
-        Shard(const ShardId& id,
-              const ConnectionString& connStr,
-              long long maxSizeMB,
-              bool isDraining);
+        Shard(const ShardId& id, const ConnectionString& connStr);
+        ~Shard();
 
         const ShardId& getId() const { return _id; }
 
@@ -88,34 +86,8 @@ namespace mongo {
 
         RemoteCommandRunner* getCommandRunner() const;
 
-        long long getMaxSizeMB() const {
-            return _maxSizeMB;
-        }
-
-        bool isDraining() const {
-            return _isDraining;
-        }
-
         std::string toString() const {
             return _id + ":" + _cs.toString();
-        }
-
-        friend std::ostream& operator << (std::ostream& out, const Shard& s) {
-            return (out << s.toString());
-        }
-
-        bool operator==( const Shard& s ) const {
-            if ( _id != s._id )
-                return false;
-            return _cs.sameLogicalEndpoint( s._cs );
-        }
-
-        bool operator!=( const Shard& s ) const {
-            return ! ( *this == s );
-        }
-
-        bool operator<(const Shard& o) const {
-            return _id < o._id;
         }
 
         BSONObj runCommand(const std::string& db, const std::string& simple) const;
@@ -146,9 +118,6 @@ namespace mongo {
     private:
         const ShardId _id;
         const ConnectionString _cs;
-
-        long long _maxSizeMB;    // in MBytes, 0 is unlimited
-        bool      _isDraining; // shard is currently being removed
     };
 
 } // namespace mongo

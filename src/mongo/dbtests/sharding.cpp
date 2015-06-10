@@ -108,12 +108,11 @@ namespace ShardingTests {
             _shardId = "shard0000";
             // Since we've redirected the conns, the host doesn't matter here so long as it's
             // prefixed with a "$"
-            Shard shard(_shardId,
-                        ConnectionString(HostAndPort("$hostFooBar:27017")),
-                        0 /* maxSize */,
-                        false /* draining */);
+            Shard shard(_shardId, ConnectionString(HostAndPort("$hostFooBar:27017")));
+
             // Need to run this to ensure the shard is in the global lookup table
             Shard::installShard(_shardId, shard);
+
             // Add dummy shard to config DB
             _client.insert(ShardType::ConfigNS,
                            BSON(ShardType::name() << _shardId <<

@@ -56,11 +56,9 @@ namespace mongo {
                 const string shardId = str::stream() << (i - 1);
                 _shardIds.insert(shardId);
 
-                Shard shard(shardId,
-                            ConnectionString(HostAndPort(shardId)),
-                            0 /* maxSize */,
-                            false /* draining */);
+                Shard shard(shardId, ConnectionString(HostAndPort(shardId)));
                 Shard::installShard(shardId, shard);
+
                 boost::shared_ptr<Chunk> chunk(new Chunk(this,
                                                          mySplitPoints[i - 1],
                                                          mySplitPoints[i],

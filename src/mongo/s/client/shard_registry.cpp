@@ -129,10 +129,7 @@ namespace mongo {
     }
 
     void ShardRegistry::set(const ShardId& id, const Shard& s) {
-        shared_ptr<Shard> ss(boost::make_shared<Shard>(s.getId(),
-                                                       s.getConnString(),
-                                                       s.getMaxSizeMB(),
-                                                       s.isDraining()));
+        shared_ptr<Shard> ss(boost::make_shared<Shard>(s.getId(), s.getConnString()));
 
         boost::lock_guard<boost::mutex> lk(_mutex);
         _lookup[id] = ss;
@@ -207,11 +204,7 @@ namespace mongo {
 
         const ConnectionString& shardHost(shardHostStatus.getValue());
 
-        shared_ptr<Shard> shard = boost::make_shared<Shard>(shardType.getName(),
-                                                            shardHost,
-                                                            shardType.getMaxSize(),
-                                                            shardType.getDraining());
-
+        shared_ptr<Shard> shard = boost::make_shared<Shard>(shardType.getName(), shardHost);
         _lookup[shardType.getName()] = shard;
 
         // Sync cluster connections (legacy config server) do not go through the normal targeting
