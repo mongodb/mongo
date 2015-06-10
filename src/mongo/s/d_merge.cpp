@@ -239,7 +239,6 @@ namespace mongo {
 
         // Look for hole in range
         for (size_t i = 1; i < chunksToMerge.size(); ++i) {
-            log() << "chunksToMerge[" << i-1 << "] = " << chunksToMerge[i-1].toBSON().toString();
             if (chunksToMerge[i-1].getMax().woCompare(chunksToMerge[i].getMin()) != 0) {
                 *errMsg = stream() << "could not merge chunks, collection " << nss.ns()
                                    << " has a hole in the range " << rangeToString(minKey, maxKey)
