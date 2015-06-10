@@ -31,9 +31,11 @@
 #include "mongo/rpc/legacy_reply.h"
 
 #include <utility>
+#include <tuple>
 
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/rpc/metadata.h"
 
 namespace mongo {
 namespace rpc {
@@ -61,12 +63,15 @@ namespace rpc {
                 str::stream() << "Got legacy command reply with a bad startingFrom field,"
                               << " expected a value of 0 but got " << qr.getStartingFrom(),
                 qr.getStartingFrom() == 0);
+
         // TODO bson validation
-        _commandReply = BSONObj(qr.data());
+        std::tie(_commandReply, _metadata) = uassertStatusOK(
+            rpc::upconvertReplyMetadata(BSONObj(qr.data()))
+        );
     }
 
     const BSONObj& LegacyReply::getMetadata() const {
-        return _metadataPlaceholder;
+        return _metadata;
     }
 
     const BSONObj& LegacyReply::getCommandReply() const {

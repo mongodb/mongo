@@ -41,6 +41,7 @@
 #include "mongo/db/lasterror.h"
 #include "mongo/db/query/find_and_modify_request.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/rpc/metadata/sharding_metadata.h"
 #include "mongo/s/type_lockpings.h"
 #include "mongo/s/type_locks.h"
 #include "mongo/s/write_ops/wc_error_detail.h"
@@ -115,11 +116,14 @@ namespace {
 
     /**
      * Extract the electionId from a command response.
+     *
+     * TODO: this needs to support OP_COMMAND metadata.
      */
     StatusWith<OID> extractElectionId(const BSONObj& responseObj) {
+
         BSONElement gleStatsElem;
         auto gleStatus = bsonExtractTypedField(responseObj,
-                                               kGLEStatsFieldName,
+                                               "$gleStats",
                                                Object,
                                                &gleStatsElem);
 
@@ -130,7 +134,7 @@ namespace {
         OID electionId;
 
         auto electionIdStatus = bsonExtractOIDField(gleStatsElem.Obj(),
-                                                    kGLEStatsElectionIdFieldName,
+                                                    "electionId",
                                                     &electionId);
 
         if (!electionIdStatus.isOK()) {

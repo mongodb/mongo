@@ -31,6 +31,7 @@
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/rpc/legacy_reply_builder.h"
+#include "mongo/rpc/metadata.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 
@@ -50,14 +51,17 @@ namespace rpc {
 
     LegacyReplyBuilder& LegacyReplyBuilder::setMetadata(BSONObj metadata) {
         invariant(_state == State::kMetadata);
-        // no op for now: SERVER-18236
+        _metadata = std::move(metadata);
         _state = State::kCommandReply;
         return *this;
     }
 
     LegacyReplyBuilder& LegacyReplyBuilder::setRawCommandReply(BSONObj commandReply) {
         invariant(_state == State::kCommandReply);
-        commandReply.appendSelfToBufBuilder(_builder);
+        BSONObj downconvertedCommandReply = uassertStatusOK(
+            rpc::downconvertReplyMetadata(std::move(commandReply), std::move(_metadata))
+        );
+        downconvertedCommandReply.appendSelfToBufBuilder(_builder);
         _state = State::kOutputDocs;
         return *this;
     }

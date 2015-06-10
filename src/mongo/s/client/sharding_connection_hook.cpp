@@ -104,7 +104,11 @@ namespace {
             // For every DBClient created by mongos, add a hook that will capture the response from
             // commands we pass along from the client, so that we can target the correct node when
             // subsequent getLastError calls are made by mongos.
-            conn->setPostRunCommandHook(stdx::bind(&saveGLEStats, stdx::placeholders::_1, stdx::placeholders::_2));
+            conn->setReplyMetadataReader([](const BSONObj& metadataObj, StringData hostString)
+                                         -> Status {
+                saveGLEStats(metadataObj, hostString);
+                return Status::OK();
+            });
         }
 
         // For every DBClient created by mongos, add a hook that will append impersonated users

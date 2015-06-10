@@ -38,10 +38,6 @@ namespace mongo {
     class BSONObjBuilder;
 
     static const char kUpsertedFieldName[] = "upserted";
-    static const char kGLEStatsFieldName[] = "$gleStats";
-    static const char kGLEStatsLastOpTimeFieldName[] = "lastOpTime";
-    static const char kGLEStatsLastOpTimeTermFieldName[] = "lastOpTimeTerm";
-    static const char kGLEStatsElectionIdFieldName[] = "electionId";
 
     class LastError {
     public:

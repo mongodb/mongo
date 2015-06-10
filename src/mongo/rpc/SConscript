@@ -115,6 +115,7 @@ env.Library(
     source=[
         'metadata.cpp',
         'metadata/server_selection_metadata.cpp',
+        'metadata/sharding_metadata.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/read_preference',
@@ -128,6 +129,7 @@ env.CppUnitTest(
     ],
     source=[
         'metadata/server_selection_metadata_test.cpp',
+        'metadata/sharding_metadata_test.cpp',
     ],
     LIBDEPS=[
         'metadata',

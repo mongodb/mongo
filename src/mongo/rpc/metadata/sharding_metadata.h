@@ -26,61 +26,64 @@
  *    it in the license file.
  */
 
-#pragma once
-
-#include "mongo/db/dbmessage.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/rpc/document_range.h"
-#include "mongo/rpc/reply_interface.h"
 
 namespace mongo {
-    class Message;
-
+    class BSONObj;
+    class BSONObjBuilder;
+    class Status;
+    template <typename T> class StatusWith;
 namespace rpc {
 
     /**
-     * Immutable view of an OP_REPLY legacy-style command reply.
-     *
-     * TODO: BSON validation (SERVER-18167)
+     * This class compromises the reply metadata fields that concern sharding. MongoD attaches
+     * this information to a command reply, which MongoS uses to process getLastError.
      */
-    class LegacyReply : public ReplyInterface {
+    class ShardingMetadata {
     public:
 
         /**
-         * Construct a Reply from a Message.
-         * The underlying message MUST outlive the Reply.
+         * Reads ShardingMetadata from a metadata object.
          */
-        explicit LegacyReply(const Message* message);
+        static StatusWith<ShardingMetadata> readFromMetadata(const BSONObj& metadataObj);
 
         /**
-         * Accessor for the metadata object. Metadata is generally used for information
-         * that is independent of any specific command, e.g. auditing information.
+         * Writes ShardingMetadata to a metadata builder.
          */
-        const BSONObj& getMetadata() const final;
+        Status writeToMetadata(BSONObjBuilder* metadataBob) const;
 
         /**
-         * The result of executing the command.
+         * Rewrites the ShardingMetadata from the legacy OP_QUERY format to the metadata object
+         * format.
          */
-        const BSONObj& getCommandReply() const final;
+        static Status downconvert(const BSONObj& commandReply,
+                                  const BSONObj& replyMetadata,
+                                  BSONObjBuilder* legacyCommandReply);
 
         /**
-         * A variable number of BSON documents returned by the command. It is valid for the
-         * returned range to be empty.
-         *
-         * Example usage:
-         *
-         * for (auto&& doc : reply.getOutputDocs()) {
-         *    ... do stuff with doc
-         * }
+         * Rewrites the ShardingMetadata from the legacy OP_QUERY format to the metadata object
+         * format.
          */
-        DocumentRange getOutputDocs() const final;
+        static Status upconvert(const BSONObj& legacyCommandReply,
+                                BSONObjBuilder* commandReplyBob,
+                                BSONObjBuilder* metadataBob);
+
+        /**
+         * Gets the OpTime of the oplog entry of the last succssful write operation executed by the
+         * server that produced the metadata.
+         */
+        const Timestamp& getLastOpTime() const;
+
+        /**
+         * Gets the most recent election id observed by the server that produced the metadata.
+         */
+        const OID& getLastElectionId() const;
+
+        ShardingMetadata(Timestamp lastOpTime, OID lastElectionId);
 
     private:
-        const Message* _message;
-
-        // TODO: SERVER-18236
-        BSONObj _metadata{};
-        BSONObj _commandReply{}; // will hold unowned
+        Timestamp _lastOpTime;
+        OID _lastElectionId;
     };
 
 }  // namespace rpc

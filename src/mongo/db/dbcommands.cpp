@@ -97,6 +97,7 @@
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/rpc/metadata.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
+#include "mongo/rpc/metadata/sharding_metadata.h"
 #include "mongo/s/d_state.h"
 #include "mongo/s/stale_exception.h"  // for SendStaleConfigException
 #include "mongo/scripting/engine.h"
@@ -1153,16 +1154,6 @@ namespace mongo {
         bool _impersonation;
     };
 
-namespace {
-    // TODO remove as part of SERVER-18236
-    void appendGLEHelperData(BSONObjBuilder& bob, const Timestamp& opTime, const OID& oid) {
-        BSONObjBuilder subobj(bob.subobjStart(kGLEStatsFieldName));
-        subobj.append(kGLEStatsLastOpTimeFieldName, opTime);
-        subobj.appendOID(kGLEStatsElectionIdFieldName, const_cast<OID*>(&oid));
-        subobj.done();
-    }
-}  // namespace
-
     /**
      * this handles
      - auth
@@ -1373,18 +1364,19 @@ namespace {
         }
 
         bool result = this->run(txn, db, interposedCmd, queryFlags, errmsg, replyBuilderBob);
+        BSONObjBuilder metadataBob;
 
         // For commands from mongos, append some info to help getLastError(w) work.
         // TODO: refactor out of here as part of SERVER-18326
         if (replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet &&
             shardingState.enabled()) {
-            appendGLEHelperData(
-                    replyBuilderBob,
-                    repl::ReplClientInfo::forClient(txn->getClient()).getLastOp().getTimestamp(),
-                    replCoord->getElectionId());
+            rpc::ShardingMetadata(
+                repl::ReplClientInfo::forClient(txn->getClient()).getLastOp().getTimestamp(),
+                replCoord->getElectionId()
+            ).writeToMetadata(&metadataBob);
         }
 
-        replyBuilder->setMetadata(rpc::makeEmptyMetadata());
+        replyBuilder->setMetadata(metadataBob.done());
 
         auto cmdResponse = replyBuilderBob.done();
 

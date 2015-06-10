@@ -32,6 +32,8 @@
 
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/rpc/metadata/audit_metadata.h"
+#include "mongo/rpc/metadata/sharding_metadata.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
 
 namespace mongo {
@@ -81,10 +83,27 @@ namespace rpc {
         int legacyQueryFlags = 0;
         BSONObjBuilder legacyCommandBob;
 
-        auto downconvertStatus = ServerSelectionMetadata::downconvert(cmdObj,
-                                                                      metadata,
-                                                                      &legacyCommandBob,
-                                                                      &legacyQueryFlags);
+
+    StatusWith<CommandReplyWithMetadata> upconvertReplyMetadata(BSONObj legacyReply) {
+        BSONObjBuilder commandReplyBob;
+        BSONObjBuilder metadataBob;
+
+        auto upconvertStatus = ShardingMetadata::upconvert(legacyReply,
+                                                           &commandReplyBob,
+                                                           &metadataBob);
+        if (!upconvertStatus.isOK()) {
+            return upconvertStatus;
+        }
+
+        return std::make_tuple(commandReplyBob.obj(), metadataBob.obj());
+    }
+
+    StatusWith<BSONObj> downconvertReplyMetadata(BSONObj commandReply, BSONObj replyMetadata) {
+        BSONObjBuilder legacyCommandReplyBob;
+
+        auto downconvertStatus = ShardingMetadata::downconvert(commandReply,
+                                                               replyMetadata,
+                                                               &legacyCommandReplyBob);
         if (!downconvertStatus.isOK()) {
             return downconvertStatus;
         }

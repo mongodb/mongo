@@ -57,6 +57,7 @@ namespace rpc {
 
     private:
         BufBuilder _builder{};
+        BSONObj _metadata{};
         std::unique_ptr<Message> _message;
         State _state{State::kMetadata};
     };

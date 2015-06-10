@@ -38,6 +38,7 @@
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/stats/timer_stats.h"
+#include "mongo/rpc/metadata/sharding_metadata.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -75,25 +76,39 @@ namespace mongo {
     static ServerStatusMetricField<TimerStats> displayGleLatency("getLastError.wtime",
                                                                  &gleWtimeStats);
 
-    void saveGLEStats(const BSONObj& result, const std::string& hostString) {
+    void saveGLEStats(const BSONObj& metadata, StringData hostString) {
         if (!haveClient()) {
+            // TODO: how can this happen?
             return;
         }
-        if (result[kGLEStatsFieldName].type() != Object) {
-            return;
-        }
-        std::string errmsg;
-        ConnectionString shardConn = ConnectionString::parse(hostString, errmsg);
 
-        BSONElement subobj = result[kGLEStatsFieldName];
-        Timestamp lastOpTime = subobj[kGLEStatsLastOpTimeFieldName].timestamp();
-        OID electionId = subobj[kGLEStatsElectionIdFieldName].OID();
+        auto swShardingMetadata = rpc::ShardingMetadata::readFromMetadata(metadata);
+        if (swShardingMetadata.getStatus() == ErrorCodes::NoSuchKey) {
+            return;
+        }
+        else if (!swShardingMetadata.isOK()) {
+            warning() << "Got invalid sharding metadata " << swShardingMetadata.getStatus()
+                      << " metadata object was '" << metadata << "'";
+            return;
+        }
+
+        auto shardConn = ConnectionString::parse(hostString.toString());
+        // If we got the reply from this host, we expect that its 'hostString' must be valid.
+        if (!shardConn.isOK()) {
+            severe() << "got bad host string in saveGLEStats: " << hostString;
+        }
+        invariantOK(shardConn.getStatus());
+
+        auto shardingMetadata = std::move(swShardingMetadata.getValue());
+
         auto& clientInfo = cc();
-        LOG(4) << "saveGLEStats lastOpTime:" << lastOpTime 
-               << " electionId:" << electionId;
+        LOG(4) << "saveGLEStats lastOpTime:" << shardingMetadata.getLastOpTime()
+               << " electionId:" << shardingMetadata.getLastElectionId();
 
         ClusterLastErrorInfo::get(clientInfo).addHostOpTime(
-                shardConn, HostOpTime(lastOpTime, electionId));
+            shardConn.getValue(),
+            HostOpTime(shardingMetadata.getLastOpTime(),
+                       shardingMetadata.getLastElectionId()));
     }
 
 } // namespace mongo
