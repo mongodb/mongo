@@ -169,15 +169,6 @@ namespace {
     
     void DBClientCursor::initLazy( bool isRetry ) {
         massert( 15875 , "DBClientCursor::initLazy called on a client that doesn't support lazy" , _client->lazySupported() );
-        if (DBClientWithCommands::RunCommandHookFunc hook = _client->getRunCommandHook()) {
-            if (NamespaceString(ns).isCommand()) {
-                BSONObjBuilder bob;
-                bob.appendElements(query);
-                hook(&bob);
-                query = bob.obj();
-            }
-        }
-        
         Message toSend;
         _assembleInit( toSend );
         _client->say( toSend, isRetry, &_originalHost );
@@ -202,13 +193,6 @@ namespace {
         }
 
         dataReceived( retry, _lazyHost );
-
-        if (DBClientWithCommands::PostRunCommandHookFunc hook = _client->getPostRunCommandHook()) {
-            if (NamespaceString(ns).isCommand()) {
-                BSONObj cmdResponse = peekFirst();
-                hook(cmdResponse, _lazyHost);
-            }
-        }
 
         return ! retry;
     }

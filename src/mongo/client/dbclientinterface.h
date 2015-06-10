@@ -437,6 +437,33 @@ namespace mongo {
 
         void setClientRPCProtocols(rpc::ProtocolSet clientProtocols);
 
+        /**
+         * Sets a RequestMetadataWriter on this connection.
+         *
+         * TODO: support multiple metadata writers.
+         */
+        virtual void setRequestMetadataWriter(rpc::RequestMetadataWriter writer);
+
+        /**
+         * Gets the RequestMetadataWriter that is set on this connection. This may
+         * be an uninitialized stdx::function, so it should be checked for validity
+         * with operator bool() first.
+         */
+        const rpc::RequestMetadataWriter& getRequestMetadataWriter();
+
+        /**
+         * Sets a ReplyMetadataReader on this connection.
+         *
+         * TODO: support multiple metadata readers.
+         */
+        virtual void setReplyMetadataReader(rpc::ReplyMetadataReader reader);
+
+        /**
+         * Gets the ReplyMetadataReader that is set on this connection. This may
+         * be an uninitialized stdx::function, so it should be checked for validity
+         * with operator bool() first.
+         */
+        const rpc::ReplyMetadataReader& getReplyMetadataReader();
 
         /**
          * Runs a database command. This variant allows the caller to manually specify the metadata
@@ -757,29 +784,6 @@ namespace mongo {
         virtual std::string toString() const = 0;
 
         /**
-         * A function type for runCommand hooking; the function takes a pointer
-         * to a BSONObjBuilder and returns nothing.  The builder contains a
-         * runCommand BSON object.
-         * Once such a function is set as the runCommand hook, every time the DBClient
-         * processes a runCommand, the hook will be called just prior to sending it to the server. 
-         */
-        typedef stdx::function<void(BSONObjBuilder*)> RunCommandHookFunc;
-        virtual void setRunCommandHook(RunCommandHookFunc func);
-        RunCommandHookFunc getRunCommandHook() const {
-            return _runCommandHook;
-        }
-
-        /** 
-         * Similar to above, but for running a function on a command response after a command
-         * has been run.
-         */
-        typedef stdx::function<void(const BSONObj&, const std::string&)> PostRunCommandHookFunc;
-        virtual void setPostRunCommandHook(PostRunCommandHookFunc func);
-        PostRunCommandHookFunc getPostRunCommandHook() const {
-            return _postRunCommandHook;
-        }
-
-        /**
          * Run a pseudo-command such as sys.inprog/currentOp, sys.killop/killOp
          * or sys.unlock/fsyncUnlock
          *
@@ -837,12 +841,6 @@ namespace mongo {
                        const std::string &username,
                        BSONObj *info);
 
-        /**
-         * These functions will be executed by the driver on runCommand calls.
-         */
-        RunCommandHookFunc _runCommandHook;
-        PostRunCommandHookFunc _postRunCommandHook;
-
         // should be set by subclasses during connection.
         void _setServerRPCProtocols(rpc::ProtocolSet serverProtocols);
 
@@ -863,6 +861,9 @@ namespace mongo {
          * is implemented in mongos (SERVER-18292).
          */
         rpc::ProtocolSet _serverRPCProtocols{rpc::supports::kAll};
+
+        rpc::RequestMetadataWriter _metadataWriter;
+        rpc::ReplyMetadataReader _metadataReader;
 
         enum QueryOptions _cachedAvailableOptions;
         bool _haveCachedAvailableOptions;

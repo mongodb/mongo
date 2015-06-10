@@ -244,14 +244,6 @@ namespace {
         return QueryOptions(0);
     }
 
-    void DBClientWithCommands::setRunCommandHook(RunCommandHookFunc func) {
-        _runCommandHook = func;
-    }
-
-    void DBClientWithCommands::setPostRunCommandHook(PostRunCommandHookFunc func) {
-        _postRunCommandHook = func;
-    }
-
     rpc::ProtocolSet DBClientWithCommands::getClientRPCProtocols() const {
         return _clientRPCProtocols;
     }
@@ -268,23 +260,21 @@ namespace {
         _serverRPCProtocols = std::move(protocols);
     }
 
-    bool DBClientWithCommands::runCommand(const string& dbname,
-                                          const BSONObj& cmd,
-                                          BSONObj &info,
-                                          int options) {
+    void DBClientWithCommands::setRequestMetadataWriter(rpc::RequestMetadataWriter writer) {
+        _metadataWriter = std::move(writer);
+    }
 
-        uassert(ErrorCodes::InvalidNamespace, str::stream() << "Database name '" << dbname
-                                                            << "' is not valid.",
-                NamespaceString::validDBName(dbname));
+    const rpc::RequestMetadataWriter& DBClientWithCommands::getRequestMetadataWriter() {
+        return _metadataWriter;
+    }
 
-        BSONObj maybeInterposedCommand = cmd;
+    void DBClientWithCommands::setReplyMetadataReader(rpc::ReplyMetadataReader reader) {
+        _metadataReader = std::move(reader);
+    }
 
-        if (_runCommandHook) {
-            BSONObjBuilder hookInterposedBob;
-            hookInterposedBob.appendElements(cmd);
-            _runCommandHook(&hookInterposedBob);
-            maybeInterposedCommand = hookInterposedBob.obj();
-        }
+    const rpc::ReplyMetadataReader& DBClientWithCommands::getReplyMetadataReader() {
+        return _metadataReader;
+    }
 
     rpc::UniqueReply DBClientWithCommands::runCommandWithMetadata(StringData database,
                                                                   StringData command,
@@ -293,10 +283,9 @@ namespace {
         BSONObjBuilder metadataBob;
         metadataBob.appendElements(metadata);
 
-        // upconvert command and metadata to new format
-        // right now this only handles slaveOk
-        BSONObj upconvertedCmd;
-        BSONObj upconvertedMetadata;
+        if (_metadataWriter) {
+            uassertStatusOK(_metadataWriter(&metadataBob));
+        }
 
         uassert(ErrorCodes::InvalidNamespace, str::stream() << "Database name '" << database
                                                             << "' is not valid.",
@@ -334,10 +323,8 @@ namespace {
                                            commandReply->getCommandReply());
         }
 
-        info = std::move(commandReply->getCommandReply().getOwned());
-
-        if (_postRunCommandHook) {
-            _postRunCommandHook(info, host);
+        if (_metadataReader) {
+            uassertStatusOK(_metadataReader(commandReply->getMetadata(), host));
         }
 
         return rpc::UniqueReply(std::move(replyMsg), std::move(commandReply));
@@ -511,25 +498,25 @@ namespace {
     }
 
     namespace {
-        class RunCommandHookOverrideGuard {
-            MONGO_DISALLOW_COPYING(RunCommandHookOverrideGuard);
+        class ScopedMetadataWriterRemover {
+            MONGO_DISALLOW_COPYING(ScopedMetadataWriterRemover);
         public:
-            RunCommandHookOverrideGuard(DBClientWithCommands* cli,
-                                        const DBClientWithCommands::RunCommandHookFunc& hookFunc)
-                : _cli(cli), _oldHookFunc(cli->getRunCommandHook()) {
-                cli->setRunCommandHook(hookFunc);
+            ScopedMetadataWriterRemover(DBClientWithCommands* cli)
+                : _cli(cli), _oldWriter(cli->getRequestMetadataWriter()) {
+                _cli->setRequestMetadataWriter(rpc::RequestMetadataWriter{});
             }
-            ~RunCommandHookOverrideGuard() {
-                _cli->setRunCommandHook(_oldHookFunc);
+            ~ScopedMetadataWriterRemover() {
+                _cli->setRequestMetadataWriter(_oldWriter);
             }
         private:
             DBClientWithCommands* const _cli;
-            DBClientWithCommands::RunCommandHookFunc const _oldHookFunc;
+            rpc::RequestMetadataWriter _oldWriter;
         };
     }  // namespace
 
     void DBClientWithCommands::_auth(const BSONObj& params) {
-        RunCommandHookOverrideGuard hookGuard(this, RunCommandHookFunc());
+        ScopedMetadataWriterRemover{this};
+
         std::string mechanism;
 
         uassertStatusOK(bsonExtractStringField(params,

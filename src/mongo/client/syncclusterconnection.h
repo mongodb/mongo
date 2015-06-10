@@ -126,13 +126,13 @@ namespace mongo {
         // OP_QUERY command. The reason for this is that delicate logic for targeting/locking
         // config servers is in SyncClusterConnection::findOne, and refactoring that logic
         // is both risky and of dubious value as we move to config server replica sets (CSRS).
-        virtual bool runCommand(const std::string& dbname,
-                                const BSONObj& cmd,
-                                BSONObj& info,
-                                int options) final;
+        bool runCommand(const std::string& dbname,
+                        const BSONObj& cmd,
+                        BSONObj& info,
+                        int options) final;
 
-        virtual void setRunCommandHook(DBClientWithCommands::RunCommandHookFunc func);
-        virtual void setPostRunCommandHook(DBClientWithCommands::PostRunCommandHookFunc func);
+        void setRequestMetadataWriter(rpc::RequestMetadataWriter writer) final;
+        void setReplyMetadataReader(rpc::ReplyMetadataReader reader) final;
 
         /**
          * Allow custom query processing through an external (e.g. mongos-only) service.

@@ -31,6 +31,7 @@
 #include <tuple>
 
 #include "mongo/base/status_with.h"
+#include "mongo/stdx/functional.h"
 
 namespace mongo {
     class BSONObj;
@@ -93,6 +94,40 @@ namespace rpc {
      * object and query flags bitfield augmented with the given metadata.
      */
     StatusWith<LegacyCommandAndFlags> downconvertRequestMetadata(BSONObj cmdObj, BSONObj metadata);
+
+    /**
+     * A command reply and associated metadata object.
+     */
+    using CommandReplyWithMetadata = std::tuple<BSONObj, BSONObj>;
+
+    /**
+     * Given a legacy command reply, attempts to strip the metadata from the reply and construct
+     * a metadata object.
+     */
+    StatusWith<CommandReplyWithMetadata> upconvertReplyMetadata(BSONObj legacyReply);
+
+    /**
+     * Given a command reply object and an associated metadata object,
+     * attempts to construct a legacy command object.
+     */
+    StatusWith<BSONObj> downconvertReplyMetadata(BSONObj commandReply, BSONObj replyMetadata);
+
+    /**
+     * A function type for writing request metadata. The function takes a pointer to a
+     * BSONObjBuilder used to construct the metadata object and returns a Status indicating
+     * if the metadata was written successfully.
+     */
+    using RequestMetadataWriter = stdx::function<Status(BSONObjBuilder*)>;
+
+    /**
+     * A function type for reading reply metadata. The function takes a a reference to a
+     * metadata object received in a command reply and a string containing the server address of the
+     * host that executed the command and returns a Status indicating if the
+     * metadata was read successfully.
+     *
+     * TODO: would it be a layering violation if this hook took an OperationContext* ?
+     */
+    using ReplyMetadataReader = stdx::function<Status(const BSONObj&, StringData)>;
 
 }  // namespace rpc
 }  // namespace mongo

@@ -175,27 +175,26 @@ namespace {
         return _master->getServerHostAndPort();
     }
 
-    void DBClientReplicaSet::setRunCommandHook(DBClientWithCommands::RunCommandHookFunc func) {
+    void DBClientReplicaSet::setRequestMetadataWriter(rpc::RequestMetadataWriter writer) {
         // Set the hooks in both our sub-connections and in ourselves.
         if (_master) {
-            _master->setRunCommandHook(func);
+            _master->setRequestMetadataWriter(writer);
         }
         if (_lastSlaveOkConn.get()) {
-           _lastSlaveOkConn->setRunCommandHook(func);
+            _lastSlaveOkConn->setRequestMetadataWriter(writer);
         }
-        _runCommandHook = func;
+        DBClientWithCommands::setRequestMetadataWriter(std::move(writer));
     }
 
-    void DBClientReplicaSet::setPostRunCommandHook
-    (DBClientWithCommands::PostRunCommandHookFunc func) {
+    void DBClientReplicaSet::setReplyMetadataReader(rpc::ReplyMetadataReader reader) {
         // Set the hooks in both our sub-connections and in ourselves.
         if (_master) {
-            _master->setPostRunCommandHook(func);
+            _master->setReplyMetadataReader(reader);
         }
         if (_lastSlaveOkConn.get()) {
-           _lastSlaveOkConn->setPostRunCommandHook(func);
+            _lastSlaveOkConn->setReplyMetadataReader(reader);
         }
-        _postRunCommandHook = func;
+        DBClientWithCommands::setReplyMetadataReader(std::move(reader));
     }
 
     // A replica set connection is never disconnected, since it controls its own reconnection
@@ -319,8 +318,8 @@ namespace {
         _masterHost = h;
         _master.reset(newConn);
         _master->setParentReplSetName(_setName);
-        _master->setRunCommandHook(_runCommandHook);
-        _master->setPostRunCommandHook(_postRunCommandHook);
+        _master->setRequestMetadataWriter(getRequestMetadataWriter());
+        _master->setReplyMetadataReader(getReplyMetadataReader());
 
         _auth( _master.get() );
         return _master.get();
@@ -723,8 +722,8 @@ namespace {
 
         _lastSlaveOkConn.reset(newConn);
         _lastSlaveOkConn->setParentReplSetName(_setName);
-        _lastSlaveOkConn->setRunCommandHook(_runCommandHook);
-        _lastSlaveOkConn->setPostRunCommandHook(_postRunCommandHook);
+        _lastSlaveOkConn->setRequestMetadataWriter(getRequestMetadataWriter());
+        _lastSlaveOkConn->setReplyMetadataReader(getReplyMetadataReader());
 
         if (_authPooledSecondaryConn) {
             _auth(_lastSlaveOkConn.get());

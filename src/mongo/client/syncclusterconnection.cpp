@@ -190,8 +190,8 @@ namespace mongo {
     void SyncClusterConnection::_connect( const std::string& host ) {
         log() << "SyncClusterConnection connecting to [" << host << "]" << endl;
         DBClientConnection * c = new DBClientConnection( true );
-        c->setRunCommandHook(_runCommandHook);
-        c->setPostRunCommandHook(_postRunCommandHook);
+        c->setRequestMetadataWriter(getRequestMetadataWriter());
+        c->setReplyMetadataReader(getReplyMetadataReader());
         c->setSoTimeout( _socketTimeout );
         string errmsg;
         if ( ! c->connect( HostAndPort(host), errmsg ) )
@@ -213,18 +213,44 @@ namespace mongo {
         std::string ns = dbname + ".$cmd";
         BSONObj interposedCmd = cmd;
 
-        if (_runCommandHook) {
-            BSONObjBuilder cmdObjBob;
-            cmdObjBob.appendElements(cmd);
-            _runCommandHook(&cmdObjBob);
-            interposedCmd = cmdObjBob.obj();
+        if (getRequestMetadataWriter()) {
+            // We have a metadata writer. We need to upconvert the metadata, write to it,
+            // Then downconvert it again. This unfortunate, but this code is going to be
+            // removed anyway as part of CSRS.
+
+            BSONObj upconvertedCommand;
+            BSONObj upconvertedMetadata;
+
+            std::tie(upconvertedCommand, upconvertedMetadata) =  uassertStatusOK(
+                rpc::upconvertRequestMetadata(cmd, options)
+            );
+
+            BSONObjBuilder metadataBob;
+            metadataBob.appendElements(upconvertedMetadata);
+
+            uassertStatusOK(getRequestMetadataWriter()(&metadataBob));
+
+            std::tie(interposedCmd, options) = uassertStatusOK(
+                rpc::downconvertRequestMetadata(std::move(upconvertedCommand), metadataBob.done())
+            );
         }
 
-        info = findOne(ns, Query(interposedCmd), 0, options);
+        BSONObj legacyResult = findOne(ns, Query(interposedCmd), 0, options);
 
-        if (_postRunCommandHook) {
-            _postRunCommandHook(info, getServerAddress());
+        BSONObj upconvertedMetadata;
+        BSONObj upconvertedReply;
+
+        std::tie(upconvertedReply, upconvertedMetadata) = uassertStatusOK(
+            rpc::upconvertReplyMetadata(legacyResult)
+        );
+
+        if (getReplyMetadataReader()) {
+            // TODO: what does getServerAddress() actually mean here as this connection
+            // represents a connection to 1 or 3 config servers...
+            uassertStatusOK(getReplyMetadataReader()(upconvertedReply, getServerAddress()));
         }
+
+        info = upconvertedReply;
 
         return isOk(info);
     }
@@ -600,24 +626,23 @@ namespace mongo {
             if( _conns[i] ) _conns[i]->setSoTimeout( socketTimeout );
     }
 
-    void SyncClusterConnection::setRunCommandHook(DBClientWithCommands::RunCommandHookFunc func) {
+    void SyncClusterConnection::setRequestMetadataWriter(rpc::RequestMetadataWriter writer) {
         // Set the hooks in both our sub-connections and in ourselves.
         for (size_t i = 0; i < _conns.size(); ++i) {
             if (_conns[i]) { 
-                _conns[i]->setRunCommandHook(func);
+                _conns[i]->setRequestMetadataWriter(writer);
             }
         }
-        _runCommandHook = func;
+        DBClientWithCommands::setRequestMetadataWriter(std::move(writer));
     }
 
-    void SyncClusterConnection::setPostRunCommandHook
-    (DBClientWithCommands::PostRunCommandHookFunc func) {
+    void SyncClusterConnection::setReplyMetadataReader(rpc::ReplyMetadataReader reader) {
         // Set the hooks in both our sub-connections and in ourselves.
         for (size_t i = 0; i < _conns.size(); ++i) {
             if (_conns[i]) { 
-                _conns[i]->setPostRunCommandHook(func);
+                _conns[i]->setReplyMetadataReader(reader);
             }
         }
-        _postRunCommandHook = func;
+        DBClientWithCommands::setReplyMetadataReader(std::move(reader));
     }
 }
