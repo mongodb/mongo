@@ -66,7 +66,6 @@
 
 #elif defined(_WIN32)
 #include <boost/asio/detail/socket_ops.hpp>
-#include <boost/scoped_array.hpp>
 #include <boost/system/error_code.hpp>
 #include <iphlpapi.h>
 #include <winsock2.h>
@@ -260,7 +259,7 @@ namespace {
         // for the rare case that the adapter config changes between calls
 
         ULONG adaptersLen = 15 * 1024;
-        boost::scoped_array<char> buf(new char[adaptersLen]);
+        std::unique_ptr<char[]> buf(new char[adaptersLen]);
         IP_ADAPTER_ADDRESSES* adapters = reinterpret_cast<IP_ADAPTER_ADDRESSES*>(buf.get());
         DWORD err;
 

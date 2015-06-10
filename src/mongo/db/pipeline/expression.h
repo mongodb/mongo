@@ -88,7 +88,7 @@ namespace mongo {
 
     private:
         Document _root;
-        const boost::scoped_array<Value> _rest;
+        const std::unique_ptr<Value[]> _rest;
         const size_t _numVars;
     };
 

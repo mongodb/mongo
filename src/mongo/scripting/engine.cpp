@@ -35,7 +35,6 @@
 
 #include <cctype>
 #include <boost/filesystem/operations.hpp>
-#include <boost/scoped_array.hpp>
 #include <boost/shared_ptr.hpp>
 
 #include "mongo/client/dbclientcursor.h"
@@ -172,7 +171,7 @@ namespace {
             return false;
         }
         unsigned len = static_cast<unsigned>(fo);
-        boost::scoped_array<char> data (new char[len+1]);
+        std::unique_ptr<char[]> data (new char[len+1]);
         data[len] = 0;
         f.read(0, data.get(), len);
 

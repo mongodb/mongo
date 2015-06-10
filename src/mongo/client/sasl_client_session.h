@@ -27,7 +27,7 @@
 
 #pragma once
 
-#include <boost/scoped_array.hpp>
+#include <memory>
 #include <string>
 
 #include "mongo/base/disallow_copying.h"
@@ -133,7 +133,7 @@ namespace mongo {
          * Buffer object that owns data for a single parameter.
          */
         struct DataBuffer {
-            boost::scoped_array<char> data;
+            std::unique_ptr<char[]> data;
             size_t size;
         };
 

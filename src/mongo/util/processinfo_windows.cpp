@@ -31,7 +31,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <boost/scoped_array.hpp>
 #include <iostream>
 #include <psapi.h>
 
@@ -39,7 +38,7 @@
 #include "mongo/util/log.h"
 
 using namespace std;
-using boost::scoped_array;
+using std::unique_ptr;
 
 namespace mongo {
 
@@ -177,7 +176,7 @@ namespace mongo {
             return false;
         }
 
-        boost::scoped_array<char> verData(new char[verSize]);
+        std::unique_ptr<char[]> verData(new char[verSize]);
         if (GetFileVersionInfoA(filePath, NULL, verSize, verData.get()) == 0) {
             DWORD gle = GetLastError();
             warning() << "GetFileVersionInfoSizeA on " << filePath << " failed with " << errnoWithDescription(gle);
@@ -213,7 +212,7 @@ namespace mongo {
             return false;
         }
 
-        boost::scoped_array<char> systemDirectory(new char[pathBufferSize]);
+        std::unique_ptr<char[]> systemDirectory(new char[pathBufferSize]);
         UINT systemDirectoryPathLen;
         systemDirectoryPathLen = GetSystemDirectoryA(systemDirectory.get(), pathBufferSize);
         if (systemDirectoryPathLen == 0) {
@@ -380,7 +379,7 @@ namespace mongo {
 
         DWORD returnLength = 0;
         DWORD numaNodeCount = 0;
-        scoped_array<SYSTEM_LOGICAL_PROCESSOR_INFORMATION> buffer;
+        unique_ptr<SYSTEM_LOGICAL_PROCESSOR_INFORMATION[]> buffer;
 
         LPFN_GLPI glpi(reinterpret_cast<LPFN_GLPI>(GetProcAddress(
             GetModuleHandleW(L"kernel32"),
@@ -454,7 +453,7 @@ namespace mongo {
 
     bool ProcessInfo::pagesInMemory(const void* start, size_t numPages, vector<char>* out) {
         out->resize(numPages);
-        scoped_array<PSAPI_WORKING_SET_EX_INFORMATION> wsinfo(
+        unique_ptr<PSAPI_WORKING_SET_EX_INFORMATION[]> wsinfo(
                 new PSAPI_WORKING_SET_EX_INFORMATION[numPages]);
 
         const void* startOfFirstPage = alignToStartOfPage(start);

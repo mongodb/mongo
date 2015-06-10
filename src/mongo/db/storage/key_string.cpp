@@ -34,7 +34,6 @@
 
 #include "mongo/db/storage/key_string.h"
 
-#include <boost/scoped_array.hpp>
 #include <cmath>
 
 #include "mongo/base/data_view.h"
@@ -839,7 +838,7 @@ namespace mongo {
                     *stream << BSONBinData(ptr, size, subType);
                 }
                 else {
-                    boost::scoped_array<char> flipped(new char[size]);
+                    std::unique_ptr<char[]> flipped(new char[size]);
                     memcpy_flipBits(flipped.get(), ptr, size);
                     *stream << BSONBinData(flipped.get(), size, subType);
                 }
@@ -863,7 +862,7 @@ namespace mongo {
             case CType::kDBRef: {
                 size_t size = endian::bigToNative(readType<uint32_t>(reader, inverted));
                 if (inverted) {
-                    boost::scoped_array<char> ns(new char[size]);
+                    std::unique_ptr<char[]> ns(new char[size]);
                     memcpy_flipBits(ns.get(), reader->skip(size), size);
                     char oidBytes[OID::kOIDSize];
                     memcpy_flipBits(oidBytes, reader->skip(OID::kOIDSize), OID::kOIDSize);

@@ -228,7 +228,7 @@ namespace mongo {
                 massert(17061, "couldn't get uncompressed length",
                         snappy::GetUncompressedLength(_buffer.get(), blockSize, &uncompressedSize));
 
-                boost::scoped_array<char> decompressionBuffer(new char[uncompressedSize]);
+                std::unique_ptr<char[]> decompressionBuffer(new char[uncompressedSize]);
                 massert(17062, "decompression failed",
                         snappy::RawUncompress(_buffer.get(),
                                               blockSize,
@@ -257,7 +257,7 @@ namespace mongo {
 
             const Settings _settings;
             bool _done;
-            boost::scoped_array<char> _buffer;
+            std::unique_ptr<char[]> _buffer;
             std::unique_ptr<BufReader> _reader;
             std::string _fileName;
             boost::shared_ptr<FileDeleter> _fileDeleter; // Must outlive _file

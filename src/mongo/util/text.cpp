@@ -30,7 +30,6 @@
 #include "mongo/util/text.h"
 
 #include <boost/integer_traits.hpp>
-#include <boost/smart_ptr/scoped_array.hpp>
 #include <errno.h>
 #include <iostream>
 #include <sstream>
@@ -209,7 +208,7 @@ namespace mongo {
         if ( bufferSize == 0 ) {
             return std::wstring();
         }
-        boost::scoped_array< wchar_t > tempBuffer( new wchar_t[ bufferSize ] );
+        std::unique_ptr< wchar_t []> tempBuffer( new wchar_t[ bufferSize ] );
         tempBuffer[0] = 0;
         MultiByteToWideChar(
                 CP_UTF8,            // Code page
@@ -241,7 +240,7 @@ namespace mongo {
         if ( bufferSize == 0 ) {
             return true;
         }
-        boost::scoped_array<wchar_t> utf16String( new wchar_t[ bufferSize ] );
+        std::unique_ptr<wchar_t[]> utf16String( new wchar_t[ bufferSize ] );
         MultiByteToWideChar(
                 CP_UTF8,            // Code page
                 0,                  // Flags

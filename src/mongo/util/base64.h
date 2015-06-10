@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include <boost/scoped_array.hpp>
 
 #include "mongo/util/assert_util.h"
 
@@ -65,7 +64,7 @@ namespace mongo {
         private:
             const unsigned char * encode;
         public:
-            boost::scoped_array<unsigned char> decode;
+            std::unique_ptr<unsigned char[]> decode;
         };
 
         extern Alphabet alphabet;

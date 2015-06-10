@@ -497,7 +497,7 @@ namespace mongo {
                 NUM_ITEMS = 500*1000,
                 MEM_LIMIT = 64*1024,
             };
-            boost::scoped_array<int> _array;
+            std::unique_ptr<int[]> _array;
         };
 
 

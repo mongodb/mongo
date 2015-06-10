@@ -30,7 +30,6 @@
 #include "mongo/logger/rotatable_file_writer.h"
 
 #include <boost/filesystem/operations.hpp>
-#include <boost/scoped_array.hpp>
 #include <cstdio>
 #include <fstream>
 
@@ -61,7 +60,7 @@ namespace {
 
         // A Windows wchar_t encoding of a unicode codepoint never takes more instances of wchar_t
         // than the UTF-8 encoding takes instances of char.
-        boost::scoped_array<wchar_t> tempBuffer(new wchar_t[utf8Str.size()]);
+        std::unique_ptr<wchar_t[]> tempBuffer(new wchar_t[utf8Str.size()]);
         tempBuffer[0] = L'\0';
         int finalSize = MultiByteToWideChar(
                 CP_UTF8,               // Code page

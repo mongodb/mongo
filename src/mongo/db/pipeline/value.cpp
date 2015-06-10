@@ -32,7 +32,6 @@
 
 #include <cmath>
 #include <boost/functional/hash.hpp>
-#include <boost/scoped_array.hpp>
 
 #include "mongo/base/compare_numbers.h"
 #include "mongo/db/jsobj.h"
@@ -124,7 +123,7 @@ namespace mongo {
         const size_t totalLen = patternLen + 1/*middle NUL*/ + flagsLen;
 
         // Need to copy since putString doesn't support scatter-gather.
-        boost::scoped_array<char> buf (new char[totalLen]);
+        std::unique_ptr<char[]> buf (new char[totalLen]);
         re.pattern.copyTo(buf.get(), true);
         re.flags.copyTo(buf.get() + patternLen + 1, false); // no NUL
         putString(StringData(buf.get(), totalLen));

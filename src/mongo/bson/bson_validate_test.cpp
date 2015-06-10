@@ -27,7 +27,6 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
 
-#include <boost/scoped_array.hpp>
 
 #include "mongo/base/data_view.h"
 #include "mongo/db/jsobj.h"
@@ -39,7 +38,7 @@
 namespace {
 
     using namespace mongo;
-    using boost::scoped_array;
+    using std::unique_ptr;
     using std::endl;
 
     void appendInvalidStringElement(const char* fieldName, BufBuilder* bb) {
@@ -165,7 +164,7 @@ namespace {
             int32_t fuzzFrequency = fuzzFrequencies[ i ];
 
             // Copy the 'original' BSONObj to 'buffer'.
-            scoped_array<char> buffer( new char[ original.objsize() ] );
+            unique_ptr<char[]> buffer( new char[ original.objsize() ] );
             memcpy( buffer.get(), original.objdata(), original.objsize() );
 
             // Randomly flip bits in 'buffer', with probability determined by 'fuzzFrequency'. The

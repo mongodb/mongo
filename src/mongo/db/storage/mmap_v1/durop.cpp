@@ -48,7 +48,7 @@
 
 namespace mongo {
 
-    using boost::scoped_array;
+    using std::unique_ptr;
     using boost::shared_ptr;
     using std::endl;
     using std::string;
@@ -162,7 +162,7 @@ namespace mongo {
             massert(13547, str::stream() << "recover couldn't create file " << full, f.is_open());
             unsigned long long left = _len;
             const unsigned blksz = 64 * 1024;
-            scoped_array<char> v( new char[blksz] );
+            unique_ptr<char[]> v( new char[blksz] );
             memset( v.get(), 0, blksz );
             fileofs ofs = 0;
             while( left ) {

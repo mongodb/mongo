@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include <boost/smart_ptr/scoped_array.hpp>
+#include <memory>
 
 #include "mongo/base/disallow_copying.h"
 
@@ -85,7 +85,7 @@ namespace mongo {
 
             unsigned _capacity;
             unsigned _maxProbe;
-            boost::scoped_array<Entry> _entries;
+            std::unique_ptr<Entry[]> _entries;
         };
 
     public:

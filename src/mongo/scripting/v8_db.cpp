@@ -31,7 +31,6 @@
 
 #include <iostream>
 #include <iomanip>
-#include <boost/scoped_array.hpp>
 #include <boost/shared_ptr.hpp>
 
 #include "mongo/base/init.h"
@@ -50,7 +49,7 @@
 #include "mongo/util/text.h"
 
 using namespace std;
-using boost::scoped_array;
+using std::unique_ptr;
 using boost::shared_ptr;
 
 namespace mongo {
@@ -995,7 +994,7 @@ namespace mongo {
         // up of valid hex digits, and fails in the hex utility functions
 
         int len = hexstr.length() / 2;
-        scoped_array<char> data(new char[len]);
+        unique_ptr<char[]> data(new char[len]);
         const char* src = hexstr.c_str();
         for(int i = 0; i < len; i++) {
             data[i] = fromHex(src + i * 2);

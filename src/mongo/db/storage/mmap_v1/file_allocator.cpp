@@ -289,7 +289,7 @@ namespace mongo {
             lseek(fd, 0, SEEK_SET);
 
             const long z = 256 * 1024;
-            const boost::scoped_array<char> buf_holder (new char[z]);
+            const std::unique_ptr<char[]> buf_holder (new char[z]);
             char* buf = buf_holder.get();
             memset(buf, 0, z);
             long left = size;

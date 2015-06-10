@@ -25,7 +25,6 @@
  *    then also delete it in the license file.
  */
 
-#include <boost/scoped_array.hpp>
 
 #include "mongo/client/sasl_client_session.h"
 
@@ -77,7 +76,7 @@ namespace mongo {
         bool _done;
 
         /// Stored of password in sasl_secret_t format
-        boost::scoped_array<char> _secret;
+        std::unique_ptr<char[]> _secret;
 
         /// Callbacks registered on _saslConnection for providing the Cyrus SASL library with
         /// parameter values, etc.

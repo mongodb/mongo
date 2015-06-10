@@ -336,7 +336,7 @@ int strncmp32( UChar32* first32, UChar32* second32, size_t length ) {
  */
 int write32( int fileHandle, const UChar32* string32, unsigned int sourceLengthInCharacters ) {
     size_t tempBufferBytes = 4 * sourceLengthInCharacters + 1;
-    boost::scoped_array<char> tempCharString( new char[ tempBufferBytes ] );
+    std::unique_ptr<char[]> tempCharString( new char[ tempBufferBytes ] );
     size_t count = copyString32to8counted( reinterpret_cast<UChar8*>( tempCharString.get() ),
                                            string32,
                                            tempBufferBytes,

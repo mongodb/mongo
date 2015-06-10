@@ -31,10 +31,10 @@
 
 #include <ctype.h>
 
+#include <memory>
 #include <string>
 #include <vector>
 
-#include <boost/scoped_array.hpp>
 
 #include "mongo/base/string_data.h"
 
@@ -50,7 +50,7 @@ namespace mongo {
     inline std::string tolowerString( StringData input ) {
         std::string::size_type sz = input.size();
 
-        boost::scoped_array<char> line(new char[sz+1]);
+        std::unique_ptr<char[]> line(new char[sz+1]);
         char * copy = line.get();
 
         for ( std::string::size_type i=0; i<sz; i++ ) {

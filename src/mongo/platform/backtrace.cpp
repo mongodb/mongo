@@ -32,9 +32,9 @@
 
 #include "mongo/platform/backtrace.h"
 
-#include <boost/smart_ptr/scoped_array.hpp>
 #include <cstdio>
 #include <dlfcn.h>
+#include <memory>
 #include <string>
 #include <ucontext.h>
 #include <vector>
@@ -141,7 +141,7 @@ namespace {
         size_t blockSize = size * sizeof(char*);
         size_t blockPtr = blockSize;
         const size_t kBufferSize = 8 * 1024;
-        boost::scoped_array<char> stringBuffer(new char[kBufferSize]);
+        std::unique_ptr<char[]> stringBuffer(new char[kBufferSize]);
         for (int i = 0; i < size; ++i) {
             size_t thisLength = 1 + addrtosymstr(array[i], stringBuffer.get(), kBufferSize);
             stringVector.push_back(string(stringBuffer.get()));

@@ -33,7 +33,6 @@
 
 #include <DbgHelp.h>
 #include <boost/filesystem/operations.hpp>
-#include <boost/smart_ptr/scoped_array.hpp>
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
@@ -58,7 +57,7 @@ namespace mongo {
 
         if (symbolSearchPath.empty()) {
             static const size_t bufferSize = 1024;
-            boost::scoped_array<char> pathBuffer(new char[bufferSize]);
+            std::unique_ptr<char[]> pathBuffer(new char[bufferSize]);
             GetModuleFileNameA(NULL, pathBuffer.get(), bufferSize);
             boost::filesystem::path exePath(pathBuffer.get());
             symbolSearchPath = exePath.parent_path().string();
@@ -122,7 +121,7 @@ namespace mongo {
             filename.swap( shorter );
         }
         static const size_t bufferSize = 32;
-        boost::scoped_array<char> lineNumber( new char[bufferSize] );
+        std::unique_ptr<char[]> lineNumber( new char[bufferSize] );
         _snprintf( lineNumber.get(), bufferSize, "(%u)", line64.LineNumber );
         filename += lineNumber.get();
         returnedSourceAndLine->swap( filename );
@@ -148,7 +147,7 @@ namespace mongo {
         }
         std::string symbolString( symbolInfo->Name );
         static const size_t bufferSize = 32;
-        boost::scoped_array<char> symbolOffset( new char[bufferSize] );
+        std::unique_ptr<char[]> symbolOffset( new char[bufferSize] );
         _snprintf( symbolOffset.get(), bufferSize, "+0x%x", displacement64 );
         symbolString += symbolOffset.get();
         returnedSymbolAndOffset->swap( symbolString );
@@ -219,7 +218,7 @@ namespace mongo {
 
         const size_t nameSize = 1024;
         const size_t symbolBufferSize = sizeof(SYMBOL_INFO) + nameSize;
-        boost::scoped_array<char> symbolCharBuffer( new char[symbolBufferSize] );
+        std::unique_ptr<char[]> symbolCharBuffer( new char[symbolBufferSize] );
         memset( symbolCharBuffer.get(), 0, symbolBufferSize );
         SYMBOL_INFO* symbolBuffer = reinterpret_cast<SYMBOL_INFO*>( symbolCharBuffer.get() );
         symbolBuffer->SizeOfStruct = sizeof(SYMBOL_INFO);

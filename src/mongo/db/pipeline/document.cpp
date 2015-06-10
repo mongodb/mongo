@@ -31,7 +31,6 @@
 #include "mongo/db/pipeline/document.h"
 
 #include <boost/functional/hash.hpp>
-#include <boost/scoped_array.hpp>
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/field_path.h"
@@ -146,7 +145,7 @@ namespace mongo {
         uassert(16490, "Tried to make oversized document",
                 capacity <= size_t(BufferMaxSize));
 
-        boost::scoped_array<char> oldBuf(_buffer);
+        std::unique_ptr<char[]> oldBuf(_buffer);
         _buffer = new char[capacity];
         _bufferEnd = _buffer + capacity - hashTabBytes();
 
@@ -211,7 +210,7 @@ namespace mongo {
     }
 
     DocumentStorage::~DocumentStorage() {
-        boost::scoped_array<char> deleteBufferAtScopeEnd (_buffer);
+        std::unique_ptr<char[]> deleteBufferAtScopeEnd (_buffer);
 
         for (DocumentStorageIterator it = iteratorAll(); !it.atEnd(); it.advance()) {
             it->val.~Value(); // explicit destructor call

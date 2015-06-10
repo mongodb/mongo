@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/scoped_array.hpp>
 #include <iosfwd>
 #include <string>
 #include <vector>

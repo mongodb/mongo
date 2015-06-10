@@ -33,7 +33,6 @@
 
 #include "mongo/shell/shell_utils_launcher.h"
 
-#include <boost/scoped_array.hpp>
 #include <boost/thread/thread.hpp>
 #include <iostream>
 #include <map>
@@ -62,7 +61,7 @@
 
 namespace mongo {
 
-    using boost::scoped_array;
+    using std::unique_ptr;
     using std::cout;
     using std::endl;
     using std::make_pair;
@@ -398,7 +397,7 @@ namespace mongo {
 
             string args = ss.str();
 
-            boost::scoped_array<TCHAR> args_tchar (new TCHAR[args.size() + 1]);
+            std::unique_ptr<TCHAR[]> args_tchar (new TCHAR[args.size() + 1]);
             size_t i;
             for(i=0; i < args.size(); i++)
                 args_tchar[i] = args[i];
@@ -444,14 +443,14 @@ namespace mongo {
 
 #else
 
-            scoped_array<const char *> argvStorage( new const char* [_argv.size()+1] );
+            unique_ptr<const char *[]> argvStorage( new const char* [_argv.size()+1] );
             const char** argv = argvStorage.get();
             for (unsigned i=0; i < _argv.size(); i++) {
                 argv[i] = _argv[i].c_str();
             }
             argv[_argv.size()] = 0;
 
-            scoped_array<const char *> envStorage( new const char* [2] );
+            unique_ptr<const char *[]> envStorage( new const char* [2] );
             const char** env = envStorage.get();
             env[0] = NULL;
             env[1] = NULL;

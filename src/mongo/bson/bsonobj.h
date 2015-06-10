@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include <boost/scoped_array.hpp>
 #include <list>
 #include <set>
 #include <string>
@@ -721,7 +720,7 @@ namespace mongo {
 
     private:
         const int _nfields;
-        const boost::scoped_array<const char *> _fields;
+        const std::unique_ptr<const char *[]> _fields;
         int _cur;
     };
 

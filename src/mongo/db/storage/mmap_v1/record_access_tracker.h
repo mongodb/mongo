@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/scoped_array.hpp>
 
 #include "mongo/util/concurrency/mutex.h"
 
@@ -154,7 +153,7 @@ namespace mongo {
         bool _blockSupported;
 
         // An array of Rolling instances for tracking record accesses.
-        boost::scoped_array<Rolling> _rollingTable;
+        std::unique_ptr<Rolling[]> _rollingTable;
     };
 
 } // namespace

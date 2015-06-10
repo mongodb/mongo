@@ -27,8 +27,8 @@
  *    then also delete it in the license file.
  */
 
-#include <boost/smart_ptr/scoped_array.hpp>
 #include <algorithm>
+#include <memory>
 #include <string.h>
 
 namespace linenoise_utf8 {
@@ -165,7 +165,7 @@ protected:
     size_t _len;    // in units of char_t without nul
     size_t _cap;    // size of _str buffer including nul
     size_t _chars;  // number of codepoints
-    boost::scoped_array<char_t> _str;
+    std::unique_ptr<char_t[]> _str;
 };
 
 struct Utf32String;

@@ -34,7 +34,6 @@
 
 #include "mongo/util/net/listen.h"
 
-#include <boost/scoped_array.hpp>
 #include <boost/shared_ptr.hpp>
 
 #include "mongo/config.h"
@@ -430,7 +429,7 @@ namespace mongo {
         }
 
         OwnedPointerVector<EventHolder> eventHolders;
-        boost::scoped_array<WSAEVENT> events(new WSAEVENT[_socks.size()]);
+        std::unique_ptr<WSAEVENT[]> events(new WSAEVENT[_socks.size()]);
         
         
         // Populate events array with an event for each socket we are watching

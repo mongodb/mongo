@@ -32,7 +32,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <boost/scoped_array.hpp>
 #include <sasl/sasl.h>
 #include <sasl/saslplug.h>
 #include <sspi.h>
@@ -219,7 +218,7 @@ namespace {
                                                 sasl_client_params_t* cparams,
                                                 const char *serverin,
                                                 unsigned serverinlen) {
-        boost::scoped_array<char> message(new char[serverinlen]);
+        std::unique_ptr<char[]> message(new char[serverinlen]);
         memcpy(message.get(), serverin, serverinlen);
         
         SecBuffer wrapBufs[2];
@@ -299,7 +298,7 @@ namespace {
         
         // See RFC4752.
         int plaintextMessageSize = 4 + pcctx->userPlusRealm.size();
-        boost::scoped_array<char> message(new char[sizes.cbSecurityTrailer +
+        std::unique_ptr<char[]> message(new char[sizes.cbSecurityTrailer +
                                                    plaintextMessageSize +
                                                    sizes.cbBlockSize]);
         char* plaintextMessage = message.get() + sizes.cbSecurityTrailer;
