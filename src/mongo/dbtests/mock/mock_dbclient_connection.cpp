@@ -75,6 +75,27 @@ namespace mongo {
         return false;
     }
 
+    rpc::UniqueReply MockDBClientConnection::runCommandWithMetadata(StringData database,
+                                                                    StringData command,
+                                                                    const BSONObj &metadata,
+                                                                    const BSONObj &commandArgs) {
+        checkConnection();
+
+        try {
+            return _remoteServer->runCommandWithMetadata(_remoteServerInstanceID,
+                                                         database,
+                                                         command,
+                                                         metadata,
+                                                         commandArgs);
+        }
+        catch (const mongo::SocketException&) {
+            _isFailed = true;
+            throw;
+        }
+
+        MONGO_UNREACHABLE;
+    }
+
     std::unique_ptr<mongo::DBClientCursor> MockDBClientConnection::query(const string& ns,
             mongo::Query query,
             int nToReturn,

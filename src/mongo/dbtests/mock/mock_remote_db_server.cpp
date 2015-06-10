@@ -25,12 +25,21 @@
  *    then also delete it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/dbtests/mock/mock_remote_db_server.h"
 
+#include <tuple>
+
 #include "mongo/dbtests/mock/mock_dbclient_connection.h"
+#include "mongo/rpc/command_reply.h"
+#include "mongo/rpc/command_reply_builder.h"
+#include "mongo/rpc/metadata.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/sock.h"
 #include "mongo/util/time_support.h"
+#include "mongo/util/assert_util.h"
 
 using std::string;
 using std::vector;
@@ -68,6 +77,7 @@ namespace mongo {
             _queryCount(0),
             _instanceID(0) {
         insert(IdentityNS, BSON(HostField(hostAndPort)), 0);
+        setCommandReply("dbStats", BSON(HostField(hostAndPort)));
     }
 
     MockRemoteDBServer::~MockRemoteDBServer() {
@@ -128,34 +138,23 @@ namespace mongo {
         _dataMgr.erase(ns);
     }
 
-    bool MockRemoteDBServer::runCommand(MockRemoteDBServer::InstanceID id,
-            const string& dbname,
-            const BSONObj& cmdObj,
-            BSONObj &info,
-            int options) {
+    rpc::UniqueReply MockRemoteDBServer::runCommandWithMetadata(MockRemoteDBServer::InstanceID id,
+                                                                StringData database,
+                                                                StringData commandName,
+                                                                const BSONObj& metadata,
+                                                                const BSONObj& commandArgs) {
         checkIfUp(id);
+        std::string cmdName = commandName.toString();
 
-        // Get the name of the command - copied from _runCommands @ db/dbcommands.cpp
-        BSONObj innerCmdObj;
+        BSONObj reply;
         {
-            mongo::BSONElement e = cmdObj.firstElement();
-            if (e.type() == mongo::Object && (e.fieldName()[0] == '$'
-                    ? mongo::str::equals("query", e.fieldName()+1) :
-                            mongo::str::equals("query", e.fieldName()))) {
-                innerCmdObj = e.embeddedObject();
-            }
-            else {
-                innerCmdObj = cmdObj;
-            }
-        }
+            scoped_spinlock lk(_lock);
 
-        string cmdName = innerCmdObj.firstElement().fieldName();
-        uassert(16430, str::stream() << "no reply for cmd: " << cmdName,
-                _cmdMap.count(cmdName) == 1);
+            uassert(ErrorCodes::IllegalOperation,
+                    str::stream() << "no reply for command: " << commandName,
+                    _cmdMap.count(cmdName));
 
-        {
-            scoped_spinlock sLock(_lock);
-            info = _cmdMap[cmdName]->next();
+            reply = _cmdMap[cmdName]->next();
         }
 
         if (_delayMilliSec > 0) {
@@ -164,8 +163,40 @@ namespace mongo {
 
         checkIfUp(id);
 
-        scoped_spinlock sLock(_lock);
-        _cmdCount++;
+        {
+            scoped_spinlock lk(_lock);
+            _cmdCount++;
+        }
+
+        // We need to construct a reply message - it will always be read through a view so it
+        // doesn't matter whether we use CommandReplBuilder or LegacyReplyBuilder
+        auto message = rpc::CommandReplyBuilder{}.setMetadata(rpc::makeEmptyMetadata())
+                                                 .setCommandReply(reply)
+                                                 .done();
+        auto replyView = stdx::make_unique<rpc::CommandReply>(message.get());
+        return rpc::UniqueReply(std::move(message), std::move(replyView));
+    }
+
+    bool MockRemoteDBServer::runCommand(MockRemoteDBServer::InstanceID id,
+            const string& dbname,
+            const BSONObj& cmdObj,
+            BSONObj &info,
+            int options) {
+        BSONObj upconvertedRequest;
+        BSONObj upconvertedMetadata;
+        std::tie(upconvertedRequest, upconvertedMetadata) = uassertStatusOK(
+            rpc::upconvertRequestMetadata(cmdObj, options)
+        );
+
+        StringData commandName = upconvertedRequest.firstElementFieldName();
+
+        auto res = runCommandWithMetadata(id,
+                                          dbname,
+                                          commandName,
+                                          upconvertedMetadata,
+                                          upconvertedRequest);
+
+        info = res->getCommandReply().getOwned();
         return info["ok"].trueValue();
     }
 

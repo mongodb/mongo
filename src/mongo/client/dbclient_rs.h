@@ -156,6 +156,11 @@ namespace mongo {
         virtual ConnectionString::ConnectionType type() const { return ConnectionString::SET; }
         virtual bool lazySupported() const { return true; }
 
+        rpc::UniqueReply runCommandWithMetadata(StringData database,
+                                                StringData command,
+                                                const BSONObj& metadata,
+                                                const BSONObj& commandArgs) final;
+
         // ---- low level ------
 
         virtual bool call( Message &toSend, Message &response, bool assertOk=true , std::string * actualServer = 0 );

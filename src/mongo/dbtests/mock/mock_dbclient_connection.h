@@ -67,13 +67,18 @@ namespace mongo {
         bool runCommand(const std::string& dbname, const mongo::BSONObj& cmdObj,
                 mongo::BSONObj &info, int options = 0);
 
+        rpc::UniqueReply runCommandWithMetadata(StringData database,
+                                                StringData command,
+                                                const BSONObj& metadata,
+                                                const BSONObj& commandArgs) final;
+
         std::unique_ptr<mongo::DBClientCursor> query(const std::string &ns,
-                mongo::Query query = mongo::Query(),
-                int nToReturn = 0,
-                int nToSkip = 0,
-                const mongo::BSONObj* fieldsToReturn = 0,
-                int queryOptions = 0,
-                int batchSize = 0);
+                                                     mongo::Query query = mongo::Query(),
+                                                     int nToReturn = 0,
+                                                     int nToSkip = 0,
+                                                     const mongo::BSONObj* fieldsToReturn = 0,
+                                                     int queryOptions = 0,
+                                                     int batchSize = 0);
 
         uint64_t getSockCreationMicroSec() const;
 

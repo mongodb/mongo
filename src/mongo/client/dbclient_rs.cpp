@@ -38,10 +38,12 @@
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/client/global_conn_pool.h"
+#include "mongo/client/read_preference.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -216,10 +218,31 @@ namespace {
         return true;
     }
 
+namespace {
+
+    bool _isSecondaryCommand(StringData commandName,
+                             const BSONObj& commandArgs) {
+
+        if (_secOkCmdList.count(commandName.toString())) {
+            return true;
+        }
+        if (commandName == "mapReduce" || commandName == "mapreduce") {
+            if (!commandArgs.hasField("out")) {
+                return false;
+            }
+
+            BSONElement outElem(commandArgs["out"]);
+            if (outElem.isABSONObj() && outElem["inline"].trueValue()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     // Internal implementation of isSecondaryQuery, takes previously-parsed read preference
-    static bool _isSecondaryQuery( const string& ns,
-                                   const BSONObj& queryObj,
-                                   const ReadPreferenceSetting& readPref ) {
+    bool _isSecondaryQuery( const string& ns,
+                            const BSONObj& queryObj,
+                            const ReadPreferenceSetting& readPref ) {
 
         // If the read pref is primary only, this is not a secondary query
         if (readPref.pref == ReadPreference::PrimaryOnly) return false;
@@ -239,24 +262,12 @@ namespace {
             actualQueryObj = queryObj;
         }
 
-        const string cmdName = actualQueryObj.firstElementFieldName();
-        if (_secOkCmdList.count(cmdName) == 1) {
-            return true;
-        }
-
-        if (cmdName == "mapReduce" || cmdName == "mapreduce") {
-            if (!actualQueryObj.hasField("out")) {
-                return false;
-            }
-
-            BSONElement outElem(actualQueryObj["out"]);
-            if (outElem.isABSONObj() && outElem["inline"].trueValue()) {
-                return true;
-            }
-        }
-
-        return false;
+        StringData commandName = actualQueryObj.firstElementFieldName();
+        return _isSecondaryCommand(commandName, actualQueryObj);
     }
+
+}  // namespace
+
 
     bool DBClientReplicaSet::isSecondaryQuery( const string& ns,
                                                const BSONObj& queryObj,
@@ -617,7 +628,7 @@ namespace {
         verify(0);
     }
 
-    void DBClientReplicaSet::isntMaster() { 
+    void DBClientReplicaSet::isntMaster() {
         log() << "got not master for: " << _masterHost << endl;
         // Can't use _getMonitor because that will create a new monitor from the cached seed if
         // the monitor doesn't exist.
@@ -902,6 +913,66 @@ namespace {
         }
     }
 
+    rpc::UniqueReply DBClientReplicaSet::runCommandWithMetadata(StringData database,
+                                                                StringData command,
+                                                                const BSONObj& metadata,
+                                                                const BSONObj& commandArgs) {
+        // This overload exists so we can parse out the read preference and then use server
+        // selection directly without having to re-parse the raw message.
+
+        // TODO: eventually we will want to pass the metadata before serializing it to BSON
+        // so we don't have to re-parse it, however, that will come with its own set of
+        // complications (e.g. some kind of base class or concept for MetadataSerializable
+        // objects). For now we do it the stupid way.
+        auto ssm = uassertStatusOK(
+            rpc::ServerSelectionMetadata::readFromMetadata(metadata)
+        );
+
+        // If we didn't get a readPref with this query, we assume SecondaryPreferred if secondaryOk
+        // is true, and PrimaryOnly otherwise. This logic is replicated from _extractReadPref.
+        auto defaultReadPref = ssm.isSecondaryOk() ?
+            ReadPreferenceSetting(ReadPreference::SecondaryPreferred, TagSet()) :
+            ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet::primaryOnly());
+
+        auto readPref = ssm.getReadPreference().get_value_or(defaultReadPref);
+
+        if (readPref.pref == ReadPreference::PrimaryOnly ||
+            // If the command is not runnable on a secondary, we run it on the primary
+            // regardless of the read preference.
+            !_isSecondaryCommand(command, commandArgs)) {
+
+            return checkMaster()->runCommandWithMetadata(std::move(database),
+                                                         std::move(command),
+                                                         metadata,
+                                                         commandArgs);
+        }
+
+        auto rpShared = std::make_shared<ReadPreferenceSetting>(std::move(readPref));
+
+        for (size_t retry = 0; retry < MAX_RETRY; ++retry)  {
+            try {
+                auto* conn = selectNodeUsingTags(rpShared);
+                if (conn == nullptr) {
+                    break;
+                }
+                // We can't move database and command in case this throws
+                // and we retry.
+                return conn->runCommandWithMetadata(database,
+                                                    command,
+                                                    metadata,
+                                                    commandArgs);
+            }
+            catch (const DBException& ex) {
+                log() << exceptionToStatus();
+                invalidateLastSlaveOkCache();
+            }
+        }
+        uasserted(ErrorCodes::NodeNotFound,
+                  str::stream() << "Could not satisfy $readPreference of '"
+                                << readPref.toBSON() << "' "
+                                << "while attempting to run command "
+                                << command);
+    }
 
     bool DBClientReplicaSet::call(Message &toSend,
                                   Message &response,
@@ -957,13 +1028,13 @@ namespace {
                 return false;
             }
         }
-        
+
         LOG( 3 ) << "dbclient_rs call to primary node in " << _getMonitor()->getName() << endl;
 
         DBClientConnection* m = checkMaster();
         if ( actualServer )
             *actualServer = m->getServerAddress();
-        
+
         if ( ! m->call( toSend , response , assertOk ) )
             return false;
 
