@@ -67,6 +67,10 @@ public:
         MOD,
         EXISTS,
         MATCH_IN,
+        BITS_ALL_SET,
+        BITS_ALL_CLEAR,
+        BITS_ANY_SET,
+        BITS_ANY_CLEAR,
 
         // Negations.
         NOT,

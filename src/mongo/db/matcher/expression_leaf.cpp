@@ -661,4 +661,228 @@ void InMatchExpression::copyTo(InMatchExpression* toFillIn) const {
     toFillIn->init(path());
     _arrayEntries.copyTo(toFillIn->_arrayEntries);
 }
+
+// -----------
+
+const double BitTestMatchExpression::kLongLongMaxPlusOneAsDouble =
+    scalbn(1, std::numeric_limits<long long>::digits);
+
+Status BitTestMatchExpression::init(StringData path, std::vector<uint32_t> bitPositions) {
+    _bitPositions = std::move(bitPositions);
+    return initPath(path);
+}
+
+Status BitTestMatchExpression::init(StringData path, uint64_t bitMask) {
+    for (int bit = 0; bit < 64; bit++) {
+        if (bitMask & (1LL << bit)) {
+            _bitPositions.push_back(bit);
+        }
+    }
+
+    return initPath(path);
+}
+
+Status BitTestMatchExpression::init(StringData path,
+                                    const char* bitMaskBinary,
+                                    uint32_t bitMaskLen) {
+    for (uint32_t byte = 0; byte < bitMaskLen; byte++) {
+        char byteAt = bitMaskBinary[byte];
+        if (!byteAt) {
+            continue;
+        }
+
+        for (int bit = 0; bit < 8; bit++) {
+            if (byteAt & (1 << bit)) {
+                _bitPositions.push_back(8 * byte + bit);
+            }
+        }
+    }
+
+    return initPath(path);
+}
+
+bool BitTestMatchExpression::needFurtherBitTests(bool isBitSet) const {
+    const MatchType mt = matchType();
+
+    return (isBitSet && (mt == BITS_ALL_SET || mt == BITS_ANY_CLEAR)) ||
+        (!isBitSet && (mt == BITS_ALL_CLEAR || mt == BITS_ANY_SET));
+}
+
+bool BitTestMatchExpression::performBitTest(long long eValue) const {
+    const MatchType mt = matchType();
+
+    // Test each bit position.
+    for (auto bitPosition : _bitPositions) {
+        bool isBitSet;
+        if (bitPosition >= 63) {
+            // If position to test is longer than 64 bits, sign-extend.
+            isBitSet = eValue < 0;
+        } else {
+            isBitSet = eValue & (1LL << bitPosition);
+        }
+
+        if (!needFurtherBitTests(isBitSet)) {
+            // If we can skip the rest of the tests, that means we succeeded with _ANY_ or failed
+            // with _ALL_.
+            return mt == BITS_ANY_SET || mt == BITS_ANY_CLEAR;
+        }
+    }
+
+    // If we finished all the tests, that means we succeeded with _ALL_ or failed with _ANY_.
+    return mt == BITS_ALL_SET || mt == BITS_ALL_CLEAR;
+}
+
+bool BitTestMatchExpression::performBitTest(const char* eBinary, uint32_t eBinaryLen) const {
+    const MatchType mt = matchType();
+
+    // Test each bit position.
+    for (auto bitPosition : _bitPositions) {
+        bool isBitSet;
+        if (bitPosition >= eBinaryLen * 8) {
+            // If position to test is longer than the data to test against, zero-extend.
+            isBitSet = false;
+        } else {
+            // Map to byte position and bit position within that byte. Note that byte positions
+            // start at position 0 in the char array, and bit positions start at the least
+            // significant bit.
+            int bytePosition = bitPosition / 8;
+            int bit = bitPosition % 8;
+            char byte = eBinary[bytePosition];
+
+            isBitSet = byte & (1 << bit);
+        }
+
+        if (!needFurtherBitTests(isBitSet)) {
+            // If we can skip the rest fo the tests, that means we succeeded with _ANY_ or failed
+            // with _ALL_.
+            return mt == BITS_ANY_SET || mt == BITS_ANY_CLEAR;
+        }
+    }
+
+    // If we finished all the tests, that means we succeeded with _ALL_ or failed with _ANY_.
+    return mt == BITS_ALL_SET || mt == BITS_ALL_CLEAR;
+}
+
+bool BitTestMatchExpression::matchesSingleElement(const BSONElement& e) const {
+    // Validate 'e' is a number or a BinData.
+    if (!e.isNumber() && e.type() != BSONType::BinData) {
+        return false;
+    }
+
+    if (e.type() == BSONType::BinData) {
+        int eBinaryLen;  // Length of eBinary (in bytes).
+        const char* eBinary = e.binData(eBinaryLen);
+        return performBitTest(eBinary, eBinaryLen);
+    }
+
+    invariant(e.isNumber());
+
+    if (e.type() == BSONType::NumberDouble) {
+        double eDouble = e.numberDouble();
+
+        // NaN doubles are rejected.
+        if (std::isnan(eDouble)) {
+            return false;
+        }
+
+        // Integral doubles that are too large or small to be represented as a 64-bit signed
+        // integer are treated as 0. We use 'kLongLongMaxAsDouble' because if we just did
+        // eDouble > 2^63-1, it would be compared against 2^63. eDouble=2^63 would not get caught
+        // that way.
+        if (eDouble >= kLongLongMaxPlusOneAsDouble ||
+            eDouble < std::numeric_limits<long long>::min()) {
+            return false;
+        }
+
+        // This checks if e is an integral double.
+        if (eDouble != static_cast<double>(static_cast<long long>(eDouble))) {
+            return false;
+        }
+    }
+
+    long long eValue = e.numberLong();
+    return performBitTest(eValue);
+}
+
+void BitTestMatchExpression::debugString(StringBuilder& debug, int level) const {
+    _debugAddSpace(debug, level);
+
+    debug << path() << " ";
+
+    switch (matchType()) {
+        case BITS_ALL_SET:
+            debug << "$bitsAllSet:";
+            break;
+        case BITS_ALL_CLEAR:
+            debug << "$bitsAllClear:";
+            break;
+        case BITS_ANY_SET:
+            debug << "$bitsAnySet:";
+            break;
+        case BITS_ANY_CLEAR:
+            debug << "$bitsAnyClear:";
+            break;
+        default:
+            invariant(false);
+    }
+
+    debug << " [";
+    for (size_t i = 0; i < _bitPositions.size(); i++) {
+        debug << _bitPositions[i];
+        if (i != _bitPositions.size() - 1) {
+            debug << ", ";
+        }
+    }
+    debug << "]";
+
+    MatchExpression::TagData* td = getTag();
+    if (td) {
+        debug << " ";
+        td->debugString(&debug);
+    }
+}
+
+void BitTestMatchExpression::toBSON(BSONObjBuilder* out) const {
+    string opString = "";
+
+    switch (matchType()) {
+        case BITS_ALL_SET:
+            opString = "$bitsAllSet";
+            break;
+        case BITS_ALL_CLEAR:
+            opString = "$bitsAllClear";
+            break;
+        case BITS_ANY_SET:
+            opString = "$bitsAnySet";
+            break;
+        case BITS_ANY_CLEAR:
+            opString = "$bitsAnyClear";
+            break;
+        default:
+            invariant(false);
+    }
+
+    BSONArrayBuilder arrBob;
+    for (auto bitPosition : _bitPositions) {
+        arrBob.append(bitPosition);
+    }
+    arrBob.doneFast();
+
+    out->append(path(), BSON(opString << arrBob.arr()));
+}
+
+bool BitTestMatchExpression::equivalent(const MatchExpression* other) const {
+    if (matchType() != other->matchType()) {
+        return false;
+    }
+
+    const BitTestMatchExpression* realOther = static_cast<const BitTestMatchExpression*>(other);
+
+    std::vector<uint32_t> myBitPositions = getBitPositions();
+    std::vector<uint32_t> otherBitPositions = realOther->getBitPositions();
+    std::sort(myBitPositions.begin(), myBitPositions.end());
+    std::sort(otherBitPositions.begin(), otherBitPositions.end());
+
+    return path() == realOther->path() && myBitPositions == otherBitPositions;
+}
 }

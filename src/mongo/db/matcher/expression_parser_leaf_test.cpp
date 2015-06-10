@@ -750,4 +750,273 @@ TEST(MatchExpressionParserLeafTest, TypeStringnameNumber) {
     ASSERT_TRUE(tmeNumber->matchesBSON(BSON("a" << -1LL)));
     ASSERT_FALSE(tmeNumber->matchesBSON(fromjson("{a: ''}")));
 }
+
+TEST(MatchExpressionParserTest, BitTestMatchExpressionValidMask) {
+    const double k2Power53 = scalbn(1, 32);
+
+    ASSERT_OK(MatchExpressionParser::parse(BSON("a" << BSON("$bitsAllSet" << 54))).getStatus());
+    ASSERT_OK(
+        MatchExpressionParser::parse(
+            BSON("a" << BSON("$bitsAllSet" << std::numeric_limits<long long>::max()))).getStatus());
+    ASSERT_OK(
+        MatchExpressionParser::parse(BSON("a" << BSON("$bitsAllSet" << k2Power53))).getStatus());
+    ASSERT_OK(MatchExpressionParser::parse(BSON("a" << BSON("$bitsAllSet" << k2Power53 - 1)))
+                  .getStatus());
+
+    ASSERT_OK(MatchExpressionParser::parse(BSON("a" << BSON("$bitsAllClear" << 54))).getStatus());
+    ASSERT_OK(MatchExpressionParser::parse(
+                  BSON("a" << BSON("$bitsAllClear" << std::numeric_limits<long long>::max())))
+                  .getStatus());
+    ASSERT_OK(
+        MatchExpressionParser::parse(BSON("a" << BSON("$bitsAllClear" << k2Power53))).getStatus());
+    ASSERT_OK(MatchExpressionParser::parse(BSON("a" << BSON("$bitsAllClear" << k2Power53 - 1)))
+                  .getStatus());
+
+    ASSERT_OK(MatchExpressionParser::parse(BSON("a" << BSON("$bitsAnySet" << 54))).getStatus());
+    ASSERT_OK(
+        MatchExpressionParser::parse(
+            BSON("a" << BSON("$bitsAnySet" << std::numeric_limits<long long>::max()))).getStatus());
+    ASSERT_OK(
+        MatchExpressionParser::parse(BSON("a" << BSON("$bitsAnySet" << k2Power53))).getStatus());
+    ASSERT_OK(MatchExpressionParser::parse(BSON("a" << BSON("$bitsAnySet" << k2Power53 - 1)))
+                  .getStatus());
+
+    ASSERT_OK(MatchExpressionParser::parse(BSON("a" << BSON("$bitsAnyClear" << 54))).getStatus());
+    ASSERT_OK(MatchExpressionParser::parse(
+                  BSON("a" << BSON("$bitsAnyClear" << std::numeric_limits<long long>::max())))
+                  .getStatus());
+    ASSERT_OK(
+        MatchExpressionParser::parse(BSON("a" << BSON("$bitsAnyClear" << k2Power53))).getStatus());
+    ASSERT_OK(MatchExpressionParser::parse(BSON("a" << BSON("$bitsAnyClear" << k2Power53 - 1)))
+                  .getStatus());
+}
+
+TEST(MatchExpressionParserTest, BitTestMatchExpressionValidArray) {
+    ASSERT_OK(MatchExpressionParser::parse(BSON("a" << BSON("$bitsAllSet" << BSON_ARRAY(0))))
+                  .getStatus());
+    ASSERT_OK(MatchExpressionParser::parse(
+                  BSON("a" << BSON("$bitsAllSet" << BSON_ARRAY(0 << 1 << 2 << 3)))).getStatus());
+    ASSERT_OK(MatchExpressionParser::parse(
+                  BSON("a" << BSON("$bitsAllSet" << BSON_ARRAY(std::numeric_limits<int>::max()))))
+                  .getStatus());
+
+    ASSERT_OK(MatchExpressionParser::parse(BSON("a" << BSON("$bitsAllClear" << BSON_ARRAY(0))))
+                  .getStatus());
+    ASSERT_OK(MatchExpressionParser::parse(
+                  BSON("a" << BSON("$bitsAllClear" << BSON_ARRAY(0 << 1 << 2 << 3)))).getStatus());
+    ASSERT_OK(MatchExpressionParser::parse(
+                  BSON("a" << BSON("$bitsAllClear" << BSON_ARRAY(std::numeric_limits<int>::max()))))
+                  .getStatus());
+
+    ASSERT_OK(MatchExpressionParser::parse(BSON("a" << BSON("$bitsAnySet" << BSON_ARRAY(0))))
+                  .getStatus());
+    ASSERT_OK(MatchExpressionParser::parse(
+                  BSON("a" << BSON("$bitsAnySet" << BSON_ARRAY(0 << 1 << 2 << 3)))).getStatus());
+    ASSERT_OK(MatchExpressionParser::parse(
+                  BSON("a" << BSON("$bitsAnySet" << BSON_ARRAY(std::numeric_limits<int>::max()))))
+                  .getStatus());
+
+    ASSERT_OK(MatchExpressionParser::parse(BSON("a" << BSON("$bitsAnyClear" << BSON_ARRAY(0))))
+                  .getStatus());
+    ASSERT_OK(MatchExpressionParser::parse(
+                  BSON("a" << BSON("$bitsAnyClear" << BSON_ARRAY(0 << 1 << 2 << 3)))).getStatus());
+    ASSERT_OK(MatchExpressionParser::parse(
+                  BSON("a" << BSON("$bitsAnyClear" << BSON_ARRAY(std::numeric_limits<int>::max()))))
+                  .getStatus());
+}
+
+TEST(MatchExpressionParserTest, BitTestMatchExpressionValidBinData) {
+    ASSERT_OK(
+        MatchExpressionParser::parse(
+            fromjson("{a: {$bitsAllSet: {$binary: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAA', $type: '00'}}}"))
+            .getStatus());
+
+    ASSERT_OK(
+        MatchExpressionParser::parse(
+            fromjson(
+                "{a: {$bitsAllClear: {$binary: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAA', $type: '00'}}}"))
+            .getStatus());
+
+    ASSERT_OK(
+        MatchExpressionParser::parse(
+            fromjson("{a: {$bitsAnySet: {$binary: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAA', $type: '00'}}}"))
+            .getStatus());
+
+    ASSERT_OK(
+        MatchExpressionParser::parse(
+            fromjson(
+                "{a: {$bitsAnyClear: {$binary: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAA', $type: '00'}}}"))
+            .getStatus());
+}
+
+TEST(MatchExpressionParserTest, BitTestMatchExpressionInvalidMaskType) {
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: null}}")).getStatus());
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: true}}")).getStatus());
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: {}}}")).getStatus());
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: ''}}")).getStatus());
+
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: null}}")).getStatus());
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: true}}")).getStatus());
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: {}}}")).getStatus());
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: ''}}")).getStatus());
+    ASSERT_NOT_OK(
+        MatchExpressionParser::parse(
+            fromjson("{a: {$bitsAllClear: ObjectId('000000000000000000000000')}}")).getStatus());
+
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: null}}")).getStatus());
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: true}}")).getStatus());
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: {}}}")).getStatus());
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: ''}}")).getStatus());
+    ASSERT_NOT_OK(
+        MatchExpressionParser::parse(
+            fromjson("{a: {$bitsAnySet: ObjectId('000000000000000000000000')}}")).getStatus());
+
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: null}}")).getStatus());
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: true}}")).getStatus());
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: {}}}")).getStatus());
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: ''}}")).getStatus());
+    ASSERT_NOT_OK(
+        MatchExpressionParser::parse(
+            fromjson("{a: {$bitsAnyClear: ObjectId('000000000000000000000000')}}")).getStatus());
+}
+
+TEST(MatchExpressionParserTest, BitTestMatchExpressionInvalidMaskValue) {
+    const double kLongLongMaxAsDouble = scalbn(1, std::numeric_limits<long long>::digits);
+
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: NaN}}")).getStatus());
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: -54}}")).getStatus());
+    ASSERT_NOT_OK(
+        MatchExpressionParser::parse(
+            BSON("a" << BSON("$bitsAllSet" << std::numeric_limits<double>::max()))).getStatus());
+    ASSERT_NOT_OK(MatchExpressionParser::parse(
+                      BSON("a" << BSON("$bitsAllSet" << kLongLongMaxAsDouble))).getStatus());
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: 2.5}}")).getStatus());
+
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: NaN}}")).getStatus());
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: -54}}")).getStatus());
+    ASSERT_NOT_OK(
+        MatchExpressionParser::parse(
+            BSON("a" << BSON("$bitsAllClear" << std::numeric_limits<double>::max()))).getStatus());
+    ASSERT_NOT_OK(MatchExpressionParser::parse(
+                      BSON("a" << BSON("$bitsAllClear" << kLongLongMaxAsDouble))).getStatus());
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: 2.5}}")).getStatus());
+
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: NaN}}")).getStatus());
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: -54}}")).getStatus());
+    ASSERT_NOT_OK(
+        MatchExpressionParser::parse(
+            BSON("a" << BSON("$bitsAnySet" << std::numeric_limits<double>::max()))).getStatus());
+    ASSERT_NOT_OK(MatchExpressionParser::parse(
+                      BSON("a" << BSON("$bitsAnySet" << kLongLongMaxAsDouble))).getStatus());
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: 2.5}}")).getStatus());
+
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: NaN}}")).getStatus());
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: -54}}")).getStatus());
+    ASSERT_NOT_OK(
+        MatchExpressionParser::parse(
+            BSON("a" << BSON("$bitsAnyClear" << std::numeric_limits<double>::max()))).getStatus());
+    ASSERT_NOT_OK(MatchExpressionParser::parse(
+                      BSON("a" << BSON("$bitsAnyClear" << kLongLongMaxAsDouble))).getStatus());
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: 2.5}}")).getStatus());
+}
+
+TEST(MatchExpressionParserTest, BitTestMatchExpressionInvalidArray) {
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: [null]}}")).getStatus());
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: [true]}}")).getStatus());
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: ['']}}")).getStatus());
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: [{}]}}")).getStatus());
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: [[]]}}")).getStatus());
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: [-1]}}")).getStatus());
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: [2.5]}}")).getStatus());
+    ASSERT_NOT_OK(
+        MatchExpressionParser::parse(
+            fromjson(
+                "{a: {$bitsAllSet: [{$binary: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAA', $type: '00'}]}}"))
+            .getStatus());
+
+    ASSERT_NOT_OK(
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: [null]}}")).getStatus());
+    ASSERT_NOT_OK(
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: [true]}}")).getStatus());
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: ['']}}")).getStatus());
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: [{}]}}")).getStatus());
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: [[]]}}")).getStatus());
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: [-1]}}")).getStatus());
+    ASSERT_NOT_OK(
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: [2.5]}}")).getStatus());
+    ASSERT_NOT_OK(
+        MatchExpressionParser::parse(
+            fromjson(
+                "{a: {$bitsAllClear: [{$binary: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAA', $type: '00'}]}}"))
+            .getStatus());
+
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: [null]}}")).getStatus());
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: [true]}}")).getStatus());
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: ['']}}")).getStatus());
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: [{}]}}")).getStatus());
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: [[]]}}")).getStatus());
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: [-1]}}")).getStatus());
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: [2.5]}}")).getStatus());
+    ASSERT_NOT_OK(
+        MatchExpressionParser::parse(
+            fromjson(
+                "{a: {$bitsAnySet: [{$binary: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAA', $type: '00'}]}}"))
+            .getStatus());
+
+    ASSERT_NOT_OK(
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: [null]}}")).getStatus());
+    ASSERT_NOT_OK(
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: [true]}}")).getStatus());
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: ['']}}")).getStatus());
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: [{}]}}")).getStatus());
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: [[]]}}")).getStatus());
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: [-1]}}")).getStatus());
+    ASSERT_NOT_OK(
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: [2.5]}}")).getStatus());
+    ASSERT_NOT_OK(
+        MatchExpressionParser::parse(
+            fromjson(
+                "{a: {$bitsAnyClear: [{$binary: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAA', $type: '00'}]}}"))
+            .getStatus());
+}
+
+TEST(MatchExpressionParserTest, BitTestMatchExpressionInvalidArrayValue) {
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: [-54]}}")).getStatus());
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: [NaN]}}")).getStatus());
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAllSet: [2.5]}}")).getStatus());
+    ASSERT_NOT_OK(
+        MatchExpressionParser::parse(
+            BSON("a" << BSON("$bitsAllSet" << BSON_ARRAY(std::numeric_limits<long long>::max()))))
+            .getStatus());
+
+    ASSERT_NOT_OK(
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: [-54]}}")).getStatus());
+    ASSERT_NOT_OK(
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: [NaN]}}")).getStatus());
+    ASSERT_NOT_OK(
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAllClear: [2.5]}}")).getStatus());
+    ASSERT_NOT_OK(
+        MatchExpressionParser::parse(
+            BSON("a" << BSON("$bitsAllClear" << BSON_ARRAY(std::numeric_limits<long long>::max()))))
+            .getStatus());
+
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: [-54]}}")).getStatus());
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: [NaN]}}")).getStatus());
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$bitsAnySet: [2.5]}}")).getStatus());
+    ASSERT_NOT_OK(
+        MatchExpressionParser::parse(
+            BSON("a" << BSON("$bitsAnySet" << BSON_ARRAY(std::numeric_limits<long long>::max()))))
+            .getStatus());
+
+    ASSERT_NOT_OK(
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: [-54]}}")).getStatus());
+    ASSERT_NOT_OK(
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: [NaN]}}")).getStatus());
+    ASSERT_NOT_OK(
+        MatchExpressionParser::parse(fromjson("{a: {$bitsAnyClear: [2.5]}}")).getStatus());
+    ASSERT_NOT_OK(
+        MatchExpressionParser::parse(
+            BSON("a" << BSON("$bitsAnyClear" << BSON_ARRAY(std::numeric_limits<long long>::max()))))
+            .getStatus());
+}
 }

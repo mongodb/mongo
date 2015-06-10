@@ -520,6 +520,10 @@ public:
         opWITHIN = 0x14,
         opMAX_DISTANCE = 0x15,
         opGEO_INTERSECTS = 0x16,
+        opBITS_ALL_SET = 0x17,
+        opBITS_ALL_CLEAR = 0x18,
+        opBITS_ANY_SET = 0x19,
+        opBITS_ANY_CLEAR = 0x1A,
     };
 
     /** add all elements of the object to the specified vector */
