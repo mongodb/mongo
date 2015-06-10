@@ -277,7 +277,7 @@ namespace mongo {
                                          const std::string& uri ) {
         StatusWith<int64_t> result = WiredTigerUtil::getStatisticsValueAs<int64_t>(
             s,
-            "statistics:" + uri, "statistics=(fast)", WT_STAT_DSRC_BLOCK_SIZE);
+            "statistics:" + uri, "statistics=(size)", WT_STAT_DSRC_BLOCK_SIZE);
         const Status& status = result.getStatus();
         if ( !status.isOK() ) {
             if ( status.code() == ErrorCodes::CursorNotFound ) {
