@@ -38,6 +38,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/client/constants.h"
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/client/dbclientinterface.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/config.h"
@@ -1383,7 +1384,7 @@ namespace {
     }
 
     /* -- DBClientCursor ---------------------------------------------- */
-    void assembleRequest( const string &ns, BSONObj query, int nToReturn, int nToSkip, const BSONObj *fieldsToReturn, int queryOptions, Message &toSend ) {
+    void assembleQueryRequest( const string &ns, BSONObj query, int nToReturn, int nToSkip, const BSONObj *fieldsToReturn, int queryOptions, Message &toSend ) {
         if (kDebugBuild) {
             massert( 10337 ,  (string)"object not valid assembleRequest query" , query.isValid() );
         }

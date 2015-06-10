@@ -242,6 +242,14 @@ namespace mongo {
 
         void dataReceived() { bool retry; std::string lazyHost; dataReceived( retry, lazyHost ); }
         void dataReceived( bool& retry, std::string& lazyHost );
+
+        /**
+         * Called by dataReceived when the query was actually a command. Parses the command reply
+         * according to the RPC protocol used to send it, and then fills in the internal field
+         * of this cursor with the received data.
+         */
+        void commandDataReceived();
+
         void requestMore();
         void exhaustReceiveMore(); // for exhaust
 

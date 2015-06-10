@@ -49,11 +49,6 @@
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/util/timer.h"
 
-namespace mongo {
-    void assembleRequest( const std::string &ns, BSONObj query, int nToReturn, int nToSkip,
-                         const BSONObj *fieldsToReturn, int queryOptions, Message &toSend );
-}
-
 namespace QueryTests {
 
     using std::unique_ptr;
@@ -1475,10 +1470,10 @@ namespace QueryTests {
                                              "capped" << true << "size" << 8192 ), info ) );
             _client.insert( ns(), BSON( "ts" << 0 ) );
             Message message;
-            assembleRequest( ns(), BSON( "ts" << GTE << 0 ), 0, 0, 0,
-                            QueryOption_OplogReplay | QueryOption_CursorTailable |
-                            QueryOption_Exhaust,
-                            message );
+            assembleQueryRequest( ns(), BSON( "ts" << GTE << 0 ), 0, 0, 0,
+                                  QueryOption_OplogReplay | QueryOption_CursorTailable |
+                                  QueryOption_Exhaust,
+                                  message );
             DbMessage dbMessage( message );
             QueryMessage queryMessage( dbMessage );
             Message result;

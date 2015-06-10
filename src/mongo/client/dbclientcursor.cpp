@@ -36,7 +36,12 @@
 #include "mongo/client/connpool.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/rpc/factory.h"
+#include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/rpc/metadata.h"
+#include "mongo/rpc/request_builder_interface.h"
 #include "mongo/s/stale_exception.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
@@ -48,7 +53,46 @@ namespace mongo {
     using std::string;
     using std::vector;
 
-    void assembleRequest( const string &ns, BSONObj query, int nToReturn, int nToSkip, const BSONObj *fieldsToReturn, int queryOptions, Message &toSend );
+namespace {
+    /**
+     * This code is mostly duplicated from DBClientWithCommands::runCommand. It may not
+     * be worth de-duplicating as this codepath will eventually be removed anyway.
+     */
+    std::unique_ptr<Message> assembleCommandRequest(DBClientWithCommands* cli,
+                                                    StringData database,
+                                                    int legacyQueryOptions,
+                                                    BSONObj legacyQuery) {
+
+        // TODO: Rewrite this to a common utility shared between this and DBClientMultiCommand.
+
+        // Can be an OP_COMMAND or OP_QUERY message.
+        auto requestBuilder = rpc::makeRequestBuilder(cli->getClientRPCProtocols(),
+                                                      cli->getServerRPCProtocols());
+
+        BSONObj upconvertedCommand;
+        BSONObj upconvertedMetadata;
+
+        std::tie(upconvertedCommand, upconvertedMetadata) = uassertStatusOK(
+            rpc::upconvertRequestMetadata(std::move(legacyQuery), legacyQueryOptions)
+        );
+
+        BSONObjBuilder metadataBob;
+        metadataBob.appendElements(upconvertedMetadata);
+        if (cli->getRequestMetadataWriter()) {
+            uassertStatusOK(cli->getRequestMetadataWriter()(&metadataBob));
+        }
+
+        requestBuilder->setDatabase(database);
+        // We need to get the command name from the upconverted command as it may have originally
+        // been wrapped.
+        requestBuilder->setCommandName(upconvertedCommand.firstElementFieldName());
+        requestBuilder->setMetadata(metadataBob.done());
+        requestBuilder->setCommandArgs(std::move(upconvertedCommand));
+
+        return requestBuilder->done();
+    }
+
+}  // namespace
 
     void DBClientCursor::_finishConsInit() {
         _originalHost = _client->getServerAddress();
@@ -66,17 +110,43 @@ namespace mongo {
     }
 
     void DBClientCursor::_assembleInit( Message& toSend ) {
+        // If we haven't gotten a cursorId yet, we need to issue a new query or command.
         if ( !cursorId ) {
-            assembleRequest( ns, query, nextBatchSize() , nToSkip, fieldsToReturn, opts, toSend );
+            auto nss = NamespaceString(ns);
+
+            // HACK:
+            // Unfortunately, this code is used by the shell to run commands,
+            // so we need to allow the shell to send invalid options so that we can
+            // test that the server rejects them. Thus, to allow generating commands with
+            // invalid options, we validate them here, and fall back to generating an OP_QUERY
+            // through assembleQueryRequest if the options are invalid.
+
+            bool hasValidNToReturnForCommand = (nToReturn == 1 || nToReturn == -1);
+            bool hasValidFlagsForCommand = !(opts & mongo::QueryOption_Exhaust);
+
+            if (nss.isCommand() && hasValidNToReturnForCommand && hasValidFlagsForCommand) {
+                toSend = *assembleCommandRequest(_client,
+                                                 nss.db(),
+                                                 opts,
+                                                 query);
+                return;
+            }
+            assembleQueryRequest(ns,
+                                 query,
+                                 nextBatchSize(),
+                                 nToSkip,
+                                 fieldsToReturn,
+                                 opts,
+                                 toSend);
+            return;
         }
-        else {
-            BufBuilder b;
-            b.appendNum( opts );
-            b.appendStr( ns );
-            b.appendNum( nToReturn );
-            b.appendNum( cursorId );
-            toSend.setData( dbGetMore, b.buf(), b.len() );
-        }
+        // Assemble a legacy getMore request.
+        BufBuilder b;
+        b.appendNum( opts );
+        b.appendStr( ns );
+        b.appendNum( nToReturn );
+        b.appendNum( cursorId );
+        toSend.setData( dbGetMore, b.buf(), b.len() );
     }
 
     bool DBClientCursor::init() {
@@ -200,7 +270,52 @@ namespace mongo {
         dataReceived();
     }
 
+    void DBClientCursor::commandDataReceived() {
+        int op = batch.m->operation();
+        invariant(op == opReply || op == dbCommandReply);
+
+        batch.nReturned = 1;
+        batch.pos = 0;
+
+        auto commandReply = rpc::makeReply(batch.m.get());
+
+        auto commandStatus = getStatusFromCommandResult(commandReply->getCommandReply());
+
+        if (ErrorCodes::SendStaleConfig == commandStatus) {
+            throw RecvStaleConfigException("stale config in DBClientCursor::dataReceived()",
+                                           commandReply->getCommandReply());
+        }
+        else if (!commandStatus.isOK()) {
+            wasError = true;
+        }
+
+        if (_client->getReplyMetadataReader()) {
+            uassertStatusOK(
+                _client->getReplyMetadataReader()(commandReply->getMetadata(),
+                                                  _client->getServerAddress())
+            );
+        }
+
+        // HACK: If we got an OP_COMMANDREPLY, take the reply object
+        // and shove it in to an OP_REPLY message.
+        if (op == dbCommandReply) {
+            // Need to take ownership here as we destroy the underlying message.
+            BSONObj reply = commandReply->getCommandReply().getOwned();
+            batch.m = stdx::make_unique<Message>();
+            replyToQuery(0, *batch.m, reply);
+        }
+
+        QueryResult::View qr = batch.m->singleData().view2ptr();
+        batch.data = qr.data();
+    }
+
     void DBClientCursor::dataReceived( bool& retry, string& host ) {
+        NamespaceString nss(ns);
+        // If this is a reply to our initial command request.
+        if (nss.isCommand() && cursorId == 0) {
+            commandDataReceived();
+            return;
+        }
 
         QueryResult::View qr = batch.m->singleData().view2ptr();
         resultFlags = qr.getResultFlags();

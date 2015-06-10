@@ -1151,6 +1151,14 @@ namespace mongo {
         return s << q.toString();
     }
 
+    void assembleQueryRequest(const std::string &ns,
+                              BSONObj query,
+                              int nToReturn,
+                              int nToSkip,
+                              const BSONObj *fieldsToReturn,
+                              int queryOptions,
+                              Message &toSend);
+
 } // namespace mongo
 
 #include "mongo/client/dbclientcursor.h"
