@@ -45,7 +45,7 @@
 
 namespace mongo {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::endl;
     using std::vector;
 
@@ -238,11 +238,11 @@ namespace mongo {
 
     Status SubplanStage::choosePlanForSubqueries(PlanYieldPolicy* yieldPolicy) {
         // This is what we annotate with the index selections and then turn into a solution.
-        auto_ptr<OrMatchExpression> orExpr(
+        unique_ptr<OrMatchExpression> orExpr(
             static_cast<OrMatchExpression*>(_query->root()->shallowClone()));
 
         // This is the skeleton of index selections that is inserted into the cache.
-        auto_ptr<PlanCacheIndexTree> cacheData(new PlanCacheIndexTree());
+        unique_ptr<PlanCacheIndexTree> cacheData(new PlanCacheIndexTree());
 
         for (size_t i = 0; i < orExpr->numChildren(); ++i) {
             MatchExpression* orChild = orExpr->getChild(i);
@@ -537,7 +537,7 @@ namespace mongo {
 
     PlanStageStats* SubplanStage::getStats() {
         _commonStats.isEOF = isEOF();
-        auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_SUBPLAN));
+        unique_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_SUBPLAN));
         ret->children.push_back(_child->getStats());
         return ret.release();
     }

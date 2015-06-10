@@ -81,7 +81,7 @@ namespace logger {
         };
 
         // TODO(schwerin): Replace with unique_ptr in C++11.
-        typedef std::auto_ptr<EventAppender> AppenderAutoPtr;
+        typedef std::unique_ptr<EventAppender> AppenderAutoPtr;
 
         LogDomain();
         ~LogDomain();
@@ -118,7 +118,7 @@ namespace logger {
 
         /**
          * Detaches the appender referenced by "handle" from this domain, releasing ownership of it.
-         * Returns an auto_ptr to the handler to the caller, who is now responsible for its
+         * Returns an unique_ptr to the handler to the caller, who is now responsible for its
          * deletion. Caller should consider "handle" is invalid after this call.
          */
         AppenderAutoPtr detachAppender(AppenderHandle handle);

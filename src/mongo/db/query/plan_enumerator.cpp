@@ -39,7 +39,7 @@
 namespace {
 
     using namespace mongo;
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::endl;
     using std::set;
     using std::string;
@@ -276,7 +276,7 @@ namespace mongo {
         else if (Indexability::arrayUsesIndexOnChildren(node)) {
             // Add each of our children as a subnode.  We enumerate through each subnode one at a
             // time until it's exhausted then we move on.
-            auto_ptr<ArrayAssignment> aa(new ArrayAssignment());
+            unique_ptr<ArrayAssignment> aa(new ArrayAssignment());
 
             if (MatchExpression::ELEM_MATCH_OBJECT == node->matchType()) {
                 childContext.elemMatchExpr = node;

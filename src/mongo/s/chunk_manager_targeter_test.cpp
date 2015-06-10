@@ -42,7 +42,7 @@ namespace {
 
     using namespace mongo;
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::make_pair;
 
     /**
@@ -66,7 +66,7 @@ namespace {
                                  const char* queryStr,
                                  const IndexBounds& expectedBounds) {
 
-        auto_ptr<CanonicalQuery> query(canonicalize(queryStr));
+        unique_ptr<CanonicalQuery> query(canonicalize(queryStr));
         ASSERT(query.get() != NULL);
 
         BSONObj key = fromjson(keyStr);
@@ -88,7 +88,7 @@ namespace {
 
     // Assume shard key is { a: 1 }
     void checkIndexBounds(const char* queryStr, const OrderedIntervalList& expectedOil) {
-        auto_ptr<CanonicalQuery> query(canonicalize(queryStr));
+        unique_ptr<CanonicalQuery> query(canonicalize(queryStr));
         ASSERT(query.get() != NULL);
 
         BSONObj key = fromjson("{a: 1}");
@@ -278,7 +278,7 @@ namespace {
         Interval expectedInterval(BSON("" << 1 << "" << 1), true, true);
 
         const char* queryStr = "{foo: {$all: [ {$elemMatch: {a:1, b:1}} ]}}";
-        auto_ptr<CanonicalQuery> query(canonicalize(queryStr));
+        unique_ptr<CanonicalQuery> query(canonicalize(queryStr));
         ASSERT(query.get() != NULL);
 
         BSONObj key = fromjson("{'foo.a': 1}");
@@ -355,7 +355,7 @@ namespace {
     //  { a: 0 } -> hashed a: [hash(0), hash(0)]
     TEST(CMCollapseTreeTest, HashedSinglePoint) {
         const char* queryStr = "{ a: 0 }";
-        auto_ptr<CanonicalQuery> query(canonicalize(queryStr));
+        unique_ptr<CanonicalQuery> query(canonicalize(queryStr));
         ASSERT(query.get() != NULL);
 
         BSONObj key = fromjson("{a: 'hashed'}");

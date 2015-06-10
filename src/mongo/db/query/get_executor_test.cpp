@@ -41,7 +41,7 @@ using namespace mongo;
 
 namespace {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
 
     static const char* ns = "somebogusns";
 
@@ -80,7 +80,7 @@ namespace {
          AllowedIndices *allowedIndicesRaw;
 
          // getAllowedIndices should return false when query shape is not yet in query settings.
-         auto_ptr<CanonicalQuery> cq(canonicalize("{a: 1}", "{}", "{}"));
+         unique_ptr<CanonicalQuery> cq(canonicalize("{a: 1}", "{}", "{}"));
          PlanCacheKey key = planCache.computeKey(*cq);
          ASSERT_FALSE(querySettings.getAllowedIndices(key, &allowedIndicesRaw));
 
@@ -95,7 +95,7 @@ namespace {
          ASSERT_TRUE(querySettings.getAllowedIndices(key, &allowedIndicesRaw));
          ASSERT_FALSE(key.empty());
          ASSERT(NULL != allowedIndicesRaw);
-         auto_ptr<AllowedIndices> allowedIndices(allowedIndicesRaw);
+         unique_ptr<AllowedIndices> allowedIndices(allowedIndicesRaw);
 
          // Indexes from index catalog.
          std::vector<IndexEntry> indexEntries;

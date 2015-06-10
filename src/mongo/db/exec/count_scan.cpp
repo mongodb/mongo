@@ -34,7 +34,7 @@
 
 namespace mongo {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::vector;
 
     // static
@@ -159,7 +159,7 @@ namespace mongo {
     }
 
     PlanStageStats* CountScan::getStats() {
-        auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_COUNT_SCAN));
+        unique_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_COUNT_SCAN));
 
         CountScanStats* countStats = new CountScanStats(_specificStats);
         countStats->keyPattern = _specificStats.keyPattern.getOwned();

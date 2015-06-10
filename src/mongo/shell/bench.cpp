@@ -75,7 +75,7 @@ namespace {
 
 namespace mongo {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::cout;
     using std::endl;
     using std::map;
@@ -374,7 +374,7 @@ namespace mongo {
 
                 BSONObj context = e["context"].eoo() ? BSONObj() : e["context"].Obj();
 
-                auto_ptr<Scope> scope;
+                unique_ptr<Scope> scope;
                 ScriptingFunction scopeFunc = 0;
                 BSONObj scopeObj;
 
@@ -457,7 +457,7 @@ namespace mongo {
                         BSONObj filter = e["filter"].eoo() ? BSONObj() : e["filter"].Obj();
                         int expected = e["expected"].eoo() ? -1 : e["expected"].Int();
 
-                        auto_ptr<DBClientCursor> cursor;
+                        unique_ptr<DBClientCursor> cursor;
                         int count;
 
                         BSONObj fixedQuery = fixQuery(e["query"].Obj(), bsonTemplateEvaluator);

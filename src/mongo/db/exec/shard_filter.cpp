@@ -38,7 +38,7 @@
 
 namespace mongo {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::vector;
 
     // static
@@ -150,7 +150,7 @@ namespace mongo {
 
     PlanStageStats* ShardFilterStage::getStats() {
         _commonStats.isEOF = isEOF();
-        auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_SHARDING_FILTER));
+        unique_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_SHARDING_FILTER));
         ret->children.push_back(_child->getStats());
         ret->specific.reset(new ShardingFilterStats(_specificStats));
         return ret.release();

@@ -37,7 +37,7 @@
 
 namespace mongo {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::vector;
 
     // static
@@ -149,7 +149,7 @@ namespace mongo {
     }
 
     PlanStageStats* DistinctScan::getStats() {
-        auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_DISTINCT_SCAN));
+        unique_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_DISTINCT_SCAN));
         ret->specific.reset(new DistinctScanStats(_specificStats));
         return ret.release();
     }

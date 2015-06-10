@@ -65,7 +65,7 @@
 
 namespace mongo {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::endl;
     using std::string;
     using std::vector;
@@ -164,9 +164,9 @@ namespace {
     IndexCatalogEntry* IndexCatalog::_setupInMemoryStructures(OperationContext* txn,
                                                               IndexDescriptor* descriptor,
                                                               bool initFromDisk) {
-        auto_ptr<IndexDescriptor> descriptorCleanup( descriptor );
+        unique_ptr<IndexDescriptor> descriptorCleanup( descriptor );
 
-        auto_ptr<IndexCatalogEntry> entry( new IndexCatalogEntry( _collection->ns().ns(),
+        unique_ptr<IndexCatalogEntry> entry( new IndexCatalogEntry( _collection->ns().ns(),
                                                                   _collection->getCatalogEntry(),
                                                                   descriptorCleanup.release(),
                                                                   _collection->infoCache() ) );
@@ -385,7 +385,7 @@ namespace {
         IndexDescriptor* descriptor = new IndexDescriptor( _collection,
                                                            IndexNames::findPluginName(keyPattern),
                                                            _spec );
-        auto_ptr<IndexDescriptor> descriptorCleaner( descriptor );
+        unique_ptr<IndexDescriptor> descriptorCleaner( descriptor );
 
         _indexName = descriptor->indexName();
         _indexNamespace = descriptor->indexNamespace();

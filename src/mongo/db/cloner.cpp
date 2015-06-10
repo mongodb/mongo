@@ -68,7 +68,7 @@
 namespace mongo {
 
     using boost::scoped_ptr;
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::list;
     using std::set;
     using std::endl;
@@ -467,7 +467,7 @@ namespace mongo {
             }
             else if ( !masterSameProcess ) {
                 std::string errmsg;
-                auto_ptr<DBClientBase> con( cs.connect( errmsg ));
+                unique_ptr<DBClientBase> con( cs.connect( errmsg ));
                 if (!con.get()) {
                     return Status(ErrorCodes::HostUnreachable, errmsg);
                 }
@@ -479,7 +479,7 @@ namespace mongo {
                                   "Unable to authenticate as internal user");
                 }
 
-                _conn = con;
+                _conn = std::move(con);
             }
             else {
                 _conn.reset(new DBDirectClient(txn));

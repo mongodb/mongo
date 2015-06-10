@@ -49,7 +49,7 @@ namespace logger {
             return StatusWithRotatableFileWriter(ErrorCodes::FileAlreadyOpen,
                                                  "File \"" + fileName + "\" already opened.");
         }
-        std::auto_ptr<RotatableFileWriter> writer(new RotatableFileWriter);
+        std::unique_ptr<RotatableFileWriter> writer(new RotatableFileWriter);
         RotatableFileWriter::Use writerUse(writer.get());
         Status status = writerUse.setFileName(fileName, append);
         if (!status.isOK())

@@ -55,7 +55,7 @@
 namespace QueryStageUpdate {
 
     using boost::scoped_ptr;
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::vector;
 
     class QueryStageUpdateBase {
@@ -219,7 +219,7 @@ namespace QueryStageUpdate {
                 params.canonicalQuery = cq.get();
 
                 scoped_ptr<WorkingSet> ws(new WorkingSet());
-                auto_ptr<EOFStage> eofStage(new EOFStage());
+                unique_ptr<EOFStage> eofStage(new EOFStage());
 
                 scoped_ptr<UpdateStage> updateStage(
                     new UpdateStage(&_txn, params, ws.get(), collection, eofStage.release()));
@@ -296,7 +296,7 @@ namespace QueryStageUpdate {
                 updateParams.canonicalQuery = cq.get();
 
                 scoped_ptr<WorkingSet> ws(new WorkingSet());
-                auto_ptr<CollectionScan> cs(
+                unique_ptr<CollectionScan> cs(
                     new CollectionScan(&_txn, collScanParams, ws.get(), cq->root()));
 
                 scoped_ptr<UpdateStage> updateStage(

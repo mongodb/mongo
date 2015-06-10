@@ -38,7 +38,7 @@
 
 namespace mongo {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::endl;
     using std::make_pair;
     using std::string;
@@ -104,7 +104,7 @@ namespace mongo {
             return NULL;
         }
 
-        auto_ptr<CollectionMetadata> metadata( new CollectionMetadata );
+        unique_ptr<CollectionMetadata> metadata( new CollectionMetadata );
         metadata->_keyPattern = this->_keyPattern;
         metadata->_keyPattern.getOwned();
         metadata->fillKeyPatternFields();
@@ -157,7 +157,7 @@ namespace mongo {
             return NULL;
         }
 
-        auto_ptr<CollectionMetadata> metadata( new CollectionMetadata );
+        unique_ptr<CollectionMetadata> metadata( new CollectionMetadata );
         metadata->_keyPattern = this->_keyPattern;
         metadata->_keyPattern.getOwned();
         metadata->fillKeyPatternFields();
@@ -201,7 +201,7 @@ namespace mongo {
             return NULL;
         }
 
-        auto_ptr<CollectionMetadata> metadata( new CollectionMetadata );
+        unique_ptr<CollectionMetadata> metadata( new CollectionMetadata );
         metadata->_keyPattern = this->_keyPattern;
         metadata->_keyPattern.getOwned();
         metadata->fillKeyPatternFields();
@@ -237,7 +237,7 @@ namespace mongo {
             return NULL;
         }
 
-        auto_ptr<CollectionMetadata> metadata( new CollectionMetadata );
+        unique_ptr<CollectionMetadata> metadata( new CollectionMetadata );
         metadata->_keyPattern = this->_keyPattern;
         metadata->_keyPattern.getOwned();
         metadata->fillKeyPatternFields();
@@ -338,7 +338,7 @@ namespace mongo {
             }
         }
 
-        auto_ptr<CollectionMetadata> metadata(new CollectionMetadata);
+        unique_ptr<CollectionMetadata> metadata(new CollectionMetadata);
         metadata->_keyPattern = this->_keyPattern;
         metadata->_keyPattern.getOwned();
         metadata->fillKeyPatternFields();
@@ -427,7 +427,7 @@ namespace mongo {
             return NULL;
         }
 
-        auto_ptr<CollectionMetadata> metadata( new CollectionMetadata );
+        unique_ptr<CollectionMetadata> metadata( new CollectionMetadata );
         metadata->_keyPattern = this->_keyPattern;
         metadata->_keyPattern.getOwned();
         metadata->fillKeyPatternFields();

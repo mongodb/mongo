@@ -124,7 +124,7 @@
 
 namespace mongo {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::cout;
     using std::cerr;
     using std::endl;
@@ -351,7 +351,7 @@ namespace mongo {
             const string systemIndexes = db->name() + ".system.indexes";
 
             Collection* coll = db->getCollection( systemIndexes );
-            auto_ptr<PlanExecutor> exec(
+            unique_ptr<PlanExecutor> exec(
                 InternalPlanner::collectionScan(&txn, systemIndexes, coll));
 
             BSONObj index;

@@ -41,7 +41,7 @@
 
 namespace mongo {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::string;
     using std::vector;
 
@@ -184,7 +184,7 @@ namespace mongo {
             _commonStats.filter = bob.obj();
         }
 
-        auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_TEXT));
+        unique_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_TEXT));
         ret->specific.reset(new TextStats(_specificStats));
         return ret.release();
     }

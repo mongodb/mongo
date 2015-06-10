@@ -47,7 +47,7 @@
 
 namespace ExecutorRegistry {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
 
     class ExecutorRegistryBase {
     public:
@@ -66,12 +66,12 @@ namespace ExecutorRegistry {
          * Return a plan executor that is going over the collection in ns().
          */
         PlanExecutor* getCollscan() {
-            auto_ptr<WorkingSet> ws(new WorkingSet());
+            unique_ptr<WorkingSet> ws(new WorkingSet());
             CollectionScanParams params;
             params.collection = collection();
             params.direction = CollectionScanParams::FORWARD;
             params.tailable = false;
-            auto_ptr<CollectionScan> scan(new CollectionScan(&_opCtx, params, ws.get(), NULL));
+            unique_ptr<CollectionScan> scan(new CollectionScan(&_opCtx, params, ws.get(), NULL));
 
             // Create a plan executor to hold it
             CanonicalQuery* cq;
@@ -115,7 +115,7 @@ namespace ExecutorRegistry {
 
         // Order of these is important for initialization
         OperationContextImpl _opCtx;
-        auto_ptr<OldClientWriteContext> _ctx;
+        unique_ptr<OldClientWriteContext> _ctx;
         DBDirectClient _client;
     };
 
@@ -128,7 +128,7 @@ namespace ExecutorRegistry {
                 return;
             }
 
-            auto_ptr<PlanExecutor> run(getCollscan());
+            unique_ptr<PlanExecutor> run(getCollscan());
             BSONObj obj;
 
             // Read some of it.
@@ -170,7 +170,7 @@ namespace ExecutorRegistry {
     class ExecutorRegistryDropCollection : public ExecutorRegistryBase {
     public:
         void run() {
-            auto_ptr<PlanExecutor> run(getCollscan());
+            unique_ptr<PlanExecutor> run(getCollscan());
             BSONObj obj;
 
             // Read some of it.
@@ -213,7 +213,7 @@ namespace ExecutorRegistry {
     class ExecutorRegistryDropAllIndices : public ExecutorRegistryBase {
     public:
         void run() {
-            auto_ptr<PlanExecutor> run(getCollscan());
+            unique_ptr<PlanExecutor> run(getCollscan());
             BSONObj obj;
 
             ASSERT_OK(dbtests::createIndex(&_opCtx, ns(), BSON("foo" << 1)));
@@ -244,7 +244,7 @@ namespace ExecutorRegistry {
     class ExecutorRegistryDropOneIndex : public ExecutorRegistryBase {
     public:
         void run() {
-            auto_ptr<PlanExecutor> run(getCollscan());
+            unique_ptr<PlanExecutor> run(getCollscan());
             BSONObj obj;
 
             ASSERT_OK(dbtests::createIndex(&_opCtx, ns(), BSON("foo" << 1)));
@@ -275,7 +275,7 @@ namespace ExecutorRegistry {
     class ExecutorRegistryDropDatabase : public ExecutorRegistryBase {
     public:
         void run() {
-            auto_ptr<PlanExecutor> run(getCollscan());
+            unique_ptr<PlanExecutor> run(getCollscan());
             BSONObj obj;
 
             // Read some of it.

@@ -74,7 +74,7 @@
 #include "mongo/util/log.h"
 
 using boost::scoped_ptr;
-using std::auto_ptr;
+using std::unique_ptr;
 using std::cout;
 using std::endl;
 using std::max;
@@ -269,7 +269,7 @@ namespace repl {
             // check that no items are in sources other than that
             // add if missing
             int n = 0;
-            auto_ptr<PlanExecutor> exec(
+            unique_ptr<PlanExecutor> exec(
                 InternalPlanner::collectionScan(txn,
                                                 localSources,
                                                 ctx.db()->getCollection(localSources)));
@@ -314,7 +314,7 @@ namespace repl {
             }
         }
 
-        auto_ptr<PlanExecutor> exec(
+        unique_ptr<PlanExecutor> exec(
             InternalPlanner::collectionScan(txn,
                                             localSources,
                                             ctx.db()->getCollection(localSources)));

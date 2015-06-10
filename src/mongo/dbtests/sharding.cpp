@@ -48,7 +48,7 @@
 namespace ShardingTests {
 
     using boost::shared_ptr;
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::make_pair;
     using std::map;
     using std::pair;
@@ -218,7 +218,7 @@ namespace ShardingTests {
             string keyName = "_id";
             createChunks( keyName );
 
-            auto_ptr<DBClientCursor> cursor =
+            unique_ptr<DBClientCursor> cursor =
                 _client.query(ChunkType::ConfigNS, QUERY(ChunkType::ns(collName())));
 
             set<int> minorVersions;

@@ -110,7 +110,7 @@
 namespace mongo {
 
     using boost::scoped_ptr;
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::endl;
     using std::ostringstream;
     using std::string;
@@ -598,7 +598,7 @@ namespace mongo {
                     return 0;
                 }
 
-                auto_ptr<PlanExecutor> exec(rawExec);
+                unique_ptr<PlanExecutor> exec(rawExec);
                 // Process notifications when the lock is released/reacquired in the loop below
                 exec->registerExec();
 
@@ -665,7 +665,7 @@ namespace mongo {
             DBDirectClient client(txn);
             Query q(query);
             q.sort(sort);
-            auto_ptr<DBClientCursor> c = client.query(ns, q);
+            unique_ptr<DBClientCursor> c = client.query(ns, q);
             while(c->more())
                 PRINT(c->nextSafe());
         }
@@ -729,7 +729,7 @@ namespace mongo {
 
             result.appendBool( "estimate" , estimate );
 
-            auto_ptr<PlanExecutor> exec;
+            unique_ptr<PlanExecutor> exec;
             if ( min.isEmpty() && max.isEmpty() ) {
                 if ( estimate ) {
                     result.appendNumber( "size" , static_cast<long long>(collection->dataSize(txn)) );

@@ -36,7 +36,7 @@
 
 namespace mongo {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::numeric_limits;
     using std::vector;
 
@@ -326,7 +326,7 @@ namespace mongo {
             _commonStats.filter = bob.obj();
         }
 
-        auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_AND_SORTED));
+        unique_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_AND_SORTED));
         ret->specific.reset(new AndSortedStats(_specificStats));
         for (size_t i = 0; i < _children.size(); ++i) {
             ret->children.push_back(_children[i]->getStats());

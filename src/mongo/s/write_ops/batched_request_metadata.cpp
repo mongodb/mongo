@@ -32,7 +32,7 @@
 
 namespace mongo {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::string;
 
     const BSONField<string> BatchedRequestMetadata::shardName("shardName");
@@ -139,7 +139,7 @@ namespace mongo {
     }
 
     void BatchedRequestMetadata::setShardVersion(const ChunkVersion& shardVersion) {
-        auto_ptr<ChunkVersion> temp(new ChunkVersion);
+        unique_ptr<ChunkVersion> temp(new ChunkVersion);
         shardVersion.cloneTo(temp.get());
         _shardVersion.reset(temp.release());
     }

@@ -67,7 +67,7 @@
 
 namespace mongo {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::endl;
     using std::ostringstream;
     using std::set;
@@ -172,7 +172,7 @@ namespace mongo {
                 max = Helpers::toKeyFormat( kp.extendRangeBound( max, false ) );
             }
 
-            auto_ptr<PlanExecutor> exec(InternalPlanner::indexScan(txn, collection, idx,
+            unique_ptr<PlanExecutor> exec(InternalPlanner::indexScan(txn, collection, idx,
                                                                    min, max, false,
                                                                    InternalPlanner::FORWARD));
             exec->setYieldPolicy(PlanExecutor::YIELD_AUTO);
@@ -411,7 +411,7 @@ namespace mongo {
                 long long currCount = 0;
                 long long numChunks = 0;
                 
-                auto_ptr<PlanExecutor> exec(
+                unique_ptr<PlanExecutor> exec(
                     InternalPlanner::indexScan(txn, collection, idx, min, max,
                     false, InternalPlanner::FORWARD));
 
@@ -762,7 +762,7 @@ namespace mongo {
                 updates.append( op.obj() );
 
                 // remember this chunk info for logging later
-                auto_ptr<ChunkType> chunk(new ChunkType());
+                unique_ptr<ChunkType> chunk(new ChunkType());
                 chunk->setMin(startKey);
                 chunk->setMax(endKey);
                 chunk->setVersion(nextChunkVersion);
@@ -914,7 +914,7 @@ namespace mongo {
             BSONObj newmin = Helpers::toKeyFormat(kp.extendRangeBound(chunk->getMin(), false));
             BSONObj newmax = Helpers::toKeyFormat(kp.extendRangeBound(chunk->getMax(), true));
 
-            auto_ptr<PlanExecutor> exec(
+            unique_ptr<PlanExecutor> exec(
                 InternalPlanner::indexScan(txn, collection, idx, newmin, newmax, false));
 
             // check if exactly one document found

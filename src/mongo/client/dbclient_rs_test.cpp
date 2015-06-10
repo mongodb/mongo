@@ -49,7 +49,7 @@
 
 namespace {
     using boost::scoped_ptr;
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::map;
     using std::make_pair;
     using std::pair;
@@ -109,7 +109,7 @@ namespace {
         query.readPref(mongo::ReadPreference::PrimaryOnly, BSONArray());
 
         // Note: IdentityNS contains the name of the server.
-        auto_ptr<DBClientCursor> cursor = replConn.query(IdentityNS, query);
+        unique_ptr<DBClientCursor> cursor = replConn.query(IdentityNS, query);
         BSONObj doc = cursor->next();
         ASSERT_EQUALS(replSet->getPrimary(), doc[HostField.name()].str());
     }
@@ -122,7 +122,7 @@ namespace {
         query.readPref(mongo::ReadPreference::SecondaryOnly, BSONArray());
 
         // Note: IdentityNS contains the name of the server.
-        auto_ptr<DBClientCursor> cursor = replConn.query(IdentityNS, query);
+        unique_ptr<DBClientCursor> cursor = replConn.query(IdentityNS, query);
         BSONObj doc = cursor->next();
         ASSERT_EQUALS(replSet->getSecondaries().front(), doc[HostField.name()].str());
     }
@@ -138,7 +138,7 @@ namespace {
         query.readPref(mongo::ReadPreference::PrimaryPreferred, BSONArray());
 
         // Note: IdentityNS contains the name of the server.
-        auto_ptr<DBClientCursor> cursor = replConn.query(IdentityNS, query);
+        unique_ptr<DBClientCursor> cursor = replConn.query(IdentityNS, query);
         BSONObj doc = cursor->next();
         ASSERT_EQUALS(replSet->getPrimary(), doc[HostField.name()].str());
     }
@@ -154,7 +154,7 @@ namespace {
         query.readPref(mongo::ReadPreference::SecondaryPreferred, BSONArray());
 
         // Note: IdentityNS contains the name of the server.
-        auto_ptr<DBClientCursor> cursor = replConn.query(IdentityNS, query);
+        unique_ptr<DBClientCursor> cursor = replConn.query(IdentityNS, query);
         BSONObj doc = cursor->next();
         ASSERT_EQUALS(replSet->getSecondaries().front(), doc[HostField.name()].str());
     }
@@ -282,7 +282,7 @@ namespace {
         query.readPref(mongo::ReadPreference::SecondaryOnly, BSONArray());
 
         // Note: IdentityNS contains the name of the server.
-        auto_ptr<DBClientCursor> cursor = replConn.query(IdentityNS, query);
+        unique_ptr<DBClientCursor> cursor = replConn.query(IdentityNS, query);
         BSONObj doc = cursor->next();
         ASSERT_EQUALS(replSet->getSecondaries().front(), doc[HostField.name()].str());
     }
@@ -295,7 +295,7 @@ namespace {
         query.readPref(mongo::ReadPreference::PrimaryPreferred, BSONArray());
 
         // Note: IdentityNS contains the name of the server.
-        auto_ptr<DBClientCursor> cursor = replConn.query(IdentityNS, query);
+        unique_ptr<DBClientCursor> cursor = replConn.query(IdentityNS, query);
         BSONObj doc = cursor->next();
         ASSERT_EQUALS(replSet->getSecondaries().front(), doc[HostField.name()].str());
     }
@@ -308,7 +308,7 @@ namespace {
         query.readPref(mongo::ReadPreference::SecondaryPreferred, BSONArray());
 
         // Note: IdentityNS contains the name of the server.
-        auto_ptr<DBClientCursor> cursor = replConn.query(IdentityNS, query);
+        unique_ptr<DBClientCursor> cursor = replConn.query(IdentityNS, query);
         BSONObj doc = cursor->next();
         ASSERT_EQUALS(replSet->getSecondaries().front(), doc[HostField.name()].str());
     }
@@ -319,7 +319,7 @@ namespace {
 
         Query query;
         query.readPref(mongo::ReadPreference::Nearest, BSONArray());
-        auto_ptr<DBClientCursor> cursor = replConn.query(IdentityNS, query);
+        unique_ptr<DBClientCursor> cursor = replConn.query(IdentityNS, query);
         BSONObj doc = cursor->next();
         ASSERT_EQUALS(replSet->getSecondaries().front(), doc[HostField.name()].str());
     }
@@ -361,7 +361,7 @@ namespace {
         query.readPref(mongo::ReadPreference::PrimaryOnly, BSONArray());
 
         // Note: IdentityNS contains the name of the server.
-        auto_ptr<DBClientCursor> cursor = replConn.query(IdentityNS, query);
+        unique_ptr<DBClientCursor> cursor = replConn.query(IdentityNS, query);
         BSONObj doc = cursor->next();
         ASSERT_EQUALS(replSet->getPrimary(), doc[HostField.name()].str());
     }
@@ -383,7 +383,7 @@ namespace {
         query.readPref(mongo::ReadPreference::PrimaryPreferred, BSONArray());
 
         // Note: IdentityNS contains the name of the server.
-        auto_ptr<DBClientCursor> cursor = replConn.query(IdentityNS, query);
+        unique_ptr<DBClientCursor> cursor = replConn.query(IdentityNS, query);
         BSONObj doc = cursor->next();
         ASSERT_EQUALS(replSet->getPrimary(), doc[HostField.name()].str());
     }
@@ -396,7 +396,7 @@ namespace {
         query.readPref(mongo::ReadPreference::SecondaryPreferred, BSONArray());
 
         // Note: IdentityNS contains the name of the server.
-        auto_ptr<DBClientCursor> cursor = replConn.query(IdentityNS, query);
+        unique_ptr<DBClientCursor> cursor = replConn.query(IdentityNS, query);
         BSONObj doc = cursor->next();
         ASSERT_EQUALS(replSet->getPrimary(), doc[HostField.name()].str());
     }
@@ -409,7 +409,7 @@ namespace {
         query.readPref(mongo::ReadPreference::Nearest, BSONArray());
 
         // Note: IdentityNS contains the name of the server.
-        auto_ptr<DBClientCursor> cursor = replConn.query(IdentityNS, query);
+        unique_ptr<DBClientCursor> cursor = replConn.query(IdentityNS, query);
         BSONObj doc = cursor->next();
         ASSERT_EQUALS(replSet->getPrimary(), doc[HostField.name()].str());
     }
@@ -544,7 +544,7 @@ namespace {
             query.readPref(mongo::ReadPreference::PrimaryPreferred, BSONArray());
 
             // Note: IdentityNS contains the name of the server.
-            auto_ptr<DBClientCursor> cursor = replConn.query(IdentityNS, query);
+            unique_ptr<DBClientCursor> cursor = replConn.query(IdentityNS, query);
             BSONObj doc = cursor->next();
             dest = doc[HostField.name()].str();
         }
@@ -552,7 +552,7 @@ namespace {
         {
             Query query;
             query.readPref(mongo::ReadPreference::PrimaryPreferred, BSONArray());
-            auto_ptr<DBClientCursor> cursor = replConn.query(IdentityNS, query);
+            unique_ptr<DBClientCursor> cursor = replConn.query(IdentityNS, query);
             BSONObj doc = cursor->next();
             const string newDest = doc[HostField.name()].str();
             ASSERT_EQUALS(dest, newDest);
@@ -572,7 +572,7 @@ namespace {
             query.readPref(mongo::ReadPreference::PrimaryPreferred, BSONArray());
 
             // Note: IdentityNS contains the name of the server.
-            auto_ptr<DBClientCursor> cursor = replConn.query(IdentityNS, query);
+            unique_ptr<DBClientCursor> cursor = replConn.query(IdentityNS, query);
             BSONObj doc = cursor->next();
             dest = doc[HostField.name()].str();
         }
@@ -585,7 +585,7 @@ namespace {
         {
             Query query;
             query.readPref(mongo::ReadPreference::PrimaryPreferred, BSONArray());
-            auto_ptr<DBClientCursor> cursor = replConn.query(IdentityNS, query);
+            unique_ptr<DBClientCursor> cursor = replConn.query(IdentityNS, query);
             BSONObj doc = cursor->next();
             const string newDest = doc[HostField.name()].str();
             ASSERT_NOT_EQUALS(dest, newDest);
@@ -608,7 +608,7 @@ namespace {
             query.readPref(mongo::ReadPreference::SecondaryPreferred, BSONArray());
 
             // Note: IdentityNS contains the name of the server.
-            auto_ptr<DBClientCursor> cursor = replConn.query(IdentityNS, query);
+            unique_ptr<DBClientCursor> cursor = replConn.query(IdentityNS, query);
             BSONObj doc = cursor->next();
             dest = doc[HostField.name()].str();
             ASSERT_NOT_EQUALS(dest, replSet->getPrimary());
@@ -617,7 +617,7 @@ namespace {
         {
             Query query;
             query.readPref(mongo::ReadPreference::SecondaryOnly, BSONArray());
-            auto_ptr<DBClientCursor> cursor = replConn.query(IdentityNS, query);
+            unique_ptr<DBClientCursor> cursor = replConn.query(IdentityNS, query);
             BSONObj doc = cursor->next();
             const string newDest = doc[HostField.name()].str();
             ASSERT_NOT_EQUALS(dest, newDest);
@@ -641,7 +641,7 @@ namespace {
                     BSON_ARRAY(BSON("dc" << "sf")));
 
             // Note: IdentityNS contains the name of the server.
-            auto_ptr<DBClientCursor> cursor = replConn.query(IdentityNS, query);
+            unique_ptr<DBClientCursor> cursor = replConn.query(IdentityNS, query);
             BSONObj doc = cursor->next();
             dest = doc[HostField.name()].str();
             ASSERT_NOT_EQUALS(dest, replSet->getPrimary());
@@ -652,7 +652,7 @@ namespace {
             vector<pair<string, string> > tagSet;
             query.readPref(mongo::ReadPreference::SecondaryPreferred,
                     BSON_ARRAY(BSON("group" << 1)));
-            auto_ptr<DBClientCursor> cursor = replConn.query(IdentityNS, query);
+            unique_ptr<DBClientCursor> cursor = replConn.query(IdentityNS, query);
             BSONObj doc = cursor->next();
             const string newDest = doc[HostField.name()].str();
             ASSERT_NOT_EQUALS(dest, newDest);
@@ -675,7 +675,7 @@ namespace {
         mongo::DBClientConnection& secConn = replConn.slaveConn();
 
         // Note: IdentityNS contains the name of the server.
-        auto_ptr<DBClientCursor> cursor = secConn.query(IdentityNS, Query());
+        unique_ptr<DBClientCursor> cursor = secConn.query(IdentityNS, Query());
         BSONObj doc = cursor->next();
         dest = doc[HostField.name()].str();
         ASSERT_NOT_EQUALS(dest, replSet->getPrimary());

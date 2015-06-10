@@ -35,7 +35,7 @@
 
 namespace {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::string;
     using std::vector;
 
@@ -45,7 +45,7 @@ namespace {
     // creation function
     //
 
-    auto_ptr<ParsedProjection> createParsedProjection(const BSONObj& query, const BSONObj& projObj) {
+    unique_ptr<ParsedProjection> createParsedProjection(const BSONObj& query, const BSONObj& projObj) {
         StatusWithMatchExpression swme = MatchExpressionParser::parse(query);
         ASSERT(swme.isOK());
         boost::scoped_ptr<MatchExpression> queryMatchExpr(swme.getValue());
@@ -56,10 +56,10 @@ namespace {
                                            << " (query: " << query << "): " << status.toString());
         }
         ASSERT(out);
-        return auto_ptr<ParsedProjection>(out);
+        return unique_ptr<ParsedProjection>(out);
     }
 
-    auto_ptr<ParsedProjection> createParsedProjection(const char* queryStr, const char* projStr) {
+    unique_ptr<ParsedProjection> createParsedProjection(const char* queryStr, const char* projStr) {
         BSONObj query = fromjson(queryStr);
         BSONObj projObj = fromjson(projStr);
         return createParsedProjection(query, projObj);
@@ -85,17 +85,17 @@ namespace {
     // the projection spec is non-empty. This test case is included for
     // completeness and do not reflect actual usage.
     TEST(ParsedProjectionTest, MakeId) {
-        auto_ptr<ParsedProjection> parsedProj(createParsedProjection("{}", "{}"));
+        unique_ptr<ParsedProjection> parsedProj(createParsedProjection("{}", "{}"));
         ASSERT(parsedProj->requiresDocument());
     }
 
     TEST(ParsedProjectionTest, MakeEmpty) {
-        auto_ptr<ParsedProjection> parsedProj(createParsedProjection("{}", "{_id: 0}"));
+        unique_ptr<ParsedProjection> parsedProj(createParsedProjection("{}", "{_id: 0}"));
         ASSERT(parsedProj->requiresDocument());
     }
 
     TEST(ParsedProjectionTest, MakeSingleField) {
-        auto_ptr<ParsedProjection> parsedProj(createParsedProjection("{}", "{a: 1}"));
+        unique_ptr<ParsedProjection> parsedProj(createParsedProjection("{}", "{a: 1}"));
         ASSERT(!parsedProj->requiresDocument());
         const vector<string>& fields = parsedProj->getRequiredFields();
         ASSERT_EQUALS(fields.size(), 2U);
@@ -104,7 +104,7 @@ namespace {
     }
 
     TEST(ParsedProjectionTest, MakeSingleFieldCovered) {
-        auto_ptr<ParsedProjection> parsedProj(createParsedProjection("{}", "{_id: 0, a: 1}"));
+        unique_ptr<ParsedProjection> parsedProj(createParsedProjection("{}", "{_id: 0, a: 1}"));
         ASSERT(!parsedProj->requiresDocument());
         const vector<string>& fields = parsedProj->getRequiredFields();
         ASSERT_EQUALS(fields.size(), 1U);
@@ -112,7 +112,7 @@ namespace {
     }
 
     TEST(ParsedProjectionTest, MakeSingleFieldIDCovered) {
-        auto_ptr<ParsedProjection> parsedProj(createParsedProjection("{}", "{_id: 1}"));
+        unique_ptr<ParsedProjection> parsedProj(createParsedProjection("{}", "{_id: 1}"));
         ASSERT(!parsedProj->requiresDocument());
         const vector<string>& fields = parsedProj->getRequiredFields();
         ASSERT_EQUALS(fields.size(), 1U);
@@ -121,7 +121,7 @@ namespace {
 
     // boolean support is undocumented
     TEST(ParsedProjectionTest, MakeSingleFieldCoveredBoolean) {
-        auto_ptr<ParsedProjection> parsedProj(createParsedProjection("{}", "{_id: 0, a: true}"));
+        unique_ptr<ParsedProjection> parsedProj(createParsedProjection("{}", "{_id: 0, a: true}"));
         ASSERT(!parsedProj->requiresDocument());
         const vector<string>& fields = parsedProj->getRequiredFields();
         ASSERT_EQUALS(fields.size(), 1U);
@@ -130,7 +130,7 @@ namespace {
 
     // boolean support is undocumented
     TEST(ParsedProjectionTest, MakeSingleFieldCoveredIdBoolean) {
-        auto_ptr<ParsedProjection> parsedProj(createParsedProjection("{}", "{_id: false, a: 1}"));
+        unique_ptr<ParsedProjection> parsedProj(createParsedProjection("{}", "{_id: false, a: 1}"));
         ASSERT(!parsedProj->requiresDocument());
         const vector<string>& fields = parsedProj->getRequiredFields();
         ASSERT_EQUALS(fields.size(), 1U);
@@ -177,7 +177,7 @@ namespace {
     // to achieve the same effect.
     // Projection parser should handle this the same way as an empty path.
     TEST(ParsedProjectionTest, InvalidPositionalProjectionDefaultPathMatchExpression) {
-        auto_ptr<MatchExpression> queryMatchExpr(new FalseMatchExpression());
+        unique_ptr<MatchExpression> queryMatchExpr(new FalseMatchExpression());
         ASSERT(NULL == queryMatchExpr->path().rawData());
 
         ParsedProjection* out = NULL;

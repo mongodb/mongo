@@ -206,7 +206,7 @@ namespace mongo {
 
         class Batch : boost::noncopyable {
             friend class DBClientCursor;
-            std::auto_ptr<Message> m;
+            std::unique_ptr<Message> m;
             int nReturned;
             int pos;
             const char *data;

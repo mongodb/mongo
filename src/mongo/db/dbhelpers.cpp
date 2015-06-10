@@ -68,7 +68,7 @@
 
 namespace mongo {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::endl;
     using std::ios_base;
     using std::ofstream;
@@ -145,7 +145,7 @@ namespace mongo {
                             &rawExec,
                             options).isOK());
 
-        auto_ptr<PlanExecutor> exec(rawExec);
+        unique_ptr<PlanExecutor> exec(rawExec);
         PlanExecutor::ExecState state;
         RecordId loc;
         if (PlanExecutor::ADVANCED == (state = exec->getNext(NULL, &loc))) {
@@ -200,7 +200,7 @@ namespace mongo {
 
     bool Helpers::getSingleton(OperationContext* txn, const char *ns, BSONObj& result) {
         AutoGetCollectionForRead ctx(txn, ns);
-        auto_ptr<PlanExecutor> exec(InternalPlanner::collectionScan(txn, ns, ctx.getCollection()));
+        unique_ptr<PlanExecutor> exec(InternalPlanner::collectionScan(txn, ns, ctx.getCollection()));
         PlanExecutor::ExecState state = exec->getNext(&result, NULL);
 
         CurOp::get(txn)->done();
@@ -214,7 +214,7 @@ namespace mongo {
 
     bool Helpers::getLast(OperationContext* txn, const char *ns, BSONObj& result) {
         AutoGetCollectionForRead autoColl(txn, ns);
-        auto_ptr<PlanExecutor> exec(InternalPlanner::collectionScan(txn,
+        unique_ptr<PlanExecutor> exec(InternalPlanner::collectionScan(txn,
                                                                     ns,
                                                                     autoColl.getCollection(),
                                                                     InternalPlanner::BACKWARD));
@@ -366,7 +366,7 @@ namespace mongo {
                     collection->getIndexCatalog()->findIndexByKeyPattern( txn,
                                                                           indexKeyPattern.toBSON() );
 
-                auto_ptr<PlanExecutor> exec(InternalPlanner::indexScan(txn, collection, desc,
+                unique_ptr<PlanExecutor> exec(InternalPlanner::indexScan(txn, collection, desc,
                                                                        min, max,
                                                                        maxInclusive,
                                                                        InternalPlanner::FORWARD,
@@ -539,7 +539,7 @@ namespace mongo {
         bool isLargeChunk = false;
         long long docCount = 0;
 
-        auto_ptr<PlanExecutor> exec(
+        unique_ptr<PlanExecutor> exec(
             InternalPlanner::indexScan(txn, collection, idx, min, max, false));
         // we can afford to yield here because any change to the base data that we might miss  is
         // already being queued and will be migrated in the 'transferMods' stage

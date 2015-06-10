@@ -54,7 +54,7 @@ namespace mongo {
 
     using boost::scoped_ptr;
     using std::abs;
-    using std::auto_ptr;
+    using std::unique_ptr;
 
     //
     // Shared GeoNear search functionality
@@ -79,7 +79,7 @@ namespace mongo {
                 if (!element.isABSONObj())
                     return NULL;
 
-                auto_ptr<StoredGeometry> stored(new StoredGeometry);
+                unique_ptr<StoredGeometry> stored(new StoredGeometry);
                 if (!stored->geometry.parseFromStorage(element).isOK())
                     return NULL;
                 stored->element = element;
@@ -106,7 +106,7 @@ namespace mongo {
         for (BSONElementSet::iterator it = geomElements.begin(); it != geomElements.end(); ++it) {
 
             const BSONElement& el = *it;
-            auto_ptr<StoredGeometry> stored(StoredGeometry::parseFrom(el));
+            unique_ptr<StoredGeometry> stored(StoredGeometry::parseFrom(el));
 
             if (stored.get()) {
                 // Valid geometry element
@@ -746,7 +746,7 @@ namespace mongo {
 
         const CRS queryCRS = _nearParams.nearQuery->centroid->crs;
 
-        auto_ptr<R2Region> coverRegion;
+        unique_ptr<R2Region> coverRegion;
 
         if (FLAT == queryCRS) {
 

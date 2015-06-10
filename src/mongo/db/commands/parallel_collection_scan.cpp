@@ -41,7 +41,7 @@
 
 namespace mongo {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::string;
 
     class ParallelCollectionScanCmd : public Command {
@@ -115,7 +115,7 @@ namespace mongo {
                 Status execStatus = PlanExecutor::make(txn, ws, mis, collection,
                                                        PlanExecutor::YIELD_AUTO, &rawExec);
                 invariant(execStatus.isOK());
-                auto_ptr<PlanExecutor> curExec(rawExec);
+                unique_ptr<PlanExecutor> curExec(rawExec);
 
                 // The PlanExecutor was registered on construction due to the YIELD_AUTO policy.
                 // We have to deregister it, as it will be registered with ClientCursor.

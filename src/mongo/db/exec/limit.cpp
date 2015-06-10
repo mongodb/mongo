@@ -34,7 +34,7 @@
 
 namespace mongo {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::vector;
 
     // static
@@ -119,7 +119,7 @@ namespace mongo {
 
     PlanStageStats* LimitStage::getStats() {
         _commonStats.isEOF = isEOF();
-        auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_LIMIT));
+        unique_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_LIMIT));
         ret->specific.reset(new LimitStats(_specificStats));
         ret->children.push_back(_child->getStats());
         return ret.release();

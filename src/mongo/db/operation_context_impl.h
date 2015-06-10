@@ -65,7 +65,7 @@ namespace mongo {
         virtual bool writesAreReplicated() const override;
 
     private:
-        std::auto_ptr<RecoveryUnit> _recovery;
+        std::unique_ptr<RecoveryUnit> _recovery;
         bool _writesAreReplicated;
     };
 

@@ -220,7 +220,7 @@ namespace mongo {
          *                  This must include authenticated users.
          * @return the scope
          */
-        std::auto_ptr<Scope> getPooledScope(OperationContext* txn,
+        std::unique_ptr<Scope> getPooledScope(OperationContext* txn,
                                             const std::string& db,
                                             const std::string& scopeType);
 

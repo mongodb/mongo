@@ -46,7 +46,7 @@ using namespace mongo;
 namespace {
 
     using boost::scoped_ptr;
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::max;
     using std::min;
 
@@ -54,7 +54,7 @@ namespace {
 
     /* Populate a QueuedDataStage and return it.  Caller owns it. */
     QueuedDataStage* getMS(WorkingSet* ws) {
-        auto_ptr<QueuedDataStage> ms(new QueuedDataStage(ws));
+        unique_ptr<QueuedDataStage> ms(new QueuedDataStage(ws));
 
         // Put N ADVANCED results into the mock stage, and some other stalling results (YIELD/TIME).
         for (int i = 0; i < N; ++i) {

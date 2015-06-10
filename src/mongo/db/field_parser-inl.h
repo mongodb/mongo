@@ -82,7 +82,7 @@ namespace mongo {
         BSONElement elem = doc[field.name()];
         if (elem.eoo()) {
             if (field.hasDefault()) {
-                std::auto_ptr<T> temp(new T);
+                std::unique_ptr<T> temp(new T);
                 field.getDefault()->cloneTo(temp.get());
 
                 *out = temp.release();
@@ -98,7 +98,7 @@ namespace mongo {
             return FIELD_INVALID;
         }
 
-        std::auto_ptr<T> temp(new T);
+        std::unique_ptr<T> temp(new T);
         if (!temp->parseBSON(elem.embeddedObject(), errMsg)) {
             return FIELD_INVALID;
         }
@@ -134,7 +134,7 @@ namespace mongo {
             return FIELD_INVALID;
         }
 
-        std::auto_ptr<T> temp(new T);
+        std::unique_ptr<T> temp(new T);
         if (!temp->parseBSON(elem.embeddedObject(), errMsg)) {
             return FIELD_INVALID;
         }
@@ -249,7 +249,7 @@ namespace mongo {
                 return FIELD_INVALID;
             }
 
-            std::auto_ptr<T> toInsert(new T);
+            std::unique_ptr<T> toInsert(new T);
 
             if ( !toInsert->parseBSON( next.embeddedObject(), errMsg )
                  || !toInsert->isValid( errMsg ) ) {
@@ -289,7 +289,7 @@ namespace mongo {
             return FIELD_INVALID;
         }
 
-        std::auto_ptr<std::vector<T*> > tempVector(new std::vector<T*>);
+        std::unique_ptr<std::vector<T*> > tempVector(new std::vector<T*>);
 
         BSONArray arr = BSONArray(elem.embeddedObject());
         BSONObjIterator objIt(arr);
@@ -306,7 +306,7 @@ namespace mongo {
                 return FIELD_INVALID;
             }
 
-            std::auto_ptr<T> toInsert(new T);
+            std::unique_ptr<T> toInsert(new T);
             if (!toInsert->parseBSON(next.embeddedObject(), errMsg)) {
                 clearOwnedVector(tempVector.get());
                 return FIELD_INVALID;

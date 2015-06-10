@@ -45,7 +45,7 @@
 
 namespace mongo {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::endl;
     using std::vector;
 
@@ -238,7 +238,7 @@ namespace mongo {
         CanonicalQuery* rawQueryForSort;
         verify(CanonicalQuery::canonicalize(
                 "fake_ns", queryObj, &rawQueryForSort, WhereCallbackNoop()).isOK());
-        auto_ptr<CanonicalQuery> queryForSort(rawQueryForSort);
+        unique_ptr<CanonicalQuery> queryForSort(rawQueryForSort);
 
         vector<QuerySolution*> solns;
         LOG(5) << "Sort stage: Planning to obtain bounds for sort." << endl;
@@ -477,7 +477,7 @@ namespace mongo {
         _specificStats.limit = _limit;
         _specificStats.sortPattern = _pattern.getOwned();
 
-        auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_SORT));
+        unique_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_SORT));
         ret->specific.reset(new SortStats(_specificStats));
         ret->children.push_back(_child->getStats());
         return ret.release();

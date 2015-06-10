@@ -38,7 +38,7 @@
 
 namespace ClientTests {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::string;
     using std::vector;
 
@@ -141,7 +141,7 @@ namespace ClientTests {
 
             ASSERT_OK(dbtests::createIndex(&txn, ns(), BSON( "a" << 1 << "b" << 1 ) ));
 
-            auto_ptr< DBClientCursor > c = db.query( ns(), Query().sort( BSON( "a" << 1 << "b" << 1 ) ) );
+            unique_ptr< DBClientCursor > c = db.query( ns(), Query().sort( BSON( "a" << 1 << "b" << 1 ) ) );
             ASSERT_EQUALS( 1111, c->itcount() );
         }
     };
@@ -157,7 +157,7 @@ namespace ClientTests {
                 db.insert(ns(), BSON("i" << i));
             }
 
-            auto_ptr< DBClientCursor > c = db.query( ns(), Query().sort( BSON( "i" << 1 ) ) );
+            unique_ptr< DBClientCursor > c = db.query( ns(), Query().sort( BSON( "i" << 1 ) ) );
 
             BSONObj o = c->next();
             ASSERT( c->more() );

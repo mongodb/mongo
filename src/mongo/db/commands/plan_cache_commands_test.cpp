@@ -47,7 +47,7 @@ using namespace mongo;
 namespace {
 
     using boost::scoped_ptr;
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::string;
     using std::vector;
 
@@ -98,7 +98,7 @@ namespace {
      * Utility function to create a SolutionCacheData
      */
     SolutionCacheData* createSolutionCacheData() {
-        auto_ptr<SolutionCacheData> scd(new SolutionCacheData());
+        unique_ptr<SolutionCacheData> scd(new SolutionCacheData());
         scd->tree.reset(new PlanCacheIndexTree());
         return scd.release();
     }
@@ -107,10 +107,10 @@ namespace {
      * Utility function to create a PlanRankingDecision
      */
     PlanRankingDecision* createDecision(size_t numPlans) {
-        auto_ptr<PlanRankingDecision> why(new PlanRankingDecision());
+        unique_ptr<PlanRankingDecision> why(new PlanRankingDecision());
         for (size_t i = 0; i < numPlans; ++i) {
             CommonStats common("COLLSCAN");
-            auto_ptr<PlanStageStats> stats(new PlanStageStats(common, STAGE_COLLSCAN));
+            unique_ptr<PlanStageStats> stats(new PlanStageStats(common, STAGE_COLLSCAN));
             stats->specific.reset(new CollectionScanStats());
             why->stats.mutableVector().push_back(stats.release());
             why->scores.push_back(0U);
@@ -129,7 +129,7 @@ namespace {
         // Create a canonical query
         CanonicalQuery* cqRaw;
         ASSERT_OK(CanonicalQuery::canonicalize(ns, fromjson("{a: 1}"), &cqRaw));
-        auto_ptr<CanonicalQuery> cq(cqRaw);
+        unique_ptr<CanonicalQuery> cq(cqRaw);
 
         // Plan cache with one entry
         PlanCache planCache;
@@ -154,7 +154,7 @@ namespace {
         // Create a canonical query
         CanonicalQuery* cqRaw;
         ASSERT_OK(CanonicalQuery::canonicalize(ns, fromjson("{a: 1}"), &cqRaw));
-        auto_ptr<CanonicalQuery> cq(cqRaw);
+        unique_ptr<CanonicalQuery> cq(cqRaw);
 
         // Plan cache with one entry
         PlanCache planCache;
@@ -261,9 +261,9 @@ namespace {
         // Create 2 canonical queries.
         CanonicalQuery* cqRaw;
         ASSERT_OK(CanonicalQuery::canonicalize(ns, fromjson("{a: 1}"), &cqRaw));
-        auto_ptr<CanonicalQuery> cqA(cqRaw);
+        unique_ptr<CanonicalQuery> cqA(cqRaw);
         ASSERT_OK(CanonicalQuery::canonicalize(ns, fromjson("{b: 1}"), &cqRaw));
-        auto_ptr<CanonicalQuery> cqB(cqRaw);
+        unique_ptr<CanonicalQuery> cqB(cqRaw);
 
         // Create plan cache with 2 entries.
         PlanCache planCache;
@@ -378,7 +378,7 @@ namespace {
         // Create a canonical query
         CanonicalQuery* cqRaw;
         ASSERT_OK(CanonicalQuery::canonicalize(ns, fromjson("{a: 1}"), &cqRaw));
-        auto_ptr<CanonicalQuery> cq(cqRaw);
+        unique_ptr<CanonicalQuery> cq(cqRaw);
 
         // Plan cache with one entry
         PlanCache planCache;
@@ -397,7 +397,7 @@ namespace {
         // Create a canonical query
         CanonicalQuery* cqRaw;
         ASSERT_OK(CanonicalQuery::canonicalize(ns, fromjson("{a: 1}"), &cqRaw));
-        auto_ptr<CanonicalQuery> cq(cqRaw);
+        unique_ptr<CanonicalQuery> cq(cqRaw);
 
         // Plan cache with one entry
         PlanCache planCache;

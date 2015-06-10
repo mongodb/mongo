@@ -2128,7 +2128,7 @@ namespace mongo {
             start.appendMinKey( "a" );
             BSONObjBuilder end;
             end.appendMaxKey( "a" );
-            auto_ptr< BtreeCursor > c( BtreeCursor::make( nsdetails( ns() ),
+            unique_ptr< BtreeCursor > c( BtreeCursor::make( nsdetails( ns() ),
                                                           id(),
                                                           start.done(),
                                                           end.done(),
@@ -2193,7 +2193,7 @@ namespace mongo {
             end.appendMaxKey( "a" );
             BSONObj l = bt()->keyNode( 0 ).key.toBson();
             string toInsert;
-            auto_ptr< BtreeCursor > c( BtreeCursor::make( nsdetails( ns() ),
+            unique_ptr< BtreeCursor > c( BtreeCursor::make( nsdetails( ns() ),
                                                           id(),
                                                           start.done(),
                                                           end.done(),

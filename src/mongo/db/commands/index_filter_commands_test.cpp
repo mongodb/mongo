@@ -45,7 +45,7 @@ using namespace mongo;
 namespace {
 
     using boost::scoped_ptr;
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::string;
     using std::vector;
 
@@ -97,10 +97,10 @@ namespace {
      * Utility function to create a PlanRankingDecision
      */
     PlanRankingDecision* createDecision(size_t numPlans) {
-        auto_ptr<PlanRankingDecision> why(new PlanRankingDecision());
+        unique_ptr<PlanRankingDecision> why(new PlanRankingDecision());
         for (size_t i = 0; i < numPlans; ++i) {
             CommonStats common("COLLSCAN");
-            auto_ptr<PlanStageStats> stats(new PlanStageStats(common, STAGE_COLLSCAN));
+            unique_ptr<PlanStageStats> stats(new PlanStageStats(common, STAGE_COLLSCAN));
             stats->specific.reset(new CollectionScanStats());
             why->stats.mutableVector().push_back(stats.release());
             why->scores.push_back(0U);

@@ -50,7 +50,7 @@
 namespace QueryStageCollectionScan {
 
     using boost::scoped_ptr;
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::vector;
 
     //
@@ -90,7 +90,7 @@ namespace QueryStageCollectionScan {
             // Make the filter.
             StatusWithMatchExpression swme = MatchExpressionParser::parse(filterObj);
             verify(swme.isOK());
-            auto_ptr<MatchExpression> filterExpr(swme.getValue());
+            unique_ptr<MatchExpression> filterExpr(swme.getValue());
 
             // Make a scan and have the runner own it.
             WorkingSet* ws = new WorkingSet();

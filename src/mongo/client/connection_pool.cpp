@@ -169,7 +169,7 @@ namespace {
 
         // No idle connection in the pool; make a new one.
         lk.unlock();
-        std::auto_ptr<DBClientConnection> conn(new DBClientConnection);
+        std::unique_ptr<DBClientConnection> conn(new DBClientConnection);
 
         // setSoTimeout takes a double representing the number of seconds for send and receive
         // timeouts.  Thus, we must take count() and divide by 1000.0 to get the number

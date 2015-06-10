@@ -46,7 +46,7 @@
 namespace mongo {
 
     using boost::scoped_ptr;
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::endl;
     using std::string;
     using std::vector;
@@ -223,7 +223,7 @@ namespace mongo {
     }
 
     // Helper function for safe cursors
-    DBClientCursor* _safeCursor(auto_ptr<DBClientCursor> cursor) {
+    DBClientCursor* _safeCursor(unique_ptr<DBClientCursor> cursor) {
         // TODO: Make error handling more consistent, it's annoying that cursors error out by
         // throwing exceptions *and* being empty
         uassert(16625, str::stream() << "cursor not found, transport error", cursor.get());

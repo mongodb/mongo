@@ -47,7 +47,7 @@
 namespace mongo {
 
     using boost::shared_ptr;
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::endl;
     using std::map;
     using std::set;
@@ -261,7 +261,7 @@ namespace {
     bool DBClientReplicaSet::isSecondaryQuery( const string& ns,
                                                const BSONObj& queryObj,
                                                int queryOptions ) {
-        auto_ptr<ReadPreferenceSetting> readPref( _extractReadPref( queryObj, queryOptions ) );
+        unique_ptr<ReadPreferenceSetting> readPref( _extractReadPref( queryObj, queryOptions ) );
         return _isSecondaryQuery( ns, queryObj, *readPref );
     }
 
@@ -491,7 +491,7 @@ namespace {
         return checkMaster()->update( ns, query, obj, flags );
     }
 
-    auto_ptr<DBClientCursor> DBClientReplicaSet::query(const string &ns,
+    unique_ptr<DBClientCursor> DBClientReplicaSet::query(const string &ns,
                                                        Query query,
                                                        int nToReturn,
                                                        int nToSkip,
@@ -521,11 +521,11 @@ namespace {
                         break;
                     }
 
-                    auto_ptr<DBClientCursor> cursor = conn->query(ns, query,
+                    unique_ptr<DBClientCursor> cursor = conn->query(ns, query,
                             nToReturn, nToSkip, fieldsToReturn, queryOptions,
                             batchSize);
 
-                    return checkSlaveQueryResult(cursor);
+                    return checkSlaveQueryResult(std::move(cursor));
                 }
                 catch (const DBException &dbExcep) {
                     StringBuilder errMsgBuilder;
@@ -629,7 +629,7 @@ namespace {
         resetMaster();
     }
 
-    auto_ptr<DBClientCursor> DBClientReplicaSet::checkSlaveQueryResult( auto_ptr<DBClientCursor> result ){
+    unique_ptr<DBClientCursor> DBClientReplicaSet::checkSlaveQueryResult( unique_ptr<DBClientCursor> result ){
         if ( result.get() == NULL ) return result;
 
         BSONObj error;

@@ -46,7 +46,7 @@
 
 namespace QueryStageMergeSortTests {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::set;
     using std::string;
 
@@ -527,7 +527,7 @@ namespace QueryStageMergeSortTests {
             // Sort by foo:1
             MergeSortStageParams msparams;
             msparams.pattern = BSON("foo" << 1);
-            auto_ptr<MergeSortStage> ms(new MergeSortStage(msparams, &ws, coll));
+            unique_ptr<MergeSortStage> ms(new MergeSortStage(msparams, &ws, coll));
 
             IndexScanParams params;
             params.bounds.isSimpleRange = true;

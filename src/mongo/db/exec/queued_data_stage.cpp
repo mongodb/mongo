@@ -33,7 +33,7 @@
 
 namespace mongo {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::vector;
 
     const char* QueuedDataStage::kStageType = "QUEUED_DATA";
@@ -84,7 +84,7 @@ namespace mongo {
 
     PlanStageStats* QueuedDataStage::getStats() {
         _commonStats.isEOF = isEOF();
-        auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_QUEUED_DATA));
+        unique_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_QUEUED_DATA));
         ret->specific.reset(new MockStats(_specificStats));
         return ret.release();
     }

@@ -37,7 +37,7 @@
 
 namespace {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::string;
     using std::vector;
 
@@ -135,7 +135,7 @@ namespace {
                           int index,
                           BatchedCommandResponse* response ) {
 
-        auto_ptr<WriteErrorDetail> error( new WriteErrorDetail );
+        unique_ptr<WriteErrorDetail> error( new WriteErrorDetail );
         error->setErrCode( code );
         error->setErrMessage( message );
         error->setIndex( index );
@@ -145,7 +145,7 @@ namespace {
 
     static void addWCError( BatchedCommandResponse* response ) {
 
-        auto_ptr<WCErrorDetail> error( new WCErrorDetail );
+        unique_ptr<WCErrorDetail> error( new WCErrorDetail );
         error->setErrCode( ErrorCodes::WriteConcernFailed );
         error->setErrMessage( "mock wc error" );
 

@@ -65,7 +65,7 @@
 
 namespace mongo {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::endl;
     using std::list;
     using std::set;
@@ -181,10 +181,10 @@ namespace mongo {
             return collection;
         }
 
-        auto_ptr<CollectionCatalogEntry> cce( _dbEntry->getCollectionCatalogEntry( fullns ) );
+        unique_ptr<CollectionCatalogEntry> cce( _dbEntry->getCollectionCatalogEntry( fullns ) );
         invariant( cce.get() );
 
-        auto_ptr<RecordStore> rs( _dbEntry->getRecordStore( fullns ) );
+        unique_ptr<RecordStore> rs( _dbEntry->getRecordStore( fullns ) );
         invariant( rs.get() ); // if cce exists, so should this
 
         // Not registering AddCollectionChange since this is for collections that already exist.

@@ -55,7 +55,7 @@
 
 namespace mongo {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
 
     PlanStage* buildStages(OperationContext* txn,
                            Collection* collection,
@@ -152,7 +152,7 @@ namespace mongo {
         }
         else if (STAGE_AND_HASH == root->getType()) {
             const AndHashNode* ahn = static_cast<const AndHashNode*>(root);
-            auto_ptr<AndHashStage> ret(new AndHashStage(ws, ahn->filter.get(), collection));
+            unique_ptr<AndHashStage> ret(new AndHashStage(ws, ahn->filter.get(), collection));
             for (size_t i = 0; i < ahn->children.size(); ++i) {
                 PlanStage* childStage = buildStages(txn, collection, qsol, ahn->children[i], ws);
                 if (NULL == childStage) { return NULL; }
@@ -162,7 +162,7 @@ namespace mongo {
         }
         else if (STAGE_OR == root->getType()) {
             const OrNode * orn = static_cast<const OrNode*>(root);
-            auto_ptr<OrStage> ret(new OrStage(ws, orn->dedup, orn->filter.get()));
+            unique_ptr<OrStage> ret(new OrStage(ws, orn->dedup, orn->filter.get()));
             for (size_t i = 0; i < orn->children.size(); ++i) {
                 PlanStage* childStage = buildStages(txn, collection, qsol, orn->children[i], ws);
                 if (NULL == childStage) { return NULL; }
@@ -172,7 +172,7 @@ namespace mongo {
         }
         else if (STAGE_AND_SORTED == root->getType()) {
             const AndSortedNode* asn = static_cast<const AndSortedNode*>(root);
-            auto_ptr<AndSortedStage> ret(new AndSortedStage(ws, asn->filter.get(), collection));
+            unique_ptr<AndSortedStage> ret(new AndSortedStage(ws, asn->filter.get(), collection));
             for (size_t i = 0; i < asn->children.size(); ++i) {
                 PlanStage* childStage = buildStages(txn, collection, qsol, asn->children[i], ws);
                 if (NULL == childStage) { return NULL; }
@@ -185,7 +185,7 @@ namespace mongo {
             MergeSortStageParams params;
             params.dedup = msn->dedup;
             params.pattern = msn->sort;
-            auto_ptr<MergeSortStage> ret(new MergeSortStage(params, ws, collection));
+            unique_ptr<MergeSortStage> ret(new MergeSortStage(params, ws, collection));
             for (size_t i = 0; i < msn->children.size(); ++i) {
                 PlanStage* childStage = buildStages(txn, collection, qsol, msn->children[i], ws);
                 if (NULL == childStage) { return NULL; }

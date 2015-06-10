@@ -104,7 +104,7 @@
 namespace mongo {
 
     using boost::shared_ptr;
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::endl;
     using std::list;
     using std::map;

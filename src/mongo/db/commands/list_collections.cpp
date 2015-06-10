@@ -130,8 +130,8 @@ namespace mongo {
                 names.sort();
             }
 
-            std::auto_ptr<WorkingSet> ws(new WorkingSet());
-            std::auto_ptr<QueuedDataStage> root(new QueuedDataStage(ws.get()));
+            std::unique_ptr<WorkingSet> ws(new WorkingSet());
+            std::unique_ptr<QueuedDataStage> root(new QueuedDataStage(ws.get()));
 
             for (std::list<std::string>::const_iterator i = names.begin();
                  i != names.end();
@@ -174,7 +174,7 @@ namespace mongo {
                                                    cursorNamespace,
                                                    PlanExecutor::YIELD_MANUAL,
                                                    &rawExec);
-            std::auto_ptr<PlanExecutor> exec(rawExec);
+            std::unique_ptr<PlanExecutor> exec(rawExec);
             if (!makeStatus.isOK()) {
                 return appendCommandStatus( result, makeStatus );
             }

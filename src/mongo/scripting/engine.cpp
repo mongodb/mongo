@@ -52,7 +52,7 @@ namespace mongo {
 
     using boost::scoped_ptr;
     using boost::shared_ptr;
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::endl;
     using std::set;
     using std::string;
@@ -222,7 +222,7 @@ namespace {
         string coll = _localDBName + ".system.js";
 
         scoped_ptr<DBClientBase> directDBClient(createDirectClient(txn));
-        auto_ptr<DBClientCursor> c = directDBClient->query(coll, Query(), 0, 0, NULL,
+        unique_ptr<DBClientCursor> c = directDBClient->query(coll, Query(), 0, 0, NULL,
             QueryOption_SlaveOk, 0);
         massert(16669, "unable to get db client cursor from query", c.get());
 
@@ -458,7 +458,7 @@ namespace {
     };
 
     /** Get a scope from the pool of scopes matching the supplied pool name */
-    auto_ptr<Scope> ScriptEngine::getPooledScope(OperationContext* txn,
+    unique_ptr<Scope> ScriptEngine::getPooledScope(OperationContext* txn,
                                                  const string& db,
                                                  const string& scopeType) {
         const string fullPoolName = db + scopeType;
@@ -468,7 +468,7 @@ namespace {
             s->registerOperation(txn);
         }
 
-        auto_ptr<Scope> p;
+        unique_ptr<Scope> p;
         p.reset(new PooledScope(fullPoolName, s));
         p->setLocalDB(db);
         p->loadStored(txn, true);

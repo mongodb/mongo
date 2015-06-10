@@ -37,7 +37,7 @@
 
 namespace mongo {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::string;
 
     StatusWithMatchExpression expressionParserTextCallbackReal( const BSONObj& queryObj ) {
@@ -84,7 +84,7 @@ namespace mongo {
             return StatusWithMatchExpression( ErrorCodes::BadValue, "extra fields in $text" );
         }
 
-        auto_ptr<TextMatchExpression> e( new TextMatchExpression() );
+        unique_ptr<TextMatchExpression> e( new TextMatchExpression() );
         Status s = e->init( query, language, caseSensitive );
         if ( !s.isOK() ) {
             return StatusWithMatchExpression( s );

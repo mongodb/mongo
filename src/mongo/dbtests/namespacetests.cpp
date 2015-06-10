@@ -370,7 +370,7 @@ namespace NamespaceTests {
 
                 RecordId last, first;
                 {
-                    auto_ptr<Runner> runner(InternalPlanner::collectionScan(&txn,
+                    unique_ptr<Runner> runner(InternalPlanner::collectionScan(&txn,
                                                                             ns(),
                                                                             collection(),
                                                                             InternalPlanner::BACKWARD));
@@ -378,7 +378,7 @@ namespace NamespaceTests {
                     ASSERT( !last.isNull() );
                 }
                 {
-                    auto_ptr<Runner> runner(InternalPlanner::collectionScan(&txn,
+                    unique_ptr<Runner> runner(InternalPlanner::collectionScan(&txn,
                                                                             ns(),
                                                                             collection(),
                                                                             InternalPlanner::FORWARD));
@@ -392,7 +392,7 @@ namespace NamespaceTests {
 
                 {
                     RecordId loc;
-                    auto_ptr<Runner> runner(InternalPlanner::collectionScan(&txn,
+                    unique_ptr<Runner> runner(InternalPlanner::collectionScan(&txn,
                                                                             ns(),
                                                                             collection(),
                                                                             InternalPlanner::FORWARD));
@@ -400,7 +400,7 @@ namespace NamespaceTests {
                     ASSERT( first == loc);
                 }
                 {
-                    auto_ptr<Runner> runner(InternalPlanner::collectionScan(&txn,
+                    unique_ptr<Runner> runner(InternalPlanner::collectionScan(&txn,
                                                                             ns(),
                                                                             collection(),
                                                                             InternalPlanner::BACKWARD));

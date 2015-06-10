@@ -151,7 +151,7 @@ namespace mongo {
 
         // The Scope object that all script operations for this group stage will use.  Initialized
         // by initGroupScripting().  Owned here.
-        std::auto_ptr<Scope> _scope;
+        std::unique_ptr<Scope> _scope;
 
         // The reduce function for the group operation.  Initialized by initGroupScripting().  Owned
         // by _scope.

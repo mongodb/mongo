@@ -36,7 +36,7 @@
 
 namespace mongo {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::string;
     using std::vector;
 
@@ -97,7 +97,7 @@ namespace mongo {
             if (!lpqStatus.isOK()) {
                 return lpqStatus;
             }
-            auto_ptr<LiteParsedQuery> lpq(rawLpq);
+            unique_ptr<LiteParsedQuery> lpq(rawLpq);
 
             BSONObjBuilder explainCmdBob;
             ClusterExplain::wrapAsExplain(cmdObj, verbosity, &explainCmdBob);

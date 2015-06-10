@@ -387,12 +387,12 @@ namespace {
                 "should only be running an aggregate command here",
                 str::equals(cmd.firstElementFieldName(), "aggregate"));
 
-        scoped_ptr<DBClientCursor> cursor(conn->query(db + ".$cmd",
-                                                      cmd,
-                                                      -1, // nToReturn
-                                                      0, // nToSkip
-                                                      NULL, // fieldsToReturn
-                                                      queryOptions));
+        auto cursor = conn->query(db + ".$cmd",
+                                  cmd,
+                                  -1, // nToReturn
+                                  0, // nToSkip
+                                  NULL, // fieldsToReturn
+                                  queryOptions);
         massert(17014,
                 str::stream() << "aggregate command didn't return results on host: "
                               << conn->toString(),

@@ -37,7 +37,7 @@
 
 namespace mongo {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::string;
 
     const string LiteParsedQuery::cmdOptionMaxTimeMS("maxTimeMS");
@@ -72,7 +72,7 @@ namespace mongo {
                                  const BSONObj& cmdObj,
                                  bool isExplain,
                                  LiteParsedQuery** out) {
-        auto_ptr<LiteParsedQuery> pq(new LiteParsedQuery());
+        unique_ptr<LiteParsedQuery> pq(new LiteParsedQuery());
         pq->_ns = fullns;
         pq->_fromCommand = true;
         pq->_explain = isExplain;
@@ -566,7 +566,7 @@ namespace mongo {
 
     // static
     Status LiteParsedQuery::make(const QueryMessage& qm, LiteParsedQuery** out) {
-        auto_ptr<LiteParsedQuery> pq(new LiteParsedQuery());
+        unique_ptr<LiteParsedQuery> pq(new LiteParsedQuery());
 
         Status status = pq->init(qm.ns, qm.ntoskip, qm.ntoreturn, qm.queryOptions, qm.query,
                                  qm.fields, true);
@@ -582,7 +582,7 @@ namespace mongo {
                                  bool snapshot,
                                  bool explain,
                                  LiteParsedQuery** out) {
-        auto_ptr<LiteParsedQuery> pq(new LiteParsedQuery());
+        unique_ptr<LiteParsedQuery> pq(new LiteParsedQuery());
         pq->_sort = sort.getOwned();
         pq->_hint = hint.getOwned();
         pq->_min = minObj.getOwned();

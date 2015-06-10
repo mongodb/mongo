@@ -32,7 +32,7 @@
 
 namespace mongo {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::string;
 
     /**
@@ -238,7 +238,7 @@ namespace mongo {
         }
 
         // Fill out the returned obj.
-        auto_ptr<ParsedProjection> pp(new ParsedProjection());
+        unique_ptr<ParsedProjection> pp(new ParsedProjection());
 
         // The positional operator uses the MatchDetails from the query
         // expression to know which array element was matched.

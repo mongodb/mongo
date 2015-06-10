@@ -190,7 +190,7 @@ namespace mongo {
         void resetChild( MatchExpression* newChild) { _exp.reset(newChild); }
 
     private:
-        std::auto_ptr<MatchExpression> _exp;
+        std::unique_ptr<MatchExpression> _exp;
     };
 
 }

@@ -39,7 +39,7 @@
 
 namespace mongo {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::endl;
     using std::string;
     using std::vector;
@@ -536,7 +536,7 @@ namespace mongo {
     QuerySolution* QueryPlannerAnalysis::analyzeDataAccess(const CanonicalQuery& query,
                                                            const QueryPlannerParams& params,
                                                            QuerySolutionNode* solnRoot) {
-        auto_ptr<QuerySolution> soln(new QuerySolution());
+        unique_ptr<QuerySolution> soln(new QuerySolution());
         soln->filterData = query.getQueryObj();
         soln->indexFilterApplied = params.indexFiltersApplied;
 

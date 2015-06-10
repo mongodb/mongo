@@ -45,7 +45,7 @@
 
 namespace QueryStageTests {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
 
     class IndexScanBase {
     public:
@@ -78,7 +78,7 @@ namespace QueryStageTests {
 
             StatusWithMatchExpression swme = MatchExpressionParser::parse(filterObj);
             verify(swme.isOK());
-            auto_ptr<MatchExpression> filterExpr(swme.getValue());
+            unique_ptr<MatchExpression> filterExpr(swme.getValue());
 
             WorkingSet* ws = new WorkingSet();
 

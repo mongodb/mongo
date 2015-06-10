@@ -44,7 +44,7 @@
 
 namespace DirectClientTests {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::vector;
 
     class ClientBase {
@@ -127,7 +127,7 @@ namespace DirectClientTests {
             OperationContextImpl txn;
             DBDirectClient client(&txn);
 
-            auto_ptr<DBClientCursor> cursor = client.query( "", Query(), 1 );
+            unique_ptr<DBClientCursor> cursor = client.query( "", Query(), 1 );
             ASSERT(cursor->more());
             BSONObj result = cursor->next().getOwned();
             ASSERT( result.hasField( "$err" ));
@@ -141,7 +141,7 @@ namespace DirectClientTests {
             OperationContextImpl txn;
             DBDirectClient client(&txn);
 
-            auto_ptr<DBClientCursor> cursor = client.getMore("", 1, 1);
+            unique_ptr<DBClientCursor> cursor = client.getMore("", 1, 1);
             ASSERT(cursor->more());
             BSONObj result = cursor->next().getOwned();
             ASSERT(result.hasField("$err"));

@@ -34,7 +34,7 @@
 
 namespace mongo {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::string;
 
     using mongoutils::str::stream;
@@ -181,7 +181,7 @@ namespace mongo {
         for(std::vector<BatchedUpdateDocument*>::const_iterator it = _updates.begin();
             it != _updates.end();
             ++it) {
-            auto_ptr<BatchedUpdateDocument> tempBatchUpdateDocument(new BatchedUpdateDocument);
+            unique_ptr<BatchedUpdateDocument> tempBatchUpdateDocument(new BatchedUpdateDocument);
             (*it)->cloneTo(tempBatchUpdateDocument.get());
             other->addToUpdates(tempBatchUpdateDocument.release());
         }
@@ -232,7 +232,7 @@ namespace mongo {
         for (std::vector<BatchedUpdateDocument*>::const_iterator it = updates.begin();
              it != updates.end();
              ++it) {
-            auto_ptr<BatchedUpdateDocument> tempBatchUpdateDocument(new BatchedUpdateDocument);
+            unique_ptr<BatchedUpdateDocument> tempBatchUpdateDocument(new BatchedUpdateDocument);
             (*it)->cloneTo(tempBatchUpdateDocument.get());
             addToUpdates(tempBatchUpdateDocument.release());
         }

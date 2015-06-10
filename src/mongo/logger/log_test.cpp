@@ -93,7 +93,7 @@ namespace {
         ASSERT_EQUALS(0, dynamic_cast<CountAppender*>(countAppender.get())->getCount());
 
         // Appending to the domain after attaching the appender does affect the appender.
-        MessageLogDomain::AppenderHandle handle = domain.attachAppender(countAppender);
+        MessageLogDomain::AppenderHandle handle = domain.attachAppender(std::move(countAppender));
         domain.append(MessageEventEphemeral(Date_t(), LogSeverity::Log(), "", "2"));
         countAppender = domain.detachAppender(handle);
         ASSERT_EQUALS(1, dynamic_cast<CountAppender*>(countAppender.get())->getCount());

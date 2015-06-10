@@ -55,7 +55,7 @@
 
 namespace mongo {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::endl;
     using std::max;
     using std::string;
@@ -166,7 +166,7 @@ namespace mongo {
                 }
             }
 
-            auto_ptr<DataFile> df(new DataFile(n));
+            unique_ptr<DataFile> df(new DataFile(n));
 
             Status s = df->openExisting(fullNameString.c_str());
             if (!s.isOK()) {
@@ -235,7 +235,7 @@ namespace mongo {
         }
 
         {
-            auto_ptr<DataFile> allocFile(new DataFile(allocFileId));
+            unique_ptr<DataFile> allocFile(new DataFile(allocFileId));
             const string allocFileName = _fileName(allocFileId).string();
 
             Timer t;
@@ -254,7 +254,7 @@ namespace mongo {
 
         // Preallocate is asynchronous
         if (preallocateNextFile) {
-            auto_ptr<DataFile> nextFile(new DataFile(allocFileId + 1));
+            unique_ptr<DataFile> nextFile(new DataFile(allocFileId + 1));
             const string nextFileName = _fileName(allocFileId + 1).string();
 
             nextFile->open(txn, nextFileName.c_str(), minSize, false);

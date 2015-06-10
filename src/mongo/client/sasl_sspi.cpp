@@ -182,7 +182,7 @@ namespace {
         }
 
         // Actually acquire the handle to the client credentials.
-        std::auto_ptr<SspiConnContext> pcctx(new SspiConnContext());
+        std::unique_ptr<SspiConnContext> pcctx(new SspiConnContext());
         pcctx->userPlusRealm = userPlusRealm;
         TimeStamp ignored;
         SECURITY_STATUS status = AcquireCredentialsHandleW(NULL, // principal

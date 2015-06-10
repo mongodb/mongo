@@ -58,14 +58,14 @@ namespace mongo {
 namespace QueryMultiPlanRunner {
 
     using boost::scoped_ptr;
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::vector;
 
     /**
      * Create query solution.
      */
     QuerySolution* createQuerySolution() {
-        std::auto_ptr<QuerySolution> soln(new QuerySolution());
+        std::unique_ptr<QuerySolution> soln(new QuerySolution());
         soln->cacheData.reset(new SolutionCacheData());
         soln->cacheData->solnType = SolutionCacheData::COLLSCAN_SOLN;
         soln->cacheData->tree.reset(new PlanCacheIndexTree());
@@ -132,9 +132,9 @@ namespace QueryMultiPlanRunner {
             ixparams.bounds.endKeyInclusive = true;
             ixparams.direction = 1;
 
-            auto_ptr<WorkingSet> sharedWs(new WorkingSet());
+            unique_ptr<WorkingSet> sharedWs(new WorkingSet());
             IndexScan* ix = new IndexScan(&_txn, ixparams, sharedWs.get(), NULL);
-            auto_ptr<PlanStage> firstRoot(new FetchStage(&_txn, sharedWs.get(), ix, NULL, coll));
+            unique_ptr<PlanStage> firstRoot(new FetchStage(&_txn, sharedWs.get(), ix, NULL, coll));
 
             // Plan 1: CollScan with matcher.
             CollectionScanParams csparams;
@@ -145,9 +145,9 @@ namespace QueryMultiPlanRunner {
             BSONObj filterObj = BSON("foo" << 7);
             StatusWithMatchExpression swme = MatchExpressionParser::parse(filterObj);
             verify(swme.isOK());
-            auto_ptr<MatchExpression> filter(swme.getValue());
+            unique_ptr<MatchExpression> filter(swme.getValue());
             // Make the stage.
-            auto_ptr<PlanStage> secondRoot(new CollectionScan(&_txn, csparams, sharedWs.get(),
+            unique_ptr<PlanStage> secondRoot(new CollectionScan(&_txn, csparams, sharedWs.get(),
                                                               filter.get()));
 
             // Hand the plans off to the runner.

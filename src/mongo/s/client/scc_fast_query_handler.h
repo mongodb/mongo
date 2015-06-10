@@ -56,7 +56,7 @@ namespace mongo {
 
         virtual bool canHandleQuery(const std::string& ns, Query query);
 
-        virtual std::auto_ptr<DBClientCursor> handleQuery(const std::vector<std::string>& hostStrings,
+        virtual std::unique_ptr<DBClientCursor> handleQuery(const std::vector<std::string>& hostStrings,
                                                           const std::string &ns,
                                                           Query query,
                                                           int nToReturn,

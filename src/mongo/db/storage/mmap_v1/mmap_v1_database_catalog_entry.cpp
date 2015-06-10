@@ -57,7 +57,7 @@
 namespace mongo {
 
     using boost::scoped_ptr;
-    using std::auto_ptr;
+    using std::unique_ptr;
 
 namespace {
 
@@ -735,7 +735,7 @@ namespace {
                                                        _getIndexRecordStore(),
                                                        this));
 
-        auto_ptr<NamespaceDetailsRSV1MetaData> md(new NamespaceDetailsRSV1MetaData(ns, details));
+        unique_ptr<NamespaceDetailsRSV1MetaData> md(new NamespaceDetailsRSV1MetaData(ns, details));
         const NamespaceString nss(ns);
 
         if (details->isCapped) {
@@ -779,7 +779,7 @@ namespace {
         RecordStoreV1Base* rs = _getRecordStore(entry->descriptor()->indexNamespace());
         invariant(rs);
 
-        std::auto_ptr<SortedDataInterface> btree(
+        std::unique_ptr<SortedDataInterface> btree(
             getMMAPV1Interface(entry->headManager(),
                                rs,
                                &rs->savedCursors,

@@ -35,7 +35,7 @@
 namespace {
 
     using namespace mongo;
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::string;
     using std::vector;
 

@@ -46,7 +46,7 @@
 
 namespace mongo {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::vector;
 
     // static
@@ -250,7 +250,7 @@ namespace mongo {
             _commonStats.filter = bob.obj();
         }
 
-        auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_COLLSCAN));
+        unique_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_COLLSCAN));
         ret->specific.reset(new CollectionScanStats(_specificStats));
         return ret.release();
     }

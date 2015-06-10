@@ -42,7 +42,7 @@
 
 namespace mongo {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::dec;
     using std::endl;
     using std::hex;
@@ -114,7 +114,7 @@ namespace mongo {
 
     template <class BtreeLayout>
     Status BtreeLogic<BtreeLayout>::Builder::addKey(const BSONObj& keyObj, const DiskLoc& loc) {
-        auto_ptr<KeyDataOwnedType> key(new KeyDataOwnedType(keyObj));
+        unique_ptr<KeyDataOwnedType> key(new KeyDataOwnedType(keyObj));
 
         if (key->dataSize() > BtreeLayout::KeyMax) {
             string msg = str::stream() << "Btree::insert: key too large to index, failing "
@@ -148,7 +148,7 @@ namespace mongo {
             invariant(_logic->pushBack(rightLeaf, loc, *key, DiskLoc()));
         }
 
-        _keyLast = key;
+        _keyLast = std::move(key);
         return Status::OK();
     }
 

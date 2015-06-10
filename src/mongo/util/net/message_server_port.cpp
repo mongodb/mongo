@@ -105,7 +105,7 @@ namespace {
 
         virtual void accepted(boost::shared_ptr<Socket> psocket, long long connectionId ) {
             ScopeGuard sleepAfterClosingPort = MakeGuard(sleepmillis, 2);
-            std::auto_ptr<MessagingPortWithHandler> portWithHandler(
+            std::unique_ptr<MessagingPortWithHandler> portWithHandler(
                 new MessagingPortWithHandler(psocket, _handler, connectionId));
 
             if ( ! Listener::globalTicketHolder.tryAcquire() ) {

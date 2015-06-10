@@ -75,7 +75,7 @@ namespace mongo {
         return false;
     }
 
-    std::auto_ptr<mongo::DBClientCursor> MockDBClientConnection::query(const string& ns,
+    std::unique_ptr<mongo::DBClientCursor> MockDBClientConnection::query(const string& ns,
             mongo::Query query,
             int nToReturn,
             int nToSkip,
@@ -88,7 +88,7 @@ namespace mongo {
             mongo::BSONArray result(_remoteServer->query(_remoteServerInstanceID, ns, query,
                     nToReturn, nToSkip, fieldsToReturn, queryOptions, batchSize));
 
-            std::auto_ptr<mongo::DBClientCursor> cursor;
+            std::unique_ptr<mongo::DBClientCursor> cursor;
             cursor.reset(new MockDBClientCursor(this, result));
             return cursor;
         }
@@ -97,7 +97,7 @@ namespace mongo {
             throw;
         }
 
-        std::auto_ptr<mongo::DBClientCursor> nullPtr;
+        std::unique_ptr<mongo::DBClientCursor> nullPtr;
         return nullPtr;
     }
 

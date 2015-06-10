@@ -69,8 +69,8 @@ namespace mongo {
 
     // Helper that acts as an auto-ptr for write and wc errors
     struct GLEErrors {
-        std::auto_ptr<WriteErrorDetail> writeError;
-        std::auto_ptr<WCErrorDetail> wcError;
+        std::unique_ptr<WriteErrorDetail> writeError;
+        std::unique_ptr<WCErrorDetail> wcError;
     };
 
     /**

@@ -112,7 +112,7 @@ namespace mongo {
 
     using boost::scoped_ptr;
     using logger::LogComponent;
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::endl;
     using std::hex;
     using std::ios;
@@ -390,7 +390,7 @@ namespace {
 
         DbMessage d(m);
         QueryMessage q(d);
-        auto_ptr< Message > resp( new Message() );
+        unique_ptr< Message > resp( new Message() );
 
         CurOp& op = *CurOp::get(txn);
 

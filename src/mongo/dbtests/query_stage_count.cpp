@@ -44,7 +44,7 @@
 namespace QueryStageCount {
 
     using boost::scoped_ptr;
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::vector;
 
     const int kDocuments = 100;
@@ -147,10 +147,10 @@ namespace QueryStageCount {
             setup();
             getLocs();
 
-            auto_ptr<WorkingSet> ws(new WorkingSet);
+            unique_ptr<WorkingSet> ws(new WorkingSet);
 
             StatusWithMatchExpression swme = MatchExpressionParser::parse(request.query);
-            auto_ptr<MatchExpression> expression(swme.getValue());
+            unique_ptr<MatchExpression> expression(swme.getValue());
 
             PlanStage* scan;
             if (indexed) {

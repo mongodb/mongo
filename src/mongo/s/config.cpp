@@ -58,7 +58,7 @@
 namespace mongo {
 
     using boost::scoped_ptr;
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::endl;
     using std::set;
     using std::string;
@@ -341,7 +341,7 @@ namespace mongo {
 
         // we are not locked now, and want to load a new ChunkManager
         
-        auto_ptr<ChunkManager> tempChunkManager;
+        unique_ptr<ChunkManager> tempChunkManager;
 
         {
             boost::lock_guard<boost::mutex> lll ( _hitConfigServerLock );

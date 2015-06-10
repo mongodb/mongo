@@ -44,7 +44,7 @@
 
 namespace mongo {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::stringstream;
 
     // This field must be present, and...
@@ -287,7 +287,7 @@ namespace mongo {
                              elem.toString(false));
         }
 
-        auto_ptr<S2Loop> loop(new S2Loop(exteriorVertices));
+        unique_ptr<S2Loop> loop(new S2Loop(exteriorVertices));
         // Check whether this loop is valid.
         if (!loop->IsValid(&err)) {
             return BAD_VALUE("Loop is not valid: " << elem.toString(false) << " " << err);

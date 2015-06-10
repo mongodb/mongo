@@ -42,7 +42,7 @@
 
 namespace mongo {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::vector;
 
     // static
@@ -240,7 +240,7 @@ namespace mongo {
 
     PlanStageStats* IDHackStage::getStats() {
         _commonStats.isEOF = isEOF();
-        auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_IDHACK));
+        unique_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_IDHACK));
         ret->specific.reset(new IDHackStats(_specificStats));
         return ret.release();
     }

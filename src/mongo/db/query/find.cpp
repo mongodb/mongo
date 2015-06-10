@@ -63,7 +63,7 @@
 #include "mongo/util/mongoutils/str.h"
 
 using boost::scoped_ptr;
-using std::auto_ptr;
+using std::unique_ptr;
 using std::endl;
 
 namespace mongo {
@@ -530,7 +530,7 @@ namespace mongo {
         beginQueryOp(txn, nss, q.query, q.ntoreturn, q.ntoskip);
 
         // Parse the qm into a CanonicalQuery.
-        std::auto_ptr<CanonicalQuery> cq;
+        std::unique_ptr<CanonicalQuery> cq;
         {
             CanonicalQuery* cqRaw;
             Status canonStatus = CanonicalQuery::canonicalize(q,

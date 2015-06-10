@@ -143,7 +143,7 @@ public:
     }
 };
 
-auto_ptr< MyListener > listener;
+unique_ptr< MyListener > listener;
 
 
 void cleanup( int sig ) {

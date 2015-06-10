@@ -35,7 +35,7 @@
 
 namespace mongo {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::string;
 
     /**
@@ -118,7 +118,7 @@ namespace mongo {
     StatusWithMatchExpression WhereCallbackNoop::parseWhere(const BSONElement& where) const {
 
 
-        auto_ptr<WhereNoOpMatchExpression> exp( new WhereNoOpMatchExpression() );
+        unique_ptr<WhereNoOpMatchExpression> exp( new WhereNoOpMatchExpression() );
         if ( where.type() == String || where.type() == Code ) {
             Status s = exp->init( where.valuestr() );
             if ( !s.isOK() )

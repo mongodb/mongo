@@ -57,7 +57,7 @@
 
 namespace mongo {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::string;
     using std::stringstream;
     using std::endl;
@@ -146,7 +146,7 @@ namespace mongo {
                   << " query: " << query << " " << ( copyIndexes ? "" : ", not copying indexes" ) << endl;
 
             Cloner cloner;
-            auto_ptr<DBClientConnection> myconn;
+            unique_ptr<DBClientConnection> myconn;
             myconn.reset( new DBClientConnection() );
             if ( ! myconn->connect( HostAndPort(fromhost) , errmsg ) )
                 return false;

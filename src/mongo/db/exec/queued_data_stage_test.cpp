@@ -38,19 +38,19 @@ using namespace mongo;
 
 namespace {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
 
     //
     // Basic test that we get out valid stats objects.
     //
     TEST(QueuedDataStageTest, getValidStats) {
         WorkingSet ws;
-        auto_ptr<QueuedDataStage> mock(new QueuedDataStage(&ws));
+        unique_ptr<QueuedDataStage> mock(new QueuedDataStage(&ws));
         const CommonStats* commonStats = mock->getCommonStats();
         ASSERT_EQUALS(commonStats->works, static_cast<size_t>(0));
         const SpecificStats* specificStats = mock->getSpecificStats();
         ASSERT(specificStats);
-        auto_ptr<PlanStageStats> allStats(mock->getStats());
+        unique_ptr<PlanStageStats> allStats(mock->getStats());
         ASSERT_EQUALS(allStats->stageType, mock->stageType());
     }
 
@@ -60,7 +60,7 @@ namespace {
     TEST(QueuedDataStageTest, validateStats) {
         WorkingSet ws;
         WorkingSetID wsID;
-        auto_ptr<QueuedDataStage> mock(new QueuedDataStage(&ws));
+        unique_ptr<QueuedDataStage> mock(new QueuedDataStage(&ws));
 
         // make sure that we're at all zero
         const CommonStats* stats = mock->getCommonStats();
@@ -101,7 +101,7 @@ namespace {
 
         // and now we are d1U, but must trigger EOF with getStats()
         ASSERT_FALSE(stats->isEOF);
-        auto_ptr<PlanStageStats> allStats(mock->getStats());
+        unique_ptr<PlanStageStats> allStats(mock->getStats());
         ASSERT_TRUE(stats->isEOF);
     }
 }

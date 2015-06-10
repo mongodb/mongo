@@ -54,7 +54,7 @@ using namespace mongo::repl;
 
 namespace ReplTests {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::endl;
     using std::string;
     using std::stringstream;
@@ -120,7 +120,7 @@ namespace ReplTests {
             check( o, one( o ) );
         }
         void checkAll( const BSONObj &o ) const {
-            auto_ptr< DBClientCursor > c = _client.query( ns(), o );
+            unique_ptr< DBClientCursor > c = _client.query( ns(), o );
             verify( c->more() );
             while( c->more() ) {
                 check( o, c->next() );
@@ -718,7 +718,7 @@ namespace ReplTests {
 
             string s() const {
                 stringstream ss;
-                auto_ptr<DBClientCursor> cc = _client.query( ns() , Query().sort( BSON( "_id" << 1 ) ) );
+                unique_ptr<DBClientCursor> cc = _client.query( ns() , Query().sort( BSON( "_id" << 1 ) ) );
                 bool first = true;
                 while ( cc->more() ) {
                     if ( first ) first = false;

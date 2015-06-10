@@ -130,7 +130,7 @@ namespace mongo {
                               const std::string& ns,
                               YieldPolicy yieldPolicy,
                               PlanExecutor** out) {
-        std::auto_ptr<PlanExecutor> exec(new PlanExecutor(opCtx, ws, rt, qs, cq, collection, ns));
+        std::unique_ptr<PlanExecutor> exec(new PlanExecutor(opCtx, ws, rt, qs, cq, collection, ns));
 
         // Perform plan selection, if necessary.
         Status status = exec->pickBestPlan(yieldPolicy);

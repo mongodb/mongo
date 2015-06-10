@@ -107,12 +107,12 @@ namespace mongo {
                 : root(theRoot),
                   inArrayOperator(inArrayOp),
                   indices(indexList),
-                  currentScan(NULL),
+                  currentScan(nullptr),
                   curChild(0),
                   currentIndexNumber(IndexTag::kNoIndex),
                   ixtag(NULL),
                   tightness(IndexBoundsBuilder::INEXACT_FETCH),
-                  curOr(NULL),
+                  curOr(nullptr),
                   loosestBounds(IndexBoundsBuilder::EXACT) {
             }
 
@@ -144,7 +144,7 @@ namespace mongo {
 
             // The index access node that we are currently constructing. We may merge
             // multiple tagged predicates into a single index scan.
-            std::auto_ptr<QuerySolutionNode> currentScan;
+            std::unique_ptr<QuerySolutionNode> currentScan;
 
             // An index into the child vector of 'root'. Indicates the child MatchExpression
             // for which we are currently either constructing a new scan or which we are about
@@ -165,8 +165,8 @@ namespace mongo {
 
             // If 'root' is an $or, the child predicates which are tagged with the same index are
             // detached from the original root and added here. 'curOr' may be attached as a filter
-            // later on, or ignored and cleaned up by the auto_ptr.
-            std::auto_ptr<MatchExpression> curOr;
+            // later on, or ignored and cleaned up by the unique_ptr.
+            std::unique_ptr<MatchExpression> curOr;
 
             // The values of BoundsTightness range from loosest to tightest in this order:
             //

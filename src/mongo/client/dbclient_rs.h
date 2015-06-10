@@ -80,7 +80,7 @@ namespace mongo {
         // ----------- simple functions --------------
 
         /** throws userassertion "no master found" */
-        virtual std::auto_ptr<DBClientCursor> query(const std::string &ns, Query query, int nToReturn = 0, int nToSkip = 0,
+        virtual std::unique_ptr<DBClientCursor> query(const std::string &ns, Query query, int nToReturn = 0, int nToSkip = 0,
                                                const BSONObj *fieldsToReturn = 0, int queryOptions = 0 , int batchSize = 0 );
 
         /** throws userassertion "no master found" */
@@ -207,7 +207,7 @@ namespace mongo {
          * @throws DBException if the directed node cannot accept the query because it
          *     is not a master
          */
-        std::auto_ptr<DBClientCursor> checkSlaveQueryResult( std::auto_ptr<DBClientCursor> result );
+        std::unique_ptr<DBClientCursor> checkSlaveQueryResult( std::unique_ptr<DBClientCursor> result );
 
         DBClientConnection * checkMaster();
 
@@ -277,7 +277,7 @@ namespace mongo {
         // Connection can either be owned here or returned to the connection pool. Note that
         // if connection is primary, it is owned by _master so it is incorrect to return
         // it to the pool.
-        std::auto_ptr<DBClientConnection> _lastSlaveOkConn;
+        std::unique_ptr<DBClientConnection> _lastSlaveOkConn;
         boost::shared_ptr<ReadPreferenceSetting> _lastReadPref;
 
         double _so_timeout;

@@ -344,7 +344,7 @@ namespace mongo {
          */
         Status _fetchUserV2(OperationContext* txn,
                             const UserName& userName,
-                            std::auto_ptr<User>* acquiredUser);
+                            std::unique_ptr<User>* acquiredUser);
 
         /**
          * True if access control enforcement is enabled in this AuthorizationManager.

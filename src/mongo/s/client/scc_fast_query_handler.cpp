@@ -45,7 +45,7 @@
 
 namespace mongo {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::endl;
     using std::string;
     using std::vector;
@@ -94,7 +94,7 @@ namespace mongo {
             // operation must then be correctly discarded by the calling thread.
             //
 
-            auto_ptr<DBClientCursor> cursor;
+            unique_ptr<DBClientCursor> cursor;
 
             try {
 
@@ -225,7 +225,7 @@ namespace mongo {
         return hosts;
     }
 
-    auto_ptr<DBClientCursor> SCCFastQueryHandler::handleQuery(const vector<string>& hostStrings,
+    unique_ptr<DBClientCursor> SCCFastQueryHandler::handleQuery(const vector<string>& hostStrings,
                                                               const string& ns,
                                                               Query query,
                                                               int nToReturn,
@@ -250,7 +250,7 @@ namespace mongo {
                                                               30 * 1000);
         uassertStatusOK(status.getStatus());
 
-        auto_ptr<DBClientCursor> cursor(status.getValue());
+        unique_ptr<DBClientCursor> cursor(status.getValue());
         return cursor;
     }
 

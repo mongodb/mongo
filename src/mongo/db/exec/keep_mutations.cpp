@@ -33,7 +33,7 @@
 
 namespace mongo {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::vector;
 
     // static
@@ -142,7 +142,7 @@ namespace mongo {
 
     PlanStageStats* KeepMutationsStage::getStats() {
         _commonStats.isEOF = isEOF();
-        auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_KEEP_MUTATIONS));
+        unique_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_KEEP_MUTATIONS));
         // Takes ownership of the object returned from _child->getStats().
         ret->children.push_back(_child->getStats());
         return ret.release();

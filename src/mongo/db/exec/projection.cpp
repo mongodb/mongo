@@ -41,7 +41,7 @@
 
 namespace mongo {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::endl;
     using std::vector;
 
@@ -275,7 +275,7 @@ namespace mongo {
 
     PlanStageStats* ProjectionStage::getStats() {
         _commonStats.isEOF = isEOF();
-        auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_PROJECTION));
+        unique_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_PROJECTION));
 
         ProjectionStats* projStats = new ProjectionStats(_specificStats);
         projStats->projObj = _projObj;

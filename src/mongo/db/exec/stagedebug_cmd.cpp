@@ -59,7 +59,7 @@
 
 namespace mongo {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::string;
     using std::vector;
 
@@ -153,7 +153,7 @@ namespace mongo {
 
             // Parse the plan into these.
             OwnedPointerVector<MatchExpression> exprs;
-            auto_ptr<WorkingSet> ws(new WorkingSet());
+            unique_ptr<WorkingSet> ws(new WorkingSet());
 
             PlanStage* userRoot = parseQuery(txn, collection, planObj, ws.get(), &exprs);
             uassert(16911, "Couldn't parse plan from " + cmdObj.toString(), NULL != userRoot);
@@ -260,7 +260,7 @@ namespace mongo {
                 uassert(16921, "Nodes argument must be provided to AND",
                         nodeArgs["nodes"].isABSONObj());
 
-                auto_ptr<AndHashStage> andStage(new AndHashStage(workingSet, matcher, collection));
+                unique_ptr<AndHashStage> andStage(new AndHashStage(workingSet, matcher, collection));
 
                 int nodesAdded = 0;
                 BSONObjIterator it(nodeArgs["nodes"].Obj());
@@ -285,7 +285,7 @@ namespace mongo {
                 uassert(16924, "Nodes argument must be provided to AND",
                         nodeArgs["nodes"].isABSONObj());
 
-                auto_ptr<AndSortedStage> andStage(new AndSortedStage(workingSet, matcher,
+                unique_ptr<AndSortedStage> andStage(new AndSortedStage(workingSet, matcher,
                                                                      collection));
 
                 int nodesAdded = 0;
@@ -313,7 +313,7 @@ namespace mongo {
                 uassert(16935, "Dedup argument must be provided to OR",
                         !nodeArgs["dedup"].eoo());
                 BSONObjIterator it(nodeArgs["nodes"].Obj());
-                auto_ptr<OrStage> orStage(new OrStage(workingSet, nodeArgs["dedup"].Bool(),
+                unique_ptr<OrStage> orStage(new OrStage(workingSet, nodeArgs["dedup"].Bool(),
                                                       matcher));
                 while (it.more()) {
                     BSONElement e = it.next();
@@ -404,7 +404,7 @@ namespace mongo {
                 params.pattern = nodeArgs["pattern"].Obj();
                 // Dedup is true by default.
 
-                auto_ptr<MergeSortStage> mergeStage(new MergeSortStage(params, workingSet,
+                unique_ptr<MergeSortStage> mergeStage(new MergeSortStage(params, workingSet,
                                                                        collection));
 
                 BSONObjIterator it(nodeArgs["nodes"].Obj());

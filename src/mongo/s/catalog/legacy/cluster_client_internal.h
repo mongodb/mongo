@@ -55,6 +55,6 @@ namespace mongo {
 
     // Helper function which throws for invalid cursor initialization.
     // Note: cursor ownership will be passed to this function.
-    DBClientCursor* _safeCursor(std::auto_ptr<DBClientCursor> cursor);
+    DBClientCursor* _safeCursor(std::unique_ptr<DBClientCursor> cursor);
 
 }

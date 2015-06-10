@@ -45,7 +45,7 @@
 namespace mongo {
 
     using boost::scoped_ptr;
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::endl;
     using std::list;
     using std::set;

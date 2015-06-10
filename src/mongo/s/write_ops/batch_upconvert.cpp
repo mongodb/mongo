@@ -46,7 +46,7 @@ namespace mongo {
 
     using boost::scoped_ptr;
     using mongoutils::str::stream;
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::string;
     using std::vector;
 
@@ -54,7 +54,7 @@ namespace mongo {
 
         int opType = msg.operation();
 
-        auto_ptr<BatchedCommandRequest> request;
+        unique_ptr<BatchedCommandRequest> request;
         if ( opType == dbInsert ) {
             msgToBatchInserts( msg, requests );
         }

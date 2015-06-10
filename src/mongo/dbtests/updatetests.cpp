@@ -45,7 +45,7 @@
 
 namespace UpdateTests {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::numeric_limits;
     using std::string;
     using std::stringstream;
@@ -375,7 +375,7 @@ namespace UpdateTests {
 
         string s() {
             stringstream ss;
-            auto_ptr<DBClientCursor> cc = _client.query( ns() , Query().sort( BSON( "_id" << 1 ) ) );
+            unique_ptr<DBClientCursor> cc = _client.query( ns() , Query().sort( BSON( "_id" << 1 ) ) );
             bool first = true;
             while ( cc->more() ) {
                 if ( first ) first = false;

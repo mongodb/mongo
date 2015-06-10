@@ -33,7 +33,7 @@
 
 namespace mongo {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::vector;
 
     // static
@@ -118,7 +118,7 @@ namespace mongo {
     PlanStageStats* SkipStage::getStats() {
         _commonStats.isEOF = isEOF();
         _specificStats.skip = _toSkip;
-        auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_SKIP));
+        unique_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_SKIP));
         ret->specific.reset(new SkipStats(_specificStats));
         ret->children.push_back(_child->getStats());
         return ret.release();

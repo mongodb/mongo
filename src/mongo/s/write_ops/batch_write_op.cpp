@@ -32,7 +32,7 @@
 
 namespace mongo {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::make_pair;
     using std::set;
     using std::stringstream;
@@ -485,7 +485,7 @@ namespace mongo {
             request->setOrdered( _clientRequest->getOrdered() );
         }
 
-        auto_ptr<BatchedRequestMetadata> requestMetadata( new BatchedRequestMetadata() );
+        unique_ptr<BatchedRequestMetadata> requestMetadata( new BatchedRequestMetadata() );
         requestMetadata->setShardName( targetedBatch.getEndpoint().shardName );
         requestMetadata->setShardVersion( targetedBatch.getEndpoint().shardVersion );
         requestMetadata->setSession( 0 );
@@ -585,7 +585,7 @@ namespace mongo {
 
         // Special handling for write concern errors, save for later
         if ( response.isWriteConcernErrorSet() ) {
-            auto_ptr<ShardWCError> wcError( new ShardWCError( targetedBatch.getEndpoint(),
+            unique_ptr<ShardWCError> wcError( new ShardWCError( targetedBatch.getEndpoint(),
                                                               *response.getWriteConcernError() ));
             _wcErrors.mutableVector().push_back( wcError.release() );
         }
@@ -688,7 +688,7 @@ namespace mongo {
 
         int numErrors = ordered ? 1 : numWrites;
         for ( int i = 0; i < numErrors; i++ ) {
-            auto_ptr<WriteErrorDetail> errorClone( new WriteErrorDetail );
+            unique_ptr<WriteErrorDetail> errorClone( new WriteErrorDetail );
             error.cloneTo( errorClone.get() );
             errorClone->setIndex( i );
             writeErrResponse->addToErrDetails( errorClone.release() );

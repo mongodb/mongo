@@ -35,7 +35,7 @@ using namespace mongo;
 
 namespace {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::string;
     using std::unique_ptr;
 
@@ -104,9 +104,9 @@ namespace {
                                         false, // snapshot
                                         false, // explain
                                         &lpqRaw));
-        auto_ptr<LiteParsedQuery> lpq(lpqRaw);
+        unique_ptr<LiteParsedQuery> lpq(lpqRaw);
 
-        auto_ptr<MatchExpression> me;
+        unique_ptr<MatchExpression> me;
 
         // Valid: regular TEXT.
         auto swme = parseNormalize("{$text: {$search: 's'}}");
@@ -190,9 +190,9 @@ namespace {
                                         false, // snapshot
                                         false, // explain
                                         &lpqRaw));
-        auto_ptr<LiteParsedQuery> lpq(lpqRaw);
+        unique_ptr<LiteParsedQuery> lpq(lpqRaw);
 
-        auto_ptr<MatchExpression> me;
+        unique_ptr<MatchExpression> me;
 
         // Valid: regular GEO_NEAR.
         auto swme = parseNormalize("{a: {$near: [0, 0]}}");
@@ -286,9 +286,9 @@ namespace {
                                         false, // snapshot
                                         false, // explain
                                         &lpqRaw));
-        auto_ptr<LiteParsedQuery> lpq(lpqRaw);
+        unique_ptr<LiteParsedQuery> lpq(lpqRaw);
 
-        auto_ptr<MatchExpression> me;
+        unique_ptr<MatchExpression> me;
 
         // Invalid: TEXT and GEO_NEAR.
         auto swme = parseNormalize("{$text: {$search: 's'}, a: {$near: [0, 0]}}");
@@ -326,9 +326,9 @@ namespace {
                                         false, // snapshot
                                         false, // explain
                                         &lpqRaw));
-        auto_ptr<LiteParsedQuery> lpq(lpqRaw);
+        unique_ptr<LiteParsedQuery> lpq(lpqRaw);
 
-        auto_ptr<MatchExpression> me;
+        unique_ptr<MatchExpression> me;
 
         // Invalid: TEXT and {$natural: 1} sort order.
         auto swme = parseNormalize("{$text: {$search: 's'}}");
@@ -348,9 +348,9 @@ namespace {
                                         false, // snapshot
                                         false, // explain
                                         &lpqRaw));
-        auto_ptr<LiteParsedQuery> lpq(lpqRaw);
+        unique_ptr<LiteParsedQuery> lpq(lpqRaw);
 
-        auto_ptr<MatchExpression> me;
+        unique_ptr<MatchExpression> me;
 
         // Invalid: TEXT and {$natural: -1} sort order.
         auto swme = parseNormalize("{$text: {$search: 's'}}");
@@ -370,9 +370,9 @@ namespace {
                                         false, // snapshot
                                         false, // explain
                                         &lpqRaw));
-        auto_ptr<LiteParsedQuery> lpq(lpqRaw);
+        unique_ptr<LiteParsedQuery> lpq(lpqRaw);
 
-        auto_ptr<MatchExpression> me;
+        unique_ptr<MatchExpression> me;
 
         // Invalid: TEXT and {$natural: -1} sort order.
         auto swme = parseNormalize("{$text: {$search: 's'}}");
@@ -393,9 +393,9 @@ namespace {
                                         false, // snapshot
                                         false, // explain
                                         &lpqRaw));
-        auto_ptr<LiteParsedQuery> lpq(lpqRaw);
+        unique_ptr<LiteParsedQuery> lpq(lpqRaw);
 
-        auto_ptr<MatchExpression> me;
+        unique_ptr<MatchExpression> me;
 
         // Invalid: GEO_NEAR and {$natural: 1} sort order.
         auto swme = parseNormalize("{a: {$near: {$geometry: {type: 'Point', coordinates: [0, 0]}}}}");
@@ -416,9 +416,9 @@ namespace {
                                         false, // snapshot
                                         false, // explain
                                         &lpqRaw));
-        auto_ptr<LiteParsedQuery> lpq(lpqRaw);
+        unique_ptr<LiteParsedQuery> lpq(lpqRaw);
 
-        auto_ptr<MatchExpression> me;
+        unique_ptr<MatchExpression> me;
 
         // Invalid: GEO_NEAR and {$natural: 1} hint.
         auto swme = parseNormalize("{a: {$near: {$geometry: {type: 'Point', coordinates: [0, 0]}}}}");
@@ -438,9 +438,9 @@ namespace {
                                         snapshot,
                                         false, // explain
                                         &lpqRaw));
-        auto_ptr<LiteParsedQuery> lpq(lpqRaw);
+        unique_ptr<LiteParsedQuery> lpq(lpqRaw);
 
-        auto_ptr<MatchExpression> me;
+        unique_ptr<MatchExpression> me;
 
         // Invalid: TEXT and snapshot.
         auto swme = parseNormalize("{$text: {$search: 's'}}");
@@ -537,8 +537,8 @@ namespace {
     TEST(CanonicalQueryTest, RewriteNoDoubleOr) {
         string queryStr = "{$or:[{a:1}, {b:1}], $or:[{c:1}, {d:1}], e:1}";
         BSONObj queryObj = fromjson(queryStr);
-        auto_ptr<MatchExpression> base(parseMatchExpression(queryObj));
-        auto_ptr<MatchExpression> rewrite(CanonicalQuery::logicalRewrite(base->shallowClone()));
+        unique_ptr<MatchExpression> base(parseMatchExpression(queryObj));
+        unique_ptr<MatchExpression> rewrite(CanonicalQuery::logicalRewrite(base->shallowClone()));
         assertEquivalent(queryStr.c_str(), base.get(), rewrite.get());
     }
 
@@ -547,12 +547,12 @@ namespace {
         // Rewrite of this...
         string queryStr = "{$or:[{a:1}, {b:1}], e:1}";
         BSONObj queryObj = fromjson(queryStr);
-        auto_ptr<MatchExpression> rewrite(CanonicalQuery::logicalRewrite(parseMatchExpression(queryObj)));
+        unique_ptr<MatchExpression> rewrite(CanonicalQuery::logicalRewrite(parseMatchExpression(queryObj)));
 
         // Should look like this.
         string rewriteStr = "{$or:[{a:1, e:1}, {b:1, e:1}]}";
         BSONObj rewriteObj = fromjson(rewriteStr);
-        auto_ptr<MatchExpression> base(parseMatchExpression(rewriteObj));
+        unique_ptr<MatchExpression> base(parseMatchExpression(rewriteObj));
         assertEquivalent(queryStr.c_str(), base.get(), rewrite.get());
     }
 
@@ -560,10 +560,10 @@ namespace {
      * Test function for CanonicalQuery::normalize.
      */
     void testNormalizeQuery(const char* queryStr, const char* expectedExprStr) {
-        auto_ptr<CanonicalQuery> cq(canonicalize(queryStr));
+        unique_ptr<CanonicalQuery> cq(canonicalize(queryStr));
         MatchExpression* me = cq->root();
         BSONObj expectedExprObj = fromjson(expectedExprStr);
-        auto_ptr<MatchExpression> expectedExpr(parseMatchExpression(expectedExprObj));
+        unique_ptr<MatchExpression> expectedExpr(parseMatchExpression(expectedExprObj));
         assertEquivalent(queryStr, expectedExpr.get(), me);
     }
 

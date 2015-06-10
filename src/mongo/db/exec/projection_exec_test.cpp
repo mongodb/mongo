@@ -42,7 +42,7 @@ using namespace mongo;
 
 namespace {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
 
     /**
      * Utility function to create MatchExpression
@@ -77,7 +77,7 @@ namespace {
         // Create projection exec object.
         BSONObj spec = fromjson(specStr);
         BSONObj query = fromjson(queryStr);
-        auto_ptr<MatchExpression> queryExpression(parseMatchExpression(query));
+        unique_ptr<MatchExpression> queryExpression(parseMatchExpression(query));
         ProjectionExec exec(spec, queryExpression.get());
 
         // Create working set member.

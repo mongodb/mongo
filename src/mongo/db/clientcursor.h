@@ -264,7 +264,7 @@ namespace mongo {
 
         // Only one of these is not-NULL.
         RecoveryUnit* _unownedRU;
-        std::auto_ptr<RecoveryUnit> _ownedRU;
+        std::unique_ptr<RecoveryUnit> _ownedRU;
         // NOTE: _ownedRU must come before _exec, because _ownedRU must outlive _exec.
         // The storage engine can have resources in the PlanExecutor that rely on
         // the RecoveryUnit being alive.

@@ -46,7 +46,7 @@
 
 namespace mongo {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::string;
     using std::vector;
 
@@ -1060,7 +1060,7 @@ namespace mongo {
 
     PlanStageStats* UpdateStage::getStats() {
         _commonStats.isEOF = isEOF();
-        auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_UPDATE));
+        unique_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_UPDATE));
         ret->specific.reset(new UpdateStats(_specificStats));
         ret->children.push_back(_child->getStats());
         return ret.release();

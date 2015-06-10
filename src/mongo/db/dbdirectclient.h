@@ -58,7 +58,7 @@ namespace mongo {
         // XXX: is this valid or useful?
         void setOpCtx(OperationContext* txn);
 
-        virtual std::auto_ptr<DBClientCursor> query(const std::string &ns,
+        virtual std::unique_ptr<DBClientCursor> query(const std::string &ns,
                                                     Query query,
                                                     int nToReturn = 0,
                                                     int nToSkip = 0,

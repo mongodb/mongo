@@ -582,7 +582,7 @@ namespace {
         entry->projection = pq.getProj().getOwned();
 
         boost::lock_guard<boost::mutex> cacheLock(_cacheMutex);
-        std::auto_ptr<PlanCacheEntry> evictedEntry = _cache.add(computeKey(query), entry);
+        std::unique_ptr<PlanCacheEntry> evictedEntry = _cache.add(computeKey(query), entry);
 
         if (NULL != evictedEntry.get()) {
             LOG(1) << _ns << ": plan cache maximum size exceeded - "
@@ -614,7 +614,7 @@ namespace {
         if (NULL == feedback) {
             return Status(ErrorCodes::BadValue, "feedback is NULL");
         }
-        std::auto_ptr<PlanCacheEntryFeedback> autoFeedback(feedback);
+        std::unique_ptr<PlanCacheEntryFeedback> autoFeedback(feedback);
         PlanCacheKey ck = computeKey(cq);
 
         boost::lock_guard<boost::mutex> cacheLock(_cacheMutex);

@@ -67,7 +67,7 @@ namespace mongo {
     StatusWithMatchExpression MatchExpressionParser::_parseComparison( const char* name,
                                                                        ComparisonMatchExpression* cmp,
                                                                        const BSONElement& e ) {
-        std::auto_ptr<ComparisonMatchExpression> temp(cmp);
+        std::unique_ptr<ComparisonMatchExpression> temp(cmp);
 
         // Non-equality comparison match expressions cannot have
         // a regular expression as the argument (e.g. {a: {$gt: /b/}} is illegal).
@@ -129,7 +129,7 @@ namespace mongo {
             StatusWithMatchExpression s = _parseComparison( name, new EqualityMatchExpression(), e );
             if ( !s.isOK() )
                 return s;
-            std::auto_ptr<NotMatchExpression> n( new NotMatchExpression() );
+            std::unique_ptr<NotMatchExpression> n( new NotMatchExpression() );
             Status s2 = n->init( s.getValue() );
             if ( !s2.isOK() )
                 return StatusWithMatchExpression( s2 );
@@ -141,7 +141,7 @@ namespace mongo {
         case BSONObj::opIN: {
             if ( e.type() != Array )
                 return StatusWithMatchExpression( ErrorCodes::BadValue, "$in needs an array" );
-            std::auto_ptr<InMatchExpression> temp( new InMatchExpression() );
+            std::unique_ptr<InMatchExpression> temp( new InMatchExpression() );
             Status s = temp->init( name );
             if ( !s.isOK() )
                 return StatusWithMatchExpression( s );
@@ -154,7 +154,7 @@ namespace mongo {
         case BSONObj::NIN: {
             if ( e.type() != Array )
                 return StatusWithMatchExpression( ErrorCodes::BadValue, "$nin needs an array" );
-            std::auto_ptr<InMatchExpression> temp( new InMatchExpression() );
+            std::unique_ptr<InMatchExpression> temp( new InMatchExpression() );
             Status s = temp->init( name );
             if ( !s.isOK() )
                 return StatusWithMatchExpression( s );
@@ -162,7 +162,7 @@ namespace mongo {
             if ( !s.isOK() )
                 return StatusWithMatchExpression( s );
 
-            std::auto_ptr<NotMatchExpression> temp2( new NotMatchExpression() );
+            std::unique_ptr<NotMatchExpression> temp2( new NotMatchExpression() );
             s = temp2->init( temp.release() );
             if ( !s.isOK() )
                 return StatusWithMatchExpression( s );
@@ -200,7 +200,7 @@ namespace mongo {
                 return StatusWithMatchExpression( ErrorCodes::BadValue, "$size needs a number" );
             }
 
-            std::auto_ptr<SizeMatchExpression> temp( new SizeMatchExpression() );
+            std::unique_ptr<SizeMatchExpression> temp( new SizeMatchExpression() );
             Status s = temp->init( name, size );
             if ( !s.isOK() )
                 return StatusWithMatchExpression( s );
@@ -210,13 +210,13 @@ namespace mongo {
         case BSONObj::opEXISTS: {
             if ( e.eoo() )
                 return StatusWithMatchExpression( ErrorCodes::BadValue, "$exists can't be eoo" );
-            std::auto_ptr<ExistsMatchExpression> temp( new ExistsMatchExpression() );
+            std::unique_ptr<ExistsMatchExpression> temp( new ExistsMatchExpression() );
             Status s = temp->init( name );
             if ( !s.isOK() )
                 return StatusWithMatchExpression( s );
             if ( e.trueValue() )
                 return StatusWithMatchExpression( temp.release() );
-            std::auto_ptr<NotMatchExpression> temp2( new NotMatchExpression() );
+            std::unique_ptr<NotMatchExpression> temp2( new NotMatchExpression() );
             s = temp2->init( temp.release() );
             if ( !s.isOK() )
                 return StatusWithMatchExpression( s );
@@ -229,7 +229,7 @@ namespace mongo {
             int type = e.numberInt();
             if ( e.type() != NumberInt && type != e.number() )
                 type = -1;
-            std::auto_ptr<TypeMatchExpression> temp( new TypeMatchExpression() );
+            std::unique_ptr<TypeMatchExpression> temp( new TypeMatchExpression() );
             Status s = temp->init( name, type );
             if ( !s.isOK() )
                 return StatusWithMatchExpression( s );
@@ -281,7 +281,7 @@ namespace mongo {
             return StatusWithMatchExpression( ErrorCodes::BadValue, ss );
         }
 
-        std::auto_ptr<AndMatchExpression> root( new AndMatchExpression() );
+        std::unique_ptr<AndMatchExpression> root( new AndMatchExpression() );
 
         bool topLevel = (level == 0);
         level++;
@@ -298,7 +298,7 @@ namespace mongo {
                     if ( e.type() != Array )
                         return StatusWithMatchExpression( ErrorCodes::BadValue,
                                                      "$or needs an array" );
-                    std::auto_ptr<OrMatchExpression> temp( new OrMatchExpression() );
+                    std::unique_ptr<OrMatchExpression> temp( new OrMatchExpression() );
                     Status s = _parseTreeList( e.Obj(), temp.get(), level );
                     if ( !s.isOK() )
                         return StatusWithMatchExpression( s );
@@ -308,7 +308,7 @@ namespace mongo {
                     if ( e.type() != Array )
                         return StatusWithMatchExpression( ErrorCodes::BadValue,
                                                      "and needs an array" );
-                    std::auto_ptr<AndMatchExpression> temp( new AndMatchExpression() );
+                    std::unique_ptr<AndMatchExpression> temp( new AndMatchExpression() );
                     Status s = _parseTreeList( e.Obj(), temp.get(), level );
                     if ( !s.isOK() )
                         return StatusWithMatchExpression( s );
@@ -318,7 +318,7 @@ namespace mongo {
                     if ( e.type() != Array )
                         return StatusWithMatchExpression( ErrorCodes::BadValue,
                                                      "and needs an array" );
-                    std::auto_ptr<NorMatchExpression> temp( new NorMatchExpression() );
+                    std::unique_ptr<NorMatchExpression> temp( new NorMatchExpression() );
                     Status s = _parseTreeList( e.Obj(), temp.get(), level );
                     if ( !s.isOK() )
                         return StatusWithMatchExpression( s );
@@ -355,7 +355,7 @@ namespace mongo {
                           mongoutils::str::equals( "id", rest ) ||
                           mongoutils::str::equals( "db", rest ) ) {
                     // DBRef fields.
-                    std::auto_ptr<ComparisonMatchExpression> eq( new EqualityMatchExpression() );
+                    std::unique_ptr<ComparisonMatchExpression> eq( new EqualityMatchExpression() );
                     Status s = eq->init( e.fieldName(), e );
                     if ( !s.isOK() )
                         return StatusWithMatchExpression( s );
@@ -387,7 +387,7 @@ namespace mongo {
                 continue;
             }
 
-            std::auto_ptr<ComparisonMatchExpression> eq( new EqualityMatchExpression() );
+            std::unique_ptr<ComparisonMatchExpression> eq( new EqualityMatchExpression() );
             Status s = eq->init( e.fieldName(), e );
             if ( !s.isOK() )
                 return StatusWithMatchExpression( s );
@@ -548,7 +548,7 @@ namespace mongo {
         if ( i.more() )
             return StatusWithMatchExpression( ErrorCodes::BadValue, "malformed mod, too many elements" );
 
-        std::auto_ptr<ModMatchExpression> temp( new ModMatchExpression() );
+        std::unique_ptr<ModMatchExpression> temp( new ModMatchExpression() );
         Status s = temp->init( name, d.numberInt(), r.numberInt() );
         if ( !s.isOK() )
             return StatusWithMatchExpression( s );
@@ -560,7 +560,7 @@ namespace mongo {
         if ( e.type() != RegEx )
             return StatusWithMatchExpression( ErrorCodes::BadValue, "not a regex" );
 
-        std::auto_ptr<RegexMatchExpression> temp( new RegexMatchExpression() );
+        std::unique_ptr<RegexMatchExpression> temp( new RegexMatchExpression() );
         Status s = temp->init( name, e.regex(), e.regexFlags() );
         if ( !s.isOK() )
             return StatusWithMatchExpression( s );
@@ -602,7 +602,7 @@ namespace mongo {
 
         }
 
-        std::auto_ptr<RegexMatchExpression> temp( new RegexMatchExpression() );
+        std::unique_ptr<RegexMatchExpression> temp( new RegexMatchExpression() );
         Status s = temp->init( name, regex, regexOptions );
         if ( !s.isOK() )
             return StatusWithMatchExpression( s );
@@ -623,7 +623,7 @@ namespace mongo {
             }
 
             if ( e.type() == RegEx ) {
-                std::auto_ptr<RegexMatchExpression> r( new RegexMatchExpression() );
+                std::unique_ptr<RegexMatchExpression> r( new RegexMatchExpression() );
                 Status s = r->init( "", e );
                 if ( !s.isOK() )
                     return s;
@@ -677,7 +677,7 @@ namespace mongo {
             if ( !s.isOK() )
                 return StatusWithMatchExpression( s );
 
-            std::auto_ptr<ElemMatchValueMatchExpression> temp( new ElemMatchValueMatchExpression() );
+            std::unique_ptr<ElemMatchValueMatchExpression> temp( new ElemMatchValueMatchExpression() );
             s = temp->init( name );
             if ( !s.isOK() )
                 return StatusWithMatchExpression( s );
@@ -699,7 +699,7 @@ namespace mongo {
         StatusWithMatchExpression subRaw = _parse( obj, level );
         if ( !subRaw.isOK() )
             return subRaw;
-        std::auto_ptr<MatchExpression> sub( subRaw.getValue() );
+        std::unique_ptr<MatchExpression> sub( subRaw.getValue() );
 
         // $where is not supported under $elemMatch because $where
         // applies to top-level document, not array elements in a field.
@@ -708,7 +708,7 @@ namespace mongo {
                 "$elemMatch cannot contain $where expression" );
         }
 
-        std::auto_ptr<ElemMatchObjectMatchExpression> temp( new ElemMatchObjectMatchExpression() );
+        std::unique_ptr<ElemMatchObjectMatchExpression> temp( new ElemMatchObjectMatchExpression() );
         Status status = temp->init( name, sub.release() );
         if ( !status.isOK() )
             return StatusWithMatchExpression( status );
@@ -723,7 +723,7 @@ namespace mongo {
             return StatusWithMatchExpression( ErrorCodes::BadValue, "$all needs an array" );
 
         BSONObj arr = e.Obj();
-        std::auto_ptr<AndMatchExpression> myAnd( new AndMatchExpression() );
+        std::unique_ptr<AndMatchExpression> myAnd( new AndMatchExpression() );
         BSONObjIterator i( arr );
 
         if ( arr.firstElement().type() == Object &&
@@ -762,7 +762,7 @@ namespace mongo {
             BSONElement e = i.next();
 
             if ( e.type() == RegEx ) {
-                std::auto_ptr<RegexMatchExpression> r( new RegexMatchExpression() );
+                std::unique_ptr<RegexMatchExpression> r( new RegexMatchExpression() );
                 Status s = r->init( name, e );
                 if ( !s.isOK() )
                     return StatusWithMatchExpression( s );
@@ -772,7 +772,7 @@ namespace mongo {
                 return StatusWithMatchExpression( ErrorCodes::BadValue, "no $ expressions in $all" );
             }
             else {
-                std::auto_ptr<EqualityMatchExpression> x( new EqualityMatchExpression() );
+                std::unique_ptr<EqualityMatchExpression> x( new EqualityMatchExpression() );
                 Status s = x->init( name, e );
                 if ( !s.isOK() )
                     return StatusWithMatchExpression( s );

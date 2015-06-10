@@ -47,7 +47,7 @@
 
 namespace mongo {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::string;
     using std::stringstream;
 
@@ -131,7 +131,7 @@ namespace mongo {
                 return 0;
             }
 
-            auto_ptr<PlanExecutor> exec(rawExec);
+            unique_ptr<PlanExecutor> exec(rawExec);
 
             BSONObj obj;
             PlanExecutor::ExecState state;

@@ -38,7 +38,7 @@
 
 namespace {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using namespace mongo;
     using mongo::Polygon; // "windows.h" has another Polygon for Windows GDI.
 
@@ -270,7 +270,7 @@ namespace {
             coverer.setMaxLevel( coverer.minLevel() + 4 );
 
             double radius = randDouble(0.0, MAXBOUND / 2);
-            auto_ptr<GeometryContainer> geometry(getRandomCircle(radius));
+            unique_ptr<GeometryContainer> geometry(getRandomCircle(radius));
             const R2Region& region = geometry->getR2Region();
 
             vector<GeoHash> covering;
@@ -293,7 +293,7 @@ namespace {
 
                // 100 * 2 ^ -32 ~= 2.3E-8 (cell edge length)
                double radius = randDouble(1E-15, ldexp(100.0, -32) * 10);
-               auto_ptr<GeometryContainer> geometry(getRandomCircle(radius));
+               unique_ptr<GeometryContainer> geometry(getRandomCircle(radius));
                const R2Region& region = geometry->getR2Region();
 
                vector<GeoHash> covering;

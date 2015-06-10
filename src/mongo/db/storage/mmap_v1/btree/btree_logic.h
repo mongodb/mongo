@@ -121,7 +121,7 @@ namespace mongo {
 
             DiskLoc _rightLeafLoc; // DiskLoc of right-most (highest) leaf bucket.
             bool _dupsAllowed;
-            std::auto_ptr<KeyDataOwnedType> _keyLast;
+            std::unique_ptr<KeyDataOwnedType> _keyLast;
 
             // Not owned.
             OperationContext* _txn;

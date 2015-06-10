@@ -62,7 +62,7 @@
 
 namespace mongo {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::endl;
     using std::list;
     using std::map;
@@ -795,7 +795,7 @@ namespace {
 
                 if ( id != 0 ) {
                     const std::string ns = cursorObj["ns"].String();
-                    auto_ptr<DBClientCursor> cursor = getMore(ns, id, 0, 0);
+                    unique_ptr<DBClientCursor> cursor = getMore(ns, id, 0, 0);
                     while ( cursor->more() ) {
                         infos.push_back(cursor->nextSafe().getOwned());
                     }
@@ -826,7 +826,7 @@ namespace {
         fallbackFilter.appendElementsUnique( filter );
 
         string ns = db + ".system.namespaces";
-        auto_ptr<DBClientCursor> c = query(
+        unique_ptr<DBClientCursor> c = query(
                 ns.c_str(), fallbackFilter.obj(), 0, 0, 0, QueryOption_SlaveOk);
         uassert(28611, str::stream() << "listCollections failed querying " << ns, c.get());
 
@@ -870,7 +870,7 @@ namespace {
     void DBClientInterface::findN(vector<BSONObj>& out, const string& ns, Query query, int nToReturn, int nToSkip, const BSONObj *fieldsToReturn, int queryOptions) { 
         out.reserve(nToReturn);
 
-        auto_ptr<DBClientCursor> c =
+        unique_ptr<DBClientCursor> c =
             this->query(ns, query, nToReturn, nToSkip, fieldsToReturn, queryOptions);
 
         uassert( 10276 ,  str::stream() << "DBClientBase::findN: transport error: " << getServerAddress() << " ns: " << ns << " query: " << query.toString(), c.get() );
@@ -906,7 +906,7 @@ namespace {
 
         // we keep around SockAddr for connection life -- maybe MessagingPort
         // requires that?
-        std::auto_ptr<SockAddr> serverSockAddr(new SockAddr(_server.host().c_str(),
+        std::unique_ptr<SockAddr> serverSockAddr(new SockAddr(_server.host().c_str(),
                                                             _server.port()));
         if (!serverSockAddr->isValid()) {
             errmsg = str::stream() << "couldn't initialize connection to host "
@@ -1024,21 +1024,21 @@ namespace {
     const uint64_t DBClientBase::INVALID_SOCK_CREATION_TIME =
             static_cast<uint64_t>(0xFFFFFFFFFFFFFFFFULL);
 
-    auto_ptr<DBClientCursor> DBClientBase::query(const string &ns, Query query, int nToReturn,
+    unique_ptr<DBClientCursor> DBClientBase::query(const string &ns, Query query, int nToReturn,
             int nToSkip, const BSONObj *fieldsToReturn, int queryOptions , int batchSize ) {
-        auto_ptr<DBClientCursor> c( new DBClientCursor( this,
+        unique_ptr<DBClientCursor> c( new DBClientCursor( this,
                                     ns, query.obj, nToReturn, nToSkip,
                                     fieldsToReturn, queryOptions , batchSize ) );
         if ( c->init() )
             return c;
-        return auto_ptr< DBClientCursor >( 0 );
+        return nullptr;
     }
 
-    auto_ptr<DBClientCursor> DBClientBase::getMore( const string &ns, long long cursorId, int nToReturn, int options ) {
-        auto_ptr<DBClientCursor> c( new DBClientCursor( this, ns, cursorId, nToReturn, options ) );
+    unique_ptr<DBClientCursor> DBClientBase::getMore( const string &ns, long long cursorId, int nToReturn, int options ) {
+        unique_ptr<DBClientCursor> c( new DBClientCursor( this, ns, cursorId, nToReturn, options ) );
         if ( c->init() )
             return c;
-        return auto_ptr< DBClientCursor >( 0 );
+        return nullptr;
     }
 
     struct DBClientFunConvertor {
@@ -1067,7 +1067,7 @@ namespace {
         // mask options
         queryOptions &= (int)( QueryOption_NoCursorTimeout | QueryOption_SlaveOk );
 
-        auto_ptr<DBClientCursor> c( this->query(ns, query, 0, 0, fieldsToReturn, queryOptions) );
+        unique_ptr<DBClientCursor> c( this->query(ns, query, 0, 0, fieldsToReturn, queryOptions) );
         uassert( 16090, "socket error for mapping query", c.get() );
 
         unsigned long long n = 0;
@@ -1095,7 +1095,7 @@ namespace {
         queryOptions &= (int)( QueryOption_NoCursorTimeout | QueryOption_SlaveOk );
         queryOptions |= (int)QueryOption_Exhaust;
 
-        auto_ptr<DBClientCursor> c( this->query(ns, query, 0, 0, fieldsToReturn, queryOptions) );
+        unique_ptr<DBClientCursor> c( this->query(ns, query, 0, 0, fieldsToReturn, queryOptions) );
         uassert( 13386, "socket error for mapping query", c.get() );
 
         unsigned long long n = 0;
@@ -1250,7 +1250,7 @@ namespace {
 
                 if ( id != 0 ) {
                     const std::string ns = cursorObj["ns"].String();
-                    auto_ptr<DBClientCursor> cursor = getMore(ns, id, 0, 0);
+                    unique_ptr<DBClientCursor> cursor = getMore(ns, id, 0, 0);
                     while ( cursor->more() ) {
                         specs.push_back(cursor->nextSafe().getOwned());
                     }
@@ -1274,7 +1274,7 @@ namespace {
 
         // fallback to querying system.indexes
         // TODO(spencer): Remove fallback behavior after 3.0
-        auto_ptr<DBClientCursor> cursor = query(NamespaceString(ns).getSystemIndexesCollection(),
+        unique_ptr<DBClientCursor> cursor = query(NamespaceString(ns).getSystemIndexesCollection(),
                                                 BSON("ns" << ns), 0, 0, 0, options);
         uassert(28612, str::stream() << "listIndexes failed querying " << ns, cursor.get());
 

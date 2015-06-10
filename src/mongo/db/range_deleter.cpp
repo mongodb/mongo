@@ -46,7 +46,7 @@
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
 
-using std::auto_ptr;
+using std::unique_ptr;
 using std::endl;
 using std::set;
 using std::pair;
@@ -224,7 +224,7 @@ namespace mongo {
         const BSONObj& min(options.range.minKey);
         const BSONObj& max(options.range.maxKey);
 
-        auto_ptr<RangeDeleteEntry> toDelete(
+        unique_ptr<RangeDeleteEntry> toDelete(
                 new RangeDeleteEntry(options));
         toDelete->notifyDone = notifyDone;
 

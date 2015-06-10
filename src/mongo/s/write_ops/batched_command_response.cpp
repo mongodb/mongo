@@ -33,7 +33,7 @@
 
 namespace mongo {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::string;
 
     using mongoutils::str::stream;
@@ -408,7 +408,7 @@ namespace mongo {
         for (std::vector<BatchedUpsertDetail*>::const_iterator it = upsertDetails.begin();
              it != upsertDetails.end();
              ++it) {
-            auto_ptr<BatchedUpsertDetail> tempBatchedUpsertDetail(new BatchedUpsertDetail);
+            unique_ptr<BatchedUpsertDetail> tempBatchedUpsertDetail(new BatchedUpsertDetail);
             (*it)->cloneTo(tempBatchedUpsertDetail.get());
             addToUpsertDetails(tempBatchedUpsertDetail.release());
         }
@@ -493,7 +493,7 @@ namespace mongo {
         for (std::vector<WriteErrorDetail*>::const_iterator it = errDetails.begin();
              it != errDetails.end();
              ++it) {
-            auto_ptr<WriteErrorDetail> tempBatchErrorDetail(new WriteErrorDetail);
+            unique_ptr<WriteErrorDetail> tempBatchErrorDetail(new WriteErrorDetail);
             (*it)->cloneTo(tempBatchErrorDetail.get());
             addToErrDetails(tempBatchErrorDetail.release());
         }

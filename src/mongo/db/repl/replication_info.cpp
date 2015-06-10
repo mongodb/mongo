@@ -51,7 +51,7 @@
 
 namespace mongo {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::list;
     using std::string;
     using std::stringstream;
@@ -89,7 +89,7 @@ namespace repl {
             {
                 const char* localSources = "local.sources";
                 AutoGetCollectionForRead ctx(txn, localSources);
-                auto_ptr<PlanExecutor> exec(
+                unique_ptr<PlanExecutor> exec(
                     InternalPlanner::collectionScan(txn, localSources, ctx.getCollection()));
                 BSONObj obj;
                 PlanExecutor::ExecState state;

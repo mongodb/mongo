@@ -112,7 +112,7 @@ namespace mongo {
         }
 
     private:
-        std::auto_ptr<RecoveryUnit> _recoveryUnit;
+        std::unique_ptr<RecoveryUnit> _recoveryUnit;
         boost::scoped_ptr<Locker> _locker;
         ProgressMeter _pm;
     };

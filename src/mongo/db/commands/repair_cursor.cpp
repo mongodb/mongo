@@ -87,8 +87,8 @@ namespace mongo {
                                                   "repair iterator not supported"));
             }
 
-            std::auto_ptr<WorkingSet> ws(new WorkingSet());
-            std::auto_ptr<MultiIteratorStage> stage(new MultiIteratorStage(txn, ws.get(),
+            std::unique_ptr<WorkingSet> ws(new WorkingSet());
+            std::unique_ptr<MultiIteratorStage> stage(new MultiIteratorStage(txn, ws.get(),
                                                                            collection));
             stage->addIterator(std::move(cursor));
 
@@ -100,7 +100,7 @@ namespace mongo {
                                                    PlanExecutor::YIELD_AUTO,
                                                    &rawExec);
             invariant(execStatus.isOK());
-            std::auto_ptr<PlanExecutor> exec(rawExec);
+            std::unique_ptr<PlanExecutor> exec(rawExec);
 
             // 'exec' will be used in getMore(). It was automatically registered on construction
             // due to the auto yield policy, so it could yield during plan selection. We deregister

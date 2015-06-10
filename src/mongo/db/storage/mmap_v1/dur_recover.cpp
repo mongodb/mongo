@@ -59,7 +59,7 @@
 namespace mongo {
 
     using boost::shared_ptr;
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::endl;
     using std::hex;
     using std::map;
@@ -157,7 +157,7 @@ namespace mongo {
                 const char *p = _uncompressed.c_str();
                 verify(compressedLen == _h.sectionLen() - sizeof(JSectFooter) - sizeof(JSectHeader));
 
-                _entries = auto_ptr<BufReader>(new BufReader(p, _uncompressed.size()));
+                _entries = unique_ptr<BufReader>(new BufReader(p, _uncompressed.size()));
             }
 
             // We work with the uncompressed buffer when doing a WRITETODATAFILES (for speed)
@@ -228,7 +228,7 @@ namespace mongo {
 
 
         private:
-            auto_ptr<BufReader> _entries;
+            unique_ptr<BufReader> _entries;
             const JSectHeader _h;
             const char *_lastDbName; // pointer into mmaped journal file
             const bool _doDurOps;
@@ -412,12 +412,12 @@ namespace mongo {
                 return;
             }
 
-            auto_ptr<JournalSectionIterator> i;
+            unique_ptr<JournalSectionIterator> i;
             if( _recovering ) {
-                i = auto_ptr<JournalSectionIterator>(new JournalSectionIterator(*h, p, len, _recovering));
+                i = unique_ptr<JournalSectionIterator>(new JournalSectionIterator(*h, p, len, _recovering));
             }
             else { 
-                i = auto_ptr<JournalSectionIterator>(new JournalSectionIterator(*h, /*after header*/p, /*w/out header*/len));
+                i = unique_ptr<JournalSectionIterator>(new JournalSectionIterator(*h, /*after header*/p, /*w/out header*/len));
             }
 
             // we use a static so that we don't have to reallocate every time through.  occasionally we 

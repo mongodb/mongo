@@ -53,7 +53,7 @@ namespace QueryPlanExecutor {
 
     using boost::scoped_ptr;
     using boost::shared_ptr;
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::string;
 
     class PlanExecutorBase {
@@ -97,7 +97,7 @@ namespace QueryPlanExecutor {
             CollectionScanParams csparams;
             csparams.collection = coll;
             csparams.direction = CollectionScanParams::FORWARD;
-            auto_ptr<WorkingSet> ws(new WorkingSet());
+            unique_ptr<WorkingSet> ws(new WorkingSet());
 
             // Canonicalize the query
             CanonicalQuery* cq;
@@ -105,7 +105,7 @@ namespace QueryPlanExecutor {
             verify(NULL != cq);
 
             // Make the stage.
-            auto_ptr<PlanStage> root(new CollectionScan(&_txn, csparams, ws.get(), cq->root()));
+            unique_ptr<PlanStage> root(new CollectionScan(&_txn, csparams, ws.get(), cq->root()));
 
             PlanExecutor* exec;
             // Hand the plan off to the executor.
@@ -140,9 +140,9 @@ namespace QueryPlanExecutor {
 
             const Collection* coll = db->getCollection(ns());
 
-            auto_ptr<WorkingSet> ws(new WorkingSet());
+            unique_ptr<WorkingSet> ws(new WorkingSet());
             IndexScan* ix = new IndexScan(&_txn, ixparams, ws.get(), NULL);
-            auto_ptr<PlanStage> root(new FetchStage(&_txn, ws.get(), ix, NULL, coll));
+            unique_ptr<PlanStage> root(new FetchStage(&_txn, ws.get(), ix, NULL, coll));
 
             CanonicalQuery* cq;
             verify(CanonicalQuery::canonicalize(ns(), BSONObj(), &cq).isOK());
@@ -284,8 +284,8 @@ namespace QueryPlanExecutor {
             ASSERT_EQUALS(errmsg, "");
 
             // Create the output PlanExecutor that pulls results from the pipeline.
-            std::auto_ptr<WorkingSet> ws(new WorkingSet());
-            std::auto_ptr<PipelineProxyStage> proxy(
+            std::unique_ptr<WorkingSet> ws(new WorkingSet());
+            std::unique_ptr<PipelineProxyStage> proxy(
                 new PipelineProxyStage(pipeline, innerExec, ws.get()));
             Collection* collection = ctx.getCollection();
 

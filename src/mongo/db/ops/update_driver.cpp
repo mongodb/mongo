@@ -49,7 +49,7 @@ namespace mongo {
     namespace mb = mongo::mutablebson;
 
     using boost::scoped_ptr;
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::vector;
 
     using pathsupport::EqualityMatches;
@@ -81,7 +81,7 @@ namespace mongo {
             // definition, an object. We wrap the 'updateExpr' as the mod is expecting. Note
             // that the wrapper is temporary so the object replace mod should make a copy of
             // the object.
-            auto_ptr<ModifierObjectReplace> mod(new ModifierObjectReplace);
+            unique_ptr<ModifierObjectReplace> mod(new ModifierObjectReplace);
             BSONObj wrapper = BSON( "dummy" << updateExpr );
             Status status = mod->init(wrapper.firstElement(), _modOptions);
             if (!status.isOK()) {
@@ -153,7 +153,7 @@ namespace mongo {
                                         << " which is not allowed for any $" << type << " mod.");
         }
 
-        auto_ptr<ModifierInterface> mod(modifiertable::makeUpdateMod(type));
+        unique_ptr<ModifierInterface> mod(modifiertable::makeUpdateMod(type));
         dassert(mod.get());
 
         bool positional = false;

@@ -56,7 +56,7 @@ namespace QueryStageAnd {
 
     using boost::scoped_ptr;
     using boost::shared_ptr;
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::set;
 
     class QueryStageAndBase {
@@ -759,7 +759,7 @@ namespace QueryStageAnd {
             BSONObj filter = BSON("bar" << 97);
             StatusWithMatchExpression swme = MatchExpressionParser::parse(filter);
             verify(swme.isOK());
-            auto_ptr<MatchExpression> filterExpr(swme.getValue());
+            unique_ptr<MatchExpression> filterExpr(swme.getValue());
             scoped_ptr<AndHashStage> ah(new AndHashStage(&ws, filterExpr.get(), coll));
 
             // Foo <= 20
@@ -1338,7 +1338,7 @@ namespace QueryStageAnd {
             BSONObj filterObj = BSON("foo" << BSON("$ne" << 1));
             StatusWithMatchExpression swme = MatchExpressionParser::parse(filterObj);
             verify(swme.isOK());
-            auto_ptr<MatchExpression> filterExpr(swme.getValue());
+            unique_ptr<MatchExpression> filterExpr(swme.getValue());
             scoped_ptr<AndSortedStage> ah(new AndSortedStage(&ws, filterExpr.get(), coll));
 
             // Scan over foo == 1

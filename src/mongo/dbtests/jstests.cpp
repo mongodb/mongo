@@ -48,7 +48,7 @@
 #include "mongo/util/timer.h"
 
 using boost::scoped_ptr;
-using std::auto_ptr;
+using std::unique_ptr;
 using std::cout;
 using std::endl;
 using std::string;
@@ -92,7 +92,7 @@ namespace JSTests {
     public:
         void run() {
             /* Currently reset does not clear data in v8 or spidermonkey scopes.  See SECURITY-10
-            auto_ptr<Scope> s;
+            unique_ptr<Scope> s;
             s.reset( globalScriptEngine->newScope() );
 
             s->setBoolean( "x" , true );
@@ -655,7 +655,7 @@ namespace JSTests {
     class NumberLong {
     public:
         void run() {
-            auto_ptr<Scope> s( globalScriptEngine->newScope() );
+            unique_ptr<Scope> s( globalScriptEngine->newScope() );
             BSONObjBuilder b;
             long long val = (long long)( 0xbabadeadbeefbaddULL );
             b.append( "a", val );
@@ -715,7 +715,7 @@ namespace JSTests {
     class NumberLong2 {
     public:
         void run() {
-            auto_ptr<Scope> s( globalScriptEngine->newScope() );
+            unique_ptr<Scope> s( globalScriptEngine->newScope() );
 
             BSONObj in;
             {
@@ -742,7 +742,7 @@ namespace JSTests {
     class NumberLongUnderLimit {
     public:
         void run() {
-            auto_ptr<Scope> s( globalScriptEngine->newScope() );
+            unique_ptr<Scope> s( globalScriptEngine->newScope() );
 
             BSONObjBuilder b;
             // limit is 2^53
@@ -788,7 +788,7 @@ namespace JSTests {
     class InvalidTimestamp {
     public:
         void run() {
-            auto_ptr<Scope> s( globalScriptEngine->newScope() );
+            unique_ptr<Scope> s( globalScriptEngine->newScope() );
 
             // Timestamp 't' component cannot exceed max for int32_t.
             BSONObj in;
@@ -966,7 +966,7 @@ namespace JSTests {
             if( !globalScriptEngine->utf8Ok() )
                 return;
 
-            auto_ptr<Scope> s;
+            unique_ptr<Scope> s;
             s.reset( globalScriptEngine->newScope() );
 
             BSONObj b;
@@ -1928,7 +1928,7 @@ namespace JSTests {
             BSONObj start = BSON( "x" << 5.0 );
             BSONObj empty;
 
-            auto_ptr<Scope> s;
+            unique_ptr<Scope> s;
             s.reset( globalScriptEngine->newScope() );
 
             ScriptingFunction f = s->createFunction( "return this.x + 6;" );
@@ -1946,7 +1946,7 @@ namespace JSTests {
     class ScopeOut {
     public:
         void run() {
-            auto_ptr<Scope> s;
+            unique_ptr<Scope> s;
             s.reset( globalScriptEngine->newScope() );
 
             s->invokeSafe( "x = 5;" , 0, 0 );
@@ -1972,7 +1972,7 @@ namespace JSTests {
     class RenameTest {
     public:
         void run() {
-            auto_ptr<Scope> s;
+            unique_ptr<Scope> s;
             s.reset( globalScriptEngine->newScope() );
 
             s->setNumber( "x" , 5 );

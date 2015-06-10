@@ -49,7 +49,7 @@
 
 namespace mongo {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::numeric_limits;
 
     // Copied verbatim from db/index.h
@@ -250,7 +250,7 @@ namespace mongo {
             return Status(ErrorCodes::BadValue, "Cannot produce cache data: tree is NULL.");
         }
 
-        auto_ptr<PlanCacheIndexTree> indexTree(new PlanCacheIndexTree());
+        unique_ptr<PlanCacheIndexTree> indexTree(new PlanCacheIndexTree());
 
         if (NULL != taggedTree->getTag()) {
             IndexTag* itag = static_cast<IndexTag*>(taggedTree->getTag());
@@ -758,7 +758,7 @@ namespace mongo {
                 if (!indexTreeStatus.isOK()) {
                     LOG(5) << "Query is not cachable: " << indexTreeStatus.reason() << endl;
                 }
-                auto_ptr<PlanCacheIndexTree> autoData(cacheData);
+                unique_ptr<PlanCacheIndexTree> autoData(cacheData);
 
                 // This can fail if enumeration makes a mistake.
                 QuerySolutionNode* solnRoot =

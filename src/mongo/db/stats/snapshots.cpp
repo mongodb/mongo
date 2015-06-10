@@ -45,7 +45,7 @@
  */
 namespace mongo {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::endl;
 
     void SnapshotData::takeSnapshot() {

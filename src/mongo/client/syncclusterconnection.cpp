@@ -44,7 +44,7 @@
 
 namespace mongo {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::endl;
     using std::list;
     using std::map;
@@ -323,7 +323,7 @@ namespace mongo {
 
     // TODO: logout is required for use of this class outside of a cluster environment
 
-    auto_ptr<DBClientCursor> SyncClusterConnection::query(const string &ns, Query query, int nToReturn, int nToSkip,
+    unique_ptr<DBClientCursor> SyncClusterConnection::query(const string &ns, Query query, int nToReturn, int nToSkip,
             const BSONObj *fieldsToReturn, int queryOptions, int batchSize ) {
         _lastErrors.clear();
         if ( ns.find( ".$cmd" ) != string::npos ) {
@@ -336,7 +336,7 @@ namespace mongo {
     }
 
     bool SyncClusterConnection::_commandOnActive(const string &dbname, const BSONObj& cmd, BSONObj &info, int options ) {
-        auto_ptr<DBClientCursor> cursor = _queryOnActive(dbname + ".$cmd", cmd, 1, 0, 0, options, 0);
+        unique_ptr<DBClientCursor> cursor = _queryOnActive(dbname + ".$cmd", cmd, 1, 0, 0, options, 0);
         if ( cursor->more() )
             info = cursor->next().copy();
         else
@@ -348,7 +348,7 @@ namespace mongo {
         _customQueryHandler.reset( handler );
     }
 
-    auto_ptr<DBClientCursor> SyncClusterConnection::_queryOnActive(const string &ns, Query query, int nToReturn, int nToSkip,
+    unique_ptr<DBClientCursor> SyncClusterConnection::_queryOnActive(const string &ns, Query query, int nToReturn, int nToSkip,
             const BSONObj *fieldsToReturn, int queryOptions, int batchSize ) {
 
         if ( _customQueryHandler && _customQueryHandler->canHandleQuery( ns, query ) ) {
@@ -368,7 +368,7 @@ namespace mongo {
 
         for ( size_t i=0; i<_conns.size(); i++ ) {
             try {
-                auto_ptr<DBClientCursor> cursor =
+                unique_ptr<DBClientCursor> cursor =
                     _conns[i]->query( ns , query , nToReturn , nToSkip , fieldsToReturn , queryOptions , batchSize );
                 if ( cursor.get() )
                     return cursor;
@@ -390,9 +390,9 @@ namespace mongo {
         throw UserException( 8002 , str::stream() << "all servers down/unreachable when querying: " << _address );
     }
 
-    auto_ptr<DBClientCursor> SyncClusterConnection::getMore( const string &ns, long long cursorId, int nToReturn, int options ) {
+    unique_ptr<DBClientCursor> SyncClusterConnection::getMore( const string &ns, long long cursorId, int nToReturn, int options ) {
         uassert( 10022 , "SyncClusterConnection::getMore not supported yet" , 0);
-        auto_ptr<DBClientCursor> c;
+        unique_ptr<DBClientCursor> c;
         return c;
     }
 

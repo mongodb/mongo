@@ -43,7 +43,7 @@ using namespace mongo;
 
 namespace {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::string;
     using std::vector;
 
@@ -81,7 +81,7 @@ namespace {
      */
     void testGetFields(const char* query, const char* prefix, const char* expectedFieldsStr) {
         BSONObj obj = fromjson(query);
-        auto_ptr<MatchExpression> expr(parseMatchExpression(obj));
+        unique_ptr<MatchExpression> expr(parseMatchExpression(obj));
         unordered_set<string> fields;
         QueryPlannerIXSelect::getFields(expr.get(), prefix, &fields);
 
@@ -186,7 +186,7 @@ namespace {
         // Parse and rate query. Some of the nodes in the rated tree
         // will be tagged after the rating process.
         BSONObj obj = fromjson(query);
-        auto_ptr<MatchExpression> expr(parseMatchExpression(obj));
+        unique_ptr<MatchExpression> expr(parseMatchExpression(obj));
 
         // Currently, we tag every indexable node even when no compatible
         // index is available. Hence, it is fine to pass an empty vector of

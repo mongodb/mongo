@@ -57,7 +57,7 @@
 namespace mongo {
 
     using boost::shared_ptr;
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::map;
     using std::ostringstream;
     using std::set;
@@ -260,7 +260,7 @@ namespace {
             // Splitting close to the lower bound means that the split point will be the
             // upper bound. Chunk range upper bounds are exclusive so skip a document to
             // make the lower half of the split end up with a single document.
-            auto_ptr<DBClientCursor> cursor = conn->query(_manager->getns(),
+            unique_ptr<DBClientCursor> cursor = conn->query(_manager->getns(),
                                                           q,
                                                           1, /* nToReturn */
                                                           1 /* nToSkip */);

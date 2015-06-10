@@ -52,7 +52,7 @@
 namespace mongo {
 
     using boost::shared_ptr;
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::vector;
     using std::map;
     using std::string;
@@ -166,7 +166,7 @@ namespace mongo {
         BSONObj indexDoc = createIndexDoc(ns, keys, unique);
 
         // Go through the shard insert path
-        std::auto_ptr<BatchedInsertRequest> insert(new BatchedInsertRequest());
+        std::unique_ptr<BatchedInsertRequest> insert(new BatchedInsertRequest());
         insert->addToDocuments(indexDoc);
 
         BatchedCommandRequest request(insert.release());
@@ -208,7 +208,7 @@ namespace mongo {
                                BatchedCommandResponse* response ) {
 
         // Add _ids to insert request if req'd
-        auto_ptr<BatchedCommandRequest> idRequest(BatchedCommandRequest::cloneWithIds(origRequest));
+        unique_ptr<BatchedCommandRequest> idRequest(BatchedCommandRequest::cloneWithIds(origRequest));
         const BatchedCommandRequest& request = NULL != idRequest.get() ? *idRequest : origRequest;
 
         const NamespaceString& nss = request.getNSS();

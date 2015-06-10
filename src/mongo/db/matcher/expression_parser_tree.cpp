@@ -73,7 +73,7 @@ namespace mongo {
             StatusWithMatchExpression s = _parseRegexElement( name, e );
             if ( !s.isOK() )
                 return s;
-            std::auto_ptr<NotMatchExpression> n( new NotMatchExpression() );
+            std::unique_ptr<NotMatchExpression> n( new NotMatchExpression() );
             Status s2 = n->init( s.getValue() );
             if ( !s2.isOK() )
                 return StatusWithMatchExpression( s2 );
@@ -87,7 +87,7 @@ namespace mongo {
         if ( notObject.isEmpty() )
             return StatusWithMatchExpression( ErrorCodes::BadValue, "$not cannot be empty" );
 
-        std::auto_ptr<AndMatchExpression> theAnd( new AndMatchExpression() );
+        std::unique_ptr<AndMatchExpression> theAnd( new AndMatchExpression() );
         Status s = _parseSub( name, notObject, theAnd.get(), level );
         if ( !s.isOK() )
             return StatusWithMatchExpression( s );
@@ -98,7 +98,7 @@ namespace mongo {
             if ( theAnd->getChild(i)->matchType() == MatchExpression::REGEX )
                 return StatusWithMatchExpression( ErrorCodes::BadValue, "$not cannot have a regex" );
 
-        std::auto_ptr<NotMatchExpression> theNot( new NotMatchExpression() );
+        std::unique_ptr<NotMatchExpression> theNot( new NotMatchExpression() );
         s = theNot->init( theAnd.release() );
         if ( !s.isOK() )
             return StatusWithMatchExpression( s );

@@ -464,7 +464,7 @@ namespace mongo {
             return Status::OK();
         }
 
-        std::auto_ptr<User> user;
+        std::unique_ptr<User> user;
 
         int authzVersion = _version;
         guard.beginFetchPhase();
@@ -530,16 +530,16 @@ namespace mongo {
 
     Status AuthorizationManager::_fetchUserV2(OperationContext* txn,
                                               const UserName& userName,
-                                              std::auto_ptr<User>* acquiredUser) {
+                                              std::unique_ptr<User>* acquiredUser) {
         BSONObj userObj;
         Status status = getUserDescription(txn, userName, &userObj);
         if (!status.isOK()) {
             return status;
         }
 
-        // Put the new user into an auto_ptr temporarily in case there's an error while
+        // Put the new user into an unique_ptr temporarily in case there's an error while
         // initializing the user.
-        std::auto_ptr<User> user(new User(userName));
+        std::unique_ptr<User> user(new User(userName));
 
         status = _initializeUserFromPrivilegeDocument(user.get(), userObj);
         if (!status.isOK()) {

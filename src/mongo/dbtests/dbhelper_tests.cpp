@@ -39,7 +39,7 @@
 
 namespace mongo {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::set;
 
     /**
@@ -96,7 +96,7 @@ namespace mongo {
 
         BSONArray docs(OperationContext* txn) const {
             DBDirectClient client(txn);
-            auto_ptr<DBClientCursor> cursor = client.query( ns,
+            unique_ptr<DBClientCursor> cursor = client.query( ns,
                                                             Query().hint( BSON( "_id" << 1 ) ) );
             BSONArrayBuilder bab;
             while ( cursor->more() ) {

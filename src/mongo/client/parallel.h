@@ -284,8 +284,8 @@ namespace mongo {
 
     private:
 
-        std::auto_ptr<DBClientCursor> _cursor;
-        std::auto_ptr<ParallelConnectionMetadata> _pcmData;
+        std::unique_ptr<DBClientCursor> _cursor;
+        std::unique_ptr<ParallelConnectionMetadata> _pcmData;
     };
 
     /**

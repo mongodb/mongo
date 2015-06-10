@@ -88,7 +88,7 @@ namespace mongo {
                          bool mayBeInterrupted);
 
         struct Fun;
-        std::auto_ptr<DBClientBase> _conn;
+        std::unique_ptr<DBClientBase> _conn;
     };
 
     /**

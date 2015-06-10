@@ -59,7 +59,7 @@ namespace mongo {
     using boost::intrusive_ptr;
     using boost::scoped_ptr;
     using boost::shared_ptr;
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::string;
     using std::stringstream;
     using std::endl;
@@ -219,7 +219,7 @@ namespace mongo {
 
             PlanExecutor* exec = NULL;
             scoped_ptr<ClientCursorPin> pin; // either this OR the execHolder will be non-null
-            auto_ptr<PlanExecutor> execHolder;
+            unique_ptr<PlanExecutor> execHolder;
             {
                 // This will throw if the sharding version for this connection is out of date. The
                 // lock must be held continuously from now until we have we created both the output
@@ -242,8 +242,8 @@ namespace mongo {
                 // Create the PlanExecutor which returns results from the pipeline. The WorkingSet
                 // ('ws') and the PipelineProxyStage ('proxy') will be owned by the created
                 // PlanExecutor.
-                auto_ptr<WorkingSet> ws(new WorkingSet());
-                auto_ptr<PipelineProxyStage> proxy(
+                unique_ptr<WorkingSet> ws(new WorkingSet());
+                unique_ptr<PipelineProxyStage> proxy(
                     new PipelineProxyStage(pPipeline, input, ws.get()));
                 Status execStatus = Status::OK();
                 if (NULL == collection) {

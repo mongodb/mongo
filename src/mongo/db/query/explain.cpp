@@ -49,7 +49,7 @@ namespace {
 
     using namespace mongo;
     using boost::scoped_ptr;
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::string;
     using std::vector;
 
@@ -595,7 +595,7 @@ namespace mongo {
 
         // Get stats of the winning plan from the trial period, if the verbosity level
         // is high enough and there was a runoff between multiple plans.
-        auto_ptr<PlanStageStats> winningStatsTrial;
+        unique_ptr<PlanStageStats> winningStatsTrial;
         if (verbosity >= ExplainCommon::EXEC_ALL_PLANS && NULL != mps) {
             winningStatsTrial.reset(exec->getStats());
             invariant(winningStatsTrial.get());

@@ -51,7 +51,7 @@ namespace {
     using namespace mongo;
 
     using boost::scoped_ptr;
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::string;
     using std::vector;
 
@@ -504,7 +504,7 @@ namespace {
     };
 
     TEST_F(MultipleMetadataFixture, PromotePendingNA) {
-        auto_ptr<ChunkType> chunk( new ChunkType() );
+        unique_ptr<ChunkType> chunk( new ChunkType() );
         chunk->setNS("foo.bar");
         chunk->setShard("shard0000");
         chunk->setMin( BSON( "x" << MINKEY ) );
@@ -542,7 +542,7 @@ namespace {
     TEST_F(MultipleMetadataFixture, PromotePendingNAVersion) {
         OID epoch = OID::gen();
 
-        auto_ptr<ChunkType> chunk( new ChunkType() );
+        unique_ptr<ChunkType> chunk( new ChunkType() );
         chunk->setNS("foo.bar");
         chunk->setShard("shard0000");
         chunk->setMin( BSON( "x" << MINKEY ) );
@@ -587,7 +587,7 @@ namespace {
 
         OwnedPointerVector<ChunkType> chunks;
 
-        auto_ptr<ChunkType> chunk( new ChunkType() );
+        unique_ptr<ChunkType> chunk( new ChunkType() );
         chunk->setNS("foo.bar");
         chunk->setShard("shard0000");
         chunk->setMin( BSON( "x" << MINKEY ) );
@@ -672,7 +672,7 @@ namespace {
 
         OwnedPointerVector<ChunkType> chunks;
 
-        auto_ptr<ChunkType> chunk( new ChunkType() );
+        unique_ptr<ChunkType> chunk( new ChunkType() );
         chunk->setNS("foo.bar");
         chunk->setShard("shard0000");
         chunk->setMin( BSON( "x" << MINKEY ) );

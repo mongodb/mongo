@@ -37,18 +37,18 @@
 
 namespace mongo {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
 
     StatusWithMatchExpression expressionParserGeoCallbackReal( const char* name,
                                                                int type,
                                                                const BSONObj& section ) {
         if (BSONObj::opWITHIN == type || BSONObj::opGEO_INTERSECTS == type) {
-            auto_ptr<GeoExpression> gq(new GeoExpression(name));
+            unique_ptr<GeoExpression> gq(new GeoExpression(name));
             Status parseStatus = gq->parseFrom(section);
 
             if (!parseStatus.isOK()) return StatusWithMatchExpression(parseStatus);
 
-            auto_ptr<GeoMatchExpression> e( new GeoMatchExpression() );
+            unique_ptr<GeoMatchExpression> e( new GeoMatchExpression() );
 
             // Until the index layer accepts non-BSON predicates, or special indices are moved into
             // stages, we have to clean up the raw object so it can be passed down to the index
@@ -62,12 +62,12 @@ namespace mongo {
         }
         else {
             verify(BSONObj::opNEAR == type);
-            auto_ptr<GeoNearExpression> nq(new GeoNearExpression(name));
+            unique_ptr<GeoNearExpression> nq(new GeoNearExpression(name));
             Status s = nq->parseFrom( section );
             if ( !s.isOK() ) {
                 return StatusWithMatchExpression( s );
             }
-            auto_ptr<GeoNearMatchExpression> e( new GeoNearMatchExpression() );
+            unique_ptr<GeoNearMatchExpression> e( new GeoNearMatchExpression() );
             // Until the index layer accepts non-BSON predicates, or special indices are moved into
             // stages, we have to clean up the raw object so it can be passed down to the index
             // layer.

@@ -340,7 +340,7 @@ namespace mongo {
     private:
         boost::scoped_ptr<WorkingSetComputedData> _computed[WSM_COMPUTED_NUM_TYPES];
 
-        std::auto_ptr<RecordFetcher> _fetcher;
+        std::unique_ptr<RecordFetcher> _fetcher;
     };
 
 }  // namespace mongo

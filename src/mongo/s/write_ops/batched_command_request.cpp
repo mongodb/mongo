@@ -33,7 +33,7 @@
 
 namespace mongo {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::string;
     using std::vector;
 
@@ -295,7 +295,7 @@ namespace mongo {
             || origCmdRequest.isInsertIndexRequest())
             return NULL;
 
-        auto_ptr<BatchedInsertRequest> idRequest;
+        unique_ptr<BatchedInsertRequest> idRequest;
         BatchedInsertRequest* origRequest = origCmdRequest.getInsertRequest();
 
         const vector<BSONObj>& inserts = origRequest->getDocuments();

@@ -33,7 +33,7 @@
 
 namespace mongo {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::string;
 
     using mongoutils::str::stream;
@@ -161,7 +161,7 @@ namespace mongo {
         for(std::vector<BatchedDeleteDocument*>::const_iterator it = _deletes.begin();
             it != _deletes.end();
             ++it) {
-            auto_ptr<BatchedDeleteDocument> tempBatchDeleteDocument(new BatchedDeleteDocument);
+            unique_ptr<BatchedDeleteDocument> tempBatchDeleteDocument(new BatchedDeleteDocument);
             (*it)->cloneTo(tempBatchDeleteDocument.get());
             other->addToDeletes(tempBatchDeleteDocument.release());
         }
@@ -211,7 +211,7 @@ namespace mongo {
         for (std::vector<BatchedDeleteDocument*>::const_iterator it = deletes.begin();
              it != deletes.end();
              ++it) {
-            auto_ptr<BatchedDeleteDocument> tempBatchDeleteDocument(new BatchedDeleteDocument);
+            unique_ptr<BatchedDeleteDocument> tempBatchDeleteDocument(new BatchedDeleteDocument);
             (*it)->cloneTo(tempBatchDeleteDocument.get());
             addToDeletes(tempBatchDeleteDocument.release());
         }

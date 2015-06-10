@@ -38,7 +38,7 @@ namespace {
     using namespace mongo::modifiertable;
 
     using mongo::ModifierInterface;
-    using std::auto_ptr;
+    using std::unique_ptr;
 
     TEST(getType, Normal) {
         ASSERT_EQUALS(getType("$set"), MOD_SET);
@@ -47,7 +47,7 @@ namespace {
     }
 
     TEST(makeUpdateMod, Normal) {
-        auto_ptr<ModifierInterface> mod;
+        unique_ptr<ModifierInterface> mod;
 
         mod.reset(makeUpdateMod(MOD_SET));
         ASSERT_NOT_EQUALS(mod.get(), static_cast<ModifierInterface*>(0));

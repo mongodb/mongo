@@ -129,7 +129,7 @@ namespace mongo {
         UpdateDriver _driver;
 
         // Parsed query object, or NULL if the query proves to be an id hack query.
-        std::auto_ptr<CanonicalQuery> _canonicalQuery;
+        std::unique_ptr<CanonicalQuery> _canonicalQuery;
     };
 
 }  // namespace mongo

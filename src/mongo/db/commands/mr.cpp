@@ -74,7 +74,7 @@ namespace mongo {
 
     using boost::scoped_ptr;
     using boost::shared_ptr;
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::endl;
     using std::set;
     using std::string;
@@ -626,7 +626,7 @@ namespace mongo {
                                           "M/R Merge Post Processing Progress",
                                           count);
                 }
-                auto_ptr<DBClientCursor> cursor = _db.query(_config.tempNamespace , BSONObj());
+                unique_ptr<DBClientCursor> cursor = _db.query(_config.tempNamespace , BSONObj());
                 while (cursor->more()) {
                     ScopedTransaction scopedXact(_txn, MODE_IX);
                     Lock::DBLock lock(_txn->lockState(),
@@ -650,7 +650,7 @@ namespace mongo {
                                           "M/R Reduce Post Processing Progress",
                                           count);
                 }
-                auto_ptr<DBClientCursor> cursor = _db.query( _config.tempNamespace , BSONObj() );
+                unique_ptr<DBClientCursor> cursor = _db.query( _config.tempNamespace , BSONObj() );
                 while ( cursor->more() ) {
                     ScopedTransaction transaction(txn, MODE_X);
                     Lock::GlobalWrite lock(txn->lockState()); // TODO(erh) why global?
@@ -1048,7 +1048,7 @@ namespace mongo {
                                                 BSONObj(),
                                                 &cqRaw,
                                                 whereCallback).isOK());
-            std::auto_ptr<CanonicalQuery> cq(cqRaw);
+            std::unique_ptr<CanonicalQuery> cq(cqRaw);
 
             Collection* coll = getCollectionOrUassert(ctx->getDb(), _config.incLong);
             invariant(coll);
@@ -1120,7 +1120,7 @@ namespace mongo {
                 return;
             }
 
-            auto_ptr<InMemory> n( new InMemory() ); // for new data
+            unique_ptr<InMemory> n( new InMemory() ); // for new data
             long nSize = 0;
             _dupCount = 0;
 
@@ -1327,7 +1327,7 @@ namespace mongo {
                 CollectionMetadataPtr collMetadata;
 
                 // Prevent sharding state from changing during the MR.
-                auto_ptr<RangePreserver> rangePreserver;
+                unique_ptr<RangePreserver> rangePreserver;
                 {
                     AutoGetCollectionForRead ctx(txn, config.ns);
 
@@ -1416,7 +1416,7 @@ namespace mongo {
                             uasserted(17238, "Can't canonicalize query " + config.filter.toString());
                             return 0;
                         }
-                        std::auto_ptr<CanonicalQuery> cq(cqRaw);
+                        std::unique_ptr<CanonicalQuery> cq(cqRaw);
 
                         Database* db = scopedAutoDb->getDb();
                         Collection* coll = state.getCollectionOrUassert(db, config.ns);

@@ -37,7 +37,7 @@
 namespace {
 
     using namespace mongo;
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::string;
 
     TEST(RoundTrip, Normal) {
@@ -83,7 +83,7 @@ namespace {
         request.addToDocuments(insertA);
         request.addToDocuments(insertB);
 
-        auto_ptr<BatchedCommandRequest> idCmdRequest;
+        unique_ptr<BatchedCommandRequest> idCmdRequest;
         idCmdRequest.reset(BatchedCommandRequest::cloneWithIds(cmdRequest));
         ASSERT(idCmdRequest.get());
 
@@ -112,7 +112,7 @@ namespace {
         request.addToDocuments(insertB);
         request.addToDocuments(insertC);
 
-        auto_ptr<BatchedCommandRequest> idCmdRequest;
+        unique_ptr<BatchedCommandRequest> idCmdRequest;
         idCmdRequest.reset(BatchedCommandRequest::cloneWithIds(cmdRequest));
         ASSERT(idCmdRequest.get());
 
@@ -141,7 +141,7 @@ namespace {
         request.addToDocuments(insertA);
         request.addToDocuments(insertB);
 
-        auto_ptr<BatchedCommandRequest> idCmdRequest;
+        unique_ptr<BatchedCommandRequest> idCmdRequest;
         idCmdRequest.reset(BatchedCommandRequest::cloneWithIds(cmdRequest));
         ASSERT(!idCmdRequest.get());
     }

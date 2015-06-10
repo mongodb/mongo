@@ -57,7 +57,7 @@
 
 namespace ThreadedTests {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::cout;
     using std::endl;
     using std::string;
@@ -366,7 +366,7 @@ namespace ThreadedTests {
              */            
             RWLockRecursiveNongreedy lk( "eliot2" , 120 * 1000 );
             cout << "RWLock impl: " << lk.implType() << endl;
-            auto_ptr<RWLockRecursiveNongreedy::Shared> a( new RWLockRecursiveNongreedy::Shared(lk) );            
+            unique_ptr<RWLockRecursiveNongreedy::Shared> a( new RWLockRecursiveNongreedy::Shared(lk) );            
             AtomicUInt32 x1(0);
             cout << "A : " << &x1 << endl;
             boost::thread t1( stdx::bind( worker1 , &lk , &x1 ) );
@@ -404,7 +404,7 @@ namespace ThreadedTests {
             
             RWLockRecursiveNongreedy lk( "eliot2" , 120 * 1000 );
             
-            auto_ptr<RWLockRecursiveNongreedy::Shared> a( new RWLockRecursiveNongreedy::Shared( lk ) );
+            unique_ptr<RWLockRecursiveNongreedy::Shared> a( new RWLockRecursiveNongreedy::Shared( lk ) );
             
             AtomicUInt32 x2(0);
 

@@ -42,7 +42,7 @@
 
 namespace mongo {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::endl;
     using std::string;
     using std::stringstream;
@@ -91,7 +91,7 @@ namespace mongo {
         string _code;
         BSONObj _userScope;
 
-        auto_ptr<Scope> _scope;
+        unique_ptr<Scope> _scope;
         ScriptingFunction _func;
 
         // Not owned. See comments insde WhereCallbackReal for the lifetime of this pointer.
@@ -191,7 +191,7 @@ namespace mongo {
             return StatusWithMatchExpression(ErrorCodes::BadValue,
                                              "no globalScriptEngine in $where parsing");
 
-        auto_ptr<WhereMatchExpression> exp(new WhereMatchExpression(_txn));
+        unique_ptr<WhereMatchExpression> exp(new WhereMatchExpression(_txn));
         if (where.type() == String || where.type() == Code) {
             Status s = exp->init(_dbName, where.valuestr(), BSONObj());
             if (!s.isOK())

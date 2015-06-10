@@ -54,7 +54,7 @@ namespace mongo {
 
     bool getInitialSyncCompleted();
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::string;
     using std::stringstream;
     using std::endl;
@@ -179,7 +179,7 @@ namespace mongo {
             BSONObj query = queryBuilder.obj();
 
             DBDirectClient db(txn);
-            auto_ptr<DBClientCursor> cursor = db.query( ns.c_str() , query, num , skip );
+            unique_ptr<DBClientCursor> cursor = db.query( ns.c_str() , query, num , skip );
             uassert( 13085 , "query failed for dbwebserver" , cursor.get() );
 
             if ( one ) {

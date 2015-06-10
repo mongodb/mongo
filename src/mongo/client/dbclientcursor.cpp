@@ -43,7 +43,7 @@
 
 namespace mongo {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::endl;
     using std::string;
     using std::vector;
@@ -168,11 +168,11 @@ namespace mongo {
 
         Message toSend;
         toSend.setData(dbGetMore, b.buf(), b.len());
-        auto_ptr<Message> response(new Message());
+        unique_ptr<Message> response(new Message());
 
         if ( _client ) {
             _client->call( toSend, *response );
-            this->batch.m = response;
+            this->batch.m = std::move(response);
             dataReceived();
         }
         else {
@@ -180,7 +180,7 @@ namespace mongo {
             ScopedDbConnection conn(_scopedHost);
             conn->call( toSend , *response );
             _client = conn.get();
-            this->batch.m = response;
+            this->batch.m = std::move(response);
             dataReceived();
             _client = 0;
             conn.done();
@@ -191,12 +191,12 @@ namespace mongo {
     void DBClientCursor::exhaustReceiveMore() {
         verify( cursorId && batch.pos == batch.nReturned );
         verify( !haveLimit );
-        auto_ptr<Message> response(new Message());
+        unique_ptr<Message> response(new Message());
         verify( _client );
         if (!_client->recv(*response)) {
             uasserted(16465, "recv failed while exhausting cursor");
         }
-        batch.m = response;
+        batch.m = std::move(response);
         dataReceived();
     }
 

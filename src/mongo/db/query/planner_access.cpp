@@ -59,7 +59,7 @@ namespace {
 
 namespace mongo {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::vector;
 
     // static
@@ -843,7 +843,7 @@ namespace mongo {
                                                            bool inArrayOperator,
                                                            const vector<IndexEntry>& indices,
                                                            const QueryPlannerParams& params) {
-        auto_ptr<MatchExpression> autoRoot;
+        unique_ptr<MatchExpression> autoRoot;
         if (!inArrayOperator) {
             autoRoot.reset(root);
         }
@@ -854,7 +854,7 @@ namespace mongo {
         // sure that the FETCH stage will recheck the entire predicate.
         //
         // XXX: This block is a hack to accommodate the storage layer concurrency model.
-        std::auto_ptr<MatchExpression> clonedRoot;
+        std::unique_ptr<MatchExpression> clonedRoot;
         if (params.options & QueryPlannerParams::CANNOT_TRIM_IXISECT) {
             clonedRoot.reset(root->shallowClone());
         }
@@ -975,7 +975,7 @@ namespace mongo {
                                                           bool inArrayOperator,
                                                           const vector<IndexEntry>& indices,
                                                           const QueryPlannerParams& params) {
-        auto_ptr<MatchExpression> autoRoot;
+        unique_ptr<MatchExpression> autoRoot;
         if (!inArrayOperator) {
             autoRoot.reset(root);
         }
@@ -1083,7 +1083,7 @@ namespace mongo {
             }
         }
         else {
-            auto_ptr<MatchExpression> autoRoot;
+            unique_ptr<MatchExpression> autoRoot;
             if (!inArrayOperator) {
                 autoRoot.reset(root);
             }

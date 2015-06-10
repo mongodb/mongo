@@ -159,7 +159,7 @@ namespace QueryStageIxscan {
             // Make the {x: 1} index multikey by inserting a doc where 'x' is an array.
             insert(fromjson("{_id: 1, x: [1, 2, 3]}"));
 
-            std::auto_ptr<IndexScan> ixscan(
+            std::unique_ptr<IndexScan> ixscan(
                 createIndexScanSimpleRange(BSON("x" << 1), BSON("x" << 3)));
 
             // Verify that SpecificStats of 'ixscan' have been properly initialized.

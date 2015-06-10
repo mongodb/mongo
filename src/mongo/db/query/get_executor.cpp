@@ -80,7 +80,7 @@
 
 namespace mongo {
 
-    using std::auto_ptr;
+    using std::unique_ptr;
     using std::endl;
     using std::string;
     using std::vector;
@@ -445,8 +445,8 @@ namespace mongo {
                        PlanExecutor::YieldPolicy yieldPolicy,
                        PlanExecutor** out,
                        size_t plannerOptions) {
-        auto_ptr<CanonicalQuery> canonicalQuery(rawCanonicalQuery);
-        auto_ptr<WorkingSet> ws(new WorkingSet());
+        unique_ptr<CanonicalQuery> canonicalQuery(rawCanonicalQuery);
+        unique_ptr<WorkingSet> ws(new WorkingSet());
         PlanStage* root;
         QuerySolution* querySolution;
         Status status = prepareExecution(txn, collection, ws.get(), canonicalQuery.get(),
@@ -534,7 +534,7 @@ namespace {
                              PlanExecutor** execOut) {
         invariant(collection);
         invariant(cq);
-        auto_ptr<CanonicalQuery> autoCq(cq);
+        unique_ptr<CanonicalQuery> autoCq(cq);
 
         // A query can only do oplog start finding if it has a top-level $gt or $gte predicate over
         // the "ts" field (the operation's timestamp). Find that predicate and pass it to
@@ -724,7 +724,7 @@ namespace {
         deleteStageParams.isExplain = request->isExplain();
         deleteStageParams.returnDeleted = request->shouldReturnDeleted();
 
-        auto_ptr<WorkingSet> ws(new WorkingSet());
+        unique_ptr<WorkingSet> ws(new WorkingSet());
         PlanExecutor::YieldPolicy policy = parsedDelete->canYield() ? PlanExecutor::YIELD_AUTO :
                                                                       PlanExecutor::YIELD_MANUAL;
 
@@ -769,7 +769,7 @@ namespace {
         }
 
         // This is the regular path for when we have a CanonicalQuery.
-        std::auto_ptr<CanonicalQuery> cq(parsedDelete->releaseParsedQuery());
+        std::unique_ptr<CanonicalQuery> cq(parsedDelete->releaseParsedQuery());
 
         PlanStage* rawRoot;
         QuerySolution* rawQuerySolution;
@@ -882,7 +882,7 @@ namespace {
         PlanExecutor::YieldPolicy policy = parsedUpdate->canYield() ? PlanExecutor::YIELD_AUTO :
                                                                       PlanExecutor::YIELD_MANUAL;
 
-        auto_ptr<WorkingSet> ws(new WorkingSet());
+        unique_ptr<WorkingSet> ws(new WorkingSet());
         UpdateStageParams updateStageParams(request, driver, opDebug);
 
         if (!parsedUpdate->hasParsedQuery()) {
@@ -926,7 +926,7 @@ namespace {
         }
 
         // This is the regular path for when we have a CanonicalQuery.
-        std::auto_ptr<CanonicalQuery> cq(parsedUpdate->releaseParsedQuery());
+        std::unique_ptr<CanonicalQuery> cq(parsedUpdate->releaseParsedQuery());
 
         PlanStage* rawRoot;
         QuerySolution* rawQuerySolution;
@@ -988,7 +988,7 @@ namespace {
             return Status(ErrorCodes::BadValue, "server-side JavaScript execution is disabled");
         }
 
-        auto_ptr<WorkingSet> ws(new WorkingSet());
+        unique_ptr<WorkingSet> ws(new WorkingSet());
         PlanStage* root;
         QuerySolution* querySolution;
 
@@ -1011,7 +1011,7 @@ namespace {
         if (!canonicalizeStatus.isOK()) {
             return canonicalizeStatus;
         }
-        auto_ptr<CanonicalQuery> canonicalQuery(rawCanonicalQuery);
+        unique_ptr<CanonicalQuery> canonicalQuery(rawCanonicalQuery);
 
         const size_t defaultPlannerOptions = 0;
         Status status = prepareExecution(txn, collection, ws.get(), canonicalQuery.get(),
@@ -1216,7 +1216,7 @@ namespace {
                             bool explain,
                             PlanExecutor::YieldPolicy yieldPolicy,
                             PlanExecutor** execOut) {
-        auto_ptr<WorkingSet> ws(new WorkingSet());
+        unique_ptr<WorkingSet> ws(new WorkingSet());
         PlanStage* root;
         QuerySolution* querySolution;
 
@@ -1231,7 +1231,7 @@ namespace {
             return PlanExecutor::make(txn, ws.release(), root, request.ns, yieldPolicy, execOut);
         }
 
-        auto_ptr<CanonicalQuery> cq;
+        unique_ptr<CanonicalQuery> cq;
         if (!request.query.isEmpty() || !request.hint.isEmpty()) {
             // If query or hint is not empty, canonicalize the query before working with collection.
             typedef MatchExpressionParser::WhereCallback WhereCallback;
@@ -1422,7 +1422,7 @@ namespace {
             return status;
         }
 
-        auto_ptr<CanonicalQuery> autoCq(cq);
+        unique_ptr<CanonicalQuery> autoCq(cq);
 
         // If there's no query, we can just distinct-scan one of the indices.
         // Not every index in plannerParams.indices may be suitable. Refer to
