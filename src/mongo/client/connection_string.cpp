@@ -42,6 +42,14 @@ namespace mongo {
         _finishInit();
     }
 
+    ConnectionString::ConnectionString(StringData setName, std::vector<HostAndPort> servers)
+        : _type(SET),
+          _servers(std::move(servers)),
+          _setName(setName.toString()) {
+
+        _finishInit();
+    }
+
     ConnectionString::ConnectionString(ConnectionType type,
                                        const std::string& s,
                                        const std::string& setName) {
@@ -79,6 +87,11 @@ namespace mongo {
         }
 
         _finishInit();
+    }
+
+    ConnectionString ConnectionString::forReplicaSet(StringData setName,
+                                                     std::vector<HostAndPort> servers) {
+        return ConnectionString(setName, std::move(servers));
     }
 
     void ConnectionString::_fillServers( std::string s ) {

@@ -33,6 +33,7 @@
 #include <string>
 #include <vector>
 
+#include "mongo/base/string_data.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/hostandport.h"
 
@@ -64,6 +65,15 @@ namespace mongo {
 
         ConnectionString() = default;
 
+        /**
+         * Constructs a connection string representing a replica set.
+         */
+        static ConnectionString forReplicaSet(StringData setName,
+                                              std::vector<HostAndPort> servers);
+
+        /**
+         * Creates a MASTER connection string with the specified server.
+         */
         explicit ConnectionString(const HostAndPort& server);
 
         ConnectionString(ConnectionType type, const std::string& s, const std::string& setName);
@@ -127,6 +137,12 @@ namespace mongo {
         }
 
     private:
+        /**
+         * Creates a SET connection string with the specified set name and servers.
+         */
+        ConnectionString(StringData setName, std::vector<HostAndPort> servers);
+
+
         void _fillServers( std::string s );
         void _finishInit();
 

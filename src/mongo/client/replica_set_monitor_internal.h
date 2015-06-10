@@ -162,8 +162,6 @@ namespace mongo {
          */
         void checkInvariants() const;
 
-        static ConfigChangeHook configChangeHook;
-
         boost::mutex mutex; // must hold this to access any other member or method (except name).
 
         // If Refresher::getNextStep returns WAIT, you should wait on the condition_variable,

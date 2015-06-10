@@ -35,6 +35,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/client/connpool.h"
+#include "mongo/client/global_conn_pool.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/syncclusterconnection.h"
 #include "mongo/util/exit.h"
@@ -174,8 +175,6 @@ namespace mongo {
     }
 
     // ------ DBConnectionPool ------
-
-    DBConnectionPool pool;
 
     const int PoolForHost::kPoolSizeUnlimited(-1);
 
@@ -371,21 +370,8 @@ namespace mongo {
         bb.done();
         
         // Always report all replica sets being tracked
-        set<string> replicaSets = ReplicaSetMonitor::getAllTrackedSets();
-        
-        BSONObjBuilder setBuilder( b.subobjStart( "replicaSets" ) );
-        for ( set<string>::iterator i=replicaSets.begin(); i!=replicaSets.end(); ++i ) {
-            string rs = *i;
-            ReplicaSetMonitorPtr m = ReplicaSetMonitor::get( rs );
-            if ( ! m ) {
-                warning() << "no monitor for set: " << rs << endl;
-                continue;
-            }
-            
-            BSONObjBuilder temp( setBuilder.subobjStart( rs ) );
-            m->appendInfo( temp );
-            temp.done();
-        }
+        BSONObjBuilder setBuilder(b.subobjStart("replicaSets"));
+        globalRSMonitorManager.report(&setBuilder);
         setBuilder.done();
 
         {

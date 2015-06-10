@@ -375,7 +375,6 @@ namespace mongo {
         const std::string _host;
         DBClientBase *_conn;
         const double _socketTimeout;
-
     };
 
 } // namespace mongo

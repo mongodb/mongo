@@ -147,11 +147,6 @@ namespace mongo {
         static std::shared_ptr<ReplicaSetMonitor> get(const std::string& name);
 
         /**
-         * Returns all the currently tracked replica set names.
-         */
-        static std::set<std::string> getAllTrackedSets();
-
-        /**
          * Removes the ReplicaSetMonitor for the given set name from _sets, which will delete it.
          * If clearSeedCache is true, then the cached seed std::string for this Replica Set will be
          * removed from _seedServers.
