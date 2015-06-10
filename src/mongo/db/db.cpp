@@ -754,16 +754,17 @@ static void startupConfigActions(const std::vector<std::string>& args) {
 
 MONGO_INITIALIZER_WITH_PREREQUISITES(CreateReplicationManager, ("SetGlobalEnvironment"))
         (InitializerContext* context) {
-    repl::ReplicationCoordinatorImpl* replCoord = new repl::ReplicationCoordinatorImpl(
-            getGlobalReplSettings(),
-            new repl::ReplicationCoordinatorExternalStateImpl,
-            new executor::NetworkInterfaceImpl{},
-            new repl::StorageInterfaceImpl{},
-            new repl::TopologyCoordinatorImpl(Seconds(repl::maxSyncSourceLagSecs)),
-            static_cast<int64_t>(curTimeMillis64()));
-    repl::setGlobalReplicationCoordinator(replCoord);
+    auto replCoord = stdx::make_unique<repl::ReplicationCoordinatorImpl>(
+        getGlobalReplSettings(),
+        new repl::ReplicationCoordinatorExternalStateImpl,
+        new executor::NetworkInterfaceImpl{},
+        new repl::StorageInterfaceImpl{},
+        new repl::TopologyCoordinatorImpl(Seconds(repl::maxSyncSourceLagSecs)),
+        static_cast<int64_t>(curTimeMillis64()));
+    auto serviceContext = getGlobalServiceContext();
+    serviceContext->registerKillOpListener(replCoord.get());
+    repl::ReplicationCoordinator::set(serviceContext, std::move(replCoord));
     repl::setOplogCollectionName();
-    getGlobalServiceContext()->registerKillOpListener(replCoord);
     return Status::OK();
 }
 

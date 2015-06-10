@@ -103,12 +103,13 @@ namespace dbtests {
 
 int dbtestsMain( int argc, char** argv, char** envp ) {
     static StaticObserver StaticObserver;
+    Command::testCommandsEnabled = 1;
     ::mongo::setupSynchronousSignalHandlers();
+    mongo::runGlobalInitializersOrDie(argc, argv, envp);
     repl::ReplSettings replSettings;
     replSettings.oplogSize = 10 * 1024 * 1024;
+    replSettings.master = true;
     repl::setGlobalReplicationCoordinator(new repl::ReplicationCoordinatorMock(replSettings));
-    Command::testCommandsEnabled = 1;
-    mongo::runGlobalInitializersOrDie(argc, argv, envp);
     getGlobalAuthorizationManager()->setAuthEnabled(false);
     StartupTest::runTests();
     return mongo::dbtests::runDbTests(argc, argv);

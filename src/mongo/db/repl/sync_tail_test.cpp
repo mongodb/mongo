@@ -65,9 +65,6 @@ namespace {
     void BackgroundSyncMock::waitForMore() { }
 
     class SyncTailTest : public unittest::Test {
-    public:
-        SyncTailTest();
-
     protected:
         void _testSyncApplyInsertDocument(LockMode expectedMode);
 
@@ -80,11 +77,7 @@ namespace {
     private:
         void setUp() override;
         void tearDown() override;
-
-        ReplicationCoordinator* _prevCoordinator;
     };
-
-    SyncTailTest::SyncTailTest() : _prevCoordinator(nullptr) { }
 
     void SyncTailTest::setUp() {
         ServiceContext* serviceContext = getGlobalServiceContext();
@@ -97,7 +90,6 @@ namespace {
             mongo::storageGlobalParams.engineSetByUser = true;
             serviceContext->initializeGlobalStorageEngine();
         }
-        _prevCoordinator = getGlobalReplicationCoordinator();
         ReplSettings replSettings;
         replSettings.oplogSize = 5 * 1024 * 1024;
 
@@ -125,8 +117,7 @@ namespace {
             invariant(mongo::dbHolder().closeAll(_txn.get(), unused, false));
         }
         _txn.reset();
-        delete getGlobalReplicationCoordinator();
-        setGlobalReplicationCoordinator(_prevCoordinator);
+        setGlobalReplicationCoordinator(nullptr);
     }
 
     TEST_F(SyncTailTest, Peek) {

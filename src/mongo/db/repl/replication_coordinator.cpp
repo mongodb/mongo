@@ -29,15 +29,36 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/service_context.h"
 
 namespace mongo {
 namespace repl {
+
+
+namespace {
+    const auto getReplicationCoordinator =
+        ServiceContext::declareDecoration<std::unique_ptr<ReplicationCoordinator>>();
+}
 
     ReplicationCoordinator::ReplicationCoordinator() {}
     ReplicationCoordinator::~ReplicationCoordinator() {}
 
     // TODO(dannenberg) remove when master slave is removed
     const char *replAllDead = 0;
+
+    ReplicationCoordinator* ReplicationCoordinator::get(ServiceContext* service) {
+        return getReplicationCoordinator(service).get();
+    }
+
+    ReplicationCoordinator* ReplicationCoordinator::get(ServiceContext& service) {
+        return getReplicationCoordinator(service).get();
+    }
+
+    void ReplicationCoordinator::set(ServiceContext* service,
+                                     std::unique_ptr<ReplicationCoordinator> replCoord) {
+        auto& coordinator = getReplicationCoordinator(service);
+        coordinator = std::move(replCoord);
+    }
 
 } // namespace repl
 } // namespace mongo

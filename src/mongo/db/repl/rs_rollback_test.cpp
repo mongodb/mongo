@@ -121,22 +121,16 @@ namespace {
     }
 
     class RSRollbackTest : public unittest::Test {
-    public:
-        RSRollbackTest();
-
     protected:
-
         std::unique_ptr<OperationContext> _txn;
-        std::unique_ptr<ReplicationCoordinator> _coordinator;
+
+        // Owned by service context
+        ReplicationCoordinator* _coordinator;
 
     private:
         void setUp() override;
         void tearDown() override;
-
-        ReplicationCoordinator* _prevCoordinator;
     };
-
-    RSRollbackTest::RSRollbackTest() : _prevCoordinator(nullptr) { }
 
     void RSRollbackTest::setUp() {
         ServiceContext* serviceContext = getGlobalServiceContext();
@@ -153,10 +147,9 @@ namespace {
 
         Client::initThreadIfNotAlready();
         _txn.reset(new OperationContextReplMock(&cc(), 1));
-        _coordinator.reset(new ReplicationCoordinatorRollbackMock());
+        _coordinator = new ReplicationCoordinatorRollbackMock();
 
-        _prevCoordinator = getGlobalReplicationCoordinator();
-        setGlobalReplicationCoordinator(_coordinator.get());
+        setGlobalReplicationCoordinator(_coordinator);
 
         setOplogCollectionName();
     }
@@ -167,9 +160,8 @@ namespace {
             BSONObjBuilder unused;
             invariant(mongo::dbHolder().closeAll(_txn.get(), unused, false));
         }
-        setGlobalReplicationCoordinator(_prevCoordinator);
-        _coordinator.reset();
         _txn.reset();
+        setGlobalReplicationCoordinator(nullptr);
     }
 
     void noSleep(Seconds seconds) {}
@@ -183,7 +175,7 @@ namespace {
                 OplogInterfaceMock(kEmptyMockOperations),
                 RollbackSourceMock(std::unique_ptr<OplogInterface>(
                     new OplogInterfaceMock(kEmptyMockOperations))),
-                _coordinator.get(),
+                _coordinator,
                 noSleep);
         ASSERT_EQUALS(ErrorCodes::UnrecoverableRollbackError, status.code());
         ASSERT_EQUALS(18750, status.location());
@@ -197,8 +189,8 @@ namespace {
             MemberState getMemberState() const override { return MemberState::RS_DOWN; }
             bool setFollowerMode(const MemberState& newState) override { return false; }
         };
-        _coordinator.reset(new ReplicationCoordinatorSetFollowerModeMock());
-        setGlobalReplicationCoordinator(_coordinator.get());
+        _coordinator = new ReplicationCoordinatorSetFollowerModeMock();
+        setGlobalReplicationCoordinator(_coordinator);
 
         ASSERT_EQUALS(
             ErrorCodes::OperationFailed,
@@ -208,7 +200,7 @@ namespace {
                 OplogInterfaceMock(kEmptyMockOperations),
                 RollbackSourceMock(std::unique_ptr<OplogInterface>(
                     new OplogInterfaceMock(kEmptyMockOperations))),
-                _coordinator.get(),
+                _coordinator,
                 noSleep).code());
     }
 
@@ -225,7 +217,7 @@ namespace {
                 RollbackSourceMock(std::unique_ptr<OplogInterface>(new OplogInterfaceMock({
                     operation,
                 }))),
-                _coordinator.get(),
+                _coordinator,
                 noSleep).code());
     }
 
@@ -240,7 +232,7 @@ namespace {
                 OplogInterfaceMock({operation}),
                 RollbackSourceMock(std::unique_ptr<OplogInterface>(
                     new OplogInterfaceMock(kEmptyMockOperations))),
-                _coordinator.get(),
+                _coordinator,
                 noSleep);
         ASSERT_EQUALS(ErrorCodes::UnrecoverableRollbackError, status.code());
         ASSERT_EQUALS(18752, status.location());
@@ -265,7 +257,7 @@ namespace {
                 OplogInterfaceMock({operation}),
                 RollbackSourceLocal(std::unique_ptr<OplogInterface>(
                     new OplogInterfaceMock(kEmptyMockOperations))),
-                _coordinator.get(),
+                _coordinator,
                 noSleep),
             UserException,
             ErrorCodes::UnknownError);
@@ -284,7 +276,7 @@ namespace {
                 RollbackSourceMock(std::unique_ptr<OplogInterface>(new OplogInterfaceMock({
                     operation,
                 }))),
-                _coordinator.get(),
+                _coordinator,
                 noSleep));
     }
 
@@ -371,14 +363,14 @@ namespace {
 
     TEST_F(RSRollbackTest, RollBackDeleteNoDocumentAtSourceCollectionDoesNotExist) {
         createOplog(_txn.get());
-        ASSERT_EQUALS(-1, _testRollBackDelete(_txn.get(), _coordinator.get(), BSONObj()));
+        ASSERT_EQUALS(-1, _testRollBackDelete(_txn.get(), _coordinator, BSONObj()));
     }
 
     TEST_F(RSRollbackTest, RollBackDeleteNoDocumentAtSourceCollectionExistsNonCapped) {
         createOplog(_txn.get());
         _createCollection(_txn.get(), "test.t", CollectionOptions());
-        _testRollBackDelete(_txn.get(), _coordinator.get(), BSONObj());
-        ASSERT_EQUALS(0, _testRollBackDelete(_txn.get(), _coordinator.get(), BSONObj()));
+        _testRollBackDelete(_txn.get(), _coordinator, BSONObj());
+        ASSERT_EQUALS(0, _testRollBackDelete(_txn.get(), _coordinator, BSONObj()));
     }
 
     TEST_F(RSRollbackTest, RollBackDeleteNoDocumentAtSourceCollectionExistsCapped) {
@@ -386,15 +378,15 @@ namespace {
         CollectionOptions options;
         options.capped = true;
         _createCollection(_txn.get(), "test.t", options);
-        ASSERT_EQUALS(0, _testRollBackDelete(_txn.get(), _coordinator.get(), BSONObj()));
+        ASSERT_EQUALS(0, _testRollBackDelete(_txn.get(), _coordinator, BSONObj()));
     }
 
     TEST_F(RSRollbackTest, RollBackDeleteRestoreDocument) {
         createOplog(_txn.get());
         _createCollection(_txn.get(), "test.t", CollectionOptions());
         BSONObj doc = BSON("_id" << 0 << "a" << 1);
-        _testRollBackDelete(_txn.get(), _coordinator.get(), doc);
-        ASSERT_EQUALS(1, _testRollBackDelete(_txn.get(), _coordinator.get(), doc));
+        _testRollBackDelete(_txn.get(), _coordinator, doc);
+        ASSERT_EQUALS(1, _testRollBackDelete(_txn.get(), _coordinator, doc));
     }
 
     TEST_F(RSRollbackTest, RollbackUnknownCommand) {
@@ -426,7 +418,7 @@ namespace {
                 RollbackSourceMock(std::unique_ptr<OplogInterface>(new OplogInterfaceMock({
                     commonOperation,
                 }))),
-                _coordinator.get(),
+                _coordinator,
                 noSleep);
         ASSERT_EQUALS(ErrorCodes::UnrecoverableRollbackError, status.code());
         ASSERT_EQUALS(18751, status.location());
@@ -466,7 +458,7 @@ namespace {
                 opTime,
                 OplogInterfaceMock({dropCollectionOperation, commonOperation}),
                 rollbackSource,
-                _coordinator.get(),
+                _coordinator,
                 noSleep));
         ASSERT_TRUE(rollbackSource.called);
     }
@@ -494,7 +486,7 @@ namespace {
                 opTime,
                 OplogInterfaceMock({createCollectionOperation, commonOperation}),
                 rollbackSource,
-                _coordinator.get(),
+                _coordinator,
                 noSleep));
         {
             Lock::DBLock dbLock(_txn->lockState(), "test", MODE_S);
@@ -538,7 +530,7 @@ namespace {
                 opTime,
                 OplogInterfaceMock({collectionModificationOperation, commonOperation}),
                 rollbackSource,
-                _coordinator.get(),
+                _coordinator,
                 noSleep));
         ASSERT_TRUE(rollbackSource.called);
     }
@@ -574,7 +566,7 @@ namespace {
                 opTime,
                 OplogInterfaceMock({collectionModificationOperation, commonOperation}),
                 rollbackSource,
-                _coordinator.get(),
+                _coordinator,
                 noSleep);
         ASSERT_EQUALS(ErrorCodes::UnrecoverableRollbackError, status.code());
         ASSERT_EQUALS(18753, status.location());

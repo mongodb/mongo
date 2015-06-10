@@ -66,19 +66,11 @@ namespace ReplTests {
 
     class Base {
     protected:
-        repl::ReplicationCoordinator* _prevGlobGoordinator;
         mutable OperationContextImpl _txn;
         mutable DBDirectClient _client;
 
     public:
-        Base() : _prevGlobGoordinator(getGlobalReplicationCoordinator())
-               , _client(&_txn) {
-            ReplSettings replSettings;
-            replSettings.oplogSize = 5 * 1024 * 1024;
-            replSettings.master = true;
-            ReplicationCoordinatorMock* replCoord = new ReplicationCoordinatorMock(replSettings);
-            setGlobalReplicationCoordinator(replCoord);
-
+        Base() : _client(&_txn) {
             setOplogCollectionName();
             createOplog(&_txn);
 
@@ -95,10 +87,6 @@ namespace ReplTests {
         }
         ~Base() {
             try {
-                delete getGlobalReplicationCoordinator();
-                setGlobalReplicationCoordinator(_prevGlobGoordinator);
-                _prevGlobGoordinator = NULL;
-
                 deleteAll( ns() );
                 deleteAll( cllNS() );
             }

@@ -45,6 +45,7 @@ namespace mongo {
     class IndexDescriptor;
     class NamespaceString;
     class OperationContext;
+    class ServiceContext;
     class Timestamp;
     struct WriteConcernOptions;
 
@@ -87,6 +88,10 @@ namespace repl {
         MONGO_DISALLOW_COPYING(ReplicationCoordinator);
 
     public:
+        static ReplicationCoordinator* get(ServiceContext* service);
+        static ReplicationCoordinator* get(ServiceContext& service);
+        static void set(ServiceContext* service,
+                        std::unique_ptr<ReplicationCoordinator> replCoordinator);
 
         struct StatusAndDuration {
         public:
