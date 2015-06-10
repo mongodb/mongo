@@ -28,10 +28,11 @@ static int __verify_last_truncate(WT_SESSION_IMPL *, WT_BLOCK *, WT_CKPT *);
  *	Start file verification.
  */
 int
-__wt_block_verify_start(
-    WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckptbase)
+__wt_block_verify_start(WT_SESSION_IMPL *session,
+    WT_BLOCK *block, WT_CKPT *ckptbase, const char *cfg[])
 {
 	WT_CKPT *ckpt;
+	WT_CONFIG_ITEM cval;
 	wt_off_t size;
 
 	/*
@@ -97,6 +98,10 @@ __wt_block_verify_start(
 	 * get it now and initialize the list of file fragments.
 	 */
 	WT_RET(__verify_last_avail(session, block, ckpt));
+
+	/* Configuration: strict behavior on any error. */
+	WT_RET(__wt_config_gets(session, cfg, "strict", &cval));
+	block->verify_strict = cval.val ? 1 : 0;
 
 	block->verify = 1;
 	return (0);
@@ -164,14 +169,18 @@ __wt_block_verify_end(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	/* Confirm we verified every file block. */
 	ret = __verify_filefrag_chk(session, block);
 
+	block->verify = 0;
+	block->verify_strict = 0;
+	block->verify_size = 0;
+
 	/* Discard the accumulated allocation list. */
 	__wt_block_extlist_free(session, &block->verify_alloc);
 
 	/* Discard the fragment tracking lists. */
+	block->frags = 0;
 	__wt_free(session, block->fragfile);
 	__wt_free(session, block->fragckpt);
 
-	block->verify = 0;
 	return (ret);
 }
 
@@ -434,7 +443,7 @@ __verify_filefrag_chk(WT_SESSION_IMPL *session, WT_BLOCK *block)
 		return (0);
 
 	__wt_errx(session, "file ranges never verified: %" PRIu64, count);
-	return (WT_ERROR);
+	return (block->verify_strict ? WT_ERROR : 0);
 }
 
 /*
@@ -527,5 +536,5 @@ __verify_ckptfrag_chk(WT_SESSION_IMPL *session, WT_BLOCK *block)
 
 	__wt_errx(session,
 	    "checkpoint ranges never verified: %" PRIu64, count);
-	return (WT_ERROR);
+	return (block->verify_strict ? WT_ERROR : 0);
 }
