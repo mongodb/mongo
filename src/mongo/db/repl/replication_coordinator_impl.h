@@ -742,14 +742,18 @@ namespace repl {
         /**
          * Callback called when the dryRun VoteRequester has completed; checks the results and
          * decides whether to conduct a proper election.
+         * "originalTerm" was the term during which the dry run began, if the term has since
+         * changed, do not run for election.
          */
-        void _onDryRunComplete();
+        void _onDryRunComplete(long long originalTerm);
 
         /**
          * Callback called when the VoteRequester has completed; checks the results and
          * decides whether to change state to primary and alert other nodes of our primary-ness.
+         * "originalTerm" was the term during which the election began, if the term has since
+         * changed, do not step up as primary.
          */
-        void _onVoteRequestComplete();
+        void _onVoteRequestComplete(long long originalTerm);
 
         /**
          * Callback called when the ElectWinnerDeclarer has completed; checks the results and

@@ -542,6 +542,81 @@ namespace {
                 countLogLinesContaining("not becoming primary, we have been superceded already"));
     }
 
+    TEST_F(ReplCoordElectV1Test, ElectTermChangeDuringDryRun) {
+        startCapturingLogMessages();
+        BSONObj configObj = BSON("_id" << "mySet" <<
+                                 "version" << 1 <<
+                                 "members" << BSON_ARRAY(BSON("_id" << 1 << "host" << "node1:12345")
+                                                      << BSON("_id" << 2 << "host" << "node2:12345")
+                                                      << BSON("_id" << 3 << "host" << "node3:12345")
+                                                        ) <<
+                                 "protocolVersion" << 1);
+        assertStartSuccess(configObj, HostAndPort("node1", 12345));
+        ReplicaSetConfig config = assertMakeRSConfig(configObj);
+
+        OperationContextNoop txn;
+        OpTime time1(Timestamp(100, 1), 0);
+        getReplCoord()->setMyLastOptime(time1);
+        ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+
+        simulateEnoughHeartbeatsForElectability();
+        // update to a future term before dry run completes
+        getReplCoord()->updateTerm(1000);
+        simulateSuccessfulDryRun();
+        stopCapturingLogMessages();
+        ASSERT_EQUALS(1,
+                countLogLinesContaining(
+                    "not running for primary, we have been superceded already"));
+    }
+
+    TEST_F(ReplCoordElectV1Test, ElectTermChangeDuringActualElection) {
+        startCapturingLogMessages();
+        BSONObj configObj = BSON("_id" << "mySet" <<
+                                 "version" << 1 <<
+                                 "members" << BSON_ARRAY(BSON("_id" << 1 << "host" << "node1:12345")
+                                                      << BSON("_id" << 2 << "host" << "node2:12345")
+                                                      << BSON("_id" << 3 << "host" << "node3:12345")
+                                                        ) <<
+                                 "protocolVersion" << 1);
+        assertStartSuccess(configObj, HostAndPort("node1", 12345));
+        ReplicaSetConfig config = assertMakeRSConfig(configObj);
+
+        OperationContextNoop txn;
+        OpTime time1(Timestamp(100, 1), 0);
+        getReplCoord()->setMyLastOptime(time1);
+        ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+
+        simulateEnoughHeartbeatsForElectability();
+        simulateSuccessfulDryRun();
+        // update to a future term before the election completes
+        getReplCoord()->updateTerm(1000);
+
+        NetworkInterfaceMock* net = getNet();
+        net->enterNetwork();
+        while (net->hasReadyRequests()) {
+            const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
+            const RemoteCommandRequest& request = noi->getRequest();
+            log() << request.target.toString() << " processing " << request.cmdObj;
+            if (request.cmdObj.firstElement().fieldNameStringData() != "replSetRequestVotes") {
+                net->blackHole(noi);
+            }
+            else {
+                net->scheduleResponse(
+                        noi,
+                        net->now(),
+                        makeResponseStatus(BSON("ok" << 1 <<
+                                                "term" << request.cmdObj["term"].Long() <<
+                                                "voteGranted" << true <<
+                                                "reason" << "")));
+            }
+            net->runReadyNetworkOperations();
+        }
+        net->exitNetwork();
+        stopCapturingLogMessages();
+        ASSERT_EQUALS(1,
+                countLogLinesContaining("not becoming primary, we have been superceded already"));
+    }
+
 }
 }
 }
