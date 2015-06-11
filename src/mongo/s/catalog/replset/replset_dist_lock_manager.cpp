@@ -30,6 +30,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <chrono>
+
 #include "mongo/s/catalog/replset/replset_dist_lock_manager.h"
 
 #include "mongo/base/status.h"
@@ -48,6 +50,7 @@ namespace mongo {
     using std::string;
     using std::unique_ptr;
     using stdx::chrono::milliseconds;
+    using std::chrono::duration_cast;
 
     ReplSetDistLockManager::ReplSetDistLockManager(StringData processID,
                                                    unique_ptr<DistLockCatalog> catalog,
@@ -92,8 +95,24 @@ namespace mongo {
     }
 
     void ReplSetDistLockManager::doTask() {
+        LOG(0) << "creating distributed lock ping thread for process " << _processID
+               << " (sleeping for "
+               << duration_cast<milliseconds>(_pingInterval).count() << " ms)";
+
+        Timer elapsedSincelastPing;
         while (!isShutDown()) {
-            _catalog->ping(_processID, Date_t::now());
+            auto pingStatus = _catalog->ping(_processID, Date_t::now());
+
+            if (!pingStatus.isOK()) {
+                warning() << "pinging failed for distributed lock pinger" << causedBy(pingStatus);
+            }
+
+            const milliseconds elapsed(elapsedSincelastPing.millis());
+            if (elapsed > 10 * _pingInterval) {
+                warning() << "Lock pinger for proc: " << _processID
+                          << " was inactive for " << elapsed << " ms";
+            }
+            elapsedSincelastPing.reset();
 
             std::deque<DistLockHandle> toUnlockBatch;
             {
@@ -108,6 +127,10 @@ namespace mongo {
                     warning() << "Failed to unlock lock with " << LocksType::lockID()
                               << ": " << toUnlock << causedBy(unlockStatus);
                     queueUnlock(toUnlock);
+                }
+                else {
+                    LOG(0) << "distributed lock with" << LocksType::lockID()
+                           << ": " << toUnlock << "' unlocked.";
                 }
 
                 if (isShutDown()) {
@@ -169,6 +192,11 @@ namespace mongo {
         auto configServerLocalTime = serverInfo.serverTime - delay;
 
         auto* pingInfo = &pingIter->second;
+
+        LOG(1) << "checking last ping for lock '" << lockDoc.getName()
+               << "' against last seen process " << pingInfo->processId
+               << " and ping " << pingInfo->lastPing;
+
         if (pingInfo->lastPing != pingValue || // ping is active
 
                 // Owner of this lock is now different from last time so we can't
@@ -194,9 +222,19 @@ namespace mongo {
 
         milliseconds elapsedSinceLastPing(configServerLocalTime - pingInfo->configLocalTime);
         if (elapsedSinceLastPing >= _lockExpiration) {
+            LOG(0) << "forcing lock '" << lockDoc.getName()
+                   << "' because elapsed time "
+                   << duration_cast<milliseconds>(elapsedSinceLastPing).count()
+                   << " ms >= takeover time "
+                   << duration_cast<milliseconds>(_lockExpiration).count() << " ms";
             return true;
         }
 
+        LOG(1) << "could not force lock '" << lockDoc.getName()
+               << "' because elapsed time "
+               << duration_cast<milliseconds>(elapsedSinceLastPing).count()
+               << " ms < takeover time "
+               << duration_cast<milliseconds>(_lockExpiration).count() << " ms";
         return false;
     }
 
@@ -211,6 +249,16 @@ namespace mongo {
         while (waitFor <= milliseconds::zero() || milliseconds(timer.millis()) < waitFor) {
             OID lockSessionID = OID::gen();
             string who = str::stream() << _processID << ":" << getThreadName();
+
+            LOG(1) << "trying to acquire new distributed lock for " << name
+                   << " ( lock timeout : "
+                   << duration_cast<milliseconds>(_lockExpiration).count()
+                   << " ms, ping interval : "
+                   << duration_cast<milliseconds>(_pingInterval).count()
+                   << " ms, process : " << _processID << " )"
+                   << " with lockSessionID: " << lockSessionID
+                   << ", why: " << whyMessage;
+
             auto lockResult = _catalog->grabLock(name,
                                                  lockSessionID,
                                                  who,
@@ -223,6 +271,7 @@ namespace mongo {
             if (status.isOK()) {
                 // Lock is acquired since findAndModify was able to successfully modify
                 // the lock document.
+                LOG(0) << "distributed lock '" << name << "' acquired, ts : " << lockSessionID;
                 return ScopedDistLock(lockSessionID, this);
             }
 
@@ -265,6 +314,10 @@ namespace mongo {
                     if (overtakeResult.isOK()) {
                         // Lock is acquired since findAndModify was able to successfully modify
                         // the lock document.
+
+                        LOG(0) << "lock '" << name << "' successfully forced";
+                        LOG(0) << "distributed lock '" << name
+                               << "' acquired, ts : " << lockSessionID;
                         return ScopedDistLock(lockSessionID, this);
                     }
 
@@ -276,6 +329,8 @@ namespace mongo {
                     }
                 }
             }
+
+            LOG(1) << "distributed lock '" << name << "' was not acquired.";
 
             if (waitFor == milliseconds::zero()) {
                 break;
@@ -302,6 +357,10 @@ namespace mongo {
 
         if (!unlockStatus.isOK()) {
             queueUnlock(lockSessionID);
+        }
+        else {
+            LOG(0) << "distributed lock with" << LocksType::lockID()
+                   << ": " << lockSessionID << "' unlocked.";
         }
     }
 
