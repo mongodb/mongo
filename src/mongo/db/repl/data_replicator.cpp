@@ -67,21 +67,6 @@ namespace {
         return static_cast<size_t>(o.objsize());
     }
 
-    std::string toString(DataReplicatorState s) {
-        switch (s) {
-            case DataReplicatorState::InitialSync:
-                return "InitialSync";
-            case DataReplicatorState::Rollback:
-                return "Rollback";
-            case DataReplicatorState::Steady:
-                return "Steady Replication";
-            case DataReplicatorState::Uninitialized:
-                return "Uninitialized";
-            default:
-                return "<invalid>";
-        }
-    }
-
     Timestamp findCommonPoint(HostAndPort host, Timestamp start) {
         // TODO: walk back in the oplog looking for a known/shared optime.
         return Timestamp();
@@ -92,6 +77,20 @@ namespace {
         return false;
     }
 } // namespace
+
+std::string toString(DataReplicatorState s) {
+    switch (s) {
+    case DataReplicatorState::InitialSync:
+        return "InitialSync";
+    case DataReplicatorState::Rollback:
+        return "Rollback";
+    case DataReplicatorState::Steady:
+        return "Steady Replication";
+    case DataReplicatorState::Uninitialized:
+        return "Uninitialized";
+    }
+    MONGO_UNREACHABLE;
+}
 
     /**
      * Follows the fetcher pattern for a find+getmore on an oplog
@@ -132,7 +131,7 @@ namespace {
                          src,
                          oplogNSS,
                          BSON("find" << oplogNSS.coll() <<
-                              "query" << BSON("ts" << BSON("$gte" << startTS))),
+                              "filter" << BSON("ts" << BSON("$gte" << startTS))),
                          work),
             _startTS(startTS) {
     }
@@ -152,16 +151,34 @@ namespace {
             Fetcher::Documents::const_iterator firstDoc = fetchResult.getValue().documents.begin();
             auto hasDoc = firstDoc != fetchResult.getValue().documents.end();
 
-            if (checkStartTS &&
-                    (!hasDoc || (hasDoc && (*firstDoc)["ts"].timestamp() != _startTS))) {
-                // Set next action to none.
-                *nextAction = Fetcher::NextAction::kNoAction;
-                _work(Status(ErrorCodes::OplogStartMissing,
-                             str::stream() << "First returned " << (*firstDoc)["ts"]
-                                           << " is not where we wanted to start: "
-                                           << _startTS.toString()),
-                      nextAction);
-                return;
+            if (checkStartTS) {
+                if (!hasDoc) {
+                    // Set next action to none.
+                    *nextAction = Fetcher::NextAction::kNoAction;
+                    _work(Status(ErrorCodes::OplogStartMissing, str::stream() <<
+                                 "No operations on sync source with op time starting at: " <<
+                                 _startTS.toString()),
+                          nextAction);
+                    return;
+                } else if ((*firstDoc)["ts"].eoo()) {
+                    // Set next action to none.
+                    *nextAction = Fetcher::NextAction::kNoAction;
+                    _work(Status(ErrorCodes::OplogStartMissing, str::stream() <<
+                                 "Missing 'ts' field in first returned " << (*firstDoc)["ts"] <<
+                                 " starting at " << _startTS.toString()),
+                          nextAction);
+                    return;
+                } else if ((*firstDoc)["ts"].timestamp() != _startTS) {
+                    // Set next action to none.
+                    *nextAction = Fetcher::NextAction::kNoAction;
+                    _work(Status(ErrorCodes::OplogStartMissing,
+                                 str::stream() << "First returned " << (*firstDoc)["ts"]
+                                               << " is not where we wanted to start: "
+                                               << _startTS.toString()),
+                          nextAction);
+                    return;
+                }
+
             }
 
             if (hasDoc) {
@@ -502,6 +519,22 @@ namespace {
     DataReplicator::DataReplicator(DataReplicatorOptions opts,
                                    ReplicationExecutor* exec,
                                    ReplicationCoordinator* replCoord)
+        : DataReplicator(opts,
+          exec,
+          replCoord,
+          // TODO: replace this with a method in the replication coordinator.
+          [replCoord] (const Timestamp& ts) { replCoord->setMyLastOptime(OpTime(ts, 0)); }) {
+    }
+
+    DataReplicator::DataReplicator(DataReplicatorOptions opts,
+                                   ReplicationExecutor* exec)
+                            : DataReplicator(opts, exec, nullptr, [] (const Timestamp& ts) {}) {
+    }
+
+    DataReplicator::DataReplicator(DataReplicatorOptions opts,
+                                   ReplicationExecutor* exec,
+                                   ReplicationCoordinator* replCoord,
+                                   OnBatchCompleteFn batchCompletedFn)
                             : _opts(opts),
                               _exec(exec),
                               _replCoord(replCoord),
@@ -510,24 +543,9 @@ namespace {
                               _reporterPaused(false),
                               _applierActive(false),
                               _applierPaused(false),
+                              _batchCompletedFn(batchCompletedFn),
                               _oplogBuffer(256*1024*1024, &getSize), // Limit buffer to 256MB
                               _doShutdown(false) {
-        // TODO: replace this with a method in the replication coordinator.
-        if (replCoord) {
-            _batchCompletedFn = [&] (const Timestamp& ts) {
-                OpTime ot(ts, 0);
-                _replCoord->setMyLastOptime(ot);
-            };
-        }
-        else {
-            _batchCompletedFn = [] (const Timestamp& ts) {
-            };
-        }
-    }
-
-    DataReplicator::DataReplicator(DataReplicatorOptions opts,
-                                   ReplicationExecutor* exec)
-                            : DataReplicator(opts, exec, nullptr) {
     }
 
     DataReplicator::~DataReplicator() {
@@ -562,7 +580,18 @@ namespace {
         return Status::OK();
     }
 
+    DataReplicatorState DataReplicator::getState() const {
+        LockGuard lk(_mutex);
+        return _state;
+    }
+
+    Timestamp DataReplicator::getLastTimestampFetched() const {
+        LockGuard lk(_mutex);
+        return _lastTimestampFetched;
+    }
+
     std::string DataReplicator::getDiagnosticString() const {
+        LockGuard lk(_mutex);
         str::stream out;
         out << "DataReplicator -"
             << " opts: " << _opts.toString()
@@ -1002,7 +1031,9 @@ namespace {
                                              const size_t numApplied) {
         invariant(cbData.status.isOK());
         UniqueLock lk(_mutex);
-        _initialSyncState->appliedOps += numApplied;
+        if (_initialSyncState) {
+            _initialSyncState->appliedOps += numApplied;
+        }
         if (!ts.isOK()) {
             _handleFailedApplyBatch(ts, ops);
             return;
@@ -1044,7 +1075,7 @@ namespace {
         const BSONObj failedOplogEntry = *ops.begin();
         const BSONElement missingIdElem = failedOplogEntry.getFieldDotted("o2._id");
         const NamespaceString nss(ops.begin()->getField("ns").str());
-        const BSONObj query = BSON("find" << nss.coll() << "query" << missingIdElem.wrap());
+        const BSONObj query = BSON("find" << nss.coll() << "filter" << missingIdElem.wrap());
         _tmpFetcher.reset(new QueryFetcher(_exec, _syncSource, nss, query,
                                            stdx::bind(&DataReplicator::_onMissingFetched,
                                                       this,
@@ -1097,9 +1128,9 @@ namespace {
             return;
         }
 
+        LockGuard lk(_mutex);
         auto status = _scheduleApplyBatch_inlock(ops);
         if (!status.isOK()) {
-            LockGuard lk(_mutex);
             _initialSyncState->setStatus(status);
             _exec->signalEvent(_initialSyncState->finishEvent);
         }
@@ -1243,7 +1274,6 @@ namespace {
         const Status status = fetchResult.getStatus();
         if (status.code() == ErrorCodes::CallbackCanceled)
             return;
-
         if (status.isOK()) {
             const auto docs = fetchResult.getValue().documents;
             if (docs.begin() != docs.end()) {

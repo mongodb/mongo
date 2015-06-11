@@ -36,7 +36,6 @@
 #include "mongo/db/repl/read_after_optime_args.h"
 #include "mongo/db/repl/read_after_optime_response.h"
 #include "mongo/db/repl/replica_set_config.h"
-#include "mongo/db/repl/optime.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -75,8 +74,7 @@ namespace repl {
     }
 
     MemberState ReplicationCoordinatorMock::getMemberState() const {
-        // TODO
-        invariant(false);
+        return _memberState;
     }
 
     bool ReplicationCoordinatorMock::isInPrimaryOrSecondaryState() const {
@@ -146,13 +144,16 @@ namespace repl {
         // TODO
     }
 
-    void ReplicationCoordinatorMock::setMyLastOptime(const OpTime& opTime) {}
+    void ReplicationCoordinatorMock::setMyLastOptime(const OpTime& opTime) {
+        _myLastOpTime = opTime;
+    }
 
-    void ReplicationCoordinatorMock::resetMyLastOptime() {}
+    void ReplicationCoordinatorMock::resetMyLastOptime() {
+        _myLastOpTime = OpTime();
+    }
 
     OpTime ReplicationCoordinatorMock::getMyLastOptime() const {
-        // TODO
-        return OpTime();
+        return _myLastOpTime;
     }
 
     ReadAfterOpTimeResponse ReplicationCoordinatorMock::waitUntilOpTime(
@@ -176,6 +177,7 @@ namespace repl {
     }
 
     bool ReplicationCoordinatorMock::setFollowerMode(const MemberState& newState) {
+        _memberState = newState;
         return true;
     }
 
@@ -300,12 +302,10 @@ namespace repl {
     }
 
     HostAndPort ReplicationCoordinatorMock::chooseNewSyncSource() {
-        invariant(false);
         return HostAndPort();
     }
 
     void ReplicationCoordinatorMock::blacklistSyncSource(const HostAndPort& host, Date_t until) {
-        invariant(false);
     }
 
     void ReplicationCoordinatorMock::resetLastOpTimeFromOplog(OperationContext* txn) {

@@ -604,7 +604,8 @@ env.CppUnitTest(
         'data_replicator',
         'replica_set_messages',
         'replication_executor_test_fixture',
-        'repl_coordinator_test_fixture',
+        'replmocks',
+        '$BUILD_DIR/mongo/unittest/concurrency',
     ],
 )
 

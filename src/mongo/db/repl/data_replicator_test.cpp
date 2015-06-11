@@ -39,17 +39,17 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_impl.h"
 #include "mongo/db/repl/replica_set_config.h"
-#include "mongo/db/repl/replication_coordinator_external_state_mock.h"
-#include "mongo/db/repl/replication_coordinator_impl.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_executor_test_fixture.h"
 #include "mongo/db/repl/replication_executor.h"
-#include "mongo/db/repl/topology_coordinator_impl.h"
 #include "mongo/executor/network_interface_mock.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/log.h"
 
+#include "mongo/unittest/barrier.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
@@ -75,32 +75,25 @@ namespace {
             ReplicationExecutorTest::setUp();
             reset();
 
-            // PRNG seed for tests.
-            const int64_t seed = 0;
-
             _settings.replSet = "foo"; // We are a replica set :)
-            ReplicationExecutor* exec = &(getExecutor());
-            _topo = new TopologyCoordinatorImpl(Seconds(0));
-            _externalState = new ReplicationCoordinatorExternalStateMock;
-            _repl.reset(new ReplicationCoordinatorImpl(_settings,
-                                                       _externalState,
-                                                       _topo,
-                                                       exec,
-                                                       seed));
+            _repl.reset(new ReplicationCoordinatorMock(_settings));
             launchExecutorThread();
-            createDataReplicator(DataReplicatorOptions{});
+            DataReplicatorOptions options;
+            options.initialSyncRetryWait = Milliseconds(0);
+            createDataReplicator(options);
         }
 
         void postExecutorThreadLaunch() override {};
 
         void tearDown() override {
             ReplicationExecutorTest::tearDown();
+            _dr.reset();
+            _repl.reset();
             // Executor may still invoke callback before shutting down.
         }
 
         void reset() {
             // clear/reset state
-
         }
 
         void createDataReplicator(DataReplicatorOptions opts) {
@@ -108,13 +101,25 @@ namespace {
             _dr->__setSourceForTesting(target);
         }
 
+        void createDataReplicator(DataReplicatorOptions opts,
+                                  DataReplicator::OnBatchCompleteFn batchCompletedFn) {
+            _dr.reset(new DataReplicator(opts, &(getExecutor()), _repl.get(), batchCompletedFn));
+            _dr->__setSourceForTesting(target);
+        }
+
         void scheduleNetworkResponse(const BSONObj& obj) {
             NetworkInterfaceMock* net = getNet();
             ASSERT_TRUE(net->hasReadyRequests());
+            scheduleNetworkResponse(net->getNextReadyRequest(), obj);
+        }
+
+        void scheduleNetworkResponse(NetworkInterfaceMock::NetworkOperationIterator noi,
+                                     const BSONObj& obj) {
+            NetworkInterfaceMock* net = getNet();
             Milliseconds millis(0);
             RemoteCommandResponse response(obj, millis);
             ReplicationExecutor::ResponseStatus responseStatus(response);
-            net->scheduleResponse(net->getNextReadyRequest(), net->now(), responseStatus);
+            net->scheduleResponse(noi, net->now(), responseStatus);
         }
 
         void scheduleNetworkResponse(ErrorCodes::Error code, const std::string& reason) {
@@ -140,19 +145,12 @@ namespace {
         }
 
         DataReplicator& getDR() { return *_dr; }
-        TopologyCoordinatorImpl& getTopo() { return *_topo; }
-        ReplicationCoordinatorImpl& getRepl() { return *_repl; }
+        ReplicationCoordinator& getRepl() { return *_repl; }
 
 
     private:
         std::unique_ptr<DataReplicator> _dr;
-        std::unique_ptr<ReplicationCoordinatorImpl> _repl;
-        // Owned by ReplicationCoordinatorImpl
-        TopologyCoordinatorImpl* _topo;
-        // Owned by ReplicationCoordinatorImpl
-        NetworkInterfaceMock* _net;
-        // Owned by ReplicationCoordinatorImpl
-        ReplicationCoordinatorExternalStateMock* _externalState;
+        std::unique_ptr<ReplicationCoordinator> _repl;
         ReplSettings _settings;
 
     };
@@ -468,7 +466,6 @@ namespace {
         ReplicaSetConfig config = assertMakeRSConfig(configObj);
         Timestamp time1(100, 1);
         OpTime opTime1(time1, OpTime::kDefaultTerm);
-        getTopo().updateConfig(config, 0, getNet()->now(), opTime1);
         getRepl().setMyLastOptime(opTime1);
         ASSERT(getRepl().setFollowerMode(MemberState::RS_SECONDARY));
 
@@ -503,4 +500,103 @@ namespace {
         playResponses();
         verifySync(ErrorCodes::InitialSyncFailure);
     }
+
+    class SteadyStateTest : public DataReplicatorTest {
+    protected:
+        void _testOplogStartMissing(const BSONObj& oplogFetcherResponse) {
+            DataReplicator& dr = getDR();
+            auto net = getNet();
+            net->enterNetwork();
+            ASSERT_OK(dr.start());
+
+            ASSERT_TRUE(net->hasReadyRequests());
+            auto noi = net->getNextReadyRequest();
+            scheduleNetworkResponse(noi, oplogFetcherResponse);
+            net->runReadyNetworkOperations();
+            ASSERT_EQUALS(MemberState(MemberState::RS_RECOVERING).toString(),
+                          getRepl().getMemberState().toString());
+        }
+
+    };
+
+    TEST_F(SteadyStateTest, StartWhenInSteadyState) {
+        DataReplicator& dr = getDR();
+        ASSERT_EQUALS(toString(DataReplicatorState::Uninitialized), toString(dr.getState()));
+        ASSERT_OK(dr.start());
+        ASSERT_EQUALS(toString(DataReplicatorState::Steady), toString(dr.getState()));
+        ASSERT_EQUALS(ErrorCodes::IllegalOperation, dr.start().code());
+    }
+
+    TEST_F(SteadyStateTest, RemoteOplogEmpty) {
+        _testOplogStartMissing(
+            fromjson("{ok:1, cursor:{id:0, ns:'local.oplog.rs', firstBatch: []}}"));
+    }
+
+    TEST_F(SteadyStateTest, RemoteOplogFirstOperationMissingTimestamp) {
+        _testOplogStartMissing(
+            fromjson("{ok:1, cursor:{id:0, ns:'local.oplog.rs', firstBatch: [{}]}}"));
+    }
+
+    TEST_F(SteadyStateTest, RemoteOplogFirstOperationTimestampDoesNotMatch) {
+        _testOplogStartMissing(
+            fromjson("{ok:1, cursor:{id:0, ns:'local.oplog.rs', "
+                     "firstBatch: [{ts:Timestamp(1,1)}]}}"));
+    }
+
+    TEST_F(SteadyStateTest, ApplyOneOperation) {
+        auto operationToApply = BSON("op" << "a" << "ts" << Timestamp(Seconds(123), 0));
+        stdx::mutex mutex;
+        unittest::Barrier barrier(2U);
+        Timestamp lastTimestampApplied;
+        BSONObj operationApplied;
+        auto batchCompletedFn = [&] (const Timestamp& ts) {
+            stdx::lock_guard<stdx::mutex> lock(mutex);
+            lastTimestampApplied = ts;
+            barrier.countDownAndWait();
+        };
+        DataReplicatorOptions opts;
+        opts.applierFn = [&] (OperationContext* txn, const BSONObj& op) {
+            stdx::lock_guard<stdx::mutex> lock(mutex);
+            operationApplied = op;
+            barrier.countDownAndWait();
+            return Status::OK();
+        };
+        createDataReplicator(opts, batchCompletedFn);
+
+        auto& repl = getRepl();
+        repl.setMyLastOptime(OpTime(operationToApply["ts"].timestamp(), 0));
+        ASSERT_TRUE(repl.setFollowerMode(MemberState::RS_SECONDARY));
+
+        auto net = getNet();
+        net->enterNetwork();
+
+        auto& dr = getDR();
+        ASSERT_OK(dr.start());
+
+        ASSERT_TRUE(net->hasReadyRequests());
+        auto noi = net->getNextReadyRequest();
+        auto oplogFetcherResponse = BSON(
+            "ok" << 1 <<
+            "cursor" << BSON(
+                "id" << 0 <<
+                "ns" << "local.oplog.rs" <<
+                "firstBatch" << BSON_ARRAY(operationToApply)));
+        scheduleNetworkResponse(noi, oplogFetcherResponse);
+        net->runReadyNetworkOperations();
+
+        // Wait for applier function.
+        barrier.countDownAndWait();
+        ASSERT_EQUALS(operationToApply["ts"].timestamp(), dr.getLastTimestampFetched());
+        net->exitNetwork();
+
+        // Wait for batch completion callback.
+        barrier.countDownAndWait();
+
+        ASSERT_EQUALS(MemberState(MemberState::RS_SECONDARY).toString(),
+                      repl.getMemberState().toString());
+        stdx::lock_guard<stdx::mutex> lock(mutex);
+        ASSERT_EQUALS(operationToApply, operationApplied);
+        ASSERT_EQUALS(operationToApply["ts"].timestamp(), lastTimestampApplied);
+    }
+
 }

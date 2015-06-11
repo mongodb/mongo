@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/base/status.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
 
 namespace mongo {
@@ -212,6 +213,8 @@ namespace repl {
     private:
 
         const ReplSettings _settings;
+        MemberState _memberState;
+        OpTime _myLastOpTime;
     };
 
 } // namespace repl

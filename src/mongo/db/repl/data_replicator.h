@@ -78,6 +78,8 @@ enum class DataReplicatorState {
     Uninitialized,
 };
 
+std::string toString(DataReplicatorState s);
+
 // TBD -- ignore for now
 enum class DataReplicatorScope {
     ReplicateAll,
@@ -138,6 +140,14 @@ public:
     DataReplicator(DataReplicatorOptions opts,
                    ReplicationExecutor* exec);
 
+    /**
+     * Used for testing.
+     */
+    DataReplicator(DataReplicatorOptions opts,
+                   ReplicationExecutor* exec,
+                   ReplicationCoordinator* replCoord,
+                   OnBatchCompleteFn batchCompletedFn);
+
     virtual ~DataReplicator();
 
     Status start();
@@ -161,9 +171,12 @@ public:
     // Don't use above methods before these
     TimestampStatus initialSync();
 
+    DataReplicatorState getState() const;
+    Timestamp getLastTimestampFetched() const;
     std::string getDiagnosticString() const;
 
     // For testing only
+
     void _resetState_inlock(Timestamp lastAppliedOptime);
     void __setSourceForTesting(HostAndPort src) { _syncSource = src; }
     void _setInitialSyncStorageInterface(CollectionCloner::StorageInterface* si);
