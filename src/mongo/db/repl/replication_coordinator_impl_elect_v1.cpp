@@ -130,11 +130,7 @@ namespace {
             return;
         }
 
-        log() << "running for election";
-        _topCoord->incrementTerm();
-        // Secure our vote for ourself first
-        _topCoord->voteForMyselfV1();
-
+        log() << "conducting a dry run election to see if we could be elected";
         _voteRequester.reset(new VoteRequester);
 
         // This is necessary because the voteRequester may call directly into winning an
@@ -147,7 +143,53 @@ namespace {
                 _rsConfig,
                 _rsConfig.getMemberAt(_selfIndex).getId(),
                 _topCoord->getTerm(),
-                false, // TODO(dannenberg): make this the second election stage by adding a dryrun
+                true, // dry run
+                getMyLastOptime(),
+                stdx::bind(&ReplicationCoordinatorImpl::_onDryRunComplete, this));
+        if (nextPhaseEvh.getStatus() == ErrorCodes::ShutdownInProgress) {
+            return;
+        }
+        fassert(28685, nextPhaseEvh.getStatus());
+        lossGuard.dismiss();
+    }
+
+    void ReplicationCoordinatorImpl::_onDryRunComplete() {
+        invariant(_voteRequester);
+        invariant(!_electionWinnerDeclarer);
+        LoseElectionGuardV1 lossGuard(_topCoord.get(),
+                                      &_replExecutor,
+                                      &_voteRequester,
+                                      &_electionWinnerDeclarer,
+                                      &_electionFinishedEvent);
+
+        const VoteRequester::VoteRequestResult endResult = _voteRequester->getResult();
+
+        if (endResult == VoteRequester::InsufficientVotes) {
+            log() << "not running for primary, we received insufficient votes";
+            return;
+        }
+        else if (endResult == VoteRequester::StaleTerm) {
+            log() << "not running for primary, we have been superceded already";
+            return;
+        }
+        else if (endResult != VoteRequester::SuccessfullyElected) {
+            log() << "not running for primary, we received an unexpected problem";
+            return;
+        }
+
+        log() << "dry election run succeeded, running for election";
+        _topCoord->incrementTerm();
+        // Secure our vote for ourself first
+        _topCoord->voteForMyselfV1();
+
+        _voteRequester.reset(new VoteRequester);
+
+        StatusWith<ReplicationExecutor::EventHandle> nextPhaseEvh = _voteRequester->start(
+                &_replExecutor,
+                _rsConfig,
+                _rsConfig.getMemberAt(_selfIndex).getId(),
+                _topCoord->getTerm(),
+                false,
                 getMyLastOptime(),
                 stdx::bind(&ReplicationCoordinatorImpl::_onVoteRequestComplete, this));
         if (nextPhaseEvh.getStatus() == ErrorCodes::ShutdownInProgress) {

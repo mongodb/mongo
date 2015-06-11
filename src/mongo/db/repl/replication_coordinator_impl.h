@@ -720,6 +720,7 @@ namespace repl {
          *      _onElectCmdRunnerComplete()
          * For V1 (raft) style elections the election path is:
          *      _startElectSelfV1()
+         *      _onDryRunComplete()
          *      _onVoteRequestComplete()
          *      _onElectionWinnerDeclarerComplete()
          */
@@ -737,6 +738,12 @@ namespace repl {
          * decides whether to complete the election and change state to primary.
          **/
         void _onElectCmdRunnerComplete();
+
+        /**
+         * Callback called when the dryRun VoteRequester has completed; checks the results and
+         * decides whether to conduct a proper election.
+         */
+        void _onDryRunComplete();
 
         /**
          * Callback called when the VoteRequester has completed; checks the results and
