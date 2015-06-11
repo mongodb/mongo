@@ -54,7 +54,7 @@ using std::unique_ptr;
 using std::string;
 using std::stringstream;
 
-class WiredTigerHarnessHelper : public HarnessHelper {
+class WiredTigerHarnessHelper final : public HarnessHelper {
 public:
     static WT_CONNECTION* createConnection(StringData dbpath, StringData extraStrings) {
         WT_CONNECTION* conn = NULL;
@@ -86,10 +86,10 @@ public:
         _conn->close(_conn, NULL);
     }
 
-    virtual RecordStore* newNonCappedRecordStore() {
+    virtual std::unique_ptr<RecordStore> newNonCappedRecordStore() {
         return newNonCappedRecordStore("a.b");
     }
-    RecordStore* newNonCappedRecordStore(const std::string& ns) {
+    std::unique_ptr<RecordStore> newNonCappedRecordStore(const std::string& ns) {
         WiredTigerRecoveryUnit* ru = new WiredTigerRecoveryUnit(_sessionCache);
         OperationContextNoop txn(ru);
         string uri = "table:" + ns;
@@ -106,12 +106,17 @@ public:
             uow.commit();
         }
 
-        return new WiredTigerRecordStore(&txn, ns, uri);
+        return stdx::make_unique<WiredTigerRecordStore>(&txn, ns, uri);
     }
 
-    virtual RecordStore* newCappedRecordStore(const std::string& ns,
-                                              int64_t cappedMaxSize,
-                                              int64_t cappedMaxDocs) {
+    std::unique_ptr<RecordStore> newCappedRecordStore(int64_t cappedSizeBytes,
+                                                      int64_t cappedMaxDocs) final {
+        return newCappedRecordStore("a.b", cappedSizeBytes, cappedMaxDocs);
+    }
+
+    std::unique_ptr<RecordStore> newCappedRecordStore(const std::string& ns,
+                                                      int64_t cappedMaxSize,
+                                                      int64_t cappedMaxDocs) {
         WiredTigerRecoveryUnit* ru = new WiredTigerRecoveryUnit(_sessionCache);
         OperationContextNoop txn(ru);
         string uri = "table:a.b";
@@ -131,11 +136,16 @@ public:
             uow.commit();
         }
 
-        return new WiredTigerRecordStore(&txn, ns, uri, true, cappedMaxSize, cappedMaxDocs);
+        return stdx::make_unique<WiredTigerRecordStore>(
+            &txn, ns, uri, true, cappedMaxSize, cappedMaxDocs);
     }
 
-    virtual RecoveryUnit* newRecoveryUnit() {
+    RecoveryUnit* newRecoveryUnit() final {
         return new WiredTigerRecoveryUnit(_sessionCache);
+    }
+
+    bool supportsDocLocking() final {
+        return true;
     }
 
     WT_CONNECTION* conn() const {
@@ -148,8 +158,8 @@ private:
     WiredTigerSessionCache* _sessionCache;
 };
 
-HarnessHelper* newHarnessHelper() {
-    return new WiredTigerHarnessHelper();
+std::unique_ptr<HarnessHelper> newHarnessHelper() {
+    return stdx::make_unique<WiredTigerHarnessHelper>();
 }
 
 TEST(WiredTigerRecordStoreTest, GenerateCreateStringEmptyDocument) {
@@ -390,7 +400,7 @@ private:
     virtual void setUp() {
         harnessHelper.reset(new WiredTigerHarnessHelper());
         sizeStorer.reset(new WiredTigerSizeStorer(harnessHelper->conn(), "table:sizeStorer"));
-        rs.reset(harnessHelper->newNonCappedRecordStore());
+        rs = harnessHelper->newNonCappedRecordStore();
         WiredTigerRecordStore* wtrs = checked_cast<WiredTigerRecordStore*>(rs.get());
         wtrs->setSizeStorer(sizeStorer.get());
         uri = wtrs->getURI();

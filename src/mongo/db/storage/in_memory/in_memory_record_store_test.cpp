@@ -37,22 +37,31 @@
 
 namespace mongo {
 
-class InMemoryHarnessHelper : public HarnessHelper {
+class InMemoryHarnessHelper final : public HarnessHelper {
 public:
     InMemoryHarnessHelper() {}
 
-    virtual RecordStore* newNonCappedRecordStore() {
-        return new InMemoryRecordStore("a.b", &data);
+    std::unique_ptr<RecordStore> newNonCappedRecordStore() final {
+        return stdx::make_unique<InMemoryRecordStore>("a.b", &data);
+    }
+    std::unique_ptr<RecordStore> newCappedRecordStore(int64_t cappedSizeBytes,
+                                                      int64_t cappedMaxDocs) final {
+        return stdx::make_unique<InMemoryRecordStore>(
+            "a.b", &data, true, cappedSizeBytes, cappedMaxDocs);
     }
 
-    virtual RecoveryUnit* newRecoveryUnit() {
+    RecoveryUnit* newRecoveryUnit() final {
         return new InMemoryRecoveryUnit();
+    }
+
+    bool supportsDocLocking() final {
+        return false;
     }
 
     std::shared_ptr<void> data;
 };
 
-HarnessHelper* newHarnessHelper() {
-    return new InMemoryHarnessHelper();
+std::unique_ptr<HarnessHelper> newHarnessHelper() {
+    return stdx::make_unique<InMemoryHarnessHelper>();
 }
 }

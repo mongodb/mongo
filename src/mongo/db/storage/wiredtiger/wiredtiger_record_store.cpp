@@ -108,7 +108,32 @@ public:
             return {};
 
         WT_CURSOR* c = _cursor->get();
-        {
+
+        bool mustAdvance = true;
+        if (_lastReturnedId.isNull() && !_forward && _rs._isCapped) {
+            // In this case we need to seek to the highest visible record.
+            const RecordId reverseCappedInitialSeekPoint =
+                _readUntilForOplog.isNull() ? _rs.lowestCappedHiddenRecord() : _readUntilForOplog;
+
+            if (!reverseCappedInitialSeekPoint.isNull()) {
+                c->set_key(c, _makeKey(reverseCappedInitialSeekPoint));
+                int cmp;
+                int seekRet = WT_OP_CHECK(c->search_near(c, &cmp));
+                if (seekRet == WT_NOTFOUND) {
+                    _eof = true;
+                    return {};
+                }
+                invariantWTOK(seekRet);
+
+                // If we landed at or past the lowest hidden record, we must advance to be in
+                // the visible range.
+                mustAdvance = _rs.isCappedHidden(reverseCappedInitialSeekPoint)
+                    ? (cmp >= 0)
+                    : (cmp > 0);  // No longer hidden.
+            }
+        }
+
+        if (mustAdvance) {
             // Nothing after the next line can throw WCEs.
             // Note that an unpositioned (or eof) WT_CURSOR returns the first/last entry in the
             // table when you call next/prev.
@@ -139,11 +164,6 @@ public:
     }
 
     boost::optional<Record> seekExact(const RecordId& id) final {
-        if (!isVisible(id)) {
-            _eof = true;
-            return {};
-        }
-
         WT_CURSOR* c = _cursor->get();
         c->set_key(c, _makeKey(id));
         // Nothing after the next line can throw WCEs.
@@ -280,7 +300,7 @@ private:
     bool _forParallelCollectionScan;  // This can go away once SERVER-17364 is resolved.
     std::unique_ptr<WiredTigerCursor> _cursor;
     bool _eof = false;
-    RecordId _lastReturnedId;
+    RecordId _lastReturnedId;  // If null, need to seek to first/last record.
     const RecordId _readUntilForOplog;
 };
 
@@ -801,6 +821,11 @@ bool WiredTigerRecordStore::isCappedHidden(const RecordId& loc) const {
         return false;
     }
     return _uncommittedDiskLocs.front() <= loc;
+}
+
+RecordId WiredTigerRecordStore::lowestCappedHiddenRecord() const {
+    boost::lock_guard<boost::mutex> lk(_uncommittedDiskLocsMutex);
+    return _uncommittedDiskLocs.empty() ? RecordId() : _uncommittedDiskLocs.front();
 }
 
 StatusWith<RecordId> WiredTigerRecordStore::insertRecord(OperationContext* txn,

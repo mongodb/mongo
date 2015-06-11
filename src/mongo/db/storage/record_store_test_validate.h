@@ -68,7 +68,7 @@ public:
     ValidateTest()
         : _harnessHelper(newHarnessHelper()), _rs(_harnessHelper->newNonCappedRecordStore()) {}
 
-    OperationContext* newOperationContext() {
+    std::unique_ptr<OperationContext> newOperationContext() {
         return _harnessHelper->newOperationContext();
     }
 

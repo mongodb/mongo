@@ -45,18 +45,18 @@ class MyHarnessHelper : public HarnessHelper {
 public:
     MyHarnessHelper() {}
 
-    virtual RecordStore* newNonCappedRecordStore() {
+    virtual std::unique_ptr<RecordStore> newNonCappedRecordStore() {
         OperationContextNoop txn;
         DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData(false, 0);
         md->setUserFlag(&txn, CollectionOptions::Flag_NoPadding);
-        SimpleRecordStoreV1* rs = new SimpleRecordStoreV1(&txn, "a.b", md, &_em, false);
-        return rs;
+        return stdx::make_unique<SimpleRecordStoreV1>(&txn, "a.b", md, &_em, false);
     }
 
-    virtual RecordStore* newCappedRecordStore(int64_t cappedMaxSize, int64_t cappedMaxDocs) {
+    std::unique_ptr<RecordStore> newCappedRecordStore(int64_t cappedMaxSize,
+                                                      int64_t cappedMaxDocs) final {
         OperationContextNoop txn;
         DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData(true, 0);
-        CappedRecordStoreV1* rs = new CappedRecordStoreV1(&txn, NULL, "a.b", md, &_em, false);
+        auto rs = stdx::make_unique<CappedRecordStoreV1>(&txn, nullptr, "a.b", md, &_em, false);
 
         LocAndSize records[] = {{}};
         LocAndSize drecs[] = {{DiskLoc(0, 1000), 1000}, {}};
@@ -64,18 +64,22 @@ public:
         md->setCapFirstNewRecord(&txn, DiskLoc().setInvalid());
         initializeV1RS(&txn, records, drecs, NULL, &_em, md);
 
-        return rs;
+        return std::move(rs);
     }
 
     virtual RecoveryUnit* newRecoveryUnit() {
         return new RecoveryUnitNoop();
     }
 
+    bool supportsDocLocking() final {
+        return false;
+    }
+
 private:
     DummyExtentManager _em;
 };
 
-HarnessHelper* newHarnessHelper() {
-    return new MyHarnessHelper();
+std::unique_ptr<HarnessHelper> newHarnessHelper() {
+    return stdx::make_unique<MyHarnessHelper>();
 }
 }

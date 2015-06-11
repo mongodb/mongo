@@ -201,6 +201,7 @@ public:
 
     void dealtWithCappedLoc(const RecordId& loc);
     bool isCappedHidden(const RecordId& loc) const;
+    RecordId lowestCappedHiddenRecord() const;
 
     bool inShutdown() const;
     int64_t cappedDeleteAsNeeded(OperationContext* txn, const RecordId& justInserted);
