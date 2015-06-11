@@ -4600,6 +4600,83 @@ namespace {
     
     }
 
+    TEST_F(TopoCoordTest, ProcessRequestVotesDryRunsDoNotDisallowFutureRequestVotes) {
+        updateConfig(BSON("_id" << "rs0" <<
+                          "version" << 1 <<
+                          "members" << BSON_ARRAY(
+                              BSON("_id" << 10 << "host" << "hself") <<
+                              BSON("_id" << 20 << "host" << "h2") <<
+                              BSON("_id" << 30 << "host" << "h3"))),
+                     0);
+        setSelfMemberState(MemberState::RS_SECONDARY);
+
+        // dry run
+        ReplSetRequestVotesArgs args;
+        args.initialize(BSON("replSetRequestVotes" << 1
+                          << "setName" << "rs0"
+                          << "dryRun" << true
+                          << "term" << 1LL
+                          << "candidateId" << 10LL
+                          << "configVersion" << 1LL
+                          << "lastCommittedOp" << BSON ("ts" << Timestamp(10, 0)
+                                                     << "term" << 0LL)));
+        ReplSetRequestVotesResponse response;
+        OpTime lastAppliedOpTime;
+
+        getTopoCoord().processReplSetRequestVotes(args, &response, lastAppliedOpTime);
+        ASSERT_EQUALS("", response.getReason());
+        ASSERT_TRUE(response.getVoteGranted());
+    
+        // second dry run fine
+        ReplSetRequestVotesArgs args2;
+        args2.initialize(BSON("replSetRequestVotes" << 1
+                           << "setName" << "rs0"
+                           << "dryRun" << true
+                           << "term" << 1LL
+                           << "candidateId" << 10LL
+                           << "configVersion" << 1LL
+                           << "lastCommittedOp" << BSON ("ts" << Timestamp(10, 0)
+                                                      << "term" << 0LL)));
+        ReplSetRequestVotesResponse response2;
+
+        getTopoCoord().processReplSetRequestVotes(args2, &response2, lastAppliedOpTime);
+        ASSERT_EQUALS("", response2.getReason());
+        ASSERT_TRUE(response2.getVoteGranted());
+    
+        // real request fine
+        ReplSetRequestVotesArgs args3;
+        args3.initialize(BSON("replSetRequestVotes" << 1
+                           << "setName" << "rs0"
+                           << "dryRun" << false
+                           << "term" << 1LL
+                           << "candidateId" << 10LL
+                           << "configVersion" << 1LL
+                           << "lastCommittedOp" << BSON ("ts" << Timestamp(10, 0)
+                                                      << "term" << 0LL)));
+        ReplSetRequestVotesResponse response3;
+
+        getTopoCoord().processReplSetRequestVotes(args3, &response3, lastAppliedOpTime);
+        ASSERT_EQUALS("", response3.getReason());
+        ASSERT_TRUE(response3.getVoteGranted());
+
+        // dry post real, fails
+        ReplSetRequestVotesArgs args4;
+        args4.initialize(BSON("replSetRequestVotes" << 1
+                           << "setName" << "rs0"
+                           << "dryRun" << false
+                           << "term" << 1LL
+                           << "candidateId" << 10LL
+                           << "configVersion" << 1LL
+                           << "lastCommittedOp" << BSON ("ts" << Timestamp(10, 0)
+                                                      << "term" << 0LL)));
+        ReplSetRequestVotesResponse response4;
+
+        getTopoCoord().processReplSetRequestVotes(args4, &response4, lastAppliedOpTime);
+        ASSERT_EQUALS("already voted for another candidate this term", response4.getReason());
+        ASSERT_FALSE(response4.getVoteGranted());
+
+    }
+
     TEST_F(TopoCoordTest, ProcessRequestVotesBadCommands) {
         updateConfig(BSON("_id" << "rs0" <<
                           "version" << 1 <<
@@ -4683,6 +4760,123 @@ namespace {
         getTopoCoord().processReplSetRequestVotes(args4, &response4, lastAppliedOpTime2);
         ASSERT_EQUALS("candidate's data is staler than mine", response4.getReason());
         ASSERT_FALSE(response4.getVoteGranted());
+    }
+
+    TEST_F(TopoCoordTest, ProcessRequestVotesBadCommandsDryRun) {
+        updateConfig(BSON("_id" << "rs0" <<
+                          "version" << 1 <<
+                          "members" << BSON_ARRAY(
+                              BSON("_id" << 10 << "host" << "hself") <<
+                              BSON("_id" << 20 << "host" << "h2") <<
+                              BSON("_id" << 30 << "host" << "h3"))),
+                     0);
+        setSelfMemberState(MemberState::RS_SECONDARY);
+        // set term to 1
+        ASSERT(getTopoCoord().updateTerm(1));
+        // and make sure we voted in term 1
+        ReplSetRequestVotesArgs argsForRealVote;
+        argsForRealVote.initialize(BSON("replSetRequestVotes" << 1
+                                     << "setName" << "rs0"
+                                     << "term" << 1LL
+                                     << "candidateId" << 10LL
+                                     << "configVersion" << 1LL
+                                     << "lastCommittedOp" << BSON ("ts" << Timestamp(10, 0)
+                                                                 << "term" << 0LL)));
+        ReplSetRequestVotesResponse responseForRealVote;
+        OpTime lastAppliedOpTime;
+
+        getTopoCoord().processReplSetRequestVotes(argsForRealVote,
+                                                  &responseForRealVote,
+                                                  lastAppliedOpTime);
+        ASSERT_EQUALS("", responseForRealVote.getReason());
+        ASSERT_TRUE(responseForRealVote.getVoteGranted());
+    
+
+        // mismatched setName
+        ReplSetRequestVotesArgs args;
+        args.initialize(BSON("replSetRequestVotes" << 1
+                          << "setName" << "wrongName"
+                          << "dryRun" << true
+                          << "term" << 2LL
+                          << "candidateId" << 10LL
+                          << "configVersion" << 1LL
+                          << "lastCommittedOp" << BSON ("ts" << Timestamp(10, 0)
+                                                     << "term" << 0LL)));
+        ReplSetRequestVotesResponse response;
+
+        getTopoCoord().processReplSetRequestVotes(args, &response, lastAppliedOpTime);
+        ASSERT_EQUALS("candidate's set name differs from mine", response.getReason());
+        ASSERT_EQUALS(1, response.getTerm());
+        ASSERT_FALSE(response.getVoteGranted());
+    
+        // mismatched configVersion
+        ReplSetRequestVotesArgs args2;
+        args2.initialize(BSON("replSetRequestVotes" << 1
+                           << "setName" << "rs0"
+                           << "dryRun" << true
+                           << "term" << 2LL
+                           << "candidateId" << 20LL
+                           << "configVersion" << 0LL
+                           << "lastCommittedOp" << BSON ("ts" << Timestamp(10, 0)
+                                                      << "term" << 0LL)));
+        ReplSetRequestVotesResponse response2;
+
+        getTopoCoord().processReplSetRequestVotes(args2, &response2, lastAppliedOpTime);
+        ASSERT_EQUALS("candidate's config version differs from mine", response2.getReason());
+        ASSERT_EQUALS(1, response2.getTerm());
+        ASSERT_FALSE(response2.getVoteGranted());
+    
+        // stale term
+        ReplSetRequestVotesArgs args3;
+        args3.initialize(BSON("replSetRequestVotes" << 1
+                           << "setName" << "rs0"
+                           << "dryRun" << true
+                           << "term" << 0LL
+                           << "candidateId" << 20LL
+                           << "configVersion" << 1LL
+                           << "lastCommittedOp" << BSON ("ts" << Timestamp(10, 0)
+                                                      << "term" << 0LL)));
+        ReplSetRequestVotesResponse response3;
+
+        getTopoCoord().processReplSetRequestVotes(args3, &response3, lastAppliedOpTime);
+        ASSERT_EQUALS("candidate's term is lower than mine", response3.getReason());
+        ASSERT_EQUALS(1, response3.getTerm());
+        ASSERT_FALSE(response3.getVoteGranted());
+    
+        // repeat term
+        ReplSetRequestVotesArgs args4;
+        args4.initialize(BSON("replSetRequestVotes" << 1
+                           << "setName" << "rs0"
+                           << "dryRun" << true
+                           << "term" << 1LL
+                           << "candidateId" << 20LL
+                           << "configVersion" << 1LL
+                           << "lastCommittedOp" << BSON ("ts" << Timestamp(10, 0)
+                                                      << "term" << 0LL)));
+        ReplSetRequestVotesResponse response4;
+
+        getTopoCoord().processReplSetRequestVotes(args4, &response4, lastAppliedOpTime);
+        ASSERT_EQUALS("", response4.getReason());
+        ASSERT_EQUALS(1, response4.getTerm());
+        ASSERT_TRUE(response4.getVoteGranted());
+    
+        // stale OpTime
+        ReplSetRequestVotesArgs args5;
+        args5.initialize(BSON("replSetRequestVotes" << 1
+                           << "setName" << "rs0"
+                           << "dryRun" << true
+                           << "term" << 3LL
+                           << "candidateId" << 20LL
+                           << "configVersion" << 1LL
+                           << "lastCommittedOp" << BSON ("ts" << Timestamp(10, 0)
+                                                      << "term" << 0LL)));
+        ReplSetRequestVotesResponse response5;
+        OpTime lastAppliedOpTime2 = {Timestamp(20, 0), 0};
+
+        getTopoCoord().processReplSetRequestVotes(args5, &response5, lastAppliedOpTime2);
+        ASSERT_EQUALS("candidate's data is staler than mine", response5.getReason());
+        ASSERT_EQUALS(1, response5.getTerm());
+        ASSERT_FALSE(response5.getVoteGranted());
     }
 
     TEST_F(TopoCoordTest, ProcessDeclareElectionWinner) {

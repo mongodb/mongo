@@ -45,10 +45,12 @@ namespace repl {
     VoteRequester::Algorithm::Algorithm(const ReplicaSetConfig& rsConfig,
                                         long long candidateId,
                                         long long term,
+                                        bool dryRun,
                                         OpTime lastOplogEntry) :
             _rsConfig(rsConfig),
             _candidateId(candidateId),
             _term(term),
+            _dryRun(dryRun),
             _lastOplogEntry(lastOplogEntry) {
 
         // populate targets with all voting members that aren't this node
@@ -66,6 +68,7 @@ namespace repl {
         BSONObjBuilder requestVotesCmdBuilder;
         requestVotesCmdBuilder.append("replSetRequestVotes", 1);
         requestVotesCmdBuilder.append("setName", _rsConfig.getReplSetName());
+        requestVotesCmdBuilder.append("dryRun", _dryRun);
         requestVotesCmdBuilder.append("term", _term);
         requestVotesCmdBuilder.append("candidateId", _candidateId);
         requestVotesCmdBuilder.append("configVersion", _rsConfig.getConfigVersion());
@@ -112,7 +115,6 @@ namespace repl {
                 _staleTerm = true;
             }
         }
-
     }
 
     bool VoteRequester::Algorithm::hasReceivedSufficientResponses() const {
@@ -141,12 +143,14 @@ namespace repl {
             const ReplicaSetConfig& rsConfig,
             long long candidateId,
             long long term,
+            bool dryRun,
             OpTime lastOplogEntry,
             const stdx::function<void ()>& onCompletion) {
 
         _algorithm.reset(new Algorithm(rsConfig,
                                        candidateId,
                                        term,
+                                       dryRun,
                                        lastOplogEntry));
         _runner.reset(new ScatterGatherRunner(_algorithm.get()));
         return _runner->start(executor, onCompletion);

@@ -47,6 +47,7 @@ namespace repl {
         long long getCandidateId() const;
         long long getConfigVersion() const;
         OpTime getLastCommittedOp() const;
+        bool isADryRun() const;
 
         void addToBSON(BSONObjBuilder* builder) const;
 
@@ -56,6 +57,7 @@ namespace repl {
         long long _candidateId = -1; // replSet id of the member who sent the replSetRequestVotesCmd
         long long _cfgver = -1; // replSet config version known to the command issuer
         OpTime _lastCommittedOp; // The last known committed op of the command issuer 
+        bool _dryRun = false; // Indicates this is a pre-election check when true
     };
 
     class ReplSetRequestVotesResponse {

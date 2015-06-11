@@ -2272,13 +2272,15 @@ namespace {
             response->setVoteGranted(false);
             response->setReason("candidate's data is staler than mine");
         }
-        else if (_lastVote.getTerm() == args.getTerm()) {
+        else if (!args.isADryRun() && _lastVote.getTerm() == args.getTerm()) {
             response->setVoteGranted(false);
             response->setReason("already voted for another candidate this term");
         }
         else {
-            _lastVote.setTerm(args.getTerm());
-            _lastVote.setCandidateId(args.getCandidateId());
+            if (!args.isADryRun()) {
+                _lastVote.setTerm(args.getTerm());
+                _lastVote.setCandidateId(args.getCandidateId());
+            }
             response->setVoteGranted(true);
         }
 

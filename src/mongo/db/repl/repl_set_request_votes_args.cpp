@@ -39,6 +39,7 @@ namespace {
     const std::string kCandidateIdFieldName = "candidateId";
     const std::string kCommandName = "replSetRequestVotes";
     const std::string kConfigVersionFieldName = "configVersion";
+    const std::string kDryRunFieldName = "dryRun";
     const std::string kLastCommittedOpFieldName = "lastCommittedOp";
     const std::string kOkFieldName = "ok";
     const std::string kOpTimeFieldName = "ts";
@@ -51,6 +52,7 @@ namespace {
         kCandidateIdFieldName,
         kCommandName,
         kConfigVersionFieldName,
+        kDryRunFieldName,
         kLastCommittedOpFieldName,
         kOpTimeFieldName,
         kSetNameFieldName,
@@ -90,6 +92,10 @@ namespace {
         if (!status.isOK())
             return status;
 
+        status = bsonExtractBooleanField(argsObj, kDryRunFieldName, &_dryRun);
+        if (!status.isOK())
+            return status;
+
         // extracting the lastCommittedOp is a bit of a process
         BSONObj lastCommittedOp = argsObj[kLastCommittedOpFieldName].Obj();
         Timestamp ts;
@@ -126,9 +132,14 @@ namespace {
         return _lastCommittedOp;
     }
 
+    bool ReplSetRequestVotesArgs::isADryRun() const {
+        return _dryRun;
+    }
+
     void ReplSetRequestVotesArgs::addToBSON(BSONObjBuilder* builder) const {
         builder->append(kCommandName, 1);
         builder->append(kSetNameFieldName, _setName);
+        builder->append(kDryRunFieldName, _dryRun);
         builder->append(kTermFieldName, _term);
         builder->appendIntOrLL(kCandidateIdFieldName, _candidateId);
         builder->appendIntOrLL(kConfigVersionFieldName, _cfgver);

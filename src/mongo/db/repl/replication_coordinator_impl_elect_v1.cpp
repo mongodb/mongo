@@ -147,6 +147,7 @@ namespace {
                 _rsConfig,
                 _rsConfig.getMemberAt(_selfIndex).getId(),
                 _topCoord->getTerm(),
+                false, // TODO(dannenberg): make this the second election stage by adding a dryrun
                 getMyLastOptime(),
                 stdx::bind(&ReplicationCoordinatorImpl::_onVoteRequestComplete, this));
         if (nextPhaseEvh.getStatus() == ErrorCodes::ShutdownInProgress) {

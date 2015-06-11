@@ -2563,7 +2563,9 @@ namespace {
             return {ErrorCodes::BadValue, "not using election protocol v1"};
         }
 
-        updateTerm(args.getTerm());
+        if (!args.isADryRun()) {
+            updateTerm(args.getTerm());
+        }
 
         Status result{ErrorCodes::InternalError, "didn't set status in processReplSetRequestVotes"};
         CBHStatus cbh = _replExecutor.scheduleWork(

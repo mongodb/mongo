@@ -75,6 +75,7 @@ namespace {
             _requester.reset(new VoteRequester::Algorithm(config,
                                                           candidateId,
                                                           term,
+                                                          false, // not a dryRun
                                                           lastOplogEntry));
         }
 
@@ -173,8 +174,34 @@ namespace {
                                                                  Milliseconds(10)));
         }
 
-    private:
         std::unique_ptr<VoteRequester::Algorithm> _requester;
+    };
+
+    class VoteRequesterDryRunTest : public VoteRequesterTest {
+    public:
+        virtual void setUp() {
+            ReplicaSetConfig config;
+            ASSERT_OK(config.initialize(
+                BSON("_id" << "rs0" <<
+                     "version" << 2 <<
+                     "members" << BSON_ARRAY(
+                         BSON("_id" << 0 << "host" << "host0") <<
+                         BSON("_id" << 1 << "host" << "host1") <<
+                         BSON("_id" << 2 << "host" << "host2") <<
+                         BSON("_id" << 3 << "host" << "host3" << "votes" << 0) <<
+                         BSON("_id" << 4 << "host" << "host4" << "votes" << 0)))));
+            ASSERT_OK(config.validate());
+            long long candidateId = 0;
+            long long term = 2;
+            OpTime lastOplogEntry = OpTime(Timestamp(999,0), 1);
+
+            _requester.reset(new VoteRequester::Algorithm(config,
+                                                          candidateId,
+                                                          term,
+                                                          true, // dryRun
+                                                          lastOplogEntry));
+        }
+
     };
 
     TEST_F(VoteRequesterTest, ImmediateGoodResponseWinElection) {
@@ -255,6 +282,96 @@ namespace {
     }
 
     TEST_F(VoteRequesterTest, NotEnoughVotesLoseElection) {
+        startCapturingLogMessages();
+        ASSERT_FALSE(hasReceivedSufficientResponses());
+        processResponse(requestFrom("host1"), votedNoBecauseSetNameDiffers());
+        ASSERT_FALSE(hasReceivedSufficientResponses());
+        ASSERT_EQUALS(1, countLogLinesContaining("Got no vote from host1"));
+        processResponse(requestFrom("host2"), badResponseStatus());
+        ASSERT_EQUALS(1, countLogLinesContaining("Got failed response from host2"));
+        ASSERT_TRUE(hasReceivedSufficientResponses());
+        ASSERT_EQUALS(VoteRequester::InsufficientVotes, getResult());
+        stopCapturingLogMessages();
+    }
+
+    TEST_F(VoteRequesterDryRunTest, ImmediateGoodResponseWinElection) {
+        ASSERT_FALSE(hasReceivedSufficientResponses());
+        processResponse(requestFrom("host1"), votedYes());
+        ASSERT_TRUE(hasReceivedSufficientResponses());
+        ASSERT_EQUALS(VoteRequester::SuccessfullyElected, getResult());
+    }
+
+    TEST_F(VoteRequesterDryRunTest, BadConfigVersionWinElection) {
+        startCapturingLogMessages();
+        ASSERT_FALSE(hasReceivedSufficientResponses());
+        processResponse(requestFrom("host1"), votedNoBecauseConfigVersionDoesNotMatch());
+        ASSERT_FALSE(hasReceivedSufficientResponses());
+        ASSERT_EQUALS(1, countLogLinesContaining("Got no vote from host1"));
+        processResponse(requestFrom("host2"), votedYes());
+        ASSERT_TRUE(hasReceivedSufficientResponses());
+        ASSERT_EQUALS(VoteRequester::SuccessfullyElected, getResult());
+        stopCapturingLogMessages();
+    }
+
+    TEST_F(VoteRequesterDryRunTest, SetNameDiffersWinElection) {
+        startCapturingLogMessages();
+        ASSERT_FALSE(hasReceivedSufficientResponses());
+        processResponse(requestFrom("host1"), votedNoBecauseSetNameDiffers());
+        ASSERT_FALSE(hasReceivedSufficientResponses());
+        ASSERT_EQUALS(1, countLogLinesContaining("Got no vote from host1"));
+        processResponse(requestFrom("host2"), votedYes());
+        ASSERT_TRUE(hasReceivedSufficientResponses());
+        ASSERT_EQUALS(VoteRequester::SuccessfullyElected, getResult());
+        stopCapturingLogMessages();
+    }
+
+    TEST_F(VoteRequesterDryRunTest, LastOpTimeIsGreaterWinElection) {
+        startCapturingLogMessages();
+        ASSERT_FALSE(hasReceivedSufficientResponses());
+        processResponse(requestFrom("host1"), votedNoBecauseLastOpTimeIsGreater());
+        ASSERT_FALSE(hasReceivedSufficientResponses());
+        ASSERT_EQUALS(1, countLogLinesContaining("Got no vote from host1"));
+        processResponse(requestFrom("host2"), votedYes());
+        ASSERT_TRUE(hasReceivedSufficientResponses());
+        ASSERT_EQUALS(VoteRequester::SuccessfullyElected, getResult());
+        stopCapturingLogMessages();
+    }
+
+    TEST_F(VoteRequesterDryRunTest, FailedToContactWinElection) {
+        startCapturingLogMessages();
+        ASSERT_FALSE(hasReceivedSufficientResponses());
+        processResponse(requestFrom("host1"), badResponseStatus());
+        ASSERT_FALSE(hasReceivedSufficientResponses());
+        ASSERT_EQUALS(1, countLogLinesContaining("Got failed response from host1"));
+        processResponse(requestFrom("host2"), votedYes());
+        ASSERT_TRUE(hasReceivedSufficientResponses());
+        ASSERT_EQUALS(VoteRequester::SuccessfullyElected, getResult());
+        stopCapturingLogMessages();
+    }
+
+    TEST_F(VoteRequesterDryRunTest, AlreadyVotedWinElection) {
+        startCapturingLogMessages();
+        ASSERT_FALSE(hasReceivedSufficientResponses());
+        processResponse(requestFrom("host1"), votedNoBecauseAlreadyVoted());
+        ASSERT_FALSE(hasReceivedSufficientResponses());
+        ASSERT_EQUALS(1, countLogLinesContaining("Got no vote from host1"));
+        processResponse(requestFrom("host2"), votedYes());
+        ASSERT_TRUE(hasReceivedSufficientResponses());
+        ASSERT_EQUALS(VoteRequester::SuccessfullyElected, getResult());
+        stopCapturingLogMessages();
+    }
+
+    TEST_F(VoteRequesterDryRunTest, StaleTermLoseElection) {
+        startCapturingLogMessages();
+        ASSERT_FALSE(hasReceivedSufficientResponses());
+        processResponse(requestFrom("host1"), votedNoBecauseTermIsGreater());
+        ASSERT_EQUALS(1, countLogLinesContaining("Got no vote from host1"));
+        ASSERT_TRUE(hasReceivedSufficientResponses());
+        ASSERT_EQUALS(VoteRequester::StaleTerm, getResult());
+        stopCapturingLogMessages();
+    }
+
+    TEST_F(VoteRequesterDryRunTest, NotEnoughVotesLoseElection) {
         startCapturingLogMessages();
         ASSERT_FALSE(hasReceivedSufficientResponses());
         processResponse(requestFrom("host1"), votedNoBecauseSetNameDiffers());

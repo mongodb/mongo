@@ -63,6 +63,7 @@ namespace repl {
             Algorithm(const ReplicaSetConfig& rsConfig,
                       long long candidateId,
                       long long term,
+                      bool dryRun,
                       OpTime lastOplogEntry);
             virtual ~Algorithm();
             virtual std::vector<RemoteCommandRequest> getRequests() const;
@@ -82,6 +83,7 @@ namespace repl {
             const ReplicaSetConfig _rsConfig;
             const long long _candidateId;
             const long long _term;
+            bool _dryRun = false; // this bool indicates this is a mock election when true
             const OpTime _lastOplogEntry;
             std::vector<HostAndPort> _targets;
             bool _staleTerm = false;
@@ -106,6 +108,7 @@ namespace repl {
             const ReplicaSetConfig& rsConfig,
             long long candidateId,
             long long term,
+            bool dryRun,
             OpTime lastOplogEntry,
             const stdx::function<void ()>& onCompletion = stdx::function<void ()>());
 
