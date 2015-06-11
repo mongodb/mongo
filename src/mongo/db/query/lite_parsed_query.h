@@ -39,8 +39,8 @@ namespace mongo {
     class QueryMessage;
 
     /**
-     * Parses the QueryMessage received from the user and makes the various fields more easily
-     * accessible.
+     * Parses the QueryMessage or find command received from the user and makes the various fields
+     * more easily accessible.
      */
     class LiteParsedQuery {
     public:
@@ -58,6 +58,11 @@ namespace mongo {
                            const BSONObj& cmdObj,
                            bool isExplain,
                            LiteParsedQuery** out);
+
+        /**
+         * Converts this LPQ into a find command.
+         */
+        BSONObj asFindCommand() const;
 
         /**
          * Helper functions to parse maxTimeMS from a command object.  Returns the contained value,

@@ -31,6 +31,7 @@
 #include <cmath>
 
 #include "mongo/db/dbmessage.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/read_after_optime_args.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
@@ -51,21 +52,44 @@ namespace mongo {
 
     const int LiteParsedQuery::kDefaultBatchSize = 101;
 
-    namespace {
+namespace {
 
-        Status checkFieldType(const BSONElement& el, BSONType type) {
-            if (type != el.type()) {
-                mongoutils::str::stream ss;
-                ss << "Failed to parse: " << el.toString() << ". "
-                   << "'" << el.fieldName() << "' field must be of BSON type "
-                   << typeName(type) << ".";
-                return Status(ErrorCodes::FailedToParse, ss);
-            }
-
-            return Status::OK();
+    Status checkFieldType(const BSONElement& el, BSONType type) {
+        if (type != el.type()) {
+            mongoutils::str::stream ss;
+            ss << "Failed to parse: " << el.toString() << ". "
+               << "'" << el.fieldName() << "' field must be of BSON type "
+               << typeName(type) << ".";
+            return Status(ErrorCodes::FailedToParse, ss);
         }
 
-    } // namespace
+        return Status::OK();
+    }
+
+    // Find command field names.
+    const char kCmdName[] = "find";
+    const char kFilterField[] = "filter";
+    const char kProjectionField[] = "projection";
+    const char kSortField[] = "sort";
+    const char kHintField[] = "hint";
+    const char kSkipField[] = "skip";
+    const char kLimitField[] = "limit";
+    const char kBatchSizeField[] = "batchSize";
+    const char kSingleBatchField[] = "singleBatch";
+    const char kCommentField[] = "comment";
+    const char kMaxScanField[] = "maxScan";
+    const char kMaxField[] = "max";
+    const char kMinField[] = "min";
+    const char kReturnKeyField[] = "returnKey";
+    const char kShowRecordIdField[] = "showRecordId";
+    const char kSnapshotField[] = "snapshot";
+    const char kTailableField[] = "tailable";
+    const char kOplogReplayField[] = "oplogReplay";
+    const char kNoCursorTimeoutField[] = "noCursorTimeout";
+    const char kAwaitDataField[] = "awaitData";
+    const char kPartialField[] = "partial";
+
+} // namespace
 
     // static
     Status LiteParsedQuery::make(const std::string& fullns,
@@ -82,12 +106,12 @@ namespace mongo {
         while (it.more()) {
             BSONElement el = it.next();
             const char* fieldName = el.fieldName();
-            if (mongoutils::str::equals(fieldName, "find")) {
+            if (mongoutils::str::equals(fieldName, kCmdName)) {
                 // We've already parsed the namespace information contained in the 'find'
                 // field, so just move on.
                 continue;
             }
-            else if (mongoutils::str::equals(fieldName, "filter")) {
+            else if (mongoutils::str::equals(fieldName, kFilterField)) {
                 Status status = checkFieldType(el, Object);
                 if (!status.isOK()) {
                     return status;
@@ -95,7 +119,7 @@ namespace mongo {
 
                 pq->_filter = el.Obj().getOwned();
             }
-            else if (mongoutils::str::equals(fieldName, "projection")) {
+            else if (mongoutils::str::equals(fieldName, kProjectionField)) {
                 Status status = checkFieldType(el, Object);
                 if (!status.isOK()) {
                     return status;
@@ -103,7 +127,7 @@ namespace mongo {
 
                 pq->_proj = el.Obj().getOwned();
             }
-            else if (mongoutils::str::equals(fieldName, "sort")) {
+            else if (mongoutils::str::equals(fieldName, kSortField)) {
                 Status status = checkFieldType(el, Object);
                 if (!status.isOK()) {
                     return status;
@@ -117,7 +141,7 @@ namespace mongo {
 
                 pq->_sort = sort;
             }
-            else if (mongoutils::str::equals(fieldName, "hint")) {
+            else if (mongoutils::str::equals(fieldName, kHintField)) {
                 BSONObj hintObj;
                 if (Object == el.type()) {
                     hintObj = cmdObj["hint"].Obj().getOwned();
@@ -132,7 +156,7 @@ namespace mongo {
 
                 pq->_hint = hintObj;
             }
-            else if (mongoutils::str::equals(fieldName, "skip")) {
+            else if (mongoutils::str::equals(fieldName, kSkipField)) {
                 if (!el.isNumber()) {
                     mongoutils::str::stream ss;
                     ss << "Failed to parse: " << cmdObj.toString() << ". "
@@ -147,7 +171,7 @@ namespace mongo {
 
                 pq->_skip = skip;
             }
-            else if (mongoutils::str::equals(fieldName, "limit")) {
+            else if (mongoutils::str::equals(fieldName, kLimitField)) {
                 if (!el.isNumber()) {
                     mongoutils::str::stream ss;
                     ss << "Failed to parse: " << cmdObj.toString() << ". "
@@ -162,7 +186,7 @@ namespace mongo {
 
                 pq->_limit = limit;
             }
-            else if (mongoutils::str::equals(fieldName, "batchSize")) {
+            else if (mongoutils::str::equals(fieldName, kBatchSizeField)) {
                 if (!el.isNumber()) {
                     mongoutils::str::stream ss;
                     ss << "Failed to parse: " << cmdObj.toString() << ". "
@@ -177,7 +201,7 @@ namespace mongo {
 
                 pq->_batchSize = batchSize;
             }
-            else if (mongoutils::str::equals(fieldName, "singleBatch")) {
+            else if (mongoutils::str::equals(fieldName, kSingleBatchField)) {
                 Status status = checkFieldType(el, Bool);
                 if (!status.isOK()) {
                     return status;
@@ -185,7 +209,7 @@ namespace mongo {
 
                 pq->_wantMore = !el.boolean();
             }
-            else if (mongoutils::str::equals(fieldName, "comment")) {
+            else if (mongoutils::str::equals(fieldName, kCommentField)) {
                 Status status = checkFieldType(el, String);
                 if (!status.isOK()) {
                     return status;
@@ -193,7 +217,7 @@ namespace mongo {
 
                 pq->_comment = el.str();
             }
-            else if (mongoutils::str::equals(fieldName, "maxScan")) {
+            else if (mongoutils::str::equals(fieldName, kMaxScanField)) {
                 if (!el.isNumber()) {
                     mongoutils::str::stream ss;
                     ss << "Failed to parse: " << cmdObj.toString() << ". "
@@ -216,7 +240,7 @@ namespace mongo {
 
                 pq->_maxTimeMS = maxTimeMS.getValue();
             }
-            else if (mongoutils::str::equals(fieldName, "min")) {
+            else if (mongoutils::str::equals(fieldName, kMinField)) {
                 Status status = checkFieldType(el, Object);
                 if (!status.isOK()) {
                     return status;
@@ -224,7 +248,7 @@ namespace mongo {
 
                 pq->_min = el.Obj().getOwned();
             }
-            else if (mongoutils::str::equals(fieldName, "max")) {
+            else if (mongoutils::str::equals(fieldName, kMaxField)) {
                 Status status = checkFieldType(el, Object);
                 if (!status.isOK()) {
                     return status;
@@ -232,7 +256,7 @@ namespace mongo {
 
                 pq->_max = el.Obj().getOwned();
             }
-            else if (mongoutils::str::equals(fieldName, "returnKey")) {
+            else if (mongoutils::str::equals(fieldName, kReturnKeyField)) {
                 Status status = checkFieldType(el, Bool);
                 if (!status.isOK()) {
                     return status;
@@ -240,7 +264,7 @@ namespace mongo {
 
                 pq->_returnKey = el.boolean();
             }
-            else if (mongoutils::str::equals(fieldName, "showRecordId")) {
+            else if (mongoutils::str::equals(fieldName, kShowRecordIdField)) {
                 Status status = checkFieldType(el, Bool);
                 if (!status.isOK()) {
                     return status;
@@ -248,7 +272,7 @@ namespace mongo {
 
                 pq->_showRecordId = el.boolean();
             }
-            else if (mongoutils::str::equals(fieldName, "snapshot")) {
+            else if (mongoutils::str::equals(fieldName, kSnapshotField)) {
                 Status status = checkFieldType(el, Bool);
                 if (!status.isOK()) {
                     return status;
@@ -259,7 +283,7 @@ namespace mongo {
             else if (mongoutils::str::equals(fieldName, "$readPreference")) {
                 pq->_hasReadPref = true;
             }
-            else if (mongoutils::str::equals(fieldName, "tailable")) {
+            else if (mongoutils::str::equals(fieldName, kTailableField)) {
                 Status status = checkFieldType(el, Bool);
                 if (!status.isOK()) {
                     return status;
@@ -275,7 +299,7 @@ namespace mongo {
 
                 pq->_slaveOk = el.boolean();
             }
-            else if (mongoutils::str::equals(fieldName, "oplogReplay")) {
+            else if (mongoutils::str::equals(fieldName, kOplogReplayField)) {
                 Status status = checkFieldType(el, Bool);
                 if (!status.isOK()) {
                     return status;
@@ -283,7 +307,7 @@ namespace mongo {
 
                 pq->_oplogReplay = el.boolean();
             }
-            else if (mongoutils::str::equals(fieldName, "noCursorTimeout")) {
+            else if (mongoutils::str::equals(fieldName, kNoCursorTimeoutField)) {
                 Status status = checkFieldType(el, Bool);
                 if (!status.isOK()) {
                     return status;
@@ -291,7 +315,7 @@ namespace mongo {
 
                 pq->_noCursorTimeout = el.boolean();
             }
-            else if (mongoutils::str::equals(fieldName, "awaitData")) {
+            else if (mongoutils::str::equals(fieldName, kAwaitDataField)) {
                 Status status = checkFieldType(el, Bool);
                 if (!status.isOK()) {
                     return status;
@@ -299,7 +323,7 @@ namespace mongo {
 
                 pq->_awaitData = el.boolean();
             }
-            else if (mongoutils::str::equals(fieldName, "partial")) {
+            else if (mongoutils::str::equals(fieldName, kPartialField)) {
                 Status status = checkFieldType(el, Bool);
                 if (!status.isOK()) {
                     return status;
@@ -363,6 +387,99 @@ namespace mongo {
 
         *out = pq.release();
         return Status::OK();
+    }
+
+    BSONObj LiteParsedQuery::asFindCommand() const {
+        BSONObjBuilder bob;
+
+        const NamespaceString nss(_ns);
+        bob.append(kCmdName, nss.coll());
+
+        if (!_filter.isEmpty()) {
+            bob.append(kFilterField, _filter);
+        }
+
+        if (!_proj.isEmpty()) {
+            bob.append(kProjectionField, _proj);
+        }
+
+        if (!_sort.isEmpty()) {
+            bob.append(kSortField, _sort);
+        }
+
+        if (!_hint.isEmpty()) {
+            bob.append(kHintField, _hint);
+        }
+
+        if (_skip > 0) {
+            bob.append(kSkipField, _skip);
+        }
+
+        if (_limit) {
+            bob.append(kLimitField, *_limit);
+        }
+
+        if (_batchSize) {
+            bob.append(kBatchSizeField, *_batchSize);
+        }
+
+        if (!_wantMore) {
+            bob.append(kSingleBatchField, true);
+        }
+
+        if (!_comment.empty()) {
+            bob.append(kCommentField, _comment);
+        }
+
+        if (_maxScan > 0) {
+            bob.append(kMaxScanField, _maxScan);
+        }
+
+        if (_maxTimeMS > 0) {
+            bob.append(cmdOptionMaxTimeMS, _maxTimeMS);
+        }
+
+        if (!_max.isEmpty()) {
+            bob.append(kMaxField, _max);
+        }
+
+        if (!_min.isEmpty()) {
+            bob.append(kMinField, _min);
+        }
+
+        if (_returnKey) {
+            bob.append(kReturnKeyField, true);
+        }
+
+        if (_showRecordId) {
+            bob.append(kShowRecordIdField, true);
+        }
+
+        if (_snapshot) {
+            bob.append(kSnapshotField, true);
+        }
+
+        if (_tailable) {
+            bob.append(kTailableField, true);
+        }
+
+        if (_oplogReplay) {
+            bob.append(kOplogReplayField, true);
+        }
+
+        if (_noCursorTimeout) {
+            bob.append(kNoCursorTimeoutField, true);
+        }
+
+        if (_awaitData) {
+            bob.append(kAwaitDataField, true);
+        }
+
+        if (_partial) {
+            bob.append(kPartialField, true);
+        }
+
+        return bob.obj();
     }
 
     void LiteParsedQuery::addReturnKeyMetaProj() {
