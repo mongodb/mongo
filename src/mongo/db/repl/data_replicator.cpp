@@ -1337,7 +1337,7 @@ namespace {
                               });
                 auto doc = docs.rbegin();
                 BSONElement tsElem(doc->getField("ts"));
-                while(tsElem.eoo() || doc != docs.rend()) {
+                while(tsElem.eoo() && doc != docs.rend()) {
                     tsElem =  (doc++)->getField("ts");
                 }
 
