@@ -196,17 +196,15 @@ namespace audit {
                             const BSONObj& keyPattern,
                             bool unique) MONGO_AUDIT_STUB
 
-    void appendImpersonatedUsers(BSONObjBuilder* cmd) MONGO_AUDIT_STUB
+    void writeImpersonatedUsersToMetadata(BSONObjBuilder* metadata) MONGO_AUDIT_STUB
 
     void parseAndRemoveImpersonatedUsersField(
             BSONObj cmdObj,
-            AuthorizationSession* authSession,
             std::vector<UserName>* parsedUserNames,
             bool* fieldIsPresent) MONGO_AUDIT_STUB
 
     void parseAndRemoveImpersonatedRolesField(
             BSONObj cmdObj,
-            AuthorizationSession* authSession,
             std::vector<RoleName>* parsedRoleNames,
             bool* fieldIsPresent) MONGO_AUDIT_STUB
 

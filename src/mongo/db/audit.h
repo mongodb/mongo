@@ -328,12 +328,10 @@ namespace audit {
 
     /*
      * Appends an array of user/db pairs and an array of role/db pairs
-     * to the provided Document. The users and roles are extracted from the current client.
+     * to the provided metadata builder. The users and roles are extracted from the current client.
      * They are to be the impersonated users and roles for a Command run by an internal user.
      */
-    void appendImpersonatedUsers(BSONObjBuilder* cmd);
-    const char cmdOptionImpersonatedUsers[] = "impersonatedUsers";
-    const char cmdOptionImpersonatedRoles[] = "impersonatedRoles";
+    void writeImpersonatedUsersToMetadata(BSONObjBuilder* metadataBob);
 
     /*
      * Looks for an 'impersonatedUsers' field.  This field is used by mongos to
@@ -345,13 +343,11 @@ namespace audit {
      * command BSON to efficiently remove the field before returning.
      *
      * cmdObj [in, out]: If any impersonated users field exists, it will be parsed and removed.
-     * authSession [in]: current authorization session
      * parsedUserNames [out]: populated with parsed usernames
      * fieldIsPresent [out]: true if impersonatedUsers field was present in the object
      */
     void parseAndRemoveImpersonatedUsersField(
             BSONObj cmdObj,
-            AuthorizationSession* authSession,
             std::vector<UserName>* parsedUserNames,
             bool* fieldIsPresent);
 
@@ -365,13 +361,11 @@ namespace audit {
      * command BSON to efficiently remove the field before returning.
      *
      * cmdObj [in, out]: If any impersonated roles field exists, it will be parsed and removed.
-     * authSession [in]: current authorization session
      * parsedRoleNames [out]: populated with parsed user rolenames
      * fieldIsPresent [out]: true if impersonatedRoles field was present in the object
      */
     void parseAndRemoveImpersonatedRolesField(
             BSONObj cmdObj,
-            AuthorizationSession* authSession,
             std::vector<RoleName>* parsedRoleNames,
             bool* fieldIsPresent);
 

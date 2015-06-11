@@ -36,7 +36,10 @@
 
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/authorization_manager_global.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/internal_user_auth.h"
+#include "mongo/db/client.h"
+#include "mongo/rpc/metadata/audit_metadata.h"
 #include "mongo/s/client/scc_fast_query_handler.h"
 #include "mongo/s/cluster_last_error_info.h"
 #include "mongo/s/version_manager.h"
@@ -114,7 +117,10 @@ namespace {
         // For every DBClient created by mongos, add a hook that will append impersonated users
         // to the end of every runCommand.  mongod uses this information to produce auditing
         // records attributed to the proper authenticated user(s).
-        conn->setRunCommandHook(stdx::bind(&audit::appendImpersonatedUsers, stdx::placeholders::_1));
+        conn->setRequestMetadataWriter([](BSONObjBuilder* metadataBob) -> Status {
+            audit::writeImpersonatedUsersToMetadata(metadataBob);
+            return Status::OK();
+        });
 
         // For every SCC created, add a hook that will allow fastest-config-first config reads if
         // the appropriate server options are set.

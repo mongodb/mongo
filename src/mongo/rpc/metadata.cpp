@@ -50,6 +50,11 @@ namespace rpc {
         }
         ServerSelectionMetadata::get(txn) = std::move(swServerSelectionMetadata.getValue());
 
+        auto swAuditMetadata = AuditMetadata::readFromMetadata(metadataObj);
+        if (!swAuditMetadata.isOK()) {
+            return swAuditMetadata.getStatus();
+        }
+        AuditMetadata::get(txn) = std::move(swAuditMetadata.getValue());
         return Status::OK();
     }
 
@@ -65,24 +70,66 @@ namespace rpc {
     }
 
     StatusWith<CommandAndMetadata> upconvertRequestMetadata(BSONObj legacyCmdObj, int queryFlags) {
-        BSONObjBuilder commandBob;
+        // We can reuse the same metadata BOB for every upconvert call, but we need to keep
+        // making new command BOBs as each metadata bob will need to remove fields. We can not use
+        // mutablebson here because the ServerSelectionMetadata upconvert routine performs
+        // manipulations (replacing a root with its child) that mutablebson doesn't
+        // support.
         BSONObjBuilder metadataBob;
 
+        // Ordering is important here - ServerSelectionMetadata must be upconverted
+        // first, then AuditMetadata.
+        BSONObjBuilder ssmCommandBob;
         auto upconvertStatus = ServerSelectionMetadata::upconvert(legacyCmdObj,
                                                                   queryFlags,
-                                                                  &commandBob,
+                                                                  &ssmCommandBob,
                                                                   &metadataBob);
         if (!upconvertStatus.isOK()) {
             return upconvertStatus;
         }
 
-        return std::make_tuple(commandBob.obj(), metadataBob.obj());
+
+        BSONObjBuilder auditCommandBob;
+        upconvertStatus = AuditMetadata::upconvert(ssmCommandBob.done(),
+                                                   queryFlags,
+                                                   &auditCommandBob,
+                                                   &metadataBob);
+
+        if (!upconvertStatus.isOK()) {
+            return upconvertStatus;
+        }
+
+
+        return std::make_tuple(auditCommandBob.obj(), metadataBob.obj());
     }
 
     StatusWith<LegacyCommandAndFlags> downconvertRequestMetadata(BSONObj cmdObj, BSONObj metadata) {
         int legacyQueryFlags = 0;
-        BSONObjBuilder legacyCommandBob;
+        BSONObjBuilder auditCommandBob;
+        // Ordering is important here - AuditingMetadata must be downconverted first,
+        // then ServerSelectionMetadata.
+        auto downconvertStatus = AuditMetadata::downconvert(cmdObj,
+                                                            metadata,
+                                                            &auditCommandBob,
+                                                            &legacyQueryFlags);
 
+        if (!downconvertStatus.isOK()) {
+            return downconvertStatus;
+        }
+
+
+        BSONObjBuilder ssmCommandBob;
+        downconvertStatus = ServerSelectionMetadata::downconvert(auditCommandBob.done(),
+                                                                 metadata,
+                                                                 &ssmCommandBob,
+                                                                 &legacyQueryFlags);
+        if (!downconvertStatus.isOK()) {
+            return downconvertStatus;
+        }
+
+
+        return std::make_tuple(ssmCommandBob.obj(), std::move(legacyQueryFlags));
+    }
 
     StatusWith<CommandReplyWithMetadata> upconvertReplyMetadata(BSONObj legacyReply) {
         BSONObjBuilder commandReplyBob;
@@ -108,7 +155,7 @@ namespace rpc {
             return downconvertStatus;
         }
 
-        return std::make_tuple(legacyCommandBob.obj(), std::move(legacyQueryFlags));
+        return legacyCommandReplyBob.obj();
     }
 
 }  // namespace rpc

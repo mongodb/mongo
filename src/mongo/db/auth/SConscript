@@ -55,6 +55,7 @@ env.Library('authorization_manager_global',
             ],
             LIBDEPS=[
                 'authcore',
+                '$BUILD_DIR/mongo/db/server_options_core',
                 '$BUILD_DIR/mongo/db/service_context',
             ])
 
@@ -99,7 +100,8 @@ env.Library('saslauth',
 env.Library('authmongod',
             ['authz_manager_external_state_d.cpp',
              'authz_session_external_state_d.cpp',
-             'auth_index_d.cpp'],
+             'auth_index_d.cpp',
+             'impersonation_session.cpp'],
 
             LIBDEPS=[
                 'authservercommon',

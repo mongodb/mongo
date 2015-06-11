@@ -106,14 +106,10 @@ namespace mutablebson {
         /**
          * Translation point between the new request/response types and the legacy types.
          *
-         * TODO: Remove interposedCmd once we have refactored metadata (SERVER-18236).
          * Then we won't need to mutate the command object. At that point we can also make
          * this method virtual so commands can override it directly.
-         *
-         * This function is also temporarily defined in dbcommands.cpp
          */
         /*virtual*/ bool run(OperationContext* txn,
-                             const BSONObj& interposedCmd,
                              const rpc::RequestInterface& request,
                              rpc::ReplyBuilderInterface* replyBuilder);
 
