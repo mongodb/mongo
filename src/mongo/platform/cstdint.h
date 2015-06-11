@@ -29,31 +29,11 @@
 #pragma once
 
 /**
- * Include "mongo/platform/cstdint.h" to get the C++11 cstdint types in namespace mongo.
+ * This file is a deprecated synonym for #include <cstdint> that predates the availability
+ * of <cstdint> on all supported platforms and compilers.
+ *
+ * Per SERVER-18928, please refrain from including this file in new code, and remove references to
+ * it in favor of <cstdint> when updating includes.
  */
 
-#if defined(_MSC_VER)
 #include <cstdint>
-#define _MONGO_STDINT_NAMESPACE std
-#elif defined(__GNUC__)
-#include <stdint.h>
-#define _MONGO_STDINT_NAMESPACE
-#else
-#error "Unsupported compiler family"
-#endif
-
-namespace mongo {
-    using _MONGO_STDINT_NAMESPACE::int8_t;
-    using _MONGO_STDINT_NAMESPACE::int16_t;
-    using _MONGO_STDINT_NAMESPACE::int32_t;
-    using _MONGO_STDINT_NAMESPACE::int64_t;
-    using _MONGO_STDINT_NAMESPACE::intptr_t;
-
-    using _MONGO_STDINT_NAMESPACE::uint8_t;
-    using _MONGO_STDINT_NAMESPACE::uint16_t;
-    using _MONGO_STDINT_NAMESPACE::uint32_t;
-    using _MONGO_STDINT_NAMESPACE::uint64_t;
-    using _MONGO_STDINT_NAMESPACE::uintptr_t;
-}  // namespace mongo
-
-#undef _MONGO_STDINT_NAMESPACE
