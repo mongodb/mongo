@@ -87,7 +87,7 @@ var ThreadManager = function(clusterOptions, executionMode) {
         initialized = true;
     };
 
-    this.spawnAll = function spawnAll(host, options) {
+    this.spawnAll = function spawnAll(cluster, options) {
         if (!initialized) {
             throw new Error('thread manager has not been initialized yet');
         }
@@ -110,7 +110,7 @@ var ThreadManager = function(clusterOptions, executionMode) {
                 var args = {
                     tid: tid++,
                     data: workloadData,
-                    host: host,
+                    host: cluster.getHost(),
                     latch: latch,
                     dbName: _context[workload].dbName,
                     collName: _context[workload].collName,

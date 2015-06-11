@@ -360,7 +360,7 @@ var runner = (function() {
 
                     startTime = new Date();
                     threadMgr.init(workloads, context, maxAllowedConnections);
-                    threadMgr.spawnAll(cluster.getHost(), executionOptions);
+                    threadMgr.spawnAll(cluster, executionOptions);
                     threadMgr.checkFailed(0.2);
 
                     errors = threadMgr.joinAll();
