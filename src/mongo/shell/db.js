@@ -911,7 +911,7 @@ DB.prototype.printReplicationInfo = function() {
             print("cannot provide replication status from an arbiter.");
             return;
         }
-        else if (!this.isMaster().ismaster) {
+        else if (!isMaster.ismaster) {
             print("this is a slave, printing slave replication info.");
             this.printSlaveReplicationInfo();
             return;
