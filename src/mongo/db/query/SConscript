@@ -83,6 +83,7 @@ env.Library(
         "$BUILD_DIR/mongo/bson/bson",
         "$BUILD_DIR/mongo/db/matcher/expressions_geo",
         "$BUILD_DIR/mongo/db/index_names",
+        "$BUILD_DIR/mongo/db/index/expression_params",
         "$BUILD_DIR/mongo/db/mongohasher",
         "$BUILD_DIR/mongo/db/server_parameters",
     ],

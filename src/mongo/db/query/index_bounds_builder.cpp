@@ -35,6 +35,8 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/geo/geoconstants.h"
+#include "mongo/db/index/expression_params.h"
+#include "mongo/db/index/s2_indexing_params.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/query/expression_index.h"
 #include "mongo/db/query/expression_index_knobs.h"
@@ -557,7 +559,9 @@ void IndexBoundsBuilder::translate(const MatchExpression* expr,
         if (mongoutils::str::equals("2dsphere", elt.valuestrsafe())) {
             verify(gme->getGeoExpression().getGeometry().hasS2Region());
             const S2Region& region = gme->getGeoExpression().getGeometry().getS2Region();
-            ExpressionMapping::cover2dsphere(region, index.infoObj, oilOut);
+            S2IndexingParams indexParams;
+            ExpressionParams::parse2dsphereParams(index.infoObj, &indexParams);
+            ExpressionMapping::cover2dsphere(region, indexParams, oilOut);
             *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
         } else if (mongoutils::str::equals("2d", elt.valuestrsafe())) {
             verify(gme->getGeoExpression().getGeometry().hasR2Region());

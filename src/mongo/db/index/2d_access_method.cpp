@@ -52,7 +52,7 @@ void TwoDAccessMethod::getKeys(const BSONObj& obj, BSONObjSet* keys) const {
 }
 
 /** Finds all locations in a geo-indexed object */
-void TwoDAccessMethod::getKeys(const BSONObj& obj, vector<BSONObj>& locs) const {
+void TwoDAccessMethod::getKeys(const BSONObj& obj, std::vector<BSONObj>& locs) const {
     ExpressionKeysPrivate::get2DKeys(obj, _params, NULL, &locs);
 }
 

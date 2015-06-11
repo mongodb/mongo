@@ -810,6 +810,7 @@ GeoNear2DSphereStage::GeoNear2DSphereStage(const GeoNearParams& nearParams,
       _boundsIncrement(0.0) {
     _specificStats.keyPattern = s2Index->keyPattern();
     _specificStats.indexName = s2Index->indexName();
+    ExpressionParams::parse2dsphereParams(s2Index->infoObj(), &_indexParams);
 }
 
 GeoNear2DSphereStage::~GeoNear2DSphereStage() {}
@@ -897,15 +898,14 @@ class GeoNear2DSphereStage::DensityEstimator {
 public:
     DensityEstimator(PlanStage::Children* children,
                      const IndexDescriptor* s2Index,
-                     const GeoNearParams* nearParams)
+                     const GeoNearParams* nearParams,
+                     const S2IndexingParams& indexParams)
         : _children(children), _s2Index(s2Index), _nearParams(nearParams), _currentLevel(0) {
-        S2IndexingParams params;
-        ExpressionParams::parse2dsphereParams(_s2Index->infoObj(), &params);
         // Since cellId.AppendVertexNeighbors(level, output) requires level < cellId.level(),
         // we have to start to find documents at most S2::kMaxCellLevel - 1. Thus the finest
         // search area is 16 * finest cell area at S2::kMaxCellLevel, which is less than
         // (1.4 inch X 1.4 inch) on the earth.
-        _currentLevel = std::max(0, params.finestIndexedLevel - 1);
+        _currentLevel = std::max(0, indexParams.finestIndexedLevel - 1);
     }
 
     // Search for a document in neighbors at current level.
@@ -1023,7 +1023,8 @@ PlanStage::StageState GeoNear2DSphereStage::initialize(OperationContext* txn,
                                                        Collection* collection,
                                                        WorkingSetID* out) {
     if (!_densityEstimator) {
-        _densityEstimator.reset(new DensityEstimator(&_children, _s2Index, &_nearParams));
+        _densityEstimator.reset(
+            new DensityEstimator(&_children, _s2Index, &_nearParams, _indexParams));
     }
 
     double estimatedDistance;
@@ -1105,8 +1106,7 @@ StatusWith<NearStage::CoveredInterval*>  //
     TwoDSphereKeyInRegionExpression* keyMatcher =
         new TwoDSphereKeyInRegionExpression(_currBounds, s2Field);
 
-    ExpressionMapping::cover2dsphere(
-        keyMatcher->getRegion(), _s2Index->infoObj(), coveredIntervals);
+    ExpressionMapping::cover2dsphere(keyMatcher->getRegion(), _indexParams, coveredIntervals);
 
     // IndexScan owns the hash matcher
     IndexScan* scan = new IndexScanWithMatch(txn, scanParams, workingSet, keyMatcher);

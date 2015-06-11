@@ -32,12 +32,12 @@
 #include <string>
 
 #include "mongo/db/fts/fts_spec.h"
-#include "mongo/db/index/s2_common.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/index/2d_common.h"
 #include "mongo/db/index/btree_key_generator.h"
 #include "mongo/db/index/expression_keys_private.h"
 #include "mongo/db/index/expression_params.h"
+#include "mongo/db/index/s2_indexing_params.h"
 #include "mongo/db/jsobj.h"
 
 namespace mongo {

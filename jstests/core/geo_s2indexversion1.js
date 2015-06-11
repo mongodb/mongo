@@ -17,7 +17,7 @@ res = coll.ensureIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": 0});
 assert.commandFailed(res);
 coll.drop();
 
-res = coll.ensureIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": 3});
+res = coll.ensureIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": 4});
 assert.commandFailed(res);
 coll.drop();
 
@@ -66,13 +66,13 @@ assert.commandWorked(res);
 coll.drop();
 
 //
-// {2dsphereIndexVersion: 2} should be the default for new indexes.
+// {2dsphereIndexVersion: 3} should be the default for new indexes.
 //
 
 res = coll.ensureIndex({geo: "2dsphere"});
 assert.commandWorked(res);
 var specObj = coll.getIndexes().filter( function(z){ return z.name == "geo_2dsphere"; } )[0];
-assert.eq(2, specObj["2dsphereIndexVersion"]);
+assert.eq(3, specObj["2dsphereIndexVersion"]);
 coll.drop();
 
 //

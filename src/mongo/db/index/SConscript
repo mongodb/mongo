@@ -18,9 +18,9 @@ env.Library(
             'expression_keys_private.cpp',
         ],
         LIBDEPS=[
+            'expression_params',
             '$BUILD_DIR/mongo/bson/bson',
             '$BUILD_DIR/mongo/db/fts/base',
-            '$BUILD_DIR/mongo/db/geo/geometry',
             '$BUILD_DIR/mongo/db/geo/geoparser',
             '$BUILD_DIR/mongo/db/index_names',
             '$BUILD_DIR/mongo/db/mongohasher',
@@ -37,6 +37,20 @@ env.Library(
             'key_generator',
             '$BUILD_DIR/mongo/bson/bson',
         ],
+)
+
+env.Library(
+        target='expression_params',
+        source=[
+            'expression_params.cpp',
+            's2_indexing_params.cpp',
+        ],
+        LIBDEPS=[
+            '$BUILD_DIR/mongo/bson/bson',
+            '$BUILD_DIR/mongo/bson/util/bson_extract',
+            '$BUILD_DIR/mongo/db/mongohasher',
+            '$BUILD_DIR/third_party/s2/s2',
+        ]
 )
 
 env.CppUnitTest(

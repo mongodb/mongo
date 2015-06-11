@@ -32,8 +32,9 @@
 #include "mongo/db/exec/near.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/exec/plan_stats.h"
-#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/geo/geometry_container.h"
+#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index/s2_indexing_params.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/query/index_bounds.h"
@@ -132,6 +133,8 @@ private:
     // The 2D index we're searching over
     // Not owned here
     IndexDescriptor* const _s2Index;
+
+    S2IndexingParams _indexParams;
 
     // The total search annulus
     const R2Annulus _fullBounds;

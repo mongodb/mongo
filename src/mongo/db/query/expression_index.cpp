@@ -92,18 +92,10 @@ void ExpressionMapping::cover2d(const R2Region& region,
     }
 }
 
-// TODO: what should we really pass in for indexInfoObj?
 void ExpressionMapping::cover2dsphere(const S2Region& region,
-                                      const BSONObj& indexInfoObj,
+                                      const S2IndexingParams& indexingParams,
                                       OrderedIntervalList* oilOut) {
-    int coarsestIndexedLevel;
-    BSONElement ce = indexInfoObj["coarsestIndexedLevel"];
-    if (ce.isNumber()) {
-        coarsestIndexedLevel = ce.numberInt();
-    } else {
-        coarsestIndexedLevel = S2::kAvgEdge.GetClosestLevel(100 * 1000.0 / kRadiusOfEarthInMeters);
-    }
-
+    int coarsestIndexedLevel = indexingParams.coarsestIndexedLevel;
     // The min level of our covering is the level whose cells are the closest match to the
     // *area* of the region (or the max indexed level, whichever is smaller) The max level
     // is 4 sizes larger.

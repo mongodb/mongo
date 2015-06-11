@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2014 MongoDB Inc.
+ *    Copyright (C) 2015 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,35 +26,27 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/db/index/s2_indexing_params.h"
 
-#include <string>
-#include <vector>
-
-#include "mongo/db/jsobj.h"
-#include "mongo/db/hasher.h"
+#include "third_party/s2/s2regioncoverer.h"
 
 namespace mongo {
 
-struct TwoDIndexingParams;
-struct S2IndexingParams;
+std::string S2IndexingParams::toString() const {
+    std::stringstream ss;
+    ss << "maxKeysPerInsert: " << maxKeysPerInsert << std::endl;
+    ss << "maxCellsInCovering: " << maxCellsInCovering << std::endl;
+    ss << "finestIndexedLevel: " << finestIndexedLevel << std::endl;
+    ss << "coarsestIndexedLevel: " << coarsestIndexedLevel << std::endl;
+    ss << "indexVersion: " << indexVersion << std::endl;
+    return ss.str();
+}
 
-namespace ExpressionParams {
+void S2IndexingParams::configureCoverer(S2RegionCoverer* coverer) const {
+    coverer->set_min_level(coarsestIndexedLevel);
+    coverer->set_max_level(finestIndexedLevel);
 
-void parseTwoDParams(const BSONObj& infoObj, TwoDIndexingParams* out);
-
-void parseHashParams(const BSONObj& infoObj,
-                     HashSeed* seedOut,
-                     int* versionOut,
-                     std::string* fieldOut);
-
-void parseHaystackParams(const BSONObj& infoObj,
-                         std::string* geoFieldOut,
-                         std::vector<std::string>* otherFieldsOut,
-                         double* bucketSizeOut);
-
-void parse2dsphereParams(const BSONObj& infoObj, S2IndexingParams* out);
-
-}  // namespace ExpressionParams
-
+    // This is advisory; the two above are strict.
+    coverer->set_max_cells(maxCellsInCovering);
+}
 }  // namespace mongo

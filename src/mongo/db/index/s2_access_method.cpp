@@ -35,7 +35,6 @@
 #include "mongo/base/status.h"
 #include "mongo/db/geo/geoparser.h"
 #include "mongo/db/geo/geoconstants.h"
-#include "mongo/db/index/s2_common.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/index/expression_keys_private.h"
 #include "mongo/db/index/expression_params.h"
@@ -82,13 +81,13 @@ S2AccessMethod::S2AccessMethod(IndexCatalogEntry* btreeState, SortedDataInterfac
 // static
 BSONObj S2AccessMethod::fixSpec(const BSONObj& specObj) {
     // If the spec object has the field "2dsphereIndexVersion", validate it.  If it doesn't, add
-    // {2dsphereIndexVersion: 2}, which is the default for newly-built indexes.
+    // {2dsphereIndexVersion: 3}, which is the default for newly-built indexes.
 
     BSONElement indexVersionElt = specObj[kIndexVersionFieldName];
     if (indexVersionElt.eoo()) {
         BSONObjBuilder bob;
         bob.appendElements(specObj);
-        bob.append(kIndexVersionFieldName, S2_INDEX_VERSION_2);
+        bob.append(kIndexVersionFieldName, S2_INDEX_VERSION_3);
         return bob.obj();
     }
 
@@ -96,9 +95,10 @@ BSONObj S2AccessMethod::fixSpec(const BSONObj& specObj) {
     uassert(17394,
             str::stream() << "unsupported geo index version { " << kIndexVersionFieldName << " : "
                           << indexVersionElt << " }, only support versions: [" << S2_INDEX_VERSION_1
-                          << "," << S2_INDEX_VERSION_2 << "]",
+                          << "," << S2_INDEX_VERSION_2 << "," << S2_INDEX_VERSION_3 << "]",
             indexVersionElt.isNumber() &&
-                (indexVersion == S2_INDEX_VERSION_2 || indexVersion == S2_INDEX_VERSION_1));
+                (indexVersion == S2_INDEX_VERSION_3 || indexVersion == S2_INDEX_VERSION_2 ||
+                 indexVersion == S2_INDEX_VERSION_1));
     return specObj;
 }
 

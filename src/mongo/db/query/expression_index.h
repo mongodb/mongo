@@ -30,8 +30,9 @@
 
 #include "third_party/s2/s2region.h"
 
-#include "mongo/db/jsobj.h"
 #include "mongo/db/geo/shapes.h"
+#include "mongo/db/index/s2_indexing_params.h"
+#include "mongo/db/jsobj.h"
 #include "mongo/db/query/index_bounds_builder.h"  // For OrderedIntervalList
 
 namespace mongo {
@@ -50,9 +51,8 @@ public:
                         int maxCoveringCells,
                         OrderedIntervalList* oil);
 
-    // TODO: what should we really pass in for indexInfoObj?
     static void cover2dsphere(const S2Region& region,
-                              const BSONObj& indexInfoObj,
+                              const S2IndexingParams& indexParams,
                               OrderedIntervalList* oilOut);
 };
 
