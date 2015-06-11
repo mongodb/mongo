@@ -35,35 +35,11 @@
 
 #include <boost/noncopyable.hpp>
 #include <boost/thread/mutex.hpp>
-#include <boost/thread/xtime.hpp>
 
-#include "mongo/bson/inline_decls.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/threadlocal.h"
-#include "mongo/util/time_support.h"
-
-// Macro to get line as a std::string constant
-#define MONGO_STRINGIFY(X) #X
-// Double-expansion trick to get preproc to actually substitute __LINE__
-#define _MONGO_LINE_STRING(LINE) MONGO_STRINGIFY( LINE )
-#define MONGO_LINE_STRING _MONGO_LINE_STRING( __LINE__ )
-
-// Mutex names should be as <file>::<line> string
-#define MONGO_FILE_LINE __FILE__ "::" MONGO_LINE_STRING
 
 namespace mongo {
-
-    inline boost::xtime incxtimemillis( long long s ) {
-        boost::xtime xt;
-        boost::xtime_get(&xt, MONGO_BOOST_TIME_UTC);
-        xt.sec += (int)( s / 1000 );
-        xt.nsec += (int)(( s % 1000 ) * 1000000);
-        if ( xt.nsec >= 1000000000 ) {
-            xt.nsec -= 1000000000;
-            xt.sec++;
-        }
-        return xt;
-    }
 
     // If you create a local static instance of this class, that instance will be destroyed
     // before all global static objects are destroyed, so _destroyingStatics will be set
@@ -76,8 +52,8 @@ namespace mongo {
 
     using mutex = boost::mutex;
 
-    /** The concept with SimpleMutex is that it is a basic lock/unlock with no 
-          special functionality (such as try and try timeout).  Thus it can be 
+    /** The concept with SimpleMutex is that it is a basic lock/unlock with no
+          special functionality (such as try and try timeout).  Thus it can be
           implemented using OS-specific facilities in all environments (if desired).
         On Windows, the implementation below is faster than boost mutex.
     */
@@ -109,9 +85,9 @@ namespace mongo {
     public:
         void dassertLocked() const { }
         SimpleMutex(StringData name) { verify( pthread_mutex_init(&_lock,0) == 0 ); }
-        ~SimpleMutex(){ 
-            if ( ! StaticObserver::_destroyingStatics ) { 
-                verify( pthread_mutex_destroy(&_lock) == 0 ); 
+        ~SimpleMutex(){
+            if ( ! StaticObserver::_destroyingStatics ) {
+                verify( pthread_mutex_destroy(&_lock) == 0 );
             }
         }
 
@@ -142,14 +118,14 @@ namespace mongo {
             RecursiveMutex& rm;
             int& nLocksByMe;
         public:
-            scoped_lock( RecursiveMutex &m ) : rm(m), nLocksByMe(rm.n.getRef()) { 
-                if( nLocksByMe++ == 0 ) 
-                    rm.m.lock(); 
+            scoped_lock( RecursiveMutex &m ) : rm(m), nLocksByMe(rm.n.getRef()) {
+                if( nLocksByMe++ == 0 )
+                    rm.m.lock();
             }
-            ~scoped_lock() { 
+            ~scoped_lock() {
                 verify( nLocksByMe > 0 );
                 if( --nLocksByMe == 0 ) {
-                    rm.m.unlock(); 
+                    rm.m.unlock();
                 }
             }
         };

@@ -35,6 +35,7 @@
 #include <boost/thread/thread.hpp>
 #include <boost/thread/tss.hpp>
 #include <boost/thread/xtime.hpp>
+#include <boost/version.hpp>
 
 #include "mongo/base/init.h"
 #include "mongo/base/parse_number.h"
@@ -42,6 +43,12 @@
 #include "mongo/platform/cstdint.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
+
+#if BOOST_VERSION >= 105000
+#define MONGO_BOOST_TIME_UTC boost::TIME_UTC_
+#else
+#define MONGO_BOOST_TIME_UTC boost::TIME_UTC
+#endif
 
 #ifdef _WIN32
 #include <boost/date_time/filetime_functions.hpp>

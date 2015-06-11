@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include <boost/noncopyable.hpp>
-#include <boost/thread/condition.hpp>
+#include <chrono>
+#include <condition_variable>
+#include <mutex>
 #include <limits>
 #include <queue>
 
-#include "mongo/util/concurrency/mutex.h"
-#include "mongo/util/timer.h"
+#include "mongo/base/disallow_copying.h"
 
 namespace mongo {
 
@@ -49,10 +49,12 @@ namespace mongo {
      * A custom sizing function can optionally be given.  By default the getSize function
      * returns 1 for each item, resulting in size equaling the number of items queued.
      *
-     * Note that use of this class is deprecated.  This class only works with a single consumer and      * a single producer.
+     * Note that use of this class is deprecated.  This class only works with a single consumer and
+     * a single producer.
      */
     template<typename T>
-    class BlockingQueue : boost::noncopyable {
+    class BlockingQueue {
+        MONGO_DISALLOW_COPYING(BlockingQueue);
         typedef size_t (*getSizeFunc)(const T& t);
     public:
         BlockingQueue() :
@@ -69,7 +71,7 @@ namespace mongo {
             _getSize(f) {}
 
         void push(T const& t) {
-            boost::unique_lock<boost::mutex> l( _lock );
+            std::unique_lock<std::mutex> l( _lock );
             size_t tSize = _getSize(t);
             while (_currentSize + tSize > _maxSize) {
                 _cvNoLongerFull.wait( l );
@@ -80,7 +82,7 @@ namespace mongo {
         }
 
         bool empty() const {
-            boost::lock_guard<boost::mutex> l( _lock );
+            std::lock_guard<std::mutex> l( _lock );
             return _queue.empty();
         }
 
@@ -88,7 +90,7 @@ namespace mongo {
          * The size as measured by the size function. Default to counting each item
          */
         size_t size() const {
-            boost::lock_guard<boost::mutex> l( _lock );
+            std::lock_guard<std::mutex> l( _lock );
             return _currentSize;
         }
 
@@ -103,19 +105,19 @@ namespace mongo {
          * The number/count of items in the queue ( _queue.size() )
          */
         size_t count() const {
-            boost::lock_guard<boost::mutex> l( _lock );
+            std::lock_guard<std::mutex> l( _lock );
             return _queue.size();
         }
 
         void clear() {
-            boost::lock_guard<boost::mutex> l(_lock);
+            std::lock_guard<std::mutex> l(_lock);
             _queue = std::queue<T>();
             _currentSize = 0;
             _cvNoLongerFull.notify_one();
         }
 
         bool tryPop( T & t ) {
-            boost::lock_guard<boost::mutex> l( _lock );
+            std::lock_guard<std::mutex> l( _lock );
             if ( _queue.empty() )
                 return false;
 
@@ -129,7 +131,7 @@ namespace mongo {
 
         T blockingPop() {
 
-            boost::unique_lock<boost::mutex> l( _lock );
+            std::unique_lock<std::mutex> l( _lock );
             while( _queue.empty() )
                 _cvNoLongerEmpty.wait( l );
 
@@ -148,16 +150,11 @@ namespace mongo {
          * otherwise return false and t won't be changed
          */
         bool blockingPop( T& t , int maxSecondsToWait ) {
-
-            Timer timer;
-
-            boost::xtime xt;
-            boost::xtime_get(&xt, MONGO_BOOST_TIME_UTC);
-            xt.sec += maxSecondsToWait;
-
-            boost::unique_lock<boost::mutex> l( _lock );
-            while( _queue.empty() ) {
-                if ( ! _cvNoLongerEmpty.timed_wait( l , xt ) )
+            using namespace std::chrono;
+            const auto deadline = system_clock::now() + seconds(maxSecondsToWait);
+            std::unique_lock<std::mutex> l(_lock);
+            while(_queue.empty()) {
+                if (std::cv_status::timeout == _cvNoLongerEmpty.wait_until(l, deadline))
                     return false;
             }
 
@@ -171,15 +168,11 @@ namespace mongo {
         // Obviously, this should only be used when you have
         // only one consumer
         bool blockingPeek(T& t, int maxSecondsToWait) {
-            Timer timer;
-
-            boost::xtime xt;
-            boost::xtime_get(&xt, MONGO_BOOST_TIME_UTC);
-            xt.sec += maxSecondsToWait;
-
-            boost::unique_lock<boost::mutex> l( _lock );
-            while( _queue.empty() ) {
-                if ( ! _cvNoLongerEmpty.timed_wait( l , xt ) )
+            using namespace std::chrono;
+            const auto deadline = system_clock::now() + seconds(maxSecondsToWait);
+            std::unique_lock<std::mutex> l(_lock);
+            while(_queue.empty()) {
+                if (std::cv_status::timeout == _cvNoLongerEmpty.wait_until(l, deadline))
                     return false;
             }
 
@@ -191,7 +184,7 @@ namespace mongo {
         // only one consumer
         bool peek(T& t) {
 
-            boost::unique_lock<boost::mutex> l( _lock );
+            std::unique_lock<std::mutex> l( _lock );
             if (_queue.empty()) {
                 return false;
             }
@@ -201,14 +194,14 @@ namespace mongo {
         }
 
     private:
-        mutable mongo::mutex _lock;
+        mutable std::mutex _lock;
         std::queue<T> _queue;
         const size_t _maxSize;
         size_t _currentSize;
         getSizeFunc _getSize;
 
-        boost::condition _cvNoLongerFull;
-        boost::condition _cvNoLongerEmpty;
+        std::condition_variable _cvNoLongerFull;
+        std::condition_variable _cvNoLongerEmpty;
     };
 
 }

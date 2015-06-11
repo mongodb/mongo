@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <boost/thread/condition.hpp>
 #include <boost/thread/mutex.hpp>
 
 #include "mongo/util/queue.h"
@@ -50,7 +51,7 @@ namespace repl {
     public:
         virtual ~BackgroundSyncInterface();
 
-        // Gets the head of the buffer, but does not remove it. 
+        // Gets the head of the buffer, but does not remove it.
         // Returns true if an element was present at the head;
         // false if the queue was empty.
         virtual bool peek(BSONObj* op) = 0;
