@@ -107,7 +107,7 @@ namespace {
 
         void tearDown() override {
             // Don't care about what shutDown passes to stopPing here.
-            _mockCatalog->setSucceedingExpectedStopPing([](StringData){}, Status::OK());
+            _mockCatalog->expectStopPing([](StringData){}, Status::OK());
             _mgr.shutDown();
         }
 
@@ -160,7 +160,7 @@ namespace {
 
         OID lockSessionIDPassed;
 
-        getMockCatalog()->setSucceedingExpectedGrabLock(
+        getMockCatalog()->expectGrabLock(
                 [this, &lockName, &now, &whyMsg, &lockSessionIDPassed](
                         StringData lockID,
                         const OID& lockSessionID,
@@ -189,7 +189,7 @@ namespace {
             ASSERT_OK(lockStatus.getStatus());
 
             getMockCatalog()->expectNoGrabLock();
-            getMockCatalog()->setSucceedingExpectedUnLock(
+            getMockCatalog()->expectUnLock(
                     [&unlockCallCount, &unlockSessionIDPassed](const OID& lockSessionID) {
                 unlockCallCount++;
                 unlockSessionIDPassed = lockSessionID;
@@ -225,7 +225,7 @@ namespace {
         goodLockDoc.setWhy(whyMsg);
         goodLockDoc.setLockID(OID::gen());
 
-        getMockCatalog()->setSucceedingExpectedGrabLock(
+        getMockCatalog()->expectGrabLock(
                 [this,
                  &lockName,
                  &lastTS,
@@ -252,12 +252,12 @@ namespace {
             lastTime = time;
 
             if (++retryAttempt >= kMaxRetryAttempt) {
-                getMockCatalog()->setSucceedingExpectedGrabLock([this,
-                                                                 &lockName,
-                                                                 &lastTS,
-                                                                 &me,
-                                                                 &lastTime,
-                                                                 &whyMsg](
+                getMockCatalog()->expectGrabLock([this,
+                                                  &lockName,
+                                                  &lastTS,
+                                                  &me,
+                                                  &lastTime,
+                                                  &whyMsg](
                         StringData lockID,
                         const OID& lockSessionID,
                         StringData who,
@@ -275,7 +275,7 @@ namespace {
 
                     getMockCatalog()->expectNoGrabLock();
 
-                    getMockCatalog()->setSucceedingExpectedGetLockByName([](StringData name) {
+                    getMockCatalog()->expectGetLockByName([](StringData name) {
                         FAIL("should not attempt to overtake lock after successful lock");
                     }, LocksType());
                 }, goodLockDoc);
@@ -294,7 +294,7 @@ namespace {
         currentLockDoc.setWho("me");
         currentLockDoc.setWhy("why");
 
-        getMockCatalog()->setSucceedingExpectedGetLockByName([](StringData name) {
+        getMockCatalog()->expectGetLockByName([](StringData name) {
             ASSERT_EQUALS("test", name);
         }, currentLockDoc);
 
@@ -302,12 +302,12 @@ namespace {
         pingDoc.setProcess("otherProcess");
         pingDoc.setPing(Date_t());
 
-        getMockCatalog()->setSucceedingExpectedGetPing([](StringData process) {
+        getMockCatalog()->expectGetPing([](StringData process) {
             ASSERT_EQUALS("otherProcess", process);
         }, pingDoc);
 
         // Config server time is fixed, so overtaking will never succeed.
-        getMockCatalog()->setSucceedingExpectedGetServerInfo([]() {
+        getMockCatalog()->expectGetServerInfo([]() {
         }, DistLockCatalog::ServerInfo(Date_t(), OID()));
 
         //
@@ -322,7 +322,7 @@ namespace {
             ASSERT_OK(lockStatus.getStatus());
 
             getMockCatalog()->expectNoGrabLock();
-            getMockCatalog()->setSucceedingExpectedUnLock(
+            getMockCatalog()->expectUnLock(
                     [&unlockCallCount, &unlockSessionIDPassed](const OID& lockSessionID) {
                 unlockCallCount++;
                 unlockSessionIDPassed = lockSessionID;
@@ -350,7 +350,7 @@ namespace {
         int retryAttempt = 0;
         const int kMaxRetryAttempt = 3;
 
-        getMockCatalog()->setSucceedingExpectedGrabLock(
+        getMockCatalog()->expectGrabLock(
                 [this,
                  &lockName,
                  &lastTS,
@@ -376,12 +376,12 @@ namespace {
             lastTime = time;
 
             if (++retryAttempt >= kMaxRetryAttempt) {
-                getMockCatalog()->setSucceedingExpectedGrabLock([this,
-                                                                 &lockName,
-                                                                 &lastTS,
-                                                                 &me,
-                                                                 &lastTime,
-                                                                 &whyMsg](
+                getMockCatalog()->expectGrabLock([this,
+                                                  &lockName,
+                                                  &lastTS,
+                                                  &me,
+                                                  &lastTime,
+                                                  &whyMsg](
                         StringData lockID,
                         const OID& lockSessionID,
                         StringData who,
@@ -403,7 +403,7 @@ namespace {
         }, {ErrorCodes::LockStateChangeFailed, "nMod 0"});
 
         // Make mock return lock not found to skip lock overtaking.
-        getMockCatalog()->setSucceedingExpectedGetLockByName([](StringData) {},
+        getMockCatalog()->expectGetLockByName([](StringData) {},
                 {ErrorCodes::LockNotFound, "not found!"});
 
         stdx::mutex unlockMutex;
@@ -411,7 +411,7 @@ namespace {
         OID unlockSessionIDPassed;
         int unlockCallCount = 0;
 
-        getMockCatalog()->setSucceedingExpectedUnLock(
+        getMockCatalog()->expectUnLock(
                 [&unlockMutex, &unlockCV, &unlockCallCount, &unlockSessionIDPassed](
                         const OID& lockSessionID) {
             stdx::unique_lock<stdx::mutex> lk(unlockMutex);
@@ -435,17 +435,13 @@ namespace {
     }
 
     TEST_F(ReplSetDistLockManagerFixture, LockBusyNoRetry) {
-        getMockCatalog()->setSucceedingExpectedGrabLock([this](StringData lockID,
-                                                               const OID& lockSessionID,
-                                                               StringData who,
-                                                               StringData processId,
-                                                               Date_t time,
-                                                               StringData why) {
+        getMockCatalog()->expectGrabLock([this](
+                StringData, const OID&, StringData, StringData, Date_t, StringData) {
             getMockCatalog()->expectNoGrabLock(); // Call only once.
         }, {ErrorCodes::LockStateChangeFailed, "nMod 0"});
 
         // Make mock return lock not found to skip lock overtaking.
-        getMockCatalog()->setSucceedingExpectedGetLockByName([](StringData) {},
+        getMockCatalog()->expectGetLockByName([](StringData) {},
                 {ErrorCodes::LockNotFound, "not found!"});
 
         auto status = getMgr()->lock("", "", Milliseconds(0), Milliseconds(0)).getStatus();
@@ -470,7 +466,7 @@ namespace {
 
         int retryAttempt = 0;
 
-        getMockCatalog()->setSucceedingExpectedGrabLock(
+        getMockCatalog()->expectGrabLock(
                 [this,
                  &lockName,
                  &lastTS,
@@ -497,7 +493,7 @@ namespace {
         }, {ErrorCodes::LockStateChangeFailed, "nMod 0"});
 
         // Make mock return lock not found to skip lock overtaking.
-        getMockCatalog()->setSucceedingExpectedGetLockByName([](StringData) {},
+        getMockCatalog()->expectGetLockByName([](StringData) {},
                         {ErrorCodes::LockNotFound, "not found!"});
 
         auto lockStatus = getMgr()->lock(lockName,
@@ -523,7 +519,7 @@ namespace {
         OID lastTS;
         string whyMsg("because");
 
-        getMockCatalog()->setSucceedingExpectedGrabLock(
+        getMockCatalog()->expectGrabLock(
                 [this,
                  &lockName,
                  &lastTS,
@@ -550,7 +546,7 @@ namespace {
         int unlockCallCount = 0;
         OID unlockSessionIDPassed;
 
-        getMockCatalog()->setSucceedingExpectedUnLock(
+        getMockCatalog()->expectUnLock(
                 [&unlockMutex, &unlockCV, &unlockCallCount, &unlockSessionIDPassed](
                         const OID& lockSessionID) {
             stdx::unique_lock<stdx::mutex> lk(unlockMutex);
@@ -589,7 +585,7 @@ namespace {
         vector<Date_t> pingValues;
         vector<string> processIDList;
 
-        getMockCatalog()->setSucceedingExpectedPing(
+        getMockCatalog()->expectPing(
                 [&testMutex, &ping3TimesCV, &processIDList, &pingValues](
                         StringData processIDArg, Date_t ping) {
             stdx::lock_guard<stdx::mutex> lk(testMutex);
@@ -633,14 +629,14 @@ namespace {
         const unsigned int kUnlockErrorCount = 3;
         vector<OID> lockSessionIDPassed;
 
-        getMockCatalog()->setSucceedingExpectedUnLock(
+        getMockCatalog()->expectUnLock(
                 [this, &unlockMutex, &unlockCV, &kUnlockErrorCount, &lockSessionIDPassed](
                         const OID& lockSessionID) {
             stdx::unique_lock<stdx::mutex> lk(unlockMutex);
             lockSessionIDPassed.push_back(lockSessionID);
 
             if (lockSessionIDPassed.size() >= kUnlockErrorCount) {
-                getMockCatalog()->setSucceedingExpectedUnLock(
+                getMockCatalog()->expectUnLock(
                         [&lockSessionIDPassed, &unlockMutex, &unlockCV](
                                 const OID& lockSessionID) {
                     stdx::unique_lock<stdx::mutex> lk(unlockMutex);
@@ -660,7 +656,7 @@ namespace {
         // Will be different from the actual lock session id. For testing only.
         retLockDoc.setLockID(OID::gen());
 
-        getMockCatalog()->setSucceedingExpectedGrabLock([&lockSessionID](
+        getMockCatalog()->expectGrabLock([&lockSessionID](
                 StringData lockID,
                 const OID& lockSessionIDArg,
                 StringData who,
@@ -713,7 +709,7 @@ namespace {
             return iter == map.end();
         };
 
-        getMockCatalog()->setSucceedingExpectedUnLock(
+        getMockCatalog()->expectUnLock(
                 [this, &unlockIDMap, &testMutex, &unlockCV, &mapEntriesGreaterThanTwo](
                         const OID& lockSessionID) {
             stdx::unique_lock<stdx::mutex> lk(testMutex);
@@ -721,7 +717,7 @@ namespace {
 
             // Wait until we see at least 2 unique lockSessionID more than twice.
             if (unlockIDMap.size() >= 2 && mapEntriesGreaterThanTwo(unlockIDMap)) {
-                getMockCatalog()->setSucceedingExpectedUnLock(
+                getMockCatalog()->expectUnLock(
                         [&testMutex, &unlockCV](const OID& lockSessionID) {
                     stdx::unique_lock<stdx::mutex> lk(testMutex);
                     unlockCV.notify_all();
@@ -738,7 +734,7 @@ namespace {
         // Will be different from the actual lock session id. For testing only.
         retLockDoc.setLockID(OID::gen());
 
-        getMockCatalog()->setSucceedingExpectedGrabLock([&testMutex, &lockSessionIDPassed](
+        getMockCatalog()->expectGrabLock([&testMutex, &lockSessionIDPassed](
                 StringData lockID,
                 const OID& lockSessionIDArg,
                 StringData who,
@@ -770,7 +766,7 @@ namespace {
 
     TEST_F(ReplSetDistLockManagerFixture, CleanupPingOnShutdown) {
         bool stopPingCalled = false;
-        getMockCatalog()->setSucceedingExpectedStopPing([this, & stopPingCalled](
+        getMockCatalog()->expectStopPing([this, & stopPingCalled](
                 StringData processID) {
             ASSERT_EQUALS(getProcessID(), processID);
             stopPingCalled = true;
@@ -792,7 +788,7 @@ namespace {
 
         OID lockSessionID;
 
-        getMockCatalog()->setSucceedingExpectedGrabLock([&lockSessionID]
+        getMockCatalog()->expectGrabLock([&lockSessionID]
                 (StringData, const OID& ts, StringData, StringData, Date_t, StringData) {
             lockSessionID = ts;
         }, retLockDoc);
@@ -802,14 +798,14 @@ namespace {
         ASSERT_OK(lockStatus.getStatus());
 
         getMockCatalog()->expectNoGrabLock();
-        getMockCatalog()->setSucceedingExpectedUnLock([](const OID&) {
+        getMockCatalog()->expectUnLock([](const OID&) {
             // Don't care
         }, Status::OK());
 
         auto& scopedLock = lockStatus.getValue();
 
         getMockCatalog()->expectNoGrabLock();
-        getMockCatalog()->setSucceedingExpectedGetLockByTS([&lockSessionID](const OID& ts) {
+        getMockCatalog()->expectGetLockByTS([&lockSessionID](const OID& ts) {
             ASSERT_EQUALS(lockSessionID, ts);
         }, retLockDoc);
 
@@ -828,7 +824,7 @@ namespace {
 
         OID lockSessionID;
 
-        getMockCatalog()->setSucceedingExpectedGrabLock([&lockSessionID]
+        getMockCatalog()->expectGrabLock([&lockSessionID]
                 (StringData, const OID& ts, StringData, StringData, Date_t, StringData) {
             lockSessionID = ts;
         }, retLockDoc);
@@ -838,14 +834,14 @@ namespace {
         ASSERT_OK(lockStatus.getStatus());
 
         getMockCatalog()->expectNoGrabLock();
-        getMockCatalog()->setSucceedingExpectedUnLock([](const OID&) {
+        getMockCatalog()->expectUnLock([](const OID&) {
             // Don't care
         }, Status::OK());
 
         auto& scopedLock = lockStatus.getValue();
 
         getMockCatalog()->expectNoGrabLock();
-        getMockCatalog()->setSucceedingExpectedGetLockByTS([&lockSessionID](const OID& ts) {
+        getMockCatalog()->expectGetLockByTS([&lockSessionID](const OID& ts) {
             ASSERT_EQUALS(lockSessionID, ts);
         }, {ErrorCodes::LockNotFound, "no lock"});
 
@@ -864,7 +860,7 @@ namespace {
 
         OID lockSessionID;
 
-        getMockCatalog()->setSucceedingExpectedGrabLock([&lockSessionID]
+        getMockCatalog()->expectGrabLock([&lockSessionID]
                 (StringData, const OID& ts, StringData, StringData, Date_t, StringData) {
             lockSessionID = ts;
         }, retLockDoc);
@@ -874,14 +870,14 @@ namespace {
         ASSERT_OK(lockStatus.getStatus());
 
         getMockCatalog()->expectNoGrabLock();
-        getMockCatalog()->setSucceedingExpectedUnLock([](const OID&) {
+        getMockCatalog()->expectUnLock([](const OID&) {
             // Don't care
         }, Status::OK());
 
         auto& scopedLock = lockStatus.getValue();
 
         getMockCatalog()->expectNoGrabLock();
-        getMockCatalog()->setSucceedingExpectedGetLockByTS([&lockSessionID](const OID& ts) {
+        getMockCatalog()->expectGetLockByTS([&lockSessionID](const OID& ts) {
             ASSERT_EQUALS(lockSessionID, ts);
         }, {ErrorCodes::NetworkTimeout, "bad test network"});
 
@@ -901,12 +897,8 @@ namespace {
     TEST_F(ReplSetDistLockManagerFixture, BasicLockOvertaking) {
         OID lastTS;
 
-        getMockCatalog()->setSucceedingExpectedGrabLock([&lastTS](StringData lockID,
-                                                                  const OID& lockSessionID,
-                                                                  StringData who,
-                                                                  StringData processId,
-                                                                  Date_t time,
-                                                                  StringData why) {
+        getMockCatalog()->expectGrabLock([&lastTS](
+                StringData, const OID& lockSessionID, StringData, StringData, Date_t, StringData) {
             lastTS = lockSessionID;
         }, {ErrorCodes::LockStateChangeFailed, "nMod 0"});
 
@@ -918,7 +910,7 @@ namespace {
         currentLockDoc.setWho("me");
         currentLockDoc.setWhy("why");
 
-        getMockCatalog()->setSucceedingExpectedGetLockByName([](StringData name) {
+        getMockCatalog()->expectGetLockByName([](StringData name) {
             ASSERT_EQUALS("bar", name);
         }, currentLockDoc);
 
@@ -926,11 +918,11 @@ namespace {
         pingDoc.setProcess("otherProcess");
         pingDoc.setPing(Date_t());
 
-        getMockCatalog()->setSucceedingExpectedGetPing([](StringData process) {
+        getMockCatalog()->expectGetPing([](StringData process) {
             ASSERT_EQUALS("otherProcess", process);
         }, pingDoc);
 
-        getMockCatalog()->setSucceedingExpectedGetServerInfo([]() {
+        getMockCatalog()->expectGetServerInfo([]() {
         }, DistLockCatalog::ServerInfo(Date_t(), OID()));
 
         // First attempt will record the ping data.
@@ -941,10 +933,10 @@ namespace {
         }
 
         // Advance config server time to exceed lock expiration.
-        getMockCatalog()->setSucceedingExpectedGetServerInfo([]() {
+        getMockCatalog()->expectGetServerInfo([]() {
         }, DistLockCatalog::ServerInfo(Date_t() + kLockExpiration + Milliseconds(1), OID()));
 
-        getMockCatalog()->setSucceedingExpectedOvertakeLock(
+        getMockCatalog()->expectOvertakeLock(
                 [this, &lastTS, &currentLockDoc]
                  (StringData lockID,
                   const OID& lockSessionID,
@@ -973,7 +965,7 @@ namespace {
             ASSERT_OK(lockStatus.getStatus());
 
             getMockCatalog()->expectNoGrabLock();
-            getMockCatalog()->setSucceedingExpectedUnLock(
+            getMockCatalog()->expectUnLock(
                     [&unlockCallCount, &unlockSessionIDPassed](const OID& lockSessionID) {
                 unlockCallCount++;
                 unlockSessionIDPassed = lockSessionID;
@@ -985,7 +977,7 @@ namespace {
     }
 
     TEST_F(ReplSetDistLockManagerFixture, CannotOvertakeIfExpirationHasNotElapsed) {
-        getMockCatalog()->setSucceedingExpectedGrabLock([](
+        getMockCatalog()->expectGrabLock([](
                 StringData, const OID&, StringData, StringData, Date_t, StringData) {
             // Don't care.
         }, {ErrorCodes::LockStateChangeFailed, "nMod 0"});
@@ -998,7 +990,7 @@ namespace {
         currentLockDoc.setWho("me");
         currentLockDoc.setWhy("why");
 
-        getMockCatalog()->setSucceedingExpectedGetLockByName([](StringData name) {
+        getMockCatalog()->expectGetLockByName([](StringData name) {
             ASSERT_EQUALS("bar", name);
         }, currentLockDoc);
 
@@ -1006,11 +998,11 @@ namespace {
         pingDoc.setProcess("otherProcess");
         pingDoc.setPing(Date_t());
 
-        getMockCatalog()->setSucceedingExpectedGetPing([](StringData process) {
+        getMockCatalog()->expectGetPing([](StringData process) {
             ASSERT_EQUALS("otherProcess", process);
         }, pingDoc);
 
-        getMockCatalog()->setSucceedingExpectedGetServerInfo([]() {
+        getMockCatalog()->expectGetServerInfo([]() {
         }, DistLockCatalog::ServerInfo(Date_t(), OID()));
 
         // First attempt will record the ping data.
@@ -1021,7 +1013,7 @@ namespace {
         }
 
         // Advance config server time to 1 millisecond before lock expiration.
-        getMockCatalog()->setSucceedingExpectedGetServerInfo([]() {
+        getMockCatalog()->expectGetServerInfo([]() {
         }, DistLockCatalog::ServerInfo(Date_t() + kLockExpiration - Milliseconds(1), OID()));
 
         // Second attempt should still not overtake lock.
@@ -1033,7 +1025,7 @@ namespace {
     }
 
     TEST_F(ReplSetDistLockManagerFixture, GetPingErrorWhileOvertaking) {
-        getMockCatalog()->setSucceedingExpectedGrabLock([](
+        getMockCatalog()->expectGrabLock([](
                 StringData, const OID&, StringData, StringData, Date_t, StringData) {
             // Don't care
         }, {ErrorCodes::LockStateChangeFailed, "nMod 0"});
@@ -1046,11 +1038,11 @@ namespace {
         currentLockDoc.setWho("me");
         currentLockDoc.setWhy("why");
 
-        getMockCatalog()->setSucceedingExpectedGetLockByName([](StringData name) {
+        getMockCatalog()->expectGetLockByName([](StringData name) {
             ASSERT_EQUALS("bar", name);
         }, currentLockDoc);
 
-        getMockCatalog()->setSucceedingExpectedGetPing([](StringData process) {
+        getMockCatalog()->expectGetPing([](StringData process) {
             ASSERT_EQUALS("otherProcess", process);
         }, {ErrorCodes::NetworkTimeout, "bad test network"});
 
@@ -1060,7 +1052,7 @@ namespace {
     }
 
     TEST_F(ReplSetDistLockManagerFixture, GetInvalidPingDocumentWhileOvertaking) {
-        getMockCatalog()->setSucceedingExpectedGrabLock([](
+        getMockCatalog()->expectGrabLock([](
                 StringData, const OID&, StringData, StringData, Date_t, StringData) {
             // Don't care
         }, {ErrorCodes::LockStateChangeFailed, "nMod 0"});
@@ -1073,12 +1065,12 @@ namespace {
         currentLockDoc.setWho("me");
         currentLockDoc.setWhy("why");
 
-        getMockCatalog()->setSucceedingExpectedGetLockByName([](StringData name) {
+        getMockCatalog()->expectGetLockByName([](StringData name) {
             ASSERT_EQUALS("bar", name);
         }, currentLockDoc);
 
         LockpingsType invalidPing;
-        getMockCatalog()->setSucceedingExpectedGetPing([](StringData process) {
+        getMockCatalog()->expectGetPing([](StringData process) {
             ASSERT_EQUALS("otherProcess", process);
         }, invalidPing);
 
@@ -1088,7 +1080,7 @@ namespace {
     }
 
     TEST_F(ReplSetDistLockManagerFixture, GetServerInfoErrorWhileOvertaking) {
-        getMockCatalog()->setSucceedingExpectedGrabLock([](
+        getMockCatalog()->expectGrabLock([](
                 StringData, const OID&, StringData, StringData, Date_t, StringData) {
             // Don't care
         }, {ErrorCodes::LockStateChangeFailed, "nMod 0"});
@@ -1101,7 +1093,7 @@ namespace {
         currentLockDoc.setWho("me");
         currentLockDoc.setWhy("why");
 
-        getMockCatalog()->setSucceedingExpectedGetLockByName([](StringData name) {
+        getMockCatalog()->expectGetLockByName([](StringData name) {
             ASSERT_EQUALS("bar", name);
         }, currentLockDoc);
 
@@ -1109,11 +1101,11 @@ namespace {
         pingDoc.setProcess("otherProcess");
         pingDoc.setPing(Date_t());
 
-        getMockCatalog()->setSucceedingExpectedGetPing([](StringData process) {
+        getMockCatalog()->expectGetPing([](StringData process) {
             ASSERT_EQUALS("otherProcess", process);
         }, pingDoc);
 
-        getMockCatalog()->setSucceedingExpectedGetServerInfo([]() {
+        getMockCatalog()->expectGetServerInfo([]() {
         }, {ErrorCodes::NetworkTimeout, "bad test network"});
 
         auto status = getMgr()->lock("bar", "", Milliseconds(0), Milliseconds(0)).getStatus();
@@ -1122,12 +1114,12 @@ namespace {
     }
 
     TEST_F(ReplSetDistLockManagerFixture, GetLockErrorWhileOvertaking) {
-        getMockCatalog()->setSucceedingExpectedGrabLock([](
+        getMockCatalog()->expectGrabLock([](
                 StringData, const OID&, StringData, StringData, Date_t, StringData) {
             // Don't care
         }, {ErrorCodes::LockStateChangeFailed, "nMod 0"});
 
-        getMockCatalog()->setSucceedingExpectedGetLockByName([](StringData name) {
+        getMockCatalog()->expectGetLockByName([](StringData name) {
             ASSERT_EQUALS("bar", name);
         }, {ErrorCodes::NetworkTimeout, "bad test network"});
 
@@ -1137,12 +1129,12 @@ namespace {
     }
 
     TEST_F(ReplSetDistLockManagerFixture, GetLockDisappearedWhileOvertaking) {
-        getMockCatalog()->setSucceedingExpectedGrabLock([](
+        getMockCatalog()->expectGrabLock([](
                 StringData, const OID&, StringData, StringData, Date_t, StringData) {
             // Don't care
         }, {ErrorCodes::LockStateChangeFailed, "nMod 0"});
 
-        getMockCatalog()->setSucceedingExpectedGetLockByName([](StringData name) {
+        getMockCatalog()->expectGetLockByName([](StringData name) {
             ASSERT_EQUALS("bar", name);
         }, {ErrorCodes::LockNotFound, "disappeared!"});
 
@@ -1159,7 +1151,7 @@ namespace {
      * 4. Try to grab lock again when the ping was not updated and lock expiration has elapsed.
      */
     TEST_F(ReplSetDistLockManagerFixture, CannotOvertakeIfPingIsActive) {
-        getMockCatalog()->setSucceedingExpectedGrabLock([](
+        getMockCatalog()->expectGrabLock([](
                 StringData, const OID&, StringData, StringData, Date_t, StringData) {
             // Don't care
         }, {ErrorCodes::LockStateChangeFailed, "nMod 0"});
@@ -1179,7 +1171,7 @@ namespace {
         Date_t configServerLocalTime;
         int getServerInfoCallCount = 0;
 
-        getMockCatalog()->setSucceedingExpectedGetLockByName([](StringData name) {
+        getMockCatalog()->expectGetLockByName([](StringData name) {
             ASSERT_EQUALS("bar", name);
         }, currentLockDoc);
 
@@ -1191,11 +1183,11 @@ namespace {
             currentPing += Milliseconds(1);
             pingDoc.setPing(currentPing);
 
-            getMockCatalog()->setSucceedingExpectedGetPing([](StringData process) {
+            getMockCatalog()->expectGetPing([](StringData process) {
                 ASSERT_EQUALS("otherProcess", process);
             }, pingDoc);
 
-            getMockCatalog()->setSucceedingExpectedGetServerInfo([&getServerInfoCallCount]() {
+            getMockCatalog()->expectGetServerInfo([&getServerInfoCallCount]() {
                 getServerInfoCallCount++;
             }, DistLockCatalog::ServerInfo(configServerLocalTime, OID()));
 
@@ -1207,13 +1199,13 @@ namespace {
         ASSERT_EQUALS(kLoopCount, getServerInfoCallCount);
 
         configServerLocalTime += kLockExpiration;
-        getMockCatalog()->setSucceedingExpectedGetServerInfo([&getServerInfoCallCount]() {
+        getMockCatalog()->expectGetServerInfo([&getServerInfoCallCount]() {
             getServerInfoCallCount++;
         }, DistLockCatalog::ServerInfo(configServerLocalTime, OID()));
 
         OID lockTS;
         // Make sure that overtake is now ok since ping is no longer updated.
-        getMockCatalog()->setSucceedingExpectedOvertakeLock(
+        getMockCatalog()->expectOvertakeLock(
                 [this, &lockTS, &currentLockDoc]
                  (StringData lockID,
                   const OID& lockSessionID,
@@ -1241,7 +1233,7 @@ namespace {
             ASSERT_OK(lockStatus.getStatus());
 
             getMockCatalog()->expectNoGrabLock();
-            getMockCatalog()->setSucceedingExpectedUnLock(
+            getMockCatalog()->expectUnLock(
                     [&unlockCallCount, &unlockSessionIDPassed](const OID& lockSessionID) {
                 unlockCallCount++;
                 unlockSessionIDPassed = lockSessionID;
@@ -1260,7 +1252,7 @@ namespace {
      * 4. Try to grab lock again when the ping was not updated and lock expiration has elapsed.
      */
     TEST_F(ReplSetDistLockManagerFixture, CannotOvertakeIfOwnerJustChanged) {
-        getMockCatalog()->setSucceedingExpectedGrabLock([](
+        getMockCatalog()->expectGrabLock([](
                 StringData, const OID&, StringData, StringData, Date_t, StringData) {
             // Don't care
         }, {ErrorCodes::LockStateChangeFailed, "nMod 0"});
@@ -1281,7 +1273,7 @@ namespace {
         Date_t configServerLocalTime;
         int getServerInfoCallCount = 0;
 
-        getMockCatalog()->setSucceedingExpectedGetPing([](StringData process) {
+        getMockCatalog()->expectGetPing([](StringData process) {
             ASSERT_EQUALS("otherProcess", process);
         }, pingDoc);
 
@@ -1292,11 +1284,11 @@ namespace {
 
             currentLockDoc.setLockID(OID::gen());
 
-            getMockCatalog()->setSucceedingExpectedGetLockByName([](StringData name) {
+            getMockCatalog()->expectGetLockByName([](StringData name) {
                 ASSERT_EQUALS("bar", name);
             }, currentLockDoc);
 
-            getMockCatalog()->setSucceedingExpectedGetServerInfo([&getServerInfoCallCount]() {
+            getMockCatalog()->expectGetServerInfo([&getServerInfoCallCount]() {
                 getServerInfoCallCount++;
             }, DistLockCatalog::ServerInfo(configServerLocalTime, OID()));
 
@@ -1308,13 +1300,13 @@ namespace {
         ASSERT_EQUALS(kLoopCount, getServerInfoCallCount);
 
         configServerLocalTime += kLockExpiration;
-        getMockCatalog()->setSucceedingExpectedGetServerInfo([&getServerInfoCallCount]() {
+        getMockCatalog()->expectGetServerInfo([&getServerInfoCallCount]() {
             getServerInfoCallCount++;
         }, DistLockCatalog::ServerInfo(configServerLocalTime, OID()));
 
         OID lockTS;
         // Make sure that overtake is now ok since lock owner didn't change.
-        getMockCatalog()->setSucceedingExpectedOvertakeLock(
+        getMockCatalog()->expectOvertakeLock(
                 [this, &lockTS, &currentLockDoc]
                  (StringData lockID,
                   const OID& lockSessionID,
@@ -1342,7 +1334,7 @@ namespace {
             ASSERT_OK(lockStatus.getStatus());
 
             getMockCatalog()->expectNoGrabLock();
-            getMockCatalog()->setSucceedingExpectedUnLock(
+            getMockCatalog()->expectUnLock(
                     [&unlockCallCount, &unlockSessionIDPassed](const OID& lockSessionID) {
                 unlockCallCount++;
                 unlockSessionIDPassed = lockSessionID;
@@ -1361,7 +1353,7 @@ namespace {
      * 4. Try to grab lock again when the ping was not updated and lock expiration has elapsed.
      */
     TEST_F(ReplSetDistLockManagerFixture, CannotOvertakeIfElectionIdChanged) {
-        getMockCatalog()->setSucceedingExpectedGrabLock([](
+        getMockCatalog()->expectGrabLock([](
                 StringData, const OID&, StringData, StringData, Date_t, StringData) {
             // Don't care
         }, {ErrorCodes::LockStateChangeFailed, "nMod 0"});
@@ -1391,16 +1383,16 @@ namespace {
             // Advance config server time to reach lock expiration.
             configServerLocalTime += kLockExpiration;
 
-            getMockCatalog()->setSucceedingExpectedGetLockByName([](StringData name) {
+            getMockCatalog()->expectGetLockByName([](StringData name) {
                 ASSERT_EQUALS("bar", name);
             }, fixedLockDoc);
 
-            getMockCatalog()->setSucceedingExpectedGetPing([](StringData process) {
+            getMockCatalog()->expectGetPing([](StringData process) {
                 ASSERT_EQUALS("otherProcess", process);
             }, fixedPingDoc);
 
             lastElectionId = OID::gen();
-            getMockCatalog()->setSucceedingExpectedGetServerInfo([&getServerInfoCallCount]() {
+            getMockCatalog()->expectGetServerInfo([&getServerInfoCallCount]() {
                 getServerInfoCallCount++;
             }, DistLockCatalog::ServerInfo(configServerLocalTime, lastElectionId));
 
@@ -1412,13 +1404,13 @@ namespace {
         ASSERT_EQUALS(kLoopCount, getServerInfoCallCount);
 
         configServerLocalTime += kLockExpiration;
-        getMockCatalog()->setSucceedingExpectedGetServerInfo([&getServerInfoCallCount]() {
+        getMockCatalog()->expectGetServerInfo([&getServerInfoCallCount]() {
             getServerInfoCallCount++;
         }, DistLockCatalog::ServerInfo(configServerLocalTime, lastElectionId));
 
         OID lockTS;
         // Make sure that overtake is now ok since electionId didn't change.
-        getMockCatalog()->setSucceedingExpectedOvertakeLock(
+        getMockCatalog()->expectOvertakeLock(
                 [this, &lockTS, &currentLockDoc]
                  (StringData lockID,
                   const OID& lockSessionID,
@@ -1446,7 +1438,7 @@ namespace {
             ASSERT_OK(lockStatus.getStatus());
 
             getMockCatalog()->expectNoGrabLock();
-            getMockCatalog()->setSucceedingExpectedUnLock(
+            getMockCatalog()->expectUnLock(
                     [&unlockCallCount, &unlockSessionIDPassed](const OID& lockSessionID) {
                 unlockCallCount++;
                 unlockSessionIDPassed = lockSessionID;
@@ -1470,7 +1462,7 @@ namespace {
      * 8. Check that unlock was called.
      */
     TEST_F(ReplSetDistLockManagerFixture, LockOvertakingResultsInError) {
-        getMockCatalog()->setSucceedingExpectedGrabLock([](
+        getMockCatalog()->expectGrabLock([](
                 StringData, const OID&, StringData, StringData, Date_t, StringData) {
             // Don't care
         }, {ErrorCodes::LockStateChangeFailed, "nMod 0"});
@@ -1483,7 +1475,7 @@ namespace {
         currentLockDoc.setWho("me");
         currentLockDoc.setWhy("why");
 
-        getMockCatalog()->setSucceedingExpectedGetLockByName([](StringData name) {
+        getMockCatalog()->expectGetLockByName([](StringData name) {
             ASSERT_EQUALS("bar", name);
         }, currentLockDoc);
 
@@ -1491,11 +1483,11 @@ namespace {
         pingDoc.setProcess("otherProcess");
         pingDoc.setPing(Date_t());
 
-        getMockCatalog()->setSucceedingExpectedGetPing([](StringData process) {
+        getMockCatalog()->expectGetPing([](StringData process) {
             ASSERT_EQUALS("otherProcess", process);
         }, pingDoc);
 
-        getMockCatalog()->setSucceedingExpectedGetServerInfo([]() {
+        getMockCatalog()->expectGetServerInfo([]() {
         }, DistLockCatalog::ServerInfo(Date_t(), OID()));
 
         // First attempt will record the ping data.
@@ -1506,11 +1498,11 @@ namespace {
         }
 
         // Advance config server time to exceed lock expiration.
-        getMockCatalog()->setSucceedingExpectedGetServerInfo([]() {
+        getMockCatalog()->expectGetServerInfo([]() {
         }, DistLockCatalog::ServerInfo(Date_t() + kLockExpiration + Milliseconds(1), OID()));
 
         OID lastTS;
-        getMockCatalog()->setSucceedingExpectedOvertakeLock(
+        getMockCatalog()->expectOvertakeLock(
                 [this, &lastTS, &currentLockDoc]
                  (StringData lockID,
                   const OID& lockSessionID,
@@ -1530,7 +1522,7 @@ namespace {
 
         stdx::mutex unlockMutex;
         stdx::condition_variable unlockCV;
-        getMockCatalog()->setSucceedingExpectedUnLock(
+        getMockCatalog()->expectUnLock(
                 [&unlockSessionIDPassed, &unlockMutex, &unlockCV](
                         const OID& lockSessionID) {
             stdx::unique_lock<stdx::mutex> lk(unlockMutex);
@@ -1566,7 +1558,7 @@ namespace {
      * 7. Attempt to overtake resulted failed because someone beat us into it.
      */
     TEST_F(ReplSetDistLockManagerFixture, LockOvertakingFailed) {
-        getMockCatalog()->setSucceedingExpectedGrabLock([](
+        getMockCatalog()->expectGrabLock([](
                 StringData, const OID&, StringData, StringData, Date_t, StringData) {
             // Don't care
         }, {ErrorCodes::LockStateChangeFailed, "nMod 0"});
@@ -1579,7 +1571,7 @@ namespace {
         currentLockDoc.setWho("me");
         currentLockDoc.setWhy("why");
 
-        getMockCatalog()->setSucceedingExpectedGetLockByName([](StringData name) {
+        getMockCatalog()->expectGetLockByName([](StringData name) {
             ASSERT_EQUALS("bar", name);
         }, currentLockDoc);
 
@@ -1587,11 +1579,11 @@ namespace {
         pingDoc.setProcess("otherProcess");
         pingDoc.setPing(Date_t());
 
-        getMockCatalog()->setSucceedingExpectedGetPing([](StringData process) {
+        getMockCatalog()->expectGetPing([](StringData process) {
             ASSERT_EQUALS("otherProcess", process);
         }, pingDoc);
 
-        getMockCatalog()->setSucceedingExpectedGetServerInfo([]() {
+        getMockCatalog()->expectGetServerInfo([]() {
         }, DistLockCatalog::ServerInfo(Date_t(), OID()));
 
         // First attempt will record the ping data.
@@ -1602,11 +1594,11 @@ namespace {
         }
 
         // Advance config server time to exceed lock expiration.
-        getMockCatalog()->setSucceedingExpectedGetServerInfo([]() {
+        getMockCatalog()->expectGetServerInfo([]() {
         }, DistLockCatalog::ServerInfo(Date_t() + kLockExpiration + Milliseconds(1), OID()));
 
         // Second attempt should overtake lock.
-        getMockCatalog()->setSucceedingExpectedOvertakeLock([this, &currentLockDoc]
+        getMockCatalog()->expectOvertakeLock([this, &currentLockDoc]
                  (StringData lockID,
                   const OID& lockSessionID,
                   const OID& currentHolderTS,
@@ -1642,7 +1634,7 @@ namespace {
      * 7. Attempt to overtake resulted failed because someone beat us into it.
      */
     TEST_F(ReplSetDistLockManagerFixture, CannotOvertakeIfConfigServerClockGoesBackwards) {
-        getMockCatalog()->setSucceedingExpectedGrabLock([](
+        getMockCatalog()->expectGrabLock([](
                 StringData, const OID&, StringData, StringData, Date_t, StringData) {
             // Don't care
         }, {ErrorCodes::LockStateChangeFailed, "nMod 0"});
@@ -1655,7 +1647,7 @@ namespace {
         currentLockDoc.setWho("me");
         currentLockDoc.setWhy("why");
 
-        getMockCatalog()->setSucceedingExpectedGetLockByName([](StringData name) {
+        getMockCatalog()->expectGetLockByName([](StringData name) {
             ASSERT_EQUALS("bar", name);
         }, currentLockDoc);
 
@@ -1663,12 +1655,12 @@ namespace {
         pingDoc.setProcess("otherProcess");
         pingDoc.setPing(Date_t());
 
-        getMockCatalog()->setSucceedingExpectedGetPing([](StringData process) {
+        getMockCatalog()->expectGetPing([](StringData process) {
             ASSERT_EQUALS("otherProcess", process);
         }, pingDoc);
 
         Date_t configClock(Date_t::now());
-        getMockCatalog()->setSucceedingExpectedGetServerInfo([]() {
+        getMockCatalog()->expectGetServerInfo([]() {
         }, DistLockCatalog::ServerInfo(configClock, OID()));
 
         // First attempt will record the ping data.
@@ -1679,7 +1671,7 @@ namespace {
         }
 
         // Make config server time go backwards by lock expiration duration.
-        getMockCatalog()->setSucceedingExpectedGetServerInfo([]() {
+        getMockCatalog()->expectGetServerInfo([]() {
         }, DistLockCatalog::ServerInfo(configClock - kLockExpiration - Milliseconds(1), OID()));
 
         // Second attempt should not overtake lock.

@@ -269,9 +269,8 @@ namespace {
         return ret;
     }
 
-    void DistLockCatalogMock::setSucceedingExpectedGrabLock(
-            DistLockCatalogMock::GrabLockFunc checkerFunc,
-            StatusWith<LocksType> returnThis) {
+    void DistLockCatalogMock::expectGrabLock(DistLockCatalogMock::GrabLockFunc checkerFunc,
+                                             StatusWith<LocksType> returnThis) {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         _grabLockChecker = checkerFunc;
         _grabLockReturnValue = returnThis;
@@ -283,63 +282,55 @@ namespace {
         _grabLockReturnValue = kLocksTypeBadRetValue;
     }
 
-    void DistLockCatalogMock::setSucceedingExpectedUnLock(
-            DistLockCatalogMock::UnlockFunc checkerFunc,
-            Status returnThis) {
+    void DistLockCatalogMock::expectUnLock(DistLockCatalogMock::UnlockFunc checkerFunc,
+                                           Status returnThis) {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         _unlockChecker = checkerFunc;
         _unlockReturnValue = returnThis;
     }
 
-    void DistLockCatalogMock::setSucceedingExpectedPing(
-            DistLockCatalogMock::PingFunc checkerFunc,
-            Status returnThis) {
+    void DistLockCatalogMock::expectPing(DistLockCatalogMock::PingFunc checkerFunc,
+                                         Status returnThis) {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         _pingChecker = checkerFunc;
         _pingReturnValue = returnThis;
     }
 
-    void DistLockCatalogMock::setSucceedingExpectedStopPing(
-            StopPingFunc checkerFunc,
-            Status returnThis) {
+    void DistLockCatalogMock::expectStopPing(StopPingFunc checkerFunc, Status returnThis) {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         _stopPingChecker = checkerFunc;
         _stopPingReturnValue = returnThis;
     }
 
-    void DistLockCatalogMock::setSucceedingExpectedGetLockByTS(
-            GetLockByTSFunc checkerFunc,
-            StatusWith<LocksType> returnThis) {
+    void DistLockCatalogMock::expectGetLockByTS(GetLockByTSFunc checkerFunc,
+                                                StatusWith<LocksType> returnThis) {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         _getLockByTSChecker = checkerFunc;
         _getLockByTSReturnValue = returnThis;
     }
 
-    void DistLockCatalogMock::setSucceedingExpectedGetLockByName(
-            GetLockByNameFunc checkerFunc,
-            StatusWith<LocksType> returnThis) {
+    void DistLockCatalogMock::expectGetLockByName(GetLockByNameFunc checkerFunc,
+                                                  StatusWith<LocksType> returnThis) {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         _getLockByNameChecker = checkerFunc;
         _getLockByNameReturnValue = returnThis;
     }
 
-    void DistLockCatalogMock::setSucceedingExpectedOvertakeLock(
-            OvertakeLockFunc checkerFunc,
-            StatusWith<LocksType> returnThis) {
+    void DistLockCatalogMock::expectOvertakeLock(OvertakeLockFunc checkerFunc,
+                                                 StatusWith<LocksType> returnThis) {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         _overtakeLockChecker = checkerFunc;
         _overtakeLockReturnValue = returnThis;
     }
 
-    void DistLockCatalogMock::setSucceedingExpectedGetPing(
-            GetPingFunc checkerFunc,
-            StatusWith<LockpingsType> returnThis) {
+    void DistLockCatalogMock::expectGetPing(GetPingFunc checkerFunc,
+                                            StatusWith<LockpingsType> returnThis) {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         _getPingChecker = checkerFunc;
         _getPingReturnValue = returnThis;
     }
 
-    void DistLockCatalogMock::setSucceedingExpectedGetServerInfo(
+    void DistLockCatalogMock::expectGetServerInfo(
             GetServerInfoFunc checkerFunc,
             StatusWith<DistLockCatalog::ServerInfo> returnThis) {
         stdx::lock_guard<stdx::mutex> lk(_mutex);

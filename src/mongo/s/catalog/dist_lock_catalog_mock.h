@@ -44,7 +44,7 @@ namespace mongo {
      *
      * DistLockCatalogMock mock;
      * LocksType badLock;
-     * mock.setSucceedingExpectedGrabLock([](StringData lockID,
+     * mock.expectGrabLock([](StringData lockID,
      *                                       const OID& lockSessionID,
      *                                       StringData who,
      *                                       StringData processId,
@@ -59,7 +59,7 @@ namespace mongo {
      * such that grabLock can only be called once, you can do this:
      *
      * DistLockCatalogMock mock;
-     * mock.setSucceedingExpectedGrabLock([&mock](...) {
+     * mock.expectGrabLock([&mock](...) {
      *   mock.expectNoGrabLock();
      * }, Status::OK());
      */
@@ -122,8 +122,7 @@ namespace mongo {
          * Sets the checker method to use and the return value for grabLock to return every
          * time it is called.
          */
-        void setSucceedingExpectedGrabLock(GrabLockFunc checkerFunc,
-                                           StatusWith<LocksType> returnThis);
+        void expectGrabLock(GrabLockFunc checkerFunc, StatusWith<LocksType> returnThis);
 
         /**
          * Expect grabLock to never be called after this is called.
@@ -134,53 +133,48 @@ namespace mongo {
          * Sets the checker method to use and the return value for unlock to return every
          * time it is called.
          */
-        void setSucceedingExpectedUnLock(UnlockFunc checkerFunc, Status returnThis);
+        void expectUnLock(UnlockFunc checkerFunc, Status returnThis);
 
         /**
          * Sets the checker method to use and its return value the every time ping is called.
          */
-        void setSucceedingExpectedPing(PingFunc checkerFunc, Status returnThis);
+        void expectPing(PingFunc checkerFunc, Status returnThis);
 
         /**
          * Sets the checker method to use and its return value the every time stopPing is called.
          */
-        void setSucceedingExpectedStopPing(StopPingFunc checkerFunc, Status returnThis);
+        void expectStopPing(StopPingFunc checkerFunc, Status returnThis);
 
         /**
          * Sets the checker method to use and its return value the every time
          * getLockByTS is called.
          */
-        void setSucceedingExpectedGetLockByTS(GetLockByTSFunc checkerFunc,
-                                              StatusWith<LocksType> returnThis);
+        void expectGetLockByTS(GetLockByTSFunc checkerFunc, StatusWith<LocksType> returnThis);
 
         /**
          * Sets the checker method to use and its return value the every time
          * getLockByName is called.
          */
-        void setSucceedingExpectedGetLockByName(GetLockByNameFunc checkerFunc,
-                                                StatusWith<LocksType> returnThis);
+        void expectGetLockByName(GetLockByNameFunc checkerFunc, StatusWith<LocksType> returnThis);
 
         /**
          * Sets the checker method to use and its return value the every time
          * overtakeLock is called.
          */
-        void setSucceedingExpectedOvertakeLock(OvertakeLockFunc checkerFunc,
-                                               StatusWith<LocksType> returnThis);
+        void expectOvertakeLock(OvertakeLockFunc checkerFunc, StatusWith<LocksType> returnThis);
 
         /**
          * Sets the checker method to use and its return value the every time
          * getPing is called.
          */
-        void setSucceedingExpectedGetPing(GetPingFunc checkerFunc,
-                                          StatusWith<LockpingsType> returnThis);
+        void expectGetPing(GetPingFunc checkerFunc, StatusWith<LockpingsType> returnThis);
 
         /**
          * Sets the checker method to use and its return value the every time
          * getServerInfo is called.
          */
-        void setSucceedingExpectedGetServerInfo(
-                GetServerInfoFunc checkerFunc,
-                StatusWith<DistLockCatalog::ServerInfo> returnThis);
+        void expectGetServerInfo(GetServerInfoFunc checkerFunc,
+                                 StatusWith<DistLockCatalog::ServerInfo> returnThis);
 
     private:
         // Protects all the member variables.
