@@ -489,7 +489,7 @@ namespace mongo {
         {
             stringstream ss;
             ss << "repairpath (" << storageGlobalParams.repairpath << ") does not exist";
-            uassert(12590, 
+            uassert(12590,
                     ss.str().c_str(),
                     boost::filesystem::exists(storageGlobalParams.repairpath));
         }
@@ -522,7 +522,7 @@ namespace mongo {
         }
 
         /* this is for security on certain platforms (nonce generation) */
-        srand((unsigned) (curTimeMicros() ^ startupSrandTimer.micros()));
+        srand((unsigned) (curTimeMicros64() ^ startupSrandTimer.micros()));
 
         // The snapshot thread provides historical collection level and lock statistics for use
         // by the web interface. Only needed when HTTP is enabled.
@@ -582,7 +582,7 @@ namespace mongo {
                       << " documents are present in local.system.replset" << startupWarningsLog;
                 log() << "**          Restart with --replSet unless you are doing maintenance and "
                       << " no other clients are connected." << startupWarningsLog;
-                log() << "**          The TTL collection monitor will not start because of this." 
+                log() << "**          The TTL collection monitor will not start because of this."
                       << startupWarningsLog;
                 log() << "**         ";
                 log() << " For more info see http://dochub.mongodb.org/core/ttlcollections";
@@ -769,8 +769,8 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(CreateReplicationManager, ("SetGlobalEnviro
 }
 
 #ifdef MONGO_CONFIG_SSL
-MONGO_INITIALIZER_GENERAL(setSSLManagerType, 
-                          MONGO_NO_PREREQUISITES, 
+MONGO_INITIALIZER_GENERAL(setSSLManagerType,
+                          MONGO_NO_PREREQUISITES,
                           ("SSLManager"))(InitializerContext* context) {
     isSSLServer = true;
     return Status::OK();
@@ -810,7 +810,7 @@ static int mongoDbMain(int argc, char* argv[], char **envp) {
 
     dbExecCommand = argv[0];
 
-    srand(curTimeMicros());
+    srand(static_cast<unsigned>(curTimeMicros64()));
 
     {
         unsigned x = 0x12345678;

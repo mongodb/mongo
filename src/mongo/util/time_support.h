@@ -343,8 +343,6 @@ namespace mongo {
     /** Date_t is milliseconds since epoch */
      Date_t jsTime();
 
-    /** warning this will wrap */
-    unsigned curTimeMicros();
     unsigned long long curTimeMicros64();
     unsigned long long curTimeMillis64();
 
