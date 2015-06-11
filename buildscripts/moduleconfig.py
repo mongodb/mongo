@@ -24,7 +24,8 @@ MongoDB module SConscript files can describe libraries, programs and unit tests,
 MongoDB SConscript files do.
 """
 
-__all__ = ('discover_modules', 'configure_modules', 'register_module_test')
+__all__ = ('discover_modules', 'discover_module_directories', 'configure_modules',
+            'register_module_test')
 
 import imp
 import inspect
@@ -66,6 +67,36 @@ def discover_modules(module_root, allowed_modules):
                 found_modules.append(module)
             finally:
                 fp.close()
+
+    return found_modules
+
+def discover_module_directories(module_root, allowed_modules):
+    """Scans module_root for subdirectories that look like MongoDB modules.
+
+    Returns a list of directory names.
+    """
+    if not os.path.isdir(module_root):
+        return []
+
+    found_modules = []
+
+    if allowed_modules is not None:
+        allowed_modules = allowed_modules.split(',')
+
+    for name in os.listdir(module_root):
+        root = os.path.join(module_root, name)
+        if name.startswith('.') or not os.path.isdir(root):
+            continue
+
+        build_py = os.path.join(root, 'build.py')
+
+        if allowed_modules is not None and name not in allowed_modules:
+            print "skipping module: %s" % name
+            continue
+
+        if os.path.isfile(build_py):
+            print "adding module: %s" % name
+            found_modules.append(name)
 
     return found_modules
 

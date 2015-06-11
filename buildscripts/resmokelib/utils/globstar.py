@@ -89,6 +89,9 @@ def _split_path(pathname):
     while True:
         (dirname, basename) = os.path.split(pathname)
         parts.append(basename)
+        if pathname == dirname:
+            parts.append(dirname)
+            break
         if not dirname:
             break
         pathname = dirname
