@@ -906,7 +906,12 @@ DB.prototype.getReplicationInfo = function() {
 DB.prototype.printReplicationInfo = function() {
     var result = this.getReplicationInfo();
     if( result.errmsg ) {
-        if (!this.isMaster().ismaster) {
+        var isMaster = this.isMaster();
+        if (isMaster.arbiterOnly) {
+            print("cannot provide replication status from an arbiter.");
+            return;
+        }
+        else if (!this.isMaster().ismaster) {
             print("this is a slave, printing slave replication info.");
             this.printSlaveReplicationInfo();
             return;
