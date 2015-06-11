@@ -38,6 +38,7 @@
 #include <set>
 #include <vector>
 
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
@@ -108,6 +109,9 @@ stdx::condition_variable newTimestampNotifier;
 
 static std::string _oplogCollectionName;
 
+const std::string kTimestampFieldName = "ts";
+const std::string kTermFieldName = "t";
+
 // so we can fail the same way
 void checkOplogInsert(StatusWith<RecordId> result) {
     massert(17322,
@@ -137,13 +141,14 @@ std::pair<OpTime, long long> getNextOpTime(OperationContext* txn,
     fassert(28560, oplog->getRecordStore()->oplogDiskLocRegister(txn, ts));
 
     long long hashNew = 0;
-    long long term = 0;
+    long long term = OpTime::kProtocolVersionV0Term;
 
     // Set hash and term if we're in replset mode, otherwise they remain 0 in master/slave.
     if (replCoord->getReplicationMode() == ReplicationCoordinator::modeReplSet) {
-        // Current term. If we're not a replset of pv=1, it could be the default value (0) or
-        // the last valid term before downgrade.
-        term = ReplClientInfo::forClient(txn->getClient()).getTerm();
+        // Current term. If we're not a replset of pv=1, it remains kOldProtocolVersionTerm.
+        if (replCoord->isV1ElectionProtocol()) {
+            term = ReplClientInfo::forClient(txn->getClient()).getTerm();
+        }
 
         hashNew = BackgroundSync::get()->getLastAppliedHash();
 
@@ -290,8 +295,11 @@ void _logOp(OperationContext* txn,
     */
 
     BSONObjBuilder b(256);
-    b.append("ts", slot.first.getTimestamp());
-    b.append("t", slot.first.getTerm());
+    b.append(kTimestampFieldName, slot.first.getTimestamp());
+    // Don't add term in protocol version 0.
+    if (slot.first.getTerm() != OpTime::kProtocolVersionV0Term) {
+        b.append(kTermFieldName, slot.first.getTerm());
+    }
     b.append("h", slot.second);
     b.append("v", OPLOG_VERSION);
     b.append("op", opstr);
@@ -341,6 +349,7 @@ OpTime writeOpsToOplog(OperationContext* txn, const std::deque<BSONObj>& ops) {
 
             checkOplogInsert(_localOplogCollection->insertDocument(txn, op, false));
 
+            // lastOptime and optime are successive in the log, so it's safe to compare them.
             if (!(lastOptime < optime)) {
                 severe() << "replication oplog stream went back in time. "
                             "previous timestamp: " << lastOptime << " newest timestamp: " << optime
@@ -823,8 +832,12 @@ void setNewTimestamp(const Timestamp& newTime) {
 }
 
 OpTime extractOpTime(const BSONObj& op) {
-    const Timestamp ts = op["ts"].timestamp();
-    const long long term = op["t"].numberLong();  // Default to 0 if it's absent
+    const Timestamp ts = op[kTimestampFieldName].timestamp();
+    long long term;
+    // Default to -1 if the term is absent.
+    fassert(28696,
+            bsonExtractIntegerFieldWithDefault(
+                op, kTermFieldName, OpTime::kProtocolVersionV0Term, &term));
     return OpTime(ts, term);
 }
 
@@ -834,7 +847,7 @@ void initTimestampFromOplog(OperationContext* txn, const std::string& oplogNS) {
 
     if (!lastOp.isEmpty()) {
         LOG(1) << "replSet setting last Timestamp";
-        setNewTimestamp(lastOp["ts"].timestamp());
+        setNewTimestamp(lastOp[kTimestampFieldName].timestamp());
     }
 }
 

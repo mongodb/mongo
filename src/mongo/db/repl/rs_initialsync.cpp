@@ -261,7 +261,7 @@ bool _initialSyncApplyOplog(OperationContext* ctx, repl::SyncTail& syncer, Oplog
         return true;
 
     verify(!stopOpTime.isNull());
-    verify(stopOpTime > startOpTime);
+    verify(stopOpTime.getTimestamp() > startOpTime.getTimestamp());
 
     // apply till stopOpTime
     try {

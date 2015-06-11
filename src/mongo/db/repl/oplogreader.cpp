@@ -182,11 +182,12 @@ void OplogReader::connectToSyncSource(OperationContext* txn,
         BSONObj remoteOldestOp(findOne(rsOplogName.c_str(), Query()));
         OpTime remoteOldOpTime = extractOpTime(remoteOldestOp);
 
-        if (lastOpTimeFetched < remoteOldOpTime) {
+        // remoteOldOpTime may come from a very old config, so we cannot compare their terms.
+        if (lastOpTimeFetched.getTimestamp() < remoteOldOpTime.getTimestamp()) {
             // We're too stale to use this sync source.
             resetConnection();
             replCoord->blacklistSyncSource(candidate, Date_t::now() + Minutes(10));
-            if (oldestOpTimeSeen > remoteOldOpTime) {
+            if (oldestOpTimeSeen.getTimestamp() > remoteOldOpTime.getTimestamp()) {
                 warning() << "we are too stale to use " << candidate.toString()
                           << " as a sync source";
                 oldestOpTimeSeen = remoteOldOpTime;

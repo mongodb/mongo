@@ -204,24 +204,22 @@ HostAndPort TopologyCoordinatorImpl::chooseNewSyncSource(Date_t now, const OpTim
 
     // find the member with the lowest ping time that is ahead of me
 
+    // choose a time that will exclude no candidates by default, in case we don't see a primary
+    OpTime oldestSyncOpTime;
+
     // Find primary's oplog time. Reject sync candidates that are more than
     // maxSyncSourceLagSecs seconds behind.
-    OpTime primaryOpTime;
     if (_currentPrimaryIndex != -1) {
-        primaryOpTime = _hbdata[_currentPrimaryIndex].getOpTime();
-    } else {
-        // choose a time that will exclude no candidates, since we don't see a primary
-        primaryOpTime = OpTime(Timestamp(_maxSyncSourceLagSecs, 0), 0);
-    }
+        OpTime primaryOpTime = _hbdata[_currentPrimaryIndex].getOpTime();
 
-    if (primaryOpTime.getSecs() < static_cast<unsigned int>(_maxSyncSourceLagSecs.count())) {
-        // erh - I think this means there was just a new election
-        // and we don't yet know the new primary's optime
-        primaryOpTime = OpTime(Timestamp(_maxSyncSourceLagSecs, 0), 0);
+        // Check if primaryOpTime is still close to 0 because we haven't received
+        // our first heartbeat from a new primary yet.
+        unsigned int maxLag = static_cast<unsigned int>(_maxSyncSourceLagSecs.count());
+        if (primaryOpTime.getSecs() >= maxLag) {
+            oldestSyncOpTime =
+                OpTime(Timestamp(primaryOpTime.getSecs() - maxLag, 0), primaryOpTime.getTerm());
+        }
     }
-
-    OpTime oldestSyncOpTime(Timestamp(primaryOpTime.getSecs() - _maxSyncSourceLagSecs.count(), 0),
-                            primaryOpTime.getTerm());
 
     int closestIndex = -1;
 
@@ -257,7 +255,7 @@ HostAndPort TopologyCoordinatorImpl::chooseNewSyncSource(Date_t now, const OpTim
             }
 
             // only consider candidates that are ahead of where we are
-            if (it->getOpTime() <= lastOpApplied) {
+            if (it->getOpTime().getTimestamp() <= lastOpApplied.getTimestamp()) {
                 continue;
             }
 

@@ -670,8 +670,8 @@ Status ReplicationCoordinatorImpl::setLastOptimeForSlave(const OID& rid, const T
             "This is likely caused by an old (pre-2.6) member syncing from this node.",
             getReplicationMode() == modeMasterSlave);
 
-    // Term == 0 for master-slave
-    OpTime opTime(ts, OpTime::kDefaultTerm);
+    // term == -1 for master-slave
+    OpTime opTime(ts, OpTime::kProtocolVersionV0Term);
     SlaveInfo* slaveInfo = _findSlaveInfoByRID_inlock(rid);
     if (slaveInfo) {
         if (slaveInfo->opTime < opTime) {

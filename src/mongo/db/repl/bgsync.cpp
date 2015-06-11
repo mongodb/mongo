@@ -402,33 +402,15 @@ bool BackgroundSync::_rollbackIfNeeded(OperationContext* txn, OplogReader& r) {
     };
 
     if (!r.more()) {
-        try {
-            BSONObj theirLastOp = r.getLastOp(rsOplogName.c_str());
-            if (theirLastOp.isEmpty()) {
-                error() << "empty query result from " << hn << " oplog";
-                sleepsecs(2);
-                return true;
-            }
-            OpTime theirOpTime = extractOpTime(theirLastOp);
-            if (theirOpTime < _lastOpTimeFetched) {
-                log() << "we are ahead of the sync source, will try to roll back";
-                fassertRollbackStatusNoTrace(28656,
-                                             syncRollback(txn,
-                                                          _replCoord->getMyLastOptime(),
-                                                          OplogInterfaceLocal(txn, rsOplogName),
-                                                          RollbackSourceImpl(r.conn(), rsOplogName),
-                                                          _replCoord));
+        // The GTE query from upstream returns nothing, so we're ahead of the upstream.
+        log() << "we are ahead of the sync source, will try to roll back";
+        fassertRollbackStatusNoTrace(28656,
+                                     syncRollback(txn,
+                                                  _replCoord->getMyLastOptime(),
+                                                  OplogInterfaceLocal(txn, rsOplogName),
+                                                  RollbackSourceImpl(r.conn(), rsOplogName),
+                                                  _replCoord));
 
-                return true;
-            }
-            /* we're not ahead?  maybe our new query got fresher data.  best to come back and try
-               again */
-            log() << "syncTail condition 1";
-            sleepsecs(1);
-        } catch (DBException& e) {
-            error() << "querying " << hn << ' ' << e.toString();
-            sleepsecs(2);
-        }
         return true;
     }
 
