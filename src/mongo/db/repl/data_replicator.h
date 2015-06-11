@@ -85,6 +85,13 @@ enum class DataReplicatorScope {
 };
 
 struct DataReplicatorOptions {
+    // Error and retry values
+    Milliseconds syncSourceRetryWait{1000};
+    Milliseconds initialSyncRetryWait{1000};
+    Seconds blacklistSyncSourcePenaltyForNetworkConnectionError{10};
+    Minutes blacklistSyncSourcePenaltyForOplogStartMissing{10};
+
+    // Replication settings
     Timestamp startOptime;
     NamespaceString localOplogNS = NamespaceString("local.oplog.rs");
     NamespaceString remoteOplogNS = NamespaceString("local.oplog.rs");
@@ -162,14 +169,13 @@ public:
 
 private:
 
-    // Run a member function in the executor, waiting for it to finish.
-//    Status _run(void*());
+    // Returns OK when there is a good syncSource at _syncSource.
+    Status _ensureGoodSyncSource_inlock();
 
     // Only executed via executor
     void _resumeFinish(CallbackArgs cbData);
     void _onOplogFetchFinish(const BatchDataStatus& fetchResult,
                              Fetcher::NextAction* nextAction);
-    void _doNextActionsCB(CallbackArgs cbData);
     void _doNextActions();
     void _doNextActions_InitialSync_inlock();
     void _doNextActions_Rollback_inlock();

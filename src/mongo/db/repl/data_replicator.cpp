@@ -60,10 +60,6 @@ namespace repl {
     MONGO_FP_DECLARE(failInitialSyncWithBadHost);
 
 namespace {
-    // public so tests can remove the sleep.
-    const Milliseconds NoSyncSourceRetryDelayMS{4000};
-    const int InitialSyncRetrySleepSecs{1};
-
     size_t getSize(const BSONObj& o) {
         // SERVER-9808 Avoid Fortify complaint about implicit signed->unsigned conversion
         return static_cast<size_t>(o.objsize());
@@ -147,6 +143,10 @@ namespace {
 
         virtual ~OplogFetcher() = default;
         std::string toString() const;
+
+        const Timestamp getStartTimestamp() const {
+            return _startTS;
+        }
 
     protected:
 
@@ -624,33 +624,10 @@ namespace {
         }
 
         _state = DataReplicatorState::Steady;
-
-        if (_replCoord) {
-            const auto lastOptime = _replCoord->getMyLastOptime();
-            _fetcher.reset(new OplogFetcher(_exec,
-                                            lastOptime.getTimestamp(),
-                                            HostAndPort(), //TODO _replCoord->chooseNewSyncSource(),
-                                            _opts.remoteOplogNS,
-                                            stdx::bind(&DataReplicator::_onOplogFetchFinish,
-                                                       this,
-                                                       stdx::placeholders::_1,
-                                                       stdx::placeholders::_2)));
-        }
-        else {
-            // TODO: add query options await_data, oplog_replay
-            _fetcher.reset(new OplogFetcher(_exec,
-                                            _opts.startOptime,
-                                            _opts.syncSource,
-                                            _opts.remoteOplogNS,
-                                            stdx::bind(&DataReplicator::_onOplogFetchFinish,
-                                                       this,
-                                                       stdx::placeholders::_1,
-                                                       stdx::placeholders::_2)));
-        }
-
-
-        // TODO
-
+        _applierPaused = false;
+        _fetcherPaused = false;
+        _reporterPaused = false;
+        _doNextActions_Steady_inlock();
         return Status::OK();
     }
 
@@ -813,7 +790,7 @@ namespace {
 
             Event initialSyncFinishEvent;
             if (attemptErrorStatus.isOK() && _syncSource.empty()) {
-                _syncSource = _replCoord->chooseNewSyncSource();
+                attemptErrorStatus = _ensureGoodSyncSource_inlock();
             }
             else if(attemptErrorStatus.isOK()) {
                 StatusWith<Event> status = _exec->makeEvent();
@@ -875,7 +852,7 @@ namespace {
 
             // Sleep for retry time
             lk.unlock();
-            sleepsecs(InitialSyncRetrySleepSecs);
+            sleepmillis(_opts.initialSyncRetryWait.count());
             lk.lock();
 
             // No need to print a stack
@@ -988,10 +965,6 @@ namespace {
             _initialSyncState->dbsCloner.wait();
     }
 
-    void DataReplicator::_doNextActionsCB(CallbackArgs cbData) {
-        _doNextActions();
-    }
-
     void DataReplicator::_doNextActions() {
         // Can be in one of 3 main states/modes (DataReplicatiorState):
         // 1.) Initial Sync
@@ -1069,15 +1042,13 @@ namespace {
         }
         if (_syncSource.empty()) {
             // No sync source, reschedule check
-            Date_t when = _exec->now() + NoSyncSourceRetryDelayMS;
+            Date_t when = _exec->now() + _opts.syncSourceRetryWait;
             // schedule self-callback w/executor
             _exec->scheduleWorkAt(when, // to try to get a new sync source in a bit
-                                  stdx::bind(&DataReplicator::_doNextActionsCB,
-                                             this,
-                                             stdx::placeholders::_1));
+                                  [this] (const CallbackArgs&) { _doNextActions(); });
         } else {
             // Check if active fetch, if not start one
-            if (!_fetcher->isActive()) {
+            if (!_fetcher || !_fetcher->isActive()) {
                 _scheduleFetch_inlock();
             }
         }
@@ -1089,7 +1060,7 @@ namespace {
 
         if (!_reporterPaused && (!_reporter || !_reporter->getStatus().isOK())) {
             // TODO get reporter in good shape
-            _reporter.reset(new Reporter(_exec, _replCoord, HostAndPort()));
+            _reporter.reset(new Reporter(_exec, _replCoord, _syncSource));
         }
     }
 
@@ -1259,7 +1230,45 @@ namespace {
         return _scheduleFetch_inlock();
     }
 
+    Status DataReplicator::_ensureGoodSyncSource_inlock() {
+        if (_syncSource.empty()) {
+            if (_replCoord) {
+                _syncSource = _replCoord->chooseNewSyncSource();
+                if (!_syncSource.empty()) {
+                    return Status::OK();
+                }
+            } else {
+                _syncSource = _opts.syncSource; // set this back to the options source
+            }
+
+            return Status{ErrorCodes::InvalidSyncSource, "No valid sync source."};
+        }
+        return Status::OK();
+    }
+
     Status DataReplicator::_scheduleFetch_inlock() {
+        if (!_fetcher) {
+            const auto startOptime = _replCoord ? _replCoord->getMyLastOptime().getTimestamp()
+                                                : _opts.startOptime;
+            if (!_ensureGoodSyncSource_inlock().isOK()) {
+                auto status = _exec->scheduleWork([this](const CallbackArgs&){ _doNextActions(); });
+                if (!status.isOK()) {
+                    return status.getStatus();
+                }
+            }
+            const auto remoteOplogNS = _opts.remoteOplogNS;
+
+            // TODO: add query options await_data, oplog_replay
+            _fetcher.reset(new OplogFetcher(_exec,
+                                            startOptime,
+                                            _syncSource,
+                                            remoteOplogNS,
+                                            stdx::bind(&DataReplicator::_onOplogFetchFinish,
+                                                       this,
+                                                       stdx::placeholders::_1,
+                                                       stdx::placeholders::_2)));
+
+        }
         if (!_fetcher->isActive()) {
             Status status = _fetcher->schedule();
             if (!status.isOK()) {
@@ -1289,10 +1298,7 @@ namespace {
 
         // Schedule _doNextActions in case nothing is active to trigger the _onShutdown event.
         StatusWith<Handle> statusHandle = _exec->scheduleWork(
-                                                stdx::bind(&DataReplicator::_doNextActionsCB,
-                                                           this,
-                                                           stdx::placeholders::_1));
-
+                                                [this] (const CallbackArgs&) { _doNextActions(); });
         if (statusHandle.isOK()) {
             _exec->waitForEvent(_onShutdown);
         } else {
@@ -1355,7 +1361,17 @@ namespace {
                     // possible rollback
                     bool didRollback = _didRollback(_syncSource);
                     if (!didRollback) {
-                        _replCoord->setFollowerMode(MemberState::RS_RECOVERING); // TODO too stale
+                        auto s = _replCoord->setFollowerMode(MemberState::RS_RECOVERING);
+                        if (!s) {
+                            error() << "Failed to transition to RECOVERING when "
+                                       "we couldn't find oplog start position ("
+                                    << _fetcher->getStartTimestamp().toString()
+                                    << ") from sync source: "
+                                    << _syncSource.toString();
+                        }
+                        Date_t until{_exec->now() +
+                                     _opts.blacklistSyncSourcePenaltyForOplogStartMissing};
+                        _replCoord->blacklistSyncSource(_syncSource, until);
                     }
                     else {
                         // TODO: cleanup state/restart -- set _lastApplied, and other stuff
@@ -1366,12 +1382,12 @@ namespace {
                     // Error, sync source
                     // fallthrough
                 default:
-                    // TODO: SERVER-18034 -- real blacklist timeout time
-                    Date_t until{};
-                    LockGuard lk(_mutex);
+                    Date_t until{_exec->now() +
+                                 _opts.blacklistSyncSourcePenaltyForNetworkConnectionError};
                     _replCoord->blacklistSyncSource(_syncSource, until);
-                    _syncSource = HostAndPort();
             }
+            LockGuard lk(_mutex);
+            _syncSource = HostAndPort();
         }
 
         _doNextActions();
