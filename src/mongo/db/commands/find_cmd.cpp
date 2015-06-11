@@ -105,15 +105,10 @@ namespace mongo {
             const NamespaceString nss(fullns);
 
             // Parse the command BSON to a LiteParsedQuery.
-            std::unique_ptr<LiteParsedQuery> lpq;
-            {
-                LiteParsedQuery* rawLpq;
-                const bool isExplain = true;
-                Status lpqStatus = LiteParsedQuery::make(fullns, cmdObj, isExplain, &rawLpq);
-                if (!lpqStatus.isOK()) {
-                    return lpqStatus;
-                }
-                lpq.reset(rawLpq);
+            const bool isExplain = true;
+            auto lpqStatus = LiteParsedQuery::fromFindCommand(fullns, cmdObj, isExplain);
+            if (!lpqStatus.isOK()) {
+                return lpqStatus.getStatus();
             }
 
             // Finish the parsing step by using the LiteParsedQuery to create a CanonicalQuery.
@@ -121,7 +116,7 @@ namespace mongo {
             {
                 CanonicalQuery* rawCq;
                 WhereCallbackReal whereCallback(txn, nss.db());
-                Status canonStatus = CanonicalQuery::canonicalize(lpq.release(),
+                Status canonStatus = CanonicalQuery::canonicalize(lpqStatus.getValue().release(),
                                                                   &rawCq,
                                                                   whereCallback);
                 if (!canonStatus.isOK()) {
@@ -189,16 +184,13 @@ namespace mongo {
             }
 
             // 1a) Parse the command BSON to a LiteParsedQuery.
-            std::unique_ptr<LiteParsedQuery> lpq;
-            {
-                LiteParsedQuery* rawLpq;
-                const bool isExplain = false;
-                Status lpqStatus = LiteParsedQuery::make(fullns, cmdObj, isExplain, &rawLpq);
-                if (!lpqStatus.isOK()) {
-                    return appendCommandStatus(result, lpqStatus);
-                }
-                lpq.reset(rawLpq);
+            const bool isExplain = false;
+            auto lpqStatus = LiteParsedQuery::fromFindCommand(fullns, cmdObj, isExplain);
+            if (!lpqStatus.isOK()) {
+                return appendCommandStatus(result, lpqStatus.getStatus());
             }
+
+            auto& lpq = lpqStatus.getValue();
 
             // Fill out curop information.
             int ntoreturn = lpq->getBatchSize().value_or(0);

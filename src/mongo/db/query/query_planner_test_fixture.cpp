@@ -40,6 +40,8 @@
 
 namespace mongo {
 
+    using unittest::assertGet;
+
     const char* QueryPlannerTest::ns = "somebogusns";
 
     void QueryPlannerTest::setUp() {
@@ -234,20 +236,15 @@ namespace mongo {
     void QueryPlannerTest::runQueryAsCommand(const BSONObj& cmdObj) {
         solns.clear();
 
-        std::unique_ptr<LiteParsedQuery> lpq;
-        {
-            LiteParsedQuery* rawLpq;
-            const bool isExplain = false;
-            Status lpqStatus = LiteParsedQuery::make(ns, cmdObj, isExplain, &rawLpq);
-            ASSERT_OK(lpqStatus);
-            lpq.reset(rawLpq);
+        const bool isExplain = false;
+        std::unique_ptr<LiteParsedQuery> lpq(
+            assertGet(LiteParsedQuery::fromFindCommand(ns, cmdObj, isExplain)));
 
-            CanonicalQuery* rawCq;
-            WhereCallbackNoop whereCallback;
-            Status canonStatus = CanonicalQuery::canonicalize(lpq.release(), &rawCq, whereCallback);
-            ASSERT_OK(canonStatus);
-            cq.reset(rawCq);
-        }
+        CanonicalQuery* rawCq;
+        WhereCallbackNoop whereCallback;
+        Status canonStatus = CanonicalQuery::canonicalize(lpq.release(), &rawCq, whereCallback);
+        ASSERT_OK(canonStatus);
+        cq.reset(rawCq);
 
         Status s = QueryPlanner::plan(*cq, params, &solns.mutableVector());
         ASSERT_OK(s);

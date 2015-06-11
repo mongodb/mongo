@@ -33,7 +33,7 @@
 #include <memory>
 
 #include "mongo/client/fetcher.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/db/json.h"
 #include "mongo/db/repl/base_cloner_test_fixture.h"
 #include "mongo/db/repl/data_replicator.h"
 #include "mongo/db/repl/replication_coordinator.h"

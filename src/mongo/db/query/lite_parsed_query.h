@@ -28,15 +28,16 @@
 
 #pragma once
 
-#include <algorithm>
 #include <boost/optional.hpp>
+#include <string>
 
-#include "mongo/client/dbclientinterface.h"
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
 
     class QueryMessage;
+    class Status;
+    template<typename T> class StatusWith;
 
     /**
      * Parses the QueryMessage or find command received from the user and makes the various fields
@@ -45,19 +46,35 @@ namespace mongo {
     class LiteParsedQuery {
     public:
         /**
-         * Parses a find command object, 'cmdObj'. Caller must indicate whether or not
-         * this lite parsed query is an explained query or not via 'isExplain'.
+         * Parses a find command object, 'cmdObj'. Caller must indicate whether or not this lite
+         * parsed query is an explained query or not via 'isExplain'.
          *
-         * On success, fills in the out-parameter 'parsedQuery' and returns an OK status.
-         * The caller takes ownership of *out.
-         *
-         * Returns a failure status if 'cmdObj' is not well formed. On failure the caller
-         * is not responsible for deleting *out.
+         * Returns a heap allocated LiteParsedQuery on success or an error if 'cmdObj' is not well
+         * formed.
          */
-        static Status make(const std::string& fullns,
-                           const BSONObj& cmdObj,
-                           bool isExplain,
-                           LiteParsedQuery** out);
+        static StatusWith<std::unique_ptr<LiteParsedQuery>> fromFindCommand(const std::string& ns,
+                                                                            const BSONObj& cmdObj,
+                                                                            bool isExplain);
+
+        /**
+         * Short and long forms for constructing a new LiteParsedQuery.
+         */
+        static StatusWith<std::unique_ptr<LiteParsedQuery>> make(const std::string& ns,
+                                                                 int ntoreturn,
+                                                                 const BSONObj& query);
+
+        static StatusWith<std::unique_ptr<LiteParsedQuery>> make(const std::string& ns,
+                                                                 int ntoskip,
+                                                                 int ntoreturn,
+                                                                 int queryoptions,
+                                                                 const BSONObj& query,
+                                                                 const BSONObj& proj,
+                                                                 const BSONObj& sort,
+                                                                 const BSONObj& hint,
+                                                                 const BSONObj& minObj,
+                                                                 const BSONObj& maxObj,
+                                                                 bool snapshot,
+                                                                 bool explain);
 
         /**
          * Converts this LPQ into a find command.
@@ -116,7 +133,6 @@ namespace mongo {
         static const std::string metaIndexKey;
 
         const std::string& ns() const { return _ns; }
-        bool isLocalDB() const { return _ns.compare(0, 6, "local.") == 0; }
 
         const BSONObj& getFilter() const { return _filter; }
         const BSONObj& getProj() const { return _proj; }
@@ -164,30 +180,11 @@ namespace mongo {
         //
 
         /**
-         * Parse the provided QueryMessage and set *out to point to the output.
-         *
-         * Return Status::OK() if parsing succeeded.  Caller owns *out.
-         * Otherwise, *out is invalid and the returned Status indicates why parsing failed.
+         * Parse the provided QueryMessage and return a heap constructed LiteParsedQuery, which
+         * represents it or an error.
          */
-        static Status make(const QueryMessage& qm, LiteParsedQuery** out);
-
-        /**
-         * Fills out a LiteParsedQuery.  Used for debugging and testing, when we don't have a
-         * QueryMessage.
-         */
-        static Status make(const std::string& ns,
-                           int ntoskip,
-                           int ntoreturn,
-                           int queryoptions,
-                           const BSONObj& query,
-                           const BSONObj& proj,
-                           const BSONObj& sort,
-                           const BSONObj& hint,
-                           const BSONObj& minObj,
-                           const BSONObj& maxObj,
-                           bool snapshot,
-                           bool explain,
-                           LiteParsedQuery** out);
+        static StatusWith<std::unique_ptr<LiteParsedQuery>> fromLegacyQueryMessage(
+            const QueryMessage& qm);
 
     private:
         LiteParsedQuery() = default;

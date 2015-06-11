@@ -31,13 +31,13 @@
 #include "mongo/db/json.h"
 #include "mongo/unittest/unittest.h"
 
-using namespace mongo;
-
+namespace mongo {
 namespace {
 
     using std::unique_ptr;
     using std::string;
     using std::unique_ptr;
+    using unittest::assertGet;
 
     static const char* ns = "somebogusns";
 
@@ -97,15 +97,19 @@ namespace {
     TEST(CanonicalQueryTest, IsValidText) {
         // Passes in default values for LiteParsedQuery.
         // Filter inside LiteParsedQuery is not used.
-        LiteParsedQuery* lpqRaw;
-        ASSERT_OK(LiteParsedQuery::make(ns, 0, 0, 0, fromjson("{}"), fromjson("{}"),
-                                        fromjson("{}"), fromjson("{}"), fromjson("{}"),
-                                        fromjson("{}"),
-                                        false, // snapshot
-                                        false, // explain
-                                        &lpqRaw));
-        unique_ptr<LiteParsedQuery> lpq(lpqRaw);
-
+        unique_ptr<LiteParsedQuery> lpq(
+            assertGet(LiteParsedQuery::make(ns,
+                                            0,
+                                            0,
+                                            0,
+                                            BSONObj(),
+                                            BSONObj(),
+                                            BSONObj(),
+                                            BSONObj(),
+                                            BSONObj(),
+                                            BSONObj(),
+                                            false,      // snapshot
+                                            false)));   // explain
         unique_ptr<MatchExpression> me;
 
         // Valid: regular TEXT.
@@ -183,15 +187,19 @@ namespace {
     TEST(CanonicalQueryTest, IsValidGeo) {
         // Passes in default values for LiteParsedQuery.
         // Filter inside LiteParsedQuery is not used.
-        LiteParsedQuery* lpqRaw;
-        ASSERT_OK(LiteParsedQuery::make(ns, 0, 0, 0, fromjson("{}"), fromjson("{}"),
-                                        fromjson("{}"), fromjson("{}"), fromjson("{}"),
-                                        fromjson("{}"),
-                                        false, // snapshot
-                                        false, // explain
-                                        &lpqRaw));
-        unique_ptr<LiteParsedQuery> lpq(lpqRaw);
-
+        unique_ptr<LiteParsedQuery> lpq(
+            assertGet(LiteParsedQuery::make(ns,
+                                            0,
+                                            0,
+                                            0,
+                                            BSONObj(),
+                                            BSONObj(),
+                                            BSONObj(),
+                                            BSONObj(),
+                                            BSONObj(),
+                                            BSONObj(),
+                                            false,      // snapshot
+                                            false)));   // explain
         unique_ptr<MatchExpression> me;
 
         // Valid: regular GEO_NEAR.
@@ -279,15 +287,19 @@ namespace {
     TEST(CanonicalQueryTest, IsValidTextAndGeo) {
         // Passes in default values for LiteParsedQuery.
         // Filter inside LiteParsedQuery is not used.
-        LiteParsedQuery* lpqRaw;
-        ASSERT_OK(LiteParsedQuery::make(ns, 0, 0, 0, fromjson("{}"), fromjson("{}"),
-                                        fromjson("{}"), fromjson("{}"), fromjson("{}"),
-                                        fromjson("{}"),
-                                        false, // snapshot
-                                        false, // explain
-                                        &lpqRaw));
-        unique_ptr<LiteParsedQuery> lpq(lpqRaw);
-
+        unique_ptr<LiteParsedQuery> lpq(
+            assertGet(LiteParsedQuery::make(ns,
+                                            0,
+                                            0,
+                                            0,
+                                            BSONObj(),
+                                            BSONObj(),
+                                            BSONObj(),
+                                            BSONObj(),
+                                            BSONObj(),
+                                            BSONObj(),
+                                            false,      // snapshot
+                                            false)));   // explain
         unique_ptr<MatchExpression> me;
 
         // Invalid: TEXT and GEO_NEAR.
@@ -318,16 +330,20 @@ namespace {
     TEST(CanonicalQueryTest, IsValidTextAndNaturalAscending) {
         // Passes in default values for LiteParsedQuery except for sort order.
         // Filter inside LiteParsedQuery is not used.
-        LiteParsedQuery* lpqRaw;
         BSONObj sort = fromjson("{$natural: 1}");
-        ASSERT_OK(LiteParsedQuery::make(ns, 0, 0, 0, fromjson("{}"), fromjson("{}"),
-                                        sort, fromjson("{}"), fromjson("{}"),
-                                        fromjson("{}"),
-                                        false, // snapshot
-                                        false, // explain
-                                        &lpqRaw));
-        unique_ptr<LiteParsedQuery> lpq(lpqRaw);
-
+        unique_ptr<LiteParsedQuery> lpq(
+            assertGet(LiteParsedQuery::make(ns,
+                                            0,
+                                            0,
+                                            0,
+                                            BSONObj(),
+                                            BSONObj(),
+                                            sort,
+                                            BSONObj(),
+                                            BSONObj(),
+                                            BSONObj(),
+                                            false,      // snapshot
+                                            false)));   // explain
         unique_ptr<MatchExpression> me;
 
         // Invalid: TEXT and {$natural: 1} sort order.
@@ -340,16 +356,20 @@ namespace {
     TEST(CanonicalQueryTest, IsValidTextAndNaturalDescending) {
         // Passes in default values for LiteParsedQuery except for sort order.
         // Filter inside LiteParsedQuery is not used.
-        LiteParsedQuery* lpqRaw;
         BSONObj sort = fromjson("{$natural: -1}");
-        ASSERT_OK(LiteParsedQuery::make(ns, 0, 0, 0, fromjson("{}"), fromjson("{}"),
-                                        sort, fromjson("{}"), fromjson("{}"),
-                                        fromjson("{}"),
-                                        false, // snapshot
-                                        false, // explain
-                                        &lpqRaw));
-        unique_ptr<LiteParsedQuery> lpq(lpqRaw);
-
+        unique_ptr<LiteParsedQuery> lpq(
+            assertGet(LiteParsedQuery::make(ns,
+                                            0,
+                                            0,
+                                            0,
+                                            BSONObj(),
+                                            BSONObj(),
+                                            sort,
+                                            BSONObj(),
+                                            BSONObj(),
+                                            BSONObj(),
+                                            false,      // snapshot
+                                            false)));   // explain
         unique_ptr<MatchExpression> me;
 
         // Invalid: TEXT and {$natural: -1} sort order.
@@ -362,16 +382,20 @@ namespace {
     TEST(CanonicalQueryTest, IsValidTextAndHint) {
         // Passes in default values for LiteParsedQuery except for hint.
         // Filter inside LiteParsedQuery is not used.
-        LiteParsedQuery* lpqRaw;
         BSONObj hint = fromjson("{a: 1}");
-        ASSERT_OK(LiteParsedQuery::make(ns, 0, 0, 0, fromjson("{}"), fromjson("{}"),
-                                        fromjson("{}"), hint, fromjson("{}"),
-                                        fromjson("{}"),
-                                        false, // snapshot
-                                        false, // explain
-                                        &lpqRaw));
-        unique_ptr<LiteParsedQuery> lpq(lpqRaw);
-
+        unique_ptr<LiteParsedQuery> lpq(
+            assertGet(LiteParsedQuery::make(ns,
+                                            0,
+                                            0,
+                                            0,
+                                            BSONObj(),
+                                            BSONObj(),
+                                            BSONObj(),
+                                            hint,
+                                            BSONObj(),
+                                            BSONObj(),
+                                            false,      // snapshot
+                                            false)));   // explain
         unique_ptr<MatchExpression> me;
 
         // Invalid: TEXT and {$natural: -1} sort order.
@@ -385,16 +409,20 @@ namespace {
     TEST(CanonicalQueryTest, IsValidGeoNearNaturalSort) {
         // Passes in default values for LiteParsedQuery except for sort order.
         // Filter inside LiteParsedQuery is not used.
-        LiteParsedQuery* lpqRaw;
         BSONObj sort = fromjson("{$natural: 1}");
-        ASSERT_OK(LiteParsedQuery::make(ns, 0, 0, 0, fromjson("{}"), fromjson("{}"),
-                                        sort, fromjson("{}"), fromjson("{}"),
-                                        fromjson("{}"),
-                                        false, // snapshot
-                                        false, // explain
-                                        &lpqRaw));
-        unique_ptr<LiteParsedQuery> lpq(lpqRaw);
-
+        unique_ptr<LiteParsedQuery> lpq(
+            assertGet(LiteParsedQuery::make(ns,
+                                            0,
+                                            0,
+                                            0,
+                                            BSONObj(),
+                                            BSONObj(),
+                                            sort,
+                                            BSONObj(),
+                                            BSONObj(),
+                                            BSONObj(),
+                                            false,      // snapshot
+                                            false)));   // explain
         unique_ptr<MatchExpression> me;
 
         // Invalid: GEO_NEAR and {$natural: 1} sort order.
@@ -408,16 +436,20 @@ namespace {
     TEST(CanonicalQueryTest, IsValidGeoNearNaturalHint) {
         // Passes in default values for LiteParsedQuery except for the hint.
         // Filter inside LiteParsedQuery is not used.
-        LiteParsedQuery* lpqRaw;
         BSONObj hint = fromjson("{$natural: 1}");
-        ASSERT_OK(LiteParsedQuery::make(ns, 0, 0, 0, fromjson("{}"), fromjson("{}"),
-                                        fromjson("{}"), hint, fromjson("{}"),
-                                        fromjson("{}"),
-                                        false, // snapshot
-                                        false, // explain
-                                        &lpqRaw));
-        unique_ptr<LiteParsedQuery> lpq(lpqRaw);
-
+        unique_ptr<LiteParsedQuery> lpq(
+            assertGet(LiteParsedQuery::make(ns,
+                                            0,
+                                            0,
+                                            0,
+                                            BSONObj(),
+                                            BSONObj(),
+                                            BSONObj(),
+                                            hint,
+                                            BSONObj(),
+                                            BSONObj(),
+                                            false,      // snapshot
+                                            false)));   // explain
         unique_ptr<MatchExpression> me;
 
         // Invalid: GEO_NEAR and {$natural: 1} hint.
@@ -430,16 +462,20 @@ namespace {
     TEST(CanonicalQueryTest, IsValidTextAndSnapshot) {
         // Passes in default values for LiteParsedQuery except for snapshot.
         // Filter inside LiteParsedQuery is not used.
-        LiteParsedQuery* lpqRaw;
         bool snapshot = true;
-        ASSERT_OK(LiteParsedQuery::make(ns, 0, 0, 0, fromjson("{}"), fromjson("{}"),
-                                        fromjson("{}"), fromjson("{}"), fromjson("{}"),
-                                        fromjson("{}"),
-                                        snapshot,
-                                        false, // explain
-                                        &lpqRaw));
-        unique_ptr<LiteParsedQuery> lpq(lpqRaw);
-
+        unique_ptr<LiteParsedQuery> lpq(
+            assertGet(LiteParsedQuery::make(ns,
+                                            0,
+                                            0,
+                                            0,
+                                            BSONObj(),
+                                            BSONObj(),
+                                            BSONObj(),
+                                            BSONObj(),
+                                            BSONObj(),
+                                            BSONObj(),
+                                            snapshot,
+                                            false)));   // explain
         unique_ptr<MatchExpression> me;
 
         // Invalid: TEXT and snapshot.
@@ -590,4 +626,5 @@ namespace {
                            "{$and: [{a: 1}, {b: 1}, {c: 1}]}");
     }
 
-}
+} // namespace
+} // namespace mongo

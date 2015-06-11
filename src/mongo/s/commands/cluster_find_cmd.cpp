@@ -35,6 +35,7 @@
 #include "mongo/util/timer.h"
 
 namespace mongo {
+namespace {
 
     using std::unique_ptr;
     using std::string;
@@ -91,13 +92,13 @@ namespace mongo {
             const string fullns = parseNs(dbname, cmdObj);
 
             // Parse the command BSON to a LiteParsedQuery.
-            LiteParsedQuery* rawLpq;
             bool isExplain = true;
-            Status lpqStatus = LiteParsedQuery::make(fullns, cmdObj, isExplain, &rawLpq);
+            auto lpqStatus = LiteParsedQuery::fromFindCommand(fullns, cmdObj, isExplain);
             if (!lpqStatus.isOK()) {
-                return lpqStatus;
+                return lpqStatus.getStatus();
             }
-            unique_ptr<LiteParsedQuery> lpq(rawLpq);
+
+            auto& lpq = lpqStatus.getValue();
 
             BSONObjBuilder explainCmdBob;
             ClusterExplain::wrapAsExplain(cmdObj, verbosity, &explainCmdBob);
@@ -137,4 +138,5 @@ namespace mongo {
 
     } cmdFindCluster;
 
+} // namespace
 } // namespace mongo

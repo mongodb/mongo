@@ -28,12 +28,13 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/query/canonical_query.h"
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/util/log.h"
-
 
 namespace mongo {
 namespace {
@@ -200,11 +201,12 @@ namespace {
                                         CanonicalQuery** out,
                                         const MatchExpressionParser::WhereCallback& whereCallback) {
         // Make LiteParsedQuery.
-        LiteParsedQuery* lpq;
-        Status parseStatus = LiteParsedQuery::make(qm, &lpq);
-        if (!parseStatus.isOK()) { return parseStatus; }
+        auto lpqStatus = LiteParsedQuery::fromLegacyQueryMessage(qm);
+        if (!lpqStatus.isOK()) {
+            return lpqStatus.getStatus();
+        }
 
-        return CanonicalQuery::canonicalize(lpq, out, whereCallback);
+        return CanonicalQuery::canonicalize(lpqStatus.getValue().release(), out, whereCallback);
     }
 
     // static
@@ -222,6 +224,7 @@ namespace {
 
         // Make the CQ we'll hopefully return.
         std::unique_ptr<CanonicalQuery> cq(new CanonicalQuery());
+
         // Takes ownership of lpq and the MatchExpression* in swme.
         Status initStatus = cq->init(autoLpq.release(), whereCallback, swme.getValue());
 
@@ -236,26 +239,30 @@ namespace {
                                         CanonicalQuery** out,
                                         const MatchExpressionParser::WhereCallback& whereCallback) {
 
-        LiteParsedQuery* lpq;
-
         // Pass empty sort and projection.
         BSONObj emptyObj;
+
         // 0, 0, 0 is 'ntoskip', 'ntoreturn', and 'queryoptions'
         // false, false is 'snapshot' and 'explain'
-        Status parseStatus = LiteParsedQuery::make(baseQuery.ns(),
-                                                   0, 0, 0,
-                                                   baseQuery.getParsed().getFilter(),
-                                                   baseQuery.getParsed().getProj(),
-                                                   baseQuery.getParsed().getSort(),
-                                                   emptyObj, emptyObj, emptyObj,
-                                                   false, false, &lpq);
-        if (!parseStatus.isOK()) {
-            return parseStatus;
+        auto lpqStatus = LiteParsedQuery::make(baseQuery.ns(),
+                                               0,
+                                               0,
+                                               0,
+                                               baseQuery.getParsed().getFilter(),
+                                               baseQuery.getParsed().getProj(),
+                                               baseQuery.getParsed().getSort(),
+                                               emptyObj,
+                                               emptyObj,
+                                               emptyObj,
+                                               false,
+                                               false);
+        if (!lpqStatus.isOK()) {
+            return lpqStatus.getStatus();
         }
 
         // Make the CQ we'll hopefully return.
         std::unique_ptr<CanonicalQuery> cq(new CanonicalQuery());
-        Status initStatus = cq->init(lpq, whereCallback, root->shallowClone());
+        Status initStatus = cq->init(lpqStatus.getValue().release(), whereCallback, root->shallowClone());
 
         if (!initStatus.isOK()) { return initStatus; }
         *out = cq.release();
@@ -276,16 +283,27 @@ namespace {
                                         bool explain,
                                         CanonicalQuery** out,
                                         const MatchExpressionParser::WhereCallback& whereCallback) {
-        LiteParsedQuery* lpqRaw;
+
         // Pass empty sort and projection.
         BSONObj emptyObj;
-        Status parseStatus = LiteParsedQuery::make(ns, skip, limit, 0, query, proj, sort,
-                                                   hint, minObj, maxObj, snapshot, explain,
-                                                   &lpqRaw);
-        if (!parseStatus.isOK()) {
-            return parseStatus;
+
+        auto lpqStatus = LiteParsedQuery::make(ns,
+                                               skip,
+                                               limit,
+                                               0,
+                                               query,
+                                               proj,
+                                               sort,
+                                               hint,
+                                               minObj,
+                                               maxObj,
+                                               snapshot,
+                                               explain);
+        if (!lpqStatus.isOK()) {
+            return lpqStatus.getStatus();
         }
-        std::unique_ptr<LiteParsedQuery> lpq(lpqRaw);
+
+        auto& lpq = lpqStatus.getValue();
 
         // Build a parse tree from the BSONObj in the parsed query.
         StatusWithMatchExpression swme = 
