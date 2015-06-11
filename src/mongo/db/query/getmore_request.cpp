@@ -40,12 +40,21 @@
 
 namespace mongo {
 
+namespace {
+
+const char kCmdName[] = "getMore";
+const char kCollectionField[] = "collection";
+const char kBatchSizeField[] = "batchSize";
+const char kMaxTimeMSField[] = "maxTimeMS";
+
+}  // namespace
+
 GetMoreRequest::GetMoreRequest() : cursorid(0), batchSize(0) {}
 
-GetMoreRequest::GetMoreRequest(const std::string& fullns,
+GetMoreRequest::GetMoreRequest(NamespaceString namespaceString,
                                CursorId id,
                                boost::optional<int> sizeOfBatch)
-    : nss(fullns), cursorid(id), batchSize(sizeOfBatch) {}
+    : nss(std::move(namespaceString)), cursorid(id), batchSize(sizeOfBatch) {}
 
 Status GetMoreRequest::isValid() const {
     if (!nss.isValid()) {
@@ -88,14 +97,14 @@ StatusWith<GetMoreRequest> GetMoreRequest::parseFromBSON(const std::string& dbna
 
     for (BSONElement el : cmdObj) {
         const char* fieldName = el.fieldName();
-        if (str::equals(fieldName, "getMore")) {
+        if (str::equals(fieldName, kCmdName)) {
             if (el.type() != BSONType::NumberLong) {
                 return {ErrorCodes::TypeMismatch,
                         str::stream() << "Field 'getMore' must be of type long in: " << cmdObj};
             }
 
             cursorid = el.Long();
-        } else if (str::equals(fieldName, "collection")) {
+        } else if (str::equals(fieldName, kCollectionField)) {
             if (el.type() != BSONType::String) {
                 return {ErrorCodes::TypeMismatch,
                         str::stream()
@@ -103,14 +112,14 @@ StatusWith<GetMoreRequest> GetMoreRequest::parseFromBSON(const std::string& dbna
             }
 
             fullns = parseNs(dbname, cmdObj);
-        } else if (str::equals(fieldName, "batchSize")) {
+        } else if (str::equals(fieldName, kBatchSizeField)) {
             if (!el.isNumber()) {
                 return {ErrorCodes::TypeMismatch,
                         str::stream() << "Field 'batchSize' must be a number in: " << cmdObj};
             }
 
             batchSize = el.numberInt();
-        } else if (str::equals(fieldName, "maxTimeMS")) {
+        } else if (str::equals(fieldName, kMaxTimeMSField)) {
             // maxTimeMS is parsed by the command handling code, so we don't repeat the parsing
             // here.
             continue;
@@ -131,13 +140,26 @@ StatusWith<GetMoreRequest> GetMoreRequest::parseFromBSON(const std::string& dbna
                 str::stream() << "Field 'collection' missing in: " << cmdObj};
     }
 
-    GetMoreRequest request(*fullns, *cursorid, batchSize);
+    GetMoreRequest request(NamespaceString(*fullns), *cursorid, batchSize);
     Status validStatus = request.isValid();
     if (!validStatus.isOK()) {
         return validStatus;
     }
 
     return request;
+}
+
+BSONObj GetMoreRequest::toBSON() const {
+    BSONObjBuilder builder;
+
+    builder.append(kCmdName, cursorid);
+    builder.append(kCollectionField, nss.coll());
+
+    if (batchSize) {
+        builder.append(kBatchSizeField, *batchSize);
+    }
+
+    return builder.obj();
 }
 
 }  // namespace mongo

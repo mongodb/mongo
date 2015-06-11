@@ -1,0 +1,37 @@
+# -*- mode: python -*-
+
+Import("env")
+
+env.Library(
+    target="cluster_query",
+    source=[
+    ],
+    LIBDEPS=[
+        "cluster_client_cursor"
+    ],
+)
+
+env.Library(
+    target="cluster_client_cursor",
+    source=[
+        "cluster_client_cursor.cpp",
+        "async_cluster_client_cursor.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/query/command_request_response",
+        "$BUILD_DIR/mongo/executor/task_executor_interface",
+    ],
+)
+
+env.CppUnitTest(
+    target="async_cluster_client_cursor_test",
+    source=[
+        "async_cluster_client_cursor_test.cpp",
+    ],
+    LIBDEPS=[
+        "cluster_client_cursor",
+        # TODO dependencies shouldn't have repl
+        "$BUILD_DIR/mongo/db/repl/replication_executor_test_fixture",
+        "$BUILD_DIR/mongo/db/query/lite_parsed_query",
+    ],
+)

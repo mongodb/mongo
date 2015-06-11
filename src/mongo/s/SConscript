@@ -7,6 +7,7 @@ env.SConscript(
         'catalog',
         'client',
         'commands',
+        'query',
     ],
 )
 

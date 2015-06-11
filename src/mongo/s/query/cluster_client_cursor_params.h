@@ -29,53 +29,40 @@
 #pragma once
 
 #include <boost/optional.hpp>
-#include <string>
 
-#include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
-#include "mongo/db/clientcursor.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
 
 namespace mongo {
 
-struct GetMoreRequest {
-    /**
-     * Construct an empty request.
-     */
-    GetMoreRequest();
+struct ClusterClientCursorParams {
+    ClusterClientCursorParams() {}
 
-    /**
-     * Construct from values for each field.
-     */
-    GetMoreRequest(NamespaceString namespaceString, CursorId id, boost::optional<int> batch);
+    ClusterClientCursorParams(NamespaceString nss) : nsString(std::move(nss)) {}
 
-    /**
-     * Construct a GetMoreRequest from the command specification and db name.
-     */
-    static StatusWith<GetMoreRequest> parseFromBSON(const std::string& dbname,
-                                                    const BSONObj& cmdObj);
+    NamespaceString nsString;
 
-    /**
-     * Serializes this object into a BSON representation. Fields that are not set will not be
-     * part of the the serialized object.
-     */
-    BSONObj toBSON() const;
+    // The raw command parameters (e.g. the find command specification).
+    BSONObj cmdObj;
 
-    static std::string parseNs(const std::string& dbname, const BSONObj& cmdObj);
+    // The sort specification. Leave empty if there is no sort.
+    BSONObj sort;
 
-    const NamespaceString nss;
-    const CursorId cursorid;
+    // The projection specification. Leave empty if there is no projection.
+    BSONObj projection;
 
-    // The batch size is optional. If not provided, we will put as many documents into the batch
-    // as fit within the byte limit.
-    const boost::optional<int> batchSize;
+    // The number of results to skip. Optional. Should not be forwarded to the remote hosts in
+    // 'cmdObj'.
+    boost::optional<int> skip;
 
-private:
-    /**
-     * Returns a non-OK status if there are semantic errors in the parsed request
-     * (e.g. a negative batchSize).
-     */
-    Status isValid() const;
+    // The number of results per batch. Optional. If specified, will be specified as the batch for
+    // each
+    // getMore.
+    boost::optional<int> batchSize;
+
+    // Limits the number of results returned by the ClusterClientCursor to this many. Optional.
+    // Should be forwarded to the remote hosts in 'cmdObj'.
+    boost::optional<int> limit;
 };
 
-}  // namespace mongo
+}  // mongo

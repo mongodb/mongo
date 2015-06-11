@@ -28,54 +28,34 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <string>
+#include <vector>
 
-#include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/namespace_string.h"
 
 namespace mongo {
 
-struct GetMoreRequest {
+struct GetMoreResponse {
     /**
-     * Construct an empty request.
+     * Constructs from values for each of the fields.
      */
-    GetMoreRequest();
+    GetMoreResponse(NamespaceString namspaceString, CursorId id, const std::vector<BSONObj>& objs);
 
     /**
-     * Construct from values for each field.
+     * Constructs a GetMoreResponse from the command BSON response.
      */
-    GetMoreRequest(NamespaceString namespaceString, CursorId id, boost::optional<int> batch);
+    static StatusWith<GetMoreResponse> parseFromBSON(const BSONObj& cmdResponse);
 
     /**
-     * Construct a GetMoreRequest from the command specification and db name.
-     */
-    static StatusWith<GetMoreRequest> parseFromBSON(const std::string& dbname,
-                                                    const BSONObj& cmdObj);
-
-    /**
-     * Serializes this object into a BSON representation. Fields that are not set will not be
-     * part of the the serialized object.
+     * Converts this response to its raw BSON representation.
      */
     BSONObj toBSON() const;
 
-    static std::string parseNs(const std::string& dbname, const BSONObj& cmdObj);
-
     const NamespaceString nss;
-    const CursorId cursorid;
-
-    // The batch size is optional. If not provided, we will put as many documents into the batch
-    // as fit within the byte limit.
-    const boost::optional<int> batchSize;
-
-private:
-    /**
-     * Returns a non-OK status if there are semantic errors in the parsed request
-     * (e.g. a negative batchSize).
-     */
-    Status isValid() const;
+    const CursorId cursorId;
+    const std::vector<BSONObj> batch;
 };
 
 }  // namespace mongo

@@ -26,56 +26,46 @@
  *    it in the license file.
  */
 
-#pragma once
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
 
-#include <boost/optional.hpp>
-#include <string>
+#include "mongo/platform/basic.h"
 
-#include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
-#include "mongo/db/clientcursor.h"
-#include "mongo/db/namespace_string.h"
+#include "mongo/s/query/cluster_client_cursor.h"
+
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
-struct GetMoreRequest {
-    /**
-     * Construct an empty request.
-     */
-    GetMoreRequest();
+ClusterClientCursor::ClusterClientCursor(executor::TaskExecutor* executor,
+                                         const ClusterClientCursorParams& params,
+                                         const std::vector<HostAndPort>& remotes)
+    : _executor(executor), _params(params), _accc(executor, params, remotes) {}
 
-    /**
-     * Construct from values for each field.
-     */
-    GetMoreRequest(NamespaceString namespaceString, CursorId id, boost::optional<int> batch);
+StatusWith<boost::optional<BSONObj>> ClusterClientCursor::next() {
+    // On error, kill the underlying ACCC.
+    ScopeGuard cursorKiller = MakeGuard(&ClusterClientCursor::kill, this);
 
-    /**
-     * Construct a GetMoreRequest from the command specification and db name.
-     */
-    static StatusWith<GetMoreRequest> parseFromBSON(const std::string& dbname,
-                                                    const BSONObj& cmdObj);
+    while (!_accc.ready()) {
+        auto nextEventStatus = _accc.nextEvent();
+        if (!nextEventStatus.isOK()) {
+            return nextEventStatus.getStatus();
+        }
+        auto event = nextEventStatus.getValue();
 
-    /**
-     * Serializes this object into a BSON representation. Fields that are not set will not be
-     * part of the the serialized object.
-     */
-    BSONObj toBSON() const;
+        // Block until there are further results to return.
+        _executor->waitForEvent(event);
+    }
 
-    static std::string parseNs(const std::string& dbname, const BSONObj& cmdObj);
+    auto statusWithNext = _accc.nextReady();
+    if (statusWithNext.isOK()) {
+        cursorKiller.Dismiss();
+    }
+    return statusWithNext;
+}
 
-    const NamespaceString nss;
-    const CursorId cursorid;
-
-    // The batch size is optional. If not provided, we will put as many documents into the batch
-    // as fit within the byte limit.
-    const boost::optional<int> batchSize;
-
-private:
-    /**
-     * Returns a non-OK status if there are semantic errors in the parsed request
-     * (e.g. a negative batchSize).
-     */
-    Status isValid() const;
-};
+void ClusterClientCursor::kill() {
+    auto killEvent = _accc.kill();
+    _executor->waitForEvent(killEvent);
+}
 
 }  // namespace mongo
