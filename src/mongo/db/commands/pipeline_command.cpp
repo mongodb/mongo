@@ -189,11 +189,12 @@ namespace mongo {
                          int options,
                          string &errmsg,
                          BSONObjBuilder &result) {
-            NamespaceString nss(parseNs(db, cmdObj));
-            if (nss.coll().empty()) {
+            const std::string ns = parseNs(db, cmdObj);
+            if (nsToCollectionSubstring(ns).empty()) {
                 errmsg = "missing collection name";
                 return false;
             }
+            NamespaceString nss(ns);
 
             intrusive_ptr<ExpressionContext> pCtx = new ExpressionContext(txn, nss);
             pCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
