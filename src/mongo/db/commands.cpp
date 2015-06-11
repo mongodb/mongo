@@ -35,6 +35,7 @@
 
 #include "mongo/db/commands.h"
 
+#include <map>
 #include <string>
 #include <vector>
 
@@ -60,6 +61,7 @@
 
 namespace mongo {
 
+    using std::map;
     using std::string;
     using std::stringstream;
     using std::endl;
@@ -334,6 +336,14 @@ namespace mongo {
         BSONObjBuilder bob;
         cmdToLog.writeTo(&bob);
         return bob.obj();
+    }
+
+    void Command::getCommandsSortedByName(map<string, Command *> & out) {
+        for (CommandMap::const_iterator it=_commands->begin(); 
+              it!=_commands->end(); 
+              ++it) {
+            out.emplace(it->first, it->second);
+        }
     }
 
     void Command::logIfSlow( const Timer& timer, const string& msg ) {

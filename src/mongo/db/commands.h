@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <map>
 #include <string>
 #include <vector>
 
@@ -240,6 +241,9 @@ namespace mutablebson {
                 return cmdObj["q"].embeddedObject();
             return BSONObj();
         }
+
+        /** @param out  Contains commands in natural order when the method ends */        
+        static void getCommandsSortedByName(std::map<std::string, Command *> & out);
 
         static void logIfSlow( const Timer& cmdTimer,  const std::string& msg);
 

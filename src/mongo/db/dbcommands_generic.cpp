@@ -67,6 +67,7 @@
 namespace mongo {
 
     using std::endl;
+    using std::map;
     using std::string;
     using std::stringstream;
     using std::vector;
@@ -241,11 +242,15 @@ namespace mongo {
                          string& errmsg,
                          BSONObjBuilder& result) {
             BSONObjBuilder b( result.subobjStart( "commands" ) );
-            for ( CommandMap::const_iterator i=_commands->begin(); i!=_commands->end(); ++i ) {
-                Command * c = i->second;
+
+            map<string, Command *> sortedCommands;
+            getCommandsSortedByName(sortedCommands);
+            for (map<string, Command *>::const_iterator it = sortedCommands.cbegin();
+                  it != sortedCommands.cend(); ++it) {
+                Command * c = it->second;
 
                 // don't show oldnames
-                if (i->first != c->name)
+                if (it->first != c->name)
                     continue;
 
                 BSONObjBuilder temp( b.subobjStart( c->name ) );
