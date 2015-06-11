@@ -9,7 +9,6 @@ env.SConscript(
     dirs=[
         'cmdline_utils',
         'concurrency',
-        'mongoutils',
         'net',
         'options_parser',
     ],

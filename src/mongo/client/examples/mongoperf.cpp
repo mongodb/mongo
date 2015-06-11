@@ -25,7 +25,7 @@
  *    then also delete it in the license file.
  */
 
-/* 
+/*
    How to build and run:
 
    scons mongoperf
@@ -58,6 +58,7 @@
 
 using namespace std;
 using namespace mongo;
+using namespace mongoutils::str;
 
 int dummy;
 unsigned recSizeKB;
@@ -85,6 +86,21 @@ void syncThread() {
     }
 }
 
+void stripTrailing(std::string& s, const char *chars) {
+    std::string::iterator to = s.begin();
+    for ( std::string::iterator i = s.begin(); i != s.end(); i++ ) {
+        // During each iteration if i finds a non-"chars" character it writes it to the
+        // position of t. So the part of the string left from the "to" iterator is already
+        // "cleared" string.
+        if ( !contains(chars, *i) ) {
+            if ( i != to )
+                s.replace(to, to + 1, 1, *i);
+            to++;
+        }
+    }
+    s.erase(to, s.end());
+}
+
 char* round(char* x) {
     size_t f = (size_t) x;
     char *p = (char *) ((f+PG-1)/PG*PG);
@@ -94,9 +110,9 @@ char* round(char* x) {
 struct Aligned {
     char x[8192];
     char* addr() { return round(x); }
-}; 
+};
 
-unsigned long long rrand() { 
+unsigned long long rrand() {
     // RAND_MAX is very small on windows
     return (static_cast<unsigned long long>(rand()) << 15) ^ rand();
 }
@@ -107,14 +123,14 @@ void workerThread() {
     cout << "read:" << r << " write:" << w << endl;
     long long su = options["sleepMicros"].numberLong();
     Aligned a;
-    while( 1 ) { 
+    while( 1 ) {
         unsigned long long rofs = (rrand() * PG) % len;
         unsigned long long wofs = (rrand() * PG) % len;
         const unsigned P = PG/1024;
-        if( mmf ) { 
+        if( mmf ) {
             if( r ) {
                 for( unsigned p = P; p <= recSizeKB; p += P ) {
-                    if( rofs < len ) 
+                    if( rofs < len )
                         dummy += mmf[rofs];
                     rofs += PG;
                 }
@@ -160,9 +176,9 @@ void go() {
     if( len == 0 ) len = 1;
     cout << len << "MB ..." << endl;
 
-    if( 0 && len > 2000 && !options["mmf"].trueValue() ) { 
+    if( 0 && len > 2000 && !options["mmf"].trueValue() ) {
         // todo make tests use 64 bit offsets in their i/o -- i.e. adjust LogFile::writeAt and such
-        cout << "\nsizes > 2GB not yet supported with mmf:false" << endl; 
+        cout << "\nsizes > 2GB not yet supported with mmf:false" << endl;
         return;
     }
     len *= 1024 * 1024;
@@ -170,7 +186,7 @@ void go() {
     try {
         boost::filesystem::remove(fname);
     }
-    catch(...) { 
+    catch(...) {
         cout << "error deleting file " << fname << endl;
         return;
     }
@@ -178,7 +194,7 @@ void go() {
     const unsigned sz = 1024 * 1024 * 32; // needs to be big as we are using synchronousAppend.  if we used a regular MongoFile it wouldn't have to be
     char *buf = (char*) mongoMalloc(sz+4096);
     const char *p = round(buf);
-    for( unsigned long long i = 0; i < len; i += sz ) { 
+    for( unsigned long long i = 0; i < len; i += sz ) {
         lf->synchronousAppend(p, sz);
         if( i % (1024ULL*1024*1024) == 0 && i ) {
             cout << i / (1024ULL*1024*1024) << "GB..." << endl;
@@ -186,7 +202,7 @@ void go() {
     }
     BSONObj& o = options;
 
-    if( o["mmf"].trueValue() ) { 
+    if( o["mmf"].trueValue() ) {
         delete lf;
         lf = 0;
         mmfFile = new MemoryMappedFile();
@@ -208,7 +224,7 @@ void go() {
     }
     cout << "wthr " << wthr << endl;
 
-    if( wthr < 1 ) { 
+    if( wthr < 1 ) {
         cout << "bad threads field value" << endl;
         return;
     }
@@ -231,7 +247,7 @@ void go() {
         iops.store(0);
         w /= 1; // 1 secs
         cout << w << " ops/sec ";
-        if( mmf == 0 ) 
+        if( mmf == 0 )
             // only writing 4 bytes with mmf so we don't say this
             cout << (w * PG / 1024 / 1024) << " MB/sec";
         cout << endl;
@@ -243,7 +259,7 @@ int main(int argc, char *argv[]) {
     try {
         cout << "mongoperf" << endl;
 
-        if( argc > 1 ) { 
+        if( argc > 1 ) {
 cout <<
 
 "\n"
@@ -279,17 +295,17 @@ cout <<
         char input[1024];
         memset(input, 0, sizeof(input));
         cin.read(input, 1000);
-        if( *input == 0 ) { 
+        if( *input == 0 ) {
             cout << "error no options found on stdin for mongoperf" << endl;
             return EXIT_FAILURE;
         }
 
         string s = input;
-        mongoutils::str::stripTrailing(s, " \n\r\0x1a");
-        try { 
+        stripTrailing(s, " \n\r\0x1a");
+        try {
             options = fromjson(s);
         }
-        catch(...) { 
+        catch(...) {
             cout << "couldn't parse json options. input was:\n|" << s << "|" << endl;
             return EXIT_FAILURE;
         }
@@ -297,12 +313,11 @@ cout <<
         ProcessInfo::initializeSystemInfo();
 
         go();
-    } 
-    catch(DBException& e) { 
+    }
+    catch(DBException& e) {
         cout << "caught DBException " << e.toString() << endl;
         return EXIT_FAILURE;
     }
 
     return EXIT_SUCCESS;
 }
-
