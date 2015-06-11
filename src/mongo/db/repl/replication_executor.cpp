@@ -95,13 +95,8 @@ namespace {
         return _networkInterface->now();
     }
 
-    bool ReplicationExecutor::isRunThread() const {
-        return (_runThreadId == std::this_thread::get_id());
-    }
-
     void ReplicationExecutor::run() {
         setThreadName("ReplicationExecutor");
-        _runThreadId = std::this_thread::get_id();
         _networkInterface->startup();
         _dblockWorkers.startThreads();
         std::pair<WorkItem, CallbackHandle> work;

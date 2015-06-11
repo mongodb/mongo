@@ -197,11 +197,6 @@ namespace repl {
          */
         int64_t nextRandomInt64(int64_t limit);
 
-        /**
-         * Returns true if executing in the "run" thread, which should not block with IO
-         */
-        bool isRunThread() const;
-
     private:
         class Callback;
         class Event;
@@ -326,7 +321,6 @@ namespace repl {
         TaskRunner _dblockTaskRunner;
         TaskRunner _dblockExclusiveLockTaskRunner;
         uint64_t _nextId;
-        std::thread::id _runThreadId;
     };
 
     class ReplicationExecutor::Callback : public executor::TaskExecutor::CallbackState {

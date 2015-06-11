@@ -222,7 +222,6 @@ namespace {
 
     void OplogFetcher::_delegateCallback(const BatchDataStatus& fetchResult,
                                          Fetcher::NextAction* nextAction) {
-        invariant(_exec->isRunThread());
         const bool checkStartTS = _responses == 0;
 
         if (fetchResult.isOK()) {
@@ -466,7 +465,6 @@ namespace {
     }
 
     void DatabasesCloner::_onListDatabaseFinish(const CommandCallbackArgs& cbd) {
-        invariant(_exec->isRunThread());
         const Status respStatus = cbd.response.getStatus();
         if (!respStatus.isOK()) {
             // TODO: retry internally?
@@ -915,7 +913,6 @@ namespace {
 
     void DataReplicator::_onApplierReadyStart(const BatchDataStatus& fetchResult,
                                               NextAction* nextAction) {
-        invariant(_exec->isRunThread());
         // Data clone done, move onto apply.
         TimestampStatus ts(ErrorCodes::OplogStartMissing, "");
         _initialSyncState->_setTimestampSatus(fetchResult, nextAction, &ts);
@@ -1143,8 +1140,6 @@ namespace {
                                            Fetcher::NextAction* nextAction,
                                            const Operations& ops,
                                            const NamespaceString nss) {
-        invariant(_exec->isRunThread());
-
         if (!fetchResult.isOK()) {
             // TODO: do retries on network issues, like SyncTail::getMissingDoc
             _initialSyncState->setStatus(fetchResult.getStatus());
@@ -1321,7 +1316,6 @@ namespace {
 
     void DataReplicator::_onOplogFetchFinish(const StatusWith<Fetcher::BatchData>& fetchResult,
                                              Fetcher::NextAction* nextAction) {
-        invariant(_exec->isRunThread());
         const Status status = fetchResult.getStatus();
         if (status.code() == ErrorCodes::CallbackCanceled)
             return;
