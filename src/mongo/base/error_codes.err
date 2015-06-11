@@ -129,6 +129,8 @@ error_code("RPCProtocolNegotiationFailed", 126)
 error_code("UnrecoverableRollbackError", 127)
 error_code("LockNotFound", 128)
 error_code("LockStateChangeFailed", 129)
+error_code("SymbolNotFound", 130)
+error_code("RLPInitializationFailed", 131)
 
 # Non-sequential error codes (for compatibility only)
 error_code("NotMaster", 10107) #this comes from assert_util.h
