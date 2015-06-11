@@ -332,7 +332,8 @@ __fill_index(WT_SESSION_IMPL *session, WT_TABLE *table, const char *name)
 		return (0);
 
 	WT_ERR(sess->open_cursor(sess, table->name, NULL, "readonly", &tcur));
-	WT_ERR(sess->open_cursor(sess, name, NULL, NULL, &icur));
+	WT_WITH_PRELOCKED_BTREE(session,
+	    WT_ERR(sess->open_cursor(sess, name, NULL, NULL, &icur)));
 
 	ctable = (WT_CURSOR_TABLE *)tcur;
 	cindex = (WT_CURSOR_INDEX *)icur;

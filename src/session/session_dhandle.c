@@ -8,6 +8,8 @@
 
 #include "wt_internal.h"
 
+static int __session_dhandle_find(
+    WT_SESSION_IMPL *, const char *, const char *);
 static int __session_dhandle_sweep(WT_SESSION_IMPL *);
 
 /*
@@ -195,6 +197,10 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 		ret = __wt_conn_btree_sync_and_close(session, 0, 0);
 		F_CLR(dhandle, WT_DHANDLE_DISCARD);
 	}
+	if (F_ISSET(session, WT_SESSION_LOCKED_BTREE)) {
+		session->dhandle = NULL;
+		return (0);
+	}
 
 	if (write_locked)
 		F_CLR(dhandle, WT_DHANDLE_EXCLUSIVE);
@@ -202,7 +208,6 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 	WT_TRET(write_locked ?
 	    __wt_writeunlock(session, dhandle->rwlock):
 	    __wt_readunlock(session, dhandle->rwlock));
-
 	session->dhandle = NULL;
 	return (ret);
 }
@@ -244,7 +249,11 @@ retry:			WT_RET(__wt_meta_checkpoint_last_name(
 			    session, cval.str, cval.len, &checkpoint));
 	}
 
-	ret = __wt_session_get_btree(session, uri, checkpoint, cfg, flags);
+	if (F_ISSET(session, WT_SESSION_LOCKED_BTREE))
+		ret = __session_dhandle_find(session, uri, checkpoint);
+	else
+		ret = __wt_session_get_btree(session, uri, checkpoint, cfg,
+		    flags);
 	__wt_free(session, checkpoint);
 
 	/*

@@ -19,6 +19,16 @@
 
 #define	WT_WITH_BTREE(s, b, e)	WT_WITH_DHANDLE(s, (b)->dhandle, e)
 
+/*
+ * With a btree already exclusively locked, call a function with a flag
+ * to indicate that the same btree should not be relocked.
+ */
+#define	WT_WITH_PRELOCKED_BTREE(s, e) do {				\
+	F_SET(s, WT_SESSION_LOCKED_BTREE);				\
+	e;								\
+	F_CLR(s, WT_SESSION_LOCKED_BTREE);				\
+} while (0)
+
 /* Call a function without the caller's data handle, restore afterwards. */
 #define	WT_WITHOUT_DHANDLE(s, e) WT_WITH_DHANDLE(s, NULL, e)
 
