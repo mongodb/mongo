@@ -28,33 +28,17 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/client/remote_command_targeter_mock.h"
-
-#include "mongo/base/status_with.h"
-#include "mongo/client/read_preference.h"
+#include "mongo/s/catalog/replset/catalog_manager_replica_set.h"
+#include "mongo/s/catalog/replset/catalog_manager_replica_set_test_fixture.h"
 
 namespace mongo {
+namespace {
 
-    RemoteCommandTargeterMock::RemoteCommandTargeterMock()
-        : _findHostReturnValue(Status(ErrorCodes::InternalError, "No return value set")) {
+    // TODO: Just a placeholder so the catalog manager RS tests may compile. Remove when actual
+    //       tests are written.
+    TEST_F(CatalogManagerReplSetTestFixture, Placeholder) {
+
     }
 
-    RemoteCommandTargeterMock::~RemoteCommandTargeterMock() = default;
-
-    RemoteCommandTargeterMock* RemoteCommandTargeterMock::get(RemoteCommandTargeter* targeter) {
-        auto mock = dynamic_cast<RemoteCommandTargeterMock*>(targeter);
-        invariant(mock);
-
-        return mock;
-    }
-
-    StatusWith<HostAndPort> RemoteCommandTargeterMock::findHost(
-            const ReadPreferenceSetting& readPref) {
-        return _findHostReturnValue;
-    }
-
-    void RemoteCommandTargeterMock::setFindHostReturnValue(StatusWith<HostAndPort> returnValue) {
-        _findHostReturnValue = std::move(returnValue);
-    }
-
+} // namespace
 } // namespace mongo

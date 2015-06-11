@@ -36,7 +36,12 @@ namespace mongo {
     class RemoteCommandTargeterMock final : public RemoteCommandTargeter {
     public:
         RemoteCommandTargeterMock();
-        virtual ~RemoteCommandTargeterMock() = default;
+        virtual ~RemoteCommandTargeterMock();
+
+        /**
+         * Shortcut for unit-tests.
+         */
+        static RemoteCommandTargeterMock* get(RemoteCommandTargeter* targeter);
 
         /**
          * Returns the return value last set by setFindHostReturnValue.

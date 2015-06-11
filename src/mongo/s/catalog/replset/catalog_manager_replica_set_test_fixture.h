@@ -26,35 +26,31 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include "mongo/client/remote_command_targeter_mock.h"
-
-#include "mongo/base/status_with.h"
-#include "mongo/client/read_preference.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 
-    RemoteCommandTargeterMock::RemoteCommandTargeterMock()
-        : _findHostReturnValue(Status(ErrorCodes::InternalError, "No return value set")) {
-    }
+    class CatalogManagerReplicaSet;
+    class RemoteCommandRunnerMock;
+    class ShardRegistry;
 
-    RemoteCommandTargeterMock::~RemoteCommandTargeterMock() = default;
+    /**
+     * Sets up the mocked out objects for testing the replica-set backed catalog manager.
+     */
+    class CatalogManagerReplSetTestFixture : public mongo::unittest::Test {
+    public:
+        CatalogManagerReplSetTestFixture();
+        ~CatalogManagerReplSetTestFixture();
 
-    RemoteCommandTargeterMock* RemoteCommandTargeterMock::get(RemoteCommandTargeter* targeter) {
-        auto mock = dynamic_cast<RemoteCommandTargeterMock*>(targeter);
-        invariant(mock);
+    protected:
+        // Shortcut methods, which return the main testable objects
+        CatalogManagerReplicaSet* catalogManager() const;
 
-        return mock;
-    }
+        ShardRegistry* shardRegistry() const;
 
-    StatusWith<HostAndPort> RemoteCommandTargeterMock::findHost(
-            const ReadPreferenceSetting& readPref) {
-        return _findHostReturnValue;
-    }
-
-    void RemoteCommandTargeterMock::setFindHostReturnValue(StatusWith<HostAndPort> returnValue) {
-        _findHostReturnValue = std::move(returnValue);
-    }
+        RemoteCommandRunnerMock* commandRunner() const;
+    };
 
 } // namespace mongo

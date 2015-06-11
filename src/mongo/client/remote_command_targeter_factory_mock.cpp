@@ -28,33 +28,23 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/client/remote_command_targeter_mock.h"
+#include "mongo/client/remote_command_targeter_factory_mock.h"
 
 #include "mongo/base/status_with.h"
-#include "mongo/client/read_preference.h"
+#include "mongo/client/connection_string.h"
+#include "mongo/client/remote_command_targeter_mock.h"
+#include "mongo/stdx/memory.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
-    RemoteCommandTargeterMock::RemoteCommandTargeterMock()
-        : _findHostReturnValue(Status(ErrorCodes::InternalError, "No return value set")) {
-    }
+    RemoteCommandTargeterFactoryMock::RemoteCommandTargeterFactoryMock() = default;
 
-    RemoteCommandTargeterMock::~RemoteCommandTargeterMock() = default;
+    RemoteCommandTargeterFactoryMock::~RemoteCommandTargeterFactoryMock() = default;
 
-    RemoteCommandTargeterMock* RemoteCommandTargeterMock::get(RemoteCommandTargeter* targeter) {
-        auto mock = dynamic_cast<RemoteCommandTargeterMock*>(targeter);
-        invariant(mock);
-
-        return mock;
-    }
-
-    StatusWith<HostAndPort> RemoteCommandTargeterMock::findHost(
-            const ReadPreferenceSetting& readPref) {
-        return _findHostReturnValue;
-    }
-
-    void RemoteCommandTargeterMock::setFindHostReturnValue(StatusWith<HostAndPort> returnValue) {
-        _findHostReturnValue = std::move(returnValue);
+    std::unique_ptr<RemoteCommandTargeter>
+    RemoteCommandTargeterFactoryMock::create(const ConnectionString& connStr) {
+        return stdx::make_unique<RemoteCommandTargeterMock>();
     }
 
 } // namespace mongo

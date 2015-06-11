@@ -47,6 +47,15 @@ namespace {
             _response(Status(ErrorCodes::InternalError, "response not set")) {
     }
 
+    RemoteCommandRunnerMock::~RemoteCommandRunnerMock() = default;
+
+    RemoteCommandRunnerMock* RemoteCommandRunnerMock::get(RemoteCommandRunner* runner) {
+        auto mock = dynamic_cast<RemoteCommandRunnerMock*>(runner);
+        invariant(mock);
+
+        return mock;
+    }
+
     StatusWith<RemoteCommandResponse> RemoteCommandRunnerMock::runCommand(
             const RemoteCommandRequest& request) {
         _runCommandChecker(request);

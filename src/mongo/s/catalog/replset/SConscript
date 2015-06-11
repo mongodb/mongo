@@ -36,3 +36,23 @@ env.Library(
         '$BUILD_DIR/mongo/s/client/sharding_client',
     ]
 )
+
+env.CppUnitTest(
+    target='catalog_manager_rs_test',
+    source=[
+        'catalog_manager_replica_set_test.cpp',
+        'catalog_manager_replica_set_test_fixture.cpp',
+    ],
+    LIBDEPS=[
+        'catalog_manager_rs',
+        'replset_dist_lock_manager',
+        '$BUILD_DIR/mongo/client/remote_command_runner_mock',
+        '$BUILD_DIR/mongo/client/remote_command_targeter_mock',
+        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
+        '$BUILD_DIR/mongo/db/coredb',
+        '$BUILD_DIR/mongo/dbtests/mocklib',
+        '$BUILD_DIR/mongo/s/catalog/dist_lock_catalog_mock',
+        '$BUILD_DIR/mongo/s/coreshard',
+        '$BUILD_DIR/mongo/s/mongoscore',
+    ]
+)

@@ -39,16 +39,20 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/read_preference.h"
+#include "mongo/client/remote_command_runner.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/dist_lock_manager.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog/type_settings.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard.h"
+#include "mongo/s/client/shard_registry.h"
+#include "mongo/s/grid.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/stdx/memory.h"
@@ -65,8 +69,12 @@ namespace mongo {
 namespace {
 
     const Status notYetImplemented(ErrorCodes::InternalError, "Not yet implemented"); // todo remove
+
+    // Until read committed is supported always write to the primary with majoirty write and read
+    // from the secondary. That way we ensure that reads will see a consistent data.
     const ReadPreferenceSetting kConfigWriteSelector(ReadPreference::PrimaryOnly, TagSet{});
     const ReadPreferenceSetting kConfigReadSelector(ReadPreference::SecondaryOnly, TagSet{});
+
     const Seconds kConfigCommandTimeout{30};
     const int kNotMasterNumRetries = 3;
     const Milliseconds kNotMasterRetryInterval{500};
@@ -84,9 +92,19 @@ namespace {
 
     CatalogManagerReplicaSet::~CatalogManagerReplicaSet() = default;
 
-    Status CatalogManagerReplicaSet::init(std::unique_ptr<DistLockManager> distLockManager) {
+    Status CatalogManagerReplicaSet::init(const ConnectionString& configCS,
+                                          std::unique_ptr<DistLockManager> distLockManager) {
+
+        invariant(configCS.type() == ConnectionString::SET);
+
+        _configServerConnectionString = configCS;
         _distLockManager = std::move(distLockManager);
+
         return Status::OK();
+    }
+
+    ConnectionString CatalogManagerReplicaSet::connectionString() const {
+        return _configServerConnectionString;
     }
 
     void CatalogManagerReplicaSet::shutDown() {

@@ -39,16 +39,13 @@
 
 namespace mongo {
 
-    class DistLockManager;
-
-
     /**
      * Implements the catalog manager using the legacy 3-config server protocol.
      */
-    class CatalogManagerLegacy : public CatalogManager {
+    class CatalogManagerLegacy final : public CatalogManager {
     public:
         CatalogManagerLegacy();
-        virtual ~CatalogManagerLegacy();
+        ~CatalogManagerLegacy();
 
         /**
          * Initializes the catalog manager with the hosts, which will be used as a configuration
@@ -67,87 +64,86 @@ namespace mongo {
          */
         Status startConfigServerChecker();
 
-        ConnectionString connectionString() const final;
+        ConnectionString connectionString() const override;
 
-        void shutDown() final;
+        void shutDown() override;
 
-        virtual Status enableSharding(const std::string& dbName);
+        Status enableSharding(const std::string& dbName) override;
 
-        virtual Status shardCollection(const std::string& ns,
-                                       const ShardKeyPattern& fieldsAndOrder,
-                                       bool unique,
-                                       std::vector<BSONObj>* initPoints,
-                                       std::set<ShardId>* initShardIds);
+        Status shardCollection(const std::string& ns,
+                               const ShardKeyPattern& fieldsAndOrder,
+                               bool unique,
+                               std::vector<BSONObj>* initPoints,
+                               std::set<ShardId>* initShardIds) override;
 
-        virtual StatusWith<std::string> addShard(const std::string& name,
-                                                 const ConnectionString& shardConnectionString,
-                                                 const long long maxSize);
+        StatusWith<std::string> addShard(const std::string& name,
+                                         const ConnectionString& shardConnectionString,
+                                         const long long maxSize) override;
 
-        virtual StatusWith<ShardDrainingStatus> removeShard(OperationContext* txn,
-                                                            const std::string& name);
+        StatusWith<ShardDrainingStatus> removeShard(OperationContext* txn,
+                                                    const std::string& name) override;
 
-        virtual Status createDatabase(const std::string& dbName);
+        Status createDatabase(const std::string& dbName) override;
 
-        virtual Status updateDatabase(const std::string& dbName, const DatabaseType& db);
+        Status updateDatabase(const std::string& dbName, const DatabaseType& db) override;
 
-        virtual StatusWith<DatabaseType> getDatabase(const std::string& dbName);
+        StatusWith<DatabaseType> getDatabase(const std::string& dbName) override;
 
-        virtual Status updateCollection(const std::string& collNs, const CollectionType& coll);
+        Status updateCollection(const std::string& collNs, const CollectionType& coll) override;
 
-        virtual StatusWith<CollectionType> getCollection(const std::string& collNs);
+        StatusWith<CollectionType> getCollection(const std::string& collNs) override;
 
-        virtual Status getCollections(const std::string* dbName,
-                                      std::vector<CollectionType>* collections);
+        Status getCollections(const std::string* dbName, std::vector<CollectionType>* collections);
 
-        virtual Status dropCollection(const std::string& collectionNs);
+        Status dropCollection(const std::string& collectionNs);
 
         Status getDatabasesForShard(const std::string& shardName,
-                                    std::vector<std::string>* dbs) final;
+                                    std::vector<std::string>* dbs) override;
 
-        virtual Status getChunks(const Query& query,
-                                 int nToReturn,
-                                 std::vector<ChunkType>* chunks);
+        Status getChunks(const Query& query,
+                         int nToReturn,
+                         std::vector<ChunkType>* chunks) override;
 
         Status getTagsForCollection(const std::string& collectionNs,
-                                    std::vector<TagsType>* tags) final;
+                                    std::vector<TagsType>* tags) override;
 
         StatusWith<std::string> getTagForChunk(const std::string& collectionNs,
-                                               const ChunkType& chunk) final;
+                                               const ChunkType& chunk) override;
 
-        virtual Status getAllShards(std::vector<ShardType>* shards);
+        Status getAllShards(std::vector<ShardType>* shards) override;
 
-        virtual bool isShardHost(const ConnectionString& shardConnectionString);
+        bool isShardHost(const ConnectionString& shardConnectionString) override;
 
-        virtual bool doShardsExist();
+        bool doShardsExist() override;
 
         /**
          * Grabs a distributed lock and runs the command on all config servers.
          */
-        virtual bool runUserManagementWriteCommand(const std::string& commandName,
-                                                   const std::string& dbname,
-                                                   const BSONObj& cmdObj,
-                                                   BSONObjBuilder* result);
+        bool runUserManagementWriteCommand(const std::string& commandName,
+                                           const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           BSONObjBuilder* result) override;
 
-        virtual bool runUserManagementReadCommand(const std::string& dbname,
-                                                  const BSONObj& cmdObj,
-                                                  BSONObjBuilder* result);
+        bool runUserManagementReadCommand(const std::string& dbname,
+                                          const BSONObj& cmdObj,
+                                          BSONObjBuilder* result) override;
 
-        virtual Status applyChunkOpsDeprecated(const BSONArray& updateOps,
-                                               const BSONArray& preCondition);
+        Status applyChunkOpsDeprecated(const BSONArray& updateOps,
+                                       const BSONArray& preCondition) override;
 
-        virtual void logAction(const ActionLogType& actionLog);
+        void logAction(const ActionLogType& actionLog);
 
-        virtual void logChange(OperationContext* txn,
-                               const std::string& what,
-                               const std::string& ns,
-                               const BSONObj& detail);
+        void logChange(OperationContext* txn,
+                       const std::string& what,
+                       const std::string& ns,
+                       const BSONObj& detail) override;
 
-        virtual StatusWith<SettingsType> getGlobalSettings(const std::string& key);
+        StatusWith<SettingsType> getGlobalSettings(const std::string& key) override;
 
-        virtual void writeConfigServerDirect(const BatchedCommandRequest& request,
-                                             BatchedCommandResponse* response);
+        void writeConfigServerDirect(const BatchedCommandRequest& request,
+                                     BatchedCommandResponse* response) override;
 
-        virtual DistLockManager* getDistLockManager() override;
+        DistLockManager* getDistLockManager() override;
 
     private:
         /**

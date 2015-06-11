@@ -46,9 +46,15 @@ namespace mongo {
      *
      * auto response = executor.runCommand(RemoteCommandRequest()); // Assertion error!
      */
-    class RemoteCommandRunnerMock : public RemoteCommandRunner {
+    class RemoteCommandRunnerMock final : public RemoteCommandRunner {
     public:
         RemoteCommandRunnerMock();
+        virtual ~RemoteCommandRunnerMock();
+
+        /**
+         * Shortcut for unit-tests.
+         */
+        static RemoteCommandRunnerMock* get(RemoteCommandRunner* runner);
 
         /**
          * Runs the function set by the last call to setNextExpectedCommand. Calling this more

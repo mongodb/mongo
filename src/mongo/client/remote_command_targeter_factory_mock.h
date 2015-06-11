@@ -26,35 +26,21 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include "mongo/client/remote_command_targeter_mock.h"
-
-#include "mongo/base/status_with.h"
-#include "mongo/client/read_preference.h"
+#include "mongo/client/remote_command_targeter_factory.h"
 
 namespace mongo {
 
-    RemoteCommandTargeterMock::RemoteCommandTargeterMock()
-        : _findHostReturnValue(Status(ErrorCodes::InternalError, "No return value set")) {
-    }
+    /**
+     * Factory which instantiates mock remote command targeters. Used for unit-testing.
+     */
+    class RemoteCommandTargeterFactoryMock final : public RemoteCommandTargeterFactory {
+    public:
+        RemoteCommandTargeterFactoryMock();
+        ~RemoteCommandTargeterFactoryMock();
 
-    RemoteCommandTargeterMock::~RemoteCommandTargeterMock() = default;
-
-    RemoteCommandTargeterMock* RemoteCommandTargeterMock::get(RemoteCommandTargeter* targeter) {
-        auto mock = dynamic_cast<RemoteCommandTargeterMock*>(targeter);
-        invariant(mock);
-
-        return mock;
-    }
-
-    StatusWith<HostAndPort> RemoteCommandTargeterMock::findHost(
-            const ReadPreferenceSetting& readPref) {
-        return _findHostReturnValue;
-    }
-
-    void RemoteCommandTargeterMock::setFindHostReturnValue(StatusWith<HostAndPort> returnValue) {
-        _findHostReturnValue = std::move(returnValue);
-    }
+        std::unique_ptr<RemoteCommandTargeter> create(const ConnectionString& connStr) override;
+    };
 
 } // namespace mongo
