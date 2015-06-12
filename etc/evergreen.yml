@@ -2019,7 +2019,7 @@ buildvariants:
   modules:
   - enterprise
   run_on:
-  - rhel57-test
+  - rhel55-test
   expansions:
     push_path: linux
     push_bucket: downloads.10gen.com
@@ -2031,7 +2031,7 @@ buildvariants:
   tasks:
   - name: compile
     distros:
-    - rhel57-build
+    - rhel55
   - name: audit
   - name: jsCore_auth
   - name: replicasets_auth
