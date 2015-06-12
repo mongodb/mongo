@@ -55,6 +55,7 @@
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/time_support.h"
 
 //#define RS_ITERATOR_TRACE(x) log() << "WTRS::Iterator " << x
 #define RS_ITERATOR_TRACE(x)
@@ -373,6 +374,8 @@ namespace {
               _cappedMaxSize( cappedMaxSize ),
               _cappedMaxSizeSlack( std::min(cappedMaxSize/10, int64_t(16*1024*1024)) ),
               _cappedMaxDocs( cappedMaxDocs ),
+              _cappedSleep(0),
+              _cappedSleepMS(0),
               _cappedDeleteCallback( cappedDeleteCallback ),
               _cappedDeleteCheckCount(0),
               _useOplogHack(shouldUseOplogHack(ctx, _uri)),
@@ -601,7 +604,13 @@ namespace {
             // We're not actually going to delete anything, but we're going to syncronize
             // on the deleter thread.
             // Don't wait forever: we're in a transaction, we could block eviction.
-            (void)lock.timed_lock(boost::posix_time::millisec(200));
+            if (!lock.try_lock()) {
+                Date_t before = Date_t::now();
+                (void)lock.timed_lock(boost::posix_time::millisec(200));
+                stdx::chrono::milliseconds delay = Date_t::now() - before;
+                _cappedSleep.fetchAndAdd(1);
+                _cappedSleepMS.fetchAndAdd(delay.count());
+            }
             return 0;
         }
         else {
@@ -612,9 +621,14 @@ namespace {
                     return 0;
 
                 // Don't wait forever: we're in a transaction, we could block eviction.
-                if (!lock.timed_lock(boost::posix_time::millisec(200)))
+                Date_t before = Date_t::now();
+                bool gotLock = lock.timed_lock(boost::posix_time::millisec(200));
+                stdx::chrono::milliseconds delay = Date_t::now() - before;
+                _cappedSleep.fetchAndAdd(1);
+                _cappedSleepMS.fetchAndAdd(delay.count());
+                if (!gotLock)
                     return 0;
-
+                
                 // If we already waited, let someone else do cleanup unless we are significantly
                 // over the limit.
                 if ((_dataSize.load() - _cappedMaxSize) < (2 * _cappedMaxSizeSlack))
@@ -1004,8 +1018,10 @@ namespace {
                                                    double scale ) const {
         result->appendBool( "capped", _isCapped );
         if ( _isCapped ) {
-            result->appendIntOrLL( "max", _cappedMaxDocs );
-            result->appendIntOrLL( "maxSize", static_cast<long long>(_cappedMaxSize / scale) );
+            result->appendIntOrLL("max", _cappedMaxDocs );
+            result->appendIntOrLL("maxSize", static_cast<long long>(_cappedMaxSize / scale) );
+            result->appendIntOrLL("sleepCount", _cappedSleep.load());
+            result->appendIntOrLL("sleepMS", _cappedSleepMS.load());
         }
         WiredTigerSession* session = WiredTigerRecoveryUnit::get(txn)->getSession(txn);
         WT_SESSION* s = session->getSession();
