@@ -3,4 +3,6 @@ selector:
 
 executor:
   db_test:
-    config: {}
+    config:
+      dbtest_options:
+        dur: ''
