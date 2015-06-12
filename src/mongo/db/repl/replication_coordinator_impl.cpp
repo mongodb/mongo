@@ -776,7 +776,6 @@ namespace {
             OperationContext* txn,
             const ReadAfterOpTimeArgs& settings) {
         const auto& ts = settings.getOpTime();
-        const auto& timeout = settings.getTimeout();
 
         if (ts.isNull()) {
             return ReadAfterOpTimeResponse();
@@ -811,15 +810,6 @@ namespace {
                         Milliseconds(timer.millis()));
             }
 
-            const Microseconds elapsedTime{timer.micros()};
-            if (timeout > Microseconds::zero() && elapsedTime > timeout) {
-                return ReadAfterOpTimeResponse(
-                        Status(ErrorCodes::ReadAfterOptimeTimeout,
-                              str::stream() << "timed out waiting for opTime: "
-                                            << ts.toString()),
-                        duration_cast<Milliseconds>(elapsedTime));
-            }
-
             stdx::condition_variable condVar;
             WaiterInfo waitInfo(&_opTimeWaiterList,
                                 txn->getOpID(),
@@ -827,19 +817,11 @@ namespace {
                                 nullptr, // Don't care about write concern.
                                 &condVar);
 
-            const Microseconds maxTimeMicrosRemaining{txn->getRemainingMaxTimeMicros()};
-            Microseconds waitTime = Microseconds::max();
-            if (maxTimeMicrosRemaining != Microseconds::zero()) {
-                waitTime = maxTimeMicrosRemaining;
-            }
-            if (timeout != Microseconds::zero()) {
-                waitTime = std::min<Microseconds>(timeout - elapsedTime, waitTime);
-            }
-            if (waitTime == Microseconds::max()) {
-                condVar.wait(lock);
+            if (CurOp::get(txn)->isMaxTimeSet()) {
+                condVar.wait_for(lock, Microseconds(txn->getRemainingMaxTimeMicros()));
             }
             else {
-                condVar.wait_for(lock, waitTime);
+                condVar.wait(lock);
             }
         }
 

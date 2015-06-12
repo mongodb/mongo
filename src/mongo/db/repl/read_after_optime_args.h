@@ -47,19 +47,17 @@ namespace repl {
         static const std::string kOpTimeFieldName;
         static const std::string kOpTimestampFieldName;
         static const std::string kOpTermFieldName;
-        static const std::string kTimeoutFieldName;
 
         ReadAfterOpTimeArgs();
-        ReadAfterOpTimeArgs(OpTime opTime, Milliseconds timeout);
+        explicit ReadAfterOpTimeArgs(OpTime opTime);
 
         /**
          * Format:
          * {
          *    find: “coll”,
          *    filter: <Query Object>,
-         *    after: { // optional
-         *      opTime: { ts: <timestamp>, term: <NumberLong> },
-         *      timeoutMS: <NumberLong> //optional
+         *    $readConcern: { // optional
+         *      afterOpTime: { ts: <timestamp>, term: <NumberLong> },
          *    }
          * }
          */
@@ -71,7 +69,6 @@ namespace repl {
     private:
 
         OpTime _opTime;
-        Milliseconds _timeout;
     };
 
 } // namespace repl

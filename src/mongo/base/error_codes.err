@@ -121,7 +121,7 @@ error_code("NamespaceNotSharded", 118)
 error_code("InvalidSyncSource", 119)
 error_code("OplogStartMissing", 120)
 error_code("DocumentValidationFailure", 121) # Only for the document validator on collections.
-error_code("ReadAfterOptimeTimeout", 122)
+error_code("OBSOLETE_ReadAfterOptimeTimeout", 122)
 error_code("NotAReplicaSet", 123)
 error_code("IncompatibleElectionProtocol", 124)
 error_code("CommandFailed", 125)

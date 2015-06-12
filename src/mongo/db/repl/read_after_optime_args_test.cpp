@@ -41,12 +41,10 @@ namespace {
                 << ReadAfterOpTimeArgs::kRootFieldName
                 << BSON(ReadAfterOpTimeArgs::kOpTimeFieldName
                         << BSON(ReadAfterOpTimeArgs::kOpTimestampFieldName << Timestamp(20, 30)
-                                << ReadAfterOpTimeArgs::kOpTermFieldName << 2)
-                << ReadAfterOpTimeArgs::kTimeoutFieldName << 100))));
+                                << ReadAfterOpTimeArgs::kOpTermFieldName << 2)))));
 
         ASSERT_EQ(Timestamp(20, 30), readAfterOpTime.getOpTime().getTimestamp());
         ASSERT_EQ(2, readAfterOpTime.getOpTime().getTerm());
-        ASSERT_EQ(Milliseconds(100), readAfterOpTime.getTimeout());
     }
 
     TEST(ReadAfterParse, Empty) {
@@ -54,7 +52,6 @@ namespace {
         ASSERT_OK(readAfterOpTime.initialize(BSON("find" << "test")));
 
         ASSERT(readAfterOpTime.getOpTime().getTimestamp().isNull());
-        ASSERT_EQ(Milliseconds::zero(), readAfterOpTime.getTimeout());
     }
 
     TEST(ReadAfterParse, BadRootType) {
@@ -76,8 +73,7 @@ namespace {
         ReadAfterOpTimeArgs readAfterOpTime;
         ASSERT_NOT_OK(readAfterOpTime.initialize(BSON(
                 "find" << "test"
-                << ReadAfterOpTimeArgs::kRootFieldName
-                << BSON(ReadAfterOpTimeArgs::kTimeoutFieldName << 100))));
+                << ReadAfterOpTimeArgs::kRootFieldName << BSONObj())));
     }
 
     TEST(ReadAfterParse, NoOpTimeTS) {
@@ -86,8 +82,7 @@ namespace {
                     "find" << "test"
                     << ReadAfterOpTimeArgs::kRootFieldName
                     << BSON(ReadAfterOpTimeArgs::kOpTimeFieldName
-                            << BSON(ReadAfterOpTimeArgs::kOpTermFieldName << 2)
-                    << ReadAfterOpTimeArgs::kTimeoutFieldName << 100))));
+                            << BSON(ReadAfterOpTimeArgs::kOpTermFieldName << 2)))));
     }
 
     TEST(ReadAfterParse, NoOpTimeTerm) {
@@ -96,8 +91,7 @@ namespace {
                 "find" << "test"
                 << ReadAfterOpTimeArgs::kRootFieldName
                 << BSON(ReadAfterOpTimeArgs::kOpTimeFieldName
-                        << BSON(ReadAfterOpTimeArgs::kOpTermFieldName << 2)
-                << ReadAfterOpTimeArgs::kTimeoutFieldName << 100))));
+                        << BSON(ReadAfterOpTimeArgs::kOpTermFieldName << 2)))));
     }
 
     TEST(ReadAfterParse, BadOpTimeTSType) {
@@ -107,8 +101,7 @@ namespace {
                 << ReadAfterOpTimeArgs::kRootFieldName
                 << BSON(ReadAfterOpTimeArgs::kOpTimeFieldName
                         << BSON(ReadAfterOpTimeArgs::kOpTimestampFieldName << BSON("x" << 1)
-                                << ReadAfterOpTimeArgs::kOpTermFieldName << 2)
-                << ReadAfterOpTimeArgs::kTimeoutFieldName << 100))));
+                                << ReadAfterOpTimeArgs::kOpTermFieldName << 2)))));
     }
 
     TEST(ReadAfterParse, BadOpTimeTermType) {
@@ -118,59 +111,7 @@ namespace {
                 << ReadAfterOpTimeArgs::kRootFieldName
                 << BSON(ReadAfterOpTimeArgs::kOpTimeFieldName
                         << BSON(ReadAfterOpTimeArgs::kOpTimestampFieldName << Timestamp(1, 0)
-                                << ReadAfterOpTimeArgs::kOpTermFieldName << "y")
-                << ReadAfterOpTimeArgs::kTimeoutFieldName << 100))));
-    }
-
-    TEST(ReadAfterParse, TimeoutDefault) {
-        ReadAfterOpTimeArgs readAfterOpTime;
-        ASSERT_OK(readAfterOpTime.initialize(BSON(
-                "find" << "test"
-                << ReadAfterOpTimeArgs::kRootFieldName
-                << BSON(ReadAfterOpTimeArgs::kOpTimeFieldName
-                        << BSON(ReadAfterOpTimeArgs::kOpTimestampFieldName << Timestamp(1, 0)
-                                << ReadAfterOpTimeArgs::kOpTermFieldName << 2)))));
-
-        ASSERT_EQ(Timestamp(1, 0), readAfterOpTime.getOpTime().getTimestamp());
-        ASSERT_EQ(2, readAfterOpTime.getOpTime().getTerm());
-        ASSERT_EQ(Milliseconds::zero(), readAfterOpTime.getTimeout());
-    }
-
-    TEST(ReadAfterParse, BadTimeoutType) {
-        ReadAfterOpTimeArgs readAfterOpTime;
-        ASSERT_NOT_OK(readAfterOpTime.initialize(BSON(
-                "find" << "test"
-                << ReadAfterOpTimeArgs::kRootFieldName
-                << BSON(ReadAfterOpTimeArgs::kOpTimeFieldName
-                        << BSON(ReadAfterOpTimeArgs::kOpTimestampFieldName << Timestamp(1, 0)
-                                << ReadAfterOpTimeArgs::kOpTermFieldName << 2)
-                << ReadAfterOpTimeArgs::kTimeoutFieldName << "abc"))));
-    }
-
-    TEST(ReadAfterParse, NegativeTimeout) {
-        ReadAfterOpTimeArgs readAfterOpTime;
-        ASSERT_NOT_OK(readAfterOpTime.initialize(BSON(
-                "find" << "test"
-                << ReadAfterOpTimeArgs::kRootFieldName
-                << BSON(ReadAfterOpTimeArgs::kOpTimeFieldName
-                        << BSON(ReadAfterOpTimeArgs::kOpTimestampFieldName << Timestamp(1, 0)
-                                << ReadAfterOpTimeArgs::kOpTermFieldName << 2)
-                << ReadAfterOpTimeArgs::kTimeoutFieldName << -100))));
-    }
-
-    TEST(ReadAfterParse, ZeroTimeout) {
-        ReadAfterOpTimeArgs readAfterOpTime;
-        ASSERT_OK(readAfterOpTime.initialize(BSON(
-                "find" << "test"
-                << ReadAfterOpTimeArgs::kRootFieldName
-                << BSON(ReadAfterOpTimeArgs::kOpTimeFieldName
-                        << BSON(ReadAfterOpTimeArgs::kOpTimestampFieldName << Timestamp(20, 30)
-                                << ReadAfterOpTimeArgs::kOpTermFieldName << 2)
-                << ReadAfterOpTimeArgs::kTimeoutFieldName << 0))));
-
-        ASSERT_EQ(Timestamp(20, 30), readAfterOpTime.getOpTime().getTimestamp());
-        ASSERT_EQ(2, readAfterOpTime.getOpTime().getTerm());
-        ASSERT_EQ(Milliseconds::zero(), readAfterOpTime.getTimeout());
+                                << ReadAfterOpTimeArgs::kOpTermFieldName << "y")))));
     }
 
 } // unnamed namespace
