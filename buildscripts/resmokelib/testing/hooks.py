@@ -123,7 +123,7 @@ class CleanEveryN(CustomBehavior):
 
             # Raise this after calling setup in case --continueOnFailure was specified.
             if not teardown_success:
-                raise errors.ServerFailure("%s did not exit cleanly" % (self.fixture))
+                raise errors.TestFailure("%s did not exit cleanly" % (self.fixture))
 
 
 class CheckReplDBHash(CustomBehavior):
