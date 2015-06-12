@@ -65,6 +65,9 @@ var Cluster = function(options) {
     };
     var nextConn = 0;
 
+    // TODO: Define size of replica set from options
+    var replSetNodes = 3;
+
     validateClusterOptions(options);
     Object.freeze(options);
 
@@ -86,7 +89,7 @@ var Cluster = function(options) {
             // TODO: allow 'options' to specify an 'rs' config
             if (options.replication) {
                 shardConfig.rs = {
-                    nodes: 3,
+                    nodes: replSetNodes,
                     // Increase the oplog size (in MB) to prevent rollover
                     // during write-heavy workloads
                     oplogSize: 1024,
@@ -136,7 +139,7 @@ var Cluster = function(options) {
         } else if (options.replication) {
             // TODO: allow 'options' to specify the number of nodes
             var replSetConfig = {
-                nodes: 3,
+                nodes: replSetNodes,
                 // Increase the oplog size (in MB) to prevent rollover during write-heavy workloads
                 oplogSize: 1024,
                 nodeOptions: { verbose: verbosityLevel }
@@ -246,9 +249,34 @@ var Cluster = function(options) {
         return !!options.sharded;
     };
 
+    this.isReplication = function isReplication() {
+        return !!options.replication;
+    };
+
     this.shardCollection = function shardCollection() {
         assert(this.isSharded(), 'cluster is not sharded');
         throw new Error('cluster has not been initialized yet');
+    };
+
+    this.awaitReplication = function awaitReplication() {
+        if (this.isReplication()) {
+            var wc = {
+                writeConcern: {
+                    w: replSetNodes, // all nodes in replica set
+                    wtimeout: 300000 // wait up to 5 minutes
+                }
+            };
+            this.executeOnMongodNodes(function (db) {
+                // Execute on all primary nodes
+                if (db.isMaster().ismaster) {
+                    // Insert a document with a writeConcern for all nodes in the replica set to
+                    // ensure that all previous workload operations have completed on secondaries
+                    var result = db.getSiblingDB('test').fsm_teardown.insert({ a: 1 }, wc);
+                    assert.writeOK(result, 'teardown insert failed: ' + tojson(result));
+                    assert(db.getSiblingDB('test').fsm_teardown.drop(), 'teardown drop failed');
+                }
+            });
+        }
     };
 };
 

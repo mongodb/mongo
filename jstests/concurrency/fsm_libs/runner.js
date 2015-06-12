@@ -398,6 +398,9 @@ var runner = (function() {
                 if (teardownFailed) {
                     throw new Error('workload teardown function(s) failed, see logs');
                 }
+
+                // Ensure that secondaries have caught up for workload teardown (SERVER-18878)
+                cluster.awaitReplication();
             });
         } finally {
             cluster.teardown();
