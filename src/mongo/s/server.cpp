@@ -233,25 +233,6 @@ static ExitCode runMongosServer( bool doUpgrade ) {
         }
     }
 
-    {
-        Status statusConfigChecker = catalogManager->startConfigServerChecker();
-        if (!statusConfigChecker.isOK()) {
-            error() << "unable to start config servers checker thread " << statusConfigChecker;
-            return EXIT_SHARDING_ERROR;
-        }
-    }
-
-    {
-        Status statusCatalogUpgrade = catalogManager->checkAndUpgradeConfigMetadata(doUpgrade);
-        if (!statusCatalogUpgrade.isOK()) {
-            error() << "stale config server metadata: " << statusCatalogUpgrade;
-            return EXIT_SHARDING_ERROR;
-        }
-        else if (doUpgrade) {
-            return EXIT_CLEAN;
-        }
-    }
-
     auto shardRegistry = stdx::make_unique<ShardRegistry>(
                             stdx::make_unique<RemoteCommandTargeterFactoryImpl>(),
                             stdx::make_unique<RemoteCommandRunnerImpl>(0),
@@ -259,6 +240,18 @@ static ExitCode runMongosServer( bool doUpgrade ) {
                             catalogManager.get());
 
     grid.init(std::move(catalogManager), std::move(shardRegistry));
+
+    {
+        Status startupStatus = grid.catalogManager()->startup(doUpgrade);
+        if (!startupStatus.isOK()) {
+            error() << "Mongos catalog manager startup failed: " << startupStatus;
+            return EXIT_SHARDING_ERROR;
+        }
+
+        if (doUpgrade) {
+            return EXIT_CLEAN;
+        }
+    }
 
     ConfigServer::reloadSettings();
 

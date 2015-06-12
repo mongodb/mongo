@@ -384,7 +384,17 @@ namespace {
         return Status::OK();
     }
 
-    Status CatalogManagerLegacy::checkAndUpgradeConfigMetadata(bool doUpgrade) {
+    Status CatalogManagerLegacy::startup(bool upgrade) {
+        Status status = _startConfigServerChecker();
+        if (!status.isOK()) {
+            return status;
+        }
+
+        status = _checkAndUpgradeConfigMetadata(upgrade);
+        return status;
+    }
+
+    Status CatalogManagerLegacy::_checkAndUpgradeConfigMetadata(bool doUpgrade) {
         VersionType initVersionInfo;
         VersionType versionInfo;
         string errMsg;
@@ -403,9 +413,9 @@ namespace {
         return Status::OK();
     }
 
-    Status CatalogManagerLegacy::startConfigServerChecker() {
+    Status CatalogManagerLegacy::_startConfigServerChecker() {
         if (!_checkConfigServersConsistent()) {
-            return Status(ErrorCodes::IncompatibleShardingMetadata,
+            return Status(ErrorCodes::ConfigServersInconsistent,
                           "Data inconsistency detected amongst config servers");
         }
 
@@ -1471,7 +1481,7 @@ namespace {
         // check if config servers are consistent
         if (!_isConsistentFromLastCheck()) {
             toBatchError(
-                Status(ErrorCodes::IncompatibleShardingMetadata,
+                Status(ErrorCodes::ConfigServersInconsistent,
                        "Data inconsistency detected amongst config servers"),
                 response);
             return;

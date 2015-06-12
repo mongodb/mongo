@@ -103,6 +103,10 @@ namespace {
         return Status::OK();
     }
 
+    Status CatalogManagerReplicaSet::startup(bool upgrade) {
+        return Status::OK();
+    }
+
     ConnectionString CatalogManagerReplicaSet::connectionString() const {
         return _configServerConnectionString;
     }

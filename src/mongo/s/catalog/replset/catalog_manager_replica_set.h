@@ -65,6 +65,8 @@ namespace executor {
         Status init(const ConnectionString& configCS,
                     std::unique_ptr<DistLockManager> distLockManager);
 
+        Status startup(bool upgrade) override;
+
         ConnectionString connectionString() const override;
 
         void shutDown() override;

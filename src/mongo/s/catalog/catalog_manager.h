@@ -85,6 +85,13 @@ namespace mongo {
         virtual ConnectionString connectionString() const = 0;
 
         /**
+         * Performs implementation-specific startup tasks including but not limited to doing any
+         * necessary config schema upgrade work.  Must be run after the catalog manager
+         * has been installed into the global 'grid' object.
+         */
+        virtual Status startup(bool upgrade) = 0;
+
+        /**
          * Performs necessary cleanup when shutting down cleanly.
          */
         virtual void shutDown() = 0;

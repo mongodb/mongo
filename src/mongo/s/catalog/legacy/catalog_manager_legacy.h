@@ -53,16 +53,7 @@ namespace mongo {
          */
         Status init(const ConnectionString& configCS);
 
-        /**
-         * Updates the config server's metadata to the current version.
-         */
-        Status checkAndUpgradeConfigMetadata(bool doUpgrade);
-
-        /**
-         * Starts the thread that periodically checks data consistency amongst the config servers.
-         * Note: this is not thread safe and can only be called once for the lifetime.
-         */
-        Status startConfigServerChecker();
+        Status startup(bool upgrade) override;
 
         ConnectionString connectionString() const override;
 
@@ -146,6 +137,18 @@ namespace mongo {
         DistLockManager* getDistLockManager() override;
 
     private:
+
+        /**
+         * Updates the config server's metadata to the current version.
+         */
+        Status _checkAndUpgradeConfigMetadata(bool doUpgrade);
+
+        /**
+         * Starts the thread that periodically checks data consistency amongst the config servers.
+         * Note: this is not thread safe and can only be called once for the lifetime.
+         */
+        Status _startConfigServerChecker();
+
         /**
          * Direct network check to see if a particular database does not already exist with the
          * same name or different case.
