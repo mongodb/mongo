@@ -16,6 +16,7 @@ load('jstests/concurrency/fsm_workload_helpers/drop_utils.js'); // for dropColle
 
 var $config = extendWorkload($config, function($config, $super) {
     $config.data.prefix = 'count_fsm';
+    $config.data.shardKey = { tid: 1, i: 1 };
 
     $config.data.getCount = function getCount(db, predicate) {
         var query = Object.extend({ tid: this.tid }, predicate);

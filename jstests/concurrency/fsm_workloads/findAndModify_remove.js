@@ -8,6 +8,10 @@
  */
 var $config = (function() {
 
+    var data = {
+        shardKey: { tid: 1 }
+    };
+
     var states = (function() {
 
         function init(db, collName) {
@@ -53,6 +57,7 @@ var $config = (function() {
     return {
         threadCount: 20,
         iterations: 20,
+        data: data,
         states: states,
         transitions: transitions
     };

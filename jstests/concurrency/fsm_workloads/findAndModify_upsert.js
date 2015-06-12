@@ -11,7 +11,8 @@
 var $config = (function() {
 
     var data = {
-        sort: false
+        sort: false,
+        shardKey: { tid: 1 }
     };
 
     var states = (function() {

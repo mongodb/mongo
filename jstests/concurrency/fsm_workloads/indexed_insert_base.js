@@ -96,6 +96,7 @@ var $config = (function() {
                 return doc;
             },
             indexedField: 'x',
+            shardKey: { x: 1 },
             docsPerInsert: 1
         },
         setup: setup

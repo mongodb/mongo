@@ -19,5 +19,8 @@ var $config = extendWorkload($config, function($config, $super) {
     // scan is performed for the query and sort operations.
     $config.setup = function setup(db, collName, cluster) { };
 
+    // Remove the shardKey so that a collection scan is performed
+    delete $config.data.shardKey;
+
     return $config;
 });

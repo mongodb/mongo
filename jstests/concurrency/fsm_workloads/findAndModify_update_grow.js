@@ -12,6 +12,10 @@ load('jstests/concurrency/fsm_workload_helpers/server_types.js'); // for isMongo
 
 var $config = (function() {
 
+    var data = {
+        shardKey: { tid: 1 },
+    };
+
     var states = (function() {
 
         // Use the workload name as the field name (since it is assumed
@@ -114,6 +118,7 @@ var $config = (function() {
     return {
         threadCount: 20,
         iterations: 20,
+        data: data,
         states: states,
         startState: 'insert',
         transitions: transitions

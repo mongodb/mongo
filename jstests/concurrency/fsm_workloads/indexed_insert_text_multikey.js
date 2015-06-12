@@ -23,5 +23,8 @@ var $config = extendWorkload($config, function($config, $super) {
         return textArr;
     };
 
+    // Remove the shard key, since it cannot be a multikey index
+    delete $config.data.shardKey;
+
     return $config;
 });

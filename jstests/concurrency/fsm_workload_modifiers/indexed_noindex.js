@@ -16,5 +16,9 @@ function indexedNoindex($config, $super) {
         this.indexExists = false;
     };
 
+
+    // Remove the shard key for the no index tests
+    delete $config.data.shardKey;
+
     return $config;
 }

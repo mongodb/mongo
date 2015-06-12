@@ -144,6 +144,12 @@ var runner = (function() {
         var firstWorkload = true;
 
         workloads.forEach(function(workload) {
+            // Workloads cannot have a shardKey if sameCollection is specified
+            if (clusterOptions.sameCollection &&
+                    cluster.isSharded() &&
+                    context[workload].config.data.shardKey) {
+                throw new Error('cannot specify a shardKey with sameCollection option');
+            }
             if (firstWorkload || !clusterOptions.sameCollection) {
                 if (firstWorkload || !clusterOptions.sameDB) {
                     dbName = uniqueDBName();
@@ -154,8 +160,9 @@ var runner = (function() {
                 myDB[collName].drop();
 
                 if (cluster.isSharded()) {
-                    // TODO: allow 'clusterOptions' to specify the shard key and split
-                    cluster.shardCollection(myDB[collName], { _id: 'hashed' }, false);
+                    var shardKey = context[workload].config.data.shardKey || { _id: 'hashed' };
+                    // TODO: allow workload config data to specify split
+                    cluster.shardCollection(myDB[collName], shardKey, false);
                 }
             }
 

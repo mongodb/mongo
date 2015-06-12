@@ -13,7 +13,8 @@ var $config = (function() {
         insertedDocuments: 0,
         generateDocumentToInsert: function generateDocumentToInsert() {
             return { tid: this.tid };
-        }
+        },
+        shardKey: { tid: 1 }
     };
 
     var states = {

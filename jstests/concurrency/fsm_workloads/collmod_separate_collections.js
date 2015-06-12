@@ -15,6 +15,7 @@ load('jstests/concurrency/fsm_workload_helpers/drop_utils.js'); // for dropColle
 
 var $config = extendWorkload($config, function($config, $super) {
     $config.data.prefix = 'collmod_separate_collections';
+    $config.data.shardKey = { createdAt: 1 };
 
     $config.states.init = function init(db, collName) {
         this.threadCollName = this.prefix + '_' + this.tid;

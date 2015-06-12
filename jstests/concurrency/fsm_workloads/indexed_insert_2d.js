@@ -13,6 +13,8 @@ load('jstests/concurrency/fsm_workloads/indexed_insert_base.js'); // for $config
 var $config = extendWorkload($config, function($config, $super) {
 
     $config.data.indexedField = 'indexed_insert_2d';
+    // Remove the shard key for 2d indexes, as they are not supported
+    delete $config.data.shardKey;
 
     $config.states.init = function init(db, collName) {
         $super.states.init.apply(this, arguments);

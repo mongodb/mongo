@@ -32,5 +32,7 @@ var $config = extendWorkload($config, function($config, $super) {
         };
     };
 
+    $config.data.shardKey = $config.data.getIndexSpec();
+
     return $config;
 });

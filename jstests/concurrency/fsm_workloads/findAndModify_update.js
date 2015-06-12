@@ -12,6 +12,7 @@ var $config = (function() {
 
     var data = {
         numDocsPerThread: 3, // >1 for 'sort' to be meaningful
+        shardKey: { tid: 1 }
     };
 
     var states = (function() {

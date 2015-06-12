@@ -14,6 +14,8 @@ load('jstests/concurrency/fsm_workloads/indexed_insert_base.js'); // for $config
 var $config = extendWorkload($config, function($config, $super) {
 
     $config.data.indexedField = 'indexed_insert_unordered_bulk';
+    $config.data.shardKey = {};
+    $config.data.shardKey[$config.data.indexedField] = 1;
 
     $config.states.insert = function insert(db, collName) {
         var doc = {};

@@ -13,7 +13,8 @@ var $config = (function() {
 
     var data = {
         numDocs: 1000,
-        prefix: 'distinct_fsm'
+        prefix: 'distinct_fsm',
+        shardKey: { i: 1 }
     };
 
     var states = (function() {

@@ -16,6 +16,8 @@ var $config = extendWorkload($config, function($config, $super) {
     var length = 100;
     var prefix = 'indexed_insert_long_fieldname_';
     $config.data.indexedField = prefix + new Array(length - prefix.length + 1).join('x');
+    $config.data.shardKey = {};
+    $config.data.shardKey[$config.data.indexedField] = 1;
 
     return $config;
 });

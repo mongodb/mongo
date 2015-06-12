@@ -15,6 +15,9 @@ var $config = extendWorkload($config, function($config, $super) {
 
     $config.data.indexedField = 'indexed_insert_large';
 
+    // Remove the shard key, since it cannot be greater than 512 bytes
+    delete $config.data.shardKey;
+
     $config.states.init = function init(db, collName) {
         $super.states.init.apply(this, arguments);
 
