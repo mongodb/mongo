@@ -71,6 +71,11 @@ namespace ReplTests {
 
     public:
         Base() : _client(&_txn) {
+            ReplSettings replSettings;
+            replSettings.oplogSize = 10 * 1024 * 1024;
+            replSettings.master = true;
+            setGlobalReplicationCoordinator(new repl::ReplicationCoordinatorMock(replSettings));
+
             setOplogCollectionName();
             createOplog(&_txn);
 
@@ -89,6 +94,9 @@ namespace ReplTests {
             try {
                 deleteAll( ns() );
                 deleteAll( cllNS() );
+                ReplSettings replSettings;
+                replSettings.oplogSize = 10 * 1024 * 1024;
+                setGlobalReplicationCoordinator(new repl::ReplicationCoordinatorMock(replSettings));
             }
             catch ( ... ) {
                 FAIL( "Exception while cleaning up test" );
