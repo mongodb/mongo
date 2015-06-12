@@ -2247,7 +2247,8 @@ TEST_F(ReplCoordTest, MetadataUpdatesLastCommittedOpTime) {
                                                   << "node2:12345"
                                                   << "_id" << 1) << BSON("host"
                                                                          << "node3:12345"
-                                                                         << "_id" << 2))),
+                                                                         << "_id" << 2))
+                            << "settings" << BSON("protocolVersion" << 1)),
                        HostAndPort("node1", 12345));
     ASSERT_EQUALS(OpTime(Timestamp(0, 0), 0), getReplCoord()->getLastCommittedOpTime());
     getReplCoord()->updateTerm(1);
@@ -2283,7 +2284,8 @@ TEST_F(ReplCoordTest, MetadataUpdatesTermAndPrimaryId) {
                                                   << "node2:12345"
                                                   << "_id" << 1) << BSON("host"
                                                                          << "node3:12345"
-                                                                         << "_id" << 2))),
+                                                                         << "_id" << 2))
+                            << "settings" << BSON("protocolVersion" << 1)),
                        HostAndPort("node1", 12345));
     ASSERT_EQUALS(OpTime(Timestamp(0, 0), 0), getReplCoord()->getLastCommittedOpTime());
     getReplCoord()->updateTerm(1);

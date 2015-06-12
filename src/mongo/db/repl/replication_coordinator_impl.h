@@ -265,7 +265,7 @@ public:
      */
     virtual long long getTerm() override;
 
-    virtual bool updateTerm(long long term) override;
+    virtual Status updateTerm(long long term) override;
 
     // ================== Test support API ===================
 

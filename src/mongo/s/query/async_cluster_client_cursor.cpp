@@ -198,7 +198,8 @@ StatusWith<executor::TaskExecutor::EventHandle> AsyncClusterClientCursor::nextEv
             // request for which we have a valid callback handle, send a getMore with the
             // appropriate cursorId. Otherwise, send the cursor-establishing command.
             BSONObj cmdObj = remote.cursorId
-                ? GetMoreRequest(_params.nsString, *remote.cursorId, _params.batchSize).toBSON()
+                ? GetMoreRequest(_params.nsString, *remote.cursorId, _params.batchSize, boost::none)
+                      .toBSON()
                 : _params.cmdObj;
 
             RemoteCommandRequest request(

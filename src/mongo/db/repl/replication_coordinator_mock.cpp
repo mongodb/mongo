@@ -347,8 +347,8 @@ long long ReplicationCoordinatorMock::getTerm() {
     return OpTime::kDefaultTerm;
 }
 
-bool ReplicationCoordinatorMock::updateTerm(long long term) {
-    return false;
+Status ReplicationCoordinatorMock::updateTerm(long long term) {
+    return Status::OK();
 }
 
 }  // namespace repl

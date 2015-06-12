@@ -47,7 +47,10 @@ struct GetMoreRequest {
     /**
      * Construct from values for each field.
      */
-    GetMoreRequest(NamespaceString namespaceString, CursorId id, boost::optional<int> batch);
+    GetMoreRequest(NamespaceString namespaceString,
+                   CursorId id,
+                   boost::optional<int> sizeOfBatch,
+                   boost::optional<long long> term);
 
     /**
      * Construct a GetMoreRequest from the command specification and db name.
@@ -69,6 +72,9 @@ struct GetMoreRequest {
     // The batch size is optional. If not provided, we will put as many documents into the batch
     // as fit within the byte limit.
     const boost::optional<int> batchSize;
+
+    // Only internal queries from replication will typically have a term.
+    const boost::optional<long long> term;
 
 private:
     /**

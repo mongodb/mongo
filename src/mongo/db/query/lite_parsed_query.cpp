@@ -90,6 +90,7 @@ const char kOplogReplayField[] = "oplogReplay";
 const char kNoCursorTimeoutField[] = "noCursorTimeout";
 const char kAwaitDataField[] = "awaitData";
 const char kPartialField[] = "partial";
+const char kTermField[] = "term";
 
 }  // namespace
 
@@ -334,6 +335,12 @@ StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeFromFindCommand(Nam
         } else if (str::equals(fieldName, repl::ReadAfterOpTimeArgs::kRootFieldName.c_str())) {
             // read after optime parsing is handled elsewhere.
             continue;
+        } else if (str::equals(fieldName, kTermField)) {
+            Status status = checkFieldType(el, NumberLong);
+            if (!status.isOK()) {
+                return status;
+            }
+            pq->_replicationTerm = el._numberLong();
         } else if (!str::startsWith(fieldName, '$')) {
             return Status(ErrorCodes::FailedToParse,
                           str::stream() << "Failed to parse: " << cmdObj.toString() << ". "
@@ -496,6 +503,10 @@ BSONObj LiteParsedQuery::asFindCommand() const {
 
     if (_partial) {
         bob.append(kPartialField, true);
+    }
+
+    if (_replicationTerm) {
+        bob.append(kTermField, *_replicationTerm);
     }
 
     return bob.obj();

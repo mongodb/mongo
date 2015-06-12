@@ -46,6 +46,7 @@ const char kCmdName[] = "getMore";
 const char kCollectionField[] = "collection";
 const char kBatchSizeField[] = "batchSize";
 const char kMaxTimeMSField[] = "maxTimeMS";
+const char kTermField[] = "term";
 
 }  // namespace
 
@@ -53,8 +54,9 @@ GetMoreRequest::GetMoreRequest() : cursorid(0), batchSize(0) {}
 
 GetMoreRequest::GetMoreRequest(NamespaceString namespaceString,
                                CursorId id,
-                               boost::optional<int> sizeOfBatch)
-    : nss(std::move(namespaceString)), cursorid(id), batchSize(sizeOfBatch) {}
+                               boost::optional<int> sizeOfBatch,
+                               boost::optional<long long> term)
+    : nss(std::move(namespaceString)), cursorid(id), batchSize(sizeOfBatch), term(term) {}
 
 Status GetMoreRequest::isValid() const {
     if (!nss.isValid()) {
@@ -92,8 +94,9 @@ StatusWith<GetMoreRequest> GetMoreRequest::parseFromBSON(const std::string& dbna
     boost::optional<CursorId> cursorid;
     boost::optional<std::string> fullns;
 
-    // Optional field.
+    // Optional fields.
     boost::optional<int> batchSize;
+    boost::optional<long long> term;
 
     for (BSONElement el : cmdObj) {
         const char* fieldName = el.fieldName();
@@ -123,6 +126,12 @@ StatusWith<GetMoreRequest> GetMoreRequest::parseFromBSON(const std::string& dbna
             // maxTimeMS is parsed by the command handling code, so we don't repeat the parsing
             // here.
             continue;
+        } else if (str::equals(fieldName, kTermField)) {
+            if (el.type() != BSONType::NumberLong) {
+                return {ErrorCodes::TypeMismatch,
+                        str::stream() << "Field 'term' must be of type NumberLong in: " << cmdObj};
+            }
+            term = el.Long();
         } else if (!str::startsWith(fieldName, "$")) {
             return {ErrorCodes::FailedToParse,
                     str::stream() << "Failed to parse: " << cmdObj << ". "
@@ -140,7 +149,7 @@ StatusWith<GetMoreRequest> GetMoreRequest::parseFromBSON(const std::string& dbna
                 str::stream() << "Field 'collection' missing in: " << cmdObj};
     }
 
-    GetMoreRequest request(NamespaceString(*fullns), *cursorid, batchSize);
+    GetMoreRequest request(NamespaceString(*fullns), *cursorid, batchSize, term);
     Status validStatus = request.isValid();
     if (!validStatus.isOK()) {
         return validStatus;
@@ -157,6 +166,10 @@ BSONObj GetMoreRequest::toBSON() const {
 
     if (batchSize) {
         builder.append(kBatchSizeField, *batchSize);
+    }
+
+    if (term) {
+        builder.append(kTermField, *term);
     }
 
     return builder.obj();

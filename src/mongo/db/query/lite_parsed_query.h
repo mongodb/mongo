@@ -234,6 +234,10 @@ public:
         return _partial;
     }
 
+    boost::optional<long long> getReplicationTerm() const {
+        return _replicationTerm;
+    }
+
     /**
      * Return options as a bit vector.
      */
@@ -337,6 +341,8 @@ private:
     bool _awaitData = false;
     bool _exhaust = false;
     bool _partial = false;
+
+    boost::optional<long long> _replicationTerm;
 };
 
 }  // namespace mongo

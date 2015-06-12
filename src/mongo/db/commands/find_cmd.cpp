@@ -42,6 +42,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/query/cursor_responses.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/find.h"
@@ -205,6 +206,16 @@ public:
         }
 
         auto& lpq = lpqStatus.getValue();
+
+        // Validate term, if provided.
+        if (auto term = lpq->getReplicationTerm()) {
+            auto replCoord = repl::ReplicationCoordinator::get(txn);
+            Status status = replCoord->updateTerm(*term);
+            // Note: updateTerm returns ok if term stayed the same.
+            if (!status.isOK()) {
+                return appendCommandStatus(result, status);
+            }
+        }
 
         // Fill out curop information.
         int ntoreturn = lpq->getBatchSize().value_or(0);

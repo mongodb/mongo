@@ -200,7 +200,7 @@ public:
 
     virtual long long getTerm();
 
-    virtual bool updateTerm(long long term);
+    virtual Status updateTerm(long long term);
 
 private:
     const ReplSettings _settings;

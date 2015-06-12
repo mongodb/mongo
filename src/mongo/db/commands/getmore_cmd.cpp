@@ -45,10 +45,9 @@
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/global_timestamp.h"
 #include "mongo/db/query/cursor_responses.h"
-#include "mongo/db/repl/oplog.h"
-#include "mongo/db/service_context.h"
 #include "mongo/db/query/find.h"
 #include "mongo/db/query/getmore_request.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
@@ -215,6 +214,16 @@ public:
             if (cursor->isAggCursor()) {
                 Status status(ErrorCodes::BadValue,
                               "awaitData cannot be set on an aggregation cursor");
+                return appendCommandStatus(result, status);
+            }
+        }
+
+        // Validate term, if provided.
+        if (request.term) {
+            auto replCoord = repl::ReplicationCoordinator::get(txn);
+            Status status = replCoord->updateTerm(*request.term);
+            // Note: updateTerm returns ok if term stayed the same.
+            if (!status.isOK()) {
                 return appendCommandStatus(result, status);
             }
         }

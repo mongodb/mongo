@@ -2720,7 +2720,17 @@ void ReplicationCoordinatorImpl::_getTerm_helper(const ReplicationExecutor::Call
     *term = _topCoord->getTerm();
 }
 
-bool ReplicationCoordinatorImpl::updateTerm(long long term) {
+Status ReplicationCoordinatorImpl::updateTerm(long long term) {
+    if (!isV1ElectionProtocol()) {
+        // Do not update if not in V1 protocol.
+        return Status::OK();
+    }
+
+    // Term is only valid if we are replicating.
+    if (getReplicationMode() != modeReplSet) {
+        return {ErrorCodes::BadValue, "cannot supply 'term' without active replication"};
+    }
+
     bool updated = false;
     CBHStatus cbh =
         _replExecutor.scheduleWork(stdx::bind(&ReplicationCoordinatorImpl::_updateTerm_helper,
@@ -2730,11 +2740,16 @@ bool ReplicationCoordinatorImpl::updateTerm(long long term) {
                                               &updated,
                                               nullptr));
     if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
-        return false;
+        return cbh.getStatus();
     }
     fassert(28670, cbh.getStatus());
     _replExecutor.wait(cbh.getValue());
-    return updated;
+
+    if (updated) {
+        return {ErrorCodes::StaleTerm, "Replication term of this node was stale; retry query"};
+    }
+
+    return Status::OK();
 }
 
 bool ReplicationCoordinatorImpl::updateTerm_forTest(long long term) {
