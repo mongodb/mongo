@@ -28,6 +28,8 @@ import uuid
 from buildscripts import utils
 from buildscripts import moduleconfig
 
+from mongo_scons_utils import default_variant_dir_generator
+
 import libdeps
 
 EnsureSConsVersion( 2, 3, 0 )
@@ -88,50 +90,24 @@ def is_running_os(*os_list):
 def env_os_is_wrapper(self, *os_list):
     return is_os_raw(self['TARGET_OS'], os_list)
 
-# --- options ----
-options = {}
+def add_option(name, **kwargs):
 
-def add_option( name, help, nargs, contributesToVariantDir,
-                dest=None, default = None, type="string", choices=None, metavar=None, const=None ):
+    if 'dest' not in kwargs:
+        kwargs['dest'] = name
 
-    if dest is None:
-        dest = name
+    if 'metavar' not in kwargs and kwargs.get('type', None) == 'choice':
+        kwargs['metavar'] = '[' + '|'.join(kwargs['choices']) + ']'
 
-    if type == 'choice' and not metavar:
-        metavar = '[' + '|'.join(choices) + ']'
+    AddOption('--' + name, **kwargs)
 
-    AddOption( "--" + name , 
-               dest=dest,
-               type=type,
-               nargs=nargs,
-               action="store",
-               choices=choices,
-               default=default,
-               metavar=metavar,
-               const=const,
-               help=help )
+def get_option(name):
+    return GetOption(name)
 
-    options[name] = { "help" : help ,
-                      "nargs" : nargs ,
-                      "contributesToVariantDir" : contributesToVariantDir ,
-                      "dest" : dest,
-                      "default": default }
-
-def get_option( name ):
-    return GetOption( name )
-
-def has_option( name ):
-    x = get_option( name )
-    if x is None:
-        return False
-
-    if x == False:
-        return False
-
-    if x == "":
-        return False
-
-    return True
+def has_option(name):
+    optval = GetOption(name)
+    # Options with nargs=0 are true when their value is the empty tuple. Otherwise,
+    # if the value is falsish (empty string, None, etc.), coerce to False.
+    return True if optval == () else bool(optval)
 
 def use_system_version_of_library(name):
     return has_option('use-system-all') or has_option('use-system-' + name)
@@ -143,173 +119,301 @@ def using_system_version_of_cxx_libraries():
     cxx_library_names = ["tcmalloc", "boost", "v8"]
     return True in [use_system_version_of_library(x) for x in cxx_library_names]
 
-def get_variant_dir():
+def make_variant_dir_generator():
+    memoized_variant_dir = [False]
+    def generate_variant_dir(target, source, env, for_signature):
+        if not memoized_variant_dir[0]:
+            memoized_variant_dir[0] = env.subst('$BUILD_ROOT/$VARIANT_DIR')
+        return memoized_variant_dir[0]
+    return generate_variant_dir
 
-    build_dir = get_option('build-dir').rstrip('/')
+# Options TODOs:
+#
+# - We should either alphabetize the entire list of options, or split them into logical groups
+#   with clear boundaries, and then alphabetize the groups. There is no way in SCons though to
+#   inform it of options groups.
+#
+# - Many of these options are currently only either present or absent. This is not good for
+#   scripting the build invocation because it means you need to interpolate in the presence of
+#   the whole option. It is better to make all options take an optional on/off or true/false
+#   using the nargs='const' mechanism.
+#
 
-    if has_option('variant-dir'):
-        return (build_dir + '/' + get_option('variant-dir')).rstrip('/')
+add_option('mute',
+    help='do not display commandlines for compiling and linking, to reduce screen noise',
+    nargs=0,
+)
 
-    substitute = lambda x: re.sub( "[:,\\\\/]" , "_" , x )
+add_option('prefix',
+    default='$BUILD_ROOT/install',
+    help='installation prefix',
+)
 
-    a = []
+add_option('distname',
+    help='dist name (0.8.0)',
+)
 
-    for name in options:
-        o = options[name]
-        if not has_option( o["dest"] ):
-            continue
-        if not o["contributesToVariantDir"]:
-            continue
-        if get_option(o["dest"]) == o["default"]:
-            continue
+add_option('distmod',
+    help='additional piece for full dist name',
+)
 
-        if o["nargs"] == 0:
-            a.append( name )
-        else:
-            x = substitute( get_option( name ) )
-            a.append( name + "_" + x )
+add_option('distarch',
+    help='override the architecture name in dist output',
+)
 
-    extras = []
-    if has_option("extra-variant-dirs"):
-        extras = [substitute(x) for x in get_option( 'extra-variant-dirs' ).split( ',' )]
+add_option('nostrip',
+    help='do not strip installed binaries',
+    nargs=0,
+)
 
-    if has_option("add-branch-to-variant-dir"):
-        extras += ["branch_" + substitute( utils.getGitBranch() )]
+add_option('build-dir',
+    default='#build',
+    help='build output directory',
+)
 
-    if has_option('cache'):
-        s = "cached"
-        s += "/".join(extras) + "/"
-    else:
-        s = "${TARGET_ARCH}/"
-        a += extras
+add_option('release',
+    help='release build',
+    nargs=0,
+)
 
-        if len(a) > 0:
-            a.sort()
-            s += "/".join( a ) + "/"
-        else:
-            s += "normal/"
+add_option('lto',
+    help='enable link time optimizations (experimental, except with MSVC)',
+    nargs=0,
+)
 
-    return (build_dir + '/' + s).rstrip('/')
+add_option('dynamic-windows',
+    help='dynamically link on Windows',
+    nargs=0,
+)
 
-# build output
-add_option( "mute" , "do not display commandlines for compiling and linking, to reduce screen noise", 0, False )
+add_option('endian',
+    choices=['big', 'little', 'auto'],
+    default='auto',
+    help='endianness of target platform',
+    nargs=1,
+    type='choice',
+)
 
-# installation/packaging
-add_option( "prefix" , "installation prefix" , 1 , False, default='$BUILD_ROOT/install' )
-add_option( "distname" , "dist name (0.8.0)" , 1 , False )
-add_option( "distmod", "additional piece for full dist name" , 1 , False )
-add_option( "distarch", "override the architecture name in dist output" , 1 , False )
-add_option( "nostrip", "do not strip installed binaries" , 0 , False )
-add_option( "extra-variant-dirs", "extra variant dir components, separated by commas", 1, False)
-add_option( "add-branch-to-variant-dir", "add current git branch to the variant dir", 0, False )
-add_option( "build-dir", "build output directory", 1, False, default='#build')
-add_option( "variant-dir", "override variant subdirectory", 1, False )
+add_option('disable-minimum-compiler-version-enforcement',
+    help='allow use of unsupported older compilers (NEVER for production builds)',
+    nargs=0,
+)
 
-# linking options
-add_option( "release" , "release build" , 0 , True )
+add_option('ssl',
+    help='Enable SSL',
+    nargs=0
+)
 
-add_option( "lto", "enable link time optimizations (experimental, except with MSVC)" , 0 , True )
-add_option( "dynamic-windows", "dynamically link on Windows", 0, True)
-
-# base compile flags
-add_option( "endian" , "endianness of target platform" , 1 , False , "endian",
-            type="choice", choices=["big", "little", "auto"], default="auto" )
-
-add_option( "disable-minimum-compiler-version-enforcement",
-            "allow use of unsupported older compilers (NEVER for production builds)",
-            0, False )
-
-add_option( "ssl" , "Enable SSL" , 0 , True )
-add_option( "wiredtiger", "Enable wiredtiger", "?", True, "wiredtiger",
-            type="choice", choices=["on", "off"], const="on", default="on")
+add_option('wiredtiger',
+    choices=['on', 'off'],
+    const='on',
+    default='on',
+    help='Enable wiredtiger',
+    nargs='?',
+    type='choice',
+)
 
 # library choices
 js_engine_choices = ['v8-3.12', 'v8-3.25', 'none']
-add_option( "js-engine", "JavaScript scripting engine implementation", 1, False,
-           type='choice', default=js_engine_choices[0], choices=js_engine_choices)
-add_option( "server-js", "Build mongod without JavaScript support", 1, False,
-           type='choice', choices=["on", "off"], const="on", default="on")
-add_option( "libc++", "use libc++ (experimental, requires clang)", 0, True )
+add_option('js-engine',
+    choices=js_engine_choices,
+    default=js_engine_choices[0],
+    help='JavaScript scripting engine implementation',
+    type='choice',
+)
 
-add_option( "use-glibcxx-debug",
-            "Enable the glibc++ debug implementations of the C++ standard libary", 0, True )
+add_option('server-js',
+    choices=['on', 'off'],
+    const='on',
+    default='on',
+    help='Build mongod without JavaScript support',
+    type='choice',
+)
 
-# mongo feature options
-add_option( "noshell", "don't build shell" , 0 , True )
-add_option( "safeshell", "don't let shell scripts run programs (still, don't run untrusted scripts)" , 0 , True )
+add_option('libc++',
+    help='use libc++ (experimental, requires clang)',
+    nargs=0,
+)
 
-# new style debug and optimize flags
-add_option( "dbg", "Enable runtime debugging checks", "?", True, "dbg",
-            type="choice", choices=["on", "off"], const="on" )
+add_option('use-glibcxx-debug',
+    help='Enable the glibc++ debug implementations of the C++ standard libary',
+    nargs=0,
+)
 
-add_option( "opt", "Enable compile-time optimization", "?", True, "opt",
-            type="choice", choices=["on", "off"], const="on" )
+add_option('noshell',
+    help="don't build shell",
+    nargs=0,
+)
 
-add_option( "sanitize", "enable selected sanitizers", 1, True, metavar="san1,san2,...sanN" )
-add_option( "llvm-symbolizer", "name of (or path to) the LLVM symbolizer", 1, False, default="llvm-symbolizer" )
+add_option('safeshell',
+    help="don't let shell scripts run programs (still, don't run untrusted scripts)",
+    nargs=0,
+)
 
-# debugging/profiling help
+add_option('dbg',
+    choices=['on', 'off'],
+    const='on',
+    default='off',
+    help='Enable runtime debugging checks',
+    nargs='?',
+    type='choice',
+)
+
+add_option('opt',
+    choices=['on', 'off'],
+    const='on',
+    help='Enable compile-time optimization',
+    nargs='?',
+    type='choice',
+)
+
+add_option('sanitize',
+    help='enable selected sanitizers',
+    metavar='san1,san2,...sanN',
+)
+
+add_option('llvm-symbolizer',
+    default='llvm-symbolizer',
+    help='name of (or path to) the LLVM symbolizer',
+)
+
+add_option('durableDefaultOn',
+    help='have durable default to on',
+    nargs=0,
+)
+
 if is_running_os('linux') or is_running_os('windows'):
    defaultAllocator = 'tcmalloc'
 else:
     defaultAllocator = 'system'
-add_option( "allocator" , "allocator to use (tcmalloc or system)" , 1 , True,
-            default=defaultAllocator )
-add_option( "gdbserver" , "build in gdb server support" , 0 , True )
-add_option( "gcov" , "compile with flags for gcov" , 0 , True )
 
-add_option("smokedbprefix", "prefix to dbpath et al. for smoke tests", 1 , False )
-add_option("smokeauth", "run smoke tests with --auth", 0 , False )
+add_option('allocator',
+    default=defaultAllocator,
+    help='allocator to use (tcmalloc or system)',
+)
 
-add_option("use-sasl-client", "Support SASL authentication in the client library", 0, False)
+add_option('gdbserver',
+    help='build in gdb server support',
+    nargs=0,
+)
 
-add_option( "use-system-tcmalloc", "use system version of tcmalloc library", 0, True )
+add_option('gcov',
+    help='compile with flags for gcov',
+    nargs=0,
+)
 
-add_option( "use-system-pcre", "use system version of pcre library", 0, True )
+add_option('smokedbprefix',
+    help='prefix to dbpath et al. for smoke tests',
+)
 
-add_option( "use-system-wiredtiger", "use system version of wiredtiger library", 0, True)
+add_option('smokeauth',
+    help='run smoke tests with --auth',
+    nargs=0,
+)
 
-# library choices
+add_option('use-sasl-client',
+    help='Support SASL authentication in the client library',
+    nargs=0,
+)
+
+add_option('use-system-tcmalloc',
+    help='use system version of tcmalloc library',
+    nargs=0,
+)
+
+add_option('use-system-pcre',
+    help='use system version of pcre library',
+    nargs=0,
+)
+
+add_option('use-system-wiredtiger',
+    help='use system version of wiredtiger library',
+    nargs=0,
+)
+
 boost_choices = ['1.56']
-add_option( "internal-boost", "Specify internal boost version to use", 1, True,
-           type='choice', default=boost_choices[0], choices=boost_choices)
+add_option('internal-boost',
+    choices=boost_choices,
+    default=boost_choices[0],
+    help='Specify internal boost version to use',
+    type='choice',
+)
 
-add_option( "system-boost-lib-search-suffixes",
-            "Comma delimited sequence of boost library suffixes to search",
-            1, False )
+add_option('system-boost-lib-search-suffixes',
+    help='Comma delimited sequence of boost library suffixes to search',
+)
 
-add_option( "use-system-boost", "use system version of boost libraries", 0, True )
+add_option('use-system-boost',
+    help='use system version of boost libraries',
+    nargs=0,
+)
 
-add_option( "use-system-snappy", "use system version of snappy library", 0, True )
+add_option('use-system-snappy',
+    help='use system version of snappy library',
+    nargs=0,
+)
 
-add_option( "use-system-zlib", "use system version of zlib library", 0, True )
+add_option('use-system-zlib',
+    help='use system version of zlib library',
+    nargs=0,
+)
 
-add_option( "use-system-v8", "use system version of v8 library", 0, True )
+add_option('use-system-v8',
+    help='use system version of v8 library',
+    nargs=0,
+)
 
-add_option( "use-system-stemmer", "use system version of stemmer", 0, True )
+add_option('use-system-stemmer',
+    help='use system version of stemmer',
+    nargs=0)
 
-add_option( "use-system-yaml", "use system version of yaml", 0, True )
+add_option('use-system-yaml',
+    help='use system version of yaml',
+    nargs=0,
+)
 
-add_option( "use-system-asio", "use system version of ASIO", 0, True )
+add_option('use-system-asio',
+    help="use system version of ASIO",
+    nargs=0,
+)
 
-add_option( "use-system-all" , "use all system libraries", 0 , True )
+add_option('use-system-all',
+    help='use all system libraries',
+    nargs=0,
+)
 
-# deprecated
-add_option( "use-new-tools" , "put new tools in the tarball", 0 , False )
+add_option('use-new-tools',
+    help='put new tools in the tarball',
+    nargs=0,
+)
 
-add_option( "use-cpu-profiler",
-            "Link against the google-perftools profiler library",
-            0, False )
+add_option('use-cpu-profiler',
+    help='Link against the google-perftools profiler library',
+    nargs=0,
+)
 
-add_option('build-fast-and-loose', "looser dependency checking, ignored for --release builds",
-           '?', False, type="choice", choices=["on", "off"], const="on", default="on")
+add_option('build-fast-and-loose',
+    choices=['on', 'off'],
+    const='on',
+    default='on',
+    help='looser dependency checking, ignored for --release builds',
+    nargs='?',
+    type='choice',
+)
 
-add_option('disable-warnings-as-errors', "Don't add -Werror to compiler command line", 0, False)
+add_option('disable-warnings-as-errors',
+    help="Don't add -Werror to compiler command line",
+    nargs=0,
+)
 
 add_option('variables-help',
-           "Print the help text for SCons variables", 0, False)
+    help='Print the help text for SCons variables',
+    nargs=0,
+)
 
-add_option("osx-version-min", "minimum OS X version to support", 1, True)
+add_option('osx-version-min',
+    help='minimum OS X version to support',
+)
 
 win_version_min_choices = {
     'vista'   : ('0600', '0000'),
@@ -319,17 +423,22 @@ win_version_min_choices = {
     'win81'   : ('0603', '0000'),
 }
 
-add_option("win-version-min", "minimum Windows version to support", 1, True,
-           type = 'choice', default = None,
-           choices = win_version_min_choices.keys())
+add_option('win-version-min',
+    choices=win_version_min_choices.keys(),
+    default=None,
+    help='minimum Windows version to support',
+    type='choice',
+)
 
 add_option('cache',
-           "Use an object cache rather than a per-build variant directory (experimental)",
-           0, False)
+    help='Use an object cache rather than a per-build variant directory (experimental)',
+    nargs=0,
+)
 
 add_option('cache-dir',
-           "Specify the directory to use for caching objects if --cache is in use",
-           1, False, default="$BUILD_ROOT/scons/cache")
+    default='$BUILD_ROOT/scons/cache',
+    help='Specify the directory to use for caching objects if --cache is in use',
+)
 
 def find_mongo_custom_variables():
     files = []
@@ -342,19 +451,21 @@ def find_mongo_custom_variables():
     return files
 
 add_option('variables-files',
-           "Specify variables files to load",
-           1, False, default=find_mongo_custom_variables())
+    default=find_mongo_custom_variables(),
+    help="Specify variables files to load",
+)
 
 variable_parse_mode_choices=['auto', 'posix', 'other']
 add_option('variable-parse-mode',
-           "Select which parsing mode is used to interpret command line variables",
-           1, False,
-           type='choice', default=variable_parse_mode_choices[0],
-           choices=variable_parse_mode_choices)
+    choices=variable_parse_mode_choices,
+    default=variable_parse_mode_choices[0],
+    help='Select which parsing mode is used to interpret command line variables',
+    type='choice',
+)
 
 add_option('modules',
-           "Comma-separated list of modules to build. Empty means none. Default is all.",
-           1, False)
+    help="Comma-separated list of modules to build. Empty means none. Default is all.",
+)
 
 try:
     with open("version.json", "r") as version_fp:
@@ -551,6 +662,11 @@ env_vars.Add('TOOLS',
     converter=variable_tools_converter,
     default=decide_platform_tools())
 
+env_vars.Add('VARIANT_DIR',
+    help='Sets the name (or generator function) for the variant directory',
+    default=default_variant_dir_generator,
+)
+
 # don't run configure if user calls --help
 if GetOption('help'):
     Return()
@@ -617,9 +733,6 @@ releaseBuild = has_option("release")
 
 dbg_opt_mapping = {
     # --dbg, --opt   :   dbg    opt
-    ( None,  None  ) : ( False, True ),
-    ( None,  "on"  ) : ( False, True ),
-    ( None,  "off" ) : ( False, False ),
     ( "on",  None  ) : ( True,  False ),  # special case interaction
     ( "on",  "on"  ) : ( True,  True ),
     ( "on",  "off" ) : ( True,  False ),
@@ -657,7 +770,7 @@ if not serverJs and not usev8:
 # variant dirs. For now, we call that BUILD_ROOT. If and when we s/BUILD_DIR/VARIANT_DIR/g,
 # then also s/BUILD_ROOT/BUILD_DIR/g.
 envDict = dict(BUILD_ROOT=buildDir,
-               BUILD_DIR=get_variant_dir(),
+               BUILD_DIR=make_variant_dir_generator(),
                DIST_ARCHIVE_SUFFIX='.tgz',
                MODULE_BANNERS=[],
                ARCHIVE_ADDITION_DIR_MAP={},

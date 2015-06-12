@@ -405,15 +405,22 @@ for full_dir, archive_dir in env["ARCHIVE_ADDITION_DIR_MAP"].items():
 # Attempts to build release artifacts without tools must fail
 if has_option("use-new-tools"):
     env.Command(
-        '#/${SERVER_ARCHIVE}',
-        ['#buildscripts/make_archive.py'] + env["MODULE_BANNERS"] + env["ARCHIVE_ADDITIONS"] +
-        distBinaries, ' '.join(['$PYTHON ${SOURCES[0]} -o $TARGET'] + archive_addition_transforms +
-        module_banner_transforms + [
-                '--transform ${str(Dir(BUILD_DIR))}/mongo/stripped=$SERVER_DIST_BASENAME/bin',
-                '--transform ${str(Dir(BUILD_DIR))}/mongo=$SERVER_DIST_BASENAME/bin',
-                '--transform ${str(Dir(BUILD_DIR))}/mongo/stripped/src/mongo-tools=$SERVER_DIST_BASENAME/bin',
+        target='#/${SERVER_ARCHIVE}',
+        source=['#buildscripts/make_archive.py'] + env["MODULE_BANNERS"] + env["ARCHIVE_ADDITIONS"] + distBinaries,
+        action=' '.join(
+            ['$PYTHON ${SOURCES[0]} -o $TARGET'] +
+            archive_addition_transforms +
+            module_banner_transforms +
+            [
+                '--transform $BUILD_DIR/mongo/stripped=$SERVER_DIST_BASENAME/bin',
+                '--transform $BUILD_DIR/mongo=$SERVER_DIST_BASENAME/bin',
+                '--transform $BUILD_DIR/mongo/stripped/src/mongo-tools=$SERVER_DIST_BASENAME/bin',
                 '--transform src/mongo-tools=$SERVER_DIST_BASENAME/bin',
-                '${TEMPFILE(SOURCES[1:])}']))
+                '${TEMPFILE(SOURCES[1:])}'
+            ],
+        ),
+        BUILD_DIR=env.Dir('$BUILD_DIR').path
+    )
 
     env.Alias("dist", source='#/${SERVER_ARCHIVE}')
 else:
