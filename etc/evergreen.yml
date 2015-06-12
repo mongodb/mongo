@@ -2793,7 +2793,7 @@ buildvariants:
   modules:
   - enterprise
   run_on:
-  - rhel57-test
+  - rhel55-test
   expansions:
     gitvars: LD_LIBRARY_PATH=/opt/openssl/lib64 #needed to workaround the old openSSL on rhel55 builders.
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
