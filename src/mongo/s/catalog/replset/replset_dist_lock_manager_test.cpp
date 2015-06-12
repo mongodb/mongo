@@ -430,6 +430,11 @@ namespace {
             ASSERT(unlockCV.wait_for(lk, kUnlockTimeout) == stdx::cv_status::no_timeout);
         }
 
+        // Join the background thread before trying to call asserts. Shutdown calls
+        // stopPing and we don't care in this test.
+        getMockCatalog()->expectStopPing([](StringData){}, Status::OK());
+        getMgr()->shutDown();
+
         ASSERT_EQUALS(1, unlockCallCount);
         ASSERT_EQUALS(lastTS, unlockSessionIDPassed);
     }
@@ -567,6 +572,11 @@ namespace {
             ASSERT(unlockCV.wait_for(lk, kUnlockTimeout) == stdx::cv_status::no_timeout);
         }
 
+        // Join the background thread before trying to call asserts. Shutdown calls
+        // stopPing and we don't care in this test.
+        getMockCatalog()->expectStopPing([](StringData){}, Status::OK());
+        getMgr()->shutDown();
+
         ASSERT_EQUALS(1, unlockCallCount);
         ASSERT_EQUALS(lastTS, unlockSessionIDPassed);
     }
@@ -675,6 +685,11 @@ namespace {
             ASSERT(unlockCV.wait_for(lk, kUnlockTimeout) == stdx::cv_status::no_timeout);
         }
 
+        // Join the background thread before trying to call asserts. Shutdown calls
+        // stopPing and we don't care in this test.
+        getMockCatalog()->expectStopPing([](StringData){}, Status::OK());
+        getMgr()->shutDown();
+
         for (const auto& id : lockSessionIDPassed) {
             ASSERT_EQUALS(lockSessionID, id);
         }
@@ -751,11 +766,17 @@ namespace {
         }
 
         stdx::unique_lock<stdx::mutex> lk(testMutex);
-        ASSERT_EQUALS(2u, lockSessionIDPassed.size());
 
         if (unlockIDMap.size() < 2 || !mapEntriesGreaterThanTwo(unlockIDMap)) {
             ASSERT(unlockCV.wait_for(lk, kUnlockTimeout) == stdx::cv_status::no_timeout);
         }
+
+        // Join the background thread before trying to call asserts. Shutdown calls
+        // stopPing and we don't care in this test.
+        getMockCatalog()->expectStopPing([](StringData){}, Status::OK());
+        getMgr()->shutDown();
+
+        ASSERT_EQUALS(2u, lockSessionIDPassed.size());
 
         for (const auto& id : lockSessionIDPassed) {
             ASSERT_GREATER_THAN(unlockIDMap[id], 2)
@@ -1542,6 +1563,11 @@ namespace {
         if (!unlockSessionIDPassed.isSet()) {
             ASSERT(unlockCV.wait_for(lk, kUnlockTimeout) == stdx::cv_status::no_timeout);
         }
+
+        // Join the background thread before trying to call asserts. Shutdown calls
+        // stopPing and we don't care in this test.
+        getMockCatalog()->expectStopPing([](StringData){}, Status::OK());
+        getMgr()->shutDown();
 
         ASSERT_EQUALS(lastTS, unlockSessionIDPassed);
     }
