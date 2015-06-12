@@ -36,7 +36,6 @@
 #include <iostream>
 #include <string>
 #include <sys/utsname.h>
-#include <ucontext.h>
 
 #include "mongo/base/init.h"
 #include "mongo/config.h"
@@ -47,6 +46,8 @@
 
 #if defined(MONGO_CONFIG_HAVE_EXECINFO_BACKTRACE)
 #include <execinfo.h>
+#elif defined(__sun)
+#include <ucontext.h>
 #endif
 
 namespace mongo {
