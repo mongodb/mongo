@@ -310,7 +310,7 @@ __wt_txn_idle_cache_check(WT_SESSION_IMPL *session)
 	WT_TXN_STATE *txn_state;
 
 	txn = &session->txn;
-	txn_state = &S2C(session)->txn_global.states[session->id];
+	txn_state = WT_SESSION_TXN_STATE(session);
 
 	/*
 	 * Check the published snap_min because read-uncommitted never sets

@@ -58,7 +58,7 @@ __wt_txn_release_snapshot(WT_SESSION_IMPL *session)
 	WT_TXN_STATE *txn_state;
 
 	txn = &session->txn;
-	txn_state = &S2C(session)->txn_global.states[session->id];
+	txn_state = WT_SESSION_TXN_STATE(session);
 
 	WT_ASSERT(session,
 	    txn_state->snap_min == WT_TXN_NONE ||
@@ -587,7 +587,7 @@ __wt_txn_init(WT_SESSION_IMPL *session)
 #ifdef HAVE_DIAGNOSTIC
 	if (S2C(session)->txn_global.states != NULL) {
 		WT_TXN_STATE *txn_state;
-		txn_state = &S2C(session)->txn_global.states[session->id];
+		txn_state = WT_SESSION_TXN_STATE(session);
 		WT_ASSERT(session, txn_state->snap_min == WT_TXN_NONE);
 	}
 #endif
