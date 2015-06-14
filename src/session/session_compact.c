@@ -49,7 +49,7 @@
  * a named checkpoint, there is nothing we can do to compact the file, no
  * matter how many times we rewrite the block, the named checkpoint can't be
  * discarded and so the reference count on the original block will never go to
- * zero.   What's worse, because the block manager doesn't reference count
+ * zero. What's worse, because the block manager doesn't reference count
  * blocks, it can't easily know this is the case, and so we'll waste a lot of
  * effort trying to compact files that can't be compacted.
  *

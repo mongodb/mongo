@@ -902,7 +902,7 @@ WT_PACKED_STRUCT_BEGIN(__wt_update)
  *
  * In column-store variable-length run-length encoded pages, a single indx
  * entry may reference a large number of records, because there's a single
- * on-page entry representing many identical records.   (We don't expand those
+ * on-page entry representing many identical records. (We don't expand those
  * entries when the page comes into memory, as that would require resources as
  * pages are moved to/from the cache, including read-only files.)  Instead, a
  * single indx entry represents all of the identical records originally found

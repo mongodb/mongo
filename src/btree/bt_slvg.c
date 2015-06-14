@@ -268,7 +268,7 @@ __wt_bt_salvage(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, const char *cfg[])
 	/*
 	 * Step 6:
 	 * We may have lost key ranges in column-store databases, that is, some
-	 * part of the record number space is gone.   Look for missing ranges.
+	 * part of the record number space is gone; look for missing ranges.
 	 */
 	switch (ss->page_type) {
 	case WT_PAGE_COL_FIX:
@@ -608,8 +608,8 @@ __slvg_trk_leaf(WT_SESSION_IMPL *session,
 		 * Row-store format: copy the first and last keys on the page.
 		 * Keys are prefix-compressed, the simplest and slowest thing
 		 * to do is instantiate the in-memory page, then instantiate
-		 * and copy the full keys, then free the page.   We do this
-		 * on every leaf page, and if you need to speed up the salvage,
+		 * and copy the full keys, then free the page. We do this on
+		 * every leaf page, and if you need to speed up the salvage,
 		 * it's probably a great place to start.
 		 */
 		WT_ERR(__wt_page_inmem(session, NULL, dsk, 0, 0, &page));
@@ -746,8 +746,8 @@ __slvg_trk_leaf_ovfl(
  *
  * The leaf page array is sorted in key order, and secondarily on LSN: what this
  * means is that for each new key range, the first page we find is the best page
- * for that key.   The process is to walk forward from each page until we reach
- * a page with a starting key after the current page's stopping key.
+ * for that key. The process is to walk forward from each page until we reach a
+ * page with a starting key after the current page's stopping key.
  *
  * For each of page, check to see if they overlap the current page's key range.
  * If they do, resolve the overlap.  Because WiredTiger rarely splits pages,
@@ -1668,7 +1668,7 @@ delete_b:	/*
 
 	/*
 	 * Third, set its its stop key to be the stop key of the original chunk,
-	 * and call __slvg_row_trk_update_start.   That function will both set
+	 * and call __slvg_row_trk_update_start. That function will both set
 	 * the start key to be the first key after the stop key of the middle
 	 * chunk (that's b_trk), and re-sort the WT_TRACK array as necessary to
 	 * move our new entry into the right sorted location.

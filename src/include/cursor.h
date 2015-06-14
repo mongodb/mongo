@@ -144,7 +144,7 @@ struct __wt_cursor_btree {
 
 	/*
 	 * Variable-length column-store values are run-length encoded and may
-	 * be overflow values or Huffman encoded.   To avoid repeatedly reading
+	 * be overflow values or Huffman encoded. To avoid repeatedly reading
 	 * overflow values or decompressing encoded values, process it once and
 	 * store the result in a temporary buffer.  The cip_saved field is used
 	 * to determine if we've switched columns since our last cursor call.

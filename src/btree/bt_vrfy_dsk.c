@@ -300,8 +300,8 @@ __verify_dsk_row(
 		 * Remaining checks are for key order and prefix compression.
 		 * If this cell isn't a key, we're done, move to the next cell.
 		 * If this cell is an overflow item, instantiate the key and
-		 * compare it with the last key.   Otherwise, we have to deal
-		 * with prefix compression.
+		 * compare it with the last key. Otherwise, we have to deal with
+		 * prefix compression.
 		 */
 		switch (cell_type) {
 		case WT_CELL_KEY:

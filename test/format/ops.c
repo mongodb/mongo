@@ -925,7 +925,7 @@ table_append(uint64_t keyno)
 
 	/*
 	 * We don't want to ignore records we append, which requires we update
-	 * the "last row" as we insert new records.   Threads allocating record
+	 * the "last row" as we insert new records. Threads allocating record
 	 * numbers can race with other threads, so the thread allocating record
 	 * N may return after the thread allocating N + 1.  We can't update a
 	 * record before it's been inserted, and so we can't leave gaps when the
@@ -943,7 +943,7 @@ table_append(uint64_t keyno)
 	 * to sleep (so the append table fills up), then N threads of control
 	 * used the same g.append_cnt value to decide there was an available
 	 * slot in the append table and both allocated new records, we could run
-	 * out of space in the table.   It's unfortunately not even unlikely in
+	 * out of space in the table. It's unfortunately not even unlikely in
 	 * the case of a large number of threads all inserting as fast as they
 	 * can and a single thread going to sleep for an unexpectedly long time.
 	 * If it happens, sleep and retry until earlier records are resolved

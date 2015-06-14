@@ -2980,7 +2980,7 @@ struct __wt_compressor {
 	 * encodes none, some or all of the byte strings and copies the encoded
 	 * representation into a destination buffer.  The callback returns the
 	 * number of byte strings encoded and the bytes needed for the encoded
-	 * representation.   The encoded representation has header information
+	 * representation. The encoded representation has header information
 	 * prepended and is written as a block to the underlying file object.
 	 *
 	 * On entry, \c page_max is the configured maximum size for objects of

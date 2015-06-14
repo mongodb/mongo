@@ -309,7 +309,7 @@ __ckpt_extlist_fblocks(
 
 	/*
 	 * Free blocks used to write checkpoint extents into the live system's
-	 * checkpoint avail list (they were never on any alloc list).   Do not
+	 * checkpoint avail list (they were never on any alloc list). Do not
 	 * use the live system's avail list because that list is used to decide
 	 * if the file can be truncated, and we can't truncate any part of the
 	 * file that contains a previous checkpoint's extents.

@@ -158,7 +158,7 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	/*
 	 * Sessions are re-used, clear the structure: the clear sets the active
 	 * field to 0, which will exclude the hazard array from review by the
-	 * eviction thread.   Because some session fields are accessed by other
+	 * eviction thread. Because some session fields are accessed by other
 	 * threads, the structure must be cleared carefully.
 	 *
 	 * We don't need to publish here, because regardless of the active field
