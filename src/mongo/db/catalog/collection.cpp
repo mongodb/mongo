@@ -175,7 +175,8 @@ Collection::Collection(OperationContext* txn,
     _indexCatalog.init(txn);
     if (isCapped())
         _recordStore->setCappedDeleteCallback(this);
-    _infoCache.reset(txn);
+
+    _infoCache.init(txn);
 }
 
 Collection::~Collection() {
@@ -718,7 +719,6 @@ Status Collection::truncate(OperationContext* txn) {
     if (!status.isOK())
         return status;
     _cursorManager.invalidateAll(false, "collection truncated");
-    _infoCache.reset(txn);
 
     // 3) truncate record store
     status = _recordStore->truncate(txn);

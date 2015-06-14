@@ -327,6 +327,30 @@ var authCommandsLib = {
             ]
         },
         {
+            testname: "aggregate_indexStats",
+            command: {aggregate: "foo", pipeline: [{$indexStats: {}}]},
+            setup: function (db) {
+                db.createCollection("foo");
+            },
+            teardown: function (db) {
+                db.foo.drop();
+            },
+            testcases: [
+                {
+                    runOnDb: firstDbName,
+                    roles: {
+                        clusterMonitor: 1,
+                        clusterAdmin: 1,
+                        root: 1,
+                        __system: 1
+                    },
+                    privileges: [
+                        {resource: {anyResource: true}, actions: ["indexStats"]}
+                    ]
+                }
+            ]
+        },
+        {
             testname: "appendOplogNote",
             command: {appendOplogNote: 1, data: {a: 1}},
             skipSharded: true,

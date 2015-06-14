@@ -53,13 +53,18 @@ const char* IDHackStage::kStageType = "IDHACK";
 IDHackStage::IDHackStage(OperationContext* txn,
                          const Collection* collection,
                          CanonicalQuery* query,
-                         WorkingSet* ws)
+                         WorkingSet* ws,
+                         const IndexDescriptor* descriptor)
     : PlanStage(kStageType, txn),
       _collection(collection),
       _workingSet(ws),
       _key(query->getQueryObj()["_id"].wrap()),
       _done(false),
       _idBeingPagedIn(WorkingSet::INVALID_ID) {
+    const IndexCatalog* catalog = _collection->getIndexCatalog();
+    _specificStats.indexName = descriptor->indexName();
+    _accessMethod = catalog->getIndex(descriptor);
+
     if (NULL != query->getProj()) {
         _addKeyMetadata = query->getProj()->wantIndexKey();
     } else {
@@ -70,14 +75,19 @@ IDHackStage::IDHackStage(OperationContext* txn,
 IDHackStage::IDHackStage(OperationContext* txn,
                          Collection* collection,
                          const BSONObj& key,
-                         WorkingSet* ws)
+                         WorkingSet* ws,
+                         const IndexDescriptor* descriptor)
     : PlanStage(kStageType, txn),
       _collection(collection),
       _workingSet(ws),
       _key(key),
       _done(false),
       _addKeyMetadata(false),
-      _idBeingPagedIn(WorkingSet::INVALID_ID) {}
+      _idBeingPagedIn(WorkingSet::INVALID_ID) {
+    const IndexCatalog* catalog = _collection->getIndexCatalog();
+    _specificStats.indexName = descriptor->indexName();
+    _accessMethod = catalog->getIndex(descriptor);
+}
 
 IDHackStage::~IDHackStage() {}
 
@@ -114,18 +124,8 @@ PlanStage::StageState IDHackStage::work(WorkingSetID* out) {
 
     WorkingSetID id = WorkingSet::INVALID_ID;
     try {
-        // Use the index catalog to get the id index.
-        const IndexCatalog* catalog = _collection->getIndexCatalog();
-
-        // Find the index we use.
-        IndexDescriptor* idDesc = catalog->findIdIndex(getOpCtx());
-        if (NULL == idDesc) {
-            _done = true;
-            return PlanStage::IS_EOF;
-        }
-
         // Look up the key by going directly to the index.
-        RecordId loc = catalog->getIndex(idDesc)->findSingle(getOpCtx(), _key);
+        RecordId loc = _accessMethod->findSingle(getOpCtx(), _key);
 
         // Key not found.
         if (loc.isNull()) {

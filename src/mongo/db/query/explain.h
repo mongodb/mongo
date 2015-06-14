@@ -71,6 +71,9 @@ struct PlanSummaryStats {
 
     // Did this plan use an in-memory sort stage?
     bool hasSortStage;
+
+    // The names of each index used by the plan.
+    std::set<std::string> indexesUsed;
 };
 
 /**

@@ -141,8 +141,10 @@ public:
     virtual void commit() {}
 
     virtual void rollback() {
+        // Need to preserve indexName as _desc no longer exists after remove().
+        const std::string indexName = _desc->indexName();
         _entries->remove(_desc);
-        _collection->infoCache()->reset(_txn);
+        _collection->infoCache()->droppedIndex(_txn, indexName);
     }
 
 private:
@@ -444,7 +446,7 @@ void IndexCatalog::IndexBuildBlock::success() {
     _txn->recoveryUnit()->registerChange(new IndexCompletionChange(_txn, entry));
     entry->setIsReady(true);
 
-    _catalog->_collection->infoCache()->addedIndex(_txn);
+    _catalog->_collection->infoCache()->addedIndex(_txn, _indexName);
 }
 
 namespace {
@@ -822,7 +824,7 @@ public:
 
     void rollback() final {
         _entries->add(_entry);
-        _collection->infoCache()->reset(_txn);
+        _collection->infoCache()->addedIndex(_txn, _entry->descriptor()->indexName());
     }
 
 private:
@@ -860,20 +862,16 @@ Status IndexCatalog::_dropIndex(OperationContext* txn, IndexCatalogEntry* entry)
         false, str::stream() << "index '" << indexName << "' dropped");
 
     // --------- START REAL WORK ----------
-
     audit::logDropIndex(&cc(), indexName, _collection->ns().ns());
 
     invariant(_entries.release(entry->descriptor()) == entry);
     txn->recoveryUnit()->registerChange(new IndexRemoveChange(txn, _collection, &_entries, entry));
     entry = NULL;
-
     _deleteIndexFromDisk(txn, indexName, indexNamespace);
 
     _checkMagic();
 
-    // Now that we've dropped the index, ask the info cache to rebuild its cached view of
-    // collection state.
-    _collection->infoCache()->reset(txn);
+    _collection->infoCache()->droppedIndex(txn, indexName);
 
     return Status::OK();
 }

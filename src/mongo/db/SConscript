@@ -286,6 +286,27 @@ env.CppUnitTest(
     ],
 )
 
+env.Library(
+    target='collection_index_usage_tracker',
+    source=[
+        'collection_index_usage_tracker.cpp'
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+)
+
+env.CppUnitTest(
+    target='collection_index_usage_tracker_test',
+    source=[
+        'collection_index_usage_tracker_test.cpp',
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/util/clock_source_mock",
+        'collection_index_usage_tracker',
+    ],
+)
+
 # This library exists because some libraries, such as our networking library, need access to server
 # options, but not to the helpers to set them from the command line.  libserver_options_core.a just
 # has the structure for storing the server options, while libserver_options.a has the code to set
@@ -358,7 +379,6 @@ env.CppUnitTest(
         'range_deleter',
     ],
 )
-
 
 # This library is linked into mongos and mongod only, not into the shell or any tools.
 env.Library(
@@ -662,6 +682,7 @@ serveronlyLibdeps = [
     "catalog/collection_options",
     "catalog/index_key_validate",
     "commands/killcursors_common",
+    "collection_index_usage_tracker",
     "common",
     "concurrency/lock_manager",
     "concurrency/write_conflict_exception",

@@ -342,6 +342,8 @@ struct IDHackStats : public SpecificStats {
         return specific;
     }
 
+    std::string indexName;
+
     // Number of entries retrieved from the index while executing the idhack.
     size_t keysExamined;
 

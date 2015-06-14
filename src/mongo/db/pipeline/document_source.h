@@ -42,6 +42,7 @@
 #include "mongo/base/init.h"
 #include "mongo/client/connpool.h"
 #include "mongo/db/clientcursor.h"
+#include "mongo/db/collection_index_usage_tracker.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/db/pipeline/accumulator.h"
@@ -177,7 +178,9 @@ public:
 
     virtual void serializeToArray(std::vector<Value>& array, bool explain = false) const;
 
-    /// Returns true if doesn't require an input source (most DocumentSources do).
+    /**
+     * Returns true if doesn't require an input source (most DocumentSources do).
+     */
     virtual bool isValidInitialSource() const {
         return false;
     }
@@ -287,6 +290,9 @@ public:
          * Inserts 'objs' into 'ns' and returns the "detailed" last error object.
          */
         virtual BSONObj insert(const NamespaceString& ns, const std::vector<BSONObj>& objs) = 0;
+
+        virtual CollectionIndexUsageMap getIndexStats(OperationContext* opCtx,
+                                                      const NamespaceString& ns) = 0;
 
         // Add new methods as needed.
     };
@@ -523,6 +529,32 @@ private:
     std::pair<Value, Value> _firstPartOfNextGroup;
     Value _currentId;
     Accumulators _currentAccumulators;
+};
+
+/**
+ * Provides a document source interface to retrieve index statistics for a given namespace.
+ * Each document returned represents a single index and mongod instance.
+ */
+class DocumentSourceIndexStats final : public DocumentSource, public DocumentSourceNeedsMongod {
+public:
+    // virtuals from DocumentSource
+    boost::optional<Document> getNext() final;
+    const char* getSourceName() const final;
+    Value serialize(bool explain = false) const final;
+
+    virtual bool isValidInitialSource() const final {
+        return true;
+    }
+
+    static boost::intrusive_ptr<DocumentSource> createFromBson(
+        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+
+private:
+    DocumentSourceIndexStats(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+
+    CollectionIndexUsageMap _indexStatsMap;
+    CollectionIndexUsageMap::const_iterator _indexStatsIter;
+    std::string _processName;
 };
 
 

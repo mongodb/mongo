@@ -41,6 +41,8 @@
 #include "mongo/db/index_legacy.h"
 #include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/planner_ixselect.h"
+#include "mongo/db/service_context.h"
+#include "mongo/util/clock_source.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/log.h"
 
@@ -50,19 +52,11 @@ CollectionInfoCache::CollectionInfoCache(Collection* collection)
     : _collection(collection),
       _keysComputed(false),
       _planCache(new PlanCache(collection->ns().ns())),
-      _querySettings(new QuerySettings()) {}
+      _querySettings(new QuerySettings()),
+      _indexUsageTracker(getGlobalServiceContext()->getClockSource()) {}
 
-void CollectionInfoCache::reset(OperationContext* txn) {
-    LOG(1) << _collection->ns().ns() << ": clearing plan cache - collection info cache reset";
-    clearQueryCache();
-    _keysComputed = false;
-    computeIndexKeys(txn);
-    updatePlanCacheIndexEntries(txn);
-    // query settings is not affected by info cache reset.
-    // index filters should persist throughout life of collection
-}
 
-const UpdateIndexData& CollectionInfoCache::indexKeys(OperationContext* txn) const {
+const UpdateIndexData& CollectionInfoCache::getIndexKeys(OperationContext* txn) const {
     // This requires "some" lock, and MODE_IS is an expression for that, for now.
     dassert(txn->lockState()->isCollectionLockedForMode(_collection->ns().ns(), MODE_IS));
     invariant(_keysComputed);
@@ -70,8 +64,6 @@ const UpdateIndexData& CollectionInfoCache::indexKeys(OperationContext* txn) con
 }
 
 void CollectionInfoCache::computeIndexKeys(OperationContext* txn) {
-    // This function modified objects attached to the Collection so we need a write lock
-    invariant(txn->lockState()->isCollectionLockedForMode(_collection->ns().ns(), MODE_X));
     _indexedPaths.clear();
 
     IndexCatalog::IndexIterator i = _collection->getIndexCatalog()->getIndexIterator(txn, true);
@@ -123,7 +115,20 @@ void CollectionInfoCache::computeIndexKeys(OperationContext* txn) {
     _keysComputed = true;
 }
 
+void CollectionInfoCache::notifyOfQuery(OperationContext* txn,
+                                        const std::set<std::string>& indexesUsed) {
+    // Record indexes used to fulfill query.
+    for (auto it = indexesUsed.begin(); it != indexesUsed.end(); ++it) {
+        if (NULL == _collection->getIndexCatalog()->findIndexByName(txn, *it)) {
+            // Index removed since the operation started.  Nothing to report.
+            continue;
+        }
+        _indexUsageTracker.recordIndexAccess(*it);
+    }
+}
+
 void CollectionInfoCache::clearQueryCache() {
+    LOG(1) << _collection->ns().ns() << ": clearing plan cache - collection info cache reset";
     if (NULL != _planCache.get()) {
         _planCache->clear();
     }
@@ -159,5 +164,48 @@ void CollectionInfoCache::updatePlanCacheIndexEntries(OperationContext* txn) {
     }
 
     _planCache->notifyOfIndexEntries(indexEntries);
+}
+
+void CollectionInfoCache::init(OperationContext* txn) {
+    // Requires exclusive collection lock.
+    invariant(txn->lockState()->isCollectionLockedForMode(_collection->ns().ns(), MODE_X));
+
+    const bool includeUnfinishedIndexes = false;
+    IndexCatalog::IndexIterator ii =
+        _collection->getIndexCatalog()->getIndexIterator(txn, includeUnfinishedIndexes);
+    while (ii.more()) {
+        const IndexDescriptor* desc = ii.next();
+        _indexUsageTracker.registerIndex(desc->indexName());
+    }
+
+    rebuildIndexData(txn);
+}
+
+void CollectionInfoCache::addedIndex(OperationContext* txn, StringData indexName) {
+    // Requires exclusive collection lock.
+    invariant(txn->lockState()->isCollectionLockedForMode(_collection->ns().ns(), MODE_X));
+
+    rebuildIndexData(txn);
+    _indexUsageTracker.registerIndex(indexName);
+}
+
+void CollectionInfoCache::droppedIndex(OperationContext* txn, StringData indexName) {
+    // Requires exclusive collection lock.
+    invariant(txn->lockState()->isCollectionLockedForMode(_collection->ns().ns(), MODE_X));
+
+    rebuildIndexData(txn);
+    _indexUsageTracker.unregisterIndex(indexName);
+}
+
+void CollectionInfoCache::rebuildIndexData(OperationContext* txn) {
+    clearQueryCache();
+
+    _keysComputed = false;
+    computeIndexKeys(txn);
+    updatePlanCacheIndexEntries(txn);
+}
+
+CollectionIndexUsageMap CollectionInfoCache::getIndexUsageStats() const {
+    return _indexUsageTracker.getUsageStats();
 }
 }

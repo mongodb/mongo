@@ -32,6 +32,7 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/group.h"
@@ -160,6 +161,12 @@ private:
         }
 
         invariant(planExecutor->isEOF());
+
+        PlanSummaryStats summaryStats;
+        Explain::getSummaryStats(*planExecutor, &summaryStats);
+        if (coll) {
+            coll->infoCache()->notifyOfQuery(txn, summaryStats.indexesUsed);
+        }
 
         invariant(STAGE_GROUP == planExecutor->getRootStage()->stageType());
         GroupStage* groupStage = static_cast<GroupStage*>(planExecutor->getRootStage());

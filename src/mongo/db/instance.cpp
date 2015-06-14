@@ -687,10 +687,12 @@ void receivedUpdate(OperationContext* txn, const NamespaceString& nsString, Mess
                 txn->lockState(), nsString.ns(), parsedUpdate.isIsolated() ? MODE_X : MODE_IX);
             OldClientContext ctx(txn, nsString.ns());
 
+            auto collection = ctx.db()->getCollection(nsString);
+
             //  The common case: no implicit collection creation
-            if (!upsert || ctx.db()->getCollection(nsString) != NULL) {
-                unique_ptr<PlanExecutor> exec = uassertStatusOK(getExecutorUpdate(
-                    txn, ctx.db()->getCollection(nsString), &parsedUpdate, &op.debug()));
+            if (!upsert || collection != NULL) {
+                unique_ptr<PlanExecutor> exec =
+                    uassertStatusOK(getExecutorUpdate(txn, collection, &parsedUpdate, &op.debug()));
 
                 // Run the plan and get stats out.
                 uassertStatusOK(exec->executePlan());
@@ -699,11 +701,14 @@ void receivedUpdate(OperationContext* txn, const NamespaceString& nsString, Mess
                 // for getlasterror
                 LastError::get(client).recordUpdate(res.existing, res.numMatched, res.upserted);
 
+                PlanSummaryStats summary;
+                Explain::getSummaryStats(*exec, &summary);
+                collection->infoCache()->notifyOfQuery(txn, summary.indexesUsed);
+
                 // No-ops need to reset lastOp in the client, for write concern.
                 if (repl::ReplClientInfo::forClient(client).getLastOp() == lastOpAtOperationStart) {
                     repl::ReplClientInfo::forClient(client).setLastOpToSystemLastOpTime(txn);
                 }
-
                 return;
             }
             break;
@@ -741,14 +746,19 @@ void receivedUpdate(OperationContext* txn, const NamespaceString& nsString, Mess
             wuow.commit();
         }
 
-        unique_ptr<PlanExecutor> exec = uassertStatusOK(
-            getExecutorUpdate(txn, ctx.db()->getCollection(nsString), &parsedUpdate, &op.debug()));
+        auto collection = ctx.db()->getCollection(nsString);
+        unique_ptr<PlanExecutor> exec =
+            uassertStatusOK(getExecutorUpdate(txn, collection, &parsedUpdate, &op.debug()));
 
         // Run the plan and get stats out.
         uassertStatusOK(exec->executePlan());
         UpdateResult res = UpdateStage::makeUpdateResult(*exec, &op.debug());
 
         LastError::get(client).recordUpdate(res.existing, res.numMatched, res.upserted);
+
+        PlanSummaryStats summary;
+        Explain::getSummaryStats(*exec, &summary);
+        collection->infoCache()->notifyOfQuery(txn, summary.indexesUsed);
 
         // No-ops need to reset lastOp in the client, for write concern.
         if (repl::ReplClientInfo::forClient(client).getLastOp() == lastOpAtOperationStart) {
@@ -803,8 +813,10 @@ void receivedDelete(OperationContext* txn, const NamespaceString& nsString, Mess
                 txn->lockState(), nsString.ns(), parsedDelete.isIsolated() ? MODE_X : MODE_IX);
             OldClientContext ctx(txn, nsString.ns());
 
-            unique_ptr<PlanExecutor> exec = uassertStatusOK(
-                getExecutorDelete(txn, ctx.db()->getCollection(nsString), &parsedDelete));
+            auto collection = ctx.db()->getCollection(nsString);
+
+            unique_ptr<PlanExecutor> exec =
+                uassertStatusOK(getExecutorDelete(txn, collection, &parsedDelete));
 
             // Run the plan and get the number of docs deleted.
             uassertStatusOK(exec->executePlan());
@@ -812,11 +824,14 @@ void receivedDelete(OperationContext* txn, const NamespaceString& nsString, Mess
             LastError::get(client).recordDelete(n);
             op.debug().ndeleted = n;
 
+            PlanSummaryStats summary;
+            Explain::getSummaryStats(*exec, &summary);
+            collection->infoCache()->notifyOfQuery(txn, summary.indexesUsed);
+
             // No-ops need to reset lastOp in the client, for write concern.
             if (repl::ReplClientInfo::forClient(client).getLastOp() == lastOpAtOperationStart) {
                 repl::ReplClientInfo::forClient(client).setLastOpToSystemLastOpTime(txn);
             }
-
             break;
         } catch (const WriteConflictException& dle) {
             op.debug().writeConflicts++;

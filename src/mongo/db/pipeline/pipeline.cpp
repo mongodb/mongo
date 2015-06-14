@@ -320,8 +320,17 @@ Status Pipeline::checkAuthForCommand(ClientBasic* client,
             inputNs.isValid());
 
     std::vector<Privilege> privileges;
-    Privilege::addPrivilegeToPrivilegeVector(&privileges,
-                                             Privilege(inputResource, ActionType::find));
+
+    if (cmdObj.getFieldDotted("pipeline.0.$indexStats")) {
+        Privilege::addPrivilegeToPrivilegeVector(
+            &privileges,
+            Privilege(ResourcePattern::forAnyNormalResource(), ActionType::indexStats));
+    } else {
+        // If no source requiring an alternative permission scheme is specified then default to
+        // requiring find() privileges on the given namespace.
+        Privilege::addPrivilegeToPrivilegeVector(&privileges,
+                                                 Privilege(inputResource, ActionType::find));
+    }
 
     BSONObj pipeline = cmdObj.getObjectField("pipeline");
     BSONForEach(stageElem, pipeline) {

@@ -244,12 +244,13 @@ Status prepareExecution(OperationContext* opCtx,
     plannerParams.options = plannerOptions;
     fillOutPlannerParams(opCtx, collection, canonicalQuery, &plannerParams);
 
+    const IndexDescriptor* descriptor = collection->getIndexCatalog()->findIdIndex(opCtx);
+
     // If we have an _id index we can use an idhack plan.
-    if (IDHackStage::supportsQuery(*canonicalQuery) &&
-        collection->getIndexCatalog()->findIdIndex(opCtx)) {
+    if (descriptor && IDHackStage::supportsQuery(*canonicalQuery)) {
         LOG(2) << "Using idhack: " << canonicalQuery->toStringShort();
 
-        *rootOut = new IDHackStage(opCtx, collection, canonicalQuery, ws);
+        *rootOut = new IDHackStage(opCtx, collection, canonicalQuery, ws, descriptor);
 
         // Might have to filter out orphaned docs.
         if (plannerParams.options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
@@ -449,8 +450,9 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutor(OperationContext* txn,
         return PlanExecutor::make(txn, std::move(ws), std::move(eofStage), ns, yieldPolicy);
     }
 
-    if (!CanonicalQuery::isSimpleIdQuery(unparsedQuery) ||
-        !collection->getIndexCatalog()->findIdIndex(txn)) {
+    const IndexDescriptor* descriptor = collection->getIndexCatalog()->findIdIndex(txn);
+
+    if (!descriptor || !CanonicalQuery::isSimpleIdQuery(unparsedQuery)) {
         const WhereCallbackReal whereCallback(txn, collection->ns().db());
         auto statusWithCQ =
             CanonicalQuery::canonicalize(collection->ns(), unparsedQuery, whereCallback);
@@ -466,8 +468,8 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutor(OperationContext* txn,
     LOG(2) << "Using idhack: " << unparsedQuery.toString();
 
     unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
-    unique_ptr<PlanStage> root =
-        make_unique<IDHackStage>(txn, collection, unparsedQuery["_id"].wrap(), ws.get());
+    unique_ptr<PlanStage> root = make_unique<IDHackStage>(
+        txn, collection, unparsedQuery["_id"].wrap(), ws.get(), descriptor);
 
     // Might have to filter out orphaned docs.
     if (plannerOptions & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
@@ -711,12 +713,14 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorDelete(OperationContext* txn,
             return PlanExecutor::make(txn, std::move(ws), std::move(deleteStage), nss.ns(), policy);
         }
 
-        if (CanonicalQuery::isSimpleIdQuery(unparsedQuery) &&
-            collection->getIndexCatalog()->findIdIndex(txn) && request->getProj().isEmpty()) {
+        const IndexDescriptor* descriptor = collection->getIndexCatalog()->findIdIndex(txn);
+
+        if (descriptor && CanonicalQuery::isSimpleIdQuery(unparsedQuery) &&
+            request->getProj().isEmpty()) {
             LOG(2) << "Using idhack: " << unparsedQuery.toString();
 
             PlanStage* idHackStage =
-                new IDHackStage(txn, collection, unparsedQuery["_id"].wrap(), ws.get());
+                new IDHackStage(txn, collection, unparsedQuery["_id"].wrap(), ws.get(), descriptor);
             unique_ptr<DeleteStage> root =
                 make_unique<DeleteStage>(txn, deleteStageParams, ws.get(), collection, idHackStage);
             return PlanExecutor::make(txn, std::move(ws), std::move(root), collection, policy);
@@ -853,12 +857,14 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorUpdate(OperationContext* txn,
                 txn, std::move(ws), std::move(updateStage), nsString.ns(), policy);
         }
 
-        if (CanonicalQuery::isSimpleIdQuery(unparsedQuery) &&
-            collection->getIndexCatalog()->findIdIndex(txn) && request->getProj().isEmpty()) {
+        const IndexDescriptor* descriptor = collection->getIndexCatalog()->findIdIndex(txn);
+
+        if (descriptor && CanonicalQuery::isSimpleIdQuery(unparsedQuery) &&
+            request->getProj().isEmpty()) {
             LOG(2) << "Using idhack: " << unparsedQuery.toString();
 
             PlanStage* idHackStage =
-                new IDHackStage(txn, collection, unparsedQuery["_id"].wrap(), ws.get());
+                new IDHackStage(txn, collection, unparsedQuery["_id"].wrap(), ws.get(), descriptor);
             unique_ptr<UpdateStage> root =
                 make_unique<UpdateStage>(txn, updateStageParams, ws.get(), collection, idHackStage);
             return PlanExecutor::make(txn, std::move(ws), std::move(root), collection, policy);

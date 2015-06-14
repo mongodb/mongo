@@ -160,7 +160,7 @@ MONGO_INITIALIZER(AuthorizationBuiltinRoles)(InitializerContext* context) {
     // clusterMonitor role actions that target a database (or collection) resource
     clusterMonitorRoleDatabaseActions << ActionType::collStats  // dbAdmin gets this also
                                       << ActionType::dbStats    // dbAdmin gets this also
-                                      << ActionType::getShardVersion;
+                                      << ActionType::getShardVersion << ActionType::indexStats;
 
     // hostManager role actions that target the cluster resource
     hostManagerRoleClusterActions

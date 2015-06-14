@@ -100,6 +100,7 @@ docSourceEnv.Library(
         'document_source.cpp',
         'document_source_geo_near.cpp',
         'document_source_group.cpp',
+        'document_source_index_stats.cpp',
         'document_source_limit.cpp',
         'document_source_match.cpp',
         'document_source_merge_cursors.cpp',

@@ -39,6 +39,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/geo/geoconstants.h"
 #include "mongo/db/geo/geoparser.h"
 #include "mongo/db/index/index_descriptor.h"
@@ -212,7 +213,8 @@ public:
 
         BSONObj currObj;
         long long results = 0;
-        while ((results < numWanted) && PlanExecutor::ADVANCED == exec->getNext(&currObj, NULL)) {
+        PlanExecutor::ExecState state;
+        while (PlanExecutor::ADVANCED == (state = exec->getNext(&currObj, NULL))) {
             // Come up with the correct distance.
             double dist = currObj["$dis"].number() * distanceMultiplier;
             totalDistance += dist;
@@ -249,10 +251,29 @@ public:
             }
             oneResultBuilder.append("obj", resObj);
             oneResultBuilder.done();
+
             ++results;
+
+            // Break if we have the number of requested result documents.
+            if (results >= numWanted) {
+                break;
+            }
         }
 
         resultBuilder.done();
+
+        // Return an error if execution fails for any reason.
+        if (PlanExecutor::FAILURE == state || PlanExecutor::DEAD == state) {
+            const std::unique_ptr<PlanStageStats> stats(exec->getStats());
+            log() << "Plan executor error during geoNear command: " << PlanExecutor::statestr(state)
+                  << ", stats: " << Explain::statsToBSON(*stats);
+
+            return appendCommandStatus(result,
+                                       Status(ErrorCodes::OperationFailed,
+                                              str::stream()
+                                                  << "Executor error during geoNear command: "
+                                                  << WorkingSetCommon::toStatusString(currObj)));
+        }
 
         // Fill out the stats subobj.
         BSONObjBuilder stats(result.subobjStart("stats"));
@@ -260,6 +281,10 @@ public:
         // Fill in nscanned from the explain.
         PlanSummaryStats summary;
         Explain::getSummaryStats(*exec, &summary);
+        if (collection) {
+            collection->infoCache()->notifyOfQuery(txn, summary.indexesUsed);
+        }
+
         stats.appendNumber("nscanned", summary.totalKeysExamined);
         stats.appendNumber("objectsLoaded", summary.totalDocsExamined);
 

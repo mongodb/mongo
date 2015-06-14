@@ -277,7 +277,7 @@ public:
             // there is no ClientCursor id, and then return.
             const long long numResults = 0;
             const CursorId cursorId = 0;
-            endQueryOp(txn, *exec, dbProfilingLevel, numResults, cursorId);
+            endQueryOp(txn, collection, *exec, dbProfilingLevel, numResults, cursorId);
             appendCursorResponseObject(cursorId, nss.ns(), BSONArray(), &result);
             return true;
         }
@@ -354,7 +354,7 @@ public:
         }
 
         // Fill out curop based on the results.
-        endQueryOp(txn, *cursorExec, dbProfilingLevel, numResults, cursorId);
+        endQueryOp(txn, collection, *cursorExec, dbProfilingLevel, numResults, cursorId);
 
         // 7) Generate the response object to send to the client.
         appendCursorResponseObject(cursorId, nss.ns(), firstBatch.arr(), &result);

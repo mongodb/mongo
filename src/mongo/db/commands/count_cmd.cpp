@@ -157,6 +157,12 @@ public:
             return appendCommandStatus(result, execPlanStatus);
         }
 
+        PlanSummaryStats summaryStats;
+        Explain::getSummaryStats(*exec, &summaryStats);
+        if (collection) {
+            collection->infoCache()->notifyOfQuery(txn, summaryStats.indexesUsed);
+        }
+
         // Plan is done executing. We just need to pull the count out of the root stage.
         invariant(STAGE_COUNT == exec->getRootStage()->stageType());
         CountStage* countStage = static_cast<CountStage*>(exec->getRootStage());

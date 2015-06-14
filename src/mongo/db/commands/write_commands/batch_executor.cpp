@@ -1250,11 +1250,14 @@ static void multiUpdate(OperationContext* txn,
             result->getStats().n = didInsert ? 1 : numMatched;
             result->getStats().upsertedID = resUpsertedID;
 
+            PlanSummaryStats summary;
+            Explain::getSummaryStats(*exec, &summary);
+            collection->infoCache()->notifyOfQuery(txn, summary.indexesUsed);
+
             // No-ops need to reset lastOp in the client, for write concern.
             if (repl::ReplClientInfo::forClient(client).getLastOp() == lastOpAtOperationStart) {
                 repl::ReplClientInfo::forClient(client).setLastOpToSystemLastOpTime(txn);
             }
-
         } catch (const WriteConflictException& dle) {
             debug->writeConflicts++;
             if (isMulti) {
@@ -1335,18 +1338,23 @@ static void multiRemove(OperationContext* txn,
                 return;
             }
 
-            std::unique_ptr<PlanExecutor> exec = uassertStatusOK(
-                getExecutorDelete(txn, autoDb.getDb()->getCollection(nss), &parsedDelete));
+            auto collection = autoDb.getDb()->getCollection(nss);
+
+            std::unique_ptr<PlanExecutor> exec =
+                uassertStatusOK(getExecutorDelete(txn, collection, &parsedDelete));
 
             // Execute the delete and retrieve the number deleted.
             uassertStatusOK(exec->executePlan());
             result->getStats().n = DeleteStage::getNumDeleted(*exec);
 
+            PlanSummaryStats summary;
+            Explain::getSummaryStats(*exec, &summary);
+            collection->infoCache()->notifyOfQuery(txn, summary.indexesUsed);
+
             // No-ops need to reset lastOp in the client, for write concern.
             if (repl::ReplClientInfo::forClient(client).getLastOp() == lastOpAtOperationStart) {
                 repl::ReplClientInfo::forClient(client).setLastOpToSystemLastOpTime(txn);
             }
-
             break;
         } catch (const WriteConflictException& dle) {
             CurOp::get(txn)->debug().writeConflicts++;

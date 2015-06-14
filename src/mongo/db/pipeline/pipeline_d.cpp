@@ -93,6 +93,25 @@ public:
         return _client.getLastErrorDetailed();
     }
 
+    CollectionIndexUsageMap getIndexStats(OperationContext* opCtx,
+                                          const NamespaceString& ns) final {
+        AutoGetDb autoDb(opCtx, ns.db(), MODE_IS);
+
+        uassert(28804,
+                str::stream() << "Database not found on index stats retrieval: " << ns.db(),
+                autoDb.getDb());
+
+        Lock::CollectionLock colLock(opCtx->lockState(), ns.ns(), MODE_IS);
+
+        Collection* collection = autoDb.getDb()->getCollection(ns);
+
+        uassert(28795,
+                str::stream() << "Collection not found on index stats retrieval: " << ns.ns(),
+                collection);
+
+        return collection->infoCache()->getIndexUsageStats();
+    }
+
 private:
     intrusive_ptr<ExpressionContext> _ctx;
     DBDirectClient _client;

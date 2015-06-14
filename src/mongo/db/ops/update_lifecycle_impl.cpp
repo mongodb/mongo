@@ -68,7 +68,7 @@ bool UpdateLifecycleImpl::canContinue() const {
 
 const UpdateIndexData* UpdateLifecycleImpl::getIndexKeys(OperationContext* opCtx) const {
     if (_collection)
-        return &_collection->infoCache()->indexKeys(opCtx);
+        return &_collection->infoCache()->getIndexKeys(opCtx);
     return NULL;
 }
 

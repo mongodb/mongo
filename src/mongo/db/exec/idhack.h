@@ -37,6 +37,7 @@
 
 namespace mongo {
 
+class IndexAccessMethod;
 class RecordCursor;
 
 /**
@@ -49,9 +50,14 @@ public:
     IDHackStage(OperationContext* txn,
                 const Collection* collection,
                 CanonicalQuery* query,
-                WorkingSet* ws);
+                WorkingSet* ws,
+                const IndexDescriptor* descriptor);
 
-    IDHackStage(OperationContext* txn, Collection* collection, const BSONObj& key, WorkingSet* ws);
+    IDHackStage(OperationContext* txn,
+                Collection* collection,
+                const BSONObj& key,
+                WorkingSet* ws,
+                const IndexDescriptor* descriptor);
 
     ~IDHackStage();
 
@@ -94,6 +100,9 @@ private:
 
     // The WorkingSet we annotate with results.  Not owned by us.
     WorkingSet* _workingSet;
+
+    // Not owned here.
+    const IndexAccessMethod* _accessMethod;
 
     // The value to match against the _id field.
     BSONObj _key;
