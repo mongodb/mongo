@@ -1345,10 +1345,6 @@ namespace {
         return _getShardCount(BSON(ShardType::host(connectionString.toString())));
     }
 
-    bool CatalogManagerLegacy::doShardsExist() {
-        return _getShardCount() > 0;
-    }
-
     bool CatalogManagerLegacy::runUserManagementWriteCommand(const string& commandName,
                                                              const string& dbname,
                                                              const BSONObj& cmdObj,

@@ -266,8 +266,6 @@ namespace mongo {
 
     };
 
-    extern DBConnectionPool pool;
-
     class AScopedConnection : boost::noncopyable {
     public:
         AScopedConnection() { _numConnections.fetchAndAdd(1); }
@@ -300,13 +298,8 @@ namespace mongo {
         /** the main constructor you want to use
             throws UserException if can't connect
             */
-        explicit ScopedDbConnection(const std::string& host, double socketTimeout = 0) : _host(host), _conn( pool.get(host, socketTimeout) ), _socketTimeout( socketTimeout ) {
-            _setSocketTimeout();
-        }
-
-        explicit ScopedDbConnection(const ConnectionString& host, double socketTimeout = 0) : _host(host.toString()), _conn( pool.get(host, socketTimeout) ), _socketTimeout( socketTimeout ) {
-            _setSocketTimeout();
-        }
+        explicit ScopedDbConnection(const std::string& host, double socketTimeout = 0);
+        explicit ScopedDbConnection(const ConnectionString& host, double socketTimeout = 0);
 
         ScopedDbConnection() : _host( "" ) , _conn(0), _socketTimeout( 0 ) {}
 
@@ -315,9 +308,9 @@ namespace mongo {
             _setSocketTimeout();
         }
 
-        static void clearPool();
-
         ~ScopedDbConnection();
+
+        static void clearPool();
 
         /** get the associated connection object */
         DBClientBase* operator->() {
@@ -355,18 +348,7 @@ namespace mongo {
             we can't be sure we fully read all expected data of a reply on the socket.  so
             we don't try to reuse the connection in that situation.
         */
-        void done() {
-            if ( ! _conn )
-                return;
-
-            /* we could do this, but instead of assume one is using autoreconnect mode on the connection
-            if ( _conn->isFailed() )
-                kill();
-            else
-            */
-            pool.release(_host, _conn);
-            _conn = 0;
-        }
+        void done();
 
     private:
 

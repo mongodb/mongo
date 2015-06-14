@@ -269,12 +269,6 @@ namespace mongo {
         virtual bool isShardHost(const ConnectionString& shardConnectionString) = 0;
 
         /**
-         * Returns true if there are any shards in the sharded cluster.
-         * Otherwise, returns false.
-         */
-        virtual bool doShardsExist() = 0;
-
-        /**
          * Runs a user management command on the config servers.
          * @param commandName: name of command
          * @param dbname: database for which the user management command is invoked

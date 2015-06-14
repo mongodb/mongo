@@ -105,8 +105,6 @@ namespace mongo {
 
         bool isShardHost(const ConnectionString& shardConnectionString) override;
 
-        bool doShardsExist() override;
-
         /**
          * Grabs a distributed lock and runs the command on all config servers.
          */

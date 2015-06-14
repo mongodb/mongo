@@ -37,6 +37,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/client/global_conn_pool.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/db/dbmessage.h"
@@ -702,7 +703,7 @@ namespace {
         // callback. We should eventually not need this after we remove the
         // callback.
         DBClientConnection* newConn = dynamic_cast<DBClientConnection*>(
-                pool.get(_lastSlaveOkHost.toString(), _so_timeout));
+                globalConnPool.get(_lastSlaveOkHost.toString(), _so_timeout));
 
         // Assert here instead of returning NULL since the contract of this method is such
         // that returning NULL means none of the nodes were good, which is not the case here.
@@ -1027,7 +1028,7 @@ namespace {
             }
 
             // If the connection was bad, the pool will clean it up.
-            pool.release(_lastSlaveOkHost.toString(), _lastSlaveOkConn.release());
+            globalConnPool.release(_lastSlaveOkHost.toString(), _lastSlaveOkConn.release());
         }
 
         _lastSlaveOkHost = HostAndPort();

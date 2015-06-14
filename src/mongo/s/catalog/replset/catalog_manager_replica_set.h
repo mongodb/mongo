@@ -118,8 +118,6 @@ namespace executor {
 
         bool isShardHost(const ConnectionString& shardConnectionString) override;
 
-        bool doShardsExist() override;
-
         bool runUserManagementWriteCommand(const std::string& commandName,
                                            const std::string& dbname,
                                            const BSONObj& cmdObj,

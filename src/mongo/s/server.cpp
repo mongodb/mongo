@@ -39,6 +39,7 @@
 #include "mongo/base/status.h"
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclient_rs.h"
+#include "mongo/client/global_conn_pool.h"
 #include "mongo/client/remote_command_runner_impl.h"
 #include "mongo/client/remote_command_targeter_factory_impl.h"
 #include "mongo/client/replica_set_monitor.h"
@@ -204,11 +205,9 @@ static ExitCode runMongosServer( bool doUpgrade ) {
     setThreadName( "mongosMain" );
     printShardingVersionInfo( false );
 
-    // set some global state
-
     // Add sharding hooks to both connection pools - ShardingConnectionHook includes auth hooks
-    pool.addHook( new ShardingConnectionHook( false ) );
-    shardConnectionPool.addHook( new ShardingConnectionHook( true ) );
+    globalConnPool.addHook(new ShardingConnectionHook(false));
+    shardConnectionPool.addHook(new ShardingConnectionHook(true));
 
     // Mongos shouldn't lazily kill cursors, otherwise we can end up with extras from migration
     DBClientConnection::setLazyKillCursor( false );

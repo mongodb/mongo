@@ -39,6 +39,7 @@
 #include <vector>
 
 #include "mongo/client/connpool.h"
+#include "mongo/client/global_conn_pool.h"
 #include "mongo/client/remote_command_runner_impl.h"
 #include "mongo/client/remote_command_targeter_factory_impl.h"
 #include "mongo/db/auth/action_set.h"
@@ -892,8 +893,9 @@ namespace mongo {
         boost::lock_guard<boost::mutex> lk(lock);
         if (!done) {
             log() << "first cluster operation detected, adding sharding hook to enable versioning "
-                    "and authentication to remote servers" << endl;
-            pool.addHook(new ShardingConnectionHook(false));
+                     "and authentication to remote servers";
+
+            globalConnPool.addHook(new ShardingConnectionHook(false));
             shardConnectionPool.addHook(new ShardingConnectionHook(true));
             done = true;
         }

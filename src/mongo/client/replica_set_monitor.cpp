@@ -347,7 +347,7 @@ namespace {
 
         // Kill all pooled ReplicaSetConnections for this set. They will not function correctly
         // after we kill the ReplicaSetMonitor.
-        pool.removeHost(name);
+        globalConnPool.removeHost(name);
     }
 
     void ReplicaSetMonitor::setConfigChangeHook(ConfigChangeHook hook) {

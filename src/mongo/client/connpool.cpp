@@ -467,6 +467,31 @@ namespace mongo {
 
     // ------ ScopedDbConnection ------
 
+    ScopedDbConnection::ScopedDbConnection(const std::string& host, double socketTimeout)
+        : _host(host),
+          _conn(globalConnPool.get(host, socketTimeout)),
+          _socketTimeout(socketTimeout) {
+
+        _setSocketTimeout();
+    }
+
+    ScopedDbConnection::ScopedDbConnection(const ConnectionString& host, double socketTimeout)
+        : _host(host.toString()),
+          _conn(globalConnPool.get(host, socketTimeout)),
+          _socketTimeout(socketTimeout) {
+
+        _setSocketTimeout();
+    }
+
+    void ScopedDbConnection::done() {
+        if (!_conn) {
+            return;
+        }
+
+        globalConnPool.release(_host, _conn);
+        _conn = NULL;
+    }
+
     void ScopedDbConnection::_setSocketTimeout(){
         if( ! _conn ) return;
         if( _conn->type() == ConnectionString::MASTER )
@@ -498,7 +523,7 @@ namespace mongo {
     }
 
     void ScopedDbConnection::clearPool() {
-        pool.clear();
+        globalConnPool.clear();
     }
 
     AtomicInt32 AScopedConnection::_numConnections;

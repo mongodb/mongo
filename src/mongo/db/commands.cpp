@@ -41,6 +41,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/client/connpool.h"
+#include "mongo/client/global_conn_pool.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
@@ -54,6 +55,7 @@
 #include "mongo/db/server_parameters.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata.h"
+#include "mongo/s/client/shard_connection.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/write_ops/wc_error_detail.h"
 #include "mongo/util/log.h"
@@ -512,10 +514,6 @@ namespace {
         }
     }
 
-    extern DBConnectionPool pool;
-    // This is mainly used by the internal writes using write commands.
-    extern DBConnectionPool shardConnectionPool;
-
     class PoolFlushCmd : public Command {
     public:
         PoolFlushCmd() : Command( "connPoolSync" , false , "connpoolsync" ) {}
@@ -536,7 +534,7 @@ namespace {
                          std::string&,
                          mongo::BSONObjBuilder& result) {
             shardConnectionPool.flush();
-            pool.flush();
+            globalConnPool.flush();
             return true;
         }
         virtual bool slaveOk() const {
@@ -563,7 +561,8 @@ namespace {
                          int,
                          std::string&,
                          mongo::BSONObjBuilder& result) {
-            pool.appendInfo( result );
+
+            globalConnPool.appendInfo(result);
             result.append( "numDBClientConnection" , DBClientConnection::getNumConnections() );
             result.append( "numAScopedConnection" , AScopedConnection::getNumConnections() );
             return true;

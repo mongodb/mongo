@@ -225,10 +225,6 @@ namespace {
         return false;
     }
 
-    bool CatalogManagerReplicaSet::doShardsExist() {
-        return false;
-    }
-
     bool CatalogManagerReplicaSet::runUserManagementWriteCommand(const std::string& commandName,
                                                                  const std::string& dbname,
                                                                  const BSONObj& cmdObj,
