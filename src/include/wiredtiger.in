@@ -442,7 +442,7 @@ struct __wt_cursor {
 	int __F(insert)(WT_CURSOR *cursor);
 
 	/*!
-	 * Update a record and optionally insert an existing record.
+	 * Update an existing record and optionally insert a record.
 	 *
 	 * If the cursor was configured with "overwrite=true" (the default),
 	 * both the key and value must be set; if the record already exists, the
