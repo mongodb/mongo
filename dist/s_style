@@ -55,7 +55,7 @@ for f in \
 	fi
 
 	if grep "(unsigned)" $f > $t; then
-		echo "$f: (unsigned) cast is wrong"
+		echo "$f: (unsigned) cast should be u_int"
 		cat $t
 	fi
 
