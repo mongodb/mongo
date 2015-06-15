@@ -61,10 +61,11 @@
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
+namespace mongo {
+
 using std::endl;
 using std::unique_ptr;
-
-namespace mongo {
+using stdx::make_unique;
 
 // The .h for this in find_constants.h.
 const int32_t MaxBytesToReturnToClientAtOnce = 4 * 1024 * 1024;
@@ -236,19 +237,67 @@ void endQueryOp(OperationContext* txn,
     }
 }
 
+namespace {
+
+/**
+ * Uses 'cursor' to fill out 'bb' with the batch of result documents to
+ * be returned by this getMore.
+ *
+ * Returns the number of documents in the batch in 'numResults', which must be initialized to
+ * zero by the caller. Returns the final ExecState returned by the cursor in *state. Returns
+ * whether or not to save the ClientCursor in 'shouldSaveCursor'. Returns the slave's time to
+ * read until in 'slaveReadTill' (for master/slave).
+ *
+ * Returns an OK status if the batch was successfully generated, and a non-OK status if the
+ * PlanExecutor encounters a failure.
+ */
+void generateBatch(int ntoreturn,
+                   ClientCursor* cursor,
+                   BufBuilder* bb,
+                   int* numResults,
+                   Timestamp* slaveReadTill,
+                   PlanExecutor::ExecState* state) {
+    PlanExecutor* exec = cursor->getExecutor();
+
+    BSONObj obj;
+    while (PlanExecutor::ADVANCED == (*state = exec->getNext(&obj, NULL))) {
+        // Add result to output buffer.
+        bb->appendBuf((void*)obj.objdata(), obj.objsize());
+
+        // Count the result.
+        (*numResults)++;
+
+        // Possibly note slave's position in the oplog.
+        if (cursor->queryOptions() & QueryOption_OplogReplay) {
+            BSONElement e = obj["ts"];
+            if (BSONType::Date == e.type() || BSONType::bsonTimestamp == e.type()) {
+                *slaveReadTill = e.timestamp();
+            }
+        }
+
+        if (enoughForGetMore(ntoreturn, *numResults, bb->len())) {
+            break;
+        }
+    }
+
+    if (PlanExecutor::DEAD == *state || PlanExecutor::FAILURE == *state) {
+        // Propagate this error to caller.
+        const unique_ptr<PlanStageStats> stats(exec->getStats());
+        error() << "getMore executor error, stats: " << Explain::statsToBSON(*stats);
+        uasserted(17406, "getMore executor error: " + WorkingSetCommon::toStatusString(obj));
+    }
+}
+
+}  // namespace
+
 /**
  * Called by db/instance.cpp.  This is the getMore entry point.
- *
- * pass - when QueryOption_AwaitData is in use, the caller will make repeated calls
- *        when this method returns an empty result, incrementing pass on each call.
- *        Thus, pass == 0 indicates this is the first "attempt" before any 'awaiting'.
  */
 QueryResult::View getMore(OperationContext* txn,
                           const char* ns,
                           int ntoreturn,
                           long long cursorid,
-                          int pass,
-                          bool& exhaust,
+                          bool* exhaust,
                           bool* isCursorAuthorized) {
     CurOp& curop = *CurOp::get(txn);
 
@@ -257,7 +306,7 @@ QueryResult::View getMore(OperationContext* txn,
         invariant(0);
     }
 
-    exhaust = false;
+    *exhaust = false;
 
     const NamespaceString nss(ns);
 
@@ -354,7 +403,7 @@ QueryResult::View getMore(OperationContext* txn,
                     getGlobalServiceContext()->getGlobalStorageEngine()->newRecoveryUnit());
             }
             // Swap RecoveryUnit(s) between the ClientCursor and OperationContext.
-            ruSwapper.reset(new ScopedRecoveryUnitSwapper(cc, txn));
+            ruSwapper = make_unique<ScopedRecoveryUnitSwapper>(cc, txn);
         }
 
         // Reset timeout timer on the cursor since the cursor is still in use.
@@ -373,9 +422,7 @@ QueryResult::View getMore(OperationContext* txn,
             curop.setQuery_inlock(cc->getQuery());
         }
 
-        if (0 == pass) {
-            cc->updateSlaveLocation(txn);
-        }
+        cc->updateSlaveLocation(txn);
 
         if (cc->isAggCursor()) {
             // Agg cursors handle their own locking internally.
@@ -388,50 +435,47 @@ QueryResult::View getMore(OperationContext* txn,
         // What number result are we starting at?  Used to fill out the reply.
         startingResult = cc->pos();
 
-        // What gives us results.
         PlanExecutor* exec = cc->getExecutor();
-        const int queryOptions = cc->queryOptions();
-
-        // Get results out of the executor.
         exec->restoreState(txn);
 
-        BSONObj obj;
         PlanExecutor::ExecState state;
-        while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL))) {
-            // Add result to output buffer.
-            bb.appendBuf((void*)obj.objdata(), obj.objsize());
 
-            // Count the result.
-            ++numResults;
+        generateBatch(ntoreturn, cc, &bb, &numResults, &slaveReadTill, &state);
 
-            // Possibly note slave's position in the oplog.
-            if (queryOptions & QueryOption_OplogReplay) {
-                BSONElement e = obj["ts"];
-                if (Date == e.type() || bsonTimestamp == e.type()) {
-                    slaveReadTill = e.timestamp();
-                }
-            }
+        // If this is an await data cursor, and we hit EOF without generating any results, then
+        // we block waiting for new data to arrive.
+        if (isCursorAwaitData(cc) && state == PlanExecutor::IS_EOF && numResults == 0) {
+            // Retrieve the notifier which we will wait on until new data arrives. We make sure
+            // to do this in the lock because once we drop the lock it is possible for the
+            // collection to become invalid. The notifier itself will outlive the collection if
+            // the collection is dropped, as we keep a shared_ptr to it.
+            auto notifier = ctx->getCollection()->getCappedInsertNotifier();
 
-            if (enoughForGetMore(ntoreturn, numResults, bb.len())) {
-                break;
-            }
+            // Save the PlanExecutor and drop our locks.
+            exec->saveState();
+            ctx.reset();
+
+            // Block waiting for data for up to 1 second.
+            Seconds timeout(1);
+            uint64_t lastInsertCount = notifier->getCount();
+            notifier->waitForInsert(lastInsertCount, timeout);
+            notifier.reset();
+
+            // Reacquiring locks.
+            ctx = make_unique<AutoGetCollectionForRead>(txn, nss);
+            exec->restoreState(txn);
+
+            // We woke up because either the timed_wait expired, or there was more data. Either
+            // way, attempt to generate another batch of results.
+            generateBatch(ntoreturn, cc, &bb, &numResults, &slaveReadTill, &state);
         }
-
-        if (PlanExecutor::DEAD == state || PlanExecutor::FAILURE == state) {
-            // Propagate this error to caller.
-            const unique_ptr<PlanStageStats> stats(exec->getStats());
-            error() << "getMore executor error, stats: " << Explain::statsToBSON(*stats);
-            uasserted(17406, "getMore executor error: " + WorkingSetCommon::toStatusString(obj));
-        }
-
-        const bool shouldSaveCursor = shouldSaveCursorGetMore(state, exec, isCursorTailable(cc));
 
         // In order to deregister a cursor, we need to be holding the DB + collection lock and
         // if the cursor is aggregation, we release these locks.
         if (cc->isAggCursor()) {
             invariant(NULL == ctx.get());
-            unpinDBLock.reset(new Lock::DBLock(txn->lockState(), nss.db(), MODE_IS));
-            unpinCollLock.reset(new Lock::CollectionLock(txn->lockState(), nss.ns(), MODE_IS));
+            unpinDBLock = make_unique<Lock::DBLock>(txn->lockState(), nss.db(), MODE_IS);
+            unpinCollLock = make_unique<Lock::CollectionLock>(txn->lockState(), nss.ns(), MODE_IS);
         }
 
         // Our two possible ClientCursorPin cleanup paths are:
@@ -440,7 +484,7 @@ QueryResult::View getMore(OperationContext* txn,
         //    this case, the pin's destructor will be invoked, which will call release() on the
         //    pin.  Because our ClientCursorPin is declared after our lock is declared, this
         //    will happen under the lock.
-        if (!shouldSaveCursor) {
+        if (!shouldSaveCursorGetMore(state, exec, isCursorTailable(cc))) {
             ruSwapper.reset();
             ccPin.deleteUnderlying();
 
@@ -458,25 +502,19 @@ QueryResult::View getMore(OperationContext* txn,
             LOG(5) << "getMore saving client cursor ended with state "
                    << PlanExecutor::statestr(state) << endl;
 
-            if (PlanExecutor::IS_EOF == state && (queryOptions & QueryOption_CursorTailable)) {
+            if (PlanExecutor::IS_EOF == state && isCursorTailable(cc)) {
                 if (!txn->getClient()->isInDirectClient()) {
                     // Don't stash the RU. Get a new one on the next getMore.
                     ruSwapper->dismiss();
                 }
-
-                if ((queryOptions & QueryOption_AwaitData) && (numResults == 0) && (pass < 1000)) {
-                    // Bubble up to the AwaitData handling code in receivedGetMore which will
-                    // try again.
-                    return NULL;
-                }
             }
 
             // Possibly note slave's position in the oplog.
-            if ((queryOptions & QueryOption_OplogReplay) && !slaveReadTill.isNull()) {
+            if ((cc->queryOptions() & QueryOption_OplogReplay) && !slaveReadTill.isNull()) {
                 cc->slaveReadTill(slaveReadTill);
             }
 
-            exhaust = (queryOptions & QueryOption_Exhaust);
+            *exhaust = cc->queryOptions() & QueryOption_Exhaust;
 
             // If the getmore had a time limit, remaining time is "rolled over" back to the
             // cursor (for use by future getmore ops).

@@ -151,8 +151,7 @@ QueryResult::View getMore(OperationContext* txn,
                           const char* ns,
                           int ntoreturn,
                           long long cursorid,
-                          int pass,
-                          bool& exhaust,
+                          bool* exhaust,
                           bool* isCursorAuthorized);
 
 /**

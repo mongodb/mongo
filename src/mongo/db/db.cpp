@@ -146,8 +146,6 @@ ntservice::NtServiceDefaultStrings defaultServiceStrings = {
 
 Timer startupSrandTimer;
 
-QueryResult::View emptyMoreResult(long long);
-
 class MyMessageHandler : public MessageHandler {
 public:
     virtual void connected(AbstractMessagingPort* p) {

@@ -278,7 +278,7 @@ public:
         }
 
         // If this is an await data cursor, and we hit EOF without generating any results, then
-        // we block waiting for new oplog data to arrive.
+        // we block waiting for new data to arrive.
         if (isCursorAwaitData(cursor) && state == PlanExecutor::IS_EOF && numResults == 0) {
             // Retrieve the notifier which we will wait on until new data arrives. We make sure
             // to do this in the lock because once we drop the lock it is possible for the

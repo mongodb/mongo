@@ -110,11 +110,6 @@ Status applyOperation_inlock(OperationContext* txn,
 Status applyCommand_inlock(OperationContext* txn, const BSONObj& op);
 
 /**
- * Waits up to one second for the Timestamp from the oplog to change.
- */
-void waitUpToOneSecondForTimestampChange(const Timestamp& referenceTime);
-
-/**
  * Initializes the global Timestamp with the value from the timestamp of the last oplog entry.
  */
 void initTimestampFromOplog(OperationContext* txn, const std::string& oplogNS);

@@ -807,15 +807,6 @@ Status applyCommand_inlock(OperationContext* txn, const BSONObj& op) {
     return Status::OK();
 }
 
-void waitUpToOneSecondForTimestampChange(const Timestamp& referenceTime) {
-    stdx::unique_lock<stdx::mutex> lk(newOpMutex);
-
-    while (referenceTime == getLastSetTimestamp()) {
-        if (stdx::cv_status::timeout == newTimestampNotifier.wait_for(lk, stdx::chrono::seconds(1)))
-            return;
-    }
-}
-
 void setNewTimestamp(const Timestamp& newTime) {
     stdx::lock_guard<stdx::mutex> lk(newOpMutex);
     setGlobalTimestamp(newTime);

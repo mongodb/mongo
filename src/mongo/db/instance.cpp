@@ -806,11 +806,7 @@ void receivedDelete(OperationContext* txn, const NamespaceString& nsString, Mess
     }
 }
 
-QueryResult::View emptyMoreResult(long long);
-
 bool receivedGetMore(OperationContext* txn, DbResponse& dbresponse, Message& m, CurOp& curop) {
-    bool ok = true;
-
     DbMessage d(m);
 
     const char* ns = d.getns();
@@ -825,89 +821,44 @@ bool receivedGetMore(OperationContext* txn, DbResponse& dbresponse, Message& m, 
         CurOp::get(txn)->setNS_inlock(ns);
     }
 
-    unique_ptr<AssertionException> ex;
-    unique_ptr<Timer> timer;
-    int pass = 0;
     bool exhaust = false;
     QueryResult::View msgdata = 0;
-    Timestamp last;
-    while (1) {
-        bool isCursorAuthorized = false;
-        try {
-            const NamespaceString nsString(ns);
-            uassert(16258, str::stream() << "Invalid ns [" << ns << "]", nsString.isValid());
+    bool isCursorAuthorized = false;
 
-            Status status = AuthorizationSession::get(txn->getClient())
-                                ->checkAuthForGetMore(nsString, cursorid);
-            audit::logGetMoreAuthzCheck(txn->getClient(), nsString, cursorid, status.code());
-            uassertStatusOK(status);
+    try {
+        const NamespaceString nsString(ns);
+        uassert(16258, str::stream() << "Invalid ns [" << ns << "]", nsString.isValid());
 
-            if (str::startsWith(ns, "local.oplog.")) {
-                while (MONGO_FAIL_POINT(rsStopGetMore)) {
-                    sleepmillis(0);
-                }
+        Status status =
+            AuthorizationSession::get(txn->getClient())->checkAuthForGetMore(nsString, cursorid);
+        audit::logGetMoreAuthzCheck(txn->getClient(), nsString, cursorid, status.code());
+        uassertStatusOK(status);
 
-                if (pass == 0) {
-                    last = getLastSetTimestamp();
-                } else {
-                    repl::waitUpToOneSecondForTimestampChange(last);
-                }
-            }
-
-            msgdata = getMore(txn, ns, ntoreturn, cursorid, pass, exhaust, &isCursorAuthorized);
-        } catch (AssertionException& e) {
-            if (isCursorAuthorized) {
-                // If a cursor with id 'cursorid' was authorized, it may have been advanced
-                // before an exception terminated processGetMore.  Erase the ClientCursor
-                // because it may now be out of sync with the client's iteration state.
-                // SERVER-7952
-                // TODO Temporary code, see SERVER-4563 for a cleanup overview.
-                CursorManager::eraseCursorGlobal(txn, cursorid);
-            }
-            ex.reset(new AssertionException(e.getInfo().msg, e.getCode()));
-            ok = false;
-            break;
+        while (MONGO_FAIL_POINT(rsStopGetMore)) {
+            sleepmillis(0);
         }
 
-        if (msgdata.view2ptr() == 0) {
-            // this should only happen with QueryOption_AwaitData
-            exhaust = false;
-            massert(13073, "shutting down", !inShutdown());
-            if (!timer) {
-                timer.reset(new Timer());
-            } else {
-                if (timer->seconds() >= 4) {
-                    // after about 4 seconds, return. pass stops at 1000 normally.
-                    // we want to return occasionally so slave can checkpoint.
-                    pass = 10000;
-                }
-            }
-            pass++;
-            if (kDebugBuild)
-                sleepmillis(20);
-            else
-                sleepmillis(2);
-
-            // note: the 1100 is beacuse of the waitForDifferent above
-            // should eventually clean this up a bit
-            curop.setExpectedLatencyMs(1100 + timer->millis());
-
-            continue;
+        msgdata = getMore(txn, ns, ntoreturn, cursorid, &exhaust, &isCursorAuthorized);
+    } catch (AssertionException& e) {
+        if (isCursorAuthorized) {
+            // If a cursor with id 'cursorid' was authorized, it may have been advanced
+            // before an exception terminated processGetMore.  Erase the ClientCursor
+            // because it may now be out of sync with the client's iteration state.
+            // SERVER-7952
+            // TODO Temporary code, see SERVER-4563 for a cleanup overview.
+            CursorManager::eraseCursorGlobal(txn, cursorid);
         }
-        break;
-    };
 
-    if (ex) {
         BSONObjBuilder err;
-        ex->getInfo().append(err);
+        e.getInfo().append(err);
         BSONObj errObj = err.done();
 
-        curop.debug().exceptionInfo = ex->getInfo();
+        curop.debug().exceptionInfo = e.getInfo();
 
         replyToQuery(ResultFlag_ErrSet, m, dbresponse, errObj);
         curop.debug().responseLength = dbresponse.response->header().dataLen();
         curop.debug().nreturned = 1;
-        return ok;
+        return false;
     }
 
     Message* resp = new Message();
@@ -923,7 +874,7 @@ bool receivedGetMore(OperationContext* txn, DbResponse& dbresponse, Message& m, 
         dbresponse.exhaustNS = ns;
     }
 
-    return ok;
+    return true;
 }
 
 void checkAndInsert(OperationContext* txn,
