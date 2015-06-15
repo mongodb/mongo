@@ -65,10 +65,6 @@ func (exp *MongoExport) ValidateSettings() error {
 	// use 'test'
 	if exp.ToolOptions.Namespace.DB == "" {
 		exp.ToolOptions.Namespace.DB = "test"
-	} else {
-		if err := util.ValidateDBName(exp.ToolOptions.Namespace.DB); err != nil {
-			return err
-		}
 	}
 
 	if exp.ToolOptions.Namespace.Collection == "" {
