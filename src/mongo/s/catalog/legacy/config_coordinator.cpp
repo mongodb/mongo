@@ -302,9 +302,9 @@ namespace {
 
 
     ConfigCoordinator::ConfigCoordinator(MultiCommandDispatch* dispatcher,
-                                         const vector<ConnectionString>& configHosts )
+                                         const ConnectionString& configServerConnectionString)
         : _dispatcher(dispatcher),
-          _configHosts(configHosts) {
+          _configServerConnectionString(configServerConnectionString) {
 
     }
 
@@ -313,21 +313,9 @@ namespace {
         // Send side
         //
 
-        string configStr;
-        {
-            vector<ConnectionString>::const_iterator it = _configHosts.begin();
-            configStr = it->toString();
-
-            for (++it; it != _configHosts.end(); ++it) {
-                configStr.append(",");
-                configStr.append(it->toString());
-            }
-        }
-
-        for (vector<ConnectionString>::const_iterator it = _configHosts.begin();
-                it != _configHosts.end(); ++it) {
-            SSVRequest ssvRequest(configStr);
-            _dispatcher->addCommand(*it, "admin", ssvRequest);
+        for (const HostAndPort& server : _configServerConnectionString.getServers()) {
+            SSVRequest ssvRequest(_configServerConnectionString.toString());
+            _dispatcher->addCommand(ConnectionString(server), "admin", ssvRequest);
         }
 
         _dispatcher->sendAll();
@@ -391,11 +379,8 @@ namespace {
         // getLastError on each one of them. If there was some form of write/journaling error, get
         // last error would fail.
         {
-            for (vector<ConnectionString>::iterator it = _configHosts.begin();
-                 it != _configHosts.end();
-                 ++it) {
-
-                _dispatcher->addCommand(*it,
+            for (const HostAndPort& server : _configServerConnectionString.getServers()) {
+                _dispatcher->addCommand(ConnectionString(server),
                                         "admin",
                                         RawBSONSerializable(BSON("getLastError" << true <<
                                                                  "fsync" << true)));
@@ -458,12 +443,8 @@ namespace {
         //
 
         // Get as many batches as we can at once
-        for (vector<ConnectionString>::const_iterator it = _configHosts.begin();
-             it != _configHosts.end();
-             ++it) {
-
-            const ConnectionString& configHost = *it;
-            _dispatcher->addCommand(configHost, nss.db(), configRequest);
+        for (const HostAndPort& server : _configServerConnectionString.getServers()) {
+            _dispatcher->addCommand(ConnectionString(server), nss.db(), configRequest);
         }
 
         // Send them all out

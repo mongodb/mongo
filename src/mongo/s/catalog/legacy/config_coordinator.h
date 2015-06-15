@@ -41,7 +41,7 @@ namespace mongo {
     class ConfigCoordinator {
     public:
         ConfigCoordinator(MultiCommandDispatch* dispatcher,
-                          const std::vector<ConnectionString>& configHosts);
+                          const ConnectionString& configServerConnectionString);
 
         void executeBatch(const BatchedCommandRequest& request, BatchedCommandResponse* response);
 
@@ -56,7 +56,7 @@ namespace mongo {
         // Not owned here
         MultiCommandDispatch* const _dispatcher;
 
-        std::vector<ConnectionString> _configHosts;
+        const ConnectionString _configServerConnectionString;
     };
 
 }

@@ -1517,7 +1517,7 @@ namespace {
             }
         }
 
-        ConfigCoordinator exec(&dispatcher, _configServers);
+        ConfigCoordinator exec(&dispatcher, _configServerConnectionString);
         exec.executeBatch(request, response);
     }
 
