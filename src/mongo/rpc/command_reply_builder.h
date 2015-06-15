@@ -33,6 +33,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/rpc/document_range.h"
+#include "mongo/rpc/protocol.h"
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/util/net/message.h"
 
@@ -63,6 +64,10 @@ namespace rpc {
         CommandReplyBuilder& addOutputDoc(BSONObj outputDoc) final;
 
         State getState() const final;
+
+        Protocol getProtocol() const final;
+
+        void reset() final;
 
         /**
          * Writes data then transfers ownership of the message to the caller.

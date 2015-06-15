@@ -31,6 +31,7 @@
 #include <memory>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/rpc/protocol.h"
 
 namespace mongo {
     class Message;
@@ -102,6 +103,12 @@ namespace rpc {
          * checks that the builder is in the correct state.
          */
         virtual State getState() const = 0;
+
+        /**
+         * Gets the protocol used to serialize this request. This should only be used for asserts,
+         * and not for runtime behavior changes, which should be handled with polymorphism.
+         */
+        virtual Protocol getProtocol() const = 0;
 
         /**
          * Writes data then transfers ownership of the message to the caller.

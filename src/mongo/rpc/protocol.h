@@ -83,7 +83,7 @@ namespace supports {
     /**
      * Converts a ProtocolSet to a string. Currently only the predefined ProtocolSets in the
      * 'supports' namespace are supported.
-     * 
+     *
      * This intentionally does not conform to the STL 'to_string' convention so that it will
      * not conflict with the to_string overload for uint64_t.
      */

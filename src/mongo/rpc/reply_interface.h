@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/rpc/protocol.h"
 
 namespace mongo {
     class BSONObj;
@@ -67,6 +68,12 @@ namespace rpc {
          * }
          */
         virtual DocumentRange getOutputDocs() const = 0;
+
+        /**
+         * Gets the protocol used to deserialize this reply. This should be used for validity
+         * checks only - runtime behavior changes should be implemented with polymorphism.
+         */
+        virtual Protocol getProtocol() const = 0;
 
     protected:
         ReplyInterface() = default;

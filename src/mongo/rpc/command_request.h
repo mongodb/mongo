@@ -31,6 +31,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/rpc/document_range.h"
+#include "mongo/rpc/protocol.h"
 #include "mongo/rpc/request_interface.h"
 
 namespace mongo {
@@ -86,6 +87,8 @@ namespace rpc {
          * }
          */
         DocumentRange getInputDocs() const final;
+
+        Protocol getProtocol() const final;
 
         friend bool operator==(const CommandRequest& lhs, const CommandRequest& rhs);
         friend bool operator!=(const CommandRequest& lhs, const CommandRequest& rhs);

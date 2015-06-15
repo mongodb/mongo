@@ -80,6 +80,8 @@ namespace rpc {
          */
         DocumentRange getOutputDocs() const final;
 
+        Protocol getProtocol() const final;
+
         friend bool operator==(const CommandReply& lhs, const CommandReply& rhs);
         friend bool operator!=(const CommandReply& lhs, const CommandReply& rhs);
 

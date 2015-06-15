@@ -280,16 +280,16 @@ namespace {
                                                                   StringData command,
                                                                   const BSONObj& metadata,
                                                                   const BSONObj& commandArgs) {
+        uassert(ErrorCodes::InvalidNamespace, str::stream() << "Database name '" << database
+                                                            << "' is not valid.",
+                NamespaceString::validDBName(database));
+
         BSONObjBuilder metadataBob;
         metadataBob.appendElements(metadata);
 
         if (_metadataWriter) {
             uassertStatusOK(_metadataWriter(&metadataBob));
         }
-
-        uassert(ErrorCodes::InvalidNamespace, str::stream() << "Database name '" << database
-                                                            << "' is not valid.",
-                NamespaceString::validDBName(database));
 
         auto requestBuilder = rpc::makeRequestBuilder(getClientRPCProtocols(),
                                                       getServerRPCProtocols());
@@ -313,9 +313,14 @@ namespace {
                               << "on host '" << host << "' ",
                 call(*requestMsg, *replyMsg, false, &host));
 
-        auto commandReply = rpc::makeReply(replyMsg.get(),
-                                           getClientRPCProtocols(),
-                                           getServerRPCProtocols());
+        auto commandReply = rpc::makeReply(replyMsg.get());
+
+        uassert(ErrorCodes::RPCProtocolNegotiationFailed,
+                      str::stream() << "Mismatched RPC protocols - request was '"
+                                    << opToString(requestMsg->operation()) << "' '"
+                                    << " but reply was '"
+                                    << opToString(replyMsg->operation()) << "' ",
+                requestBuilder->getProtocol() == commandReply->getProtocol());
 
         if (ErrorCodes::SendStaleConfig ==
             getStatusFromCommandResult(commandReply->getCommandReply())) {

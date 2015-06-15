@@ -124,5 +124,9 @@ namespace rpc {
         return !(lhs == rhs);
     }
 
+    Protocol CommandRequest::getProtocol() const {
+        return rpc::Protocol::kOpCommandV1;
+    }
+
 }  // namespace rpc
 }  // namespace mongo

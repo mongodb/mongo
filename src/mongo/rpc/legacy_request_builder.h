@@ -56,6 +56,8 @@ namespace rpc {
 
         State getState() const final;
 
+        Protocol getProtocol() const final;
+
         std::unique_ptr<Message> done() final;
 
     private:

@@ -110,6 +110,10 @@ namespace rpc {
         return _state;
     }
 
+    Protocol LegacyRequestBuilder::getProtocol() const {
+        return rpc::Protocol::kOpQuery;
+    }
+
     std::unique_ptr<Message> LegacyRequestBuilder::done() {
         invariant(_state == State::kInputDocs);
         _message->setData(dbQuery, _builder.buf(), _builder.len());

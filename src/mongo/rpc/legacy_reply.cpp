@@ -83,5 +83,9 @@ namespace rpc {
         return DocumentRange{};
     }
 
+    Protocol LegacyReply::getProtocol() const {
+        return rpc::Protocol::kOpQuery;
+    }
+
 }  // namespace rpc
 }  // namespace mongo

@@ -77,6 +77,10 @@ namespace rpc {
         return _state;
     }
 
+    Protocol CommandReplyBuilder::getProtocol() const {
+        return rpc::Protocol::kOpCommandV1;
+    }
+
     std::unique_ptr<Message> CommandReplyBuilder::done() {
         invariant(_state == State::kOutputDocs);
         // TODO: we can elide a large copy here by transferring the internal buffer of

@@ -82,6 +82,10 @@ namespace rpc {
         return _state;
     }
 
+    Protocol LegacyReplyBuilder::getProtocol() const {
+        return rpc::Protocol::kOpQuery;
+    }
+
     std::unique_ptr<Message> LegacyReplyBuilder::done() {
         invariant(_state == State::kOutputDocs);
         std::unique_ptr<Message> message = stdx::make_unique<Message>();

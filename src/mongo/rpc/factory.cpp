@@ -37,6 +37,8 @@
 #include "mongo/rpc/protocol.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/net/message.h"
 
 namespace mongo {
 namespace rpc {
@@ -53,16 +55,17 @@ namespace rpc {
         }
     }
 
-    std::unique_ptr<ReplyInterface> makeReply(const Message* unownedMessage,
-                                              ProtocolSet clientProtos,
-                                              ProtocolSet serverProtos) {
-        switch (uassertStatusOK(negotiate(clientProtos, serverProtos))) {
-        case Protocol::kOpQuery:
+    std::unique_ptr<ReplyInterface> makeReply(const Message* unownedMessage) {
+
+        switch (unownedMessage->operation()) {
+        case mongo::opReply:
             return stdx::make_unique<LegacyReply>(unownedMessage);
-        case Protocol::kOpCommandV1:
+        case mongo::dbCommandReply:
             return stdx::make_unique<CommandReply>(unownedMessage);
         default:
-            MONGO_UNREACHABLE;
+            uasserted(ErrorCodes::UnsupportedFormat,
+                      str::stream() << "Received a reply message with unexpected opcode: "
+                                    << unownedMessage->operation());
         }
     }
 

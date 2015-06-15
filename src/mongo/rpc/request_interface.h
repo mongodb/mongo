@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/rpc/protocol.h"
 
 namespace mongo {
     class BSONObj;
@@ -79,6 +80,12 @@ namespace rpc {
          * }
          */
         virtual DocumentRange getInputDocs() const = 0;
+
+        /**
+         * Gets the RPC protocol used to deserialize this message. This should only be used for
+         * asserts, and not for runtime behavior changes, which should be handled with polymorphism.
+         */
+        virtual Protocol getProtocol() const = 0;
 
     protected:
         RequestInterface() = default;

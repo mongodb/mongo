@@ -71,6 +71,10 @@ namespace rpc {
         return  _outputDocs;
     }
 
+    Protocol CommandReply::getProtocol() const {
+        return rpc::Protocol::kOpCommandV1;
+    }
+
     bool operator==(const CommandReply& lhs, const CommandReply& rhs) {
         return std::tie(lhs._metadata, lhs._commandReply, lhs._outputDocs) ==
                std::tie(rhs._metadata, rhs._commandReply, rhs._outputDocs);
