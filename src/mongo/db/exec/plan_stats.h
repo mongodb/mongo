@@ -243,8 +243,6 @@ namespace mongo {
                            isPartial(false),
                            isSparse(false),
                            isUnique(false),
-                           isTTL(false),
-                           expireAfterSeconds(0),
                            keysExamined(0) { }
 
         virtual ~CountScanStats() { }
@@ -266,8 +264,6 @@ namespace mongo {
         bool isPartial;
         bool isSparse;
         bool isUnique;
-        bool isTTL;
-        long long expireAfterSeconds;
 
         size_t keysExamined;
 
@@ -368,8 +364,6 @@ namespace mongo {
                            isPartial(false),
                            isSparse(false),
                            isUnique(false),
-                           isTTL(false),
-                           expireAfterSeconds(0),
                            dupsTested(0),
                            dupsDropped(0),
                            seenInvalidated(0),
@@ -409,8 +403,6 @@ namespace mongo {
         bool isPartial;
         bool isSparse;
         bool isUnique;
-        bool isTTL;
-        long long expireAfterSeconds;
 
         size_t dupsTested;
         size_t dupsDropped;

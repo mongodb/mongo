@@ -81,8 +81,6 @@ namespace mongo {
         _specificStats.isUnique = _params.descriptor->unique();
         _specificStats.isSparse = _params.descriptor->isSparse();
         _specificStats.isPartial = _params.descriptor->isPartial();
-        _specificStats.isTTL = _params.descriptor->isTTL();
-        _specificStats.expireAfterSeconds = _params.descriptor->expireAfterSeconds();
         _specificStats.indexVersion = _params.descriptor->version();
     }
 

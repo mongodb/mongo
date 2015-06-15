@@ -69,8 +69,6 @@ namespace mongo {
               _sparse(infoObj["sparse"].trueValue()),
               _unique( _isIdIndex || infoObj["unique"].trueValue() ),
               _partial(!infoObj["partialFilterExpression"].eoo()),
-              _isTTL(!infoObj["expireAfterSeconds"].eoo()),
-              _expireAfterSeconds(0), // valid value if isTTL is set
               _cachedEntry( NULL )
         {
             _indexNamespace = makeIndexNamespace( _parentNS, _indexName );
@@ -79,16 +77,6 @@ namespace mongo {
             BSONElement e = _infoObj["v"];
             if ( e.isNumber() ) {
                 _version = e.numberInt();
-            }
-
-            if (_isTTL) {
-                BSONElement expireAfterSecondsEl = infoObj["expireAfterSeconds"];
-                if (!expireAfterSecondsEl.isNumber()) {
-                    _isTTL = false;
-                }
-                else {
-                    _expireAfterSeconds = expireAfterSecondsEl.numberLong();
-                }
             }
         }
 
@@ -141,11 +129,6 @@ namespace mongo {
 
         // Is this a partial index?
         bool isPartial() const { return _partial; }
-
-        // If expireAfterSeconds value is set and valid
-        bool isTTL() const { return _isTTL; }
-
-        long long expireAfterSeconds() const { return _expireAfterSeconds; }
 
         // Is this index multikey?
         bool isMultikey( OperationContext* txn ) const {
@@ -222,8 +205,6 @@ namespace mongo {
         bool _sparse;
         bool _unique;
         bool _partial;
-        bool _isTTL;
-        long long _expireAfterSeconds;
         int _version;
 
         // only used by IndexCatalogEntryContainer to do caching for perf
