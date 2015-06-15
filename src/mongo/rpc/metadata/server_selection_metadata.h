@@ -65,20 +65,18 @@ namespace rpc {
 #endif
 
         /**
-         * Loads ServerSelectionMetadata from a metadata object and stores it on this
-         * OperationContext.
+         * Loads ServerSelectionMetadata from a metadata object.
          */
         static StatusWith<ServerSelectionMetadata> readFromMetadata(const BSONObj& metadataObj);
 
         /**
          * Writes this operation's ServerSelectionMetadata to a metadata object.
          */
-        static Status writeToMetadata(const ServerSelectionMetadata& ss,
-                                      BSONObjBuilder* metadataBob);
+        Status writeToMetadata(BSONObjBuilder* metadataBob) const;
 
         /**
-         * Rewrites the ServerSelectionMetadata from the legacy OP_QUERY format to the metadata
-         * object format. In particular, if secondaryOk is set, this will set QueryOption_SlaveOk
+         * Rewrites the ServerSelectionMetadata from the metadata object format to the legacy OP_QUERY
+         * format. In particular, if secondaryOk is set, this will set QueryOption_SlaveOk
          * on the legacyQueryFlags. If a readPreference is set, the legacy command will be wrapped
          * in a 'query' element and a top-level $readPreference field will be set on the command.
          */
@@ -107,10 +105,9 @@ namespace rpc {
          */
         const boost::optional<ReadPreferenceSetting>& getReadPreference() const;
 
-    private:
         ServerSelectionMetadata(bool secondaryOk,
                                 boost::optional<ReadPreferenceSetting> readPreference);
-
+    private:
         bool _secondaryOk{false};
         boost::optional<ReadPreferenceSetting> _readPreference{};
     };

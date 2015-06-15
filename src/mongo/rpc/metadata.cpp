@@ -55,14 +55,12 @@ namespace rpc {
             return swAuditMetadata.getStatus();
         }
         AuditMetadata::get(txn) = std::move(swAuditMetadata.getValue());
+
         return Status::OK();
     }
 
     Status writeRequestMetadata(OperationContext* txn, BSONObjBuilder* metadataBob) {
-        auto ssStatus = ServerSelectionMetadata::writeToMetadata(
-            ServerSelectionMetadata::get(txn),
-            metadataBob
-        );
+        auto ssStatus = ServerSelectionMetadata::get(txn).writeToMetadata(metadataBob);
         if (!ssStatus.isOK()) {
             return ssStatus;
         }

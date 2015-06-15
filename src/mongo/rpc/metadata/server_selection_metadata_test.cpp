@@ -172,4 +172,4 @@ namespace {
                             ErrorCodes::NoSuchKey);
     }
 
-}
+}  // namespace

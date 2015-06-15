@@ -177,14 +177,13 @@ namespace {
         return ServerSelectionMetadata(secondaryOk, std::move(readPreference));
     }
 
-    Status ServerSelectionMetadata::writeToMetadata(const ServerSelectionMetadata& ss,
-                                                    BSONObjBuilder* metadataBob) {
-        if (ss.isSecondaryOk()) {
+    Status ServerSelectionMetadata::writeToMetadata(BSONObjBuilder* metadataBob) const {
+        if (isSecondaryOk()) {
             metadataBob->append(kSecondaryOkFieldName, 1);
         }
 
-        if (ss.getReadPreference()) {
-            metadataBob->append(kReadPreferenceFieldName, ss.getReadPreference()->toBSON());
+        if (getReadPreference()) {
+            metadataBob->append(kReadPreferenceFieldName, getReadPreference()->toBSON());
         }
 
         return Status::OK();
