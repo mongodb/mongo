@@ -36,6 +36,7 @@
 #include "mongo/platform/unordered_set.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/decorable.h"
+#include "mongo/util/tick_source.h"
 
 namespace mongo {
 
@@ -303,6 +304,16 @@ namespace mongo {
          */
         virtual OpObserver* getOpObserver() = 0;
 
+        /**
+         * Returns the tick source set in this context.
+         */
+        TickSource* getTickSource() const;
+
+        /**
+         * Replaces the current tick source with a new one.
+         */
+        void setTickSource(std::unique_ptr<TickSource> newSource);
+
     protected:
         ServiceContext() = default;
 
@@ -323,6 +334,8 @@ namespace mongo {
          */
         std::vector<std::unique_ptr<ClientObserver>> _clientObservers;
         ClientSet _clients;
+
+        std::unique_ptr<TickSource> _tickSource;
     };
 
     /**

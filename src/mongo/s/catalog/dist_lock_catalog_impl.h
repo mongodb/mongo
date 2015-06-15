@@ -40,7 +40,7 @@ namespace mongo {
     class RemoteCommandRunner;
     class RemoteCommandTargeter;
 
-    class DistLockCatalogImpl: public DistLockCatalog {
+    class DistLockCatalogImpl final : public DistLockCatalog {
     public:
         DistLockCatalogImpl(RemoteCommandTargeter* targeter,
                             RemoteCommandRunner* executor,

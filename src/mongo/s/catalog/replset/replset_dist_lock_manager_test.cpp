@@ -40,6 +40,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/service_context_noop.h"
 #include "mongo/s/catalog/dist_lock_catalog_mock.h"
 #include "mongo/s/type_lockpings.h"
 #include "mongo/s/type_locks.h"
@@ -47,6 +48,8 @@
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/system_tick_source.h"
+#include "mongo/util/tick_source_mock.h"
 #include "mongo/util/time_support.h"
 
 /**
@@ -76,7 +79,11 @@ namespace {
             _dummyDoNotUse(stdx::make_unique<DistLockCatalogMock>()),
             _mockCatalog(_dummyDoNotUse.get()),
             _processID("test"),
-            _mgr(_processID, std::move(_dummyDoNotUse), kPingInterval, kLockExpiration) {
+            _mgr(&_context,
+                 _processID,
+                 std::move(_dummyDoNotUse),
+                 kPingInterval,
+                 kLockExpiration) {
         }
 
         /**
@@ -100,8 +107,23 @@ namespace {
             return _processID;
         }
 
+        /**
+         * Make the mock catalog use the mock tick source. Not thread-safe.
+         */
+        void useMockTickSource() {
+            _context.setTickSource(stdx::make_unique<TickSourceMock>());
+        }
+
+        /**
+         * Returns the mock tick source. Valid only if useMockTickSource was called.
+         */
+        TickSourceMock* getMockTickSource() {
+            return dynamic_cast<TickSourceMock*>(_context.getTickSource());
+        }
+
     protected:
         void setUp() override {
+            _context.setTickSource(stdx::make_unique<SystemTickSource>());
             _mgr.startUp();
         }
 
@@ -112,9 +134,11 @@ namespace {
         }
 
     private:
+        TickSourceMock _tickSource;
         std::unique_ptr<DistLockCatalogMock> _dummyDoNotUse; // dummy placeholder
         DistLockCatalogMock* _mockCatalog;
         string _processID;
+        ServiceContextNoop _context;
         ReplSetDistLockManager _mgr;
     };
 
@@ -217,6 +241,8 @@ namespace {
         int retryAttempt = 0;
         const int kMaxRetryAttempt = 3;
 
+        useMockTickSource();
+
         LocksType goodLockDoc;
         goodLockDoc.setName(lockName);
         goodLockDoc.setState(LocksType::LOCKED);
@@ -250,6 +276,8 @@ namespace {
 
             lastTS = lockSessionID;
             lastTime = time;
+
+            getMockTickSource()->advance(Milliseconds(1));
 
             if (++retryAttempt >= kMaxRetryAttempt) {
                 getMockCatalog()->expectGrabLock([this,
@@ -350,6 +378,8 @@ namespace {
         int retryAttempt = 0;
         const int kMaxRetryAttempt = 3;
 
+        useMockTickSource();
+
         getMockCatalog()->expectGrabLock(
                 [this,
                  &lockName,
@@ -374,6 +404,8 @@ namespace {
 
             lastTS = lockSessionID;
             lastTime = time;
+
+            getMockTickSource()->advance(Milliseconds(1));
 
             if (++retryAttempt >= kMaxRetryAttempt) {
                 getMockCatalog()->expectGrabLock([this,
@@ -480,6 +512,8 @@ namespace {
 
         int retryAttempt = 0;
 
+        useMockTickSource();
+
         getMockCatalog()->expectGrabLock(
                 [this,
                  &lockName,
@@ -504,6 +538,8 @@ namespace {
             lastTS = lockSessionID;
             lastTime = time;
             retryAttempt++;
+
+            getMockTickSource()->advance(Milliseconds(1));
         }, {ErrorCodes::LockStateChangeFailed, "nMod 0"});
 
         // Make mock return lock not found to skip lock overtaking.

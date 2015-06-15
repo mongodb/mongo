@@ -142,6 +142,14 @@ namespace mongo {
         return UniqueClient(client.release());
     }
 
+    TickSource* ServiceContext::getTickSource() const {
+        return _tickSource.get();
+    }
+
+    void ServiceContext::setTickSource(std::unique_ptr<TickSource> newSource) {
+        _tickSource = std::move(newSource);
+    }
+
     void ServiceContext::ClientDeleter::operator()(Client* client) const {
         ServiceContext* const service = client->getServiceContext();
         {

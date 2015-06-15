@@ -36,6 +36,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/db/service_context.h"
 #include "mongo/s/catalog/dist_lock_catalog.h"
 #include "mongo/s/type_lockpings.h"
 #include "mongo/s/type_locks.h"
@@ -52,10 +53,12 @@ namespace mongo {
     using stdx::chrono::milliseconds;
     using std::chrono::duration_cast;
 
-    ReplSetDistLockManager::ReplSetDistLockManager(StringData processID,
+    ReplSetDistLockManager::ReplSetDistLockManager(ServiceContext* globalContext,
+                                                   StringData processID,
                                                    unique_ptr<DistLockCatalog> catalog,
                                                    milliseconds pingInterval,
                                                    milliseconds lockExpiration):
+        _serviceContext(globalContext),
         _processID(processID.toString()),
         _catalog(std::move(catalog)),
         _pingInterval(pingInterval),
@@ -99,7 +102,7 @@ namespace mongo {
                << " (sleeping for "
                << duration_cast<milliseconds>(_pingInterval).count() << " ms)";
 
-        Timer elapsedSincelastPing;
+        Timer elapsedSincelastPing(_serviceContext->getTickSource());
         while (!isShutDown()) {
             auto pingStatus = _catalog->ping(_processID, Date_t::now());
 
@@ -158,7 +161,7 @@ namespace mongo {
                                   << ": " << errMsg};
         }
 
-        Timer timer;
+        Timer timer(_serviceContext->getTickSource());
         auto serverInfoStatus = _catalog->getServerInfo();
         if (!serverInfoStatus.isOK()) {
             return serverInfoStatus.getStatus();
@@ -243,8 +246,8 @@ namespace mongo {
             StringData whyMessage,
             milliseconds waitFor,
             milliseconds lockTryInterval) {
-        Timer timer;
-        Timer msgTimer;
+        Timer timer(_serviceContext->getTickSource());
+        Timer msgTimer(_serviceContext->getTickSource());
 
         while (waitFor <= milliseconds::zero() || milliseconds(timer.millis()) < waitFor) {
             OID lockSessionID = OID::gen();

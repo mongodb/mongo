@@ -43,9 +43,12 @@
 
 namespace mongo {
 
-    class ReplSetDistLockManager: public DistLockManager {
+    class ServiceContext;
+
+    class ReplSetDistLockManager final : public DistLockManager {
     public:
-        ReplSetDistLockManager(StringData processID,
+        ReplSetDistLockManager(ServiceContext* globalContext,
+                               StringData processID,
                                std::unique_ptr<DistLockCatalog> catalog,
                                stdx::chrono::milliseconds pingInterval,
                                stdx::chrono::milliseconds lockExpiration);
@@ -94,10 +97,13 @@ namespace mongo {
         // All member variables are labeled with one of the following codes indicating the
         // synchronization rules for accessing them.
         //
+        // (F) Self synchronizing.
         // (M) Must hold _mutex for access.
         // (I) Immutable, no synchronization needed.
         // (S) Can only be called inside startUp/shutDown.
         //
+
+        ServiceContext* const _serviceContext;                                          // (F)
 
         const std::string _processID;                                                   // (I)
         const std::unique_ptr<DistLockCatalog> _catalog;                                // (I)

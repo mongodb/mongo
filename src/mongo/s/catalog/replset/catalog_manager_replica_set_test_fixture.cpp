@@ -40,9 +40,8 @@
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/s/catalog/dist_lock_catalog_mock.h"
+#include "mongo/s/catalog/dist_lock_manager_mock.h"
 #include "mongo/s/catalog/replset/catalog_manager_replica_set.h"
-#include "mongo/s/catalog/replset/replset_dist_lock_manager.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/stdx/memory.h"
@@ -74,19 +73,13 @@ namespace mongo {
                                                 },
                                                 executor.get()));
 
-        std::unique_ptr<ReplSetDistLockManager> distLockMgr(
-            stdx::make_unique<ReplSetDistLockManager>("Test",
-                                                      stdx::make_unique<DistLockCatalogMock>(),
-                                                      Milliseconds(2),
-                                                      Seconds(10)));
-
         std::unique_ptr<CatalogManagerReplicaSet> cm(
             stdx::make_unique<CatalogManagerReplicaSet>());
 
         ASSERT_OK(cm->init(ConnectionString::forReplicaSet("CatalogManagerReplSetTest",
                                                            { HostAndPort{ "TestHost1" },
                                                              HostAndPort{ "TestHost2" } }),
-                           std::move(distLockMgr)));
+                           std::move(stdx::make_unique<DistLockManagerMock>())));
 
         std::unique_ptr<ShardRegistry> shardRegistry(
             stdx::make_unique<ShardRegistry>(stdx::make_unique<RemoteCommandTargeterFactoryMock>(),

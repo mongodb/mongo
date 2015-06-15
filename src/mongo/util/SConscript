@@ -126,6 +126,13 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='tick_source_mock',
+    source=[
+        'tick_source_mock.cpp',
+    ],
+)
+
 env.CppUnitTest(
     target='text_test',
     source=[
