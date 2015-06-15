@@ -77,6 +77,9 @@ namespace repl {
 
     void Reporter::wait() {
         boost::unique_lock<boost::mutex> lk(_mutex);
+        if (!_active) {
+            return;
+        }
         if(_remoteCommandCallbackHandle.isValid()) {
             _executor->wait(_remoteCommandCallbackHandle);
         }
