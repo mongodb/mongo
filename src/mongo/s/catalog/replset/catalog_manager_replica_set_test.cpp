@@ -39,6 +39,7 @@
 #include "mongo/s/catalog/replset/catalog_manager_replica_set.h"
 #include "mongo/s/catalog/replset/catalog_manager_replica_set_test_fixture.h"
 #include "mongo/s/catalog/type_collection.h"
+#include "mongo/s/catalog/type_database.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/util/log.h"
 
@@ -100,6 +101,53 @@ namespace {
         });
 
         // Now wait for the getCollection call to return
+        future.get();
+    }
+
+    TEST_F(CatalogManagerReplSetTestFixture, GetDatabaseExisting) {
+        RemoteCommandTargeterMock* targeter =
+            RemoteCommandTargeterMock::get(shardRegistry()->findIfExists("config")->getTargeter());
+        targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+
+        DatabaseType expectedDb;
+        expectedDb.setName("bigdata");
+        expectedDb.setPrimary("shard0000");
+        expectedDb.setSharded(true);
+
+        auto future = async(std::launch::async, [this, &expectedDb] {
+            return assertGet(catalogManager()->getDatabase(expectedDb.getName()));
+        });
+
+        onFindCommand([&expectedDb](const std::string& dbName, const BSONObj& cmdObj) {
+            const NamespaceString nss(dbName + '.' + cmdObj.firstElement().String());
+            ASSERT_EQ(nss.toString(), DatabaseType::ConfigNS);
+
+            auto query = assertGet(LiteParsedQuery::fromFindCommand(nss, cmdObj, false));
+
+            ASSERT_EQ(query->ns(), DatabaseType::ConfigNS);
+            ASSERT_EQ(query->getFilter(), BSON(DatabaseType::name(expectedDb.getName())));
+
+            return vector<BSONObj>{ expectedDb.toBSON() };
+        });
+
+        const auto& actualDb = future.get();
+        ASSERT_EQ(expectedDb.toBSON(), actualDb.toBSON());
+    }
+
+    TEST_F(CatalogManagerReplSetTestFixture, GetDatabaseNotExisting) {
+        RemoteCommandTargeterMock* targeter =
+            RemoteCommandTargeterMock::get(shardRegistry()->findIfExists("config")->getTargeter());
+        targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+
+        auto future = async(std::launch::async, [this] {
+            auto dbResult = catalogManager()->getDatabase("NonExistent");
+            ASSERT_EQ(dbResult.getStatus(), ErrorCodes::NamespaceNotFound);
+        });
+
+        onFindCommand([](const std::string& dbName, const BSONObj& cmdObj) {
+            return vector<BSONObj>{ };
+        });
+
         future.get();
     }
 

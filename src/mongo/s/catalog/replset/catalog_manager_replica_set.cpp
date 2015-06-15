@@ -167,7 +167,40 @@ namespace {
 
     StatusWith<DatabaseType> CatalogManagerReplicaSet::getDatabase(const std::string& dbName) {
         invariant(nsIsDbOnly(dbName));
-        return notYetImplemented;
+
+        // The two databases that are hosted on the config server are config and admin
+        if (dbName == "config" || dbName == "admin") {
+            DatabaseType dbt;
+            dbt.setName(dbName);
+            dbt.setSharded(false);
+            dbt.setPrimary("config");
+
+            return dbt;
+        }
+
+        const auto& configShard = grid.shardRegistry()->findIfExists("config");
+        const auto readHost = configShard->getTargeter()->findHost(kConfigReadSelector);
+        if (!readHost.isOK()) {
+            return readHost.getStatus();
+        }
+
+        auto findStatus = _find(readHost.getValue(),
+                                NamespaceString(DatabaseType::ConfigNS),
+                                BSON(DatabaseType::name(dbName)),
+                                1);
+        if (!findStatus.isOK()) {
+            return findStatus.getStatus();
+        }
+
+        const auto& docs = findStatus.getValue();
+        if (docs.empty()) {
+            return {ErrorCodes::NamespaceNotFound,
+                    stream() << "database " << dbName << " not found"};
+        }
+
+        invariant(docs.size() == 1);
+
+        return DatabaseType::fromBSON(docs.front());
     }
 
     Status CatalogManagerReplicaSet::updateCollection(const std::string& collNs,
