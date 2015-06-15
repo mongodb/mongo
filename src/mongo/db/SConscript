@@ -396,7 +396,7 @@ env.Library(
 )
 
 env.Library(
-    tagret='lasterror',
+    target='lasterror',
     source=[
         "lasterror.cpp",
     ],
