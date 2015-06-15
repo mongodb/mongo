@@ -68,7 +68,7 @@ namespace mongo {
         // for anything other than passing up NEED_FETCH. We use the loc and owned obj state, but
         // the loc isn't really pointing at any obj. The obj field of the WSM should never be used.
         WorkingSetMember* member = _workingSet->get(_wsidForFetch);
-        member->state = WorkingSetMember::LOC_AND_OWNED_OBJ;
+        member->state = WorkingSetMember::LOC_AND_OBJ;
     }
 
     PlanStage::StageState CollectionScan::work(WorkingSetID* out) {
@@ -148,7 +148,7 @@ namespace mongo {
         member->loc = curr;
         member->obj = Snapshotted<BSONObj>(_txn->recoveryUnit()->getSnapshotId(),
                                            _iter->dataFor(member->loc).releaseToBson());
-        member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
+        member->state = WorkingSetMember::LOC_AND_OBJ;
 
         // Advance the iterator.
         invariant(_iter->getNext() == curr);

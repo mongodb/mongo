@@ -92,7 +92,7 @@ namespace QueryStageSortTests {
                 // Insert some owned obj data.
                 WorkingSetMember member;
                 member.loc = *it;
-                member.state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
+                member.state = WorkingSetMember::LOC_AND_OBJ;
                 member.obj = coll->docFor(&_txn, *it);
                 ms->pushBack(member);
             }

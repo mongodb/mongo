@@ -44,13 +44,18 @@ namespace mongo {
                                           const Collection* collection);
 
         /**
-         * Iterates over 'workingSet'. For all valid working set members, if the member has a
-         * RecordId but does not have an owned obj, then puts the member in "loc with owned
-         * obj" state.
+         * Iterates over 'workingSet' members that have transitioned to the LOC_AND_IDX state since
+         * the last yield. For all members still in the LOC_AND_IDX state, fetches the associated
+         * document and puts the member in "loc with unowned obj" state.
          *
          * This "force-fetching" is called on saveState() for storage-engines that support document-
          * level locking. This ensures that all WS members are still valid, even after the
          * OperationContext becomes invalid due to a yield.
+         *
+         * Note that although we use the "loc and unowned obj" state, document-level locking storage
+         * engines are assumed to be returning owned BSON. This is an assumption that may not be
+         * valid for future versions, but must remain valid on the v3.0 branch. Therefore, it is ok
+         * to have a "loc and unowned obj" survive a yield.
          */
         static void forceFetchAllLocs(OperationContext* txn,
                                       WorkingSet* workingSet,

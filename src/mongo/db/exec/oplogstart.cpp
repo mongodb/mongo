@@ -95,7 +95,7 @@ namespace mongo {
             WorkingSetMember* member = _workingSet->get(id);
             member->loc = loc;
             member->obj = _collection->docFor(_txn, member->loc);
-            member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
+            member->state = WorkingSetMember::LOC_AND_OBJ;
             *out = id;
             return PlanStage::ADVANCED;
         }

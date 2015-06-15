@@ -59,14 +59,13 @@ namespace mongo {
         invariant(collection);
         dassert(supportsDocLocking());
 
-        for (WorkingSet::iterator it = workingSet->begin(); it != workingSet->end(); ++it) {
-            if (WorkingSetMember::LOC_AND_OWNED_OBJ == it->state) {
-                // Already in our desired state.
+        for (auto id : workingSet->getAndClearIdxIds()) {
+            if (workingSet->isFree(id)) {
                 continue;
             }
 
-            // We can't do anything without a RecordId.
-            if (!it->hasLoc()) {
+            WorkingSetMember* member = workingSet->get(id);
+            if (WorkingSetMember::LOC_AND_IDX != member->state) {
                 continue;
             }
 
@@ -77,15 +76,20 @@ namespace mongo {
             // and starts to delete the matching documents, including D. The working set members for
             // D created by the two rejected are still present, but their RecordIds no longer refer
             // to a valid document.
-            it->obj.reset();
-            if (!collection->findDoc(txn, it->loc, &it->obj)) {
+            member->obj.reset();
+            if (!collection->findDoc(txn, member->loc, &member->obj)) {
                 // Leftover working set members pointing to old docs can be safely freed.
-                it.free();
+                workingSet->free(id);
                 continue;
             }
 
-            it->obj.setValue(it->obj.value().getOwned() );
-            it->state = WorkingSetMember::LOC_AND_OWNED_OBJ;
+            // We rely on the assumption that doc-locking storage engines always return owned BSON.
+            // This assumption may become invalid in future versions but must remain valid on the
+            // 3.0 branch.
+            invariant(member->obj.value().isOwned());
+
+            member->keyData.clear();
+            member->state = WorkingSetMember::LOC_AND_OBJ;
         }
     }
 
@@ -107,7 +111,7 @@ namespace mongo {
         invariant(member->hasLoc());
         member->obj = collection->docFor(txn, member->loc);
         member->keyData.clear();
-        member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
+        member->state = WorkingSetMember::LOC_AND_OBJ;
     }
 
     // static

@@ -135,7 +135,7 @@ namespace mongo {
         WorkingSetID id = _workingSet->allocate();
         WorkingSetMember* member = _workingSet->get(id);
         member->loc = loc;
-        member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
+        member->state = WorkingSetMember::LOC_AND_OBJ;
 
         // We may need to request a yield while we fetch the document.
         std::auto_ptr<RecordFetcher> fetcher(_collection->documentNeedsFetch(_txn, loc));

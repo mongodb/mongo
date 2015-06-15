@@ -48,7 +48,7 @@ namespace mongo {
         // for anything other than passing up NEED_FETCH. We use the loc and owned obj state, but
         // the loc isn't really pointing at any obj. The obj field of the WSM should never be used.
         WorkingSetMember* member = _ws->get(_wsidForFetch);
-        member->state = WorkingSetMember::LOC_AND_OWNED_OBJ;
+        member->state = WorkingSetMember::LOC_AND_OBJ;
     }
 
     void MultiIteratorStage::addIterator(RecordIterator* it) {
@@ -84,7 +84,7 @@ namespace mongo {
         WorkingSetMember* member = _ws->get(*out);
         member->loc = next;
         member->obj = _collection->docFor(_txn, next);
-        member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
+        member->state = WorkingSetMember::LOC_AND_OBJ;
         return PlanStage::ADVANCED;
     }
 

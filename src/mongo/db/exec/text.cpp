@@ -293,7 +293,7 @@ namespace mongo {
             wsm->obj = _params.index->getCollection()->docFor(_txn, wsm->loc);
             doc = wsm->obj.value();
             wsm->keyData.clear();
-            wsm->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
+            wsm->state = WorkingSetMember::LOC_AND_OBJ;
         }
 
         // Filter for phrases and negated terms

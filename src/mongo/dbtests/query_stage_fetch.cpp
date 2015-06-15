@@ -114,7 +114,7 @@ namespace QueryStageFetch {
             // Mock data.
             {
                 WorkingSetMember mockMember;
-                mockMember.state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
+                mockMember.state = WorkingSetMember::LOC_AND_OBJ;
                 mockMember.loc = *locs.begin();
                 mockMember.obj = coll->docFor(&_txn, mockMember.loc);
                 // Points into our DB.

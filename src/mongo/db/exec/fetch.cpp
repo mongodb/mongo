@@ -125,7 +125,7 @@ namespace mongo {
                 // as well as an unowned object
                 member->obj = _collection->docFor(_txn, member->loc);
                 member->keyData.clear();
-                member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
+                member->state = WorkingSetMember::LOC_AND_OBJ;
             }
 
             return returnIfMatches(member, id, out);

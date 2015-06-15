@@ -154,6 +154,7 @@ namespace mongo {
             member->loc = loc;
             member->keyData.push_back(IndexKeyDatum(_descriptor->keyPattern(), ownedKeyObj));
             member->state = WorkingSetMember::LOC_AND_IDX;
+            _workingSet->flagNewIdxId(id);
 
             *out = id;
             ++_commonStats.advanced;

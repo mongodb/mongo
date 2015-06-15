@@ -241,6 +241,7 @@ namespace mongo {
                 member->loc = loc;
                 member->keyData.push_back(IndexKeyDatum(_keyPattern, keyObj));
                 member->state = WorkingSetMember::LOC_AND_IDX;
+                _workingSet->flagNewIdxId(id);
 
                 if (_params.addKeyMetadata) {
                     BSONObjBuilder bob;

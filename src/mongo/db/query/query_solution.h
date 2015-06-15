@@ -225,8 +225,7 @@ namespace mongo {
 
         virtual void appendToString(mongoutils::str::stream* ss, int indent) const;
 
-        // Text's return is LOC_AND_UNOWNED_OBJ or LOC_AND_OWNED_OBJ so it's fetched and has all
-        // fields.
+        // Text's return is LOC_AND_OBJ so it's fetched and has all fields.
         bool fetched() const { return true; }
         bool hasField(const std::string& field) const { return true; }
         bool sortedByDiskLoc() const { return false; }
