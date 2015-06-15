@@ -32,6 +32,7 @@ import sys
 import shlex
 import shutil
 import zipfile
+import tempfile
 from subprocess import (Popen, PIPE, STDOUT)
 
 def main(argv):
@@ -80,9 +81,10 @@ def make_tar_archive(opts):
         tar_options += "z"
 
     # clean and create a temp directory to copy files to
-    enclosing_archive_directory = os.path.join("build", "archive")
-    delete_directory(enclosing_archive_directory)
-    os.makedirs(enclosing_archive_directory)
+    enclosing_archive_directory = tempfile.mkdtemp(
+        prefix='archive_',
+        dir=os.path.abspath('build')
+    )
     output_tarfile = os.path.join(os.getcwd(), opts.output_filename)
 
     tar_command = ["tar", tar_options, output_tarfile]
@@ -94,7 +96,10 @@ def make_tar_archive(opts):
         if not os.path.exists(enclosing_file_directory):
             os.makedirs(enclosing_file_directory)
         print "copying %s => %s" % (input_filename, temp_file_location)
-        shutil.copy2(input_filename, temp_file_location)
+        if os.path.isdir(input_filename):
+            shutil.copytree(input_filename, temp_file_location)
+        else:
+            shutil.copy2(input_filename, temp_file_location)
         tar_command.append(preferred_filename)
 
     print " ".join(tar_command)

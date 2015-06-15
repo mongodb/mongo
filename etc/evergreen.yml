@@ -36,6 +36,28 @@ variables:
       resmoke_args: --help
       run_multiple_jobs: false
 
+- &debug_symbol_variants
+  - enterprise-linux-64-amazon-ami
+  - enterprise-rhel-57-64-bit
+  - enterprise-rhel-62-64-bit
+  - enterprise-rhel-70-64-bit
+  - enterprise-suse11-64
+  - enterprise-ubuntu1204-64
+  - enterprise-ubuntu1404-64
+  - enterprise-debian71-64
+  - linux-32
+  - linux-64
+  - amazon
+  - rhel55
+  - rhel62
+  - rhel70
+  - suse11
+  - ubuntu1204
+  - ubuntu1404
+  - debian71
+  - solaris-64-bit
+  - osx
+
 #######################################
 #            Functions                #
 #######################################
@@ -98,25 +120,7 @@ functions:
       permissions: public-read
       content_type: ${content_type|application/x-gzip}
       build_variants:
-        ['enterprise-linux-64-amazon-ami',
-         'enterprise-rhel-57-64-bit',
-         'enterprise-rhel-62-64-bit',
-         'enterprise-rhel-70-64-bit',
-         'enterprise-suse11-64',
-         'enterprise-ubuntu1204-64',
-         'enterprise-ubuntu1404-64',
-         'enterprise-debian71-64',
-         'linux-32',
-         'linux-64',
-         'amazon',
-         'rhel55',
-         'rhel62',
-         'rhel70',
-         'suse11',
-         'ubuntu1204',
-         'ubuntu1404',
-         'debian71',
-         'solaris-64-bit']
+        *debug_symbol_variants
 
   "fetch debugsymbols archive" :
     command: s3.get
@@ -127,25 +131,7 @@ functions:
       bucket: mciuploads
       local_file: src/mongo-debugsymbols.tgz
       build_variants:
-        ['enterprise-linux-64-amazon-ami',
-         'enterprise-rhel-57-64-bit',
-         'enterprise-rhel-62-64-bit',
-         'enterprise-rhel-70-64-bit',
-         'enterprise-suse11-64',
-         'enterprise-ubuntu1204-64',
-         'enterprise-ubuntu1404-64',
-         'enterprise-debian71-64',
-         'linux-32',
-         'linux-64',
-         'amazon',
-         'rhel55',
-         'rhel62',
-         'rhel70',
-         'suse11',
-         'ubuntu1204',
-         'ubuntu1404',
-         'debian71',
-         'solaris-64-bit']
+        *debug_symbol_variants
 
   "build rocksdb" :
     command: shell.exec
@@ -296,17 +282,16 @@ tasks:
           set -o verbose
 
           rm -rf ${install_directory|/data/mongo-install-directory}
-          ${scons|scons} ${compile_flags|} --use-new-tools all dist distsrc-${ext|tgz} ${msi_target|}
+          ${scons|scons} ${compile_flags|} --use-new-tools all dist dist-debugsymbols distsrc-${ext|tgz} ${msi_target|}
 
           ${python|python} buildscripts/generate_compile_expansions.py version.json | \
             tee compile_expansions.yml
 
-          if [ "${has_debugsymbols|}" = "true" ]; then ${scons|scons} ${compile_flags|} --nostrip --use-new-tools dist; original_filename=$(ls | grep debugsymbols); mv $original_filename $(echo $original_filename | sed 's/debugsymbols-//' | sed 's/mongodb/debugsymbols-mongodb/'); fi
           ${asan_symbolizer} ${enable_lsan} ${rlp_environment} ${python|python} buildscripts/resmoke.py --jobs=${num_jobs_unittests|1} --suites=unittests ${test_flags} --log=buildlogger --reportFile=report.json
 
           mv mongodb-src-*.${ext|tgz} distsrc.${ext|tgz}
+          mv mongodb-*-debugsymbols.${ext|tgz} mongo-debugsymbols.tgz || true
           mv mongodb-*.${ext|tgz} mongodb-binaries.tgz
-          mv debugsymbols-*.${ext|tgz} mongo-debugsymbols.tgz || true
 
     - command: archive.targz_pack
       params:
@@ -1102,7 +1087,7 @@ tasks:
       params:
         aws_secret: ${aws_secret}
         aws_key: ${aws_key}
-        build_variants: ["enterprise-linux-64-amazon-ami", "enterprise-rhel-57-64-bit", "enterprise-rhel-62-64-bit", "enterprise-rhel-70-64-bit", "enterprise-suse11-64", "enterprise-ubuntu1204-64", "enterprise-ubuntu1404-64", "enterprise-debian71-64", "linux-32", "linux-64", "amazon", "rhel55", "rhel62", "rhel70", "suse11", "ubuntu1204", "ubuntu1404", "debian71", "solaris-64-bit"]
+        build_variants: *debug_symbol_variants
         permissions: public-read
         local_file: src/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}
         bucket: build-push-testing
@@ -1137,7 +1122,7 @@ tasks:
       params:
         aws_secret: ${aws_secret}
         aws_key: ${aws_key}
-        build_variants: ["enterprise-linux-64-amazon-ami", "enterprise-rhel-57-64-bit", "enterprise-rhel-62-64-bit", "enterprise-rhel-70-64-bit", "enterprise-suse11-64", "enterprise-ubuntu1204-64", "enterprise-ubuntu1404-64", "enterprise-debian71-64", "linux-32", "linux-64", "amazon", "rhel55", "rhel62", "rhel70", "suse11", "ubuntu1204", "ubuntu1404", "debian71", "solaris-64-bit"]
+        build_variants: *debug_symbol_variants
         permissions: public-read
         local_file: src/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.sig
         bucket: build-push-testing
@@ -1184,7 +1169,7 @@ tasks:
       params:
         aws_secret: ${aws_secret}
         aws_key: ${aws_key}
-        build_variants: ["enterprise-linux-64-amazon-ami", "enterprise-rhel-57-64-bit", "enterprise-rhel-62-64-bit", "enterprise-rhel-70-64-bit", "enterprise-suse11-64", "enterprise-ubuntu1204-64", "enterprise-ubuntu1404-64", "enterprise-debian71-64", "linux-32", "linux-64", "amazon", "rhel55", "rhel62", "rhel70", "suse11", "ubuntu1204", "ubuntu1404", "debian71", "solaris-64-bit"]
+        build_variants: *debug_symbol_variants
         permissions: public-read
         local_file: src/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.sha1
         bucket: build-push-testing
@@ -1230,7 +1215,7 @@ tasks:
     - command: s3.put
       params:
         aws_secret: ${aws_secret}
-        build_variants: ["enterprise-linux-64-amazon-ami", "enterprise-rhel-57-64-bit", "enterprise-rhel-62-64-bit", "enterprise-rhel-70-64-bit", "enterprise-suse11-64", "enterprise-ubuntu1204-64", "enterprise-ubuntu1404-64", "enterprise-debian71-64", "linux-32", "linux-64", "amazon", "rhel55", "rhel62", "rhel70", "suse11", "ubuntu1204", "ubuntu1404", "debian71", "solaris-64-bit"]
+        build_variants: *debug_symbol_variants
         local_file: src/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.sha256
         aws_key: ${aws_key}
         bucket: build-push-testing
@@ -1278,7 +1263,7 @@ tasks:
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        build_variants: ["enterprise-linux-64-amazon-ami", "enterprise-rhel-57-64-bit", "enterprise-rhel-62-64-bit", "enterprise-rhel-70-64-bit", "enterprise-suse11-64", "enterprise-ubuntu1204-64", "enterprise-ubuntu1404-64", "linux-32", "linux-64", "amazon", "rhel55", "rhel62", "rhel70", "suse11", "ubuntu1204", "ubuntu1404", "debian71", "solaris-64-bit"]
+        build_variants: *debug_symbol_variants
         local_file: src/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.md5
         bucket: build-push-testing
         content_type: text/plain
@@ -1315,25 +1300,7 @@ tasks:
             #Debug Symbols
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}-${task_id}.${ext|tgz}', 'bucket': 'build-push-testing'},
                'destination': {'path': '${push_path}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}', 'bucket': '${push_bucket}'},
-               'build_variants':
-                  ['enterprise-linux-64-amazon-ami',
-                   'enterprise-rhel-57-64-bit',
-                   'enterprise-rhel-62-64-bit',
-                   'enterprise-suse11-64',
-                   'enterprise-ubuntu1204-64',
-                   'enterprise-ubuntu1404-64',
-                   'enterprise-debian71-64',
-                   'linux-32',
-                   'linux-64',
-                   'amazon',
-                   'rhel55',
-                   'rhel62',
-                   'rhel70',
-                   'suse11',
-                   'ubuntu1204',
-                   'ubuntu1404',
-                   'debian71',
-                   'solaris-64-bit']
+               'build_variants': *debug_symbol_variants
               }
 
             #MSI (Windows only)
@@ -1348,25 +1315,7 @@ tasks:
             #Debug Symbols Signature
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}-${task_id}.${ext|tgz}.sig', 'bucket': 'build-push-testing'},
                'destination': {'path': '${push_path}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.sig', 'bucket': '${push_bucket}'},
-               'build_variants':
-                  ['enterprise-linux-64-amazon-ami',
-                   'enterprise-rhel-57-64-bit',
-                   'enterprise-rhel-62-64-bit',
-                   'enterprise-suse11-64',
-                   'enterprise-ubuntu1204-64',
-                   'enterprise-ubuntu1404-64',
-                   'enterprise-debian71-64',
-                   'linux-32',
-                   'linux-64',
-                   'amazon',
-                   'rhel55',
-                   'rhel62',
-                   'rhel70',
-                   'suse11',
-                   'ubuntu1204',
-                   'ubuntu1404',
-                   'debian71',
-                   'solaris-64-bit']
+               'build_variants': *debug_symbol_variants
               }
 
             #Source tarball signature
@@ -1388,26 +1337,7 @@ tasks:
             #SHA1 for debug symbols
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}-${task_id}.${ext|tgz}.sha1', 'bucket': 'build-push-testing'},
                'destination': {'path': '${push_path}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.sha1', 'bucket': '${push_bucket}'},
-               'build_variants': [
-                   'enterprise-linux-64-amazon-ami',
-                   'enterprise-rhel-57-64-bit',
-                   'enterprise-rhel-62-64-bit',
-                   'enterprise-suse11-64',
-                   'enterprise-ubuntu1204-64',
-                   'enterprise-ubuntu1404-64',
-                   'enterprise-debian71-64',
-                   'linux-32',
-                   'linux-64',
-                   'amazon',
-                   'rhel55',
-                   'rhel62',
-                   'rhel70',
-                   'suse11',
-                   'ubuntu1204',
-                   'ubuntu1404',
-                   'debian71',
-                   'solaris-64-bit'
-                ]
+               'build_variants': *debug_symbol_variants
               }
 
             #SHA1 for MSI
@@ -1428,26 +1358,7 @@ tasks:
             #SHA256 for debugsymbols
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}-${task_id}.${ext|tgz}.sha256', 'bucket': 'build-push-testing'},
                'destination': {'path': '${push_path}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.sha256', 'bucket': '${push_bucket}'},
-               'build_variants': [
-                   'enterprise-linux-64-amazon-ami',
-                   'enterprise-rhel-57-64-bit',
-                   'enterprise-rhel-62-64-bit',
-                   'enterprise-suse11-64',
-                   'enterprise-ubuntu1204-64',
-                   'enterprise-ubuntu1404-64',
-                   'enterprise-debian71-64',
-                   'linux-32',
-                   'linux-64',
-                   'amazon',
-                   'rhel55',
-                   'rhel62',
-                   'rhel70',
-                   'suse11',
-                   'ubuntu1204',
-                   'ubuntu1404',
-                   'debian71',
-                   'solaris-64-bit'
-               ]}
+               'build_variants': *debug_symbol_variants}
 
             #SHA256 for MSI files
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-win32-${push_arch}-${suffix}-${task_id}-signed.msi.sha256', 'bucket': 'build-push-testing'},
@@ -1468,24 +1379,7 @@ tasks:
             #MD5 for debugsymbols
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}-${task_id}.${ext|tgz}.md5', 'bucket': 'build-push-testing'},
                'destination': {'path': '${push_path}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.md5', 'bucket': '${push_bucket}'},
-               'build_variants': [
-                  'enterprise-linux-64-amazon-ami',
-                  'enterprise-rhel-57-64-bit',
-                  'enterprise-rhel-62-64-bit',
-                  'enterprise-suse11-64',
-                  'enterprise-ubuntu1204-64',
-                  'enterprise-ubuntu1404-64',
-                  'linux-32',
-                  'linux-64',
-                  'amazon',
-                  'rhel55',
-                  'rhel62',
-                  'rhel70',
-                  'suse11',
-                  'ubuntu1204',
-                  'ubuntu1404',
-                  'debian71',
-                  'solaris-64-bit']
+               'build_variants': *debug_symbol_variants
                 }
 
             #MD5 for MSIs
@@ -1540,7 +1434,6 @@ buildvariants:
     num_cores: $(grep -c ^processor /proc/cpuinfo)
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
-    has_debugsymbols: true
   tasks:
   - name: compile
     distros:
@@ -1635,7 +1528,6 @@ buildvariants:
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++
-    has_debugsymbols: true
   tasks:
   - name: compile
     distros:
@@ -1706,7 +1598,6 @@ buildvariants:
     push_name: linux-duroff
     push_arch: x86_64
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++
-    has_debugsymbols: true
     num_cores: $(grep -c ^processor /proc/cpuinfo)
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure --nojournal
@@ -1806,7 +1697,6 @@ buildvariants:
     num_cores: $(grep -c ^processor /proc/cpuinfo)
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
-    has_debugsymbols: true
   tasks:
   - name: compile
     distros:
@@ -1897,7 +1787,6 @@ buildvariants:
     num_cores: $(grep -c ^processor /proc/cpuinfo)
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
-    has_debugsymbols: true
   tasks:
   - name: compile
     distros:
@@ -1989,7 +1878,6 @@ buildvariants:
     num_cores: $(grep -c ^processor /proc/cpuinfo)
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
-    has_debugsymbols: true
   tasks:
   - name: compile
     distros:
@@ -2043,7 +1931,6 @@ buildvariants:
     num_cores: $(grep -c ^processor /proc/cpuinfo)
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
-    has_debugsymbols: true
   tasks:
   - name: compile
     distros:
@@ -2135,7 +2022,6 @@ buildvariants:
     num_cores: $(grep -c ^processor /proc/cpuinfo)
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure --storageEngine=mmapv1 -j1  # Avoid starting too many mongod's on 32-bit systems.
-    has_debugsymbols: true
   tasks:
   - name: compile
     distros:
@@ -2173,7 +2059,6 @@ buildvariants:
     num_cores: $(grep -c ^processor /proc/cpuinfo)
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure --storageEngine=mmapv1 -j1  # Avoid starting too many mongod's on 32-bit systems.
-    has_debugsymbols: true
     compile_flags: --dbg=on --distarch=i686 --opt=on -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --wiredtiger=off CCFLAGS="-m32" LINKFLAGS="-m32"
   tasks:
   - name: compile
@@ -2806,7 +2691,6 @@ buildvariants:
     num_cores: $(grep -c ^processor /proc/cpuinfo)
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
-    has_debugsymbols: true
   tasks:
   - name: compile
     distros:
@@ -2847,7 +2731,6 @@ buildvariants:
     num_cores: $(grep -c ^processor /proc/cpuinfo)
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
-    has_debugsymbols: true
   tasks:
   - name: compile
     distros:
@@ -2888,7 +2771,6 @@ buildvariants:
     num_cores: $(grep -c ^processor /proc/cpuinfo)
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
-    has_debugsymbols: true
   tasks:
   - name: compile
   - name: audit
@@ -2926,7 +2808,6 @@ buildvariants:
     num_cores: $(grep -c ^processor /proc/cpuinfo)
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
-    has_debugsymbols: true
   tasks:
   - name: compile
     distros:
@@ -3018,7 +2899,6 @@ buildvariants:
     num_cores: $(grep -c ^processor /proc/cpuinfo)
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
-    has_debugsymbols: true
   tasks:
   - name: compile
     distros:
@@ -3110,7 +2990,6 @@ buildvariants:
     num_cores: $(grep -c ^processor /proc/cpuinfo)
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
-    has_debugsymbols: true
   tasks:
   - name: compile
     distros:
@@ -3207,7 +3086,6 @@ buildvariants:
     num_cores: $(grep -c ^processor /proc/cpuinfo)
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
-    has_debugsymbols: true
   tasks:
   - name: compile
     distros:
@@ -3246,7 +3124,6 @@ buildvariants:
     num_cores: $(grep -c ^processor /proc/cpuinfo)
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
-    has_debugsymbols: true
   tasks:
   - name: compile
     distros:
@@ -3289,7 +3166,6 @@ buildvariants:
     num_cores: $(grep -c ^processor /proc/cpuinfo)
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
-    has_debugsymbols: true
     # TODO: Remove the "has_pyyaml_installed" expansion after PyYAML is installed on all build variants.
     has_pyyaml_installed: true
   tasks:
@@ -3329,7 +3205,6 @@ buildvariants:
     num_cores: $(grep -c ^processor /proc/cpuinfo)
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
-    has_debugsymbols: true
     # TODO: Remove the "has_pyyaml_installed" expansion after PyYAML is installed on all build variants.
     has_pyyaml_installed: true
   tasks:
@@ -3421,11 +3296,10 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: sunos5
     push_arch: x86_64
-    compile_flags: CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ -j$(kstat cpu | sort -u | grep -c "^module") --release CCFLAGS="-m64" LINKFLAGS="-m64 -static-libstdc++ -static-libgcc"
+    compile_flags: CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ -j$(kstat cpu | sort -u | grep -c "^module") --release CCFLAGS="-m64" LINKFLAGS="-m64 -static-libstdc++ -static-libgcc" OBJCOPY=/opt/mongodbtoolchain/bin/objcopy
     num_cores: $(kstat cpu | sort -u | grep -c "^module")
     num_jobs_unittests: $(kstat cpu | sort -u | grep -c "^module")
     test_flags: --continueOnFailure
-    has_debugsymbols: true
   tasks:
   - name: compile
   - name: aggregation
@@ -3478,7 +3352,6 @@ buildvariants:
     num_cores: $(grep -c ^processor /proc/cpuinfo)
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
-    has_debugsymbols: true
   tasks:
   - name: compile
     distros:
@@ -3516,7 +3389,6 @@ buildvariants:
     num_cores: $(grep -c ^processor /proc/cpuinfo)
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
-    has_debugsymbols: true
   tasks:
   - name: compile
     distros:

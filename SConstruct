@@ -628,6 +628,10 @@ env_vars.Add('MSVC_USE_SCRIPT',
 env_vars.Add('MSVC_VERSION',
     help='Sets the version of Visual Studio to use (e.g.  12.0, 11.0, 10.0)')
 
+env_vars.Add('OBJCOPY',
+    help='Sets the path to objcopy',
+    default=WhereIs('objcopy'))
+
 env_vars.Add('RPATH',
     help='Set the RPATH for dynamic libraries and executables',
     converter=variable_shlex_converter)
@@ -2232,8 +2236,6 @@ def getSystemInstallName():
     dist_arch = GetOption("distarch")
     arch_name = env['TARGET_ARCH'] if not dist_arch else dist_arch
     n = env.GetTargetOSName() + "-" + arch_name
-    if has_option("nostrip"):
-        n += "-debugsymbols"
 
     if len(mongo_modules):
             n += "-" + "-".join(m.name for m in mongo_modules)

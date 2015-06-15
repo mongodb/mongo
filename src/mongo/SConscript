@@ -318,21 +318,53 @@ else:
 # binaries
 
 distBinaries = []
-
-if env.TargetOSIs('windows'):
-    distBinaries.extend(['mongod.pdb', 'mongos.pdb'])
+distDebugSymbols = []
 
 def add_exe( v ):
     return "${PROGPREFIX}%s${PROGSUFFIX}" % v
 
+def failMissingObjCopy(env, target, source):
+    env.FatalError("Generating debug symbols requires objcopy, please set the OBJCOPY variable.")
+
 def installBinary( e, name ):
+    debug_sym_name = name
     name = add_exe( name )
 
-    if env.TargetOSIs('solaris', 'linux') and (not has_option("nostrip")):
-        name = e.Command('stripped/%s' % name, name, Copy('$TARGET', '$SOURCE'))[0]
-        e.AddPostAction(name, 'strip $TARGET')
+    debug_sym_cmd = None
+    if e.TargetOSIs('linux', 'solaris'):
+        if 'OBJCOPY' not in e:
+            debug_sym_cmd = failMissingObjCopy
+        else:
+            debug_sym_cmd = '${OBJCOPY} --only-keep-debug ${SOURCE} ${TARGET}'
+        debug_sym_name += '.debug'
+    elif e.TargetOSIs('osx'):
+        debug_sym_name += '.dSYM'
+        debug_sym_cmd = 'dsymutil -o ${TARGET} ${SOURCE}'
+    elif e.ToolchainIs('msvc'):
+        debug_sym_name += '.pdb'
+        distBinaries.append(debug_sym_name)
+        distDebugSymbols.append(debug_sym_name)
 
-    distBinaries.append(name)
+    if debug_sym_cmd:
+        debug_sym = e.Command(
+            debug_sym_name,
+            name,
+            debug_sym_cmd
+        )
+        e.Install("#/", debug_sym)
+        e.Alias('debugsymbols', debug_sym)
+        distDebugSymbols.append(debug_sym)
+
+    if env.TargetOSIs('linux', 'solaris') and (not has_option("nostrip")):
+        strip_cmd = e.Command(
+            'stripped/%s' % name,
+            [name, debug_sym],
+            '${OBJCOPY} --strip-debug --add-gnu-debuglink ${SOURCES[1]} ${SOURCES[0]} $TARGET'
+        )
+        distBinaries.append('stripped/%s' % name)
+    else:
+        distBinaries.append(name)
+
     inst = e.Install( "$INSTALL_DIR/bin", name )
 
     if env.TargetOSIs('posix'):
@@ -432,6 +464,13 @@ else:
     env.Alias("dist", [], [ failDist ] )
     env.AlwaysBuild("dist")
 
+debug_symbols_dist = env.Command(
+    target='#/${SERVER_DIST_BASENAME}-debugsymbols${DIST_ARCHIVE_SUFFIX}',
+    source=['#buildscripts/make_archive.py'] + distDebugSymbols,
+    action='$PYTHON ${SOURCES[0]} -o $TARGET --transform $BUILD_DIR/mongo=$SERVER_DIST_BASENAME ${TEMPFILE(SOURCES[1:])}',
+    BUILD_DIR=env.Dir('$BUILD_DIR').path
+)
+env.Alias('dist-debugsymbols', debug_symbols_dist)
 
 #final alias
 env.Alias( "install", "$INSTALL_DIR" )
