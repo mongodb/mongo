@@ -92,7 +92,6 @@ namespace repl {
      */
     class ReplicationExecutor final : public executor::TaskExecutor {
         MONGO_DISALLOW_COPYING(ReplicationExecutor);
-
     public:
 
         /**

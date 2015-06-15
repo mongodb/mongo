@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kExecutor
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/repl/replication_executor.h"
@@ -37,6 +39,7 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -264,13 +267,20 @@ namespace {
 
         Callback* callback = _getCallbackFromHandle(cbHandle);
         const WorkQueue::iterator iter = callback->_iter;
+
         boost::lock_guard<boost::mutex> lk(_mutex);
         if (_inShutdown) {
             return;
         }
+
         if (expectedHandleGeneration != iter->generation) {
             return;
         }
+
+        LOG(4) << "Received remote response: "
+               << (response.isOK() ? response.getValue().toString() :
+                                     response.getStatus().toString());
+
         callback->_callbackFn = stdx::bind(remoteCommandFinished,
                                            stdx::placeholders::_1,
                                            cb,
@@ -298,6 +308,9 @@ namespace {
                            scheduledRequest));
         if (handle.isOK()) {
             _getCallbackFromHandle(handle.getValue())->_iter->isNetworkOperation = true;
+
+            LOG(4) << "Scheduling remote request: " << request.toString();
+
             _networkInterface->startCommand(
                     handle.getValue(),
                     scheduledRequest,

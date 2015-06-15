@@ -32,8 +32,13 @@
 
 #include <vector>
 
+#include "mongo/base/status_with.h"
 #include "mongo/client/remote_command_runner_mock.h"
 #include "mongo/client/remote_command_targeter_factory_mock.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/query/cursor_responses.h"
+#include "mongo/db/repl/replication_executor.h"
+#include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/catalog/dist_lock_catalog_mock.h"
 #include "mongo/s/catalog/replset/catalog_manager_replica_set.h"
@@ -44,17 +49,39 @@
 
 namespace mongo {
 
+    using executor::NetworkInterfaceMock;
     using std::vector;
 
-    CatalogManagerReplSetTestFixture::CatalogManagerReplSetTestFixture() {
-        std::unique_ptr<CatalogManagerReplicaSet> cm(
-            stdx::make_unique<CatalogManagerReplicaSet>());
+    CatalogManagerReplSetTestFixture::CatalogManagerReplSetTestFixture() = default;
+
+    CatalogManagerReplSetTestFixture::~CatalogManagerReplSetTestFixture() = default;
+
+    void CatalogManagerReplSetTestFixture::setUp() {
+        std::unique_ptr<NetworkInterfaceMock> network(
+            stdx::make_unique<executor::NetworkInterfaceMock>());
+
+        _mockNetwork = network.get();
+
+        std::unique_ptr<repl::ReplicationExecutor> executor(
+            stdx::make_unique<repl::ReplicationExecutor>(network.release(),
+                                                         nullptr,
+                                                         0));
+
+        // The executor thread might run after the executor unique_ptr above has been moved to the
+        // ShardRegistry, so make sure we get the underlying pointer before that.
+        _executorThread = std::thread(std::bind([](repl::ReplicationExecutor* executorPtr) {
+                                                    executorPtr->run();
+                                                },
+                                                executor.get()));
 
         std::unique_ptr<ReplSetDistLockManager> distLockMgr(
             stdx::make_unique<ReplSetDistLockManager>("Test",
                                                       stdx::make_unique<DistLockCatalogMock>(),
                                                       Milliseconds(2),
                                                       Seconds(10)));
+
+        std::unique_ptr<CatalogManagerReplicaSet> cm(
+            stdx::make_unique<CatalogManagerReplicaSet>());
 
         ASSERT_OK(cm->init(ConnectionString::forReplicaSet("CatalogManagerReplSetTest",
                                                            { HostAndPort{ "TestHost1" },
@@ -64,7 +91,7 @@ namespace mongo {
         std::unique_ptr<ShardRegistry> shardRegistry(
             stdx::make_unique<ShardRegistry>(stdx::make_unique<RemoteCommandTargeterFactoryMock>(),
                                              stdx::make_unique<RemoteCommandRunnerMock>(),
-                                             std::unique_ptr<executor::TaskExecutor>{nullptr},
+                                             std::move(executor),
                                              cm.get()));
 
         // For now initialize the global grid object. All sharding objects will be accessible
@@ -72,7 +99,13 @@ namespace mongo {
         grid.init(std::move(cm), std::move(shardRegistry));
     }
 
-    CatalogManagerReplSetTestFixture::~CatalogManagerReplSetTestFixture() {
+    void CatalogManagerReplSetTestFixture::tearDown() {
+        // Stop the executor and wait for the executor thread to complete. This means that there
+        // will be no more calls into the executor and it can be safely deleted.
+        shardRegistry()->getExecutor()->shutdown();
+        _executorThread.join();
+
+        // This call will delete the shard registry, which will terminate the executor
         grid.clearForUnitTests();
     }
 
@@ -89,6 +122,60 @@ namespace mongo {
 
     RemoteCommandRunnerMock* CatalogManagerReplSetTestFixture::commandRunner() const {
         return RemoteCommandRunnerMock::get(shardRegistry()->getCommandRunner());
+    }
+
+    executor::NetworkInterfaceMock* CatalogManagerReplSetTestFixture::network() const {
+        return _mockNetwork;
+    }
+
+    void CatalogManagerReplSetTestFixture::onCommand(OnCommandFunction func) {
+        network()->enterNetwork();
+
+        const NetworkInterfaceMock::NetworkOperationIterator noi =
+            network()->getNextReadyRequest();
+        const RemoteCommandRequest& request = noi->getRequest();
+
+        const auto& resultStatus = func(request.dbname, request.cmdObj);
+
+        BSONObjBuilder result;
+
+        if (resultStatus.isOK()) {
+            result.appendElements(resultStatus.getValue());
+        }
+
+        Command::appendCommandStatus(result, resultStatus.getStatus());
+
+        const RemoteCommandResponse response(result.obj(), Milliseconds(1));
+
+        network()->scheduleResponse(noi, network()->now(), response);
+
+        network()->runReadyNetworkOperations();
+
+        network()->exitNetwork();
+    }
+
+    void CatalogManagerReplSetTestFixture::onFindCommand(OnFindCommandFunction func) {
+        onCommand([&func](const std::string& dbName,
+                          const BSONObj& cmdObj) -> StatusWith<BSONObj> {
+
+            const auto& resultStatus = func(dbName, cmdObj);
+
+            if (!resultStatus.isOK()) {
+                return resultStatus.getStatus();
+            }
+
+            BSONArrayBuilder arr;
+            for (const auto& obj : resultStatus.getValue()) {
+                arr.append(obj);
+            }
+
+            const std::string nss = str::stream() << dbName << '.'
+                                                  << cmdObj.firstElement().String();
+            BSONObjBuilder result;
+            appendCursorResponseObject(0LL, nss, arr.arr(), &result);
+
+            return result.obj();
+        });
     }
 
 } // namespace mongo

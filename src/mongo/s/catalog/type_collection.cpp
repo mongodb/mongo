@@ -78,13 +78,16 @@ namespace mongo {
 
         {
             bool collDropped;
-
-            // Dropped can be missing in which case it is presumed false
-            Status status =
-                bsonExtractBooleanFieldWithDefault(source, dropped.name(), false, &collDropped);
-            if (!status.isOK()) return status;
-
-            coll._dropped = collDropped;
+            Status status = bsonExtractBooleanField(source, dropped.name(), &collDropped);
+            if (status.isOK()) {
+                coll._dropped = collDropped;
+            }
+            else if (status == ErrorCodes::NoSuchKey) {
+                // Dropped can be missing in which case it is presumed false
+            }
+            else {
+                return status;
+            }
         }
 
         {
@@ -94,7 +97,7 @@ namespace mongo {
             if (status.isOK()) {
                 BSONObj obj = collKeyPattern.Obj();
                 if (obj.isEmpty()) {
-                    return Status(ErrorCodes::ShardKeyNotFound, "invalid shard key");
+                    return Status(ErrorCodes::ShardKeyNotFound, "empty shard key");
                 }
 
                 coll._keyPattern = KeyPattern(obj.getOwned());
@@ -109,26 +112,30 @@ namespace mongo {
 
         {
             bool collUnique;
-
-            // Key uniqueness can be missing in which case it is presumed false
-            Status status =
-                bsonExtractBooleanFieldWithDefault(source, unique.name(), false, &collUnique);
-            if (!status.isOK()) return status;
-
-            coll._unique = collUnique;
+            Status status = bsonExtractBooleanField(source, unique.name(), &collUnique);
+            if (status.isOK()) {
+                coll._unique = collUnique;
+            }
+            else if (status == ErrorCodes::NoSuchKey) {
+                // Key uniqueness can be missing in which case it is presumed false
+            }
+            else {
+                return status;
+            }
         }
 
         {
             bool collNoBalance;
-
-            // No balance can be missing in which case it is presumed as false
-            Status status = bsonExtractBooleanFieldWithDefault(source,
-                                                               noBalance.name(),
-                                                               false,
-                                                               &collNoBalance);
-            if (!status.isOK()) return status;
-
-            coll._allowBalance = !collNoBalance;
+            Status status = bsonExtractBooleanField(source, noBalance.name(), &collNoBalance);
+            if (status.isOK()) {
+                coll._allowBalance = !collNoBalance;
+            }
+            else if (status == ErrorCodes::NoSuchKey) {
+                // No balance can be missing in which case it is presumed as false
+            }
+            else {
+                return status;
+            }
         }
 
         return StatusWith<CollectionType>(coll);

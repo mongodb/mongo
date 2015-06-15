@@ -26,18 +26,81 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+
 #include "mongo/platform/basic.h"
 
+#include <future>
+
+#include "mongo/client/remote_command_targeter_mock.h"
+#include "mongo/db/query/lite_parsed_query.h"
+#include "mongo/executor/network_interface_mock.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/s/catalog/replset/catalog_manager_replica_set.h"
 #include "mongo/s/catalog/replset/catalog_manager_replica_set_test_fixture.h"
+#include "mongo/s/catalog/type_collection.h"
+#include "mongo/s/client/shard_registry.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {
 
-    // TODO: Just a placeholder so the catalog manager RS tests may compile. Remove when actual
-    //       tests are written.
-    TEST_F(CatalogManagerReplSetTestFixture, Placeholder) {
+    using executor::NetworkInterfaceMock;
+    using executor::TaskExecutor;
+    using std::async;
+    using std::string;
+    using std::vector;
+    using unittest::assertGet;
 
+    TEST_F(CatalogManagerReplSetTestFixture, GetCollectionExisting) {
+        RemoteCommandTargeterMock* targeter =
+            RemoteCommandTargeterMock::get(shardRegistry()->findIfExists("config")->getTargeter());
+        targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+
+        CollectionType expectedColl;
+        expectedColl.setNs(NamespaceString("TestDB.TestNS"));
+        expectedColl.setKeyPattern(BSON("KeyName" << 1));
+        expectedColl.setUpdatedAt(Date_t());
+        expectedColl.setEpoch(OID::gen());
+
+        auto future = async(std::launch::async, [this, &expectedColl] {
+            return assertGet(catalogManager()->getCollection(expectedColl.getNs()));
+        });
+
+        onFindCommand([&expectedColl](const std::string& dbName, const BSONObj& cmdObj) {
+            const NamespaceString nss(dbName + '.' + cmdObj.firstElement().String());
+            ASSERT_EQ(nss.toString(), CollectionType::ConfigNS);
+
+            auto query = assertGet(LiteParsedQuery::fromFindCommand(nss, cmdObj, false));
+
+            // Ensure the query is correct
+            ASSERT_EQ(query->ns(), CollectionType::ConfigNS);
+            ASSERT_EQ(query->getFilter(), BSON(CollectionType::fullNs(expectedColl.getNs())));
+
+            return vector<BSONObj>{ expectedColl.toBSON() };
+        });
+
+        // Now wait for the getCollection call to return
+        const auto& actualColl = future.get();
+        ASSERT_EQ(expectedColl.toBSON(), actualColl.toBSON());
+    }
+
+    TEST_F(CatalogManagerReplSetTestFixture, GetCollectionNotExisting) {
+        RemoteCommandTargeterMock* targeter =
+            RemoteCommandTargeterMock::get(shardRegistry()->findIfExists("config")->getTargeter());
+        targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+
+        auto future = async(std::launch::async, [this] {
+            auto status = catalogManager()->getCollection("NonExistent");
+            ASSERT_EQUALS(status.getStatus(), ErrorCodes::NamespaceNotFound);
+        });
+
+        onFindCommand([](const std::string& dbName, const BSONObj& cmdObj) {
+            return vector<BSONObj>{ };
+        });
+
+        // Now wait for the getCollection call to return
+        future.get();
     }
 
 } // namespace

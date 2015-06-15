@@ -28,19 +28,19 @@
 
 #pragma once
 
-#include <boost/thread/thread.hpp>
-#include <list>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <vector>
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/connection_string.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/s/catalog/catalog_manager.h"
-#include "mongo/stdx/mutex.h"
 
 namespace mongo {
+
+    struct HostAndPort;
+    class NamespaceString;
 
 namespace executor {
 
@@ -145,6 +145,24 @@ namespace executor {
         DistLockManager* getDistLockManager() override;
 
     private:
+        /**
+         * Executes 'find' command against the specified host and fetches *all* the results that
+         * the host will return until there are no more or until an error is returned.
+         *
+         * Returns either the complete set of results or an error, never partial results.
+         */
+        StatusWith<std::vector<BSONObj>> _find(const HostAndPort& host,
+                                               const NamespaceString& nss,
+                                               const BSONObj& query,
+                                               int limit);
+
+        /**
+         * Runs a command against the specified host and returns the result.
+         */
+        StatusWith<BSONObj> _runCommand(const HostAndPort& host,
+                                        const std::string& dbName,
+                                        const BSONObj& cmdObj);
+
         // Config server connection string
         ConnectionString _configServerConnectionString;
 
@@ -152,7 +170,7 @@ namespace executor {
         std::unique_ptr<DistLockManager> _distLockManager;
 
         // protects _inShutdown
-        stdx::mutex _mutex;
+        std::mutex _mutex;
 
         // True if shutDown() has been called. False, otherwise.
         bool _inShutdown = false;

@@ -86,7 +86,7 @@ namespace mongo {
 
         LOG(1) << "found " << numShards << " shards listed on config server(s)";
 
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        std::lock_guard<std::mutex> lk(_mutex);
 
         _lookup.clear();
         _targeters.clear();
@@ -123,9 +123,9 @@ namespace mongo {
         return _findUsingLookUp(id);
     }
 
-    shared_ptr<Shard> ShardRegistry::lookupRSName(const string& name) {
-        boost::lock_guard<boost::mutex> lk(_mutex);
-        ShardMap::iterator i = _rsLookup.find(name);
+    shared_ptr<Shard> ShardRegistry::lookupRSName(const string& name) const {
+        std::lock_guard<std::mutex> lk(_mutex);
+        ShardMap::const_iterator i = _rsLookup.find(name);
 
         return (i == _rsLookup.end()) ? nullptr : i->second;
     }
@@ -133,12 +133,12 @@ namespace mongo {
     void ShardRegistry::set(const ShardId& id, const Shard& s) {
         shared_ptr<Shard> ss(std::make_shared<Shard>(s.getId(), s.getConnString()));
 
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        std::lock_guard<std::mutex> lk(_mutex);
         _lookup[id] = ss;
     }
 
     void ShardRegistry::remove(const ShardId& id) {
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        std::lock_guard<std::mutex> lk(_mutex);
 
         for (ShardMap::iterator i = _lookup.begin(); i != _lookup.end();) {
             shared_ptr<Shard> s = i->second;
@@ -165,7 +165,7 @@ namespace mongo {
         std::set<string> seen;
 
         {
-            boost::lock_guard<boost::mutex> lk(_mutex);
+            std::lock_guard<std::mutex> lk(_mutex);
             for (ShardMap::const_iterator i = _lookup.begin(); i != _lookup.end(); ++i) {
                 const shared_ptr<Shard>& s = i->second;
                 if (s->getId() == "config") {
@@ -182,10 +182,10 @@ namespace mongo {
         all->assign(seen.begin(), seen.end());
     }
 
-    void ShardRegistry::toBSON(BSONObjBuilder* result) const {
+    void ShardRegistry::toBSON(BSONObjBuilder* result) {
         BSONObjBuilder b(_lookup.size() + 50);
 
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        std::lock_guard<std::mutex> lk(_mutex);
 
         for (ShardMap::const_iterator i = _lookup.begin(); i != _lookup.end(); ++i) {
             b.append(i->first, i->second->getConnString().toString());
@@ -241,7 +241,7 @@ namespace mongo {
     }
 
     shared_ptr<Shard> ShardRegistry::_findUsingLookUp(const ShardId& shardId) {
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        std::lock_guard<std::mutex> lk(_mutex);
         ShardMap::iterator it = _lookup.find(shardId);
         if (it != _lookup.end()) {
             return it->second;
@@ -251,7 +251,7 @@ namespace mongo {
     }
 
     std::shared_ptr<RemoteCommandTargeter> ShardRegistry::_findTargeter(const string& shardId) {
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        std::lock_guard<std::mutex> lk(_mutex);
 
         TargeterMap::iterator it = _targeters.find(shardId);
         if (it != _targeters.end()) {

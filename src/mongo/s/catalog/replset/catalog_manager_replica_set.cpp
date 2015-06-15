@@ -38,6 +38,8 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/client/dbclientinterface.h"
+#include "mongo/client/query_fetcher.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_runner.h"
 #include "mongo/client/remote_command_targeter.h"
@@ -58,13 +60,19 @@
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
 
+    using executor::TaskExecutor;
+    using RemoteCommandCallbackArgs = TaskExecutor::RemoteCommandCallbackArgs;
+
     using std::set;
     using std::string;
+    using std::unique_ptr;
     using std::vector;
+    using str::stream;
 
 namespace {
 
@@ -114,7 +122,7 @@ namespace {
     void CatalogManagerReplicaSet::shutDown() {
         LOG(1) << "CatalogManagerReplicaSet::shutDown() called.";
         {
-            boost::lock_guard<boost::mutex> lk(_mutex);
+            std::lock_guard<std::mutex> lk(_mutex);
             _inShutdown = true;
         }
 
@@ -170,7 +178,30 @@ namespace {
     }
 
     StatusWith<CollectionType> CatalogManagerReplicaSet::getCollection(const std::string& collNs) {
-        return notYetImplemented;
+        auto configShard = grid.shardRegistry()->findIfExists("config");
+
+        auto readHostStatus = configShard->getTargeter()->findHost(kConfigReadSelector);
+        if (!readHostStatus.isOK()) {
+            return readHostStatus.getStatus();
+        }
+
+        auto statusFind = _find(readHostStatus.getValue(),
+                                NamespaceString(CollectionType::ConfigNS),
+                                BSON(CollectionType::fullNs(collNs)),
+                                1);
+        if (!statusFind.isOK()) {
+            return statusFind.getStatus();
+        }
+
+        const auto& retVal = statusFind.getValue();
+        if (retVal.empty()) {
+            return Status(ErrorCodes::NamespaceNotFound,
+                          stream() << "collection " << collNs << " not found");
+        }
+
+        invariant(retVal.size() == 1);
+
+        return CollectionType::fromBSON(retVal.front());
     }
 
     Status CatalogManagerReplicaSet::getCollections(const std::string* dbName,
@@ -218,7 +249,7 @@ namespace {
     }
 
     Status CatalogManagerReplicaSet::getAllShards(vector<ShardType>* shards) {
-        return notYetImplemented;
+        return Status::OK();
     }
 
     bool CatalogManagerReplicaSet::isShardHost(const ConnectionString& connectionString) {
@@ -251,6 +282,88 @@ namespace {
     void CatalogManagerReplicaSet::writeConfigServerDirect(
             const BatchedCommandRequest& batchRequest,
             BatchedCommandResponse* batchResponse) {
+
+    }
+
+    StatusWith<vector<BSONObj>> CatalogManagerReplicaSet::_find(const HostAndPort& host,
+                                                                const NamespaceString& nss,
+                                                                const BSONObj& query,
+                                                                int limit) {
+
+        // If for some reason the callback never gets invoked, we will return this status
+        Status status = Status(ErrorCodes::InternalError, "Internal error running find command");
+        vector<BSONObj> results;
+
+        auto fetcherCallback = [&status, &results](const QueryFetcher::BatchDataStatus& dataStatus,
+                                                   Fetcher::NextAction* nextAction) {
+
+            // Throw out any accumulated results on error
+            if (!dataStatus.isOK()) {
+                status = dataStatus.getStatus();
+                results.clear();
+                return;
+            }
+
+            auto& data = dataStatus.getValue();
+            for (const BSONObj& doc : data.documents) {
+                results.push_back(std::move(doc.getOwned()));
+            }
+
+            status = Status::OK();
+        };
+
+        unique_ptr<LiteParsedQuery> findCmd(
+            fassertStatusOK(0, LiteParsedQuery::make(nss.toString(), limit, query)));
+
+        QueryFetcher fetcher(grid.shardRegistry()->getExecutor(),
+                             host,
+                             nss,
+                             findCmd->asFindCommand(),
+                             fetcherCallback);
+
+        Status scheduleStatus = fetcher.schedule();
+        if (!scheduleStatus.isOK()) {
+            return scheduleStatus;
+        }
+
+        fetcher.wait();
+
+        if (!status.isOK()) {
+            return status;
+        }
+
+        return results;
+    }
+
+    StatusWith<BSONObj> CatalogManagerReplicaSet::_runCommand(const HostAndPort& host,
+                                                              const std::string& dbName,
+                                                              const BSONObj& cmdObj) {
+
+        TaskExecutor* exec = grid.shardRegistry()->getExecutor();
+
+        StatusWith<RemoteCommandResponse> responseStatus =
+            Status(ErrorCodes::InternalError, "Internal error running command");
+
+        RemoteCommandRequest request(host, dbName, cmdObj);
+        auto callStatus =
+            exec->scheduleRemoteCommand(request,
+                                        [&responseStatus](const RemoteCommandCallbackArgs& args) {
+
+            responseStatus = args.response;
+        });
+
+        if (!callStatus.isOK()) {
+            return callStatus.getStatus();
+        }
+
+        // Block until the command is carried out
+        exec->wait(callStatus.getValue());
+
+        if (!responseStatus.isOK()) {
+            return responseStatus.getStatus();
+        }
+
+        return responseStatus.getValue().data;
     }
 
 } // namespace mongo
