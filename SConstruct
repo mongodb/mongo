@@ -470,6 +470,10 @@ env_vars.Add('MONGO_GIT_HASH',
     help='Sets the githash to store in the MongoDB version information',
     default=version_data['githash'])
 
+env_vars.Add('OBJCOPY',
+    help='Sets the path to objcopy',
+    default=WhereIs('objcopy'))
+
 env_vars.Add('RPATH',
     help='Set the RPATH for dynamic libraries and executables',
     converter=variable_shlex_converter)
@@ -2383,8 +2387,6 @@ def getSystemInstallName():
     n = platform + "-" + arch_name
     if static:
         n += "-static"
-    if has_option("nostrip"):
-        n += "-debugsymbols"
     if nix and os.uname()[2].startswith("8."):
         n += "-tiger"
 
