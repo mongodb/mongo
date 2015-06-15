@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include <boost/noncopyable.hpp>
 #include <stack>
 
 #include "mongo/client/dbclientinterface.h"
@@ -266,7 +265,8 @@ namespace mongo {
 
     };
 
-    class AScopedConnection : boost::noncopyable {
+    class AScopedConnection {
+        MONGO_DISALLOW_COPYING(AScopedConnection);
     public:
         AScopedConnection() { _numConnections.fetchAndAdd(1); }
         virtual ~AScopedConnection() { _numConnections.fetchAndAdd(-1); }

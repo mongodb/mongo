@@ -31,7 +31,6 @@
 
 #include <list>
 #include <boost/filesystem/path.hpp>
-#include <boost/noncopyable.hpp>
 #include <boost/thread/condition.hpp>
 
 #include "mongo/util/concurrency/mutex.h"
@@ -43,7 +42,8 @@ namespace mongo {
      * requested asynchronously or synchronously.
      * singleton
      */
-    class FileAllocator : boost::noncopyable {
+    class FileAllocator {
+        MONGO_DISALLOW_COPYING(FileAllocator);
         /*
          * The public functions may not be called concurrently.  The allocation
          * functions may be called multiple times per file, but only the first

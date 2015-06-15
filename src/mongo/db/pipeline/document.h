@@ -32,7 +32,6 @@
 
 #include <boost/functional/hash.hpp>
 #include <boost/intrusive_ptr.hpp>
-#include <boost/noncopyable.hpp>
 
 #include "mongo/bson/util/builder.h"
 
@@ -278,7 +277,8 @@ namespace mongo {
      *  shallow-clone its storage on write (COW) if it is shared with any other
      *  Documents.
      */
-    class MutableDocument : boost::noncopyable {
+    class MutableDocument {
+        MONGO_DISALLOW_COPYING(MutableDocument);
     public:
 
         /** Create a new empty Document.

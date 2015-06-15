@@ -28,8 +28,6 @@
 
 #pragma once
 
-#include <boost/noncopyable.hpp>
-
 #include "mongo/base/string_data.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/client/read_preference.h"
@@ -372,7 +370,8 @@ namespace mongo {
     /**
        The interface that any db connection should implement
      */
-    class DBClientInterface : boost::noncopyable {
+    class DBClientInterface {
+        MONGO_DISALLOW_COPYING(DBClientInterface);
     public:
         virtual std::unique_ptr<DBClientCursor> query(const std::string &ns, Query query, int nToReturn = 0, int nToSkip = 0,
                                                const BSONObj *fieldsToReturn = 0, int queryOptions = 0 , int batchSize = 0 ) = 0;
@@ -409,6 +408,9 @@ namespace mongo {
 
         /** don't use this - called automatically by DBClientCursor for you */
         virtual std::unique_ptr<DBClientCursor> getMore( const std::string &ns, long long cursorId, int nToReturn = 0, int options = 0 ) = 0;
+
+    protected:
+        DBClientInterface() = default;
     };
 
     /**

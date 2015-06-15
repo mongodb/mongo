@@ -46,8 +46,6 @@
 #include <map>
 #include <string>
 
-#include <boost/noncopyable.hpp>
-
 #include "mongo/db/jsobj.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/platform/random.h"
@@ -74,7 +72,8 @@ namespace mongo {
      * method.
      *
      */
-    class BsonTemplateEvaluator : private boost::noncopyable {
+    class BsonTemplateEvaluator {
+        MONGO_DISALLOW_COPYING(BsonTemplateEvaluator);
     public:
         /* Status of template evaluation. Logically the  the status are "success", "bad operator"
          * and "operation evaluation error." */

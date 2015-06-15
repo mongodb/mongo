@@ -41,7 +41,6 @@
 #include <vector>
 
 #include <boost/config.hpp>
-#include <boost/noncopyable.hpp>
 
 #include "mongo/base/status_with.h"
 #include "mongo/logger/logstream_builder.h"
@@ -250,7 +249,8 @@ namespace mongo {
          * Container holding a test function and its name.  Suites
          * contain lists of these.
          */
-        class TestHolder : private boost::noncopyable {
+        class TestHolder {
+            MONGO_DISALLOW_COPYING(TestHolder);
         public:
             TestHolder(const std::string& name, const TestFunction& fn)
                 : _name(name), _fn(fn) {}
@@ -268,7 +268,8 @@ namespace mongo {
          * Base type for unit test fixtures.  Also, the default fixture type used
          * by the TEST() macro.
          */
-        class Test : private boost::noncopyable {
+        class Test {
+            MONGO_DISALLOW_COPYING(Test);
         public:
             Test();
             virtual ~Test();
@@ -280,7 +281,8 @@ namespace mongo {
              * Registration agent for adding tests to suites, used by TEST macro.
              */
             template <typename T>
-            class RegistrationAgent : private boost::noncopyable {
+            class RegistrationAgent {
+                MONGO_DISALLOW_COPYING(RegistrationAgent);
             public:
                 RegistrationAgent(const std::string& suiteName, const std::string& testName);
             };
@@ -344,7 +346,8 @@ namespace mongo {
          * by the programmer by overriding setupTests() in a subclass of Suite.  This
          * approach is deprecated.
          */
-        class Suite : private boost::noncopyable {
+        class Suite {
+            MONGO_DISALLOW_COPYING(Suite);
         public:
             Suite( const std::string& name );
             virtual ~Suite();

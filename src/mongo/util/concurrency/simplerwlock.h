@@ -28,8 +28,6 @@
 
 #pragma once
 
-#include <boost/noncopyable.hpp>
-
 #include "mongo/base/string_data.h"
 #include "mongo/config.h"
 #include "mongo/platform/atomic_word.h"
@@ -39,7 +37,8 @@ namespace mongo {
     /** separated out as later the implementation of this may be different than RWLock, 
         depending on OS, as there is no upgrade etc. facility herein.
     */
-    class SimpleRWLock : boost::noncopyable { 
+    class SimpleRWLock {
+        MONGO_DISALLOW_COPYING(SimpleRWLock);
 #if defined(NTDDI_VERSION) && defined(NTDDI_WIN7) && (NTDDI_VERSION >= NTDDI_WIN7)
         SRWLOCK _lock;
 #else
@@ -57,13 +56,15 @@ namespace mongo {
         void unlock();
         void lock_shared();
         void unlock_shared();
-        class Shared : boost::noncopyable {
+        class Shared {
+            MONGO_DISALLOW_COPYING(Shared);
             SimpleRWLock& _r;
         public:
             Shared(SimpleRWLock& rwlock) : _r(rwlock) {_r.lock_shared(); }
             ~Shared() { _r.unlock_shared(); }
         };
-        class Exclusive : boost::noncopyable {
+        class Exclusive {
+            MONGO_DISALLOW_COPYING(Exclusive);
             SimpleRWLock& _r;
         public:
             Exclusive(SimpleRWLock& rwlock) : _r(rwlock) {_r.lock(); }

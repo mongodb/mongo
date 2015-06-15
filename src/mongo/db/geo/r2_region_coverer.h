@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/noncopyable.hpp>
 #include <queue>
 
 #include "mongo/db/geo/hash.h"
@@ -38,11 +37,14 @@ namespace mongo {
 
     class R2Region;
 
-    class R2RegionCoverer : boost::noncopyable {
+    class R2RegionCoverer {
+        MONGO_DISALLOW_COPYING(R2RegionCoverer);
+
         // By default, the covering uses at most 8 cells at any level.
         static const int kDefaultMaxCells; // = 8;
 
     public:
+        R2RegionCoverer() = default;
         R2RegionCoverer(GeoHashConverter* hashConverter);
         ~R2RegionCoverer();
 
@@ -104,8 +106,18 @@ namespace mongo {
         R2Region const* _region;
 
         // We keep the candidates that may intersect with this region in a priority queue.
-        struct CompareQueueEntries;
         typedef std::pair<int, Candidate*> QueueEntry;
+
+        // We define our own own comparison function on QueueEntries in order to
+        // make the results deterministic.  Using the default less<QueueEntry>,
+        // entries of equal priority would be sorted according to the memory address
+        // of the candidate.
+        struct CompareQueueEntries {
+            bool operator()(QueueEntry const& x, QueueEntry const& y) const {
+                return x.first < y.first;
+            }
+        };
+
         typedef std::priority_queue<QueueEntry, std::vector<QueueEntry>,
                                     CompareQueueEntries> CandidateQueue;
         std::unique_ptr<CandidateQueue> _candidateQueue;  // Priority queue owns candidate pointers.
@@ -114,8 +126,11 @@ namespace mongo {
 
 
     // An R2CellUnion is a region consisting of cells of various sizes.
-    class R2CellUnion : boost::noncopyable {
+    class R2CellUnion {
+        MONGO_DISALLOW_COPYING(R2CellUnion);
     public:
+        R2CellUnion() = default;
+
         void init(const std::vector<GeoHash>& cellIds);
         bool contains(const GeoHash cellId) const;
         std::string toString() const;

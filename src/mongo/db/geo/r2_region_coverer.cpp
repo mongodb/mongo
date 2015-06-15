@@ -36,20 +36,8 @@
 
 namespace mongo {
 
-    using std::less;
-
     // Definition
     int const R2RegionCoverer::kDefaultMaxCells = 8;
-
-    // We define our own own comparison function on QueueEntries in order to
-    // make the results deterministic.  Using the default less<QueueEntry>,
-    // entries of equal priority would be sorted according to the memory address
-    // of the candidate.
-    struct R2RegionCoverer::CompareQueueEntries : public less<QueueEntry> {
-      bool operator()(QueueEntry const& x, QueueEntry const& y) {
-        return x.first < y.first;
-      }
-    };
 
     // Doesn't take ownership of "hashConverter". The caller should guarantee its life cycle
     // is longer than this coverer.

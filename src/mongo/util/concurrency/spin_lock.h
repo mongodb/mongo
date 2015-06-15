@@ -34,8 +34,6 @@
 #include "mongo/platform/windows_basic.h"
 #endif
 
-#include <boost/noncopyable.hpp>
-
 #include "mutex.h"
 
 namespace mongo {
@@ -44,7 +42,8 @@ namespace mongo {
      * The spinlock currently requires late GCC support routines to be efficient.
      * Other platforms default to a mutex implemenation.
      */
-    class SpinLock : boost::noncopyable {
+    class SpinLock {
+        MONGO_DISALLOW_COPYING(SpinLock);
     public:
         SpinLock();
         ~SpinLock();
@@ -81,7 +80,8 @@ namespace mongo {
 #endif
     };
     
-    class scoped_spinlock : boost::noncopyable {
+    class scoped_spinlock {
+        MONGO_DISALLOW_COPYING(scoped_spinlock);
     public:
         scoped_spinlock( SpinLock& l ) : _l(l) {
             _l.lock();

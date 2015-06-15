@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include <boost/noncopyable.hpp>
 #include <vector>
 
 #include "mongo/config.h"
@@ -41,7 +40,8 @@ namespace mongo {
     class MessagingPort;
     class PiggyBackData;
 
-    class AbstractMessagingPort : boost::noncopyable {
+    class AbstractMessagingPort {
+        MONGO_DISALLOW_COPYING(AbstractMessagingPort);
     public:
         AbstractMessagingPort() : tag(0), _connectionId(0) {}
         virtual ~AbstractMessagingPort() { }

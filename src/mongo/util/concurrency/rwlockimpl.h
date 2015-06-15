@@ -41,7 +41,8 @@
 namespace mongo {
     unsigned long long curTimeMicros64();
 
-    class RWLockBase : boost::noncopyable {
+    class RWLockBase {
+        MONGO_DISALLOW_COPYING(RWLockBase);
         friend class SimpleRWLock;
         SRWLOCK _lock;
     protected:
@@ -101,10 +102,13 @@ namespace mongo { using boost::shared_mutex; }
 # endif
 
 namespace mongo { 
-    class RWLockBase : boost::noncopyable {
+    class RWLockBase {
+        MONGO_DISALLOW_COPYING(RWLockBase);
         friend class SimpleRWLock;
         shared_mutex _m;
     protected:
+        RWLockBase() = default;
+
         void lock() {
              _m.lock();
         }

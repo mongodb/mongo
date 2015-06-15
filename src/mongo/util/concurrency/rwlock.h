@@ -30,8 +30,6 @@
 
 #pragma once
 
-#include <boost/noncopyable.hpp>
-
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/concurrency/rwlockimpl.h"
 #include "mongo/util/concurrency/simplerwlock.h"
@@ -78,7 +76,8 @@ namespace mongo {
             unlocks on destruction, whether in upgradable state or upgraded to exclusive
             in the interim.
             */
-        class Upgradable : boost::noncopyable { 
+        class Upgradable {
+            MONGO_DISALLOW_COPYING(Upgradable);
             RWLock& _r;
         public:
             Upgradable(RWLock& r) : _r(r) { 
@@ -101,7 +100,8 @@ namespace mongo {
     };
 
     /** throws on failure to acquire in the specified time period. */
-    class rwlock_try_write : boost::noncopyable {
+    class rwlock_try_write {
+        MONGO_DISALLOW_COPYING(rwlock_try_write);
     public:
         struct exception { };
         rwlock_try_write(RWLock& l, int millis = 0) : _l(l) {
@@ -113,7 +113,8 @@ namespace mongo {
         RWLock& _l;
     };
 
-    class rwlock_shared : boost::noncopyable {
+    class rwlock_shared {
+        MONGO_DISALLOW_COPYING(rwlock_shared);
     public:
         rwlock_shared(RWLock& rwlock) : _r(rwlock) {_r.lock_shared(); }
         ~rwlock_shared() { _r.unlock_shared(); }
@@ -122,7 +123,8 @@ namespace mongo {
     };
 
     /* scoped lock for RWLock */
-    class rwlock : boost::noncopyable {
+    class rwlock {
+        MONGO_DISALLOW_COPYING(rwlock);
     public:
         /**
          * @param write acquire write lock if true sharable if false
@@ -170,7 +172,8 @@ namespace mongo {
             verify( _state.get() < 0 );
         }
 
-        class Exclusive : boost::noncopyable { 
+        class Exclusive {
+            MONGO_DISALLOW_COPYING(Exclusive);
             RWLockRecursive& _r;
         public:
             Exclusive(RWLockRecursive& r) : _r(r) {
@@ -190,7 +193,8 @@ namespace mongo {
             }
         };
 
-        class Shared : boost::noncopyable { 
+        class Shared {
+            MONGO_DISALLOW_COPYING(Shared);
             RWLockRecursive& _r;
             bool _alreadyLockedExclusiveByUs;
         public:

@@ -31,8 +31,6 @@
 
 #pragma once
 
-#include <boost/noncopyable.hpp>
-
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"

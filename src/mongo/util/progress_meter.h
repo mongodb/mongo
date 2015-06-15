@@ -30,13 +30,13 @@
 #pragma once
 
 #include "mongo/util/thread_safe_string.h"
-#include <boost/noncopyable.hpp>
 
 #include <string>
 
 namespace mongo {
 
-    class ProgressMeter : boost::noncopyable {
+    class ProgressMeter {
+        MONGO_DISALLOW_COPYING(ProgressMeter);
     public:
         ProgressMeter(unsigned long long total,
                       int secondsBetween = 3,
@@ -110,7 +110,8 @@ namespace mongo {
     // CurOp * op = CurOp::get(txn);
     // ProgressMeterHolder pm(op->setMessage("index: (1/3) external sort", "Index: External Sort Progress", d->stats.nrecords, 10));
     // loop { pm.hit(); }
-    class ProgressMeterHolder : boost::noncopyable {
+    class ProgressMeterHolder {
+        MONGO_DISALLOW_COPYING(ProgressMeterHolder);
     public:
         ProgressMeterHolder( ProgressMeter& pm )
             : _pm( pm ) {

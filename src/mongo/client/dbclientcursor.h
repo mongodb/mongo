@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include <boost/noncopyable.hpp>
 #include <stack>
 
 #include "mongo/client/dbclientinterface.h"
@@ -44,7 +43,8 @@ namespace mongo {
     /** for mock purposes only -- do not create variants of DBClientCursor, nor hang code here
         @see DBClientMockCursor
      */
-    class DBClientCursorInterface : boost::noncopyable {
+    class DBClientCursorInterface {
+        MONGO_DISALLOW_COPYING(DBClientCursorInterface);
     public:
         virtual ~DBClientCursorInterface() {}
         virtual bool more() = 0;
@@ -204,7 +204,8 @@ namespace mongo {
         void initLazy( bool isRetry = false );
         bool initLazyFinish( bool& retry );
 
-        class Batch : boost::noncopyable {
+        class Batch {
+            MONGO_DISALLOW_COPYING(Batch);
             friend class DBClientCursor;
             std::unique_ptr<Message> m;
             int nReturned;

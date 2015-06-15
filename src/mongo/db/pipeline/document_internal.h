@@ -31,7 +31,6 @@
 #include <third_party/murmurhash3/MurmurHash3.h>
 
 #include <boost/intrusive_ptr.hpp>
-#include <boost/noncopyable.hpp>
 
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/db/pipeline/value.h"
@@ -65,7 +64,8 @@ namespace mongo {
     /** This is how values are stored in the DocumentStorage buffer
      *  Internal class. Consumers shouldn't care about this.
      */
-    class ValueElement : boost::noncopyable {
+    class ValueElement {
+        MONGO_DISALLOW_COPYING(ValueElement);
     public:
         Value val;
         Position nextCollision; // Position of next field with same hashBucket

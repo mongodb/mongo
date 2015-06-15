@@ -28,8 +28,6 @@
 
 #pragma once
 
-#include <boost/noncopyable.hpp>
-
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/record_id.h"
@@ -50,7 +48,8 @@ namespace mongo {
      * ClientCursor is a wrapper that represents a cursorid from our database application's
      * perspective.
      */
-    class ClientCursor : private boost::noncopyable {
+    class ClientCursor {
+        MONGO_DISALLOW_COPYING(ClientCursor);
     public:
         /**
          * This ClientCursor constructor creates a cursorid that can be used with getMore and

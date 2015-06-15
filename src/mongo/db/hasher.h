@@ -36,8 +36,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <boost/noncopyable.hpp>
-
 #include "mongo/bson/bsonelement.h"
 #include "mongo/util/md5.hpp"
 
@@ -46,7 +44,8 @@ namespace mongo {
     typedef int HashSeed;
     typedef unsigned char HashDigest[16];
 
-    class Hasher : private boost::noncopyable {
+    class Hasher {
+        MONGO_DISALLOW_COPYING(Hasher);
     public:
 
         explicit Hasher( HashSeed seed );
@@ -64,7 +63,8 @@ namespace mongo {
         HashSeed _seed;
     };
 
-    class HasherFactory : private boost::noncopyable  {
+    class HasherFactory {
+        MONGO_DISALLOW_COPYING(HasherFactory);
     public:
         /* Eventually this may be a more sophisticated factory
          * for creating other hashers, but for now use MD5.
@@ -77,7 +77,8 @@ namespace mongo {
         HasherFactory();
     };
 
-    class BSONElementHasher : private boost::noncopyable  {
+    class BSONElementHasher {
+        MONGO_DISALLOW_COPYING(BSONElementHasher);
     public:
 
         /* The hash function we use can be given a seed, to effectively randomize it

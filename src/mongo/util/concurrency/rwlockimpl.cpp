@@ -37,7 +37,6 @@
 #include <map>
 #include <set>
 #include <boost/version.hpp>
-#include <boost/noncopyable.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/condition.hpp>
 

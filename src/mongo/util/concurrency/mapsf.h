@@ -28,8 +28,6 @@
 *    then also delete it in the license file.
 */
 
-#include <boost/noncopyable.hpp>
-
 #include "mongo/platform/unordered_map.h"
 
 namespace mongo {
@@ -53,7 +51,9 @@ namespace mongo {
         }
     */
     template< class M >
-    struct mapsf : boost::noncopyable {
+    struct mapsf {
+        MONGO_DISALLOW_COPYING(mapsf);
+
         SimpleMutex m;
         M val;
         friend struct ref;

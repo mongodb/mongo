@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include <boost/noncopyable.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/condition_variable.hpp>
 #include <set>
@@ -47,7 +46,8 @@ namespace mongo {
 
     class MessagingPort;
 
-    class Listener : boost::noncopyable {
+    class Listener {
+        MONGO_DISALLOW_COPYING(Listener);
     public:
 
         Listener(const std::string& name, const std::string &ip, int port, bool logConnect=true );

@@ -33,7 +33,6 @@
 #include "mongo/platform/windows_basic.h"
 #endif
 
-#include <boost/noncopyable.hpp>
 #include <boost/thread/mutex.hpp>
 
 #include "mongo/util/assert_util.h"
@@ -44,9 +43,11 @@ namespace mongo {
     // If you create a local static instance of this class, that instance will be destroyed
     // before all global static objects are destroyed, so _destroyingStatics will be set
     // to true before the global static variables are destroyed.
-    class StaticObserver : boost::noncopyable {
+    class StaticObserver {
+        MONGO_DISALLOW_COPYING(StaticObserver);
     public:
         static bool _destroyingStatics;
+        StaticObserver() = default;
         ~StaticObserver() { _destroyingStatics = true; }
     };
 
@@ -58,7 +59,8 @@ namespace mongo {
         On Windows, the implementation below is faster than boost mutex.
     */
 #if defined(_WIN32)
-    class SimpleMutex : boost::noncopyable {
+    class SimpleMutex {
+        MONGO_DISALLOW_COPYING(SimpleMutex);
     public:
         SimpleMutex( StringData ) { InitializeCriticalSection( &_cs ); }
         ~SimpleMutex() {
@@ -81,7 +83,8 @@ namespace mongo {
         CRITICAL_SECTION _cs;
     };
 #else
-    class SimpleMutex : boost::noncopyable {
+    class SimpleMutex {
+        MONGO_DISALLOW_COPYING(SimpleMutex);
     public:
         void dassertLocked() const { }
         SimpleMutex(StringData name) { verify( pthread_mutex_init(&_lock,0) == 0 ); }
@@ -94,7 +97,8 @@ namespace mongo {
         void lock() { verify( pthread_mutex_lock(&_lock) == 0 ); }
         void unlock() { verify( pthread_mutex_unlock(&_lock) == 0 ); }
     public:
-        class scoped_lock : boost::noncopyable {
+        class scoped_lock {
+            MONGO_DISALLOW_COPYING(scoped_lock);
             SimpleMutex& _m;
         public:
             scoped_lock( SimpleMutex &m ) : _m(m) { _m.lock(); }
@@ -110,11 +114,14 @@ namespace mongo {
     /** This can be used instead of boost recursive mutex. The advantage is the debug checks
      *  and ability to assertLocked(). This has not yet been tested for speed vs. the boost one.
      */
-    class RecursiveMutex : boost::noncopyable {
+    class RecursiveMutex {
+        MONGO_DISALLOW_COPYING(RecursiveMutex);
     public:
         RecursiveMutex(StringData name) : m(name) { }
         bool isLocked() const { return n.get() > 0; }
-        class scoped_lock : boost::noncopyable {
+        class scoped_lock {
+            MONGO_DISALLOW_COPYING(scoped_lock);
+
             RecursiveMutex& rm;
             int& nLocksByMe;
         public:

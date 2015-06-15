@@ -35,7 +35,6 @@
 
 #include <boost/assert.hpp>
 #include <boost/detail/interlocked.hpp>
-#include <boost/noncopyable.hpp>
 #include <boost/thread/win32/thread_primitives.hpp>
 #include <boost/static_assert.hpp>
 #include <limits.h>
@@ -45,9 +44,9 @@
 
 namespace boost
 {
-    class modified_shared_mutex:
-        private boost::noncopyable
+    class modified_shared_mutex
     {
+        MONGO_DISALLOW_COPYING(modified_shared_mutex);
     private:
         struct state_data
         {

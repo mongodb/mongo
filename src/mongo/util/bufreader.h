@@ -30,8 +30,6 @@
 
 #pragma once
 
-#include <boost/noncopyable.hpp>
-
 #include "mongo/bson/util/builder.h"
 #include "mongo/util/assert_util.h"
 
@@ -41,7 +39,8 @@ namespace mongo {
         methods throw the eof exception if the operation would pass the end of the
         buffer with which we are working.
     */
-    class BufReader : boost::noncopyable {
+    class BufReader {
+        MONGO_DISALLOW_COPYING(BufReader);
     public:
         class eof : public std::exception {
         public:

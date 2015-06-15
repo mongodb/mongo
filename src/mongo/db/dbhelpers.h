@@ -209,7 +209,8 @@ namespace mongo {
         /**
          * for saving deleted bson objects to a flat file
          */
-        class RemoveSaver : public boost::noncopyable {
+        class RemoveSaver {
+            MONGO_DISALLOW_COPYING(RemoveSaver);
         public:
             RemoveSaver(const std::string& type, const std::string& ns, const std::string& why);
             ~RemoveSaver();

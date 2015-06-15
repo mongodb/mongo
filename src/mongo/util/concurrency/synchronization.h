@@ -30,7 +30,6 @@
 #pragma once
 
 #include <boost/thread/condition.hpp>
-#include <boost/noncopyable.hpp>
 
 #include "mutex.h"
 
@@ -63,7 +62,8 @@ namespace mongo {
      *
      * This class is thread-safe.
      */
-    class Notification : boost::noncopyable {
+    class Notification {
+        MONGO_DISALLOW_COPYING(Notification);
     public:
         Notification();
 
@@ -87,7 +87,8 @@ namespace mongo {
     /** establishes a synchronization point between threads. N threads are waits and one is notifier.
         threadsafe.
     */
-    class NotifyAll : boost::noncopyable {
+    class NotifyAll {
+        MONGO_DISALLOW_COPYING(NotifyAll);
     public:
         NotifyAll();
 

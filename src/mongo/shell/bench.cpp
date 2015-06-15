@@ -36,7 +36,6 @@
 
 #include <pcrecpp.h>
 
-#include <boost/noncopyable.hpp>
 #include <boost/thread/thread.hpp>
 #include <iostream>
 
@@ -719,7 +718,8 @@ namespace mongo {
     }
 
     namespace {
-        class BenchRunWorkerStateGuard : private boost::noncopyable {
+        class BenchRunWorkerStateGuard {
+            MONGO_DISALLOW_COPYING(BenchRunWorkerStateGuard);
         public:
             explicit BenchRunWorkerStateGuard( BenchRunState *brState ) : _brState( brState ) {
                 _brState->onWorkerStarted();

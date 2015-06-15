@@ -29,10 +29,10 @@
 #pragma once
 
 #include <boost/intrusive_ptr.hpp>
-#include <boost/noncopyable.hpp>
 #include <stdlib.h>
 
 #include "mongo/platform/atomic_word.h"
+#include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
 #include "mongo/util/allocator.h"
 
@@ -55,9 +55,10 @@ namespace mongo {
   be used.  For static objects, the implementations of addRef() and release()
   can be overridden to do nothing.
  */
-    class IntrusiveCounter :
-        boost::noncopyable {
+    class IntrusiveCounter {
+        MONGO_DISALLOW_COPYING(IntrusiveCounter);
     public:
+        IntrusiveCounter() = default;
         virtual ~IntrusiveCounter() {};
 
         // these are here for the boost intrusive_ptr<> class
@@ -84,7 +85,8 @@ namespace mongo {
     };
 
     /// This is an alternative base class to the above ones (will replace them eventually)
-    class RefCountable : boost::noncopyable {
+    class RefCountable {
+        MONGO_DISALLOW_COPYING(RefCountable);
     public:
         /// If false you have exclusive access to this object. This is useful for implementing COW.
         bool isShared() const {

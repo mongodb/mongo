@@ -31,7 +31,6 @@
 #include <string>
 
 #include <boost/thread/condition.hpp>
-#include <boost/noncopyable.hpp>
 #include <boost/thread/mutex.hpp>
 
 #include "mongo/client/dbclientinterface.h"
@@ -48,7 +47,8 @@ namespace mongo {
     /**
      * Configuration object describing a bench run activity.
      */
-    class BenchRunConfig : private boost::noncopyable {
+    class BenchRunConfig {
+        MONGO_DISALLOW_COPYING(BenchRunConfig);
     public:
 
         /**
@@ -138,7 +138,8 @@ namespace mongo {
      *
      * Not thread safe.  Expected use is one instance per thread during parallel execution.
      */
-    class BenchRunEventCounter : private boost::noncopyable {
+    class BenchRunEventCounter {
+        MONGO_DISALLOW_COPYING(BenchRunEventCounter);
     public:
         /// Constructs a zeroed out counter.
         BenchRunEventCounter();
@@ -190,7 +191,8 @@ namespace mongo {
      *
      * In all cases, the counter objects must outlive the trace object.
      */
-    class BenchRunEventTrace : private boost::noncopyable {
+    class BenchRunEventTrace {
+        MONGO_DISALLOW_COPYING(BenchRunEventTrace);
     public:
         explicit BenchRunEventTrace(BenchRunEventCounter *eventCounter) {
             initialize(eventCounter, eventCounter, false);
@@ -227,7 +229,8 @@ namespace mongo {
     /**
      * Statistics object representing the result of a bench run activity.
      */
-    class BenchRunStats : private boost::noncopyable {
+    class BenchRunStats {
+        MONGO_DISALLOW_COPYING(BenchRunStats);
     public:
         BenchRunStats();
         ~BenchRunStats();
@@ -254,7 +257,8 @@ namespace mongo {
      *
      * Logically, the states are "starting up", "running" and "finished."
      */
-    class BenchRunState : private boost::noncopyable {
+    class BenchRunState {
+        MONGO_DISALLOW_COPYING(BenchRunState);
     public:
         enum State { BRS_STARTING_UP, BRS_RUNNING, BRS_FINISHED };
 
@@ -316,7 +320,8 @@ namespace mongo {
      *
      * Represents the behavior of one thread working in a bench run activity.
      */
-    class BenchRunWorker : private boost::noncopyable {
+    class BenchRunWorker {
+        MONGO_DISALLOW_COPYING(BenchRunWorker);
     public:
 
         /**
@@ -363,7 +368,8 @@ namespace mongo {
     /**
      * Object representing a "bench run" activity.
      */
-    class BenchRunner : private boost::noncopyable {
+    class BenchRunner {
+        MONGO_DISALLOW_COPYING(BenchRunner);
     public:
         /**
          * Utility method to create a new bench runner from a BSONObj representation
