@@ -55,9 +55,11 @@ namespace mongo {
     void QueryFetcher::_onFetchCallback(const BatchDataStatus& fetchResult,
                                         Fetcher::NextAction* nextAction,
                                         BSONObjBuilder* getMoreBob) {
-        ++_responses;
 
         _delegateCallback(fetchResult, nextAction);
+
+        ++_responses;
+
         // The fetcher will continue to call with kGetMore until an error or the last batch.
         if (fetchResult.isOK() && *nextAction == Fetcher::NextAction::kGetMore) {
             const auto batchData(fetchResult.getValue());
