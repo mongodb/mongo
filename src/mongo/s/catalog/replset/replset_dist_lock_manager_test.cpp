@@ -425,9 +425,12 @@ namespace {
             ASSERT_NOT_OK(lockStatus.getStatus());
         }
 
-        stdx::unique_lock<stdx::mutex> lk(unlockMutex);
-        if (unlockCallCount == 0) {
-            ASSERT(unlockCV.wait_for(lk, kUnlockTimeout) == stdx::cv_status::no_timeout);
+        bool didTimeout = false;
+        {
+            stdx::unique_lock<stdx::mutex> lk(unlockMutex);
+            if (unlockCallCount == 0) {
+                didTimeout = unlockCV.wait_for(lk, kUnlockTimeout) == stdx::cv_status::timeout;
+            }
         }
 
         // Join the background thread before trying to call asserts. Shutdown calls
@@ -435,6 +438,12 @@ namespace {
         getMockCatalog()->expectStopPing([](StringData){}, Status::OK());
         getMgr()->shutDown();
 
+        // No assert until shutDown has been called to make sure that the background thread
+        // won't be trying to access the local variables that were captured by lamdas that
+        // may have gone out of scope when the assert unwinds the stack.
+        // No need to grab unlockMutex since there is only one thread running at this point.
+
+        ASSERT_FALSE(didTimeout);
         ASSERT_EQUALS(1, unlockCallCount);
         ASSERT_EQUALS(lastTS, unlockSessionIDPassed);
     }
@@ -567,9 +576,12 @@ namespace {
         ASSERT_NOT_OK(lockStatus);
         ASSERT_EQUALS(ErrorCodes::NetworkTimeout, lockStatus.code());
 
-        stdx::unique_lock<stdx::mutex> lk(unlockMutex);
-        if (unlockCallCount == 0) {
-            ASSERT(unlockCV.wait_for(lk, kUnlockTimeout) == stdx::cv_status::no_timeout);
+        bool didTimeout = false;
+        {
+            stdx::unique_lock<stdx::mutex> lk(unlockMutex);
+            if (unlockCallCount == 0) {
+                didTimeout = unlockCV.wait_for(lk, kUnlockTimeout) == stdx::cv_status::timeout;
+            }
         }
 
         // Join the background thread before trying to call asserts. Shutdown calls
@@ -577,6 +589,12 @@ namespace {
         getMockCatalog()->expectStopPing([](StringData){}, Status::OK());
         getMgr()->shutDown();
 
+        // No assert until shutDown has been called to make sure that the background thread
+        // won't be trying to access the local variables that were captured by lamdas that
+        // may have gone out of scope when the assert unwinds the stack.
+        // No need to grab unlockMutex since there is only one thread running at this point.
+
+        ASSERT_FALSE(didTimeout);
         ASSERT_EQUALS(1, unlockCallCount);
         ASSERT_EQUALS(lastTS, unlockSessionIDPassed);
     }
@@ -607,13 +625,26 @@ namespace {
             }
         }, Status::OK());
 
+        bool didTimeout = false;
         {
             stdx::unique_lock<stdx::mutex> lk(testMutex);
             if (processIDList.size() < 3) {
-                ASSERT_TRUE(ping3TimesCV.wait_for(lk, Milliseconds(50)) ==
-                            stdx::cv_status::no_timeout);
+                didTimeout = ping3TimesCV.wait_for(lk, Milliseconds(50)) ==
+                            stdx::cv_status::timeout;
             }
         }
+
+        // Join the background thread before trying to call asserts. Shutdown calls
+        // stopPing and we don't care in this test.
+        getMockCatalog()->expectStopPing([](StringData){}, Status::OK());
+        getMgr()->shutDown();
+
+        // No assert until shutDown has been called to make sure that the background thread
+        // won't be trying to access the local variables that were captured by lamdas that
+        // may have gone out of scope when the assert unwinds the stack.
+        // No need to grab testMutex since there is only one thread running at this point.
+
+        ASSERT_FALSE(didTimeout);
 
         Date_t lastPing;
         for (const auto& ping : pingValues) {
@@ -680,15 +711,25 @@ namespace {
             auto lockStatus = getMgr()->lock("test", "why", Milliseconds(0), Milliseconds(0));
         }
 
-        stdx::unique_lock<stdx::mutex> lk(unlockMutex);
-        if (lockSessionIDPassed.size() < kUnlockErrorCount) {
-            ASSERT(unlockCV.wait_for(lk, kUnlockTimeout) == stdx::cv_status::no_timeout);
+        bool didTimeout = false;
+        {
+            stdx::unique_lock<stdx::mutex> lk(unlockMutex);
+            if (lockSessionIDPassed.size() < kUnlockErrorCount) {
+                didTimeout = unlockCV.wait_for(lk, kUnlockTimeout) == stdx::cv_status::timeout;
+            }
         }
 
         // Join the background thread before trying to call asserts. Shutdown calls
         // stopPing and we don't care in this test.
         getMockCatalog()->expectStopPing([](StringData){}, Status::OK());
         getMgr()->shutDown();
+
+        // No assert until shutDown has been called to make sure that the background thread
+        // won't be trying to access the local variables that were captured by lamdas that
+        // may have gone out of scope when the assert unwinds the stack.
+        // No need to grab testMutex since there is only one thread running at this point.
+
+        ASSERT_FALSE(didTimeout);
 
         for (const auto& id : lockSessionIDPassed) {
             ASSERT_EQUALS(lockSessionID, id);
@@ -765,10 +806,13 @@ namespace {
             auto otherStatus = getMgr()->lock("lock", "why", Milliseconds(0), Milliseconds(0));
         }
 
-        stdx::unique_lock<stdx::mutex> lk(testMutex);
+        bool didTimeout = false;
+        {
+            stdx::unique_lock<stdx::mutex> lk(testMutex);
 
-        if (unlockIDMap.size() < 2 || !mapEntriesGreaterThanTwo(unlockIDMap)) {
-            ASSERT(unlockCV.wait_for(lk, kUnlockTimeout) == stdx::cv_status::no_timeout);
+            if (unlockIDMap.size() < 2 || !mapEntriesGreaterThanTwo(unlockIDMap)) {
+                didTimeout = unlockCV.wait_for(lk, kUnlockTimeout) == stdx::cv_status::timeout;
+            }
         }
 
         // Join the background thread before trying to call asserts. Shutdown calls
@@ -776,6 +820,12 @@ namespace {
         getMockCatalog()->expectStopPing([](StringData){}, Status::OK());
         getMgr()->shutDown();
 
+        // No assert until shutDown has been called to make sure that the background thread
+        // won't be trying to access the local variables that were captured by lamdas that
+        // may have gone out of scope when the assert unwinds the stack.
+        // No need to grab testMutex since there is only one thread running at this point.
+
+        ASSERT_FALSE(didTimeout);
         ASSERT_EQUALS(2u, lockSessionIDPassed.size());
 
         for (const auto& id : lockSessionIDPassed) {
@@ -1559,9 +1609,12 @@ namespace {
 
         ASSERT_NOT_OK(lockStatus.getStatus());
 
-        stdx::unique_lock<stdx::mutex> lk(unlockMutex);
-        if (!unlockSessionIDPassed.isSet()) {
-            ASSERT(unlockCV.wait_for(lk, kUnlockTimeout) == stdx::cv_status::no_timeout);
+        bool didTimeout = false;
+        {
+            stdx::unique_lock<stdx::mutex> lk(unlockMutex);
+            if (!unlockSessionIDPassed.isSet()) {
+                didTimeout = unlockCV.wait_for(lk, kUnlockTimeout) == stdx::cv_status::timeout;
+            }
         }
 
         // Join the background thread before trying to call asserts. Shutdown calls
@@ -1569,6 +1622,12 @@ namespace {
         getMockCatalog()->expectStopPing([](StringData){}, Status::OK());
         getMgr()->shutDown();
 
+        // No assert until shutDown has been called to make sure that the background thread
+        // won't be trying to access the local variables that were captured by lamdas that
+        // may have gone out of scope when the assert unwinds the stack.
+        // No need to grab testMutex since there is only one thread running at this point.
+
+        ASSERT_FALSE(didTimeout);
         ASSERT_EQUALS(lastTS, unlockSessionIDPassed);
     }
 
