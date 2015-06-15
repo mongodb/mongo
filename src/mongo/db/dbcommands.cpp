@@ -1311,17 +1311,15 @@ namespace mongo {
             ).writeToMetadata(&metadataBob);
         }
 
-        auto metadata = metadataBob.done();
         auto cmdResponse = replyBuilderBob.done();
+        replyBuilder->setMetadata(metadataBob.done());
 
         if (result) {
-            replyBuilder->setMetadata(std::move(metadata));
             replyBuilder->setCommandReply(std::move(cmdResponse));
         }
         else {
             // maintain existing behavior of returning all data appended to builder
             // even if command returned false
-            replyBuilder->setMetadata(std::move(metadata));
             replyBuilder->setCommandReply(Status(ErrorCodes::CommandFailed, errmsg),
                                           std::move(cmdResponse));
         }

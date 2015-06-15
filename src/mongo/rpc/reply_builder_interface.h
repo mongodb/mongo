@@ -119,6 +119,12 @@ namespace rpc {
         virtual Protocol getProtocol() const = 0;
 
         /**
+         * Resets the state of the builder to kMetadata and clears any data that was previously
+         * written.
+         */
+        virtual void reset() = 0;
+
+        /**
          * Writes data then transfers ownership of the message to the caller. The behavior of
          * calling any methods on the builder is subsequently undefined.
          */

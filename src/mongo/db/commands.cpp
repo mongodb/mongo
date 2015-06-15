@@ -421,6 +421,10 @@ namespace {
 
         Command::registerError(txn, exception);
 
+        // We could have thrown an exception after setting fields in the builder,
+        // so we need to reset it to a clean state just to be sure.
+        replyBuilder->reset();
+
         // No metadata is needed for an error reply.
         replyBuilder->setMetadata(rpc::makeEmptyMetadata());
 

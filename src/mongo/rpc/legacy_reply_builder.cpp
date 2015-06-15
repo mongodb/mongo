@@ -86,6 +86,18 @@ namespace rpc {
         return rpc::Protocol::kOpQuery;
     }
 
+    void LegacyReplyBuilder::reset() {
+        // If we are in State::kMetadata, we are already in the 'start' state, so by
+        // immediately returning, we save a heap allocation.
+        if (_state == State::kMetadata) {
+            return;
+        }
+        _builder.reset();
+        _metadata = BSONObj();
+        _message = stdx::make_unique<Message>();
+        _state = State::kMetadata;
+    }
+
     std::unique_ptr<Message> LegacyReplyBuilder::done() {
         invariant(_state == State::kOutputDocs);
         std::unique_ptr<Message> message = stdx::make_unique<Message>();

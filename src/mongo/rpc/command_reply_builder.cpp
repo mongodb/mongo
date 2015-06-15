@@ -81,6 +81,17 @@ namespace rpc {
         return rpc::Protocol::kOpCommandV1;
     }
 
+    void CommandReplyBuilder::reset() {
+        // If we are in State::kMetadata, we are already in the 'start' state, so by
+        // immediately returning, we save a heap allocation.
+        if (_state == State::kMetadata) {
+            return;
+        }
+        _builder.reset();
+        _message = stdx::make_unique<Message>();
+        _state = State::kMetadata;
+    }
+
     std::unique_ptr<Message> CommandReplyBuilder::done() {
         invariant(_state == State::kOutputDocs);
         // TODO: we can elide a large copy here by transferring the internal buffer of
