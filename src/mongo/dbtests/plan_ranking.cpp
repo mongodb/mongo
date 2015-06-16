@@ -583,54 +583,6 @@ namespace PlanRankingTests {
     };
 
     /**
-     * Index intersection solutions may require fewer fetches even if it does not make the
-     * query covered. The ixisect plan will scan as many index keys as the union of the two
-     * single index plans, but only needs to retrieve full documents for the intersection
-     * of the two plans---this could mean fewer fetches!
-     */
-    class PlanRankingNonCoveredIxisectFetchesLess : public PlanRankingTestBase {
-    public:
-        void run() {
-            // Set up data so that the following conditions hold:
-            //  1) Documents matching {a: 1} are of high cardinality.
-            //  2) Documents matching {b: 1} are of high cardinality.
-            //  3) Documents matching {a: 1, b: 1} are of low cardinality---
-            //  the intersection is small.
-            //  4) At least one of the documents in the intersection is
-            //  returned during the trial period.
-            insert(BSON("a" << 1 << "b" << 1));
-            for (int i = 0; i < N/2; ++i) {
-                insert(BSON("a" << 1 << "b" << 2));
-            }
-            for (int i = 0; i < N/2; ++i) {
-                insert(BSON("a" << 2 << "b" << 1));
-            }
-
-            // Add indices on 'a' and 'b'.
-            addIndex(BSON("a" << 1));
-            addIndex(BSON("b" << 1));
-
-            // Neither the predicate on 'b' nor the predicate on 'a' is
-            // very selective: both retrieve about half the documents.
-            // However, the intersection is very small, which makes
-            // the intersection plan desirable.
-            CanonicalQuery* cq;
-            ASSERT(CanonicalQuery::canonicalize(ns,
-                                                fromjson("{a: 1, b: 1}"),
-                                                &cq).isOK());
-            ASSERT(NULL != cq);
-            std::unique_ptr<CanonicalQuery> killCq(cq);
-
-            QuerySolution* soln = pickBestPlan(cq);
-            ASSERT(QueryPlannerTestLib::solutionMatches(
-                "{fetch: {node: {andSorted: {nodes: ["
-                    "{ixscan: {filter: null, pattern: {a:1}}},"
-                    "{ixscan: {filter: null, pattern: {b:1}}}]}}}}",
-                soln->root.get()));
-        }
-    };
-
-    /**
      * If the intersection is small, an AND_SORTED plan may be able to
      * hit EOF before the single index plans.
      */
@@ -838,7 +790,6 @@ namespace PlanRankingTests {
             // TODO: These don't work without counting FETCH and FETCH is now gone.
             // add<PlanRankingIxisectCovered>();
             // add<PlanRankingIxisectNonCovered>();
-            // add<PlanRankingNonCoveredIxisectFetchesLess>();
             // add<PlanRankingIxisectHitsEOFFirst>();
             // add<PlanRankingChooseBetweenIxisectPlans>();
             add<PlanRankingAvoidBlockingSort>();
