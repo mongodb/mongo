@@ -332,7 +332,7 @@ StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeFromFindCommand(
         } else if (str::equals(fieldName, repl::ReadAfterOpTimeArgs::kRootFieldName.c_str())) {
             // read after optime parsing is handled elsewhere.
             continue;
-        } else {
+        } else if (!str::startsWith(fieldName, '$')) {
             return Status(ErrorCodes::FailedToParse,
                           str::stream() << "Failed to parse: " << cmdObj.toString() << ". "
                                         << "Unrecognized field '" << fieldName << "'.");
