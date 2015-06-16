@@ -111,7 +111,10 @@ namespace mongo {
         b.appendElements(options.toBSON());
         BSONObj cmdObj = b.obj();
 
-        repl::_logOp(txn, "c", dbName.c_str(), cmdObj, nullptr, false);
+        if (!collectionName.isSystemDotProfile()) {
+            // do not replicate system.profile modifications
+            repl::_logOp(txn, "c", dbName.c_str(), cmdObj, nullptr, false);
+        }
 
         getGlobalAuthorizationManager()->logOp(txn, "c", dbName.c_str(), cmdObj, nullptr);
         logOpForDbHash(txn, dbName.c_str());
@@ -120,7 +123,13 @@ namespace mongo {
     void OpObserver::onCollMod(OperationContext* txn,
                                const std::string& dbName,
                                const BSONObj& collModCmd) {
-        repl::_logOp(txn, "c", dbName.c_str(), collModCmd, nullptr, false);
+        BSONElement first = collModCmd.firstElement();
+        std::string coll = first.valuestr();
+
+        if (!NamespaceString(NamespaceString(dbName).db(), coll).isSystemDotProfile()) {
+            // do not replicate system.profile modifications
+            repl::_logOp(txn, "c", dbName.c_str(), collModCmd, nullptr, false);
+        }
 
         getGlobalAuthorizationManager()->logOp(txn, "c", dbName.c_str(), collModCmd, nullptr);
         logOpForDbHash(txn, dbName.c_str());
@@ -141,7 +150,10 @@ namespace mongo {
         std::string dbName = collectionName.db().toString() + ".$cmd";
         BSONObj cmdObj = BSON("drop" << collectionName.coll().toString());
 
-        repl::_logOp(txn, "c", dbName.c_str(), cmdObj, nullptr, false);
+        if (!collectionName.isSystemDotProfile()) {
+            // do not replicate system.profile modifications
+            repl::_logOp(txn, "c", dbName.c_str(), cmdObj, nullptr, false);
+        }
 
         getGlobalAuthorizationManager()->logOp(txn, "c", dbName.c_str(), cmdObj, nullptr);
         logOpForDbHash(txn, dbName.c_str());
@@ -188,7 +200,10 @@ namespace mongo {
         std::string dbName = collectionName.db().toString() + ".$cmd";
         BSONObj cmdObj = BSON("convertToCapped" << collectionName.coll() << "size" << size);
 
-        repl::_logOp(txn, "c", dbName.c_str(), cmdObj, nullptr, false);
+        if (!collectionName.isSystemDotProfile()) {
+            // do not replicate system.profile modifications
+            repl::_logOp(txn, "c", dbName.c_str(), cmdObj, nullptr, false);
+        }
 
         getGlobalAuthorizationManager()->logOp(txn, "c", dbName.c_str(), cmdObj, nullptr);
         logOpForDbHash(txn, dbName.c_str());
@@ -198,7 +213,10 @@ namespace mongo {
         std::string dbName = collectionName.db().toString() + ".$cmd";
         BSONObj cmdObj = BSON("emptycapped" << collectionName.coll());
 
-        repl::_logOp(txn, "c", dbName.c_str(), cmdObj, nullptr, false);
+        if (!collectionName.isSystemDotProfile()) {
+            // do not replicate system.profile modifications
+            repl::_logOp(txn, "c", dbName.c_str(), cmdObj, nullptr, false);
+        }
 
         getGlobalAuthorizationManager()->logOp(txn, "c", dbName.c_str(), cmdObj, nullptr);
         logOpForDbHash(txn, dbName.c_str());
