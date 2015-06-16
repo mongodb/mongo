@@ -36,7 +36,7 @@ assert.soon(
         }
         A.runCommand({replSetSyncFrom : bAddress});
         return false;
-    }, "A refused to sync from B", 60*1000, 1000
+    }, "A refused to sync from B", 30*1000, 1000
 );
 
 print("Black-hole and freeze B");
