@@ -30,6 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include <chrono>
 #include <future>
 
 #include "mongo/client/remote_command_targeter_mock.h"
@@ -41,6 +42,8 @@
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/write_ops/batched_command_response.h"
+#include "mongo/s/write_ops/batched_update_request.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -52,6 +55,8 @@ namespace {
     using std::string;
     using std::vector;
     using unittest::assertGet;
+
+    static const std::chrono::seconds kFutureTimeout{5};
 
     TEST_F(CatalogManagerReplSetTestFixture, GetCollectionExisting) {
         RemoteCommandTargeterMock* targeter =
@@ -149,6 +154,147 @@ namespace {
         });
 
         future.get();
+    }
+
+    TEST_F(CatalogManagerReplSetTestFixture, UpdateCollection) {
+        RemoteCommandTargeterMock* targeter =
+            RemoteCommandTargeterMock::get(shardRegistry()->findIfExists("config")->getTargeter());
+        targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+
+        CollectionType collection;
+        collection.setNs(NamespaceString("db.coll"));
+        collection.setUpdatedAt(network()->now());
+        collection.setUnique(true);
+        collection.setEpoch(OID::gen());
+        collection.setKeyPattern(KeyPattern(BSON("_id" << 1)));
+
+        auto future = async(std::launch::async, [this, collection] {
+            auto status = catalogManager()->updateCollection(collection.getNs().toString(),
+                                                             collection);
+            ASSERT_OK(status);
+        });
+
+        onCommand([collection](const RemoteCommandRequest& request) {
+            ASSERT_EQUALS("config", request.dbname);
+
+            BatchedUpdateRequest actualBatchedUpdate;
+            std::string errmsg;
+            ASSERT_TRUE(actualBatchedUpdate.parseBSON(request.cmdObj, &errmsg));
+            ASSERT_EQUALS(CollectionType::ConfigNS, actualBatchedUpdate.getCollName());
+            auto updates = actualBatchedUpdate.getUpdates();
+            ASSERT_EQUALS(1U, updates.size());
+            auto update = updates.front();
+
+            ASSERT_TRUE(update->getUpsert());
+            ASSERT_FALSE(update->getMulti());
+            ASSERT_EQUALS(update->getQuery(),
+                          BSON(CollectionType::fullNs(collection.getNs().toString())));
+            ASSERT_EQUALS(update->getUpdateExpr(), collection.toBSON());
+
+            BatchedCommandResponse response;
+            response.setOk(true);
+            response.setNModified(1);
+
+            return response.toBSON();
+        });
+
+        // Now wait for the updateCollection call to return
+        future.wait_for(kFutureTimeout);
+    }
+
+    TEST_F(CatalogManagerReplSetTestFixture, UpdateCollectionNotMaster) {
+        RemoteCommandTargeterMock* targeter =
+            RemoteCommandTargeterMock::get(shardRegistry()->findIfExists("config")->getTargeter());
+        targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+
+        CollectionType collection;
+        collection.setNs(NamespaceString("db.coll"));
+        collection.setUpdatedAt(network()->now());
+        collection.setUnique(true);
+        collection.setEpoch(OID::gen());
+        collection.setKeyPattern(KeyPattern(BSON("_id" << 1)));
+
+        auto future = async(std::launch::async, [this, collection] {
+            auto status = catalogManager()->updateCollection(collection.getNs().toString(),
+                                                             collection);
+            ASSERT_EQUALS(ErrorCodes::NotMaster, status);
+        });
+
+        for (int i = 0; i < 3; ++i) {
+            onCommand([](const RemoteCommandRequest& request) {
+                BatchedCommandResponse response;
+                response.setOk(false);
+                response.setErrCode(ErrorCodes::NotMaster);
+                response.setErrMessage("not master");
+
+                return response.toBSON();
+            });
+        }
+
+        // Now wait for the updateCollection call to return
+        future.wait_for(kFutureTimeout);
+    }
+
+    TEST_F(CatalogManagerReplSetTestFixture, UpdateCollectionNotMasterRetrySuccess) {
+        RemoteCommandTargeterMock* targeter =
+            RemoteCommandTargeterMock::get(shardRegistry()->findIfExists("config")->getTargeter());
+        HostAndPort host1("TestHost1");
+        HostAndPort host2("TestHost2");
+        targeter->setFindHostReturnValue(host1);
+
+        CollectionType collection;
+        collection.setNs(NamespaceString("db.coll"));
+        collection.setUpdatedAt(network()->now());
+        collection.setUnique(true);
+        collection.setEpoch(OID::gen());
+        collection.setKeyPattern(KeyPattern(BSON("_id" << 1)));
+
+        auto future = async(std::launch::async, [this, collection] {
+            auto status = catalogManager()->updateCollection(collection.getNs().toString(),
+                                                             collection);
+            ASSERT_OK(status);
+        });
+
+        onCommand([host1, host2, targeter](const RemoteCommandRequest& request) {
+            ASSERT_EQUALS(host1, request.target);
+
+            BatchedCommandResponse response;
+            response.setOk(false);
+            response.setErrCode(ErrorCodes::NotMaster);
+            response.setErrMessage("not master");
+
+            // Ensure that when the catalog manager tries to retarget after getting the
+            // NotMaster response, it will get back a new target.
+            targeter->setFindHostReturnValue(host2);
+            return response.toBSON();
+        });
+
+        onCommand([host2, collection](const RemoteCommandRequest& request) {
+            ASSERT_EQUALS(host2, request.target);
+
+            BatchedUpdateRequest actualBatchedUpdate;
+            std::string errmsg;
+            ASSERT_TRUE(actualBatchedUpdate.parseBSON(request.cmdObj, &errmsg));
+            ASSERT_EQUALS(CollectionType::ConfigNS, actualBatchedUpdate.getCollName());
+            auto updates = actualBatchedUpdate.getUpdates();
+            ASSERT_EQUALS(1U, updates.size());
+            auto update = updates.front();
+
+            ASSERT_TRUE(update->getUpsert());
+            ASSERT_FALSE(update->getMulti());
+            ASSERT_EQUALS(update->getQuery(),
+                          BSON(CollectionType::fullNs(collection.getNs().toString())));
+            ASSERT_EQUALS(update->getUpdateExpr(), collection.toBSON());
+
+            BatchedCommandResponse response;
+            response.setOk(true);
+            response.setNModified(1);
+
+            return response.toBSON();
+        });
+
+        // Now wait for the updateCollection call to return
+        future.wait_for(kFutureTimeout);
     }
 
 } // namespace

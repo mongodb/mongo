@@ -207,7 +207,20 @@ namespace {
                                                       const CollectionType& coll) {
         fassert(28683, coll.validate());
 
-        return notYetImplemented;
+        BatchedCommandResponse response;
+        Status status = update(CollectionType::ConfigNS,
+                               BSON(CollectionType::fullNs(collNs)),
+                               coll.toBSON(),
+                               true,    // upsert
+                               false,   // multi
+                               &response);
+        if (!status.isOK()) {
+            return Status(status.code(),
+                          str::stream() << "collection metadata write failed: "
+                                        << response.toBSON() << "; status: " << status.toString());
+        }
+
+        return Status::OK();
     }
 
     StatusWith<CollectionType> CatalogManagerReplicaSet::getCollection(const std::string& collNs) {
@@ -315,7 +328,49 @@ namespace {
     void CatalogManagerReplicaSet::writeConfigServerDirect(
             const BatchedCommandRequest& batchRequest,
             BatchedCommandResponse* batchResponse) {
+        std::string dbname = batchRequest.getNSS().db().toString();
+        invariant (dbname == "config" || dbname == "admin");
+        const BSONObj cmdObj = batchRequest.toBSON();
+        auto targeter = grid.shardRegistry()->findIfExists("config")->getTargeter();
 
+        for (int i = 0; i < kNotMasterNumRetries; ++i) {
+
+            auto target = targeter->findHost(kConfigWriteSelector);
+            if (!target.isOK()) {
+                _toBatchError(target.getStatus(), batchResponse);
+                return;
+            }
+
+            auto resultStatus = _runCommand(target.getValue(),
+                                            batchRequest.getNSS().db().toString(),
+                                            batchRequest.toBSON());
+            if (!resultStatus.isOK()) {
+                _toBatchError(resultStatus.getStatus(), batchResponse);
+                return;
+            }
+
+            const BSONObj& commandResponse = resultStatus.getValue();
+
+            Status commandStatus = getStatusFromCommandResult(commandResponse);
+            if (commandStatus == ErrorCodes::NotMaster) {
+                sleepmillis(kNotMasterRetryInterval.count());
+                continue;
+            }
+
+            string errmsg;
+            if (!batchResponse->parseBSON(commandResponse, &errmsg)) {
+                _toBatchError(Status(ErrorCodes::FailedToParse,
+                                     str::stream() << "Failed to parse config server response: " <<
+                                             errmsg),
+                              batchResponse);
+                return;
+            }
+            return; // The normal case return point.
+        }
+
+        _toBatchError(Status(ErrorCodes::NotMaster,
+                             "Config server write failed due to lack of a PRIMARY"),
+                      batchResponse);
     }
 
     StatusWith<vector<BSONObj>> CatalogManagerReplicaSet::_find(const HostAndPort& host,
@@ -377,7 +432,7 @@ namespace {
         StatusWith<RemoteCommandResponse> responseStatus =
             Status(ErrorCodes::InternalError, "Internal error running command");
 
-        RemoteCommandRequest request(host, dbName, cmdObj);
+        RemoteCommandRequest request(host, dbName, cmdObj, kConfigCommandTimeout);
         auto callStatus =
             exec->scheduleRemoteCommand(request,
                                         [&responseStatus](const RemoteCommandCallbackArgs& args) {
