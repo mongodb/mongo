@@ -38,6 +38,7 @@ namespace mongo {
 
     class BSONObj;
     class CatalogManagerReplicaSet;
+    class RemoteCommandRequest;
     class RemoteCommandRunnerMock;
     class ShardRegistry;
     template<typename T> class StatusWith;
@@ -67,10 +68,10 @@ namespace executor {
          * back on the network.
          */
         using OnCommandFunction =
-            std::function<StatusWith<BSONObj>(const std::string&, const BSONObj&)>;
+            std::function<StatusWith<BSONObj>(const RemoteCommandRequest&)>;
 
         using OnFindCommandFunction =
-            std::function<StatusWith<std::vector<BSONObj>>(const std::string&, const BSONObj&)>;
+            std::function<StatusWith<std::vector<BSONObj>>(const RemoteCommandRequest&)>;
 
         CatalogManagerReplicaSet* catalogManager() const;
 

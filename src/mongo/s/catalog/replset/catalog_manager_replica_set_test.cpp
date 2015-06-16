@@ -68,11 +68,11 @@ namespace {
             return assertGet(catalogManager()->getCollection(expectedColl.getNs()));
         });
 
-        onFindCommand([&expectedColl](const std::string& dbName, const BSONObj& cmdObj) {
-            const NamespaceString nss(dbName + '.' + cmdObj.firstElement().String());
+        onFindCommand([&expectedColl](const RemoteCommandRequest& request) {
+            const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
             ASSERT_EQ(nss.toString(), CollectionType::ConfigNS);
 
-            auto query = assertGet(LiteParsedQuery::fromFindCommand(nss, cmdObj, false));
+            auto query = assertGet(LiteParsedQuery::fromFindCommand(nss, request.cmdObj, false));
 
             // Ensure the query is correct
             ASSERT_EQ(query->ns(), CollectionType::ConfigNS);
@@ -96,7 +96,7 @@ namespace {
             ASSERT_EQUALS(status.getStatus(), ErrorCodes::NamespaceNotFound);
         });
 
-        onFindCommand([](const std::string& dbName, const BSONObj& cmdObj) {
+        onFindCommand([](const RemoteCommandRequest& request) {
             return vector<BSONObj>{ };
         });
 
@@ -118,11 +118,11 @@ namespace {
             return assertGet(catalogManager()->getDatabase(expectedDb.getName()));
         });
 
-        onFindCommand([&expectedDb](const std::string& dbName, const BSONObj& cmdObj) {
-            const NamespaceString nss(dbName + '.' + cmdObj.firstElement().String());
+        onFindCommand([&expectedDb](const RemoteCommandRequest& request) {
+            const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
             ASSERT_EQ(nss.toString(), DatabaseType::ConfigNS);
 
-            auto query = assertGet(LiteParsedQuery::fromFindCommand(nss, cmdObj, false));
+            auto query = assertGet(LiteParsedQuery::fromFindCommand(nss, request.cmdObj, false));
 
             ASSERT_EQ(query->ns(), DatabaseType::ConfigNS);
             ASSERT_EQ(query->getFilter(), BSON(DatabaseType::name(expectedDb.getName())));
@@ -144,7 +144,7 @@ namespace {
             ASSERT_EQ(dbResult.getStatus(), ErrorCodes::NamespaceNotFound);
         });
 
-        onFindCommand([](const std::string& dbName, const BSONObj& cmdObj) {
+        onFindCommand([](const RemoteCommandRequest& request) {
             return vector<BSONObj>{ };
         });
 

@@ -135,7 +135,7 @@ namespace mongo {
             network()->getNextReadyRequest();
         const RemoteCommandRequest& request = noi->getRequest();
 
-        const auto& resultStatus = func(request.dbname, request.cmdObj);
+        const auto& resultStatus = func(request);
 
         BSONObjBuilder result;
 
@@ -155,10 +155,9 @@ namespace mongo {
     }
 
     void CatalogManagerReplSetTestFixture::onFindCommand(OnFindCommandFunction func) {
-        onCommand([&func](const std::string& dbName,
-                          const BSONObj& cmdObj) -> StatusWith<BSONObj> {
+        onCommand([&func](const RemoteCommandRequest& request) -> StatusWith<BSONObj> {
 
-            const auto& resultStatus = func(dbName, cmdObj);
+            const auto& resultStatus = func(request);
 
             if (!resultStatus.isOK()) {
                 return resultStatus.getStatus();
@@ -169,10 +168,10 @@ namespace mongo {
                 arr.append(obj);
             }
 
-            const std::string nss = str::stream() << dbName << '.'
-                                                  << cmdObj.firstElement().String();
+            const NamespaceString nss = NamespaceString(request.dbname,
+                                                        request.cmdObj.firstElement().String());
             BSONObjBuilder result;
-            appendCursorResponseObject(0LL, nss, arr.arr(), &result);
+            appendCursorResponseObject(0LL, nss.toString(), arr.arr(), &result);
 
             return result.obj();
         });
