@@ -85,10 +85,6 @@ namespace mongo {
 
         RemoteCommandRunner* getCommandRunner() const;
 
-        std::string toString() const {
-            return _id + ":" + _cs.toString();
-        }
-
         BSONObj runCommand(const std::string& db, const std::string& simple) const;
         BSONObj runCommand(const std::string& db, const BSONObj& cmd) const;
 
@@ -99,6 +95,11 @@ namespace mongo {
          * Returns metadata and stats for this shard.
          */
         ShardStatus getStatus() const;
+
+        /**
+         * Returns a string description of this shard entry.
+         */
+        std::string toString() const;
 
         static ShardPtr lookupRSName(const std::string& name);
         

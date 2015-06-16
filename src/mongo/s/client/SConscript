@@ -30,7 +30,6 @@ env.Library(
     ]
 )
 
-
 env.CppUnitTest(
     target='sharding_client_test',
     source=[

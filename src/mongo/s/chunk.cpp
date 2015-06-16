@@ -32,8 +32,6 @@
 
 #include "mongo/s/chunk.h"
 
-#include <iostream>
-
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/config.h"
@@ -51,7 +49,7 @@
 #include "mongo/s/config.h"
 #include "mongo/s/cursors.h"
 #include "mongo/s/grid.h"
-#include "mongo/util/concurrency/ticketholder.h"
+#include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -204,11 +202,6 @@ namespace {
     int Chunk::mkDataWritten() {
         PseudoRandom r(static_cast<int64_t>(time(0)));
         return r.nextInt32( MaxChunkSize / ChunkManager::SplitHeuristics::splitTestFactor );
-    }
-
-    string Chunk::getns() const {
-        verify( _manager );
-        return _manager->getns();
     }
 
     bool Chunk::containsKey( const BSONObj& shardKey ) const {

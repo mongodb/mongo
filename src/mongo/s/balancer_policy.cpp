@@ -305,7 +305,7 @@ namespace mongo {
             const ChunkPtr chunkPtr = it->second;
 
             ChunkType chunk;
-            chunk.setNS(chunkPtr->getns());
+            chunk.setNS(chunkMgr.getns());
             chunk.setMin(chunkPtr->getMin().getOwned());
             chunk.setMax(chunkPtr->getMax().getOwned());
             chunk.setJumbo(chunkPtr->isJumbo()); // TODO: is this reliable?

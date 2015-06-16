@@ -45,14 +45,12 @@
 #include "mongo/s/chunk.h"
 #include "mongo/s/version_mongos.h"
 #include "mongo/util/log.h"
+#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/startup_test.h"
-#include "mongo/util/stringutils.h"
 
 namespace mongo {
-
-    using std::endl;
 
     MongosGlobalParams mongosGlobalParams;
 
@@ -248,7 +246,7 @@ namespace mongo {
         if (params.count("sharding.autoSplit")) {
             Chunk::ShouldAutoSplit = params["sharding.autoSplit"].as<bool>();
             if (Chunk::ShouldAutoSplit == false) {
-                warning() << "running with auto-splitting disabled" << endl;
+                warning() << "running with auto-splitting disabled";
             }
         }
 
@@ -281,7 +279,7 @@ namespace mongo {
 
         if (configServers.size() < 3) {
             warning() << "running with less than 3 config servers should be done only for testing "
-                    "purposes and is not recommended for production" << endl;
+                         "purposes and is not recommended for production";
         }
 
         if (params.count("upgrade")) {

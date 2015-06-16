@@ -191,6 +191,7 @@ mongod = env.Program(
         "db/mongodwebserver",
         "db/serveronly",
         "db/repl/storage_interface_impl",
+        's/commands/shared_cluster_commands',
         "util/ntservice",
     ],
 )
@@ -227,17 +228,18 @@ env.Install(
             "s/mongos_options_init.cpp",
         ],
         LIBDEPS=[
+            'db/conn_pool_options',
+            'db/coredb',
+            'db/mongodandmongos',
             's/catalog/legacy/catalog_manager_legacy',
             's/catalog/replset/catalog_manager_replica_set',
             's/client/sharding_connection_hook',
             's/commands/cluster_commands',
-            "s/mongoscore",
-            "db/coredb",
-            "s/coreshard",
-            "util/ntservice",
-            "db/mongodandmongos",
-            "db/conn_pool_options",
-            '$BUILD_DIR/mongo/util/options_parser/options_parser_init',
+            's/commands/shared_cluster_commands',
+            's/coreshard',
+            's/mongoscore',
+            'util/ntservice',
+            'util/options_parser/options_parser_init',
         ]))
 
 # --- sniffer ---

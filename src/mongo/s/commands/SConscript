@@ -2,6 +2,18 @@
 
 Import("env")
 
+# These commands are linked both in MongoS and MongoD
+env.Library(
+    target='shared_cluster_commands',
+    source=[
+        'cluster_get_shard_map_cmd.cpp',
+    ],
+    LIBDEPS=[
+
+    ]
+)
+
+# These commands are linked in MongoS only
 env.Library(
     target='cluster_commands',
     source=[
@@ -13,6 +25,7 @@ env.Library(
         'cluster_enable_sharding_cmd.cpp',
         'cluster_explain_cmd.cpp',
         'cluster_find_cmd.cpp',
+        'cluster_find_and_modify_cmd.cpp',
         'cluster_flush_router_config_cmd.cpp',
         'cluster_fsync_cmd.cpp',
         'cluster_get_last_error_cmd.cpp',

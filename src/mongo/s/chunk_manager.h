@@ -32,7 +32,9 @@
 #include <string>
 #include <vector>
 
+#include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/s/chunk.h"
+#include "mongo/s/shard_key_pattern.h"
 
 namespace mongo {
 
@@ -45,7 +47,6 @@ namespace mongo {
 
     // The key for the map is max for each Chunk or ChunkRange
     typedef std::map<BSONObj, std::shared_ptr<Chunk>, BSONObjCmp> ChunkMap;
-
 
     class ChunkRange {
     public:
@@ -241,9 +242,7 @@ namespace mongo {
         //
         class SplitHeuristics {
         public:
-
-            SplitHeuristics()
-                : _splitTickets(maxParallelSplits) {
+            SplitHeuristics() : _splitTickets(maxParallelSplits) {
             }
 
             TicketHolder _splitTickets;
