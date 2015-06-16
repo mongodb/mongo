@@ -527,6 +527,36 @@ namespace {
         ASSERT_EQUALS(ErrorCodes::IllegalOperation, dr.start().code());
     }
 
+    TEST_F(SteadyStateTest, ShutdownAfterStart) {
+        DataReplicator& dr = getDR();
+        ASSERT_EQUALS(toString(DataReplicatorState::Uninitialized), toString(dr.getState()));
+        auto net = getNet();
+        net->enterNetwork();
+        ASSERT_OK(dr.start());
+        ASSERT_TRUE(net->hasReadyRequests());
+        getExecutor().shutdown();
+        ASSERT_EQUALS(toString(DataReplicatorState::Steady), toString(dr.getState()));
+        ASSERT_EQUALS(ErrorCodes::IllegalOperation, dr.start().code());
+    }
+
+    TEST_F(SteadyStateTest, RequestShutdownAfterStart) {
+        DataReplicator& dr = getDR();
+        ASSERT_EQUALS(toString(DataReplicatorState::Uninitialized), toString(dr.getState()));
+        auto net = getNet();
+        net->enterNetwork();
+        ASSERT_OK(dr.start());
+        ASSERT_TRUE(net->hasReadyRequests());
+        ASSERT_EQUALS(toString(DataReplicatorState::Steady), toString(dr.getState()));
+        // Simulating an invalid remote oplog query response. This will invalidate the existing
+        // sync source but that's fine because we're not testing oplog processing.
+        scheduleNetworkResponse(BSON("ok" << 0));
+        net->runReadyNetworkOperations();
+        ASSERT_OK(dr.scheduleShutdown());
+        net->exitNetwork(); // runs work item scheduled in 'scheduleShutdown()).
+        dr.waitForShutdown();
+        ASSERT_EQUALS(toString(DataReplicatorState::Uninitialized), toString(dr.getState()));
+    }
+
     TEST_F(SteadyStateTest, RemoteOplogEmpty) {
         _testOplogStartMissing(
             fromjson("{ok:1, cursor:{id:0, ns:'local.oplog.rs', firstBatch: []}}"));
@@ -574,19 +604,22 @@ namespace {
         ASSERT_OK(dr.start());
 
         ASSERT_TRUE(net->hasReadyRequests());
-        auto noi = net->getNextReadyRequest();
-        auto oplogFetcherResponse = BSON(
-            "ok" << 1 <<
-            "cursor" << BSON(
-                "id" << 0 <<
-                "ns" << "local.oplog.rs" <<
-                "firstBatch" << BSON_ARRAY(operationToApply)));
-        scheduleNetworkResponse(noi, oplogFetcherResponse);
+        {
+            auto networkRequest = net->getNextReadyRequest();
+            auto commandResponse = BSON(
+                "ok" << 1 <<
+                "cursor" << BSON(
+                    "id" << 0LL <<
+                    "ns" << "local.oplog.rs" <<
+                    "firstBatch" << BSON_ARRAY(operationToApply)));
+            scheduleNetworkResponse(networkRequest, commandResponse);
+        }
         net->runReadyNetworkOperations();
 
         // Wait for applier function.
         barrier.countDownAndWait();
         ASSERT_EQUALS(operationToApply["ts"].timestamp(), dr.getLastTimestampFetched());
+        // Run scheduleWork() work item scheduled in DataReplicator::_onApplyBatchFinish().
         net->exitNetwork();
 
         // Wait for batch completion callback.
@@ -594,9 +627,22 @@ namespace {
 
         ASSERT_EQUALS(MemberState(MemberState::RS_SECONDARY).toString(),
                       repl.getMemberState().toString());
-        stdx::lock_guard<stdx::mutex> lock(mutex);
-        ASSERT_EQUALS(operationToApply, operationApplied);
-        ASSERT_EQUALS(operationToApply["ts"].timestamp(), lastTimestampApplied);
+        {
+            stdx::lock_guard<stdx::mutex> lock(mutex);
+            ASSERT_EQUALS(operationToApply, operationApplied);
+            ASSERT_EQUALS(operationToApply["ts"].timestamp(), lastTimestampApplied);
+        }
+
+        // Ensure that we send position information upstream after completing batch.
+        net->enterNetwork();
+        ASSERT_TRUE(net->hasReadyRequests());
+        {
+            auto networkRequest = net->getNextReadyRequest();
+            auto commandRequest = networkRequest->getRequest();
+            ASSERT_EQUALS("admin", commandRequest.dbname);
+            const auto& cmdObj = commandRequest.cmdObj;
+            ASSERT_EQUALS(std::string("replSetUpdatePosition"), cmdObj.firstElementFieldName());
+        }
     }
 
-}
+} // namespace

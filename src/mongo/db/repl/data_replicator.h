@@ -153,6 +153,17 @@ public:
     Status start();
     Status shutdown();
 
+    /**
+     * Cancels outstanding work and begins shutting down.
+     */
+    Status scheduleShutdown();
+
+    /**
+     * Waits for data replicator to finish shutting down.
+     * Data replicator will go into uninitialized state.
+     */
+    void waitForShutdown();
+
     // Resumes apply replication events from the oplog
     Status resume(bool wait=false);
 
@@ -212,9 +223,6 @@ private:
                            Fetcher::NextAction* nextAction,
                            const Operations& ops,
                            const NamespaceString nss);
-
-    // returns true if a rollback is needed
-    bool _needToRollback(HostAndPort source, Timestamp lastApplied);
 
     void _onDataClonerFinish(const Status& status);
     // Called after _onDataClonerFinish when the new Timestamp is avail, to use for minvalid
@@ -283,7 +291,6 @@ private:
     BlockingQueue<BSONObj> _oplogBuffer;                                                // (M)
 
     // Shutdown
-    bool _doShutdown;                                                                   // (M)
     Event _onShutdown;                                                                  // (M)
 
     // Rollback stuff

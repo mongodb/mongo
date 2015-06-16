@@ -191,6 +191,7 @@ namespace repl {
 
     bool ReplicationCoordinatorMock::prepareReplSetUpdatePositionCommand(
             BSONObjBuilder* cmdBuilder) {
+        cmdBuilder->append("replSetUpdatePosition", 1);
         return true;
     }
 
