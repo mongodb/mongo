@@ -509,7 +509,9 @@ namespace {
                     BSONObjBuilder resultWeDontCareAbout;
                     return dropCollection(txn, parseNs(ns, cmd), resultWeDontCareAbout);
                 },
-                {ErrorCodes::NamespaceNotFound}
+                // IllegalOperation is necessary because in 3.0 we replicate drops of system.profile
+                // TODO(dannenberg) remove IllegalOperation once we no longer need 3.0 compatibility
+                {ErrorCodes::NamespaceNotFound, ErrorCodes::IllegalOperation}
             }
         },
         // deleteIndex(es) is deprecated but still works as of April 10, 2015
