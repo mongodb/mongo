@@ -152,7 +152,7 @@ namespace mongo {
         }
         else if (STAGE_AND_HASH == root->getType()) {
             const AndHashNode* ahn = static_cast<const AndHashNode*>(root);
-            unique_ptr<AndHashStage> ret(new AndHashStage(ws, ahn->filter.get(), collection));
+            unique_ptr<AndHashStage> ret(new AndHashStage(ws, collection));
             for (size_t i = 0; i < ahn->children.size(); ++i) {
                 PlanStage* childStage = buildStages(txn, collection, qsol, ahn->children[i], ws);
                 if (NULL == childStage) { return NULL; }
@@ -172,7 +172,7 @@ namespace mongo {
         }
         else if (STAGE_AND_SORTED == root->getType()) {
             const AndSortedNode* asn = static_cast<const AndSortedNode*>(root);
-            unique_ptr<AndSortedStage> ret(new AndSortedStage(ws, asn->filter.get(), collection));
+            unique_ptr<AndSortedStage> ret(new AndSortedStage(ws, collection));
             for (size_t i = 0; i < asn->children.size(); ++i) {
                 PlanStage* childStage = buildStages(txn, collection, qsol, asn->children[i], ws);
                 if (NULL == childStage) { return NULL; }

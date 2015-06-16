@@ -53,7 +53,7 @@ namespace mongo {
      */
     class AndSortedStage : public PlanStage {
     public:
-        AndSortedStage(WorkingSet* ws, const MatchExpression* filter, const Collection* collection);
+        AndSortedStage(WorkingSet* ws, const Collection* collection);
         virtual ~AndSortedStage();
 
         void addChild(PlanStage* child);
@@ -90,9 +90,6 @@ namespace mongo {
 
         // Not owned by us.
         WorkingSet* _ws;
-
-        // Not owned by us.
-        const MatchExpression* _filter;
 
         // Owned by us.
         std::vector<PlanStage*> _children;

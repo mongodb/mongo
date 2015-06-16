@@ -29,7 +29,6 @@
 #include "mongo/db/exec/and_hash.h"
 
 #include "mongo/db/exec/and_common-inl.h"
-#include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/exec/working_set.h"
@@ -53,25 +52,20 @@ namespace mongo {
     // static
     const char* AndHashStage::kStageType = "AND_HASH";
 
-    AndHashStage::AndHashStage(WorkingSet* ws, 
-                               const MatchExpression* filter,
-                               const Collection* collection)
+    AndHashStage::AndHashStage(WorkingSet* ws, const Collection* collection)
         : _collection(collection),
           _ws(ws),
-          _filter(filter),
           _hashingChildren(true),
           _currentChild(0),
           _commonStats(kStageType),
           _memUsage(0),
           _maxMemUsage(kDefaultMaxMemUsageBytes) {}
 
-    AndHashStage::AndHashStage(WorkingSet* ws, 
-                               const MatchExpression* filter,
+    AndHashStage::AndHashStage(WorkingSet* ws,
                                const Collection* collection,
                                size_t maxMemUsage)
         : _collection(collection),
           _ws(ws),
-          _filter(filter),
           _hashingChildren(true),
           _currentChild(0),
           _commonStats(kStageType),
@@ -246,18 +240,9 @@ namespace mongo {
             AndCommon::mergeFrom(olderMember, *member);
             _ws->free(*out);
 
-            // We should check for matching at the end so the matcher can use information in the
-            // indices of all our children.
-            if (Filter::passes(olderMember, _filter)) {
-                *out = hashID;
-                ++_commonStats.advanced;
-                return PlanStage::ADVANCED;
-            }
-            else {
-                _ws->free(hashID);
-                ++_commonStats.needTime;
-                return PlanStage::NEED_TIME;
-            }
+            ++_commonStats.advanced;
+            *out = hashID;
+            return PlanStage::ADVANCED;
         }
     }
 
@@ -527,13 +512,6 @@ namespace mongo {
 
         _specificStats.memLimit = _maxMemUsage;
         _specificStats.memUsage = _memUsage;
-
-        // Add a BSON representation of the filter to the stats tree, if there is one.
-        if (NULL != _filter) {
-            BSONObjBuilder bob;
-            _filter->toBSON(&bob);
-            _commonStats.filter = bob.obj();
-        }
 
         unique_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_AND_HASH));
         ret->specific.reset(new AndHashStats(_specificStats));

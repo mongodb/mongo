@@ -83,8 +83,8 @@ namespace mongo {
      *
      * Internal Nodes:
      *
-     * node -> {andHash: {filter: {filter}, args: { nodes: [node, node]}}}
-     * node -> {andSorted: {filter: {filter}, args: { nodes: [node, node]}}}
+     * node -> {andHash: {args: { nodes: [node, node]}}}
+     * node -> {andSorted: {args: { nodes: [node, node]}}}
      * node -> {or: {filter: {filter}, args: { dedup:bool, nodes:[node, node]}}}
      * node -> {fetch: {filter: {filter}, args: {node: node}}}
      * node -> {limit: {args: {node: node, num: posint}}}
@@ -260,7 +260,7 @@ namespace mongo {
                 uassert(16921, "Nodes argument must be provided to AND",
                         nodeArgs["nodes"].isABSONObj());
 
-                unique_ptr<AndHashStage> andStage(new AndHashStage(workingSet, matcher, collection));
+                unique_ptr<AndHashStage> andStage(new AndHashStage(workingSet, collection));
 
                 int nodesAdded = 0;
                 BSONObjIterator it(nodeArgs["nodes"].Obj());
@@ -285,8 +285,7 @@ namespace mongo {
                 uassert(16924, "Nodes argument must be provided to AND",
                         nodeArgs["nodes"].isABSONObj());
 
-                unique_ptr<AndSortedStage> andStage(new AndSortedStage(workingSet, matcher,
-                                                                     collection));
+                unique_ptr<AndSortedStage> andStage(new AndSortedStage(workingSet, collection));
 
                 int nodesAdded = 0;
                 BSONObjIterator it(nodeArgs["nodes"].Obj());

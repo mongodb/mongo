@@ -29,7 +29,6 @@
 #include "mongo/db/exec/and_sorted.h"
 
 #include "mongo/db/exec/and_common-inl.h"
-#include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/util/mongoutils/str.h"
@@ -43,12 +42,9 @@ namespace mongo {
     // static
     const char* AndSortedStage::kStageType = "AND_SORTED";
 
-    AndSortedStage::AndSortedStage(WorkingSet* ws,
-                                   const MatchExpression* filter,
-                                   const Collection* collection)
+    AndSortedStage::AndSortedStage(WorkingSet* ws, const Collection* collection)
         : _collection(collection),
           _ws(ws),
-          _filter(filter),
           _targetNode(numeric_limits<size_t>::max()),
           _targetId(WorkingSet::INVALID_ID), _isEOF(false),
           _commonStats(kStageType) { }
@@ -184,23 +180,14 @@ namespace mongo {
 
                 if (0 == _workingTowardRep.size()) {
                     WorkingSetID toReturn = _targetId;
-                    WorkingSetMember* toMatchTest = _ws->get(toReturn);
 
                     _targetNode = numeric_limits<size_t>::max();
                     _targetId = WorkingSet::INVALID_ID;
                     _targetLoc = RecordId();
 
-                    // Everyone hit it, hooray.  Return it, if it matches.
-                    if (Filter::passes(toMatchTest, _filter)) {
-                        *out = toReturn;
-                        ++_commonStats.advanced;
-                        return PlanStage::ADVANCED;
-                    }
-                    else {
-                        _ws->free(toReturn);
-                        ++_commonStats.needTime;
-                        return PlanStage::NEED_TIME;
-                    }
+                    *out = toReturn;
+                    ++_commonStats.advanced;
+                    return PlanStage::ADVANCED;
                 }
                 // More children need to be advanced to _targetLoc.
                 ++_commonStats.needTime;
@@ -318,13 +305,6 @@ namespace mongo {
 
     PlanStageStats* AndSortedStage::getStats() {
         _commonStats.isEOF = isEOF();
-
-        // Add a BSON representation of the filter to the stats tree, if there is one.
-        if (NULL != _filter) {
-            BSONObjBuilder bob;
-            _filter->toBSON(&bob);
-            _commonStats.filter = bob.obj();
-        }
 
         unique_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_AND_SORTED));
         ret->specific.reset(new AndSortedStats(_specificStats));

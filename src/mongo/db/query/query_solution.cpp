@@ -197,10 +197,6 @@ namespace mongo {
     void AndSortedNode::appendToString(mongoutils::str::stream* ss, int indent) const {
         addIndent(ss, indent);
         *ss << "AND_SORTED\n";
-        if (NULL != filter) {
-            addIndent(ss, indent + 1);
-            *ss << " filter = " << filter->toString() << '\n';
-        }
         addCommon(ss, indent);
         for (size_t i = 0; i < children.size(); ++i) {
             addIndent(ss, indent + 1);

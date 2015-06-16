@@ -29,16 +29,9 @@ res = db.runCommand({stageDebug: {plan: andix1ix2, collection: collname}});
 assert.eq(res.ok, 1);
 assert.eq(res.results.length, 11);
 
-// This should raise an error as we can't filter on baz since we haven't done a fetch and it's not
-// in the index data.
-andix1ix2badfilter = {andHash: {filter: {baz: 5}, args: {nodes: [ixscan1, ixscan2]}}};
-res = db.runCommand({stageDebug: {collection: collname, plan:andix1ix2badfilter}});
-assert.eq(res.ok, 0);
-
 // Filter predicates from 2 indices.  Tests that we union the idx info.
-andix1ix2filter = {andHash: {filter: {bar: {$in: [45, 46, 48]},
-                                      foo: {$in: [4,5,6]}},
-                             args: {nodes: [ixscan1, ixscan2]}}};
+andix1ix2filter = {fetch: {filter: {bar: {$in: [45, 46, 48]}, foo: {$in: [4,5,6]}},
+                           args: {node: {andHash: {args: {nodes: [ixscan1, ixscan2]}}}}}};
 res = db.runCommand({stageDebug: {collection: collname, plan: andix1ix2filter}});
 assert.eq(res.ok, 1);
 assert.eq(res.results.length, 2);
