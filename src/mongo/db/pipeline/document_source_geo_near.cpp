@@ -104,6 +104,9 @@ namespace mongo {
         if (maxDistance > 0)
             result.setField("maxDistance", Value(maxDistance));
 
+        if (minDistance > 0)
+            result.setField("minDistance", Value(minDistance));
+
         result.setField("query", Value(query));
         result.setField("spherical", Value(spherical));
         result.setField("distanceMultiplier", Value(distanceMultiplier));
@@ -133,6 +136,9 @@ namespace mongo {
 
         if (maxDistance > 0)
             geoNear.append("maxDistance", maxDistance);
+
+        if (minDistance > 0)
+            geoNear.append("minDistance", minDistance);
 
         geoNear.append("query", query);
         geoNear.append("spherical", spherical);
@@ -193,6 +199,9 @@ namespace mongo {
         if (options["maxDistance"].isNumber())
             maxDistance = options["maxDistance"].numberDouble();
 
+        if (options["minDistance"].isNumber())
+            minDistance = options["minDistance"].numberDouble();
+
         if (options["query"].type() == Object)
             query = options["query"].embeddedObject().getOwned();
 
@@ -216,6 +225,7 @@ namespace mongo {
         , coordsIsArray(false)
         , limit(100)
         , maxDistance(-1.0)
+        , minDistance(-1.0)
         , spherical(false)
         , distanceMultiplier(1.0)
     {}

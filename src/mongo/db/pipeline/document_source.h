@@ -1099,6 +1099,7 @@ namespace mongo {
         std::unique_ptr<FieldPath> distanceField; // Using unique_ptr because FieldPath can't be empty
         long long limit;
         double maxDistance;
+        double minDistance;
         BSONObj query;
         bool spherical;
         double distanceMultiplier;
