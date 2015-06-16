@@ -1817,6 +1817,7 @@ def doConfigure(myenv):
         else:
             llvm_symbolizer = myenv.WhereIs(llvm_symbolizer)
 
+        tsan_options = ""
         if llvm_symbolizer:
             myenv['ENV']['ASAN_SYMBOLIZER_PATH'] = llvm_symbolizer
             myenv['ENV']['LSAN_SYMBOLIZER_PATH'] = llvm_symbolizer
