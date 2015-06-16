@@ -508,7 +508,7 @@ namespace {
         else if (status != ErrorCodes::NoSuchKey) {
             // NoSuchKey means we have no $voter-tagged nodes in this config;
             // other errors are unexpected.
-            fassert(28528, status);
+            fassert(28693, status);
         }
 
         // $stepDownCheck: one electable node plus ourselves
@@ -522,7 +522,7 @@ namespace {
         else if (status != ErrorCodes::NoSuchKey) {
             // NoSuchKey means we have no $electable-tagged nodes in this config;
             // other errors are unexpected
-            fassert(28529, status);
+            fassert(28694, status);
         }
     }
 
