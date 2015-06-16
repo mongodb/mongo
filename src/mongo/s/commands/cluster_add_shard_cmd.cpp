@@ -119,8 +119,8 @@ namespace {
 
             // maxSize is the space usage cap in a shard in MBs
             long long maxSize = 0;
-            if (cmdObj[ShardType::maxSize()].isNumber()) {
-                maxSize = cmdObj[ShardType::maxSize()].numberLong();
+            if (cmdObj[ShardType::maxSizeMB()].isNumber()) {
+                maxSize = cmdObj[ShardType::maxSizeMB()].numberLong();
             }
 
             audit::logAddShard(ClientBasic::getCurrent(), name, servers.toString(), maxSize);

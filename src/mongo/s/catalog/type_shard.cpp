@@ -44,7 +44,7 @@ namespace mongo {
     const BSONField<std::string> ShardType::name("_id");
     const BSONField<std::string> ShardType::host("host");
     const BSONField<bool> ShardType::draining("draining");
-    const BSONField<long long> ShardType::maxSize("maxSize");
+    const BSONField<long long> ShardType::maxSizeMB("maxSize");
     const BSONField<BSONArray> ShardType::tags("tags");
 
 
@@ -67,27 +67,39 @@ namespace mongo {
 
         {
             bool isShardDraining;
-            Status status = bsonExtractBooleanFieldWithDefault(source,
-                                                               draining.name(),
-                                                               false,
-                                                               &isShardDraining);
-            if (!status.isOK()) return status;
-            shard._draining = isShardDraining;
+            Status status = bsonExtractBooleanField(source,
+                                                    draining.name(),
+                                                    &isShardDraining);
+            if (status.isOK()) {
+                shard._draining = isShardDraining;
+            }
+            else if (status == ErrorCodes::NoSuchKey) {
+                // draining field can be mssing in which case it is presumed false
+            }
+            else {
+                return status;
+            }
         }
 
         {
-            long long shardMaxSize;
-            // maxSize == 0 means there's no limitation to space usage.
-            Status status = bsonExtractIntegerFieldWithDefault(source,
-                                                               maxSize.name(),
-                                                               0,
-                                                               &shardMaxSize);
-            if (!status.isOK()) return status;
-            shard._maxSize = shardMaxSize;
+            long long shardMaxSizeMB;
+            // maxSizeMB == 0 means there's no limitation to space usage.
+            Status status = bsonExtractIntegerField(source,
+                                                    maxSizeMB.name(),
+                                                    &shardMaxSizeMB);
+            if (status.isOK()) {
+                shard._maxSizeMB = shardMaxSizeMB;
+            }
+            else if (status == ErrorCodes::NoSuchKey) {
+                // maxSizeMB field can be missing in which case it is presumed false
+            }
+            else {
+                return status;
+            }
         }
 
-        shard._tags = std::vector<std::string>();
         if (source.hasField(tags.name())) {
+            shard._tags = std::vector<std::string>();
             BSONElement tagsElement;
             Status status = bsonExtractTypedField(source, tags.name(), Array, &tagsElement);
             if (!status.isOK()) return status;
@@ -119,7 +131,7 @@ namespace mongo {
                           str::stream() << "missing " << host.name() << " field");
         }
 
-        if (_maxSize.is_initialized() && getMaxSize() < 0) {
+        if (_maxSizeMB.is_initialized() && getMaxSizeMB() < 0) {
             return Status(ErrorCodes::BadValue, str::stream() << "maxSize can't be negative");
         }
 
@@ -132,7 +144,7 @@ namespace mongo {
         if (_name) builder.append(name(), getName());
         if (_host) builder.append(host(), getHost());
         if (_draining) builder.append(draining(), getDraining());
-        if (_maxSize) builder.append(maxSize(), getMaxSize());
+        if (_maxSizeMB) builder.append(maxSizeMB(), getMaxSizeMB());
         if (_tags) builder.append(tags(), getTags());
 
         return builder.obj();
@@ -156,9 +168,9 @@ namespace mongo {
         _draining = isDraining;
     }
 
-    void ShardType::setMaxSize(const long long maxSize) {
-        invariant(maxSize >= 0);
-        _maxSize = maxSize;
+    void ShardType::setMaxSizeMB(const long long maxSizeMB) {
+        invariant(maxSizeMB >= 0);
+        _maxSizeMB = maxSizeMB;
     }
 
     void ShardType::setTags(const std::vector<std::string>& tags) {

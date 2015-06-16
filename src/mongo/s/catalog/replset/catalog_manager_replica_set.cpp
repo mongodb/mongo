@@ -295,6 +295,33 @@ namespace {
     }
 
     Status CatalogManagerReplicaSet::getAllShards(vector<ShardType>* shards) {
+        const auto& configShard = grid.shardRegistry()->findIfExists("config");
+        const auto readHost = configShard->getTargeter()->findHost(kConfigReadSelector);
+        if (!readHost.isOK()) {
+            return readHost.getStatus();
+        }
+
+        auto findStatus = _find(readHost.getValue(),
+                                NamespaceString(ShardType::ConfigNS),
+                                BSONObj(), // no query filter
+                                0); // no limit
+        if (!findStatus.isOK()) {
+            return findStatus.getStatus();
+        }
+
+        for (const BSONObj& doc : findStatus.getValue()) {
+            auto shardRes = ShardType::fromBSON(doc);
+            if (!shardRes.isOK()) {
+                shards->clear();
+                return {ErrorCodes::FailedToParse,
+                        stream() << "Failed to parse shard with id ("
+                                 << doc[ShardType::name()].toString() << "): "
+                                 << shardRes.getStatus().reason()};
+            }
+
+            shards->push_back(shardRes.getValue());
+        }
+
         return Status::OK();
     }
 

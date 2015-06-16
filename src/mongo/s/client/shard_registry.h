@@ -77,7 +77,7 @@ namespace executor {
 
         void reload();
 
-        std::shared_ptr<Shard> findIfExists(const ShardId& id);
+        std::shared_ptr<Shard> findIfExists(const ShardId& shardId);
 
         /**
          * Lookup shard by replica set name. Returns nullptr if the name can't be found.
@@ -99,6 +99,11 @@ namespace executor {
          * Creates a shard based on the specified information and puts it into the lookup maps.
          */
         void _addShard_inlock(const ShardType& shardType);
+
+        /**
+         * Adds the "config" shard (representing the config server) to the shard registry.
+         */
+        void _addConfigShard_inlock();
 
         std::shared_ptr<Shard> _findUsingLookUp(const ShardId& shardId);
 

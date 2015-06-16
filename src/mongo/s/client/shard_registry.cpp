@@ -60,6 +60,10 @@ namespace mongo {
            _executor(std::move(executor)),
            _catalogManager(catalogManager) {
 
+        // add config shard registry entry so know it's always there
+        std::lock_guard<std::mutex> lk(_mutex);
+        _addConfigShard_inlock();
+
     }
 
     ShardRegistry::~ShardRegistry() = default;
@@ -78,11 +82,7 @@ namespace mongo {
         _lookup.clear();
         _rsLookup.clear();
 
-        ShardType configServerShard;
-        configServerShard.setName("config");
-        configServerShard.setHost(_catalogManager->connectionString().toString());
-
-        _addShard_inlock(configServerShard);
+        _addConfigShard_inlock();
 
         for (const ShardType& shardType : shards) {
             uassertStatusOK(shardType.validate());
@@ -97,8 +97,8 @@ namespace mongo {
         }
     }
 
-    shared_ptr<Shard> ShardRegistry::findIfExists(const ShardId& id) {
-        shared_ptr<Shard> shard = _findUsingLookUp(id);
+    shared_ptr<Shard> ShardRegistry::findIfExists(const ShardId& shardId) {
+        shared_ptr<Shard> shard = _findUsingLookUp(shardId);
         if (shard) {
             return shard;
         }
@@ -106,7 +106,7 @@ namespace mongo {
         // If we can't find the shard, we might just need to reload the cache
         reload();
 
-        return _findUsingLookUp(id);
+        return _findUsingLookUp(shardId);
     }
 
     shared_ptr<Shard> ShardRegistry::lookupRSName(const string& name) const {
@@ -171,6 +171,13 @@ namespace mongo {
         }
 
         result->append("map", b.obj());
+    }
+
+    void ShardRegistry::_addConfigShard_inlock() {
+        ShardType configServerShard;
+        configServerShard.setName("config");
+        configServerShard.setHost(_catalogManager->connectionString().toString());
+        _addShard_inlock(configServerShard);
     }
 
     void ShardRegistry::_addShard_inlock(const ShardType& shardType) {

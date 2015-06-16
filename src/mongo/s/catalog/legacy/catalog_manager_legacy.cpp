@@ -721,7 +721,7 @@ namespace {
         b.append(ShardType::host(),
                  rsMonitor ? rsMonitor->getServerAddress() : shardConnectionString.toString());
         if (maxSize > 0) {
-            b.append(ShardType::maxSize(), maxSize);
+            b.append(ShardType::maxSizeMB(), maxSize);
         }
         BSONObj shardDoc = b.obj();
 
@@ -1327,14 +1327,15 @@ namespace {
 
             StatusWith<ShardType> shardRes = ShardType::fromBSON(shardObj);
             if (!shardRes.isOK()) {
+                shards->clear();
                 conn.done();
                 return Status(ErrorCodes::FailedToParse,
-                              str::stream() << "Failed to parse chunk BSONObj: "
+                              str::stream() << "Failed to parse shard with id ("
+                                            <<  shardObj[ShardType::name()].toString() << "): "
                                             << shardRes.getStatus().reason());
             }
 
-            ShardType shard = shardRes.getValue();
-            shards->push_back(shard);
+            shards->push_back(shardRes.getValue());
         }
         conn.done();
 

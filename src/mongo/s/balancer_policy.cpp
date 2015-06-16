@@ -271,7 +271,7 @@ namespace mongo {
 
                 std::set<std::string> dummy;
 
-                ShardInfo newShardEntry(shardData.getMaxSize(),
+                ShardInfo newShardEntry(shardData.getMaxSizeMB(),
                                         shardStatus.dataSizeBytes() / 1024 / 1024,
                                         shardData.getDraining(),
                                         dummy,

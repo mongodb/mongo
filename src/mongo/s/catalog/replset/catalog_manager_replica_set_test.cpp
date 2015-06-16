@@ -41,6 +41,7 @@
 #include "mongo/s/catalog/replset/catalog_manager_replica_set_test_fixture.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_database.h"
+#include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/s/write_ops/batched_update_request.h"
@@ -295,6 +296,91 @@ namespace {
 
         // Now wait for the updateCollection call to return
         future.wait_for(kFutureTimeout);
+    }
+
+    TEST_F(CatalogManagerReplSetTestFixture, GetAllShardsValid) {
+        RemoteCommandTargeterMock* targeter =
+            RemoteCommandTargeterMock::get(shardRegistry()->findIfExists("config")->getTargeter());
+        targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+
+        ShardType s1;
+        s1.setName("shard0000");
+        s1.setHost("ShardHost");
+        s1.setDraining(false);
+        s1.setMaxSizeMB(50);
+        s1.setTags({ "tag1", "tag2", "tag3" });
+
+        ShardType s2;
+        s2.setName("shard0001");
+        s2.setHost("ShardHost");
+
+        ShardType s3;
+        s3.setName("shard0002");
+        s3.setHost("ShardHost");
+        s3.setMaxSizeMB(65);
+
+        const vector<ShardType> expectedShardsList = { s1, s2, s3 };
+
+        auto future = async(std::launch::async, [this] {
+            vector<ShardType> shards;
+            ASSERT_OK(catalogManager()->getAllShards(&shards));
+            return shards;
+        });
+
+        onFindCommand([&s1, &s2, &s3](const RemoteCommandRequest& request) {
+            const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
+            ASSERT_EQ(nss.toString(), ShardType::ConfigNS);
+
+            auto query = assertGet(LiteParsedQuery::fromFindCommand(nss, request.cmdObj, false));
+
+            ASSERT_EQ(query->ns(), ShardType::ConfigNS);
+            ASSERT_EQ(query->getFilter(), BSONObj());
+
+            return vector<BSONObj>{ s1.toBSON(), s2.toBSON(), s3.toBSON() };
+        });
+
+        const vector<ShardType> actualShardsList = future.get();
+        ASSERT_EQ(actualShardsList.size(), expectedShardsList.size());
+
+        for (size_t i = 0; i < actualShardsList.size(); ++i) {
+            ASSERT_EQ(actualShardsList[i].toBSON(), expectedShardsList[i].toBSON());
+        }
+    }
+
+    TEST_F(CatalogManagerReplSetTestFixture, GetAllShardsWithInvalidShard) {
+        RemoteCommandTargeterMock* targeter =
+            RemoteCommandTargeterMock::get(shardRegistry()->findIfExists("config")->getTargeter());
+        targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+
+        auto future = async(std::launch::async, [this] {
+            vector<ShardType> shards;
+            Status status = catalogManager()->getAllShards(&shards);
+
+            ASSERT_NOT_OK(status);
+            ASSERT(shards.size() == 0);
+        });
+
+        onFindCommand([](const RemoteCommandRequest& request) {
+            const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
+            ASSERT_EQ(nss.toString(), ShardType::ConfigNS);
+
+            auto query = assertGet(LiteParsedQuery::fromFindCommand(nss, request.cmdObj, false));
+
+            ASSERT_EQ(query->ns(), ShardType::ConfigNS);
+            ASSERT_EQ(query->getFilter(), BSONObj());
+
+            // valid ShardType
+            ShardType s1;
+            s1.setName("shard0001");
+            s1.setHost("ShardHost");
+
+            return vector<BSONObj> {
+                s1.toBSON(),
+                BSONObj() // empty document is invalid
+            };
+        });
+
+        future.get();
     }
 
 } // namespace

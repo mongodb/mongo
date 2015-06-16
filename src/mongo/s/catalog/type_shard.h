@@ -56,7 +56,7 @@ namespace mongo {
         static const BSONField<std::string> name;
         static const BSONField<std::string> host;
         static const BSONField<bool> draining;
-        static const BSONField<long long> maxSize;
+        static const BSONField<long long> maxSizeMB;
         static const BSONField<BSONArray> tags;
 
 
@@ -91,8 +91,8 @@ namespace mongo {
         bool getDraining() const { return _draining.value_or(false); }
         void setDraining(const bool draining);
 
-        long long getMaxSize() const { return _maxSize.value_or(0); }
-        void setMaxSize(const long long maxSize);
+        long long getMaxSizeMB() const { return _maxSizeMB.value_or(0); }
+        void setMaxSizeMB(const long long maxSizeMB);
 
         const std::vector<std::string> getTags() const {
             return _tags.value_or(std::vector<std::string>());
@@ -109,7 +109,7 @@ namespace mongo {
         // (O) is it draining chunks?
         boost::optional<bool> _draining;
         // (O) maximum allowed disk space in MB
-        boost::optional<long long> _maxSize;
+        boost::optional<long long> _maxSizeMB;
         // (O) shard tags
         boost::optional<std::vector<std::string>> _tags;
     };
