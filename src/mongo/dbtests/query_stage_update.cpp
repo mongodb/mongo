@@ -82,11 +82,10 @@ public:
         return _client.count(ns(), query, 0, 0, 0);
     }
 
-    CanonicalQuery* canonicalize(const BSONObj& query) {
-        CanonicalQuery* cq;
-        Status status = CanonicalQuery::canonicalize(ns(), query, &cq);
-        ASSERT_OK(status);
-        return cq;
+    unique_ptr<CanonicalQuery> canonicalize(const BSONObj& query) {
+        auto statusWithCQ = CanonicalQuery::canonicalize(ns(), query);
+        ASSERT_OK(statusWithCQ.getStatus());
+        return std::move(statusWithCQ.getValue());
     }
 
     /**
@@ -377,8 +376,8 @@ public:
         UpdateDriver driver((UpdateDriver::Options()));
         const int targetDocIndex = 0;  // We'll be working with the first doc in the collection.
         const BSONObj query = BSON("foo" << BSON("$gte" << targetDocIndex));
-        const std::unique_ptr<WorkingSet> ws(stdx::make_unique<WorkingSet>());
-        const std::unique_ptr<CanonicalQuery> cq(canonicalize(query));
+        const unique_ptr<WorkingSet> ws(stdx::make_unique<WorkingSet>());
+        const unique_ptr<CanonicalQuery> cq(canonicalize(query));
 
         // Get the RecordIds that would be returned by an in-order scan.
         vector<RecordId> locs;
@@ -396,7 +395,7 @@ public:
 
         // Configure a QueuedDataStage to pass the first object in the collection back in a
         // LOC_AND_UNOWNED_OBJ state.
-        std::unique_ptr<QueuedDataStage> qds(stdx::make_unique<QueuedDataStage>(ws.get()));
+        unique_ptr<QueuedDataStage> qds(stdx::make_unique<QueuedDataStage>(ws.get()));
         WorkingSetMember member;
         member.loc = locs[targetDocIndex];
         member.state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
@@ -408,7 +407,7 @@ public:
         UpdateStageParams updateParams(&request, &driver, opDebug);
         updateParams.canonicalQuery = cq.get();
 
-        const std::unique_ptr<UpdateStage> updateStage(
+        const unique_ptr<UpdateStage> updateStage(
             stdx::make_unique<UpdateStage>(&_txn, updateParams, ws.get(), coll, qds.release()));
 
         // Should return advanced.
@@ -464,8 +463,8 @@ public:
         UpdateDriver driver((UpdateDriver::Options()));
         const int targetDocIndex = 10;
         const BSONObj query = BSON("foo" << BSON("$gte" << targetDocIndex));
-        const std::unique_ptr<WorkingSet> ws(stdx::make_unique<WorkingSet>());
-        const std::unique_ptr<CanonicalQuery> cq(canonicalize(query));
+        const unique_ptr<WorkingSet> ws(stdx::make_unique<WorkingSet>());
+        const unique_ptr<CanonicalQuery> cq(canonicalize(query));
 
         // Get the RecordIds that would be returned by an in-order scan.
         vector<RecordId> locs;
@@ -483,7 +482,7 @@ public:
 
         // Configure a QueuedDataStage to pass the first object in the collection back in a
         // LOC_AND_UNOWNED_OBJ state.
-        std::unique_ptr<QueuedDataStage> qds(stdx::make_unique<QueuedDataStage>(ws.get()));
+        unique_ptr<QueuedDataStage> qds(stdx::make_unique<QueuedDataStage>(ws.get()));
         WorkingSetMember member;
         member.loc = locs[targetDocIndex];
         member.state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
@@ -495,7 +494,7 @@ public:
         UpdateStageParams updateParams(&request, &driver, opDebug);
         updateParams.canonicalQuery = cq.get();
 
-        std::unique_ptr<UpdateStage> updateStage(
+        unique_ptr<UpdateStage> updateStage(
             stdx::make_unique<UpdateStage>(&_txn, updateParams, ws.get(), coll, qds.release()));
 
         // Should return advanced.
@@ -544,8 +543,8 @@ public:
         UpdateRequest request(nsString());
         UpdateDriver driver((UpdateDriver::Options()));
         const BSONObj query = BSONObj();
-        const std::unique_ptr<WorkingSet> ws(stdx::make_unique<WorkingSet>());
-        const std::unique_ptr<CanonicalQuery> cq(canonicalize(query));
+        const unique_ptr<WorkingSet> ws(stdx::make_unique<WorkingSet>());
+        const unique_ptr<CanonicalQuery> cq(canonicalize(query));
 
         // Populate the request.
         request.setQuery(query);
@@ -558,7 +557,7 @@ public:
         ASSERT_OK(driver.parse(request.getUpdates(), request.isMulti()));
 
         // Configure a QueuedDataStage to pass an OWNED_OBJ to the update stage.
-        std::unique_ptr<QueuedDataStage> qds(stdx::make_unique<QueuedDataStage>(ws.get()));
+        unique_ptr<QueuedDataStage> qds(stdx::make_unique<QueuedDataStage>(ws.get()));
         WorkingSetMember member;
         member.state = WorkingSetMember::OWNED_OBJ;
         member.obj = Snapshotted<BSONObj>(SnapshotId(), fromjson("{x: 1}"));
@@ -568,7 +567,7 @@ public:
         UpdateStageParams updateParams(&request, &driver, opDebug);
         updateParams.canonicalQuery = cq.get();
 
-        const std::unique_ptr<UpdateStage> updateStage(
+        const unique_ptr<UpdateStage> updateStage(
             stdx::make_unique<UpdateStage>(&_txn, updateParams, ws.get(), coll, qds.release()));
         const UpdateStats* stats = static_cast<const UpdateStats*>(updateStage->getSpecificStats());
 

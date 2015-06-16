@@ -52,6 +52,7 @@ MatchExpression* parseMatchExpression(const BSONObj& obj) {
            << ". Reason: " << status.getStatus().toString();
         FAIL(ss);
     }
+
     return status.getValue();
 }
 
@@ -62,8 +63,7 @@ MatchExpression* parseMatchExpression(const BSONObj& obj) {
  */
 Status isValid(const std::string& queryStr, const LiteParsedQuery& lpqRaw) {
     BSONObj queryObj = fromjson(queryStr);
-    std::unique_ptr<MatchExpression> me(
-        CanonicalQuery::normalizeTree(parseMatchExpression(queryObj)));
+    unique_ptr<MatchExpression> me(CanonicalQuery::normalizeTree(parseMatchExpression(queryObj)));
     return CanonicalQuery::isValid(me.get(), lpqRaw);
 }
 
@@ -461,22 +461,22 @@ TEST(CanonicalQueryTest, SortTreeNumChildrenComparison) {
 /**
  * Utility function to create a CanonicalQuery
  */
-CanonicalQuery* canonicalize(const char* queryStr) {
+unique_ptr<CanonicalQuery> canonicalize(const char* queryStr) {
     BSONObj queryObj = fromjson(queryStr);
-    CanonicalQuery* cq;
-    Status result = CanonicalQuery::canonicalize(ns, queryObj, &cq);
-    ASSERT_OK(result);
-    return cq;
+    auto statusWithCQ = CanonicalQuery::canonicalize(ns, queryObj);
+    ASSERT_OK(statusWithCQ.getStatus());
+    return std::move(statusWithCQ.getValue());
 }
 
-CanonicalQuery* canonicalize(const char* queryStr, const char* sortStr, const char* projStr) {
+std::unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
+                                             const char* sortStr,
+                                             const char* projStr) {
     BSONObj queryObj = fromjson(queryStr);
     BSONObj sortObj = fromjson(sortStr);
     BSONObj projObj = fromjson(projStr);
-    CanonicalQuery* cq;
-    Status result = CanonicalQuery::canonicalize(ns, queryObj, sortObj, projObj, &cq);
-    ASSERT_OK(result);
-    return cq;
+    auto statusWithCQ = CanonicalQuery::canonicalize(ns, queryObj, sortObj, projObj);
+    ASSERT_OK(statusWithCQ.getStatus());
+    return std::move(statusWithCQ.getValue());
 }
 
 // Don't do anything with a double OR.

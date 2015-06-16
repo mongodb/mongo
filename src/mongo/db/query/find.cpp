@@ -278,9 +278,9 @@ QueryResult::View getMore(OperationContext* txn,
     // Note that we declare our locks before our ClientCursorPin, in order to ensure that the
     // pin's destructor is called before the lock destructors (so that the unpin occurs under
     // the lock).
-    std::unique_ptr<AutoGetCollectionForRead> ctx;
-    std::unique_ptr<Lock::DBLock> unpinDBLock;
-    std::unique_ptr<Lock::CollectionLock> unpinCollLock;
+    unique_ptr<AutoGetCollectionForRead> ctx;
+    unique_ptr<Lock::DBLock> unpinDBLock;
+    unique_ptr<Lock::CollectionLock> unpinCollLock;
 
     CursorManager* cursorManager;
     CursorManager* globalCursorManager = CursorManager::getGlobalCursorManager();
@@ -315,7 +315,7 @@ QueryResult::View getMore(OperationContext* txn,
     // has a valid RecoveryUnit.  As such, we use RAII to accomplish this.
     //
     // This must be destroyed before the ClientCursor is destroyed.
-    std::unique_ptr<ScopedRecoveryUnitSwapper> ruSwapper;
+    unique_ptr<ScopedRecoveryUnitSwapper> ruSwapper;
 
     // These are set in the QueryResult msg we return.
     int resultFlags = ResultFlag_AwaitCapable;
@@ -416,7 +416,7 @@ QueryResult::View getMore(OperationContext* txn,
 
         if (PlanExecutor::DEAD == state || PlanExecutor::FAILURE == state) {
             // Propagate this error to caller.
-            const std::unique_ptr<PlanStageStats> stats(exec->getStats());
+            const unique_ptr<PlanStageStats> stats(exec->getStats());
             error() << "getMore executor error, stats: " << Explain::statsToBSON(*stats);
             uasserted(17406, "getMore executor error: " + WorkingSetCommon::toStatusString(obj));
         }
@@ -506,17 +506,14 @@ std::string runQuery(OperationContext* txn,
     beginQueryOp(txn, nss, q.query, q.ntoreturn, q.ntoskip);
 
     // Parse the qm into a CanonicalQuery.
-    std::unique_ptr<CanonicalQuery> cq;
-    {
-        CanonicalQuery* cqRaw;
-        Status canonStatus =
-            CanonicalQuery::canonicalize(q, &cqRaw, WhereCallbackReal(txn, nss.db()));
-        if (!canonStatus.isOK()) {
-            uasserted(17287,
-                      str::stream() << "Can't canonicalize query: " << canonStatus.toString());
-        }
-        cq.reset(cqRaw);
+
+    auto statusWithCQ = CanonicalQuery::canonicalize(q, WhereCallbackReal(txn, nss.db()));
+    if (!statusWithCQ.isOK()) {
+        uasserted(
+            17287,
+            str::stream() << "Can't canonicalize query: " << statusWithCQ.getStatus().toString());
     }
+    unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
     invariant(cq.get());
 
     LOG(5) << "Running query:\n" << cq->toString();
@@ -530,7 +527,7 @@ std::string runQuery(OperationContext* txn,
         ctx.getDb() ? ctx.getDb()->getProfilingLevel() : serverGlobalParams.defaultProfile;
 
     // We have a parsed query. Time to get the execution plan for it.
-    std::unique_ptr<PlanExecutor> exec;
+    unique_ptr<PlanExecutor> exec;
     {
         PlanExecutor* rawExec;
         Status execStatus =
@@ -636,7 +633,7 @@ std::string runQuery(OperationContext* txn,
 
     // Caller expects exceptions thrown in certain cases.
     if (PlanExecutor::FAILURE == state || PlanExecutor::DEAD == state) {
-        const std::unique_ptr<PlanStageStats> stats(exec->getStats());
+        const unique_ptr<PlanStageStats> stats(exec->getStats());
         error() << "Plan executor error during find: " << PlanExecutor::statestr(state)
                 << ", stats: " << Explain::statsToBSON(*stats);
         uasserted(17144, "Executor error: " + WorkingSetCommon::toStatusString(obj));

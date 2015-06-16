@@ -129,17 +129,14 @@ public:
         }
 
         // Finish the parsing step by using the LiteParsedQuery to create a CanonicalQuery.
-        std::unique_ptr<CanonicalQuery> cq;
-        {
-            CanonicalQuery* rawCq;
-            WhereCallbackReal whereCallback(txn, nss.db());
-            Status canonStatus =
-                CanonicalQuery::canonicalize(lpqStatus.getValue().release(), &rawCq, whereCallback);
-            if (!canonStatus.isOK()) {
-                return canonStatus;
-            }
-            cq.reset(rawCq);
+
+        WhereCallbackReal whereCallback(txn, nss.db());
+        auto statusWithCQ =
+            CanonicalQuery::canonicalize(lpqStatus.getValue().release(), whereCallback);
+        if (!statusWithCQ.isOK()) {
+            return statusWithCQ.getStatus();
         }
+        std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
         AutoGetCollectionForRead ctx(txn, nss);
         // The collection may be NULL. If so, getExecutor() should handle it by returning
@@ -214,16 +211,12 @@ public:
         beginQueryOp(txn, nss, cmdObj, ntoreturn, lpq->getSkip());
 
         // 1b) Finish the parsing step by using the LiteParsedQuery to create a CanonicalQuery.
-        std::unique_ptr<CanonicalQuery> cq;
-        {
-            CanonicalQuery* rawCq;
-            WhereCallbackReal whereCallback(txn, nss.db());
-            Status canonStatus = CanonicalQuery::canonicalize(lpq.release(), &rawCq, whereCallback);
-            if (!canonStatus.isOK()) {
-                return appendCommandStatus(result, canonStatus);
-            }
-            cq.reset(rawCq);
+        WhereCallbackReal whereCallback(txn, nss.db());
+        auto statusWithCQ = CanonicalQuery::canonicalize(lpq.release(), whereCallback);
+        if (!statusWithCQ.isOK()) {
+            return appendCommandStatus(result, statusWithCQ.getStatus());
         }
+        std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
         // 2) Acquire locks.
         AutoGetCollectionForRead ctx(txn, nss);

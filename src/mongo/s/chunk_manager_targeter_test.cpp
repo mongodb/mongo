@@ -53,12 +53,11 @@ using std::make_pair;
  */
 
 // Utility function to create a CanonicalQuery
-CanonicalQuery* canonicalize(const char* queryStr) {
+unique_ptr<CanonicalQuery> canonicalize(const char* queryStr) {
     BSONObj queryObj = fromjson(queryStr);
-    CanonicalQuery* cq;
-    Status result = CanonicalQuery::canonicalize("test.foo", queryObj, &cq, WhereCallbackNoop());
-    ASSERT_OK(result);
-    return cq;
+    auto statusWithCQ = CanonicalQuery::canonicalize("test.foo", queryObj, WhereCallbackNoop());
+    ASSERT_OK(statusWithCQ.getStatus());
+    return std::move(statusWithCQ.getValue());
 }
 
 void checkIndexBoundsWithKey(const char* keyStr,
@@ -69,7 +68,7 @@ void checkIndexBoundsWithKey(const char* keyStr,
 
     BSONObj key = fromjson(keyStr);
 
-    IndexBounds indexBounds = ChunkManager::getIndexBoundsForQuery(key, query.get());
+    IndexBounds indexBounds = ChunkManager::getIndexBoundsForQuery(key, *query.get());
     ASSERT_EQUALS(indexBounds.size(), expectedBounds.size());
     for (size_t i = 0; i < indexBounds.size(); i++) {
         const OrderedIntervalList& oil = indexBounds.fields[i];
@@ -92,7 +91,7 @@ void checkIndexBounds(const char* queryStr, const OrderedIntervalList& expectedO
 
     BSONObj key = fromjson("{a: 1}");
 
-    IndexBounds indexBounds = ChunkManager::getIndexBoundsForQuery(key, query.get());
+    IndexBounds indexBounds = ChunkManager::getIndexBoundsForQuery(key, *query.get());
     ASSERT_EQUALS(indexBounds.size(), 1U);
     const OrderedIntervalList& oil = indexBounds.fields.front();
 
@@ -279,7 +278,7 @@ TEST(CMCollapseTreeTest, BasicAllElemMatch) {
 
     BSONObj key = fromjson("{'foo.a': 1}");
 
-    IndexBounds indexBounds = ChunkManager::getIndexBoundsForQuery(key, query.get());
+    IndexBounds indexBounds = ChunkManager::getIndexBoundsForQuery(key, *query.get());
     ASSERT_EQUALS(indexBounds.size(), 1U);
     const OrderedIntervalList& oil = indexBounds.fields.front();
     ASSERT_EQUALS(oil.intervals.size(), 1U);
@@ -359,7 +358,7 @@ TEST(CMCollapseTreeTest, HashedSinglePoint) {
 
     BSONObj key = fromjson("{a: 'hashed'}");
 
-    IndexBounds indexBounds = ChunkManager::getIndexBoundsForQuery(key, query.get());
+    IndexBounds indexBounds = ChunkManager::getIndexBoundsForQuery(key, *query.get());
     ASSERT_EQUALS(indexBounds.size(), 1U);
     const OrderedIntervalList& oil = indexBounds.fields.front();
     ASSERT_EQUALS(oil.intervals.size(), 1U);

@@ -51,6 +51,7 @@ using std::shared_ptr;
 using std::map;
 using std::set;
 using std::string;
+using std::unique_ptr;
 using std::vector;
 
 static const char* const ns = "unittests.documentsourcetests";
@@ -178,11 +179,12 @@ protected:
         _exec.reset();
 
         OldClientWriteContext ctx(&_opCtx, ns);
-        CanonicalQuery* cq;
-        uassertStatusOK(CanonicalQuery::canonicalize(ns, /*query=*/BSONObj(), &cq));
+        auto statusWithCQ = CanonicalQuery::canonicalize(ns, /*query=*/BSONObj());
+        uassertStatusOK(statusWithCQ.getStatus());
+        unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
         PlanExecutor* execBare;
-        uassertStatusOK(
-            getExecutor(&_opCtx, ctx.getCollection(), cq, PlanExecutor::YIELD_MANUAL, &execBare));
+        uassertStatusOK(getExecutor(
+            &_opCtx, ctx.getCollection(), cq.release(), PlanExecutor::YIELD_MANUAL, &execBare));
 
         _exec.reset(execBare);
         _exec->saveState();

@@ -72,14 +72,16 @@ public:
         unique_ptr<CollectionScan> scan(new CollectionScan(&_opCtx, params, ws.get(), NULL));
 
         // Create a plan executor to hold it
-        CanonicalQuery* cq;
-        ASSERT(CanonicalQuery::canonicalize(ns(), BSONObj(), &cq).isOK());
+        auto statusWithCQ = CanonicalQuery::canonicalize(ns(), BSONObj());
+        ASSERT_OK(statusWithCQ.getStatus());
+        std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
+
         PlanExecutor* exec;
         // Takes ownership of 'ws', 'scan', and 'cq'.
         Status status = PlanExecutor::make(&_opCtx,
                                            ws.release(),
                                            scan.release(),
-                                           cq,
+                                           cq.release(),
                                            _ctx->db()->getCollection(ns()),
                                            PlanExecutor::YIELD_MANUAL,
                                            &exec);
