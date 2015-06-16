@@ -95,17 +95,23 @@ public:
         unique_ptr<WorkingSet> ws(new WorkingSet());
 
         // Canonicalize the query
-        CanonicalQuery* cq;
-        verify(CanonicalQuery::canonicalize(ns(), filterObj, &cq).isOK());
-        verify(NULL != cq);
+        auto statusWithCQ = CanonicalQuery::canonicalize(ns(), filterObj);
+        verify(statusWithCQ.isOK());
+        unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
+        verify(NULL != cq.get());
 
         // Make the stage.
-        unique_ptr<PlanStage> root(new CollectionScan(&_txn, csparams, ws.get(), cq->root()));
+        unique_ptr<PlanStage> root(new CollectionScan(&_txn, csparams, ws.get(), cq.get()->root()));
 
         PlanExecutor* exec;
         // Hand the plan off to the executor.
-        Status stat = PlanExecutor::make(
-            &_txn, ws.release(), root.release(), cq, coll, PlanExecutor::YIELD_MANUAL, &exec);
+        Status stat = PlanExecutor::make(&_txn,
+                                         ws.release(),
+                                         root.release(),
+                                         cq.release(),
+                                         coll,
+                                         PlanExecutor::YIELD_MANUAL,
+                                         &exec);
         ASSERT_OK(stat);
         return exec;
     }
@@ -139,14 +145,20 @@ public:
         IndexScan* ix = new IndexScan(&_txn, ixparams, ws.get(), NULL);
         unique_ptr<PlanStage> root(new FetchStage(&_txn, ws.get(), ix, NULL, coll));
 
-        CanonicalQuery* cq;
-        verify(CanonicalQuery::canonicalize(ns(), BSONObj(), &cq).isOK());
-        verify(NULL != cq);
+        auto statusWithCQ = CanonicalQuery::canonicalize(ns(), BSONObj());
+        verify(statusWithCQ.isOK());
+        unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
+        verify(NULL != cq.get());
 
         PlanExecutor* exec;
         // Hand the plan off to the executor.
-        Status stat = PlanExecutor::make(
-            &_txn, ws.release(), root.release(), cq, coll, PlanExecutor::YIELD_MANUAL, &exec);
+        Status stat = PlanExecutor::make(&_txn,
+                                         ws.release(),
+                                         root.release(),
+                                         cq.release(),
+                                         coll,
+                                         PlanExecutor::YIELD_MANUAL,
+                                         &exec);
         ASSERT_OK(stat);
         return exec;
     }

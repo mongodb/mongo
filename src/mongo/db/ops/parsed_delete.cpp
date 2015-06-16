@@ -69,7 +69,6 @@ Status ParsedDelete::parseRequest() {
 Status ParsedDelete::parseQueryToCQ() {
     dassert(!_canonicalQuery.get());
 
-    CanonicalQuery* cqRaw;
     const WhereCallbackReal whereCallback(_txn, _request->getNamespaceString().db());
 
     // Limit should only used for the findAndModify command when a sort is specified. If a sort
@@ -83,25 +82,24 @@ Status ParsedDelete::parseQueryToCQ() {
     // The projection needs to be applied after the delete operation, so we specify an empty
     // BSONObj as the projection during canonicalization.
     const BSONObj emptyObj;
-    Status status = CanonicalQuery::canonicalize(_request->getNamespaceString().ns(),
-                                                 _request->getQuery(),
-                                                 _request->getSort(),
-                                                 emptyObj,  // projection
-                                                 0,         // skip
-                                                 limit,
-                                                 emptyObj,  // hint
-                                                 emptyObj,  // min
-                                                 emptyObj,  // max
-                                                 false,     // snapshot
-                                                 _request->isExplain(),
-                                                 &cqRaw,
-                                                 whereCallback);
+    auto statusWithCQ = CanonicalQuery::canonicalize(_request->getNamespaceString().ns(),
+                                                     _request->getQuery(),
+                                                     _request->getSort(),
+                                                     emptyObj,  // projection
+                                                     0,         // skip
+                                                     limit,
+                                                     emptyObj,  // hint
+                                                     emptyObj,  // min
+                                                     emptyObj,  // max
+                                                     false,     // snapshot
+                                                     _request->isExplain(),
+                                                     whereCallback);
 
-    if (status.isOK()) {
-        _canonicalQuery.reset(cqRaw);
+    if (statusWithCQ.isOK()) {
+        _canonicalQuery = std::move(statusWithCQ.getValue());
     }
 
-    return status;
+    return statusWithCQ.getStatus();
 }
 
 const DeleteRequest* ParsedDelete::getRequest() const {
@@ -123,9 +121,9 @@ bool ParsedDelete::hasParsedQuery() const {
     return _canonicalQuery.get() != NULL;
 }
 
-CanonicalQuery* ParsedDelete::releaseParsedQuery() {
+std::unique_ptr<CanonicalQuery> ParsedDelete::releaseParsedQuery() {
     invariant(_canonicalQuery.get() != NULL);
-    return _canonicalQuery.release();
+    return std::move(_canonicalQuery);
 }
 
 }  // namespace mongo

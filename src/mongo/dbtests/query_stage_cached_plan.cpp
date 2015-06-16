@@ -116,9 +116,9 @@ public:
         ASSERT(collection);
 
         // Query can be answered by either index on "a" or index on "b".
-        CanonicalQuery* rawCq;
-        ASSERT_OK(CanonicalQuery::canonicalize(ns(), fromjson("{a: {$gte: 8}, b: 1}"), &rawCq));
-        const std::unique_ptr<CanonicalQuery> cq(rawCq);
+        auto statusWithCQ = CanonicalQuery::canonicalize(ns(), fromjson("{a: {$gte: 8}, b: 1}"));
+        ASSERT_OK(statusWithCQ.getStatus());
+        const std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
         // We shouldn't have anything in the plan cache for this shape yet.
         PlanCache* cache = collection->infoCache()->getPlanCache();
@@ -180,9 +180,9 @@ public:
         ASSERT(collection);
 
         // Query can be answered by either index on "a" or index on "b".
-        CanonicalQuery* rawCq;
-        ASSERT_OK(CanonicalQuery::canonicalize(ns(), fromjson("{a: {$gte: 8}, b: 1}"), &rawCq));
-        const std::unique_ptr<CanonicalQuery> cq(rawCq);
+        auto statusWithCQ = CanonicalQuery::canonicalize(ns(), fromjson("{a: {$gte: 8}, b: 1}"));
+        ASSERT_OK(statusWithCQ.getStatus());
+        const std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
         // We shouldn't have anything in the plan cache for this shape yet.
         PlanCache* cache = collection->infoCache()->getPlanCache();

@@ -208,7 +208,7 @@ public:
     //            b : { $gte : 3, $lt : 4 } }
     //   => Bounds { a : [1, 2), b : [3, 4) }
     static IndexBounds getIndexBoundsForQuery(const BSONObj& key,
-                                              const CanonicalQuery* canonicalQuery);
+                                              const CanonicalQuery& canonicalQuery);
 
     // Collapse query solution tree.
     //

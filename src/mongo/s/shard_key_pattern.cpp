@@ -265,12 +265,11 @@ StatusWith<BSONObj> ShardKeyPattern::extractShardKeyFromQuery(const BSONObj& bas
         return StatusWith<BSONObj>(BSONObj());
 
     // Extract equalities from query
-    CanonicalQuery* rawQuery;
-    Status queryStatus =
-        CanonicalQuery::canonicalize("", basicQuery, &rawQuery, WhereCallbackNoop());
-    if (!queryStatus.isOK())
-        return StatusWith<BSONObj>(queryStatus);
-    unique_ptr<CanonicalQuery> query(rawQuery);
+    auto statusWithCQ = CanonicalQuery::canonicalize("", basicQuery, WhereCallbackNoop());
+    if (!statusWithCQ.isOK()) {
+        return StatusWith<BSONObj>(statusWithCQ.getStatus());
+    }
+    unique_ptr<CanonicalQuery> query = std::move(statusWithCQ.getValue());
 
     EqualityMatches equalities;
     // TODO: Build the path set initially?

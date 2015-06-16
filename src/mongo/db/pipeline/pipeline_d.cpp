@@ -48,6 +48,7 @@ namespace mongo {
 using boost::intrusive_ptr;
 using std::shared_ptr;
 using std::string;
+using std::unique_ptr;
 
 namespace {
 class MongodImplementation final : public DocumentSourceNeedsMongod::MongodInterface {
@@ -180,14 +181,17 @@ shared_ptr<PlanExecutor> PipelineD::prepareCursorSource(
     const WhereCallbackReal whereCallback(pExpCtx->opCtx, pExpCtx->ns.db());
 
     if (sortStage) {
-        CanonicalQuery* cq;
-        Status status = CanonicalQuery::canonicalize(
-            pExpCtx->ns, queryObj, sortObj, projectionForQuery, &cq, whereCallback);
+        auto statusWithCQ = CanonicalQuery::canonicalize(
+            pExpCtx->ns, queryObj, sortObj, projectionForQuery, whereCallback);
 
         PlanExecutor* rawExec;
-        if (status.isOK() &&
-            getExecutor(txn, collection, cq, PlanExecutor::YIELD_AUTO, &rawExec, runnerOptions)
-                .isOK()) {
+        if (statusWithCQ.isOK() &&
+            getExecutor(txn,
+                        collection,
+                        statusWithCQ.getValue().release(),
+                        PlanExecutor::YIELD_AUTO,
+                        &rawExec,
+                        runnerOptions).isOK()) {
             // success: The PlanExecutor will handle sorting for us using an index.
             exec.reset(rawExec);
             sortInRunner = true;
@@ -202,13 +206,14 @@ shared_ptr<PlanExecutor> PipelineD::prepareCursorSource(
 
     if (!exec.get()) {
         const BSONObj noSort;
-        CanonicalQuery* cq;
-        uassertStatusOK(CanonicalQuery::canonicalize(
-            pExpCtx->ns, queryObj, noSort, projectionForQuery, &cq, whereCallback));
+        auto statusWithCQ = CanonicalQuery::canonicalize(
+            pExpCtx->ns, queryObj, noSort, projectionForQuery, whereCallback);
+        uassertStatusOK(statusWithCQ.getStatus());
+        unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
         PlanExecutor* rawExec;
-        uassertStatusOK(
-            getExecutor(txn, collection, cq, PlanExecutor::YIELD_AUTO, &rawExec, runnerOptions));
+        uassertStatusOK(getExecutor(
+            txn, collection, cq.release(), PlanExecutor::YIELD_AUTO, &rawExec, runnerOptions));
         exec.reset(rawExec);
     }
 

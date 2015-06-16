@@ -102,7 +102,7 @@ public:
     /**
      * Releases ownership of the canonical query to the caller.
      */
-    CanonicalQuery* releaseParsedQuery();
+    std::unique_ptr<CanonicalQuery> releaseParsedQuery();
 
 private:
     // Transactional context.  Not owned by us.

@@ -129,18 +129,19 @@ RecordId Helpers::findOne(OperationContext* txn,
     if (!collection)
         return RecordId();
 
-    CanonicalQuery* cq;
     const WhereCallbackReal whereCallback(txn, collection->ns().db());
 
-    massert(17244,
-            "Could not canonicalize " + query.toString(),
-            CanonicalQuery::canonicalize(collection->ns(), query, &cq, whereCallback).isOK());
+    auto statusWithCQ = CanonicalQuery::canonicalize(collection->ns(), query, whereCallback);
+    massert(17244, "Could not canonicalize " + query.toString(), statusWithCQ.isOK());
+    unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
     PlanExecutor* rawExec;
     size_t options = requireIndex ? QueryPlannerParams::NO_TABLE_SCAN : QueryPlannerParams::DEFAULT;
-    massert(17245,
-            "Could not get executor for query " + query.toString(),
-            getExecutor(txn, collection, cq, PlanExecutor::YIELD_MANUAL, &rawExec, options).isOK());
+    massert(
+        17245,
+        "Could not get executor for query " + query.toString(),
+        getExecutor(txn, collection, cq.release(), PlanExecutor::YIELD_MANUAL, &rawExec, options)
+            .isOK());
 
     unique_ptr<PlanExecutor> exec(rawExec);
     PlanExecutor::ExecState state;

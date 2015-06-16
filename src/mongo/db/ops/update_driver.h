@@ -71,7 +71,7 @@ public:
                                            const std::vector<FieldRef*>* immutablePaths,
                                            mutablebson::Document& doc) const;
 
-    Status populateDocumentWithQueryFields(const CanonicalQuery* query,
+    Status populateDocumentWithQueryFields(const CanonicalQuery& query,
                                            const std::vector<FieldRef*>* immutablePaths,
                                            mutablebson::Document& doc) const;
 
