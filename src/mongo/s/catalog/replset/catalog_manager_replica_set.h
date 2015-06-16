@@ -42,12 +42,6 @@ namespace mongo {
     struct HostAndPort;
     class NamespaceString;
 
-namespace executor {
-
-    class TaskExecutor;
-
-} // namespace executor
-
     /**
      * Implements the catalog manager for talking to replica set config servers.
      */

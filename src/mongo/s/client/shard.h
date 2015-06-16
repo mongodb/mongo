@@ -36,7 +36,6 @@
 namespace mongo {
 
     class BSONObj;
-    class RemoteCommandRunner;
     class RemoteCommandTargeter;
 
     using ShardId = std::string;
@@ -82,8 +81,6 @@ namespace mongo {
         const ConnectionString& getConnString() const { return _cs; }
 
         RemoteCommandTargeter* getTargeter() const;
-
-        RemoteCommandRunner* getCommandRunner() const;
 
         BSONObj runCommand(const std::string& db, const std::string& simple) const;
         BSONObj runCommand(const std::string& db, const BSONObj& cmd) const;

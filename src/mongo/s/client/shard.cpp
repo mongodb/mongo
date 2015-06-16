@@ -64,10 +64,6 @@ namespace mongo {
         return grid.shardRegistry()->getTargeterForShard(getId()).get();
     }
 
-    RemoteCommandRunner* Shard::getCommandRunner() const {
-        return grid.shardRegistry()->getCommandRunner();
-    }
-
     ShardPtr Shard::lookupRSName(const string& name) {
         return grid.shardRegistry()->lookupRSName(name);
     }
@@ -101,7 +97,7 @@ namespace mongo {
 
         const RemoteCommandRequest request(selectedHost.getValue(), db, cmd);
 
-        auto statusCommand = getCommandRunner()->runCommand(request);
+        auto statusCommand = grid.shardRegistry()->getCommandRunner()->runCommand(request);
         if (!statusCommand.isOK()) {
             return false;
         }
