@@ -40,12 +40,16 @@ if not use_system_version_of_library('stemmer'):
     thirdPartyIncludePathList.append(
         ('stemmer', '#/src/third_party/libstemmer_c/include'))
 
-# Note that the wiredtiger header is generated, so
+# Note that the wiredtiger.h header is generated, so
 # we want to look for it in the build directory not
 # the source directory.
+# The wiredtiger_ext.h is a static file in the source tree
+# In the system installs, wiredtiger.h and wiredtiger_ext.h are in the same directory
 if wiredtiger and not use_system_version_of_library('wiredtiger'):
     thirdPartyIncludePathList.append(
         ('wiredtiger', '$BUILD_DIR/third_party/wiredtiger'))
+    thirdPartyIncludePathList.append(
+        ('wiredtiger_ext', '#/src/third_party/wiredtiger/src/include'))
 
 if not use_system_version_of_library('yaml'):
     thirdPartyIncludePathList.append(
