@@ -36,7 +36,9 @@
 #include "mongo/base/data_range_cursor.h"
 #include "mongo/base/data_type_string_data.h"
 #include "mongo/base/data_type_terminated.h"
+#include "mongo/base/data_type_validated.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/rpc/object_check.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/message.h"
@@ -82,8 +84,8 @@ namespace rpc {
                 (_commandName.size() >= kMinCommandNameLength) &&
                 (_commandName.size() <= kMaxCommandNameLength));
 
-        uassertStatusOK(cur.readAndAdvance<BSONObj>(&_metadata));
-        uassertStatusOK(cur.readAndAdvance<BSONObj>(&_commandArgs));
+        _metadata = std::move(uassertStatusOK(cur.readAndAdvance<Validated<BSONObj>>()).val);
+        _commandArgs = std::move(uassertStatusOK(cur.readAndAdvance<Validated<BSONObj>>()).val);
         _inputDocs = DocumentRange{cur.data(), messageEnd};
     }
 

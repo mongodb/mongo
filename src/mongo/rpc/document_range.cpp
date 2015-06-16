@@ -35,6 +35,8 @@
 #include <tuple>
 #include <utility>
 
+#include "mongo/base/data_type_validated.h"
+#include "mongo/rpc/object_check.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -87,7 +89,7 @@ namespace rpc {
         if (_cursor.length() == 0) {
             *this = const_iterator{};
         } else {
-            uassertStatusOK(_cursor.readAndAdvance<BSONObj>(&_obj));
+            _obj = std::move(uassertStatusOK(_cursor.readAndAdvance<Validated<BSONObj>>()).val);
         }
         return *this;
     }

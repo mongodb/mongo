@@ -39,6 +39,7 @@ env.Library(
     ],
     source=[
         'factory.cpp',
+        'object_check.cpp',
     ],
     LIBDEPS=[
         'command_reply',
@@ -142,15 +143,15 @@ env.CppUnitTest(
         'rpc_test',
     ],
     source=[
-        'command_reply_builder_test.cpp',
         'command_reply_test.cpp',
         'command_request_builder_test.cpp',
         'command_request_test.cpp',
+        'object_check_test.cpp',
         'protocol_test.cpp',
+        'command_reply_builder_test.cpp',
     ],
     LIBDEPS=[
-        'command_request',
-        'command_reply',
-        'protocol',
+        'rpc',
+        '$BUILD_DIR/mongo/client/clientdriver'
     ],
 )

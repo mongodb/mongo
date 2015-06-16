@@ -26,75 +26,64 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/base/data_type_validated.h"
+#include "mongo/platform/basic.h"
 
-#include <algorithm>
 #include <iterator>
 
-#include "mongo/base/data_range.h"
 #include "mongo/base/data_range_cursor.h"
-#include "mongo/base/data_type_endian.h"
-#include "mongo/base/status.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/server_options.h"
+#include "mongo/rpc/object_check.h"
 #include "mongo/unittest/unittest.h"
-
-namespace mongo {
-    template<> struct Validator<char> {
-        static Status validateLoad(const char* ptr, size_t length) {
-            if ((length >= sizeof(char)) && (ptr[0] == 0xFU)) {
-                return Status::OK();
-            }
-            return Status(ErrorCodes::BadValue, "bad");
-        }
-
-        static Status validateStore(const char& toStore) {
-            if (toStore == 0xFU) {
-                return Status::OK();
-            }
-            return Status(ErrorCodes::BadValue, "bad");
-        }
-    };
-}  // namespace mongo
+#include "mongo/util/scopeguard.h"
 
 namespace {
 
     using namespace mongo;
-    using std::end;
-    using std::begin;
 
-    TEST(DataTypeValidated, SuccessfulValidation) {
+    TEST(DataTypeValidated, BSONValidationEnabled) {
 
-        char buf[1];
+        using std::swap;
 
+        bool wasEnabled = serverGlobalParams.objcheck;
+        const auto setValidation = [&](bool enabled){ serverGlobalParams.objcheck = enabled; };
+        ON_BLOCK_EXIT(setValidation, wasEnabled);
+
+        using std::begin;
+        using std::end;
+
+        BSONObj valid = BSON("baz" << "bar" << "garply" << BSON("foo" << "bar"));
+        char buf[1024] = { 0 };
+        std::copy(valid.objdata(), valid.objdata() + valid.objsize(), begin(buf));
         {
-            DataRangeCursor drc(begin(buf), end(buf));
-            ASSERT_OK(drc.writeAndAdvance(Validated<char>(0xFU)));
+            Validated<BSONObj> v;
+            ConstDataRangeCursor cdrc(begin(buf), end(buf));
+            ASSERT_OK(cdrc.readAndAdvance(&v));
         }
 
         {
-            Validated<char> valid;
+            // mess up the data
+            DataRangeCursor drc(begin(buf), end(buf));
+            auto maxIntLE = LittleEndian<int>(std::numeric_limits<int>::max());
+
+            // skip past size so we don't trip any sanity checks.
+            drc.advance(4);  // skip size
+            while (drc.writeAndAdvance(0xFF).isOK()) ;
+        }
+
+        {
+            Validated<BSONObj> v;
             ConstDataRangeCursor cdrc(begin(buf), end(buf));
-            ASSERT_OK(cdrc.readAndAdvance(&valid));
-            ASSERT_EQUALS(valid.val, char{0xFU});
+            ASSERT_NOT_OK(cdrc.readAndAdvance(&v));
+        }
+
+        {
+            // disable validation
+            setValidation(false);
+            Validated<BSONObj> v;
+            ConstDataRangeCursor cdrc(begin(buf), end(buf));
+            ASSERT_OK(cdrc.readAndAdvance(&v));
         }
     }
 
-    TEST(DataTypeValidated, FailedValidation) {
-
-        char buf[1];
-
-        {
-            DataRangeCursor drc(begin(buf), end(buf));
-            ASSERT_NOT_OK(drc.writeAndAdvance(Validated<char>(0x01)));
-        }
-
-        buf[0] = char{0x01};
-
-        {
-            Validated<char> valid;
-            ConstDataRangeCursor cdrc(begin(buf), end(buf));
-            ASSERT_NOT_OK(cdrc.readAndAdvance(&valid));
-        }
-    }
-
-}  // namespace
+}

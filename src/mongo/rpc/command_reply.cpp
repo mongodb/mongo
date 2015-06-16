@@ -31,8 +31,11 @@
 #include "mongo/rpc/command_reply.h"
 
 #include <tuple>
+#include <utility>
 
 #include "mongo/base/data_range_cursor.h"
+#include "mongo/base/data_type_validated.h"
+#include "mongo/rpc/object_check.h"
 #include "mongo/util/net/message.h"
 
 namespace mongo {
@@ -51,11 +54,8 @@ namespace rpc {
         const char* messageEnd = begin + length;
         ConstDataRangeCursor cur(begin, messageEnd);
 
-        // TODO(amidvidy): we don't currently handle BSON validation.
-        // we will eventually have to thread serverGlobalParams.objcheck through here
-        // similarly to DbMessage::nextJsObj
-        uassertStatusOK(cur.readAndAdvance<BSONObj>(&_metadata));
-        uassertStatusOK(cur.readAndAdvance<BSONObj>(&_commandReply));
+        _metadata = std::move(uassertStatusOK(cur.readAndAdvance<Validated<BSONObj>>()).val);
+        _commandReply = std::move(uassertStatusOK(cur.readAndAdvance<Validated<BSONObj>>()).val);
         _outputDocs = DocumentRange(cur.data(), messageEnd);
     }
 
