@@ -82,7 +82,7 @@ namespace mongo {
 namespace {
 
     // Used to obtain mutex that guards modifications to persistent authorization data
-    const auto getAuthzDataMutex = ServiceContext::declareDecoration<boost::timed_mutex>();
+    const auto getAuthzDataMutex = ServiceContext::declareDecoration<stdx::timed_mutex>();
 
     const Seconds authzDataMutexAcquisitionTimeout{5};
 
@@ -754,7 +754,7 @@ namespace {
                 return appendCommandStatus(result, status);
             }
 
-            stdx::unique_lock<boost::timed_mutex> lk(getAuthzDataMutex(serviceContext),
+            stdx::unique_lock<stdx::timed_mutex> lk(getAuthzDataMutex(serviceContext),
                                                       authzDataMutexAcquisitionTimeout);
             if (!lk) {
                 return appendCommandStatus(
@@ -874,7 +874,7 @@ namespace {
             }
 
             ServiceContext* serviceContext = txn->getClient()->getServiceContext();
-            stdx::unique_lock<boost::timed_mutex> lk(getAuthzDataMutex(serviceContext),
+            stdx::unique_lock<stdx::timed_mutex> lk(getAuthzDataMutex(serviceContext),
                                                       authzDataMutexAcquisitionTimeout);
             if (!lk) {
                 return appendCommandStatus(
@@ -948,7 +948,7 @@ namespace {
                  string& errmsg,
                  BSONObjBuilder& result) {
             ServiceContext* serviceContext = txn->getClient()->getServiceContext();
-            stdx::unique_lock<boost::timed_mutex> lk(getAuthzDataMutex(serviceContext),
+            stdx::unique_lock<stdx::timed_mutex> lk(getAuthzDataMutex(serviceContext),
                                                       authzDataMutexAcquisitionTimeout);
             if (!lk) {
                 return appendCommandStatus(
@@ -1029,7 +1029,7 @@ namespace {
                  string& errmsg,
                  BSONObjBuilder& result) {
             ServiceContext* serviceContext = txn->getClient()->getServiceContext();
-            stdx::unique_lock<boost::timed_mutex> lk(getAuthzDataMutex(serviceContext),
+            stdx::unique_lock<stdx::timed_mutex> lk(getAuthzDataMutex(serviceContext),
                                                       authzDataMutexAcquisitionTimeout);
             if (!lk) {
                 return appendCommandStatus(
@@ -1099,7 +1099,7 @@ namespace {
                  string& errmsg,
                  BSONObjBuilder& result) {
             ServiceContext* serviceContext = txn->getClient()->getServiceContext();
-            stdx::unique_lock<boost::timed_mutex> lk(getAuthzDataMutex(serviceContext),
+            stdx::unique_lock<stdx::timed_mutex> lk(getAuthzDataMutex(serviceContext),
                                                       authzDataMutexAcquisitionTimeout);
             if (!lk) {
                 return appendCommandStatus(
@@ -1184,7 +1184,7 @@ namespace {
                  string& errmsg,
                  BSONObjBuilder& result) {
             ServiceContext* serviceContext = txn->getClient()->getServiceContext();
-            stdx::unique_lock<boost::timed_mutex> lk(getAuthzDataMutex(serviceContext),
+            stdx::unique_lock<stdx::timed_mutex> lk(getAuthzDataMutex(serviceContext),
                                                       authzDataMutexAcquisitionTimeout);
             if (!lk) {
                 return appendCommandStatus(
@@ -1443,7 +1443,7 @@ namespace {
             roleObjBuilder.append("roles", rolesVectorToBSONArray(args.roles));
 
             ServiceContext* serviceContext = txn->getClient()->getServiceContext();
-            stdx::unique_lock<boost::timed_mutex> lk(getAuthzDataMutex(serviceContext),
+            stdx::unique_lock<stdx::timed_mutex> lk(getAuthzDataMutex(serviceContext),
                                                       authzDataMutexAcquisitionTimeout);
             if (!lk) {
                 return appendCommandStatus(
@@ -1537,7 +1537,7 @@ namespace {
             }
 
             ServiceContext* serviceContext = txn->getClient()->getServiceContext();
-            stdx::unique_lock<boost::timed_mutex> lk(getAuthzDataMutex(serviceContext),
+            stdx::unique_lock<stdx::timed_mutex> lk(getAuthzDataMutex(serviceContext),
                                                       authzDataMutexAcquisitionTimeout);
             if (!lk) {
                 return appendCommandStatus(
@@ -1614,7 +1614,7 @@ namespace {
                  string& errmsg,
                  BSONObjBuilder& result) {
             ServiceContext* serviceContext = txn->getClient()->getServiceContext();
-            stdx::unique_lock<boost::timed_mutex> lk(getAuthzDataMutex(serviceContext),
+            stdx::unique_lock<stdx::timed_mutex> lk(getAuthzDataMutex(serviceContext),
                                                       authzDataMutexAcquisitionTimeout);
             if (!lk) {
                 return appendCommandStatus(
@@ -1737,7 +1737,7 @@ namespace {
                  string& errmsg,
                  BSONObjBuilder& result) {
             ServiceContext* serviceContext = txn->getClient()->getServiceContext();
-            stdx::unique_lock<boost::timed_mutex> lk(getAuthzDataMutex(serviceContext),
+            stdx::unique_lock<stdx::timed_mutex> lk(getAuthzDataMutex(serviceContext),
                                                       authzDataMutexAcquisitionTimeout);
             if (!lk) {
                 return appendCommandStatus(
@@ -1885,7 +1885,7 @@ namespace {
             }
 
             ServiceContext* serviceContext = txn->getClient()->getServiceContext();
-            stdx::unique_lock<boost::timed_mutex> lk(getAuthzDataMutex(serviceContext),
+            stdx::unique_lock<stdx::timed_mutex> lk(getAuthzDataMutex(serviceContext),
                                                       authzDataMutexAcquisitionTimeout);
             if (!lk) {
                 return appendCommandStatus(
@@ -1969,7 +1969,7 @@ namespace {
                  string& errmsg,
                  BSONObjBuilder& result) {
             ServiceContext* serviceContext = txn->getClient()->getServiceContext();
-            stdx::unique_lock<boost::timed_mutex> lk(getAuthzDataMutex(serviceContext),
+            stdx::unique_lock<stdx::timed_mutex> lk(getAuthzDataMutex(serviceContext),
                                                       authzDataMutexAcquisitionTimeout);
             if (!lk) {
                 return appendCommandStatus(
@@ -2073,7 +2073,7 @@ namespace {
                  string& errmsg,
                  BSONObjBuilder& result) {
             ServiceContext* serviceContext = txn->getClient()->getServiceContext();
-            stdx::unique_lock<boost::timed_mutex> lk(getAuthzDataMutex(serviceContext),
+            stdx::unique_lock<stdx::timed_mutex> lk(getAuthzDataMutex(serviceContext),
                                                       authzDataMutexAcquisitionTimeout);
             if (!lk) {
                 return appendCommandStatus(
@@ -2246,7 +2246,7 @@ namespace {
             }
 
             ServiceContext* serviceContext = txn->getClient()->getServiceContext();
-            stdx::unique_lock<boost::timed_mutex> lk(getAuthzDataMutex(serviceContext),
+            stdx::unique_lock<stdx::timed_mutex> lk(getAuthzDataMutex(serviceContext),
                                                       authzDataMutexAcquisitionTimeout);
             if (!lk) {
                 return appendCommandStatus(
@@ -2897,7 +2897,7 @@ namespace {
             }
 
             ServiceContext* serviceContext = txn->getClient()->getServiceContext();
-            stdx::unique_lock<boost::timed_mutex> lk(getAuthzDataMutex(serviceContext),
+            stdx::unique_lock<stdx::timed_mutex> lk(getAuthzDataMutex(serviceContext),
                                                       authzDataMutexAcquisitionTimeout);
             if (!lk) {
                 return appendCommandStatus(

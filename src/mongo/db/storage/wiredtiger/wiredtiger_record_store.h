@@ -207,7 +207,7 @@ namespace mongo {
         int64_t cappedDeleteAsNeeded_inlock(OperationContext* txn,
                                             const RecordId& justInserted);
 
-        boost::timed_mutex& cappedDeleterMutex() { return _cappedDeleterMutex; }
+        stdx::timed_mutex& cappedDeleterMutex() { return _cappedDeleterMutex; }
 
     private:
         class Cursor;
@@ -245,7 +245,7 @@ namespace mongo {
         AtomicInt64 _cappedSleepMS;
         CappedDocumentDeleteCallback* _cappedDeleteCallback;
         int _cappedDeleteCheckCount; // see comment in ::cappedDeleteAsNeeded
-        mutable boost::timed_mutex _cappedDeleterMutex; // see comment in ::cappedDeleteAsNeeded
+        mutable stdx::timed_mutex _cappedDeleterMutex; // see comment in ::cappedDeleteAsNeeded
 
         const bool _useOplogHack;
 

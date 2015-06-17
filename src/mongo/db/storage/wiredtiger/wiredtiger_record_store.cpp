@@ -449,7 +449,7 @@ namespace {
 
     WiredTigerRecordStore::~WiredTigerRecordStore() {
         {
-            stdx::lock_guard<boost::timed_mutex> lk(_cappedDeleterMutex);
+            stdx::lock_guard<stdx::timed_mutex> lk(_cappedDeleterMutex);
             _shuttingDown = true;
         }
 
@@ -464,7 +464,7 @@ namespace {
     }
 
     bool WiredTigerRecordStore::inShutdown() const {
-        stdx::lock_guard<boost::timed_mutex> lk(_cappedDeleterMutex);
+        stdx::lock_guard<stdx::timed_mutex> lk(_cappedDeleterMutex);
         return _shuttingDown;
     }
 
@@ -591,7 +591,7 @@ namespace {
             return 0;
 
         // ensure only one thread at a time can do deletes, otherwise they'll conflict.
-        stdx::unique_lock<boost::timed_mutex> lock(_cappedDeleterMutex, stdx::defer_lock);
+        stdx::unique_lock<stdx::timed_mutex> lock(_cappedDeleterMutex, stdx::defer_lock);
 
         if (_cappedMaxDocs != -1) {
             lock.lock(); // Max docs has to be exact, so have to check every time.

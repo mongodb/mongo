@@ -101,7 +101,7 @@ namespace mongo {
                     WiredTigerRecordStore* rs =
                         checked_cast<WiredTigerRecordStore*>(collection->getRecordStore());
                     WriteUnitOfWork wuow(&txn);
-                    stdx::lock_guard<boost::timed_mutex> lock(rs->cappedDeleterMutex());
+                    stdx::lock_guard<stdx::timed_mutex> lock(rs->cappedDeleterMutex());
                     int64_t removed = rs->cappedDeleteAsNeeded_inlock(&txn, RecordId::max());
                     wuow.commit();
                     return removed;
