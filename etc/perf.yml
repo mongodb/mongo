@@ -7,7 +7,7 @@ post:
     - command: shell.cleanup
 
 functions:
-  "setup standalone":
+  "start server":
     - command: shell.exec
       params:
         script: |
@@ -47,6 +47,9 @@ functions:
           set -o verbose
           mkdir -p ./dbdata
           ${mongod_exec_wrapper} ./mongod --dbpath ./dbdata ${mongod_flags}
+          sleep 5
+          # if we started a replset, initiate it and wait for it to become primary
+          ./mongo --eval "if(db.isMaster().isreplicaset){rs.initiate(); assert.soon(function(){return db.isMaster().ismaster}, 'no primary')}"
           echo "MONGOD STARTED."
   "run perf tests":
     - command: shell.exec
@@ -117,7 +120,7 @@ tasks:
   depends_on:
   - name: compile
   commands:
-    - func: "setup standalone"
+    - func: "start server"
     - func: "run perf tests"
       vars:
         filter: "core-query"
@@ -125,7 +128,7 @@ tasks:
   depends_on:
   - name: compile
   commands:
-    - func: "setup standalone"
+    - func: "start server"
     - func: "run perf tests"
       vars:
         filter: "core-update"
@@ -133,7 +136,7 @@ tasks:
   depends_on:
   - name: compile
   commands:
-    - func: "setup standalone"
+    - func: "start server"
     - func: "run perf tests"
       vars:
         filter: "core-insert"
@@ -146,6 +149,24 @@ buildvariants:
     mongod_exec_wrapper: "numactl --physcpubind=4,5,6,7 -i 1"
     perf_exec_wrapper: "numactl --physcpubind=1,2,3 -i 0"
     mongod_flags: "--storageEngine=wiredTiger --logpath ./mongod.log --fork --syncdelay 0 --nojournal --setParameter ttlMonitorEnabled=false --wiredTigerCacheSizeGB 16"
+
+  run_on:
+  - "centos6-perf"
+  tasks:
+  - name: compile
+    distros:
+    - rhel55
+  - name: query
+  - name: update
+  - name: insert
+
+- name: linux-wt-repl
+  display_name: Linux WT 1-Node ReplSet
+  expansions:
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release
+    mongod_exec_wrapper: "numactl --physcpubind=4,5,6,7 -i 1"
+    perf_exec_wrapper: "numactl --physcpubind=1,2,3 -i 0"
+    mongod_flags: "--replSet=test --storageEngine=wiredTiger --logpath ./mongod.log --fork --syncdelay 0 --nojournal --setParameter ttlMonitorEnabled=false --wiredTigerCacheSizeGB 16"
 
   run_on:
   - "centos6-perf"
