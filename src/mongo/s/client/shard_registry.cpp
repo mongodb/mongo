@@ -33,6 +33,7 @@
 #include "mongo/s/client/shard_registry.h"
 
 #include "mongo/client/connection_string.h"
+#include "mongo/client/query_fetcher.h"
 #include "mongo/client/remote_command_runner_impl.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/client/remote_command_targeter_factory.h"
@@ -49,7 +50,15 @@ namespace mongo {
 
     using std::shared_ptr;
     using std::string;
+    using std::unique_ptr;
     using std::vector;
+
+    using executor::TaskExecutor;
+    using RemoteCommandCallbackArgs = TaskExecutor::RemoteCommandCallbackArgs;
+
+namespace {
+    const Seconds kConfigCommandTimeout{30};
+} // unnamed namespace
 
     ShardRegistry::ShardRegistry(std::unique_ptr<RemoteCommandTargeterFactory> targeterFactory,
                                  std::unique_ptr<RemoteCommandRunner> commandRunner,
@@ -239,6 +248,81 @@ namespace mongo {
         }
 
         return nullptr;
+    }
+
+    StatusWith<std::vector<BSONObj>> ShardRegistry::exhaustiveFind(const HostAndPort& host,
+                                                                   const NamespaceString& nss,
+                                                                   const BSONObj& query,
+                                                                   boost::optional<int> limit) {
+        // If for some reason the callback never gets invoked, we will return this status
+        Status status = Status(ErrorCodes::InternalError, "Internal error running find command");
+        vector<BSONObj> results;
+
+        auto fetcherCallback = [&status, &results](const QueryFetcher::BatchDataStatus& dataStatus,
+                                                   Fetcher::NextAction* nextAction) {
+
+            // Throw out any accumulated results on error
+            if (!dataStatus.isOK()) {
+                status = dataStatus.getStatus();
+                results.clear();
+                return;
+            }
+
+            auto& data = dataStatus.getValue();
+            for (const BSONObj& doc : data.documents) {
+                results.push_back(std::move(doc.getOwned()));
+            }
+
+            status = Status::OK();
+        };
+
+        unique_ptr<LiteParsedQuery> findCmd(
+            fassertStatusOK(28688, LiteParsedQuery::makeAsFindCmd(nss, query, std::move(limit))));
+
+        QueryFetcher fetcher(_executor.get(),
+                             host,
+                             nss,
+                             findCmd->asFindCommand(),
+                             fetcherCallback);
+
+        Status scheduleStatus = fetcher.schedule();
+        if (!scheduleStatus.isOK()) {
+            return scheduleStatus;
+        }
+
+        fetcher.wait();
+
+        if (!status.isOK()) {
+            return status;
+        }
+
+        return results;
+    }
+
+    StatusWith<BSONObj> ShardRegistry::runCommand(const HostAndPort& host,
+                                                  const std::string& dbName,
+                                                  const BSONObj& cmdObj) {
+        StatusWith<RemoteCommandResponse> responseStatus =
+            Status(ErrorCodes::InternalError, "Internal error running command");
+
+        RemoteCommandRequest request(host, dbName, cmdObj, kConfigCommandTimeout);
+        auto callStatus = _executor->scheduleRemoteCommand(request,
+                [&responseStatus](const RemoteCommandCallbackArgs& args) {
+            responseStatus = args.response;
+        });
+
+        if (!callStatus.isOK()) {
+            return callStatus.getStatus();
+        }
+
+        // Block until the command is carried out
+        _executor->wait(callStatus.getValue());
+
+        if (!responseStatus.isOK()) {
+            return responseStatus.getStatus();
+        }
+
+        return responseStatus.getValue().data;
     }
 
 } // namespace mongo

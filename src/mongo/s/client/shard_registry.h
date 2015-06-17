@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -39,10 +40,14 @@ namespace mongo {
 
     class BSONObjBuilder;
     class CatalogManager;
+    class HostAndPort;
+    class NamespaceString;
     class RemoteCommandRunner;
     class RemoteCommandTargeterFactory;
     class Shard;
     class ShardType;
+
+    template<typename T> class StatusWith;
 
 namespace executor {
 
@@ -94,6 +99,26 @@ namespace executor {
         void getAllShardIds(std::vector<ShardId>* all) const;
 
         void toBSON(BSONObjBuilder* result);
+
+        /**
+         * Executes 'find' command against the specified host and fetches *all* the results that
+         * the host will return until there are no more or until an error is returned.
+         *
+         * Returns either the complete set of results or an error, never partial results.
+         *
+         * Note: should never be used outside of CatalogManagerReplicaSet or DistLockCatalogImpl.
+         */
+        StatusWith<std::vector<BSONObj>> exhaustiveFind(const HostAndPort& host,
+                                                        const NamespaceString& nss,
+                                                        const BSONObj& query,
+                                                        boost::optional<int> limit);
+
+        /**
+         * Runs a command against the specified host and returns the result.
+         */
+        StatusWith<BSONObj> runCommand(const HostAndPort& host,
+                                       const std::string& dbName,
+                                       const BSONObj& cmdObj);
 
     private:
         typedef std::map<ShardId, std::shared_ptr<Shard>> ShardMap;

@@ -39,16 +39,14 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/dbclientinterface.h"
-#include "mongo/client/query_fetcher.h"
 #include "mongo/client/read_preference.h"
-#include "mongo/client/remote_command_runner.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/executor/task_executor.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/dist_lock_manager.h"
 #include "mongo/s/catalog/type_collection.h"
+#include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog/type_settings.h"
 #include "mongo/s/catalog/type_shard.h"
@@ -65,9 +63,6 @@
 
 namespace mongo {
 
-    using executor::TaskExecutor;
-    using RemoteCommandCallbackArgs = TaskExecutor::RemoteCommandCallbackArgs;
-
     using std::set;
     using std::string;
     using std::unique_ptr;
@@ -83,7 +78,6 @@ namespace {
     const ReadPreferenceSetting kConfigWriteSelector(ReadPreference::PrimaryOnly, TagSet{});
     const ReadPreferenceSetting kConfigReadSelector(ReadPreference::SecondaryOnly, TagSet{});
 
-    const Seconds kConfigCommandTimeout{30};
     const int kNotMasterNumRetries = 3;
     const Milliseconds kNotMasterRetryInterval{500};
 
@@ -184,10 +178,12 @@ namespace {
             return readHost.getStatus();
         }
 
-        auto findStatus = _find(readHost.getValue(),
-                                NamespaceString(DatabaseType::ConfigNS),
-                                BSON(DatabaseType::name(dbName)),
-                                1);
+        auto findStatus = grid.shardRegistry()->exhaustiveFind(
+                readHost.getValue(),
+                NamespaceString(DatabaseType::ConfigNS),
+                BSON(DatabaseType::name(dbName)),
+                1);
+
         if (!findStatus.isOK()) {
             return findStatus.getStatus();
         }
@@ -231,10 +227,12 @@ namespace {
             return readHostStatus.getStatus();
         }
 
-        auto statusFind = _find(readHostStatus.getValue(),
-                                NamespaceString(CollectionType::ConfigNS),
-                                BSON(CollectionType::fullNs(collNs)),
-                                1);
+        auto statusFind = grid.shardRegistry()->exhaustiveFind(
+                readHostStatus.getValue(),
+                NamespaceString(CollectionType::ConfigNS),
+                BSON(CollectionType::fullNs(collNs)),
+                1);
+
         if (!statusFind.isOK()) {
             return statusFind.getStatus();
         }
@@ -276,10 +274,12 @@ namespace {
             return readHost.getStatus();
         }
 
-        auto findStatus = _find(readHost.getValue(),
-                                NamespaceString(SettingsType::ConfigNS),
-                                BSON(SettingsType::key(key)),
-                                1);
+        auto findStatus = grid.shardRegistry()->exhaustiveFind(
+                readHost.getValue(),
+                NamespaceString(SettingsType::ConfigNS),
+                BSON(SettingsType::key(key)),
+                1);
+
         if (!findStatus.isOK()) {
             return findStatus.getStatus();
         }
@@ -323,10 +323,10 @@ namespace {
             return readHostStatus.getStatus();
         }
 
-        auto findStatus = _find(readHostStatus.getValue(),
-                                NamespaceString(ChunkType::ConfigNS),
-                                query.obj,
-                                boost::none); // no limit
+        auto findStatus = grid.shardRegistry()->exhaustiveFind(readHostStatus.getValue(),
+                                                               NamespaceString(ChunkType::ConfigNS),
+                                                               query.obj,
+                                                               boost::none); // no limit
         if (!findStatus.isOK()) {
             return findStatus.getStatus();
         }
@@ -364,10 +364,10 @@ namespace {
             return readHost.getStatus();
         }
 
-        auto findStatus = _find(readHost.getValue(),
-                                NamespaceString(ShardType::ConfigNS),
-                                BSONObj(), // no query filter
-                                boost::none); // no limit
+        auto findStatus = grid.shardRegistry()->exhaustiveFind(readHost.getValue(),
+                                                               NamespaceString(ShardType::ConfigNS),
+                                                               BSONObj(), // no query filter
+                                                               boost::none); // no limit
         if (!findStatus.isOK()) {
             return findStatus.getStatus();
         }
@@ -418,7 +418,7 @@ namespace {
                 return Command::appendCommandStatus(*result, target.getStatus());
             }
 
-            auto response = _runCommand(target.getValue(), dbname, cmdObj);
+            auto response = grid.shardRegistry()->runCommand(target.getValue(), dbname, cmdObj);
             if (!response.isOK()) {
                 return Command::appendCommandStatus(*result, response.getStatus());
             }
@@ -448,7 +448,7 @@ namespace {
             return Command::appendCommandStatus(*result, target.getStatus());
         }
 
-        auto resultStatus = _runCommand(target.getValue(), dbname, cmdObj);
+        auto resultStatus = grid.shardRegistry()->runCommand(target.getValue(), dbname, cmdObj);
         if (!resultStatus.isOK()) {
             return Command::appendCommandStatus(*result, resultStatus.getStatus());
         }
@@ -491,9 +491,10 @@ namespace {
                 return;
             }
 
-            auto resultStatus = _runCommand(target.getValue(),
-                                            batchRequest.getNSS().db().toString(),
-                                            batchRequest.toBSON());
+            auto resultStatus = grid.shardRegistry()->runCommand(target.getValue(),
+                    batchRequest.getNSS().db().toString(),
+                    batchRequest.toBSON());
+
             if (!resultStatus.isOK()) {
                 _toBatchError(resultStatus.getStatus(), batchResponse);
                 return;
@@ -521,87 +522,6 @@ namespace {
 
         invariant(ErrorCodes::NotMaster == notMasterStatus);
         _toBatchError(notMasterStatus, batchResponse);
-    }
-
-    StatusWith<vector<BSONObj>> CatalogManagerReplicaSet::_find(const HostAndPort& host,
-                                                                const NamespaceString& nss,
-                                                                const BSONObj& query,
-                                                                boost::optional<int> limit) {
-
-        // If for some reason the callback never gets invoked, we will return this status
-        Status status = Status(ErrorCodes::InternalError, "Internal error running find command");
-        vector<BSONObj> results;
-
-        auto fetcherCallback = [&status, &results](const QueryFetcher::BatchDataStatus& dataStatus,
-                                                   Fetcher::NextAction* nextAction) {
-
-            // Throw out any accumulated results on error
-            if (!dataStatus.isOK()) {
-                status = dataStatus.getStatus();
-                results.clear();
-                return;
-            }
-
-            auto& data = dataStatus.getValue();
-            for (const BSONObj& doc : data.documents) {
-                results.push_back(std::move(doc.getOwned()));
-            }
-
-            status = Status::OK();
-        };
-
-        unique_ptr<LiteParsedQuery> findCmd(
-            fassertStatusOK(28688, LiteParsedQuery::makeAsFindCmd(nss, query, std::move(limit))));
-
-        QueryFetcher fetcher(grid.shardRegistry()->getExecutor(),
-                             host,
-                             nss,
-                             findCmd->asFindCommand(),
-                             fetcherCallback);
-
-        Status scheduleStatus = fetcher.schedule();
-        if (!scheduleStatus.isOK()) {
-            return scheduleStatus;
-        }
-
-        fetcher.wait();
-
-        if (!status.isOK()) {
-            return status;
-        }
-
-        return results;
-    }
-
-    StatusWith<BSONObj> CatalogManagerReplicaSet::_runCommand(const HostAndPort& host,
-                                                              const std::string& dbName,
-                                                              const BSONObj& cmdObj) {
-
-        TaskExecutor* exec = grid.shardRegistry()->getExecutor();
-
-        StatusWith<RemoteCommandResponse> responseStatus =
-            Status(ErrorCodes::InternalError, "Internal error running command");
-
-        RemoteCommandRequest request(host, dbName, cmdObj, kConfigCommandTimeout);
-        auto callStatus =
-            exec->scheduleRemoteCommand(request,
-                                        [&responseStatus](const RemoteCommandCallbackArgs& args) {
-
-            responseStatus = args.response;
-        });
-
-        if (!callStatus.isOK()) {
-            return callStatus.getStatus();
-        }
-
-        // Block until the command is carried out
-        exec->wait(callStatus.getValue());
-
-        if (!responseStatus.isOK()) {
-            return responseStatus.getStatus();
-        }
-
-        return responseStatus.getValue().data;
     }
 
 } // namespace mongo

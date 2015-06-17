@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -39,9 +38,6 @@
 #include "mongo/s/catalog/catalog_manager.h"
 
 namespace mongo {
-
-    struct HostAndPort;
-    class NamespaceString;
 
     /**
      * Implements the catalog manager for talking to replica set config servers.
@@ -140,23 +136,6 @@ namespace mongo {
         DistLockManager* getDistLockManager() override;
 
     private:
-        /**
-         * Executes 'find' command against the specified host and fetches *all* the results that
-         * the host will return until there are no more or until an error is returned.
-         *
-         * Returns either the complete set of results or an error, never partial results.
-         */
-        StatusWith<std::vector<BSONObj>> _find(const HostAndPort& host,
-                                               const NamespaceString& nss,
-                                               const BSONObj& query,
-                                               boost::optional<int> limit);
-
-        /**
-         * Runs a command against the specified host and returns the result.
-         */
-        StatusWith<BSONObj> _runCommand(const HostAndPort& host,
-                                        const std::string& dbName,
-                                        const BSONObj& cmdObj);
 
         // Config server connection string
         ConnectionString _configServerConnectionString;

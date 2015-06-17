@@ -33,9 +33,6 @@ env.Library(
         'catalog_manager_replica_set.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/client/fetcher',
-        '$BUILD_DIR/mongo/db/query/lite_parsed_query',
-        '$BUILD_DIR/mongo/executor/task_executor_interface',
         '$BUILD_DIR/mongo/s/catalog/catalog_manager',
         '$BUILD_DIR/mongo/s/catalog/dist_lock_manager',
         '$BUILD_DIR/mongo/s/client/sharding_client',
