@@ -441,9 +441,16 @@ func (dump *MongoDump) DumpIntent(intent *intents.Intent) error {
 
 	}
 
+	var dumpCount int64
+
 	if dump.OutputOptions.Out == "-" {
 		log.Logf(log.Always, "writing %v to stdout", intent.Namespace())
-		return dump.dumpQueryToWriter(findQuery, intent)
+		dumpCount, err = dump.dumpQueryToWriter(findQuery, intent)
+		if err == nil {
+			// on success, print the document count
+			log.Logf(log.Always, "dumped %v %v", dumpCount, docPlural(dumpCount))
+		}
+		return err
 	}
 
 	// set where the intent will be written to
@@ -458,7 +465,7 @@ func (dump *MongoDump) DumpIntent(intent *intents.Intent) error {
 
 	if !dump.OutputOptions.Repair {
 		log.Logf(log.Always, "writing %v to %v", intent.Namespace(), intent.Location)
-		if err = dump.dumpQueryToWriter(findQuery, intent); err != nil {
+		if dumpCount, err = dump.dumpQueryToWriter(findQuery, intent); err != nil {
 			return err
 		}
 	} else {
@@ -469,29 +476,26 @@ func (dump *MongoDump) DumpIntent(intent *intents.Intent) error {
 		if err := dump.dumpIterToWriter(repairIter, intent.BSONFile, repairCounter); err != nil {
 			return fmt.Errorf("repair error: %v", err)
 		}
-		log.Logf(log.Always,
-			"\trepair cursor found %v documents in %v", repairCounter, intent.Namespace())
+		_, repairCount := repairCounter.Progress()
+		log.Logf(log.Always, "\trepair cursor found %v %v in %v",
+			repairCount, docPlural(repairCount), intent.Namespace())
 	}
 
-	// don't dump metadata for SystemIndexes collection
-	if intent.IsSystemIndexes() {
-		return nil
-	}
-
-	log.Logf(log.Always, "done dumping %v", intent.Namespace())
+	log.Logf(log.Always, "done dumping %v (%v %v)", intent.Namespace(), dumpCount, docPlural(dumpCount))
 	return nil
 }
 
 // dumpQueryToWriter takes an mgo Query, its intent, and a writer, performs the query,
-// and writes the raw bson results to the writer.
+// and writes the raw bson results to the writer. Returns a final count of documents
+// dumped, and any errors that occured.
 func (dump *MongoDump) dumpQueryToWriter(
-	query *mgo.Query, intent *intents.Intent) (err error) {
+	query *mgo.Query, intent *intents.Intent) (int64, error) {
 
 	total, err := query.Count()
 	if err != nil {
-		return fmt.Errorf("error reading from db: %v", err)
+		return int64(0), fmt.Errorf("error reading from db: %v", err)
 	}
-	log.Logf(log.Info, "\t%v documents", total)
+	log.Logf(log.Info, "\tcounted %v %v in %v", total, docPlural(int64(total)), intent.Namespace())
 
 	dumpProgressor := progress.NewCounter(int64(total))
 	bar := &progress.Bar{
@@ -502,7 +506,10 @@ func (dump *MongoDump) dumpQueryToWriter(
 	dump.progressManager.Attach(bar)
 	defer dump.progressManager.Detach(bar)
 
-	return dump.dumpIterToWriter(query.Iter(), intent.BSONFile, dumpProgressor)
+	err = dump.dumpIterToWriter(query.Iter(), intent.BSONFile, dumpProgressor)
+	_, dumpCount := dumpProgressor.Progress()
+
+	return dumpCount, err
 }
 
 // dumpIterToWriter takes an mgo iterator, a writer, and a pointer to
@@ -574,7 +581,7 @@ func (dump *MongoDump) DumpUsersAndRolesForDB(db string) error {
 		return fmt.Errorf("error opening output stream for dumping Users: %v", err)
 	}
 	defer intent.BSONFile.Close()
-	err = dump.dumpQueryToWriter(usersQuery, intent)
+	_, err = dump.dumpQueryToWriter(usersQuery, intent)
 	if err != nil {
 		return fmt.Errorf("error dumping db users: %v", err)
 	}
@@ -586,7 +593,7 @@ func (dump *MongoDump) DumpUsersAndRolesForDB(db string) error {
 		return fmt.Errorf("error opening output stream for dumping Roles: %v", err)
 	}
 	defer intent.BSONFile.Close()
-	err = dump.dumpQueryToWriter(rolesQuery, intent)
+	_, err = dump.dumpQueryToWriter(rolesQuery, intent)
 	if err != nil {
 		return fmt.Errorf("error dumping db roles: %v", err)
 	}
@@ -598,7 +605,7 @@ func (dump *MongoDump) DumpUsersAndRolesForDB(db string) error {
 		return fmt.Errorf("error opening output stream for dumping AuthVersion: %v", err)
 	}
 	defer intent.BSONFile.Close()
-	err = dump.dumpQueryToWriter(versionQuery, intent)
+	_, err = dump.dumpQueryToWriter(versionQuery, intent)
 	if err != nil {
 		return fmt.Errorf("error dumping db auth version: %v", err)
 	}
@@ -731,4 +738,10 @@ func (dump *MongoDump) handleSignals() {
 	<-sigChan
 	log.Log(log.Always, "forcefully terminating mongodump")
 	os.Exit(util.ExitKill)
+}
+
+// docPlural returns "document" or "documents" depending on the
+// count of documents passed in.
+func docPlural(count int64) string {
+	return util.Pluralize(int(count), "document", "documents")
 }

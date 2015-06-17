@@ -82,5 +82,10 @@ func (dump *MongoDump) DumpOplogAfterTimestamp(ts bson.MongoTimestamp) error {
 	session.SetPrefetch(1.0) // mimic exhaust cursor
 	queryObj := bson.M{"ts": bson.M{"$gt": ts}}
 	oplogQuery := session.DB("local").C(dump.oplogCollection).Find(queryObj).LogReplay()
-	return dump.dumpQueryToWriter(oplogQuery, dump.manager.Oplog())
+	oplogCount, err := dump.dumpQueryToWriter(oplogQuery, dump.manager.Oplog())
+	if err == nil {
+		log.Logf(log.Always, "\tdumped %v oplog %v",
+			oplogCount, util.Pluralize(int(oplogCount), "entry", "entries"))
+	}
+	return err
 }

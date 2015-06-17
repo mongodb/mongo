@@ -54,14 +54,16 @@ type Progressor interface {
 	Progress() (int64, int64)
 }
 
-// Updateable is an interface which exposes the ability for a progressing value to be
-// incremented, or reset.
+// Updateable is a Progressor which also exposes the ability for the progressing
+// value to be incremented, or reset.
 type Updateable interface {
 	// Inc increments the current progress counter by the given amount.
 	Inc(amount int64)
 
 	// Set resets the progress counter to the given amount.
 	Set(amount int64)
+
+	Progressor
 }
 
 // Bar is a tool for concurrently monitoring the progress
