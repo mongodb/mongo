@@ -46,14 +46,17 @@ namespace {
 
     class DatabaseClonerTest : public BaseClonerTest {
     public:
+
         DatabaseClonerTest();
         void collectionWork(const Status& status, const NamespaceString& sourceNss);
-        void setUp() override;
-        void tearDown() override;
         void clear() override;
         BaseCloner* getCloner() const override;
 
     protected:
+
+        void setUp() override;
+        void tearDown() override;
+
         std::list<std::pair<Status, NamespaceString> > collectionWorkResults;
         std::unique_ptr<DatabaseCloner> databaseCloner;
     };

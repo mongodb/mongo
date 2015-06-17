@@ -68,6 +68,8 @@ namespace repl {
         void resetTaskRunner(TaskRunner* taskRunner);
         void destroyTaskRunner();
 
+    protected:
+
         void setUp() override;
         void tearDown() override;
 

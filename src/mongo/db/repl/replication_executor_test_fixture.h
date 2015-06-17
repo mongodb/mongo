@@ -49,6 +49,14 @@ namespace repl {
      * a NetworkInterfaceMock.
      */
     class ReplicationExecutorTest : public unittest::Test {
+    public:
+
+        /**
+         * Creates an initial error status suitable for checking if
+         * component has modified the 'status' field in test fixture.
+         */
+        static Status getDetectableErrorStatus();
+
     protected:
         executor::NetworkInterfaceMock* getNet() { return _net; }
         ReplicationExecutor& getExecutor() { return *_executor; }
@@ -77,14 +85,14 @@ namespace repl {
          * To run the executor in the background, tests should invoke launchExecutorThread() or
          * override this function() to achieve the same effect.
          */
-        virtual void setUp();
+        void setUp() override;
 
         /**
          * Destroys the replication executor.
          *
          * Shuts down running background executor.
          */
-        virtual void tearDown();
+        void tearDown() override;
 
 
     private:

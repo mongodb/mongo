@@ -57,12 +57,6 @@ namespace repl {
         typedef executor::NetworkInterfaceMock::NetworkOperationIterator NetworkOperationIterator;
 
         /**
-         * Creates an initial error status suitable for checking if
-         * cloner has modified the 'status' field in test fixture.
-         */
-        static Status getDetectableErrorStatus();
-
-        /**
          * Creates a cursor response with given array of documents.
          */
         static BSONObj createCursorResponse(CursorId cursorId,
@@ -101,9 +95,6 @@ namespace repl {
 
         BaseClonerTest();
 
-        void setUp() override;
-        void tearDown() override;
-
         virtual void clear();
 
         void setStatus(const Status& status);
@@ -126,6 +117,9 @@ namespace repl {
         void testLifeCycle();
 
     protected:
+
+        void setUp() override;
+        void tearDown() override;
 
         std::unique_ptr<ClonerStorageInterfaceMock> storageInterface;
 

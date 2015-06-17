@@ -49,17 +49,14 @@ namespace {
 
     class ApplierTest : public ReplicationExecutorTest {
     public:
-        /**
-         * Creates an initial error status suitable for checking if
-         * applier has modified the 'status' field in test fixture.
-         */
-        static Status getDetectableErrorStatus();
 
-        void setUp() override;
-        void tearDown() override;
         Applier* getApplier() const;
 
     protected:
+
+        void setUp() override;
+        void tearDown() override;
+
         /**
          * Test function to check behavior when we fail to apply one of the operations.
          */
@@ -68,10 +65,6 @@ namespace {
         std::unique_ptr<Applier> _applier;
         std::unique_ptr<unittest::Barrier> _barrier;
     };
-
-    Status ApplierTest::getDetectableErrorStatus() {
-        return Status(ErrorCodes::InternalError, "Not mutated");
-    }
 
     void ApplierTest::setUp() {
         ReplicationExecutorTest::setUp();

@@ -63,25 +63,23 @@ namespace {
 
     class ReporterTest : public ReplicationExecutorTest {
     public:
-        static Status getDetectableErrorStatus();
+
         ReporterTest();
-        void setUp() override;
-        void tearDown() override;
         void scheduleNetworkResponse(const BSONObj& obj);
         void scheduleNetworkResponse(ErrorCodes::Error code, const std::string& reason);
         void finishProcessingNetworkResponse();
 
     protected:
+
+        void setUp() override;
+        void tearDown() override;
+
         std::unique_ptr<Reporter> reporter;
         std::unique_ptr<MockProgressManager> posUpdater;
 
     };
 
     ReporterTest::ReporterTest() {}
-
-    Status ReporterTest::getDetectableErrorStatus() {
-        return Status(ErrorCodes::InternalError, "Not mutated");
-    }
 
     void ReporterTest::setUp() {
         ReplicationExecutorTest::setUp();

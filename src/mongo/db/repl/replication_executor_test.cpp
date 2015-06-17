@@ -98,7 +98,7 @@ namespace {
 
     TEST_F(ReplicationExecutorTest, RunOne) {
         ReplicationExecutor& executor = getExecutor();
-        Status status(ErrorCodes::InternalError, "Not mutated");
+        Status status = getDetectableErrorStatus();
         ASSERT_OK(executor.scheduleWork(stdx::bind(setStatusAndShutdown,
                                                      stdx::placeholders::_1,
                                                      &status)).getStatus());
@@ -108,7 +108,7 @@ namespace {
 
     TEST_F(ReplicationExecutorTest, Schedule1ButShutdown) {
         ReplicationExecutor& executor = getExecutor();
-        Status status(ErrorCodes::InternalError, "Not mutated");
+        Status status = getDetectableErrorStatus();
         ASSERT_OK(executor.scheduleWork(stdx::bind(setStatusAndShutdown,
                                                    stdx::placeholders::_1,
                                                    &status)).getStatus());
@@ -119,8 +119,8 @@ namespace {
 
     TEST_F(ReplicationExecutorTest, Schedule2Cancel1) {
         ReplicationExecutor& executor = getExecutor();
-        Status status1(ErrorCodes::InternalError, "Not mutated");
-        Status status2(ErrorCodes::InternalError, "Not mutated");
+        Status status1 = getDetectableErrorStatus();
+        Status status2 = getDetectableErrorStatus();
         ReplicationExecutor::CallbackHandle cb = unittest::assertGet(
             executor.scheduleWork(stdx::bind(setStatusAndShutdown,
                                              stdx::placeholders::_1,
@@ -136,8 +136,8 @@ namespace {
 
     TEST_F(ReplicationExecutorTest, OneSchedulesAnother) {
         ReplicationExecutor& executor = getExecutor();
-        Status status1(ErrorCodes::InternalError, "Not mutated");
-        Status status2(ErrorCodes::InternalError, "Not mutated");
+        Status status1 = getDetectableErrorStatus();
+        Status status2 = getDetectableErrorStatus();
         ASSERT_OK(executor.scheduleWork(stdx::bind(scheduleSetStatusAndShutdown,
                                                    stdx::placeholders::_1,
                                                    &status1,
@@ -283,9 +283,9 @@ namespace {
         NetworkInterfaceMock* net = getNet();
         ReplicationExecutor& executor = getExecutor();
         launchExecutorThread();
-        Status status1(ErrorCodes::InternalError, "Not mutated");
-        Status status2(ErrorCodes::InternalError, "Not mutated");
-        Status status3(ErrorCodes::InternalError, "Not mutated");
+        Status status1 = getDetectableErrorStatus();
+        Status status2 = getDetectableErrorStatus();
+        Status status3 = getDetectableErrorStatus();
         const Date_t now = net->now();
         const ReplicationExecutor::CallbackHandle cb1 =
             unittest::assertGet(executor.scheduleWorkAt(now + Milliseconds(100),
@@ -338,7 +338,7 @@ namespace {
         NetworkInterfaceMock* net = getNet();
         ReplicationExecutor& executor = getExecutor();
         launchExecutorThread();
-        Status status1(ErrorCodes::InternalError, "Not mutated");
+        Status status1 = getDetectableErrorStatus();
         const RemoteCommandRequest request(
                 HostAndPort("localhost", 27017),
                 "mydb",
@@ -365,7 +365,7 @@ namespace {
 
     TEST_F(ReplicationExecutorTest, ScheduleAndCancelRemoteCommand) {
         ReplicationExecutor& executor = getExecutor();
-        Status status1(ErrorCodes::InternalError, "Not mutated");
+        Status status1 = getDetectableErrorStatus();
         const RemoteCommandRequest request(
                 HostAndPort("localhost", 27017),
                 "mydb",
@@ -390,7 +390,7 @@ namespace {
         unittest::Barrier barrier(2U);
         NamespaceString nss("mydb", "mycoll");
         ReplicationExecutor& executor = getExecutor();
-        Status status1(ErrorCodes::InternalError, "Not mutated");
+        Status status1 = getDetectableErrorStatus();
         OperationContext* txn = nullptr;
         using CallbackData = ReplicationExecutor::CallbackArgs;
         ASSERT_OK(executor.scheduleDBWork([&](const CallbackData& cbData) {
@@ -411,7 +411,7 @@ namespace {
     TEST_F(ReplicationExecutorTest, ScheduleDBWorkWithCollectionLock) {
         NamespaceString nss("mydb", "mycoll");
         ReplicationExecutor& executor = getExecutor();
-        Status status1(ErrorCodes::InternalError, "Not mutated");
+        Status status1 = getDetectableErrorStatus();
         OperationContext* txn = nullptr;
         bool collectionIsLocked = false;
         using CallbackData = ReplicationExecutor::CallbackArgs;
@@ -432,7 +432,7 @@ namespace {
 
     TEST_F(ReplicationExecutorTest, ScheduleExclusiveLockOperation) {
         ReplicationExecutor& executor = getExecutor();
-        Status status1(ErrorCodes::InternalError, "Not mutated");
+        Status status1 = getDetectableErrorStatus();
         OperationContext* txn = nullptr;
         bool lockIsW = false;
         using CallbackData = ReplicationExecutor::CallbackArgs;
@@ -452,7 +452,7 @@ namespace {
     TEST_F(ReplicationExecutorTest, ShutdownBeforeRunningSecondExclusiveLockOperation) {
         ReplicationExecutor& executor = getExecutor();
         using CallbackData = ReplicationExecutor::CallbackArgs;
-        Status status1(ErrorCodes::InternalError, "Not mutated");
+        Status status1 = getDetectableErrorStatus();
         ASSERT_OK(executor.scheduleWorkWithGlobalExclusiveLock([&](const CallbackData& cbData) {
             status1 = cbData.status;
             if (cbData.status != ErrorCodes::CallbackCanceled)
@@ -461,7 +461,7 @@ namespace {
         // Second db work item is invoked by the main executor thread because the work item is
         // moved from the exclusive lock queue to the ready work item queue when the first callback
         // cancels the executor.
-        Status status2(ErrorCodes::InternalError, "Not mutated");
+        Status status2 = getDetectableErrorStatus();
         ASSERT_OK(executor.scheduleWorkWithGlobalExclusiveLock([&](const CallbackData& cbData) {
             status2 = cbData.status;
             if (cbData.status != ErrorCodes::CallbackCanceled)

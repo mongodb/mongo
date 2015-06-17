@@ -70,27 +70,10 @@ namespace {
 
     class DataReplicatorTest : public ReplicationExecutorTest {
     public:
-        DataReplicatorTest() {}
-        void setUp() override {
-            ReplicationExecutorTest::setUp();
-            reset();
 
-            _settings.replSet = "foo"; // We are a replica set :)
-            _repl.reset(new ReplicationCoordinatorMock(_settings));
-            launchExecutorThread();
-            DataReplicatorOptions options;
-            options.initialSyncRetryWait = Milliseconds(0);
-            createDataReplicator(options);
-        }
+        DataReplicatorTest() {}
 
         void postExecutorThreadLaunch() override {};
-
-        void tearDown() override {
-            ReplicationExecutorTest::tearDown();
-            _dr.reset();
-            _repl.reset();
-            // Executor may still invoke callback before shutting down.
-        }
 
         void reset() {
             // clear/reset state
@@ -147,6 +130,26 @@ namespace {
         DataReplicator& getDR() { return *_dr; }
         ReplicationCoordinator& getRepl() { return *_repl; }
 
+    protected:
+
+        void setUp() override {
+            ReplicationExecutorTest::setUp();
+            reset();
+
+            _settings.replSet = "foo"; // We are a replica set :)
+            _repl.reset(new ReplicationCoordinatorMock(_settings));
+            launchExecutorThread();
+            DataReplicatorOptions options;
+            options.initialSyncRetryWait = Milliseconds(0);
+            createDataReplicator(options);
+        }
+
+        void tearDown() override {
+            ReplicationExecutorTest::tearDown();
+            _dr.reset();
+            _repl.reset();
+            // Executor may still invoke callback before shutting down.
+        }
 
     private:
         std::unique_ptr<DataReplicator> _dr;

@@ -45,11 +45,13 @@ namespace {
     class CollectionClonerTest : public BaseClonerTest {
     public:
 
-        void setUp() override;
-        void tearDown() override;
         BaseCloner* getCloner() const override;
 
     protected:
+
+        void setUp() override;
+        void tearDown() override;
+
         CollectionOptions options;
         std::unique_ptr<CollectionCloner> collectionCloner;
     };

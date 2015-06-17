@@ -1296,7 +1296,7 @@ std::string toString(DataReplicatorState s) {
         if (status.code() == ErrorCodes::CallbackCanceled)
             return;
         if (status.isOK()) {
-            const auto docs = fetchResult.getValue().documents;
+            const auto& docs = fetchResult.getValue().documents;
             if (docs.begin() != docs.end()) {
                 LockGuard lk(_mutex);
                 std::for_each(docs.cbegin(),
