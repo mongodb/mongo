@@ -4,8 +4,9 @@ Import("env")
 
 env.Library(target="unittest",
             source=[
-                'unittest.cpp',
+                'death_test.cpp',
                 'temp_dir.cpp',
+                'unittest.cpp',
                 'unittest_helpers.cpp',
             ],
             LIBDEPS=['$BUILD_DIR/mongo/util/foundation',

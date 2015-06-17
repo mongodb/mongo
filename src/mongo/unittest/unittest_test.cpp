@@ -32,12 +32,13 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/unittest/unittest.h"
-
 #include <limits>
 #include <string>
 
 #include "mongo/stdx/functional.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/unittest/death_test.h"
+#include "mongo/unittest/unittest.h"
 
 namespace {
     namespace stdx = mongo::stdx;
@@ -131,4 +132,16 @@ namespace {
         ASSERT_TEST_FAILS_MATCH(ASSERT_EQ(0, ++i), "(0 == 1)");
     }
 
+    DEATH_TEST(DeathTestSelfTest, TestDeath, "Invariant failure false") { invariant(false); }
+
+    class DeathTestSelfTestFixture : public ::mongo::unittest::Test {
+    public:
+        void setUp() override {}
+        void tearDown() override {
+            mongo::unittest::log() << "Died in tear-down";
+            invariant(false);
+        }
+    };
+
+    DEATH_TEST_F(DeathTestSelfTestFixture, DieInTearDown, "Died in tear-down") {}
 }  // namespace

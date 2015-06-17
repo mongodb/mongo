@@ -162,12 +162,13 @@
         }                                                               \
     } while (false)
 
-#define ASSERT_STRING_CONTAINS(BIG_STRING, CONTAINS ) do {              \
+#define ASSERT_STRING_CONTAINS(BIG_STRING, CONTAINS) do {               \
         std::string myString( BIG_STRING );                             \
-        if ( myString.find(CONTAINS) == std::string::npos ) {           \
-            std::string err( "Expected " #BIG_STRING " (" );            \
-            err += myString;                                            \
-            err += std::string(") to contain " #CONTAINS );             \
+        std::string myContains(CONTAINS);                               \
+        if ( myString.find(myContains) == std::string::npos ) {         \
+            str::stream err;                                            \
+            err << "Expected to find " #CONTAINS " (" << myContains <<  \
+                ") in " #BIG_STRING " (" << myString << ")";            \
             ::mongo::unittest::TestAssertionFailure(__FILE__,           \
                                                     __LINE__,           \
                                                     err).stream();      \
