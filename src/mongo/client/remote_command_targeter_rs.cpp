@@ -66,7 +66,11 @@ namespace mongo {
 
         HostAndPort hostAndPort = _rsMonitor->getHostOrRefresh(readPref);
         if (hostAndPort.empty()) {
-            return Status(ErrorCodes::HostNotFound,
+            if (readPref.pref == ReadPreference::PrimaryOnly) {
+                return Status(ErrorCodes::NotMaster,
+                              str::stream() << "No master found for set " << _rsName);
+            }
+            return Status(ErrorCodes::FailedToSatisfyReadPreference,
                           str::stream() << "could not find host matching read preference "
                                         << readPref.toString() << " for set " << _rsName);
         }

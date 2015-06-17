@@ -132,6 +132,7 @@ error_code("LockStateChangeFailed", 129)
 error_code("SymbolNotFound", 130)
 error_code("RLPInitializationFailed", 131)
 error_code("ConfigServersInconsistent", 132)
+error_code("FailedToSatisfyReadPreference", 133)
 
 # Non-sequential error codes (for compatibility only)
 error_code("NotMaster", 10107) #this comes from assert_util.h

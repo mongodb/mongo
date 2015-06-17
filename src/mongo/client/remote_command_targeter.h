@@ -49,7 +49,9 @@ namespace mongo {
          *
          * Returns OK and a host and port to use for the specified read preference or any
          * ErrorCode. Known error codes are:
-         *      HostNotFound if no host matches the specified read preference critera
+         *      NotMaster if readPref is PrimaryOnly and there is no primary in the set
+         *      FailedToSatisfyReadPreference if it cannot find a node to match the read preference
+         *          and the readPref is anything other than PrimaryOnly
          */
         virtual StatusWith<HostAndPort> findHost(const ReadPreferenceSetting& readPref) = 0;
 

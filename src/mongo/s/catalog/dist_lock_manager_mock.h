@@ -32,6 +32,7 @@
 #include <vector>
 
 #include "mongo/s/catalog/dist_lock_manager.h"
+#include "mongo/stdx/functional.h"
 
 namespace mongo {
 
@@ -50,7 +51,12 @@ namespace mongo {
                 stdx::chrono::milliseconds waitFor,
                 stdx::chrono::milliseconds lockTryInterval) override;
 
-        void setLockReturnStatus(Status status);
+        using LockFunc = stdx::function<void (StringData name,
+                                              StringData whyMessage,
+                                              stdx::chrono::milliseconds waitFor,
+                                              stdx::chrono::milliseconds lockTryInterval)>;
+
+        void expectLock(LockFunc checkerFunc, Status lockStatus);
 
     protected:
 
@@ -67,6 +73,7 @@ namespace mongo {
 
         std::vector<LockInfo> _locks;
         Status _lockReturnStatus;
+        LockFunc _lockChecker;
     };
 
 }

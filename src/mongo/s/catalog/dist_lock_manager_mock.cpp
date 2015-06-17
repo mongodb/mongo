@@ -35,12 +35,29 @@
 #include <algorithm>
 
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 
     using stdx::chrono::milliseconds;
 
-    DistLockManagerMock::DistLockManagerMock() : _lockReturnStatus{Status::OK()}{}
+namespace {
+
+    void NoLockFuncSet(StringData name,
+                       StringData whyMessage,
+                       milliseconds waitFor,
+                       milliseconds lockTryInterval) {
+        FAIL(str::stream() << "Lock not expected to be called. "
+                           << "Name: " << name
+                           << ", whyMessage: " << whyMessage
+                           << ", waitFor: " << waitFor
+                           << ", lockTryInterval: " << lockTryInterval);
+    }
+
+} // namespace
+
+    DistLockManagerMock::DistLockManagerMock() : _lockReturnStatus{Status::OK()},
+                                                 _lockChecker{NoLockFuncSet} {}
 
     void DistLockManagerMock::startUp() {}
 
@@ -55,6 +72,9 @@ namespace mongo {
             StringData whyMessage,
             milliseconds waitFor,
             milliseconds lockTryInterval) {
+
+        _lockChecker(name, whyMessage, waitFor, lockTryInterval);
+        _lockChecker = NoLockFuncSet;
 
         if (!_lockReturnStatus.isOK()) {
             return _lockReturnStatus;
@@ -92,8 +112,9 @@ namespace mongo {
         return Status::OK();
     }
 
-    void DistLockManagerMock::setLockReturnStatus(Status status) {
+    void DistLockManagerMock::expectLock(LockFunc checker, Status status) {
         _lockReturnStatus = std::move(status);
+        _lockChecker = checker;
     }
 
 }

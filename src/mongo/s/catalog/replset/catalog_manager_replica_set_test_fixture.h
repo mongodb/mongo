@@ -38,6 +38,7 @@ namespace mongo {
 
     class BSONObj;
     class CatalogManagerReplicaSet;
+    class DistLockManagerMock;
     struct RemoteCommandRequest;
     class RemoteCommandRunnerMock;
     class ShardRegistry;
@@ -80,6 +81,8 @@ namespace executor {
         RemoteCommandRunnerMock* commandRunner() const;
 
         executor::NetworkInterfaceMock* network() const;
+
+        DistLockManagerMock* distLock() const;
 
         /**
          * Blocking methods, which receive one message from the network and respond using the

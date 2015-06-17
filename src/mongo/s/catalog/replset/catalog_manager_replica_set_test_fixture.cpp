@@ -79,7 +79,7 @@ namespace mongo {
         ASSERT_OK(cm->init(ConnectionString::forReplicaSet("CatalogManagerReplSetTest",
                                                            { HostAndPort{ "TestHost1" },
                                                              HostAndPort{ "TestHost2" } }),
-                           std::move(stdx::make_unique<DistLockManagerMock>())));
+                           stdx::make_unique<DistLockManagerMock>()));
 
         std::unique_ptr<ShardRegistry> shardRegistry(
             stdx::make_unique<ShardRegistry>(stdx::make_unique<RemoteCommandTargeterFactoryMock>(),
@@ -119,6 +119,13 @@ namespace mongo {
 
     executor::NetworkInterfaceMock* CatalogManagerReplSetTestFixture::network() const {
         return _mockNetwork;
+    }
+
+    DistLockManagerMock* CatalogManagerReplSetTestFixture::distLock() const {
+        auto distLock = dynamic_cast<DistLockManagerMock*>(catalogManager()->getDistLockManager());
+        invariant(distLock);
+
+        return distLock;
     }
 
     void CatalogManagerReplSetTestFixture::onCommand(OnCommandFunction func) {
