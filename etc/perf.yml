@@ -46,7 +46,7 @@ functions:
           set -e 
           set -o verbose
           mkdir -p ./dbdata
-          ./mongod --storageEngine=${storageEngine} --dbpath ./dbdata
+          ${mongod_exec_wrapper} ./mongod --dbpath ./dbdata ${mongod_flags}
           echo "MONGOD STARTED."
   "run perf tests":
     - command: shell.exec
@@ -69,7 +69,7 @@ functions:
           cd perf
           #  give mongod a few seconds to start up so that we can connect.
           sleep 5
-          python ./benchrun.py --shell ../mongo --testFilter '${filter}' -t 1 2 4 8 16 -f testcases/* --out perf.json
+          ${perf_exec_wrapper} python benchrun.py --shell ../mongo -t 1 2 4 8 16 --trialCount 7 -f testcases/*.js --testFilter '${filter}' --out perf.json
     - command: "json.send"
       params:
         name: "perf"
@@ -142,8 +142,10 @@ buildvariants:
 - name: linux-wt-standalone
   display_name: Linux WT Standalone
   expansions:
-    storageEngine: "wiredTiger"
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release
+    mongod_exec_wrapper: "numactl --physcpubind=4,5,6,7 -i 1"
+    perf_exec_wrapper: "numactl --physcpubind=1,2,3 -i 0"
+    mongod_flags: "--storageEngine=wiredTiger --logpath ./mongod.log --fork --syncdelay 0 --nojournal --setParameter ttlMonitorEnabled=false --wiredTigerCacheSizeGB 16"
 
   run_on:
   - "centos6-perf"
