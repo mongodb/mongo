@@ -311,8 +311,7 @@ func (restore *MongoRestore) RestoreUsersOrRoles(collectionType string, intent *
 	}
 
 	log.Logf(log.DebugLow, "restoring %v to temporary collection", collectionType)
-	err = restore.RestoreCollectionToDB("admin", tempCol, bsonSource, 0)
-	if err != nil {
+	if _, err = restore.RestoreCollectionToDB("admin", tempCol, bsonSource, 0); err != nil {
 		return fmt.Errorf("error restoring %v: %v", collectionType, err)
 	}
 

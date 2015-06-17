@@ -6,6 +6,7 @@ import (
 	"github.com/mongodb/mongo-tools/common/intents"
 	"github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/common/progress"
+	"github.com/mongodb/mongo-tools/common/util"
 	"gopkg.in/mgo.v2/bson"
 	"io"
 	"io/ioutil"
@@ -148,6 +149,8 @@ func (restore *MongoRestore) RestoreIntent(intent *intents.Intent) error {
 		}
 	}
 
+	var documentCount int64
+
 	// then do bson
 	if intent.BSONPath != "" {
 		log.Logf(log.Always, "restoring %v from file %v", intent.Namespace(), intent.BSONPath)
@@ -176,7 +179,7 @@ func (restore *MongoRestore) RestoreIntent(intent *intents.Intent) error {
 		bsonSource := db.NewDecodedBSONSource(db.NewBSONSource(rawBSONSource))
 		defer bsonSource.Close()
 
-		err = restore.RestoreCollectionToDB(intent.DB, intent.C, bsonSource, size)
+		documentCount, err = restore.RestoreCollectionToDB(intent.DB, intent.C, bsonSource, intent.Size)
 		if err != nil {
 			return fmt.Errorf("error restoring from %v: %v", intent.BSONPath, err)
 		}
@@ -193,23 +196,26 @@ func (restore *MongoRestore) RestoreIntent(intent *intents.Intent) error {
 		log.Log(log.Always, "no indexes to restore")
 	}
 
-	log.Logf(log.Always, "finished restoring %v", intent.Namespace())
+	log.Logf(log.Always, "finished restoring %v (%v %v)",
+		intent.Namespace(), documentCount, util.Pluralize(int(documentCount), "document", "documents"))
 	return nil
 }
 
 // RestoreCollectionToDB pipes the given BSON data into the database.
+// Returns the number of documents restored and any errors that occured.
 func (restore *MongoRestore) RestoreCollectionToDB(dbName, colName string,
-	bsonSource *db.DecodedBSONSource, fileSize int64) error {
+	bsonSource *db.DecodedBSONSource, fileSize int64) (int64, error) {
 
 	session, err := restore.SessionProvider.GetSession()
 	if err != nil {
-		return fmt.Errorf("error establishing connection: %v", err)
+		return int64(0), fmt.Errorf("error establishing connection: %v", err)
 	}
 	session.SetSafe(restore.safety)
 	defer session.Close()
 
 	collection := session.DB(dbName).C(colName)
 
+	documentCount := int64(0)
 	watchProgressor := progress.NewCounter(fileSize)
 	bar := &progress.Bar{
 		Name:      fmt.Sprintf("%v.%v", dbName, colName),
@@ -233,6 +239,7 @@ func (restore *MongoRestore) RestoreCollectionToDB(dbName, colName string,
 			rawBytes := make([]byte, len(doc.Data))
 			copy(rawBytes, doc.Data)
 			docChan <- bson.Raw{Data: rawBytes}
+			documentCount++
 		}
 		close(docChan)
 	}()
@@ -289,12 +296,13 @@ func (restore *MongoRestore) RestoreCollectionToDB(dbName, colName string,
 	for done := 0; done < maxInsertWorkers; done++ {
 		err := <-resultChan
 		if err != nil {
-			return fmt.Errorf("insertion error: %v", err)
+			return int64(0), fmt.Errorf("insertion error: %v", err)
 		}
 	}
 	// final error check
 	if err = bsonSource.Err(); err != nil {
-		return fmt.Errorf("reading bson input: %v", err)
+		return int64(0), fmt.Errorf("reading bson input: %v", err)
 	}
-	return nil
+
+	return documentCount, nil
 }

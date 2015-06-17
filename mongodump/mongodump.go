@@ -339,9 +339,15 @@ func (dump *MongoDump) DumpIntent(intent *intents.Intent) error {
 
 	}
 
+	var dumpCount int64
 	if dump.useStdout {
 		log.Logf(log.Always, "writing %v to stdout", intent.Namespace())
-		return dump.dumpQueryToWriter(findQuery, intent, os.Stdout)
+		dumpCount, err = dump.dumpQueryToWriter(findQuery, intent, os.Stdout)
+		if err == nil {
+			// on success, print the document count
+			log.Logf(log.Always, "dumped %v %v", dumpCount, docPlural(dumpCount))
+		}
+		return err
 	}
 
 	dbFolder := filepath.Join(dump.OutputOptions.Out, intent.DB)
@@ -357,7 +363,7 @@ func (dump *MongoDump) DumpIntent(intent *intents.Intent) error {
 
 	if !dump.OutputOptions.Repair {
 		log.Logf(log.Always, "writing %v to %v", intent.Namespace(), outFilepath)
-		if err = dump.dumpQueryToWriter(findQuery, intent, out); err != nil {
+		if dumpCount, err = dump.dumpQueryToWriter(findQuery, intent, out); err != nil {
 			return err
 		}
 	} else {
@@ -368,8 +374,9 @@ func (dump *MongoDump) DumpIntent(intent *intents.Intent) error {
 		if err := dump.dumpIterToWriter(repairIter, out, repairCounter); err != nil {
 			return fmt.Errorf("repair error: %v", err)
 		}
-		log.Logf(log.Always,
-			"\trepair cursor found %v documents in %v", repairCounter, intent.Namespace())
+		_, repairCount := repairCounter.Progress()
+		log.Logf(log.Always, "\trepair cursor found %v %v in %v",
+			repairCount, docPlural(repairCount), intent.Namespace())
 	}
 
 	// don't dump metatdata for SystemIndexes collection
@@ -389,20 +396,21 @@ func (dump *MongoDump) DumpIntent(intent *intents.Intent) error {
 		return err
 	}
 
-	log.Logf(log.Always, "done dumping %v", intent.Namespace())
+	log.Logf(log.Always, "done dumping %v (%v %v)", intent.Namespace(), dumpCount, docPlural(dumpCount))
 	return nil
 }
 
 // dumpQueryToWriter takes an mgo Query, its intent, and a writer, performs the query,
-// and writes the raw bson results to the writer.
+// and writes the raw bson results to the writer. Returns a final count of documents
+// dumped, and any errors that occured.
 func (dump *MongoDump) dumpQueryToWriter(
-	query *mgo.Query, intent *intents.Intent, writer io.Writer) (err error) {
+	query *mgo.Query, intent *intents.Intent, writer io.Writer) (int64, error) {
 
 	total, err := query.Count()
 	if err != nil {
-		return fmt.Errorf("error reading from db: %v", err)
+		return int64(0), fmt.Errorf("error reading from db: %v", err)
 	}
-	log.Logf(log.Info, "\t%v documents", total)
+	log.Logf(log.Info, "\tcounted %v %v in %v", total, docPlural(int64(total)), intent.Namespace())
 
 	dumpProgressor := progress.NewCounter(int64(total))
 	bar := &progress.Bar{
@@ -413,8 +421,9 @@ func (dump *MongoDump) dumpQueryToWriter(
 	dump.progressManager.Attach(bar)
 	defer dump.progressManager.Detach(bar)
 
-	iter := query.Iter()
-	return dump.dumpIterToWriter(iter, writer, dumpProgressor)
+	err = dump.dumpIterToWriter(query.Iter(), writer, dumpProgressor)
+	_, dumpCount := dumpProgressor.Progress()
+	return dumpCount, err
 }
 
 // dumpIterToWriter takes an mgo iterator, a writer, and a pointer to
@@ -488,8 +497,7 @@ func (dump *MongoDump) DumpUsersAndRolesForDB(db string) error {
 		return fmt.Errorf("error creating file for db users: %v", err)
 	}
 	usersQuery := session.DB("admin").C("system.users").Find(dbQuery)
-	err = dump.dumpQueryToWriter(
-		usersQuery, &intents.Intent{DB: "system", C: "users"}, usersFile)
+	_, err = dump.dumpQueryToWriter(usersQuery, &intents.Intent{DB: "system", C: "users"}, usersFile)
 	if err != nil {
 		return fmt.Errorf("error dumping db users: %v", err)
 	}
@@ -499,7 +507,7 @@ func (dump *MongoDump) DumpUsersAndRolesForDB(db string) error {
 		return fmt.Errorf("error creating file for db roles: %v", err)
 	}
 	rolesQuery := session.DB("admin").C("system.roles").Find(dbQuery)
-	err = dump.dumpQueryToWriter(
+	_, err = dump.dumpQueryToWriter(
 		rolesQuery, &intents.Intent{DB: "system", C: "roles"}, rolesFile)
 	if err != nil {
 		return fmt.Errorf("error dumping db roles: %v", err)
@@ -510,11 +518,16 @@ func (dump *MongoDump) DumpUsersAndRolesForDB(db string) error {
 		return fmt.Errorf("error creating file for db auth version: %v", err)
 	}
 	versionQuery := session.DB("admin").C("system.version").Find(nil)
-	err = dump.dumpQueryToWriter(
-		versionQuery, &intents.Intent{DB: "system", C: "version"}, versionFile)
+	_, err = dump.dumpQueryToWriter(versionQuery, &intents.Intent{DB: "system", C: "version"}, versionFile)
 	if err != nil {
 		return fmt.Errorf("error dumping db auth version: %v", err)
 	}
 
 	return nil
+}
+
+// docPlural returns "document" or "documents" depending on the
+// count of documents passed in.
+func docPlural(count int64) string {
+	return util.Pluralize(int(count), "document", "documents")
 }
