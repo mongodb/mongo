@@ -839,7 +839,7 @@ namespace {
                 return status;
             }
 
-            Shard::removeShard(name);
+            grid.shardRegistry()->remove(name);
 
             shardConnectionPool.removeHost(name);
             ReplicaSetMonitor::remove(name);

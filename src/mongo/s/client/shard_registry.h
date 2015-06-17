@@ -40,7 +40,6 @@ namespace mongo {
     class BSONObjBuilder;
     class CatalogManager;
     class RemoteCommandRunner;
-    class RemoteCommandTargeter;
     class RemoteCommandTargeterFactory;
     class Shard;
     class ShardType;
@@ -72,8 +71,6 @@ namespace executor {
 
         ~ShardRegistry();
 
-        std::shared_ptr<RemoteCommandTargeter> getTargeterForShard(const std::string& shardId);
-
         RemoteCommandRunner* getCommandRunner() const { return _commandRunner.get(); }
 
         executor::TaskExecutor* getExecutor() const { return _executor.get(); }
@@ -89,8 +86,6 @@ namespace executor {
          */
         std::shared_ptr<Shard> lookupRSName(const std::string& name) const;
 
-        void set(const ShardId& id, const Shard& s);
-
         void remove(const ShardId& id);
 
         void getAllShardIds(std::vector<ShardId>* all) const;
@@ -99,7 +94,6 @@ namespace executor {
 
     private:
         typedef std::map<ShardId, std::shared_ptr<Shard>> ShardMap;
-        typedef std::map<ShardId, std::shared_ptr<RemoteCommandTargeter>> TargeterMap;
 
         /**
          * Creates a shard based on the specified information and puts it into the lookup maps.
@@ -107,8 +101,6 @@ namespace executor {
         void _addShard_inlock(const ShardType& shardType);
 
         std::shared_ptr<Shard> _findUsingLookUp(const ShardId& shardId);
-
-        std::shared_ptr<RemoteCommandTargeter> _findTargeter(const std::string& shardId);
 
         // Factory to obtain remote command targeters for shards
         const std::unique_ptr<RemoteCommandTargeterFactory> _targeterFactory;
@@ -131,9 +123,6 @@ namespace executor {
         ShardMap _lookup;
 
         // TODO: These should eventually disappear and become parts of Shard
-
-        // Map of shard name to targeter for this shard
-        TargeterMap _targeters;
 
         // Map from all hosts within a replica set to the shard representing this replica set
         ShardMap _rsLookup;

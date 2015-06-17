@@ -52,17 +52,16 @@ namespace mongo {
     using std::stringstream;
     using std::vector;
 
-    Shard::Shard(const ShardId& id, const ConnectionString& connStr)
+    Shard::Shard(const ShardId& id,
+                 const ConnectionString& connStr,
+                 std::unique_ptr<RemoteCommandTargeter> targeter)
         : _id(id),
-          _cs(connStr) {
+          _cs(connStr),
+          _targeter(std::move(targeter)) {
 
     }
 
     Shard::~Shard() = default;
-
-    RemoteCommandTargeter* Shard::getTargeter() const {
-        return grid.shardRegistry()->getTargeterForShard(getId()).get();
-    }
 
     ShardPtr Shard::lookupRSName(const string& name) {
         return grid.shardRegistry()->lookupRSName(name);
@@ -177,10 +176,6 @@ namespace mongo {
 
         LOG(1) << "best shard for new allocation is " << bestStatus;
         return bestShard;
-    }
-
-    void Shard::installShard(const ShardId& id, const Shard& shard) {
-        grid.shardRegistry()->set(id, shard);
     }
 
     ShardStatus::ShardStatus(long long dataSizeBytes, const string& mongoVersion)

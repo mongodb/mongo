@@ -30,7 +30,6 @@
 
 #include "mongo/platform/basic.h"
 
-
 #include "mongo/client/parallel.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/operation_context_impl.h"
@@ -44,7 +43,7 @@
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/config.h"
 
-namespace ShardingTests {
+namespace {
 
     using std::shared_ptr;
     using std::unique_ptr;
@@ -105,17 +104,13 @@ namespace ShardingTests {
             _client.dropCollection( collName() );
 
             _shardId = "shard0000";
-            // Since we've redirected the conns, the host doesn't matter here so long as it's
-            // prefixed with a "$"
-            Shard shard(_shardId, ConnectionString(HostAndPort("$hostFooBar:27017")));
-
-            // Need to run this to ensure the shard is in the global lookup table
-            Shard::installShard(_shardId, shard);
 
             // Add dummy shard to config DB
             _client.insert(ShardType::ConfigNS,
                            BSON(ShardType::name() << _shardId <<
-                                ShardType::host() << shard.getConnString().toString()));
+                                ShardType::host() <<
+                                    ConnectionString(
+                                        HostAndPort("$hostFooBar:27017")).toString()));
 
             // Create an index so that diffing works correctly, otherwise no cursors from S&O
             ASSERT_OK(dbtests::createIndex(
@@ -682,18 +677,17 @@ namespace ShardingTests {
 
     class All : public Suite {
     public:
-        All() : Suite( "sharding" ) {
-        }
+        All() : Suite("sharding") { }
 
         void setupTests() {
-            add< ChunkManagerCreateBasicTest >();
-            add< ChunkManagerCreateFullTest >();
-            add< ChunkManagerLoadBasicTest >();
-            add< ChunkDiffUnitTestNormal >();
-            add< ChunkDiffUnitTestInverse >();
+            add<ChunkManagerCreateBasicTest>();
+            add<ChunkManagerCreateFullTest>();
+            add<ChunkManagerLoadBasicTest>();
+            add<ChunkDiffUnitTestNormal>();
+            add<ChunkDiffUnitTestInverse>();
         }
     };
 
     SuiteInstance<All> myall;
 
-}
+} // namespace

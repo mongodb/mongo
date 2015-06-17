@@ -64,18 +64,6 @@ namespace mongo {
 
     ShardRegistry::~ShardRegistry() = default;
 
-    shared_ptr<RemoteCommandTargeter> ShardRegistry::getTargeterForShard(const string& shardId) {
-        auto targeter = _findTargeter(shardId);
-        if (targeter) {
-            return targeter;
-        }
-
-        // If we can't find the shard, we might just need to reload the cache
-        reload();
-
-        return _findTargeter(shardId);
-    }
-
     void ShardRegistry::reload() {
         vector<ShardType> shards;
         Status status = _catalogManager->getAllShards(&shards);
@@ -88,7 +76,6 @@ namespace mongo {
         std::lock_guard<std::mutex> lk(_mutex);
 
         _lookup.clear();
-        _targeters.clear();
         _rsLookup.clear();
 
         ShardType configServerShard;
@@ -127,13 +114,6 @@ namespace mongo {
         ShardMap::const_iterator i = _rsLookup.find(name);
 
         return (i == _rsLookup.end()) ? nullptr : i->second;
-    }
-
-    void ShardRegistry::set(const ShardId& id, const Shard& s) {
-        shared_ptr<Shard> ss(std::make_shared<Shard>(s.getId(), s.getConnString()));
-
-        std::lock_guard<std::mutex> lk(_mutex);
-        _lookup[id] = ss;
     }
 
     void ShardRegistry::remove(const ShardId& id) {
@@ -200,21 +180,28 @@ namespace mongo {
         auto shardHostStatus = ConnectionString::parse(shardType.getHost());
         if (!shardHostStatus.isOK()) {
             warning() << "Unable to parse shard host "
-                        << shardHostStatus.getStatus().toString();
+                      << shardHostStatus.getStatus().toString();
         }
 
         const ConnectionString& shardHost(shardHostStatus.getValue());
-
-        shared_ptr<Shard> shard = std::make_shared<Shard>(shardType.getName(), shardHost);
-        _lookup[shardType.getName()] = shard;
 
         // Sync cluster connections (legacy config server) do not go through the normal targeting
         // mechanism and must only be reachable through CatalogManagerLegacy or legacy-style
         // queries and inserts. Do not create targeter for these connections. This code should go
         // away after 3.2 is released.
         if (shardHost.type() == ConnectionString::SYNC) {
+            _lookup[shardType.getName()] =
+                std::make_shared<Shard>(shardType.getName(), shardHost, nullptr);
             return;
         }
+
+        // Non-SYNC shards
+        shared_ptr<Shard> shard =
+            std::make_shared<Shard>(shardType.getName(),
+                                    shardHost,
+                                    std::move(_targeterFactory->create(shardHost)));
+
+        _lookup[shardType.getName()] = shard;
 
         // TODO: The only reason to have the shard host names in the lookup table is for the
         // setShardVersion call, which resolves the shard id from the shard address. This is
@@ -235,25 +222,12 @@ namespace mongo {
         if (shardHost.type() == ConnectionString::SET) {
             _rsLookup[shardHost.getSetName()] = shard;
         }
-
-        _targeters[shardType.getName()] = std::move(_targeterFactory->create(shardHost));
     }
 
     shared_ptr<Shard> ShardRegistry::_findUsingLookUp(const ShardId& shardId) {
         std::lock_guard<std::mutex> lk(_mutex);
         ShardMap::iterator it = _lookup.find(shardId);
         if (it != _lookup.end()) {
-            return it->second;
-        }
-
-        return nullptr;
-    }
-
-    std::shared_ptr<RemoteCommandTargeter> ShardRegistry::_findTargeter(const string& shardId) {
-        std::lock_guard<std::mutex> lk(_mutex);
-
-        TargeterMap::iterator it = _targeters.find(shardId);
-        if (it != _targeters.end()) {
             return it->second;
         }
 
