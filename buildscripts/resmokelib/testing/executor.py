@@ -87,7 +87,7 @@ class TestGroupExecutor(object):
                     raise errors.StopExecution("Received interrupt from user")
 
                 sb = []  # String builder.
-                self._test_group.summarize(sb)
+                self._test_group.summarize_latest(sb)
                 self.logger.info("Summary: %s", "\n    ".join(sb))
 
                 if not report.wasSuccessful():

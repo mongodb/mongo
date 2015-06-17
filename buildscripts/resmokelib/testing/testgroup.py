@@ -52,9 +52,16 @@ class TestGroup(object):
         self._end_times.append(time.time())
         self._reports.append(report)
 
+    def summarize_latest(self, sb):
+        """
+        Returns a summary of the latest execution of the group and appends a
+        summary of that execution onto the string builder 'sb'.
+        """
+        return self._summarize_execution(-1, sb)
+
     def summarize(self, sb):
         """
-        Returns a summary of the exection(s) of the group and appends a
+        Returns a summary of the execution(s) of the group and appends a
         summary of the execution(s) onto the string builder 'sb'.
         """
 
