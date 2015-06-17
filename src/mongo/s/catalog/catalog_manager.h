@@ -323,7 +323,10 @@ namespace mongo {
          * Returns global settings for a certain key.
          * @param key: key for SettingsType::ConfigNS document.
          *
-         * Returns NoSuchKey if no SettingsType::ConfigNS document with such key exists.
+         * Returns ErrorCodes::NoMatchingDocument if no SettingsType::ConfigNS document
+         * with such key exists.
+         * Returns ErrorCodes::FailedToParse if we encountered an error while parsing
+         * the settings document.
          */
         virtual StatusWith<SettingsType> getGlobalSettings(const std::string& key) = 0;
 

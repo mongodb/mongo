@@ -77,7 +77,7 @@ namespace mongo {
 
         // Field names and types in the settings collection type.
         static const BSONField<std::string> key;
-        static const BSONField<long long> chunkSize;
+        static const BSONField<long long> chunkSizeMB;
         static const BSONField<bool> balancerStopped;
         static const BSONField<BSONObj> balancerActiveWindow;
         static const BSONField<bool> deprecated_secondaryThrottle;
@@ -122,9 +122,9 @@ namespace mongo {
         const std::string& getKey() const { return _key.get(); }
         void setKey(const std::string& key);
 
-        bool isChunkSizeSet() const { return _chunkSize.is_initialized(); }
-        long long getChunkSize() const { return _chunkSize.get(); }
-        void setChunkSize(const long long chunkSize);
+        bool isChunkSizeMBSet() const { return _chunkSizeMB.is_initialized(); }
+        long long getChunkSizeMB() const { return _chunkSizeMB.get(); }
+        void setChunkSizeMB(const long long chunkSizeMB);
 
         bool isBalancerStoppedSet() const { return _balancerStopped.is_initialized(); }
         bool getBalancerStopped() const { return _balancerStopped.get(); }
@@ -161,9 +161,9 @@ namespace mongo {
         // (M)  key determining the type of options to use
         boost::optional<std::string> _key;
 
-        // (S)  size of the chunks in our cluster
+        // (S)  size of the chunks in our cluster in MB
         //      Required if key is chunkSize
-        boost::optional<long long> _chunkSize;
+        boost::optional<long long> _chunkSizeMB;
 
         // (O)  is balancer enabled or disabled (default)
         //      Defaults to false.

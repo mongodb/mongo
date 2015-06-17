@@ -1161,11 +1161,19 @@ namespace {
             ScopedDbConnection conn(_configServerConnectionString, 30);
             BSONObj settingsDoc = conn->findOne(SettingsType::ConfigNS,
                                                 BSON(SettingsType::key(key)));
-            StatusWith<SettingsType> settingsResult = SettingsType::fromBSON(settingsDoc);
             conn.done();
 
+            if (settingsDoc.isEmpty()) {
+                return Status(ErrorCodes::NoMatchingDocument,
+                              str::stream() << "can't find settings document with key: " << key);
+            }
+
+            StatusWith<SettingsType> settingsResult = SettingsType::fromBSON(settingsDoc);
             if (!settingsResult.isOK()) {
-                return settingsResult.getStatus();
+                return Status(ErrorCodes::FailedToParse,
+                              str::stream() << "error while parsing settings document: "
+                                            << settingsDoc
+                                            << " : " << settingsResult.getStatus().toString());
             }
 
             const SettingsType& settings = settingsResult.getValue();

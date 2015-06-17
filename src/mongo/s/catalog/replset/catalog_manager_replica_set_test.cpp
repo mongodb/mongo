@@ -47,6 +47,7 @@
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/chunk_version.h"
+#include "mongo/s/catalog/type_settings.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/s/write_ops/batched_update_request.h"
@@ -737,6 +738,125 @@ namespace {
 
         // Now wait for the runUserManagementWriteCommand call to return
         future.wait_for(kFutureTimeout);
+    }
+
+    TEST_F(CatalogManagerReplSetTestFixture, GetGlobalSettingsBalancerDoc) {
+        RemoteCommandTargeterMock* targeter =
+            RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
+        targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+
+        // sample balancer doc
+        SettingsType st1;
+        st1.setKey(SettingsType::BalancerDocKey);
+        st1.setBalancerStopped(true);
+
+        auto future = async(std::launch::async, [this] {
+            return assertGet(catalogManager()->getGlobalSettings(SettingsType::BalancerDocKey));
+        });
+
+        onFindCommand([st1](const RemoteCommandRequest& request) {
+            const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
+            ASSERT_EQ(nss.toString(), SettingsType::ConfigNS);
+
+            auto query = assertGet(
+                LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
+
+            ASSERT_EQ(query->ns(), SettingsType::ConfigNS);
+            ASSERT_EQ(query->getFilter(), BSON(SettingsType::key(SettingsType::BalancerDocKey)));
+
+            return vector<BSONObj>{ st1.toBSON() };
+        });
+
+        const auto& actualBalSettings = future.get();
+        ASSERT_EQ(actualBalSettings.toBSON(), st1.toBSON());
+    }
+
+    TEST_F(CatalogManagerReplSetTestFixture, GetGlobalSettingsChunkSizeDoc) {
+        RemoteCommandTargeterMock* targeter =
+            RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
+        targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+
+        // sample chunk size doc
+        SettingsType st1;
+        st1.setKey(SettingsType::ChunkSizeDocKey);
+        st1.setChunkSizeMB(80);
+
+        auto future = async(std::launch::async, [this] {
+            return assertGet(catalogManager()->getGlobalSettings(SettingsType::ChunkSizeDocKey));
+        });
+
+        onFindCommand([st1](const RemoteCommandRequest& request) {
+            const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
+            ASSERT_EQ(nss.toString(), SettingsType::ConfigNS);
+
+            auto query = assertGet(
+                LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
+
+            ASSERT_EQ(query->ns(), SettingsType::ConfigNS);
+            ASSERT_EQ(query->getFilter(), BSON(SettingsType::key(SettingsType::ChunkSizeDocKey)));
+
+            return vector<BSONObj>{ st1.toBSON() };
+        });
+
+        const auto& actualBalSettings = future.get();
+        ASSERT_EQ(actualBalSettings.toBSON(), st1.toBSON());
+    }
+
+    TEST_F(CatalogManagerReplSetTestFixture, GetGlobalSettingsInvalidDoc) {
+        RemoteCommandTargeterMock* targeter =
+            RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
+        targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+
+        auto future = async(std::launch::async, [this] {
+            const auto balSettings = catalogManager()->getGlobalSettings("invalidKey");
+
+            ASSERT_EQ(balSettings.getStatus(), ErrorCodes::FailedToParse);
+        });
+
+        onFindCommand([](const RemoteCommandRequest& request) {
+            const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
+            ASSERT_EQ(nss.toString(), SettingsType::ConfigNS);
+
+            auto query = assertGet(
+                LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
+
+            ASSERT_EQ(query->ns(), SettingsType::ConfigNS);
+            ASSERT_EQ(query->getFilter(), BSON(SettingsType::key("invalidKey")));
+
+            return vector<BSONObj> {
+                BSON("invalidKey" << "some value") // invalid settings document -- key is required
+            };
+        });
+
+        future.get();
+    }
+
+    TEST_F(CatalogManagerReplSetTestFixture, GetGlobalSettingsNonExistent) {
+        RemoteCommandTargeterMock* targeter =
+            RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
+        targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+
+        auto future = async(std::launch::async, [this] {
+            const auto chunkSizeSettings = catalogManager()->getGlobalSettings(
+                SettingsType::ChunkSizeDocKey);
+
+            ASSERT_EQ(chunkSizeSettings.getStatus(), ErrorCodes::NoMatchingDocument);
+        });
+
+        onFindCommand([](const RemoteCommandRequest& request) {
+            const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
+            ASSERT_EQ(nss.toString(), SettingsType::ConfigNS);
+
+            auto query = assertGet(
+                LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
+
+            ASSERT_EQ(query->ns(), SettingsType::ConfigNS);
+            ASSERT_EQ(query->getFilter(), BSON(SettingsType::key(SettingsType::ChunkSizeDocKey)));
+
+            return vector<BSONObj> { };
+        });
+
+        future.get();
     }
 
 } // namespace

@@ -51,7 +51,7 @@ namespace mongo {
     const std::string SettingsType::ChunkSizeDocKey("chunksize");
 
     const BSONField<std::string> SettingsType::key("_id");
-    const BSONField<long long> SettingsType::chunkSize("value");
+    const BSONField<long long> SettingsType::chunkSizeMB("value");
     const BSONField<bool> SettingsType::balancerStopped("stopped");
     const BSONField<BSONObj> SettingsType::balancerActiveWindow("activeWindow");
     const BSONField<bool> SettingsType::deprecated_secondaryThrottle("_secondaryThrottle");
@@ -69,12 +69,12 @@ namespace mongo {
         }
 
         if (settings._key == ChunkSizeDocKey) {
-            long long settingsChunkSize;
+            long long settingsChunkSizeMB;
             Status status = bsonExtractIntegerField(source,
-                                                    chunkSize.name(),
-                                                    &settingsChunkSize);
+                                                    chunkSizeMB.name(),
+                                                    &settingsChunkSizeMB);
             if (!status.isOK()) return status;
-            settings._chunkSize = settingsChunkSize;
+            settings._chunkSizeMB = settingsChunkSizeMB;
         }
         else if (settings._key == BalancerDocKey) {
             {
@@ -150,9 +150,9 @@ namespace mongo {
         }
 
         if (_key == ChunkSizeDocKey) {
-            if (!(getChunkSize() > 0)) {
+            if (!(getChunkSizeMB() > 0)) {
                 return Status(ErrorCodes::BadValue,
-                              str::stream() << "chunksize specified in " << chunkSize.name()
+                              str::stream() << "chunksize specified in " << chunkSizeMB.name()
                                             << " field must be greater than zero");
             }
         }
@@ -176,7 +176,7 @@ namespace mongo {
         BSONObjBuilder builder;
 
         if (_key) builder.append(key(), getKey());
-        if (_chunkSize) builder.append(chunkSize(), getChunkSize());
+        if (_chunkSizeMB) builder.append(chunkSizeMB(), getChunkSizeMB());
         if (_balancerStopped) builder.append(balancerStopped(), getBalancerStopped());
         if (_secondaryThrottle) {
             builder.append(deprecated_secondaryThrottle(), getSecondaryThrottle());
@@ -268,10 +268,10 @@ namespace mongo {
         _key = key;
     }
 
-    void SettingsType::setChunkSize(const long long chunkSize) {
+    void SettingsType::setChunkSizeMB(const long long chunkSizeMB) {
         invariant(_key == ChunkSizeDocKey);
-        invariant(chunkSize > 0);
-        _chunkSize = chunkSize;
+        invariant(chunkSizeMB > 0);
+        _chunkSizeMB = chunkSizeMB;
     }
 
     void SettingsType::setBalancerStopped(const bool balancerStopped) {

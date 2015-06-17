@@ -47,11 +47,11 @@ namespace {
 
     TEST(SettingsType, ChunkSize) {
         BSONObj objChunkSizeZero = BSON(SettingsType::key(SettingsType::ChunkSizeDocKey) <<
-                                        SettingsType::chunkSize(0));
+                                        SettingsType::chunkSizeMB(0));
         StatusWith<SettingsType> result = SettingsType::fromBSON(objChunkSizeZero);
         ASSERT(result.isOK());
         SettingsType settings = result.getValue();
-        ASSERT_EQUALS(settings.getChunkSize(), 0);
+        ASSERT_EQUALS(settings.getChunkSizeMB(), 0);
         Status validationStatus = settings.validate();
         ASSERT_FALSE(validationStatus.isOK());
         ASSERT_EQUALS(validationStatus, ErrorCodes::BadValue);
@@ -87,14 +87,14 @@ namespace {
 
     TEST(SettingsType, ValidValues) {
         BSONObj objChunkSize = BSON(SettingsType::key(SettingsType::ChunkSizeDocKey) <<
-                                    SettingsType::chunkSize(1));
+                                    SettingsType::chunkSizeMB(1));
         StatusWith<SettingsType> result = SettingsType::fromBSON(objChunkSize);
         SettingsType settings = result.getValue();
         ASSERT(result.isOK());
         Status validationStatus = settings.validate();
         ASSERT(validationStatus.isOK());
         ASSERT_EQUALS(settings.getKey(), SettingsType::ChunkSizeDocKey);
-        ASSERT_EQUALS(settings.getChunkSize(), 1);
+        ASSERT_EQUALS(settings.getChunkSizeMB(), 1);
 
         BSONObj objBalancer = BSON(SettingsType::key(SettingsType::BalancerDocKey) <<
                                    SettingsType::balancerStopped(true) <<
@@ -116,12 +116,12 @@ namespace {
 
     TEST(SettingsType, ValidWithDeprecatedThrottle) {
         BSONObj objChunkSize = BSON(SettingsType::key(SettingsType::ChunkSizeDocKey) <<
-                                    SettingsType::chunkSize(1));
+                                    SettingsType::chunkSizeMB(1));
         StatusWith<SettingsType> result = SettingsType::fromBSON(objChunkSize);
         ASSERT(result.isOK());
         SettingsType settings = result.getValue();
         ASSERT_EQUALS(settings.getKey(), SettingsType::ChunkSizeDocKey);
-        ASSERT_EQUALS(settings.getChunkSize(), 1);
+        ASSERT_EQUALS(settings.getChunkSizeMB(), 1);
 
         BSONObj objBalancer = BSON(SettingsType::key(SettingsType::BalancerDocKey) <<
                                    SettingsType::deprecated_secondaryThrottle(true));

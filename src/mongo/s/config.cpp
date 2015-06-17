@@ -665,28 +665,28 @@ namespace mongo {
     /* --- ConfigServer ---- */
 
     void ConfigServer::reloadSettings() {
-        auto chunkSize = grid.catalogManager()->getGlobalSettings(SettingsType::ChunkSizeDocKey);
-        if (chunkSize.isOK()) {
-            const int csize = chunkSize.getValue().getChunkSize();
+        auto chunkSizeResult = grid.catalogManager()->getGlobalSettings(SettingsType::ChunkSizeDocKey);
+        if (chunkSizeResult.isOK()) {
+            const int csize = chunkSizeResult.getValue().getChunkSizeMB();
             LOG(1) << "Found MaxChunkSize: " << csize;
 
             if (!Chunk::setMaxChunkSizeSizeMB(csize)) {
                 warning() << "invalid chunksize: " << csize;
             }
         }
-        else if (chunkSize == ErrorCodes::NoSuchKey) {
+        else if (chunkSizeResult.getStatus() == ErrorCodes::NoMatchingDocument) {
             const int chunkSize = Chunk::MaxChunkSize / (1024 * 1024);
             Status result =
                 grid.catalogManager()->insert(SettingsType::ConfigNS,
                                               BSON(SettingsType::key(SettingsType::ChunkSizeDocKey)
-                                                   << SettingsType::chunkSize(chunkSize)),
+                                                   << SettingsType::chunkSizeMB(chunkSize)),
                                               NULL);
             if (!result.isOK()) {
                 warning() << "couldn't set chunkSize on config db" << causedBy(result);
             }
         }
         else {
-            warning() << "couldn't load settings on config db: " << chunkSize.getStatus();
+            warning() << "couldn't load settings on config db: " << chunkSizeResult.getStatus();
         }
 
         // indexes

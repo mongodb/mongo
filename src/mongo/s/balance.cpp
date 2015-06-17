@@ -97,7 +97,7 @@ namespace mongo {
                 grid.catalogManager()->getGlobalSettings(SettingsType::BalancerDocKey);
 
             const bool isBalSettingsAbsent =
-                balSettingsResult.getStatus() == ErrorCodes::NoSuchKey;
+                balSettingsResult.getStatus() == ErrorCodes::NoMatchingDocument;
 
             if (!balSettingsResult.isOK() && !isBalSettingsAbsent) {
                 warning() << balSettingsResult.getStatus();
@@ -540,7 +540,7 @@ namespace mongo {
                 auto balSettingsResult =
                     grid.catalogManager()->getGlobalSettings(SettingsType::BalancerDocKey);
                 const bool isBalSettingsAbsent =
-                    balSettingsResult.getStatus() == ErrorCodes::NoSuchKey;
+                    balSettingsResult.getStatus() == ErrorCodes::NoMatchingDocument;
                 if (!balSettingsResult.isOK() && !isBalSettingsAbsent) {
                     warning() << balSettingsResult.getStatus();
                     return;

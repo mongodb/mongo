@@ -748,7 +748,7 @@ namespace {
             return;
         }
         SettingsType chunkSizeSettings = chunkSizeSettingsResult.getValue();
-        int csize = chunkSizeSettings.getChunkSize();
+        int csize = chunkSizeSettings.getChunkSizeMB();
 
         LOG(1) << "Refreshing MaxChunkSize: " << csize << "MB";
 

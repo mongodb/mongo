@@ -270,7 +270,42 @@ namespace {
     }
 
     StatusWith<SettingsType> CatalogManagerReplicaSet::getGlobalSettings(const string& key) {
-        return notYetImplemented;
+        const auto configShard = grid.shardRegistry()->getShard("config");
+        const auto readHost = configShard->getTargeter()->findHost(kConfigReadSelector);
+        if (!readHost.isOK()) {
+            return readHost.getStatus();
+        }
+
+        auto findStatus = _find(readHost.getValue(),
+                                NamespaceString(SettingsType::ConfigNS),
+                                BSON(SettingsType::key(key)),
+                                1);
+        if (!findStatus.isOK()) {
+            return findStatus.getStatus();
+        }
+
+        const auto& docs = findStatus.getValue();
+        if (docs.empty()) {
+            return {ErrorCodes::NoMatchingDocument,
+                    str::stream() << "can't find settings document with key: " << key};
+        }
+
+        BSONObj settingsDoc = docs.front();
+        StatusWith<SettingsType> settingsResult = SettingsType::fromBSON(settingsDoc);
+        if (!settingsResult.isOK()) {
+            return {ErrorCodes::FailedToParse,
+                    str::stream() << "error while parsing settings document: " << settingsDoc
+                                  << " : " << settingsResult.getStatus().toString()};
+        }
+
+        const SettingsType& settings = settingsResult.getValue();
+
+        Status validationStatus = settings.validate();
+        if (!validationStatus.isOK()) {
+            return validationStatus;
+        }
+
+        return settingsResult;
     }
 
     Status CatalogManagerReplicaSet::getDatabasesForShard(const string& shardName,
