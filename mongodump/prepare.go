@@ -126,7 +126,7 @@ func (f atomicFlusher) Write(buf []byte) (int, error) {
 	return f.availableWriteFlusher.Write(buf)
 }
 
-// realMetadataFile impelemnts intent.file, and corresponds to a Metadata file on disk
+// realMetadataFile implements intent.file, and corresponds to a Metadata file on disk
 type realMetadataFile struct {
 	io.WriteCloser
 	errorReader
@@ -140,11 +140,11 @@ type realMetadataFile struct {
 // If compression is needed, the File gets wrapped in a gzip.Writer
 func (f *realMetadataFile) Open() (err error) {
 	if f.intent.MetadataPath == "" {
-		return fmt.Errorf("No MetadataPath for %v.%v", f.intent.DB, f.intent.C)
+		return fmt.Errorf("No metadata path for %v.%v", f.intent.DB, f.intent.C)
 	}
 	err = os.MkdirAll(filepath.Dir(f.intent.MetadataPath), os.ModeDir|os.ModePerm)
 	if err != nil {
-		return fmt.Errorf("error creating directory for Metadata file %v: %v",
+		return fmt.Errorf("error creating directory for metadata file %v: %v",
 			filepath.Dir(f.intent.MetadataPath), err)
 	}
 
@@ -154,7 +154,7 @@ func (f *realMetadataFile) Open() (err error) {
 	}
 	f.WriteCloser, err = os.Create(fileName)
 	if err != nil {
-		return fmt.Errorf("error creating Metadata file %v: %v", fileName, err)
+		return fmt.Errorf("error creating metadata file %v: %v", fileName, err)
 	}
 	if f.gzip {
 		f.WriteCloser = &wrappedWriteCloser{

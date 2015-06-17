@@ -113,7 +113,7 @@ func (restore *MongoRestore) RestoreIntent(intent *intents.Intent) error {
 	if intent.MetadataPath == "" {
 		if _, ok := restore.dbCollectionIndexes[intent.DB]; ok {
 			if indexes, ok = restore.dbCollectionIndexes[intent.DB][intent.C]; ok {
-				log.Logf(log.Always, "no metadata file; falling back to system.indexes")
+				log.Logf(log.Always, "no metadata; falling back to system.indexes")
 			}
 		}
 	}
@@ -125,14 +125,15 @@ func (restore *MongoRestore) RestoreIntent(intent *intents.Intent) error {
 			return err
 		}
 		defer intent.MetadataFile.Close()
-		log.Logf(log.Always, "reading metadata file from %v", intent.MetadataPath)
+
+		log.Logf(log.Always, "reading metadata for %v from %v", intent.Namespace(), intent.Location)
 		metadata, err := ioutil.ReadAll(intent.MetadataFile)
 		if err != nil {
-			return fmt.Errorf("error reading metadata file %v: %v", intent.MetadataPath, err)
+			return fmt.Errorf("error reading metadata from %v: %v", intent.Location, err)
 		}
 		options, indexes, err = restore.MetadataFromJSON(metadata)
 		if err != nil {
-			return fmt.Errorf("error parsing metadata file %v: %v", intent.MetadataPath, err)
+			return fmt.Errorf("error parsing metadata from %v: %v", intent.Location, err)
 		}
 		if !restore.OutputOptions.NoOptionsRestore {
 			if options != nil {
@@ -160,7 +161,7 @@ func (restore *MongoRestore) RestoreIntent(intent *intents.Intent) error {
 		}
 		defer intent.BSONFile.Close()
 
-		log.Logf(log.Always, "restoring %v from file %v", intent.Namespace(), intent.BSONPath)
+		log.Logf(log.Always, "restoring %v from %v", intent.Namespace(), intent.Location)
 		var size int64
 
 		bsonSource := db.NewDecodedBSONSource(db.NewBSONSource(intent.BSONFile))

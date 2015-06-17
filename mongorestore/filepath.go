@@ -83,16 +83,16 @@ type realMetadataFile struct {
 // can be called on them.
 func (f *realMetadataFile) Open() (err error) {
 	if f.intent.MetadataPath == "" {
-		return fmt.Errorf("error reading Metadata file for %v", f.intent.Namespace())
+		return fmt.Errorf("error reading metadata for %v", f.intent.Namespace())
 	}
 	file, err := os.Open(f.intent.MetadataPath)
 	if err != nil {
-		return fmt.Errorf("error reading Metadata file %v: %v", f.intent.MetadataPath, err)
+		return fmt.Errorf("error reading metadata %v: %v", f.intent.MetadataPath, err)
 	}
 	if f.gzip {
 		gzFile, err := gzip.NewReader(file)
 		if err != nil {
-			return fmt.Errorf("error reading compresed Metadata file %v: %v", f.intent.MetadataPath, err)
+			return fmt.Errorf("error reading compressed metadata %v: %v", f.intent.MetadataPath, err)
 		}
 		f.ReadCloser = &wrappedReadCloser{gzFile, file}
 	} else {
@@ -209,6 +209,12 @@ func (restore *MongoRestore) CreateAllIntents(dir archive.DirLike, filterDB stri
 					}
 				}
 				if restore.InputOptions.Archive != "" {
+					if restore.InputOptions.Archive == "-" {
+						oplogIntent.Location = "archive on stdin"
+					} else {
+						oplogIntent.Location = fmt.Sprintf("archive '%v'", restore.InputOptions.Archive)
+					}
+
 					// no need to check that we want to cache here
 					oplogIntent.BSONFile =
 						&archive.RegularCollectionReceiver{
@@ -220,10 +226,7 @@ func (restore *MongoRestore) CreateAllIntents(dir archive.DirLike, filterDB stri
 				}
 				restore.manager.Put(oplogIntent)
 			} else {
-				log.Logf(log.Always,
-					`don't know what to do with file "%v", skipping...`,
-					entry.Path(),
-				)
+				log.Logf(log.Always, `don't know what to do with file "%v", skipping...`, entry.Path())
 			}
 		}
 	}
@@ -258,8 +261,7 @@ func (restore *MongoRestore) CreateIntentsForDB(db string, filterCollection stri
 				// If these special files manage to be included in a dump directory during a full
 				// (multi-db) restore, we should ignore them.
 				if restore.ToolOptions.DB == "" && strings.HasPrefix(collection, "$") {
-					log.Logf(log.DebugLow,
-						"not restoring special collection %v.%v", db, collection)
+					log.Logf(log.DebugLow, "not restoring special collection %v.%v", db, collection)
 					skip = true
 				}
 				// TOOLS-717: disallow restoring to the system.profile collection.
@@ -287,6 +289,11 @@ func (restore *MongoRestore) CreateIntentsForDB(db string, filterCollection stri
 					BSONPath: entry.Path(),
 				}
 				if restore.InputOptions.Archive != "" {
+					if restore.InputOptions.Archive == "-" {
+						intent.Location = "archive on stdin"
+					} else {
+						intent.Location = fmt.Sprintf("archive '%v'", restore.InputOptions.Archive)
+					}
 					if skip {
 						// adding the DemuxOut to the demux, but not adding the intent to the manager
 						mutedOut := &archive.MutedCollection{Intent: intent, Demux: restore.archive.Demux}
@@ -325,6 +332,11 @@ func (restore *MongoRestore) CreateIntentsForDB(db string, filterCollection stri
 					MetadataPath: entry.Path(),
 				}
 				if restore.InputOptions.Archive != "" {
+					if restore.InputOptions.Archive == "-" {
+						intent.Location = "archive on stdin"
+					} else {
+						intent.Location = fmt.Sprintf("archive '%v'", restore.InputOptions.Archive)
+					}
 					intent.MetadataFile = &archive.MetadataPreludeFile{Intent: intent, Prelude: restore.archive.Prelude}
 				} else {
 					intent.MetadataFile = &realMetadataFile{intent: intent, gzip: restore.InputOptions.Gzip}
@@ -387,7 +399,7 @@ func (restore *MongoRestore) CreateIntentForCollection(db string, collection str
 	intent.BSONFile = &realBSONFile{intent: intent, gzip: restore.InputOptions.Gzip}
 
 	// finally, check if it has a .metadata.json file in its folder
-	log.Logf(log.DebugLow, "scanning directory %v for metadata file", dir.Name())
+	log.Logf(log.DebugLow, "scanning directory %v for metadata", dir.Name())
 	entries, err := dir.Parent().ReadDir()
 	if err != nil {
 		// try and carry on if we can

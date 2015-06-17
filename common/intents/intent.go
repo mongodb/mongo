@@ -27,6 +27,9 @@ type Intent struct {
 	MetadataPath string
 	MetadataFile file
 
+	// Indicates where the intent will be read from or written to
+	Location string
+
 	// Collection options
 	Options *bson.D
 
