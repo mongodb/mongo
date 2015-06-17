@@ -38,7 +38,7 @@ namespace mongo {
 
     class BSONObj;
     class CatalogManagerReplicaSet;
-    class RemoteCommandRequest;
+    struct RemoteCommandRequest;
     class RemoteCommandRunnerMock;
     class ShardRegistry;
     template<typename T> class StatusWith;
