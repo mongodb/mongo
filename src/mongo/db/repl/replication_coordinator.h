@@ -91,8 +91,11 @@ class ReplicationCoordinator : public SyncSourceSelector {
 public:
     static ReplicationCoordinator* get(ServiceContext* service);
     static ReplicationCoordinator* get(ServiceContext& service);
+    static ReplicationCoordinator* get(OperationContext* ctx);
+
     static void set(ServiceContext* service,
                     std::unique_ptr<ReplicationCoordinator> replCoordinator);
+
 
     struct StatusAndDuration {
     public:

@@ -28,6 +28,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/client.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
 
@@ -53,6 +55,11 @@ ReplicationCoordinator* ReplicationCoordinator::get(ServiceContext* service) {
 ReplicationCoordinator* ReplicationCoordinator::get(ServiceContext& service) {
     return getReplicationCoordinator(service).get();
 }
+
+ReplicationCoordinator* ReplicationCoordinator::get(OperationContext* ctx) {
+    return get(ctx->getClient()->getServiceContext());
+}
+
 
 void ReplicationCoordinator::set(ServiceContext* service,
                                  std::unique_ptr<ReplicationCoordinator> replCoord) {
