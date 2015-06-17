@@ -46,7 +46,7 @@ namespace repl {
 
     public:
         Reporter(ReplicationExecutor* executor,
-                 ReplicationProgressManager* ReplicationProgressManager,
+                 ReplicationProgressManager* replicationProgressManager,
                  const HostAndPort& target);
         virtual ~Reporter();
 

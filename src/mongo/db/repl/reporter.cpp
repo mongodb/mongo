@@ -41,10 +41,10 @@ namespace repl {
     ReplicationProgressManager::~ReplicationProgressManager() {}
 
     Reporter::Reporter(ReplicationExecutor* executor,
-                       ReplicationProgressManager* ReplicationProgressManager,
+                       ReplicationProgressManager* replicationProgressManager,
                        const HostAndPort& target)
         : _executor(executor),
-          _updatePositionSource(ReplicationProgressManager),
+          _updatePositionSource(replicationProgressManager),
           _target(target),
           _status(Status::OK()),
           _willRunAgain(false),
@@ -53,12 +53,14 @@ namespace repl {
         uassert(ErrorCodes::BadValue, "null replication executor", executor);
         uassert(ErrorCodes::BadValue,
                 "null replication progress manager",
-                ReplicationProgressManager);
+                replicationProgressManager);
         uassert(ErrorCodes::BadValue, "target name cannot be empty", !target.empty());
     }
 
     Reporter::~Reporter() {
-        cancel();
+        DESTRUCTOR_GUARD(
+           cancel();
+        );
     }
 
     void Reporter::cancel() {
@@ -69,20 +71,24 @@ namespace repl {
         }
 
         _status = Status(ErrorCodes::CallbackCanceled, "Reporter no longer valid");
-        _active = false;
         _willRunAgain = false;
         invariant(_remoteCommandCallbackHandle.isValid());
         _executor->cancel(_remoteCommandCallbackHandle);
     }
 
     void Reporter::wait() {
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
-        if (!_active) {
-            return;
+        ReplicationExecutor::CallbackHandle handle;
+        {
+            stdx::lock_guard<stdx::mutex> lk(_mutex);
+            if (!_active) {
+                return;
+            }
+            if (!_remoteCommandCallbackHandle.isValid()) {
+                return;
+            }
+            handle = _remoteCommandCallbackHandle;
         }
-        if(_remoteCommandCallbackHandle.isValid()) {
-            _executor->wait(_remoteCommandCallbackHandle);
-        }
+        _executor->wait(handle);
     }
 
     Status Reporter::trigger() {
@@ -102,13 +108,17 @@ namespace repl {
 
         LOG(2) << "Reporter scheduling report to : " << _target;
 
-        _willRunAgain = false;
-
         BSONObjBuilder cmd;
-        _updatePositionSource->prepareReplSetUpdatePositionCommand(&cmd);
+        if (!_updatePositionSource->prepareReplSetUpdatePositionCommand(&cmd)) {
+            // Returning NodeNotFound because currently this is the only way
+            // prepareReplSetUpdatePositionCommand() can fail in production.
+            return Status(ErrorCodes::NodeNotFound,
+                          "Reporter failed to create replSetUpdatePositionCommand command.");
+        }
+        auto cmdObj = cmd.obj();
         StatusWith<ReplicationExecutor::CallbackHandle> scheduleResult =
             _executor->scheduleRemoteCommand(
-                RemoteCommandRequest(_target, "admin", cmd.obj()),
+                RemoteCommandRequest(_target, "admin", cmdObj),
                 stdx::bind(&Reporter::_callback, this, stdx::placeholders::_1));
 
         if (!scheduleResult.isOK()) {
@@ -119,6 +129,7 @@ namespace repl {
         }
 
         _active = true;
+        _willRunAgain = false;
         _remoteCommandCallbackHandle = scheduleResult.getValue();
         return Status::OK();
     }

@@ -46,7 +46,14 @@ namespace {
                 progressMap[memberId] = ts;
             }
 
+            void setResult(bool newResult) {
+                _result = newResult;
+            }
+
             bool prepareReplSetUpdatePositionCommand(BSONObjBuilder* cmdBuilder) {
+                if (!_result) {
+                    return _result;
+                }
                 cmdBuilder->append("replSetUpdatePosition", 1);
                 BSONArrayBuilder arrayBuilder(cmdBuilder->subarrayStart("optimes"));
                 for (auto itr = progressMap.begin(); itr != progressMap.end(); ++itr) {
@@ -59,6 +66,7 @@ namespace {
             }
         private: 
             std::map<int, Timestamp> progressMap;
+            bool _result = true;
     };
 
     class ReporterTest : public ReplicationExecutorTest {
@@ -196,8 +204,8 @@ namespace {
     }
 
     // Schedule multiple times while we are already scheduled, it should set willRunAgain,
-    // then automatically schedule itself after finishing, but not a third time since the latter two
-    // will contian the same batch of updates.
+    // then automatically schedule itself after finishing, but not a third time since the latter
+    // two will contain the same batch of updates.
     TEST_F(ReporterTest, TripleScheduleShouldCauseRescheduleImmediatelyAfterRespondedToOnlyOnce) {
         posUpdater->updateMap(0, Timestamp(3,0));
         ASSERT_OK(reporter->trigger());
@@ -233,6 +241,7 @@ namespace {
         ASSERT_TRUE(reporter->willRunAgain());
 
         reporter->cancel();
+        getNet()->runReadyNetworkOperations();
         ASSERT_FALSE(reporter->isActive());
         ASSERT_FALSE(reporter->willRunAgain());
         ASSERT_FALSE(getNet()->hasReadyRequests());
@@ -257,12 +266,18 @@ namespace {
         ASSERT_FALSE(reporter->willRunAgain());
 
         reporter->cancel();
+        getNet()->runReadyNetworkOperations();
         ASSERT_FALSE(reporter->isActive());
         ASSERT_FALSE(reporter->willRunAgain());
         ASSERT_FALSE(getNet()->hasReadyRequests());
         ASSERT_EQUALS(ErrorCodes::CallbackCanceled, reporter->getStatus());
 
         ASSERT_EQUALS(ErrorCodes::CallbackCanceled, reporter->trigger());
+    }
+
+    TEST_F(ReporterTest, ProgressManagerFails) {
+        posUpdater->setResult(false);
+        ASSERT_EQUALS(ErrorCodes::NodeNotFound, reporter->trigger().code());
     }
 
 } // namespace
