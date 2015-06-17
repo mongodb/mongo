@@ -193,6 +193,8 @@ namespace mongo {
         PlanStage::StageState intervalState = _nextInterval->covering->work(&nextMemberID);
 
         if (PlanStage::IS_EOF == intervalState) {
+            getNearStats()->intervalStats.push_back(*_nextIntervalStats);
+            _nextIntervalStats.reset();
             _nextInterval = NULL;
             _searchState = SearchState_Advancing;
             return PlanStage::NEED_TIME;
@@ -227,11 +229,6 @@ namespace mongo {
 
         StatusWith<double> distanceStatus = computeDistance(nextMember);
 
-        // Store the member's RecordId, if available, for quick invalidation
-        if (nextMember->hasLoc()) {
-            _nextIntervalSeen.insert(std::make_pair(nextMember->loc, nextMemberID));
-        }
-
         if (!distanceStatus.isOK()) {
             _searchState = SearchState_Finished;
             *error = distanceStatus.getStatus();
@@ -260,6 +257,11 @@ namespace mongo {
         if (inInterval) {
             _resultBuffer.push(SearchResult(nextMemberID, memberDistance));
 
+            // Store the member's RecordId, if available, for quick invalidation
+            if (nextMember->hasLoc()) {
+                _nextIntervalSeen.insert(std::make_pair(nextMember->loc, nextMemberID));
+            }
+
             ++_nextIntervalStats->numResultsBuffered;
 
             // Update buffered distance stats
@@ -274,10 +276,6 @@ namespace mongo {
             }
         }
         else {
-            // We won't pass this WSM up, so deallocate it
-            if (nextMember->hasLoc()) {
-                _nextIntervalSeen.erase(nextMember->loc);
-            }
             _workingSet->free(nextMemberID);
         }
 
@@ -288,13 +286,9 @@ namespace mongo {
 
         if (_resultBuffer.empty()) {
 
-            getNearStats()->intervalStats.push_back(*_nextIntervalStats);
-            _nextIntervalStats.reset();
-
             // We're done returning the documents buffered for this annulus, so we can
             // clear out our buffered RecordIds.
             _nextIntervalSeen.clear();
-
             _searchState = SearchState_Buffering;
             return PlanStage::NEED_TIME;
         }
