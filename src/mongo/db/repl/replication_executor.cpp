@@ -59,7 +59,7 @@ namespace {
         _storageInterface(storageInterface),
         _totalEventWaiters(0),
         _inShutdown(false),
-        _dblockWorkers(threadpool::ThreadPool::DoNotStartThreadsTag(),
+        _dblockWorkers(OldThreadPool::DoNotStartThreadsTag(),
                        3,
                        "replExecDBWorker-"),
         _dblockTaskRunner(

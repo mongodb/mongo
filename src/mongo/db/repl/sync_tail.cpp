@@ -275,7 +275,7 @@ namespace {
 
     // Doles out all the work to the reader pool threads and waits for them to complete
     void prefetchOps(const std::deque<BSONObj>& ops,
-                               threadpool::ThreadPool* prefetcherPool) {
+                               OldThreadPool* prefetcherPool) {
         invariant(prefetcherPool);
         for (std::deque<BSONObj>::const_iterator it = ops.begin();
              it != ops.end();
@@ -287,7 +287,7 @@ namespace {
 
     // Doles out all the work to the writer pool threads and waits for them to complete
     void applyOps(const std::vector< std::vector<BSONObj> >& writerVectors,
-                            threadpool::ThreadPool* writerPool,
+                            OldThreadPool* writerPool,
                             SyncTail::MultiSyncApplyFunc func,
                             SyncTail* sync) {
         TimerHolder timer(&applyBatchStats);
@@ -343,8 +343,8 @@ namespace {
     // static
     OpTime SyncTail::multiApply(OperationContext* txn,
                                 const OpQueue& ops,
-                                threadpool::ThreadPool* prefetcherPool,
-                                threadpool::ThreadPool* writerPool,
+                                OldThreadPool* prefetcherPool,
+                                OldThreadPool* writerPool,
                                 MultiSyncApplyFunc func,
                                 SyncTail* sync,
                                 bool supportsWaitingUntilDurable) {

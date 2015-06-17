@@ -39,12 +39,7 @@ namespace mongo {
 
     class OperationContext;
     class Status;
-
-namespace threadpool {
-
-    class ThreadPool;
-
-} // namespace threadpool
+    class OldThreadPool;
 
 namespace repl {
 
@@ -74,7 +69,7 @@ namespace repl {
          */
         static Task makeCancelTask();
 
-        TaskRunner(threadpool::ThreadPool* threadPool,
+        TaskRunner(OldThreadPool* threadPool,
                    const CreateOperationContextFn& createOperationContext);
 
         virtual ~TaskRunner();
@@ -148,7 +143,7 @@ namespace repl {
          */
         Task _waitForNextTask();
 
-        threadpool::ThreadPool* _threadPool;
+        OldThreadPool* _threadPool;
         CreateOperationContextFn _createOperationContext;
 
         // Protects member data of this TaskRunner.

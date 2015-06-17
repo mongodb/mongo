@@ -41,11 +41,9 @@
 */
 
 namespace mongo {
-    namespace threadpool {
-        class ThreadPool;
-    }
 
     class Database;
+    class OldThreadPool;
     class OperationContext;
 
 namespace repl {
@@ -76,7 +74,7 @@ namespace repl {
        not done (always use main for now).
     */
     class ReplSource {
-        std::shared_ptr<threadpool::ThreadPool> tp;
+        std::shared_ptr<OldThreadPool> tp;
 
         void resync(OperationContext* txn, const std::string& dbName);
 

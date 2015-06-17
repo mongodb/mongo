@@ -45,7 +45,7 @@
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/list.h"
 #include "mongo/stdx/mutex.h"
-#include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/concurrency/old_thread_pool.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 
@@ -316,7 +316,7 @@ namespace repl {
         EventList _unsignaledEvents;
         int64_t _totalEventWaiters;
         bool _inShutdown;
-        threadpool::ThreadPool _dblockWorkers;
+        OldThreadPool _dblockWorkers;
         TaskRunner _dblockTaskRunner;
         TaskRunner _dblockExclusiveLockTaskRunner;
         uint64_t _nextId;

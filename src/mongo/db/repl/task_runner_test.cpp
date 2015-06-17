@@ -36,7 +36,7 @@
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/unittest/barrier.h"
-#include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/concurrency/old_thread_pool.h"
 
 namespace {
 

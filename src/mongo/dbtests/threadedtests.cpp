@@ -49,7 +49,7 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/mvar.h"
 #include "mongo/util/concurrency/rwlock.h"
-#include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/concurrency/old_thread_pool.h"
 #include "mongo/util/timer.h"
 #include "mongo/util/concurrency/synchronization.h"
 #include "mongo/util/concurrency/ticketholder.h"
@@ -327,7 +327,7 @@ namespace ThreadedTests {
 
     public:
         void run() {
-            ThreadPool tp(nThreads);
+            OldThreadPool tp(nThreads);
 
             for (unsigned i=0; i < iterations; i++) {
                 tp.schedule(&ThreadPoolTest::increment, this, 2);

@@ -67,7 +67,7 @@
 #include "mongo/db/repl/sync_tail.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/storage_options.h"
-#include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/concurrency/old_thread_pool.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 
@@ -712,7 +712,7 @@ namespace repl {
                     if( tp.get() == 0 ) {
                         int nthr = min(8, replSettings.pretouch);
                         nthr = max(nthr, 1);
-                        tp.reset( new ThreadPool(nthr) );
+                        tp.reset( new OldThreadPool(nthr) );
                     }
                     vector<BSONObj> v;
                     oplogReader.peek(v, replSettings.pretouch);

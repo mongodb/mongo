@@ -34,7 +34,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/stdx/functional.h"
-#include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/concurrency/old_thread_pool.h"
 
 namespace mongo {
 
@@ -159,8 +159,8 @@ namespace repl {
         // Returns the last OpTime applied.
         static OpTime multiApply(OperationContext* txn,
                                  const OpQueue& ops,
-                                 threadpool::ThreadPool* prefetcherPool,
-                                 threadpool::ThreadPool* writerPool,
+                                 OldThreadPool* prefetcherPool,
+                                 OldThreadPool* writerPool,
                                  MultiSyncApplyFunc func,
                                  SyncTail* sync,
                                  bool supportsAwaitingCommit);
@@ -183,9 +183,9 @@ namespace repl {
         void handleSlaveDelay(const BSONObj& op);
 
         // persistent pool of worker threads for writing ops to the databases
-        threadpool::ThreadPool _writerPool;
+        OldThreadPool _writerPool;
         // persistent pool of worker threads for prefetching
-        threadpool::ThreadPool _prefetcherPool;
+        OldThreadPool _prefetcherPool;
 
     };
 

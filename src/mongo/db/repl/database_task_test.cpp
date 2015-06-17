@@ -33,7 +33,7 @@
 #include "mongo/db/repl/task_runner.h"
 #include "mongo/db/repl/task_runner_test_fixture.h"
 #include "mongo/stdx/mutex.h"
-#include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/concurrency/old_thread_pool.h"
 
 namespace {
 

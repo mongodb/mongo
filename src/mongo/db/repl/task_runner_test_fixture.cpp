@@ -34,7 +34,7 @@
 #include "mongo/db/repl/task_runner.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/functional.h"
-#include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/concurrency/old_thread_pool.h"
 
 namespace mongo {
 namespace repl {
@@ -79,7 +79,7 @@ namespace {
         return *_taskRunner;
     }
 
-    threadpool::ThreadPool& TaskRunnerTest::getThreadPool() const {
+    OldThreadPool& TaskRunnerTest::getThreadPool() const {
         ASSERT(_threadPool.get());
         return *_threadPool;
     }
@@ -93,7 +93,7 @@ namespace {
     }
 
     void TaskRunnerTest::setUp() {
-        _threadPool.reset(new ThreadPool(kNumThreads, "TaskRunnerTest-"));
+        _threadPool.reset(new OldThreadPool(kNumThreads, "TaskRunnerTest-"));
         resetTaskRunner(new TaskRunner(_threadPool.get(),
                                        stdx::bind(&TaskRunnerTest::createOperationContext, this)));
     }
