@@ -27,11 +27,9 @@
  *    then also delete it in the license file.
  */
 
-
 #pragma once
 
 #include <boost/filesystem/convenience.hpp>
-#include <boost/thread/recursive_mutex.hpp>
 #include <map>
 #include <sstream>
 #include <string>

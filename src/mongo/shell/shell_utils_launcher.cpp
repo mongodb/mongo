@@ -90,18 +90,18 @@ namespace mongo {
         ProgramOutputMultiplexer programOutputLogger;
 
         bool ProgramRegistry::isPortRegistered( int port ) const {
-            stdx::lock_guard<boost::recursive_mutex> lk( _mutex );
+            stdx::lock_guard<stdx::recursive_mutex> lk( _mutex );
             return _ports.count( port ) == 1;
         }
 
         ProcessId ProgramRegistry::pidForPort( int port ) const {
-            stdx::lock_guard<boost::recursive_mutex> lk( _mutex );
+            stdx::lock_guard<stdx::recursive_mutex> lk( _mutex );
             verify( isPortRegistered( port ) );
             return _ports.find( port )->second.first;
         }
 
         int ProgramRegistry::portForPid(ProcessId pid) const {
-            stdx::lock_guard<boost::recursive_mutex> lk(_mutex);
+            stdx::lock_guard<stdx::recursive_mutex> lk(_mutex);
             for (map<int, pair<ProcessId, int> >::const_iterator it = _ports.begin();
                     it != _ports.end(); ++it)
             {
@@ -112,41 +112,41 @@ namespace mongo {
         }
 
         void ProgramRegistry::registerPort( int port, ProcessId pid, int output ) {
-            stdx::lock_guard<boost::recursive_mutex> lk( _mutex );
+            stdx::lock_guard<stdx::recursive_mutex> lk( _mutex );
             verify( !isPortRegistered( port ) );
             _ports.insert( make_pair( port, make_pair( pid, output ) ) );
         }
-        
+
         void ProgramRegistry::deletePort( int port ) {
-            stdx::lock_guard<boost::recursive_mutex> lk( _mutex );
+            stdx::lock_guard<stdx::recursive_mutex> lk( _mutex );
             if ( !isPortRegistered( port ) ) {
                 return;
             }
             close( _ports.find( port )->second.second );
             _ports.erase( port );
         }
-        
+
         void ProgramRegistry::getRegisteredPorts( vector<int> &ports ) {
-            stdx::lock_guard<boost::recursive_mutex> lk( _mutex );
+            stdx::lock_guard<stdx::recursive_mutex> lk( _mutex );
             for( map<int,pair<ProcessId,int> >::const_iterator i = _ports.begin(); i != _ports.end();
                 ++i ) {
                 ports.push_back( i->first );
             }
         }
-        
+
         bool ProgramRegistry::isPidRegistered( ProcessId pid ) const {
-            stdx::lock_guard<boost::recursive_mutex> lk( _mutex );
+            stdx::lock_guard<stdx::recursive_mutex> lk( _mutex );
             return _pids.count( pid ) == 1;
         }
-        
+
         void ProgramRegistry::registerPid( ProcessId pid, int output ) {
-            stdx::lock_guard<boost::recursive_mutex> lk( _mutex );
+            stdx::lock_guard<stdx::recursive_mutex> lk( _mutex );
             verify( !isPidRegistered( pid ) );
             _pids.insert( make_pair( pid, output ) );
         }
-        
+
         void ProgramRegistry::deletePid(ProcessId pid) {
-            stdx::lock_guard<boost::recursive_mutex> lk(_mutex);
+            stdx::lock_guard<stdx::recursive_mutex> lk(_mutex);
             if (!isPidRegistered(pid)) {
                 int port = portForPid(pid);
                 if (port < 0) return;
@@ -158,7 +158,7 @@ namespace mongo {
         }
 
         void ProgramRegistry::getRegisteredPids( vector<ProcessId> &pids ) {
-            stdx::lock_guard<boost::recursive_mutex> lk( _mutex );
+            stdx::lock_guard<stdx::recursive_mutex> lk( _mutex );
             for( map<ProcessId,int>::const_iterator i = _pids.begin(); i != _pids.end(); ++i ) {
                 pids.push_back( i->first );
             }

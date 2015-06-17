@@ -30,12 +30,14 @@
 
 #include <boost/thread/lock_guard.hpp>
 #include <boost/thread/mutex.hpp>
+#include <boost/thread/recursive_mutex.hpp>
 
 namespace mongo {
 namespace stdx {
 
     using boost::mutex;
     using boost::timed_mutex;
+    using boost::recursive_mutex;
 
     using boost::adopt_lock_t;
     using boost::defer_lock_t;
