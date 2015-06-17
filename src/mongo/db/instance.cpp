@@ -1264,7 +1264,7 @@ namespace {
     //  Ensures shutdown is single threaded.
     // Lock Ordering:
     //  No restrictions
-    boost::mutex shutdownLock;
+    stdx::mutex shutdownLock;
 
     void signalShutdown() {
         // Notify all threads shutdown has started
@@ -1276,7 +1276,7 @@ namespace {
         shutdownInProgress.fetchAndAdd(1);
 
         // Grab the shutdown lock to prevent concurrent callers
-        boost::lock_guard<boost::mutex> lockguard(shutdownLock);
+        stdx::lock_guard<stdx::mutex> lockguard(shutdownLock);
 
         // Global storage engine may not be started in all cases before we exit
         if (getGlobalServiceContext()->getGlobalStorageEngine() == NULL) {
@@ -1371,37 +1371,37 @@ namespace {
     }
 
     int DiagLog::setLevel( int newLevel ) {
-        boost::lock_guard<boost::mutex> lk(mutex);
+        stdx::lock_guard<stdx::mutex> lk(mutex);
         int old = level;
         log() << "diagLogging level=" << newLevel << endl;
-        if( f == 0 ) { 
+        if( f == 0 ) {
             openFile();
         }
         level = newLevel; // must be done AFTER f is set
         return old;
     }
-    
+
     void DiagLog::flush() {
         if ( level ) {
             log() << "flushing diag log" << endl;
-            boost::lock_guard<boost::mutex> lk(mutex);
+            stdx::lock_guard<stdx::mutex> lk(mutex);
             f->flush();
         }
     }
-    
+
     void DiagLog::writeop(char *data,int len) {
         if ( level & 1 ) {
-            boost::lock_guard<boost::mutex> lk(mutex);
+            stdx::lock_guard<stdx::mutex> lk(mutex);
             f->write(data,len);
         }
     }
-    
+
     void DiagLog::readop(char *data, int len) {
         if ( level & 2 ) {
             bool log = (level & 4) == 0;
             OCCASIONALLY log = true;
             if ( log ) {
-                boost::lock_guard<boost::mutex> lk(mutex);
+                stdx::lock_guard<stdx::mutex> lk(mutex);
                 verify( f );
                 f->write(data,len);
             }

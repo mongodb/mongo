@@ -183,7 +183,7 @@ namespace {
     }
 
 namespace {
-    boost::mutex oplogSerialization; // for OplogIntentWriteLock
+    stdx::mutex oplogSerialization; // for OplogIntentWriteLock
 } // namespace
 
     Lock::OplogIntentWriteLock::OplogIntentWriteLock(Locker* lockState)

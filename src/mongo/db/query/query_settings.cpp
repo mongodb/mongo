@@ -86,7 +86,7 @@ namespace mongo {
                                           AllowedIndices** allowedIndicesOut) const {
         invariant(allowedIndicesOut);
 
-        boost::lock_guard<boost::mutex> cacheLock(_mutex);
+        stdx::lock_guard<stdx::mutex> cacheLock(_mutex);
         AllowedIndexEntryMap::const_iterator cacheIter = _allowedIndexEntryMap.find(key);
 
         // Nothing to do if key does not exist in query settings.
@@ -104,7 +104,7 @@ namespace mongo {
     }
 
     std::vector<AllowedIndexEntry*> QuerySettings::getAllAllowedIndices() const {
-        boost::lock_guard<boost::mutex> cacheLock(_mutex);
+        stdx::lock_guard<stdx::mutex> cacheLock(_mutex);
         vector<AllowedIndexEntry*> entries;
         for (AllowedIndexEntryMap::const_iterator i = _allowedIndexEntryMap.begin(); i != _allowedIndexEntryMap.end(); ++i) {
             AllowedIndexEntry* entry = i->second;
@@ -122,7 +122,7 @@ namespace mongo {
         const BSONObj& projection = lpq.getProj();
         AllowedIndexEntry* entry = new AllowedIndexEntry(query, sort, projection, indexes);
 
-        boost::lock_guard<boost::mutex> cacheLock(_mutex);
+        stdx::lock_guard<stdx::mutex> cacheLock(_mutex);
         AllowedIndexEntryMap::iterator i = _allowedIndexEntryMap.find(key);
         // Replace existing entry.
         if (i != _allowedIndexEntryMap.end()) {
@@ -133,7 +133,7 @@ namespace mongo {
     }
 
     void QuerySettings::removeAllowedIndices(const PlanCacheKey& key) {
-        boost::lock_guard<boost::mutex> cacheLock(_mutex);
+        stdx::lock_guard<stdx::mutex> cacheLock(_mutex);
         AllowedIndexEntryMap::iterator i = _allowedIndexEntryMap.find(key);
 
         // Nothing to do if key does not exist in query settings.
@@ -148,7 +148,7 @@ namespace mongo {
     }
 
     void QuerySettings::clearAllowedIndices() {
-        boost::lock_guard<boost::mutex> cacheLock(_mutex);
+        stdx::lock_guard<stdx::mutex> cacheLock(_mutex);
         _clear();
     }
 

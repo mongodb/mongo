@@ -95,12 +95,12 @@ namespace mongo {
     }
 
     bool ShardingState::enabled() {
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         return _enabled;
     }
 
     string ShardingState::getConfigServer() {
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         invariant(_enabled);
 
         return grid.catalogManager()->connectionString().toString();
@@ -120,12 +120,12 @@ namespace mongo {
     }
 
     std::string ShardingState::getShardName() {
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         return _shardName;
     }
 
     bool ShardingState::setShardNameAndHost( const string& name, const string& host ) {
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         if ( _shardName.size() == 0 ) {
             // TODO SERVER-2299 remotely verify the name is sound w.r.t IPs
             _shardName = name;
@@ -173,20 +173,20 @@ namespace mongo {
     }
 
     void ShardingState::clearCollectionMetadata() {
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         _collMetadata.clear();
     }
 
     // TODO we shouldn't need three ways for checking the version. Fix this.
     bool ShardingState::hasVersion( const string& ns ) {
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
 
         CollectionMetadataMap::const_iterator it = _collMetadata.find(ns);
         return it != _collMetadata.end();
     }
 
     bool ShardingState::hasVersion( const string& ns , ChunkVersion& version ) {
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
 
         CollectionMetadataMap::const_iterator it = _collMetadata.find(ns);
         if ( it == _collMetadata.end() )
@@ -198,7 +198,7 @@ namespace mongo {
     }
 
     ChunkVersion ShardingState::getVersion(const string& ns) {
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
 
         CollectionMetadataMap::const_iterator it = _collMetadata.find( ns );
         if ( it != _collMetadata.end() ) {
@@ -215,9 +215,9 @@ namespace mongo {
                                     const BSONObj& min,
                                     const BSONObj& max,
                                     ChunkVersion version) {
-        
+
         invariant(txn->lockState()->isCollectionLockedForMode(ns, MODE_X));
-        boost::lock_guard<boost::mutex> lk( _mutex );
+        stdx::lock_guard<stdx::mutex> lk( _mutex );
 
         CollectionMetadataMap::const_iterator it = _collMetadata.find( ns );
         verify( it != _collMetadata.end() ) ;
@@ -247,8 +247,8 @@ namespace mongo {
                                         CollectionMetadataPtr prevMetadata) {
 
         invariant(txn->lockState()->isCollectionLockedForMode(ns, MODE_X));
-        boost::lock_guard<boost::mutex> lk( _mutex );
-        
+        stdx::lock_guard<stdx::mutex> lk( _mutex );
+
         log() << "ShardingState::undoDonateChunk acquired _mutex" << endl;
 
         CollectionMetadataMap::iterator it = _collMetadata.find( ns );
@@ -262,9 +262,9 @@ namespace mongo {
                                      const BSONObj& max,
                                      const OID& epoch,
                                      string* errMsg ) {
-        
+
         invariant(txn->lockState()->isCollectionLockedForMode(ns, MODE_X));
-        boost::lock_guard<boost::mutex> lk( _mutex );
+        stdx::lock_guard<stdx::mutex> lk( _mutex );
 
         CollectionMetadataMap::const_iterator it = _collMetadata.find( ns );
         if ( it == _collMetadata.end() ) {
@@ -307,9 +307,9 @@ namespace mongo {
                                        const BSONObj& max,
                                        const OID& epoch,
                                        string* errMsg ) {
-        
+
         invariant(txn->lockState()->isCollectionLockedForMode(ns, MODE_X));
-        boost::lock_guard<boost::mutex> lk( _mutex );
+        stdx::lock_guard<stdx::mutex> lk( _mutex );
 
         CollectionMetadataMap::const_iterator it = _collMetadata.find( ns );
         if ( it == _collMetadata.end() ) {
@@ -352,9 +352,9 @@ namespace mongo {
                                     const BSONObj& max,
                                     const vector<BSONObj>& splitKeys,
                                     ChunkVersion version ) {
-        
+
         invariant(txn->lockState()->isCollectionLockedForMode(ns, MODE_X));
-        boost::lock_guard<boost::mutex> lk( _mutex );
+        stdx::lock_guard<stdx::mutex> lk( _mutex );
 
         CollectionMetadataMap::const_iterator it = _collMetadata.find( ns );
         verify( it != _collMetadata.end() ) ;
@@ -378,7 +378,7 @@ namespace mongo {
                                      ChunkVersion mergedVersion ) {
 
         invariant(txn->lockState()->isCollectionLockedForMode(ns, MODE_X));
-        boost::lock_guard<boost::mutex> lk( _mutex );
+        stdx::lock_guard<stdx::mutex> lk( _mutex );
 
         CollectionMetadataMap::const_iterator it = _collMetadata.find( ns );
         verify( it != _collMetadata.end() );
@@ -396,7 +396,7 @@ namespace mongo {
     }
 
     void ShardingState::resetMetadata( const string& ns ) {
-        boost::lock_guard<boost::mutex> lk( _mutex );
+        stdx::lock_guard<stdx::mutex> lk( _mutex );
 
         warning() << "resetting metadata for " << ns << ", this should only be used in testing"
                   << endl;
@@ -430,7 +430,7 @@ namespace mongo {
 
         CollectionMetadataPtr storedMetadata;
         {
-            boost::lock_guard<boost::mutex> lk( _mutex );
+            stdx::lock_guard<stdx::mutex> lk( _mutex );
             CollectionMetadataMap::iterator it = _collMetadata.find( ns );
             if ( it != _collMetadata.end() ) storedMetadata = it->second;
         }
@@ -478,7 +478,7 @@ namespace mongo {
 
     void ShardingState::_initialize(const string& server) {
         // Ensure only one caller at a time initializes
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
 
         if (_enabled) {
             // TODO: Do we need to throw exception if the config servers have changed from what we
@@ -526,7 +526,7 @@ namespace mongo {
         CollectionMetadataPtr beforeMetadata;
 
         {
-            boost::lock_guard<boost::mutex> lk( _mutex );
+            stdx::lock_guard<stdx::mutex> lk( _mutex );
 
             // We can't reload if sharding is not enabled - i.e. without a config server location
             if (!_enabled) {
@@ -648,7 +648,7 @@ namespace mongo {
             // Get the metadata now that the load has completed
             //
 
-            boost::lock_guard<boost::mutex> lk( _mutex );
+            stdx::lock_guard<stdx::mutex> lk( _mutex );
 
             // Don't reload if our config server has changed or sharding is no longer enabled
             if (!_enabled) {
@@ -803,7 +803,7 @@ namespace mongo {
     }
 
     void ShardingState::appendInfo(BSONObjBuilder& builder) {
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
 
         builder.appendBool("enabled", _enabled);
         if (!_enabled) {
@@ -836,7 +836,7 @@ namespace mongo {
     }
 
     CollectionMetadataPtr ShardingState::getCollectionMetadata( const string& ns ) {
-        boost::lock_guard<boost::mutex> lk( _mutex );
+        stdx::lock_guard<stdx::mutex> lk( _mutex );
 
         CollectionMetadataMap::const_iterator it = _collMetadata.find( ns );
         if ( it == _collMetadata.end() ) {
@@ -890,7 +890,7 @@ namespace mongo {
         static mongo::mutex lock;
         static bool done = false;
 
-        boost::lock_guard<boost::mutex> lk(lock);
+        stdx::lock_guard<stdx::mutex> lk(lock);
         if (!done) {
             log() << "first cluster operation detected, adding sharding hook to enable versioning "
                      "and authentication to remote servers";

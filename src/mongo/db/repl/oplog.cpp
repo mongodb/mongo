@@ -130,7 +130,7 @@ namespace {
                                                const char* ns,
                                                ReplicationCoordinator* replCoord,
                                                const char* opstr) {
-        boost::lock_guard<boost::mutex> lk(newOpMutex);
+        stdx::lock_guard<stdx::mutex> lk(newOpMutex);
         Timestamp ts = getNextGlobalTimestamp();
         newTimestampNotifier.notify_all();
 
@@ -870,7 +870,7 @@ namespace {
     }
 
     void waitUpToOneSecondForTimestampChange(const Timestamp& referenceTime) {
-        boost::unique_lock<boost::mutex> lk(newOpMutex);
+        stdx::unique_lock<stdx::mutex> lk(newOpMutex);
 
         while (referenceTime == getLastSetTimestamp()) {
             if (!newTimestampNotifier.timed_wait(lk, boost::posix_time::seconds(1)))
@@ -879,7 +879,7 @@ namespace {
     }
 
     void setNewTimestamp(const Timestamp& newTime) {
-        boost::lock_guard<boost::mutex> lk(newOpMutex);
+        stdx::lock_guard<stdx::mutex> lk(newOpMutex);
         setGlobalTimestamp(newTime);
         newTimestampNotifier.notify_all();
     }

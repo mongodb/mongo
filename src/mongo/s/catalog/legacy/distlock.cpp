@@ -129,14 +129,14 @@ namespace mongo {
 
     DistLockPingInfo DistributedLock::LastPings::getLastPing(const ConnectionString& conn,
                                                              const string& lockName) {
-        boost::lock_guard<boost::mutex> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
         return _lastPings[std::make_pair(conn.toString(), lockName)];
     }
 
     void DistributedLock::LastPings::setLastPing(const ConnectionString& conn,
                                                  const string& lockName,
                                                  const DistLockPingInfo& pd) {
-        boost::lock_guard<boost::mutex> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
         _lastPings[std::make_pair(conn.toString(), lockName)] = pd;
     }
 

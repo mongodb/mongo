@@ -77,7 +77,7 @@ namespace mongo {
         ~DeadlineMonitor() {
             {
                 // ensure the monitor thread has been stopped before destruction
-                boost::lock_guard<boost::mutex> lk(_deadlineMutex);
+                stdx::lock_guard<stdx::mutex> lk(_deadlineMutex);
                 _inShutdown = true;
                 _newDeadlineAvailable.notify_one();
             }
@@ -93,7 +93,7 @@ namespace mongo {
          */
         void startDeadline(_Task* const task, uint64_t timeoutMs) {
             const auto deadline = Date_t::now() + Milliseconds(timeoutMs);
-            boost::lock_guard<boost::mutex> lk(_deadlineMutex);
+            stdx::lock_guard<stdx::mutex> lk(_deadlineMutex);
 
             _tasks[task] = deadline;
 
@@ -109,7 +109,7 @@ namespace mongo {
          * @return true  if the task was found and erased
          */
         bool stopDeadline(_Task* const task) {
-            boost::lock_guard<boost::mutex> lk(_deadlineMutex);
+            stdx::lock_guard<stdx::mutex> lk(_deadlineMutex);
             return _tasks.erase(task);
         }
 
@@ -120,7 +120,7 @@ namespace mongo {
          * _Task::kill() is invoked.
          */
         void deadlineMonitorThread() {
-            boost::unique_lock<boost::mutex> lk(_deadlineMutex);
+            stdx::unique_lock<stdx::mutex> lk(_deadlineMutex);
             while (!_inShutdown) {
 
                 // get the next interval to wait
@@ -160,7 +160,7 @@ namespace mongo {
 
         typedef unordered_map<_Task*, Date_t> TaskDeadlineMap;
         TaskDeadlineMap _tasks; // map of running tasks with deadlines
-        boost::mutex _deadlineMutex; // protects all non-const members, except _monitorThread
+        stdx::mutex _deadlineMutex; // protects all non-const members, except _monitorThread
         boost::condition_variable _newDeadlineAvailable; // Signaled for timeout, start and stop
         boost::thread _monitorThread; // the deadline monitor thread
         Date_t _nearestDeadlineWallclock = Date_t::max(); // absolute time of the nearest deadline

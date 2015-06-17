@@ -33,8 +33,7 @@
 #include "mongo/platform/windows_basic.h"
 #endif
 
-#include <boost/thread/mutex.hpp>
-
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/threadlocal.h"
 
@@ -51,7 +50,7 @@ namespace mongo {
         ~StaticObserver() { _destroyingStatics = true; }
     };
 
-    using mutex = boost::mutex;
+    using mutex = stdx::mutex;
 
     /** The concept with SimpleMutex is that it is a basic lock/unlock with no
           special functionality (such as try and try timeout).  Thus it can be

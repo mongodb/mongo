@@ -162,10 +162,10 @@ namespace mongo {
         LockMongoFilesShared::assertExclusivelyLocked();
 
         // Prevent flush and close from concurrently running
-        boost::lock_guard<boost::mutex> lk(_flushMutex);
+        stdx::lock_guard<stdx::mutex> lk(_flushMutex);
 
         {
-            boost::lock_guard<boost::mutex> lk(mapViewMutex);
+            stdx::lock_guard<stdx::mutex> lk(mapViewMutex);
 
             for (vector<void*>::iterator i = views.begin(); i != views.end(); i++) {
                 UnmapViewOfFile(*i);
@@ -187,7 +187,7 @@ namespace mongo {
     void* MemoryMappedFile::createReadOnlyMap() {
         verify( maphandle );
 
-        boost::lock_guard<boost::mutex> lk(mapViewMutex);
+        stdx::lock_guard<stdx::mutex> lk(mapViewMutex);
 
         void* readOnlyMapAddress = NULL;
         int current_retry = 0;
@@ -299,7 +299,7 @@ namespace mongo {
 
         void *view = 0;
         {
-            boost::lock_guard<boost::mutex> lk(mapViewMutex);
+            stdx::lock_guard<stdx::mutex> lk(mapViewMutex);
             DWORD access = ( options & READONLY ) ? FILE_MAP_READ : FILE_MAP_ALL_ACCESS;
 
             int current_retry = 0;
@@ -364,7 +364,7 @@ namespace mongo {
     void* MemoryMappedFile::createPrivateMap() {
         verify( maphandle );
 
-        boost::lock_guard<boost::mutex> lk(mapViewMutex);
+        stdx::lock_guard<stdx::mutex> lk(mapViewMutex);
 
         LPVOID thisAddress = getNextMemoryMappedFileLocation( len );
 
@@ -412,7 +412,7 @@ namespace mongo {
 
         privateViews.clearWritableBits(oldPrivateAddr, len);
 
-        boost::lock_guard<boost::mutex> lk(mapViewMutex);
+        stdx::lock_guard<stdx::mutex> lk(mapViewMutex);
 
         if( !UnmapViewOfFile(oldPrivateAddr) ) {
             DWORD dosError = GetLastError();
@@ -448,7 +448,7 @@ namespace mongo {
                           HANDLE fd,
                           const uint64_t id,
                           const std::string& filename,
-                          boost::mutex& flushMutex )
+                          stdx::mutex& flushMutex )
             : _theFile(theFile), _view(view), _fd(fd), _id(id), _filename(filename),
               _flushMutex(flushMutex)
         {}
@@ -471,7 +471,7 @@ namespace mongo {
                 _flushMutex.lock();
             }
 
-            boost::lock_guard<boost::mutex> lk(_flushMutex, boost::adopt_lock_t());
+            stdx::lock_guard<stdx::mutex> lk(_flushMutex, stdx::adopt_lock);
 
             int loopCount = 0;
             bool success = false;
@@ -520,7 +520,7 @@ namespace mongo {
         HANDLE _fd;
         const uint64_t _id;
         string _filename;
-        boost::mutex& _flushMutex;
+        stdx::mutex& _flushMutex;
     };
 
     void MemoryMappedFile::flush(bool sync) {

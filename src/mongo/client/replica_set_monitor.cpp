@@ -97,7 +97,7 @@ namespace {
         virtual string name() const { return "ReplicaSetMonitorWatcher"; }
 
         void safeGo() {
-            boost::lock_guard<boost::mutex> lk( _monitorMutex );
+            stdx::lock_guard<stdx::mutex> lk( _monitorMutex );
             if ( _started )
                 return;
 
@@ -111,7 +111,7 @@ namespace {
          * Stops monitoring the sets and wait for the monitoring thread to terminate.
          */
         void stop() {
-            boost::lock_guard<boost::mutex> sl( _monitorMutex );
+            stdx::lock_guard<stdx::mutex> sl( _monitorMutex );
             _stopRequested = true;
             _stopRequestedCV.notify_one();
         }
@@ -125,14 +125,14 @@ namespace {
             // Should not be needed after SERVER-7533 gets implemented and tests start
             // using it.
             if (!inShutdown() && !StaticObserver::_destroyingStatics) {
-                boost::unique_lock<boost::mutex> sl( _monitorMutex );
+                stdx::unique_lock<stdx::mutex> sl( _monitorMutex );
                 _stopRequestedCV.timed_wait(sl, boost::posix_time::seconds(10));
             }
 
             while ( !inShutdown() &&
                     !StaticObserver::_destroyingStatics ) {
                 {
-                    boost::lock_guard<boost::mutex> sl( _monitorMutex );
+                    stdx::lock_guard<stdx::mutex> sl( _monitorMutex );
                     if (_stopRequested) {
                         break;
                     }
@@ -148,7 +148,7 @@ namespace {
                     error() << "unknown error";
                 }
 
-                boost::unique_lock<boost::mutex> sl( _monitorMutex );
+                stdx::unique_lock<stdx::mutex> sl( _monitorMutex );
                 if (_stopRequested) {
                     break;
                 }
@@ -254,7 +254,7 @@ namespace {
 
     HostAndPort ReplicaSetMonitor::getHostOrRefresh(const ReadPreferenceSetting& criteria) {
         {
-            boost::lock_guard<boost::mutex> lk(_state->mutex);
+            stdx::lock_guard<stdx::mutex> lk(_state->mutex);
             HostAndPort out = _state->getMatchingHost(criteria);
             if (!out.empty())
                 return out;
@@ -283,7 +283,7 @@ namespace {
     }
 
     Refresher ReplicaSetMonitor::startOrContinueRefresh() {
-        boost::lock_guard<boost::mutex> lk(_state->mutex);
+        stdx::lock_guard<stdx::mutex> lk(_state->mutex);
 
         Refresher out(_state);
         DEV _state->checkInvariants();
@@ -291,7 +291,7 @@ namespace {
     }
 
     void ReplicaSetMonitor::failedHost(const HostAndPort& host) {
-        boost::lock_guard<boost::mutex> lk(_state->mutex);
+        stdx::lock_guard<stdx::mutex> lk(_state->mutex);
         Node* node = _state->findNode(host);
         if (node)
             node->markFailed();
@@ -299,19 +299,19 @@ namespace {
     }
 
     bool ReplicaSetMonitor::isPrimary(const HostAndPort& host) const {
-        boost::lock_guard<boost::mutex> lk(_state->mutex);
+        stdx::lock_guard<stdx::mutex> lk(_state->mutex);
         Node* node = _state->findNode(host);
         return node ? node->isMaster : false;
     }
 
     bool ReplicaSetMonitor::isHostUp(const HostAndPort& host) const {
-        boost::lock_guard<boost::mutex> lk(_state->mutex);
+        stdx::lock_guard<stdx::mutex> lk(_state->mutex);
         Node* node = _state->findNode(host);
         return node ? node->isUp : false;
     }
 
     int ReplicaSetMonitor::getConsecutiveFailedScans() const {
-        boost::lock_guard<boost::mutex> lk(_state->mutex);
+        stdx::lock_guard<stdx::mutex> lk(_state->mutex);
         return _state->consecutiveFailedScans;
     }
 
@@ -321,12 +321,12 @@ namespace {
     }
 
     std::string ReplicaSetMonitor::getServerAddress() const {
-        boost::lock_guard<boost::mutex> lk(_state->mutex);
+        stdx::lock_guard<stdx::mutex> lk(_state->mutex);
         return _state->getServerAddress();
     }
 
     bool ReplicaSetMonitor::contains(const HostAndPort& host) const {
-        boost::lock_guard<boost::mutex> lk(_state->mutex);
+        stdx::lock_guard<stdx::mutex> lk(_state->mutex);
         return _state->seedNodes.count(host);
     }
 
@@ -357,7 +357,7 @@ namespace {
 
     // TODO move to correct order with non-statics before pushing
     void ReplicaSetMonitor::appendInfo(BSONObjBuilder& bsonObjBuilder) const {
-        boost::lock_guard<boost::mutex> lk(_state->mutex);
+        stdx::lock_guard<stdx::mutex> lk(_state->mutex);
 
         // NOTE: the format here must be consistent for backwards compatibility
         BSONArrayBuilder hosts(bsonObjBuilder.subarrayStart("hosts"));
@@ -682,7 +682,7 @@ namespace {
     }
 
     HostAndPort Refresher::_refreshUntilMatches(const ReadPreferenceSetting* criteria) {
-        boost::unique_lock<boost::mutex> lk(_set->mutex);
+        stdx::unique_lock<stdx::mutex> lk(_set->mutex);
         while (true) {
             if (criteria) {
                 HostAndPort out = _set->getMatchingHost(*criteria);

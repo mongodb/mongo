@@ -56,11 +56,11 @@ namespace {
     // The bool is 'true' when a new background index has started in a new thread but the
     // parent thread has not yet synchronized with it.
     bool _bgIndexStarting(false);
-    boost::mutex _bgIndexStartingMutex;
+    stdx::mutex _bgIndexStartingMutex;
     boost::condition_variable _bgIndexStartingCondVar;
 
     void _setBgIndexStarting() {
-        boost::lock_guard<boost::mutex> lk(_bgIndexStartingMutex);
+        stdx::lock_guard<stdx::mutex> lk(_bgIndexStartingMutex);
         invariant(_bgIndexStarting == false);
         _bgIndexStarting = true;
         _bgIndexStartingCondVar.notify_one();
@@ -111,7 +111,7 @@ namespace {
     }
 
     void IndexBuilder::waitForBgIndexStarting() {
-        boost::unique_lock<boost::mutex> lk(_bgIndexStartingMutex);
+        stdx::unique_lock<stdx::mutex> lk(_bgIndexStartingMutex);
         while (_bgIndexStarting == false) {
             _bgIndexStartingCondVar.wait(lk);
         }

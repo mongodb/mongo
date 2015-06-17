@@ -29,13 +29,13 @@
 #pragma once
 
 #include <boost/thread/condition_variable.hpp>
-#include <boost/thread/mutex.hpp>
 #include <boost/thread/thread.hpp>
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 
@@ -138,7 +138,7 @@ namespace mongo {
             const Date_t timeoutAtMillis;
 
             // Must be held to access the parent pointer below
-            boost::mutex parentMutex;
+            stdx::mutex parentMutex;
             // Set and unset by the parent operation on scheduling and destruction
             MultiHostQueryOp* parentOp;
         };
@@ -172,7 +172,7 @@ namespace mongo {
         PendingMap _pending;
 
         // Synchronizes below
-        boost::mutex _resultsMutex;
+        stdx::mutex _resultsMutex;
 
         // Current results recv'd
         typedef std::map<ConnectionString, StatusWith<DBClientCursor*> > ResultMap;
@@ -247,7 +247,7 @@ namespace mongo {
         const int _poolSize;
         const bool _scopeAllWork;
 
-        boost::mutex _mutex;
+        stdx::mutex _mutex;
         typedef std::map<ConnectionString, HostThreadPool*> HostPoolMap;
         HostPoolMap _pools;
     };
@@ -298,7 +298,7 @@ namespace mongo {
             }
 
             // Synchronizes below
-            boost::mutex mutex;
+            stdx::mutex mutex;
 
             // The scheduled work
             std::deque<Callback> scheduled;

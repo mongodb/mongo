@@ -29,7 +29,6 @@
 #pragma once
 
 #include <boost/thread/condition_variable.hpp>
-#include <boost/thread/mutex.hpp>
 #include <memory>
 #include <string>
 
@@ -47,6 +46,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/platform/unordered_map.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 
@@ -360,7 +360,7 @@ namespace mongo {
         bool _privilegeDocsExist;
 
         // Protects _privilegeDocsExist
-        mutable boost::mutex _privilegeDocsExistMutex;
+        mutable stdx::mutex _privilegeDocsExistMutex;
 
         std::unique_ptr<AuthzManagerExternalState> _externalState;
 
@@ -400,7 +400,7 @@ namespace mongo {
          * Protects _userCache, _cacheGeneration, _version and _isFetchPhaseBusy.  Manipulated
          * via CacheGuard.
          */
-        boost::mutex _cacheMutex;
+        stdx::mutex _cacheMutex;
 
         /**
          * Condition used to signal that it is OK for another CacheGuard to enter a fetch phase.

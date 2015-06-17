@@ -35,11 +35,10 @@
 #include <string>
 #include <vector>
 
-#include <boost/thread/mutex.hpp>
 #include <boost/thread/shared_mutex.hpp>
-
 #include <wiredtiger.h>
 
+#include "mongo/stdx/mutex.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/concurrency/spin_lock.h"
 

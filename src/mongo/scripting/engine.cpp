@@ -314,7 +314,7 @@ namespace {
     class ScopeCache {
     public:
         void release(const string& poolName, const std::shared_ptr<Scope>& scope) {
-            boost::lock_guard<boost::mutex> lk(_mutex);
+            stdx::lock_guard<stdx::mutex> lk(_mutex);
 
             if (scope->hasOutOfMemoryException()) {
                 // make some room
@@ -340,7 +340,7 @@ namespace {
         }
 
         std::shared_ptr<Scope> tryAcquire(OperationContext* txn, const string& poolName) {
-            boost::lock_guard<boost::mutex> lk(_mutex);
+            stdx::lock_guard<stdx::mutex> lk(_mutex);
 
             for (Pools::iterator it = _pools.begin(); it != _pools.end(); ++it) {
                 if (it->poolName == poolName) {

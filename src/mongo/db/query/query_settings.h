@@ -30,13 +30,14 @@
 
 #include <string>
 #include <vector>
-#include <boost/thread/mutex.hpp>
+
 #include "mongo/base/disallow_copying.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/plan_cache.h"
 #include "mongo/platform/unordered_map.h"
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 
@@ -141,7 +142,7 @@ namespace mongo {
         /**
          * Protects data in query settings.
          */
-        mutable boost::mutex _mutex;
+        mutable stdx::mutex _mutex;
     };
 
 }  // namespace mongo

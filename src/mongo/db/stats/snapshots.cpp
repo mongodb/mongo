@@ -80,7 +80,7 @@ namespace mongo {
     {}
 
     const SnapshotData* Snapshots::takeSnapshot() {
-        boost::lock_guard<boost::mutex> lk(_lock);
+        stdx::lock_guard<stdx::mutex> lk(_lock);
         _loc = ( _loc + 1 ) % kNumSnapshots;
         _snapshots[_loc].takeSnapshot();
         if ( _stored < kNumSnapshots )
@@ -89,7 +89,7 @@ namespace mongo {
     }
 
     StatusWith<SnapshotDiff> Snapshots::computeDelta() {
-        boost::lock_guard<boost::mutex> lk(_lock);
+        stdx::lock_guard<stdx::mutex> lk(_lock);
 
         // We need 2 snapshots to calculate a delta
         if (_stored < 2) {

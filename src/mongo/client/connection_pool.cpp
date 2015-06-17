@@ -30,11 +30,10 @@
 
 #include "mongo/client/connection_pool.h"
 
-#include <boost/thread/lock_guard.hpp>
-
 #include "mongo/client/connpool.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/internal_user_auth.h"
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 namespace {
@@ -56,7 +55,7 @@ namespace {
     }
 
     void ConnectionPool::cleanUpOlderThan(Date_t now) {
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         _cleanUpOlderThan_inlock(now);
     }
 
@@ -95,7 +94,7 @@ namespace {
     }
 
     void ConnectionPool::closeAllInUseConnections() {
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         for (ConnectionList::iterator iter = _inUseConnections.begin();
              iter != _inUseConnections.end();
              ++iter) {
@@ -126,7 +125,7 @@ namespace {
                                                                 const HostAndPort& target,
                                                                 Date_t now,
                                                                 Milliseconds timeout) {
-        boost::unique_lock<boost::mutex> lk(_mutex);
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
 
         // Clean up connections on stale/unused hosts
         _cleanUpStaleHosts_inlock(now);
@@ -196,7 +195,7 @@ namespace {
     }
 
     void ConnectionPool::releaseConnection(ConnectionList::iterator iter, const Date_t now) {
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         if (!_shouldKeepConnection(now, *iter)) {
             _destroyConnection_inlock(&_inUseConnections, iter);
             return;
@@ -209,7 +208,7 @@ namespace {
     }
 
     void ConnectionPool::destroyConnection(ConnectionList::iterator iter) {
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         _destroyConnection_inlock(&_inUseConnections, iter);
     }
 

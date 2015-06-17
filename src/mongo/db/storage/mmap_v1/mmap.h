@@ -241,7 +241,7 @@ namespace mongo {
         //  It ensures close() cannot complete while flush() is running
         // Lock Ordering:
         //  LockMongoFilesShared must be taken before _flushMutex if both are taken
-        boost::mutex _flushMutex;
+        stdx::mutex _flushMutex;
 #endif
 
     protected:

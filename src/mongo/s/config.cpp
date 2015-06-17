@@ -150,7 +150,7 @@ namespace mongo {
     bool DBConfig::isSharded( const string& ns ) {
         if ( ! _shardingEnabled )
             return false;
-        boost::lock_guard<boost::mutex> lk( _lock );
+        stdx::lock_guard<stdx::mutex> lk( _lock );
         return _isSharded( ns );
     }
 
@@ -182,7 +182,7 @@ namespace mongo {
         
         verify( _name != "config" );
 
-        boost::lock_guard<boost::mutex> lk( _lock );
+        stdx::lock_guard<stdx::mutex> lk( _lock );
         _shardingEnabled = true;
         if( save ) _save();
     }
@@ -195,7 +195,7 @@ namespace mongo {
             return false;
         }
 
-        boost::lock_guard<boost::mutex> lk( _lock );
+        stdx::lock_guard<stdx::mutex> lk( _lock );
 
         CollectionInfoMap::iterator i = _collections.find( ns );
 
@@ -228,7 +228,7 @@ namespace mongo {
         primary.reset();
 
         {
-            boost::lock_guard<boost::mutex> lk( _lock );
+            stdx::lock_guard<stdx::mutex> lk( _lock );
 
             CollectionInfoMap::iterator i = _collections.find( ns );
 
@@ -282,7 +282,7 @@ namespace mongo {
         ChunkManagerPtr oldManager;
 
         {
-            boost::lock_guard<boost::mutex> lk(_lock);
+            stdx::lock_guard<stdx::mutex> lk(_lock);
 
             bool earlyReload = !_collections[ns].isSharded() && (shouldReload || forceReload);
             if (earlyReload) {
@@ -323,7 +323,7 @@ namespace mongo {
                 invariant(newestChunk.size() == 1);
                 ChunkVersion v = newestChunk[0].getVersion();
                 if (v.equals(oldVersion)) {
-                    boost::lock_guard<boost::mutex> lk( _lock );
+                    stdx::lock_guard<stdx::mutex> lk( _lock );
                     const CollectionInfo& ci = _collections[ns];
                     uassert(15885,
                             str::stream() << "not sharded after reloading from chunks : "
@@ -343,11 +343,11 @@ namespace mongo {
         unique_ptr<ChunkManager> tempChunkManager;
 
         {
-            boost::lock_guard<boost::mutex> lll ( _hitConfigServerLock );
-            
+            stdx::lock_guard<stdx::mutex> lll ( _hitConfigServerLock );
+
             if (!newestChunk.empty() && !forceReload) {
                 // If we have a target we're going for see if we've hit already
-                boost::lock_guard<boost::mutex> lk( _lock );
+                stdx::lock_guard<stdx::mutex> lk( _lock );
 
                 CollectionInfo& ci = _collections[ns];
 
@@ -376,8 +376,8 @@ namespace mongo {
             }
         }
 
-        boost::lock_guard<boost::mutex> lk( _lock );
-        
+        stdx::lock_guard<stdx::mutex> lk( _lock );
+
         CollectionInfo& ci = _collections[ns];
         uassert(14822, (string)"state changed in the middle: " + ns, ci.isSharded());
 
@@ -424,13 +424,13 @@ namespace mongo {
     void DBConfig::setPrimary(const std::string& s) {
         const auto& shard = grid.shardRegistry()->findIfExists(s);
 
-        boost::lock_guard<boost::mutex> lk( _lock );
+        stdx::lock_guard<stdx::mutex> lk( _lock );
         _primaryId = shard->getId();
         _save();
     }
 
     bool DBConfig::load() {
-        boost::lock_guard<boost::mutex> lk( _lock );
+        stdx::lock_guard<stdx::mutex> lk( _lock );
         return _load();
     }
 
@@ -500,7 +500,7 @@ namespace mongo {
         bool successful = false;
 
         {
-            boost::lock_guard<boost::mutex> lk( _lock );
+            stdx::lock_guard<stdx::mutex> lk( _lock );
             successful = _reload();
         }
 
@@ -641,7 +641,7 @@ namespace mongo {
     void DBConfig::getAllShardIds(set<ShardId>* shardIds) {
         dassert(shardIds);
 
-        boost::lock_guard<boost::mutex> lk(_lock);
+        stdx::lock_guard<stdx::mutex> lk(_lock);
         shardIds->insert(getPrimaryId());
         for (CollectionInfoMap::const_iterator it(_collections.begin()), end(_collections.end());
              it != end;
@@ -653,7 +653,7 @@ namespace mongo {
     }
 
     void DBConfig::getAllShardedCollections( set<string>& namespaces ) {
-        boost::lock_guard<boost::mutex> lk(_lock);
+        stdx::lock_guard<stdx::mutex> lk(_lock);
 
         for( CollectionInfoMap::const_iterator i = _collections.begin(); i != _collections.end(); i++ ) {
             log() << "Coll : " << i->first << " sharded? " << i->second.isSharded() << endl;

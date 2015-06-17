@@ -27,8 +27,9 @@
 
 #pragma once
 
-#include <boost/thread/mutex.hpp>
 #include <iosfwd>
+
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 
@@ -53,7 +54,7 @@ namespace mongo {
         std::ostream& out();
 
     private:
-        boost::unique_lock<boost::mutex> _consoleLock;
+        stdx::unique_lock<stdx::mutex> _consoleLock;
     };
 
 }  // namespace mongo

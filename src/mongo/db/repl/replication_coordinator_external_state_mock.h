@@ -131,10 +131,10 @@ namespace repl {
         Status _storeLocalConfigDocumentStatus;
         Status _storeLocalLastVoteDocumentStatus;
         // mutex and cond var for controlling stroeLocalConfigDocument()'s hanging
-        boost::mutex _shouldHangConfigMutex;
+        stdx::mutex _shouldHangConfigMutex;
         boost::condition _shouldHangConfigCondVar;
         // mutex and cond var for controlling stroeLocalLastVoteDocument()'s hanging
-        boost::mutex _shouldHangLastVoteMutex;
+        stdx::mutex _shouldHangLastVoteMutex;
         boost::condition _shouldHangLastVoteCondVar;
         bool _storeLocalConfigDocumentShouldHang;
         bool _storeLocalLastVoteDocumentShouldHang;

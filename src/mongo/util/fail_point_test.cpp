@@ -42,6 +42,7 @@
 #include "mongo/util/time_support.h"
 
 using mongo::FailPoint;
+namespace stdx = mongo::stdx;
 
 namespace mongo_test {
     TEST(FailPoint, InitialState) {
@@ -176,7 +177,7 @@ namespace mongo_test {
 
         void stopTest() {
             {
-                boost::lock_guard<boost::mutex> lk(_mutex);
+                stdx::lock_guard<stdx::mutex> lk(_mutex);
                 _inShutdown = true;
             }
             for (auto& t : _tasks) {
@@ -200,7 +201,7 @@ namespace mongo_test {
                     }
                 }
 
-                boost::lock_guard<boost::mutex> lk(_mutex);
+                stdx::lock_guard<stdx::mutex> lk(_mutex);
                 if (_inShutdown)
                     break;
             }
@@ -224,7 +225,7 @@ namespace mongo_test {
                 catch (const std::logic_error&) {
                 }
 
-                boost::lock_guard<boost::mutex> lk(_mutex);
+                stdx::lock_guard<stdx::mutex> lk(_mutex);
                 if (_inShutdown)
                     break;
            }
@@ -233,7 +234,7 @@ namespace mongo_test {
         void simpleTask() {
             while (true) {
                 static_cast<void>(MONGO_FAIL_POINT(_fp));
-                boost::lock_guard<boost::mutex> lk(_mutex);
+                stdx::lock_guard<stdx::mutex> lk(_mutex);
                 if (_inShutdown)
                     break;
             }
@@ -248,7 +249,7 @@ namespace mongo_test {
                     _fp.setMode(FailPoint::alwaysOn, 0, BSON("a" << 44));
                 }
 
-                boost::lock_guard<boost::mutex> lk(_mutex);
+                stdx::lock_guard<stdx::mutex> lk(_mutex);
                 if (_inShutdown)
                     break;
             }
@@ -256,7 +257,7 @@ namespace mongo_test {
 
         FailPoint _fp;
         std::vector<boost::thread> _tasks;
-        boost::mutex _mutex;
+        stdx::mutex _mutex;
         bool _inShutdown = false;
     };
 

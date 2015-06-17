@@ -170,7 +170,7 @@ namespace {
                 targetIndex >= 0 &&
                 hbStatusResponse.getValue().hasState() &&
                 hbStatusResponse.getValue().getState() != MemberState::RS_PRIMARY) {
-            boost::unique_lock<boost::mutex> lk(_mutex);
+            stdx::unique_lock<stdx::mutex> lk(_mutex);
             if (hbStatusResponse.getValue().getConfigVersion() == _rsConfig.getConfigVersion()) {
                 _updateOpTimeFromHeartbeat_inlock(targetIndex,
                                                   hbStatusResponse.getValue().getOpTime());
@@ -209,7 +209,7 @@ namespace {
         case HeartbeatResponseAction::NoAction:
             // Update the cached member state if different than the current topology member state
             if (_memberState != _topCoord->getMemberState()) {
-                boost::unique_lock<boost::mutex> lk(_mutex);
+                stdx::unique_lock<stdx::mutex> lk(_mutex);
                 const PostMemberStateUpdateAction postUpdateAction =
                     _updateMemberStateFromTopologyCoordinator_inlock();
                 lk.unlock();
@@ -295,7 +295,7 @@ namespace {
         invariant(cbData.txn);
         // TODO Add invariant that we've got global shared or global exclusive lock, when supported
         // by lock manager.
-        boost::unique_lock<boost::mutex> lk(_mutex);
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
         _topCoord->stepDownIfPending();
         const PostMemberStateUpdateAction action =
             _updateMemberStateFromTopologyCoordinator_inlock();
@@ -304,7 +304,7 @@ namespace {
     }
 
     void ReplicationCoordinatorImpl::_scheduleHeartbeatReconfig(const ReplicaSetConfig& newConfig) {
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         if (_inShutdown) {
             return;
         }
@@ -360,7 +360,7 @@ namespace {
             return;
         }
         fassert(18911, cbData.status);
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         if (_inShutdown) {
             return;
         }
@@ -382,7 +382,7 @@ namespace {
             return;
         }
 
-        boost::unique_lock<boost::mutex> lk(_mutex, boost::defer_lock_t());
+        stdx::unique_lock<stdx::mutex> lk(_mutex, stdx::defer_lock);
 
         const StatusWith<int> myIndex = validateConfigForHeartbeatReconfig(
                 _externalState.get(),
@@ -459,7 +459,7 @@ namespace {
             return;
         }
 
-        boost::unique_lock<boost::mutex> lk(_mutex);
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
         invariant(_rsConfigState == kConfigHBReconfiguring);
         invariant(!_rsConfig.isInitialized() ||
                   _rsConfig.getConfigVersion() < newConfig.getConfigVersion());

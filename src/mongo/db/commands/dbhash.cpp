@@ -78,7 +78,7 @@ namespace mongo {
                                           Database* db,
                                           const std::string& fullCollectionName,
                                           bool* fromCache) {
-        boost::unique_lock<boost::mutex> cachedHashedLock(_cachedHashedMutex, boost::defer_lock);
+        stdx::unique_lock<stdx::mutex> cachedHashedLock(_cachedHashedMutex, stdx::defer_lock);
 
         if ( isCachable( fullCollectionName ) ) {
             cachedHashedLock.lock();
@@ -232,7 +232,7 @@ namespace mongo {
 
         }
         void commit() {
-            boost::lock_guard<boost::mutex> lk( _dCmd->_cachedHashedMutex );
+            stdx::lock_guard<stdx::mutex> lk( _dCmd->_cachedHashedMutex );
             _dCmd->_cachedHashed.erase(_ns);
         }
         void rollback() { }

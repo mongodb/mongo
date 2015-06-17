@@ -31,13 +31,13 @@
 
 #pragma once
 
-#include <boost/thread/mutex.hpp>
 #include <map>
 #include <string>
 #include <wiredtiger.h>
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 
@@ -80,13 +80,13 @@ namespace mongo {
         int _magic;
 
         // Guards _cursor. Acquire *before* _entriesMutex.
-        mutable boost::mutex _cursorMutex;
+        mutable stdx::mutex _cursorMutex;
         const WiredTigerSession _session;
         WT_CURSOR* _cursor; // pointer is const after constructor
 
         typedef std::map<std::string,Entry> Map;
         Map _entries;
-        mutable boost::mutex _entriesMutex;
+        mutable stdx::mutex _entriesMutex;
 
     };
 

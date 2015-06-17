@@ -145,7 +145,7 @@ namespace mongo {
             // This ensures that any calls, which are currently inside of getSession/releaseSession
             // will be able to complete before we start cleaning up the pool. Any others, which are
             // about to enter will return immediately because of _shuttingDown == true.
-            boost::lock_guard<boost::shared_mutex> lk(_shutdownLock);
+            stdx::lock_guard<boost::shared_mutex> lk(_shutdownLock);
         }
 
         closeAll();
@@ -156,7 +156,7 @@ namespace mongo {
             SessionPool swapPool;
 
             {
-                boost::unique_lock<SpinLock> scopedLock(_cache[i].lock);
+                stdx::unique_lock<SpinLock> scopedLock(_cache[i].lock);
                 _cache[i].pool.swap(swapPool);
                 _cache[i].epoch++;
             }
@@ -183,7 +183,7 @@ namespace mongo {
         int epoch;
 
         {
-            boost::unique_lock<SpinLock> cachePartitionLock(_cache[cachePartition].lock);
+            stdx::unique_lock<SpinLock> cachePartitionLock(_cache[cachePartition].lock);
             epoch = _cache[cachePartition].epoch;
 
             if (!_cache[cachePartition].pool.empty()) {
@@ -224,7 +224,7 @@ namespace mongo {
         bool returnedToCache = false;
 
         if (cachePartition >= 0) {
-            boost::unique_lock<SpinLock> cachePartitionLock(_cache[cachePartition].lock);
+            stdx::unique_lock<SpinLock> cachePartitionLock(_cache[cachePartition].lock);
 
             invariant(session->_getEpoch() <= _cache[cachePartition].epoch);
 

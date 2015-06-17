@@ -71,7 +71,7 @@ namespace mongo {
 
         const ConnectionString _configServer;
 
-        boost::mutex _mutex;
+        stdx::mutex _mutex;
         boost::condition_variable _noLocksCV;
         std::map<DistLockHandle, std::unique_ptr<DistributedLock>> _lockMap;
 

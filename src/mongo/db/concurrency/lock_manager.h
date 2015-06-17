@@ -29,17 +29,17 @@
 #pragma once
 
 #include <boost/thread/condition_variable.hpp>
-#include <boost/thread/mutex.hpp>
 
 #include <deque>
 
+#include "mongo/config.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/concurrency/lock_request_list.h"
-#include "mongo/config.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/platform/cstdint.h"
 #include "mongo/platform/unordered_map.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/mutex.h"
 
 namespace mongo {

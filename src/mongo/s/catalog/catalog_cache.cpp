@@ -49,7 +49,7 @@ namespace mongo {
     }
 
     StatusWith<shared_ptr<DBConfig>> CatalogCache::getDatabase(const string& dbName) {
-        boost::lock_guard<boost::mutex> guard(_mutex);
+        stdx::lock_guard<stdx::mutex> guard(_mutex);
 
         ShardedDatabasesMap::iterator it = _databases.find(dbName);
         if (it != _databases.end()) {
@@ -71,7 +71,7 @@ namespace mongo {
     }
 
     void CatalogCache::invalidate(const string& dbName) {
-        boost::lock_guard<boost::mutex> guard(_mutex);
+        stdx::lock_guard<stdx::mutex> guard(_mutex);
 
         ShardedDatabasesMap::iterator it = _databases.find(dbName);
         if (it != _databases.end()) {
@@ -80,7 +80,7 @@ namespace mongo {
     }
 
     void CatalogCache::invalidateAll() {
-        boost::lock_guard<boost::mutex> guard(_mutex);
+        stdx::lock_guard<stdx::mutex> guard(_mutex);
 
         _databases.clear();
     }

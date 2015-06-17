@@ -62,7 +62,7 @@ namespace mongo {
         virtual void notify(ResourceId resId, LockResult result);
 
         // These two go together to implement the conditional variable pattern.
-        boost::mutex _mutex;
+        stdx::mutex _mutex;
         boost::condition_variable _cond;
 
         // Result from the last call to notify

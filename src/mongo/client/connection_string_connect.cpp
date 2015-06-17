@@ -43,7 +43,7 @@
 
 namespace mongo {
 
-    boost::mutex ConnectionString::_connectHookMutex;
+    stdx::mutex ConnectionString::_connectHookMutex;
     ConnectionString::ConnectionHook* ConnectionString::_connectHook = NULL;
 
     DBClientBase* ConnectionString::connect( std::string& errmsg, double socketTimeout ) const {
@@ -82,7 +82,7 @@ namespace mongo {
         case CUSTOM: {
 
             // Lock in case other things are modifying this at the same time
-            boost::lock_guard<boost::mutex> lk( _connectHookMutex );
+            stdx::lock_guard<stdx::mutex> lk( _connectHookMutex );
 
             // Allow the replacement of connections with other connections - useful for testing.
 

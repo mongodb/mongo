@@ -30,9 +30,8 @@
 
 #pragma once
 
-#include <boost/thread/mutex.hpp>
-
 #include "mongo/db/storage/kv/kv_engine.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
@@ -89,7 +88,7 @@ namespace mongo {
     private:
         typedef StringMap<std::shared_ptr<void> > DataMap;
 
-        mutable boost::mutex _mutex;
+        mutable stdx::mutex _mutex;
         DataMap _dataMap; // All actual data is owned in here
     };
 

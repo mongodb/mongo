@@ -170,7 +170,7 @@ namespace {
         PrivilegeVector allPrivileges;
         bool isRoleGraphInconsistent;
         {
-            boost::lock_guard<boost::mutex> lk(_roleGraphMutex);
+            stdx::lock_guard<stdx::mutex> lk(_roleGraphMutex);
             isRoleGraphInconsistent = _roleGraphState == roleGraphStateConsistent;
             for (size_t i = 0; i < directRoles.size(); ++i) {
                 const RoleName& role(directRoles[i]);
@@ -237,7 +237,7 @@ namespace {
     Status AuthzManagerExternalStateLocal::getRoleDescription(const RoleName& roleName,
                                                               bool showPrivileges,
                                                               BSONObj* result) {
-        boost::lock_guard<boost::mutex> lk(_roleGraphMutex);
+        stdx::lock_guard<stdx::mutex> lk(_roleGraphMutex);
         return _getRoleDescription_inlock(roleName, showPrivileges, result);
     }
 
@@ -301,7 +301,7 @@ namespace {
                                                                     bool showPrivileges,
                                                                     bool showBuiltinRoles,
                                                                     vector<BSONObj>* result) {
-        boost::lock_guard<boost::mutex> lk(_roleGraphMutex);
+        stdx::lock_guard<stdx::mutex> lk(_roleGraphMutex);
 
         for (RoleNameIterator it = _roleGraph.getRolesForDatabase(dbname);
                 it.more(); it.next()) {
@@ -336,7 +336,7 @@ namespace {
 }  // namespace
 
     Status AuthzManagerExternalStateLocal::_initializeRoleGraph(OperationContext* txn) {
-        boost::lock_guard<boost::mutex> lkInitialzeRoleGraph(_roleGraphMutex);
+        stdx::lock_guard<stdx::mutex> lkInitialzeRoleGraph(_roleGraphMutex);
 
         _roleGraphState = roleGraphStateInitial;
         _roleGraph = RoleGraph();
@@ -395,7 +395,7 @@ namespace {
         }
 
         virtual void commit() {
-            boost::lock_guard<boost::mutex> lk(_externalState->_roleGraphMutex);
+            stdx::lock_guard<stdx::mutex> lk(_externalState->_roleGraphMutex);
             Status status = _externalState->_roleGraph.handleLogOp(_op.c_str(),
                                                                    NamespaceString(_ns.c_str()),
                                                                    _o,

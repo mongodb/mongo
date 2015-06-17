@@ -534,7 +534,7 @@ namespace PerfTests {
 
     RWLock lk("testrw");
     SimpleMutex m("simptst");
-    boost::mutex mboost;
+    stdx::mutex mboost;
     boost::timed_mutex mboost_timed;
     std::mutex mstd;
     std::timed_mutex mstd_timed;
@@ -552,11 +552,11 @@ namespace PerfTests {
     };
     class boostmutexspeed : public B {
     public:
-        string name() { return "boost::mutex"; }
+        string name() { return "stdx::mutex"; }
         virtual int howLongMillis() { return 500; }
         virtual bool showDurStats() { return false; }
         void timed() {
-            boost::lock_guard<boost::mutex> lk(mboost);
+            stdx::lock_guard<stdx::mutex> lk(mboost);
         }
     };
     class boosttimed_mutexspeed : public B {
@@ -565,7 +565,7 @@ namespace PerfTests {
         virtual int howLongMillis() { return 500; }
         virtual bool showDurStats() { return false; }
         void timed() {
-            boost::lock_guard<boost::timed_mutex> lk(mboost_timed);
+            stdx::lock_guard<boost::timed_mutex> lk(mboost_timed);
         }
     };
     class simplemutexspeed : public B {
@@ -645,7 +645,7 @@ namespace PerfTests {
         boost::thread_specific_ptr<ResourceId> resId;
         boost::thread_specific_ptr<MMAPV1LockerImpl> locker;
         boost::thread_specific_ptr<int> id;
-        boost::mutex lock;
+        stdx::mutex lock;
 
         // The following members are intitialized in the constructor
         LockMode lockMode;

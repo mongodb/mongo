@@ -287,12 +287,12 @@ namespace DocumentSourceTests {
         public:
             PendingValue( int initialValue ) : _value( initialValue ) {}
             void set( int newValue ) {
-                boost::lock_guard<boost::mutex> lk( _mutex );
+                stdx::lock_guard<stdx::mutex> lk( _mutex );
                 _value = newValue;
                 _condition.notify_all();
             }
             void await( int expectedValue ) const {
-                boost::unique_lock<boost::mutex> lk( _mutex );
+                stdx::unique_lock<stdx::mutex> lk( _mutex );
                 while( _value != expectedValue ) {
                     _condition.wait( lk );
                 }

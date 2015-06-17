@@ -93,7 +93,7 @@ namespace repl {
             OperationContext* txn,
             const BSONObj& config) {
         {
-            boost::unique_lock<boost::mutex> lock(_shouldHangConfigMutex);
+            stdx::unique_lock<stdx::mutex> lock(_shouldHangConfigMutex);
             while (_storeLocalConfigDocumentShouldHang) {
                 _shouldHangConfigCondVar.wait(lock);
             }
@@ -120,7 +120,7 @@ namespace repl {
             OperationContext* txn,
             const LastVote& lastVote) {
         {
-            boost::unique_lock<boost::mutex> lock(_shouldHangLastVoteMutex);
+            stdx::unique_lock<stdx::mutex> lock(_shouldHangLastVoteMutex);
             while (_storeLocalLastVoteDocumentShouldHang) {
                 _shouldHangLastVoteCondVar.wait(lock);
             }
@@ -156,7 +156,7 @@ namespace repl {
     }
 
     void ReplicationCoordinatorExternalStateMock::setStoreLocalConfigDocumentToHang(bool hang) {
-        boost::unique_lock<boost::mutex> lock(_shouldHangConfigMutex);
+        stdx::unique_lock<stdx::mutex> lock(_shouldHangConfigMutex);
         _storeLocalConfigDocumentShouldHang = hang;
         if (!hang) {
             _shouldHangConfigCondVar.notify_all();
@@ -169,7 +169,7 @@ namespace repl {
     }
 
     void ReplicationCoordinatorExternalStateMock::setStoreLocalLastVoteDocumentToHang(bool hang) {
-        boost::unique_lock<boost::mutex> lock(_shouldHangLastVoteMutex);
+        stdx::unique_lock<stdx::mutex> lock(_shouldHangLastVoteMutex);
         _storeLocalLastVoteDocumentShouldHang = hang;
         if (!hang) {
             _shouldHangLastVoteCondVar.notify_all();

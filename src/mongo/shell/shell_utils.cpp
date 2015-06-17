@@ -296,14 +296,14 @@ namespace mongo {
             BSONObj info;
             if ( client.runCommand( "admin", BSON( "whatsmyuri" << 1 ), info ) ) {
                 string connstr = dynamic_cast<DBClientBase&>( client ).getServerAddress();
-                boost::lock_guard<boost::mutex> lk( _mutex );
+                stdx::lock_guard<stdx::mutex> lk( _mutex );
                 _connectionUris[ connstr ].insert( info[ "you" ].str() );
-            }            
+            }
         }
 
         void ConnectionRegistry::killOperationsOnAllConnections( bool withPrompt ) const {
             Prompter prompter( "do you want to kill the current op(s) on the server?" );
-            boost::lock_guard<boost::mutex> lk( _mutex );
+            stdx::lock_guard<stdx::mutex> lk( _mutex );
             for( map<string,set<string> >::const_iterator i = _connectionUris.begin();
                 i != _connectionUris.end(); ++i ) {
 
@@ -371,6 +371,6 @@ namespace mongo {
         }
 
 
-        mongo::mutex &mongoProgramOutputMutex(*(new boost::mutex()));
+        mongo::mutex &mongoProgramOutputMutex(*(new stdx::mutex()));
     }
 }

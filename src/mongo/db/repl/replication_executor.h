@@ -29,7 +29,6 @@
 #pragma once
 
 #include <boost/thread/condition_variable.hpp>
-#include <boost/thread/mutex.hpp>
 #include <string>
 #include <thread>
 
@@ -45,6 +44,7 @@
 #include "mongo/platform/random.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/list.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
@@ -285,7 +285,7 @@ namespace repl {
                           const Status& taskRunnerStatus,
                           const CallbackHandle& cbHandle,
                           WorkQueue* workQueue,
-                          boost::mutex* terribleExLockSyncMutex);
+                          stdx::mutex* terribleExLockSyncMutex);
 
         /**
          * Wrapper around TaskExecutor::getCallbackFromHandle that return an Event* instead of
@@ -304,8 +304,8 @@ namespace repl {
 
         std::unique_ptr<executor::NetworkInterface> _networkInterface;
         std::unique_ptr<StorageInterface> _storageInterface;
-        boost::mutex _mutex;
-        boost::mutex _terribleExLockSyncMutex;
+        stdx::mutex _mutex;
+        stdx::mutex _terribleExLockSyncMutex;
         boost::condition_variable _noMoreWaitingThreads;
         WorkQueue _freeQueue;
         WorkQueue _readyQueue;

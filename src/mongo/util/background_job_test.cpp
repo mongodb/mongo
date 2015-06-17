@@ -43,6 +43,8 @@ namespace {
     using mongo::mutex;
     using mongo::Notification;
 
+    namespace stdx = mongo::stdx;
+
     // a global variable that can be accessed independent of the IncTester object below
     // IncTester keeps it up-to-date
     int GLOBAL_val;
@@ -112,7 +114,7 @@ namespace {
 
             virtual void run() {
                 {
-                    boost::lock_guard<boost::mutex> lock( _mutex );
+                    stdx::lock_guard<stdx::mutex> lock( _mutex );
                     ASSERT_FALSE( _hasRun );
                     _hasRun = true;
                 }

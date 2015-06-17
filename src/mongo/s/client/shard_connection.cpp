@@ -67,12 +67,12 @@ namespace {
     class ActiveClientConnections {
     public:
         void add(const ClientConnections* cc) {
-            boost::lock_guard<boost::mutex> lock(_mutex);
+            stdx::lock_guard<stdx::mutex> lock(_mutex);
             _clientConnections.insert(cc);
         }
 
         void remove(const ClientConnections* cc) {
-            boost::lock_guard<boost::mutex> lock(_mutex);
+            stdx::lock_guard<stdx::mutex> lock(_mutex);
             _clientConnections.erase(cc);
         }
 
@@ -389,7 +389,7 @@ namespace {
         BSONArrayBuilder arr(64 * 1024); // There may be quite a few threads
 
         {
-            boost::lock_guard<boost::mutex> lock(_mutex);
+            stdx::lock_guard<stdx::mutex> lock(_mutex);
             for (set<const ClientConnections*>::const_iterator i = _clientConnections.begin();
                 i != _clientConnections.end();
                 ++i) {

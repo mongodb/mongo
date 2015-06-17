@@ -61,7 +61,7 @@ namespace mongo {
         }
 
         virtual void rollback() {
-            boost::lock_guard<boost::mutex> lk(_engine->_dbsLock);
+            stdx::lock_guard<stdx::mutex> lk(_engine->_dbsLock);
             _engine->_dbs[_db] = _entry;
         }
 
@@ -196,7 +196,7 @@ namespace mongo {
     }
 
     void KVStorageEngine::listDatabases( std::vector<std::string>* out ) const {
-        boost::lock_guard<boost::mutex> lk( _dbsLock );
+        stdx::lock_guard<stdx::mutex> lk( _dbsLock );
         for ( DBMap::const_iterator it = _dbs.begin(); it != _dbs.end(); ++it ) {
             if ( it->second->isEmpty() )
                 continue;
@@ -206,7 +206,7 @@ namespace mongo {
 
     DatabaseCatalogEntry* KVStorageEngine::getDatabaseCatalogEntry( OperationContext* opCtx,
                                                                     StringData dbName ) {
-        boost::lock_guard<boost::mutex> lk( _dbsLock );
+        stdx::lock_guard<stdx::mutex> lk( _dbsLock );
         KVDatabaseCatalogEntry*& db = _dbs[dbName.toString()];
         if ( !db ) {
             // Not registering change since db creation is implicit and never rolled back.
@@ -224,7 +224,7 @@ namespace mongo {
 
         KVDatabaseCatalogEntry* entry;
         {
-            boost::lock_guard<boost::mutex> lk( _dbsLock );
+            stdx::lock_guard<stdx::mutex> lk( _dbsLock );
             DBMap::const_iterator it = _dbs.find( db.toString() );
             if ( it == _dbs.end() )
                 return Status( ErrorCodes::NamespaceNotFound, "db not found to drop" );
@@ -250,7 +250,7 @@ namespace mongo {
         invariant( toDrop.empty() );
 
         {
-            boost::lock_guard<boost::mutex> lk( _dbsLock );
+            stdx::lock_guard<stdx::mutex> lk( _dbsLock );
             txn->recoveryUnit()->registerChange(new RemoveDBChange(this, db, entry));
             _dbs.erase( db.toString() );
         }

@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include <boost/thread/mutex.hpp>
 #include <boost/thread/condition_variable.hpp>
 #include <set>
 #include <string>
@@ -37,6 +36,7 @@
 
 #include "mongo/config.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/net/sock.h"
 
@@ -53,7 +53,7 @@ namespace mongo {
         Listener(const std::string& name, const std::string &ip, int port, bool logConnect=true );
 
         virtual ~Listener();
-        
+
         void initAndListen(); // never returns unless error (start a thread)
 
         /* spawn a thread, etc., then return */
@@ -64,13 +64,13 @@ namespace mongo {
 
         /**
          * @return a rough estimate of elapsed time since the server started
-           todo: 
-           1) consider adding some sort of relaxedLoad semantic to the reading here of 
+           todo:
+           1) consider adding some sort of relaxedLoad semantic to the reading here of
               _elapsedTime
            2) curTimeMillis() implementations have gotten faster. consider eliminating
-              this code?  would have to measure it first.  if eliminated be careful if 
-              syscall used isn't skewable.  Note also if #2 is done, listen() doesn't 
-              then have to keep waking up and maybe that helps on a developer's laptop 
+              this code?  would have to measure it first.  if eliminated be careful if
+              syscall used isn't skewable.  Note also if #2 is done, listen() doesn't
+              then have to keep waking up and maybe that helps on a developer's laptop
               battery usage...
          */
         long long getMyElapsedTimeMillis() const { return _elapsedTime; }
@@ -113,19 +113,19 @@ namespace mongo {
         bool _setupSocketsSuccessful;
         bool _logConnect;
         long long _elapsedTime;
-        mutable boost::mutex _readyMutex; // Protects _ready
+        mutable stdx::mutex _readyMutex; // Protects _ready
         mutable boost::condition_variable _readyCondition; // Used to wait for changes to _ready
         // Boolean that indicates whether this Listener is ready to accept incoming network requests
         bool _ready;
-        
+
 #ifdef MONGO_CONFIG_SSL
         SSLManagerInterface* _ssl;
 #endif
-        
+
         void _logListen( int port , bool ssl );
 
         static const Listener* _timeTracker;
-        
+
         virtual bool useUnixSockets() const { return false; }
 
     public:
@@ -146,21 +146,21 @@ namespace mongo {
             , _socketPaths( new std::set<std::string>() )
         { }
         void add( int sock ) {
-            boost::lock_guard<boost::mutex> lk( _mutex );
+            stdx::lock_guard<stdx::mutex> lk( _mutex );
             _sockets->insert( sock );
         }
         void addPath( const std::string& path ) {
-            boost::lock_guard<boost::mutex> lk( _mutex );
+            stdx::lock_guard<stdx::mutex> lk( _mutex );
             _socketPaths->insert( path );
         }
         void remove( int sock ) {
-            boost::lock_guard<boost::mutex> lk( _mutex );
+            stdx::lock_guard<stdx::mutex> lk( _mutex );
             _sockets->erase( sock );
         }
         void closeAll();
         static ListeningSockets* get();
     private:
-        boost::mutex _mutex;
+        stdx::mutex _mutex;
         std::set<int>* _sockets;
         std::set<std::string>* _socketPaths; // for unix domain sockets
         static ListeningSockets* _instance;

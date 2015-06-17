@@ -31,7 +31,6 @@
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
 
 #include <boost/thread/condition.hpp>
-#include <boost/thread/mutex.hpp>
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/init.h"
@@ -41,6 +40,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -56,14 +56,14 @@ namespace mongo {
             }
 
             void syncHappend() {
-                boost::lock_guard<boost::mutex> lk( mutex );
+                stdx::lock_guard<stdx::mutex> lk( mutex );
                 lastSyncTime++;
                 condvar.notify_all();
             }
 
             // return true if happened
             bool waitUntilDurable() {
-                boost::unique_lock<boost::mutex> lk( mutex );
+                stdx::unique_lock<stdx::mutex> lk( mutex );
                 long long start = lastSyncTime;
                 numWaitingForSync.fetchAndAdd(1);
                 condvar.timed_wait(lk,boost::posix_time::milliseconds(50));
@@ -73,7 +73,7 @@ namespace mongo {
 
             AtomicUInt32 numWaitingForSync;
 
-            boost::mutex mutex; // this just protects lastSyncTime
+            stdx::mutex mutex; // this just protects lastSyncTime
             boost::condition condvar;
             long long lastSyncTime;
         } waitUntilDurableData;

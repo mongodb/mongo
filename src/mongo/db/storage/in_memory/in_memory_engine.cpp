@@ -53,7 +53,7 @@ namespace mongo {
                                              StringData ns,
                                              StringData ident,
                                              const CollectionOptions& options) {
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         if (options.capped) {
             return new InMemoryRecordStore(ns,
                                            &_dataMap[ident],
@@ -77,13 +77,13 @@ namespace mongo {
     SortedDataInterface* InMemoryEngine::getSortedDataInterface(OperationContext* opCtx,
                                                              StringData ident,
                                                              const IndexDescriptor* desc) {
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         return getInMemoryBtreeImpl(Ordering::make(desc->keyPattern()), &_dataMap[ident]);
     }
 
     Status InMemoryEngine::dropIdent(OperationContext* opCtx,
                                      StringData ident) {
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         _dataMap.erase(ident);
         return Status::OK();
     }
@@ -96,7 +96,7 @@ namespace mongo {
     std::vector<std::string> InMemoryEngine::getAllIdents( OperationContext* opCtx ) const {
         std::vector<std::string> all;
         {
-            boost::lock_guard<boost::mutex> lk(_mutex);
+            stdx::lock_guard<stdx::mutex> lk(_mutex);
             for ( DataMap::const_iterator it = _dataMap.begin(); it != _dataMap.end(); ++it ) {
                 all.push_back( it->first );
             }

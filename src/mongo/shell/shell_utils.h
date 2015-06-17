@@ -32,6 +32,7 @@
 #include <boost/thread/mutex.hpp>
 
 #include "mongo/db/jsobj.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/mutex.h"
 
 namespace mongo {
@@ -82,7 +83,7 @@ namespace mongo {
 
         // This mutex helps the shell serialize output on exit, to avoid deadlocks at shutdown. So
         // it also protects the global dbexitCalled.
-        extern boost::mutex &mongoProgramOutputMutex;
+        extern stdx::mutex &mongoProgramOutputMutex;
 
         // Helper to tell if a file exists cross platform
         // TODO: Remove this when we have a cross platform file utility library

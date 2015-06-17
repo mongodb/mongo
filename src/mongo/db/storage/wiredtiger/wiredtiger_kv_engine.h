@@ -34,13 +34,12 @@
 #include <set>
 #include <string>
 
-#include <boost/thread/mutex.hpp>
-
 #include <wiredtiger.h>
 
 #include "mongo/bson/ordering.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/elapsed_tracker.h"
 
 namespace mongo {
@@ -147,7 +146,7 @@ namespace mongo {
         std::string _indexOptions;
 
         std::set<std::string> _identToDrop;
-        mutable boost::mutex _identToDropMutex;
+        mutable stdx::mutex _identToDropMutex;
 
         std::unique_ptr<WiredTigerSizeStorer> _sizeStorer;
         std::string _sizeStorerUri;

@@ -78,7 +78,7 @@ namespace mongo {
                 std::string lastRunningTestName, currentTestName;
 
                 {
-                    boost::lock_guard<boost::mutex> lk( globalCurrentTestNameMutex );
+                    stdx::lock_guard<stdx::mutex> lk( globalCurrentTestNameMutex );
                     lastRunningTestName = globalCurrentTestName;
                 }
 
@@ -87,7 +87,7 @@ namespace mongo {
                     minutesRunning++;
 
                     {
-                        boost::lock_guard<boost::mutex> lk( globalCurrentTestNameMutex );
+                        stdx::lock_guard<stdx::mutex> lk( globalCurrentTestNameMutex );
                         currentTestName = globalCurrentTestName;
                     }
 
@@ -157,6 +157,6 @@ namespace ntservice {
 }  // namespace mongo
 
 void mongo::unittest::onCurrentTestNameChange( const std::string &testName ) {
-    boost::lock_guard<boost::mutex> lk( mongo::dbtests::globalCurrentTestNameMutex );
+    stdx::lock_guard<stdx::mutex> lk( mongo::dbtests::globalCurrentTestNameMutex );
     mongo::dbtests::globalCurrentTestName = testName;
 }

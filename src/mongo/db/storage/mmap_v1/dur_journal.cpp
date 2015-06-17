@@ -162,7 +162,7 @@ namespace mongo {
             SecureRandom* mySecureRandom = NULL;
             mongo::mutex mySecureRandomMutex;
             int64_t getMySecureRandomNumber() {
-                boost::lock_guard<boost::mutex> lk( mySecureRandomMutex );
+                stdx::lock_guard<stdx::mutex> lk( mySecureRandomMutex );
                 if ( ! mySecureRandom )
                     mySecureRandom = SecureRandom::create();
                 return mySecureRandom->nextInt64();

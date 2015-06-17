@@ -28,11 +28,11 @@
 
 #pragma once
 
-#include <boost/thread/mutex.hpp>
 #include <map>
 #include <string>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 
@@ -81,7 +81,7 @@ namespace mongo {
         CatalogManager* const _catalogManager;
 
         // Databases catalog map and mutex to protect it
-        boost::mutex _mutex;
+        stdx::mutex _mutex;
         ShardedDatabasesMap _databases;
     };
 

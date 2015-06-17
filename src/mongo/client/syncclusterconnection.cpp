@@ -586,7 +586,7 @@ namespace mongo {
 
     int SyncClusterConnection::_lockType( const string& name ) {
         {
-            boost::lock_guard<boost::mutex> lk(_mutex);
+            stdx::lock_guard<stdx::mutex> lk(_mutex);
             map<string,int>::iterator i = _lockTypes.find( name );
             if ( i != _lockTypes.end() )
                 return i->second;
@@ -597,7 +597,7 @@ namespace mongo {
 
         int lockType = info["lockType"].numberInt();
 
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         _lockTypes[name] = lockType;
         return lockType;
     }

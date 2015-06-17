@@ -227,7 +227,7 @@ namespace {
     }
 
     LockResult CondVarLockGrantNotification::wait(unsigned timeoutMs) {
-        boost::unique_lock<boost::mutex> lock(_mutex);
+        stdx::unique_lock<stdx::mutex> lock(_mutex);
         while (_result == LOCK_INVALID) {
             if (boost::cv_status::timeout == _cond.wait_for(lock, Milliseconds(timeoutMs))) {
                 // Timeout
@@ -239,7 +239,7 @@ namespace {
     }
 
     void CondVarLockGrantNotification::notify(ResourceId resId, LockResult result) {
-        boost::unique_lock<boost::mutex> lock(_mutex);
+        stdx::unique_lock<stdx::mutex> lock(_mutex);
         invariant(_result == LOCK_INVALID);
         _result = result;
 
@@ -778,7 +778,7 @@ namespace {
     bool LockerImpl<IsForMMAPV1>::hasStrongLocks() const {
         if (!isLocked()) return false;
 
-        boost::lock_guard<SpinLock> lk(_lock);
+        stdx::lock_guard<SpinLock> lk(_lock);
         LockRequestsMap::ConstIterator it = _requests.begin();
         while (!it.finished()) {
             if (it->mode == MODE_X || it->mode == MODE_S) {

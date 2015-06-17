@@ -85,7 +85,7 @@ namespace {
     ReplicationCoordinatorExternalStateImpl::~ReplicationCoordinatorExternalStateImpl() {}
 
     void ReplicationCoordinatorExternalStateImpl::startThreads() {
-        boost::lock_guard<boost::mutex> lk(_threadMutex);
+        stdx::lock_guard<stdx::mutex> lk(_threadMutex);
         if (_startedThreads) {
             return;
         }
@@ -104,7 +104,7 @@ namespace {
     }
 
     void ReplicationCoordinatorExternalStateImpl::shutdown() {
-        boost::lock_guard<boost::mutex> lk(_threadMutex);
+        stdx::lock_guard<stdx::mutex> lk(_threadMutex);
         if (_startedThreads) {
             log() << "Stopping replication applier threads";
             _syncSourceFeedback.shutdown();

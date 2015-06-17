@@ -29,12 +29,12 @@
 #pragma once
 
 #include <boost/thread/condition.hpp>
-#include <boost/thread/mutex.hpp>
 
-#include "mongo/util/queue.h"
+#include "mongo/db/jsobj.h"
 #include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/util/queue.h"
 
 namespace mongo {
 
@@ -133,14 +133,14 @@ namespace repl {
     private:
         static BackgroundSync *s_instance;
         // protects creation of s_instance
-        static boost::mutex s_mutex;
+        static stdx::mutex s_mutex;
 
         // Production thread
         BlockingQueue<BSONObj> _buffer;
         OplogReader _syncSourceReader;
 
         // _mutex protects all of the class variables except _syncSourceReader and _buffer
-        mutable boost::mutex _mutex;
+        mutable stdx::mutex _mutex;
 
         OpTime _lastOpTimeFetched;
 
@@ -183,7 +183,7 @@ namespace repl {
         // bool for indicating resync need on this node and the mutex that protects it
         // The resync command sets this flag; the Applier thread observes and clears it.
         bool _initialSyncRequestedFlag;
-        boost::mutex _initialSyncMutex;
+        stdx::mutex _initialSyncMutex;
 
         // This setting affects the Applier prefetcher behavior.
         IndexPrefetchConfig _indexPrefetchConfig;

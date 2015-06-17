@@ -246,7 +246,7 @@ namespace mongo {
     }
 
     void BenchRunState::waitForState(State awaitedState) {
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
 
         switch ( awaitedState ) {
         case BRS_RUNNING:
@@ -274,7 +274,7 @@ namespace mongo {
     }
 
     void BenchRunState::assertFinished() {
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         verify(0 == _numUnstartedWorkers + _numActiveWorkers);
     }
 
@@ -287,7 +287,7 @@ namespace mongo {
     }
 
     void BenchRunState::onWorkerStarted() {
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         verify( _numUnstartedWorkers > 0 );
         --_numUnstartedWorkers;
         ++_numActiveWorkers;
@@ -297,7 +297,7 @@ namespace mongo {
     }
 
     void BenchRunState::onWorkerFinished() {
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         verify( _numActiveWorkers > 0 );
         --_numActiveWorkers;
         if (_numActiveWorkers + _numUnstartedWorkers == 0) {
@@ -790,7 +790,7 @@ namespace mongo {
           _config(config) {
 
         _oid.init();
-        boost::lock_guard<boost::mutex> lk(_staticMutex);
+        stdx::lock_guard<stdx::mutex> lk(_staticMutex);
          _activeRuns[_oid] = this;
      }
 
@@ -853,7 +853,7 @@ namespace mongo {
          }
 
          {
-             boost::lock_guard<boost::mutex> lk(_staticMutex);
+             stdx::lock_guard<stdx::mutex> lk(_staticMutex);
              _activeRuns.erase( _oid );
          }
      }
@@ -864,7 +864,7 @@ namespace mongo {
      }
 
      BenchRunner* BenchRunner::get( OID oid ) {
-         boost::lock_guard<boost::mutex> lk(_staticMutex);
+         stdx::lock_guard<stdx::mutex> lk(_staticMutex);
          return _activeRuns[ oid ];
      }
 
@@ -927,7 +927,7 @@ namespace mongo {
          return zoo;
      }
 
-     boost::mutex BenchRunner::_staticMutex;
+     stdx::mutex BenchRunner::_staticMutex;
      map< OID, BenchRunner* > BenchRunner::_activeRuns;
 
      /**

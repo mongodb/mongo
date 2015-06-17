@@ -34,12 +34,11 @@
 #include <set>
 #include <string>
 
-#include <boost/thread/mutex.hpp>
-
 #include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/capped_callback.h"
+#include "mongo/db/storage/record_store.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/fail_point_service.h"
 
 /**
@@ -254,7 +253,7 @@ namespace mongo {
         SortedDiskLocs _uncommittedDiskLocs;
         RecordId _oplog_visibleTo;
         RecordId _oplog_highestSeen;
-        mutable boost::mutex _uncommittedDiskLocsMutex;
+        mutable stdx::mutex _uncommittedDiskLocsMutex;
 
         AtomicInt64 _nextIdNum;
         AtomicInt64 _dataSize;

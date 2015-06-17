@@ -33,12 +33,11 @@
 #include <map>
 #include <string>
 
-#include <boost/thread/mutex.hpp>
-
 #include "mongo/base/string_data.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/bson_collection_catalog_entry.h"
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 
@@ -128,7 +127,7 @@ namespace mongo {
         };
         typedef std::map<std::string,Entry> NSToIdentMap;
         NSToIdentMap _idents;
-        mutable boost::mutex _identsLock;
+        mutable stdx::mutex _identsLock;
     };
 
 }

@@ -267,7 +267,7 @@ namespace mongo {
         }
 
         void RecoveryJob::close() {
-            boost::lock_guard<boost::mutex> lk(_mx);
+            stdx::lock_guard<stdx::mutex> lk(_mx);
             _close();
         }
 
@@ -387,7 +387,7 @@ namespace mongo {
 
         void RecoveryJob::processSection(const JSectHeader *h, const void *p, unsigned len, const JSectFooter *f) {
             LockMongoFilesShared lkFiles; // for RecoveryJob::Last
-            boost::lock_guard<boost::mutex> lk(_mx);
+            stdx::lock_guard<stdx::mutex> lk(_mx);
 
             // Check the footer checksum before doing anything else.
             if (_recovering) {

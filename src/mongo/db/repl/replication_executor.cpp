@@ -74,7 +74,7 @@ namespace {
     ReplicationExecutor::~ReplicationExecutor() {}
 
     std::string ReplicationExecutor::getDiagnosticString() {
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         return _getDiagnosticString_inlock();
     }
 
@@ -105,7 +105,7 @@ namespace {
         std::pair<WorkItem, CallbackHandle> work;
         while ((work = getWork()).first.callback.isValid()) {
             {
-                boost::lock_guard<boost::mutex> lk(_terribleExLockSyncMutex);
+                stdx::lock_guard<stdx::mutex> lk(_terribleExLockSyncMutex);
                 const Callback* callback = _getCallbackFromHandle(work.first.callback);
                 const Status inStatus = callback->_isCanceled ?
                     Status(ErrorCodes::CallbackCanceled, "Callback canceled") :
@@ -125,7 +125,7 @@ namespace {
         // * drain all of the unsignaled events, sleepers, and ready queue, by running those
         //   callbacks with a "shutdown" or "canceled" status.
         // * Signal all threads blocked in waitForEvent, and wait for them to return from that method.
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         _inShutdown = true;
 
         _readyQueue.splice(_readyQueue.end(), _dbWorkInProgressQueue);
@@ -145,7 +145,7 @@ namespace {
         _dblockExclusiveLockTaskRunner.cancel();
         _dblockTaskRunner.cancel();
         _dblockWorkers.join();
-        boost::unique_lock<boost::mutex> lk(_mutex);
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
         invariant(_inShutdown);
         invariant(_dbWorkInProgressQueue.empty());
         invariant(_exclusiveLockInProgressQueue.empty());
@@ -174,7 +174,7 @@ namespace {
     }
 
     StatusWith<ReplicationExecutor::EventHandle> ReplicationExecutor::makeEvent() {
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         return makeEvent_inlock();
     }
 
@@ -189,7 +189,7 @@ namespace {
     }
 
     void ReplicationExecutor::signalEvent(const EventHandle& eventHandle) {
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         signalEvent_inlock(eventHandle);
     }
 
@@ -214,7 +214,7 @@ namespace {
     StatusWith<ReplicationExecutor::CallbackHandle> ReplicationExecutor::onEvent(
             const EventHandle& eventHandle,
             const CallbackFn& work) {
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         WorkQueue* queue = &_readyQueue;
         Event* event = _getEventFromHandle(eventHandle);
         if (!event->_isSignaled) {
@@ -268,7 +268,7 @@ namespace {
         Callback* callback = _getCallbackFromHandle(cbHandle);
         const WorkQueue::iterator iter = callback->_iter;
 
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         if (_inShutdown) {
             return;
         }
@@ -299,7 +299,7 @@ namespace {
         else {
             scheduledRequest.expirationDate = _networkInterface->now() + scheduledRequest.timeout;
         }
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         StatusWith<CallbackHandle> handle = enqueueWork_inlock(
                 &_networkInProgressQueue,
                 stdx::bind(remoteCommandFailedEarly,
@@ -327,7 +327,7 @@ namespace {
 
     StatusWith<ReplicationExecutor::CallbackHandle> ReplicationExecutor::scheduleWork(
             const CallbackFn& work) {
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         _networkInterface->signalWorkAvailable();
         return enqueueWork_inlock(&_readyQueue, work);
     }
@@ -336,7 +336,7 @@ namespace {
             Date_t when,
             const CallbackFn& work) {
 
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         WorkQueue temp;
         StatusWith<CallbackHandle> cbHandle = enqueueWork_inlock(&temp, work);
         if (!cbHandle.isOK())
@@ -359,7 +359,7 @@ namespace {
                                         const NamespaceString& nss,
                                         LockMode mode) {
 
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         StatusWith<CallbackHandle> handle = enqueueWork_inlock(&_dbWorkInProgressQueue,
                                                                work);
         if (handle.isOK()) {
@@ -389,8 +389,8 @@ namespace {
                                            const Status& taskRunnerStatus,
                                            const CallbackHandle& cbHandle,
                                            WorkQueue* workQueue,
-                                           boost::mutex* terribleExLockSyncMutex) {
-        boost::unique_lock<boost::mutex> lk(_mutex);
+                                           stdx::mutex* terribleExLockSyncMutex) {
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
         if (_inShutdown)
             return;
         Callback* callback = _getCallbackFromHandle(cbHandle);
@@ -399,9 +399,9 @@ namespace {
         _freeQueue.splice(_freeQueue.begin(), *workQueue, iter);
         lk.unlock();
         {
-            std::unique_ptr<boost::lock_guard<boost::mutex> > terribleLock(
+            std::unique_ptr<stdx::lock_guard<stdx::mutex> > terribleLock(
                 terribleExLockSyncMutex ?
-                new boost::lock_guard<boost::mutex>(*terribleExLockSyncMutex) :
+                new stdx::lock_guard<stdx::mutex>(*terribleExLockSyncMutex) :
                 nullptr);
             // Only possible task runner error status is CallbackCanceled.
             callback->_callbackFn(CallbackArgs(this,
@@ -420,7 +420,7 @@ namespace {
     ReplicationExecutor::scheduleWorkWithGlobalExclusiveLock(
             const CallbackFn& work) {
 
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         StatusWith<CallbackHandle> handle = enqueueWork_inlock(&_exclusiveLockInProgressQueue,
                                                                work);
         if (handle.isOK()) {
@@ -444,7 +444,7 @@ namespace {
 
     std::pair<ReplicationExecutor::WorkItem, ReplicationExecutor::CallbackHandle>
     ReplicationExecutor::getWork() {
-        boost::unique_lock<boost::mutex> lk(_mutex);
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
         while (true) {
             const Date_t now = _networkInterface->now();
             Date_t nextWakeupDate = scheduleReadySleepers_inlock(now);
@@ -539,7 +539,7 @@ namespace {
     }
 
     void ReplicationExecutor::Event::waitUntilSignaled() {
-        boost::unique_lock<boost::mutex> lk(_executor->_mutex);
+        stdx::unique_lock<stdx::mutex> lk(_executor->_mutex);
         ++_executor->_totalEventWaiters;
         while (!_isSignaled) {
             _isSignaledCondition.wait(lk);
@@ -549,7 +549,7 @@ namespace {
     }
 
     bool ReplicationExecutor::Event::isSignaled() {
-        boost::lock_guard<boost::mutex> lk(_executor->_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_executor->_mutex);
         return _isSignaled;
     }
 
@@ -567,7 +567,7 @@ namespace {
     ReplicationExecutor::Callback::~Callback() {}
 
     void ReplicationExecutor::Callback::cancel() {
-        boost::unique_lock<boost::mutex> lk(_executor->_mutex);
+        stdx::unique_lock<stdx::mutex> lk(_executor->_mutex);
         _isCanceled = true;
         if (_iter->isNetworkOperation) {
             lk.unlock();

@@ -31,7 +31,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <boost/thread/mutex.hpp>
 #include <set>
 
 #include "mongo/base/checked_cast.h"
@@ -40,12 +39,13 @@
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/service_context.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/background.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
@@ -55,7 +55,7 @@ namespace mongo {
     namespace {
 
         std::set<NamespaceString> _backgroundThreadNamespaces;
-        boost::mutex _backgroundThreadMutex;
+        stdx::mutex _backgroundThreadMutex;
 
         class WiredTigerRecordStoreThread : public BackgroundJob {
         public:
@@ -101,7 +101,7 @@ namespace mongo {
                     WiredTigerRecordStore* rs =
                         checked_cast<WiredTigerRecordStore*>(collection->getRecordStore());
                     WriteUnitOfWork wuow(&txn);
-                    boost::lock_guard<boost::timed_mutex> lock(rs->cappedDeleterMutex());
+                    stdx::lock_guard<boost::timed_mutex> lock(rs->cappedDeleterMutex());
                     int64_t removed = rs->cappedDeleteAsNeeded_inlock(&txn, RecordId::max());
                     wuow.commit();
                     return removed;
@@ -155,7 +155,7 @@ namespace mongo {
             return false;
         }
 
-        boost::lock_guard<boost::mutex> lock(_backgroundThreadMutex);
+        stdx::lock_guard<stdx::mutex> lock(_backgroundThreadMutex);
         NamespaceString nss(ns);
         if (_backgroundThreadNamespaces.count(nss)) {
             log() << "WiredTigerRecordStoreThread " << ns << " already started";

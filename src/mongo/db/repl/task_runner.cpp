@@ -85,7 +85,7 @@ namespace {
 
     TaskRunner::~TaskRunner() {
         try {
-            boost::unique_lock<boost::mutex> lk(_mutex);
+            stdx::unique_lock<stdx::mutex> lk(_mutex);
             if (!_active) {
                 return;
             }
@@ -101,7 +101,7 @@ namespace {
     }
 
     std::string TaskRunner::getDiagnosticString() const {
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         str::stream output;
         output << "TaskRunner";
         output << " scheduled tasks: " << _tasks.size();
@@ -111,14 +111,14 @@ namespace {
     }
 
     bool TaskRunner::isActive() const {
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         return _active;
     }
 
     void TaskRunner::schedule(const Task& task) {
         invariant(task);
 
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
 
         _tasks.push_back(task);
         _condition.notify_all();
@@ -134,7 +134,7 @@ namespace {
     }
 
     void TaskRunner::cancel() {
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         _cancelRequested = true;
         _condition.notify_all();
     }
@@ -159,7 +159,7 @@ namespace {
             // Release thread back to pool after disposing if no scheduled tasks in queue.
             if (nextAction == NextAction::kDisposeOperationContext ||
                 nextAction == NextAction::kInvalid) {
-                boost::lock_guard<boost::mutex> lk(_mutex);
+                stdx::lock_guard<stdx::mutex> lk(_mutex);
                 if (_tasks.empty()) {
                     _finishRunTasks_inlock();
                     return;
@@ -170,7 +170,7 @@ namespace {
 
         std::list<Task> tasks;
         {
-            boost::lock_guard<boost::mutex> lk(_mutex);
+            stdx::lock_guard<stdx::mutex> lk(_mutex);
             tasks.swap(_tasks);
         }
 
@@ -180,7 +180,7 @@ namespace {
                 "this task has been canceled by a previously invoked task"));
         }
 
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         _finishRunTasks_inlock();
     }
 
@@ -191,7 +191,7 @@ namespace {
     }
 
     TaskRunner::Task TaskRunner::_waitForNextTask() {
-        boost::unique_lock<boost::mutex> lk(_mutex);
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
 
         while (_tasks.empty() && !_cancelRequested) {
             _condition.wait(lk);

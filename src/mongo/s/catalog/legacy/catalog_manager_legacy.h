@@ -191,7 +191,7 @@ namespace mongo {
         std::unique_ptr<DistLockManager> _distLockManager;
 
         // protects _inShutdown, _consistentFromLastCheck; used by _consistencyCheckerCV
-        boost::mutex _mutex;
+        stdx::mutex _mutex;
 
         // True if CatalogManagerLegacy::shutDown has been called. False, otherwise.
         bool _inShutdown = false;

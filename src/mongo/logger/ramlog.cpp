@@ -59,7 +59,7 @@ namespace {
     RamLog::~RamLog() {}
 
     void RamLog::write(const std::string& str) {
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         _lastWrite = time(0);
         _totalLinesWritten++;
 
@@ -209,7 +209,7 @@ namespace {
             _namedLock = new mongo::mutex();
         }
 
-        boost::lock_guard<boost::mutex> lk( *_namedLock );
+        stdx::lock_guard<stdx::mutex> lk( *_namedLock );
         if (!_named) {
             // Guaranteed to happen before multi-threaded operation.
             _named = new RM();
@@ -226,7 +226,7 @@ namespace {
     RamLog* RamLog::getIfExists(const std::string& name) {
         if (!_named)
             return NULL;
-        boost::lock_guard<boost::mutex> lk(*_namedLock);
+        stdx::lock_guard<stdx::mutex> lk(*_namedLock);
         return mapFindWithDefault(*_named, name, static_cast<RamLog*>(NULL));
     }
 
@@ -234,7 +234,7 @@ namespace {
         if ( ! _named )
             return;
 
-        boost::lock_guard<boost::mutex> lk( *_namedLock );
+        stdx::lock_guard<stdx::mutex> lk( *_namedLock );
         for ( RM::iterator i=_named->begin(); i!=_named->end(); ++i ) {
             if ( i->second->n )
                 names.push_back( i->first );

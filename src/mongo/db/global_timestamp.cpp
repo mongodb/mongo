@@ -51,17 +51,17 @@ namespace {
 
 namespace mongo {
     void setGlobalTimestamp(const Timestamp& newTime) {
-        boost::lock_guard<boost::mutex> lk(globalTimestampMutex);
+        stdx::lock_guard<stdx::mutex> lk(globalTimestampMutex);
         globalTimestamp = newTime;
     }
 
     Timestamp getLastSetTimestamp() {
-        boost::lock_guard<boost::mutex> lk(globalTimestampMutex);
+        stdx::lock_guard<stdx::mutex> lk(globalTimestampMutex);
         return globalTimestamp;
     }
 
     Timestamp getNextGlobalTimestamp() {
-        boost::lock_guard<boost::mutex> lk(globalTimestampMutex);
+        stdx::lock_guard<stdx::mutex> lk(globalTimestampMutex);
 
         const unsigned now = (unsigned) time(0);
         const unsigned globalSecs = globalTimestamp.getSecs();

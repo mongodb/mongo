@@ -30,11 +30,10 @@
 
 #include "mongo/client/replica_set_monitor_manager.h"
 
-#include <boost/thread/lock_guard.hpp>
-
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/client/replica_set_monitor.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/map_util.h"
 
 namespace mongo {
@@ -49,7 +48,7 @@ namespace mongo {
     ReplicaSetMonitorManager::~ReplicaSetMonitorManager() = default;
 
     shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getMonitor(StringData setName) {
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
 
         return mapFindWithDefault(_monitors, setName, shared_ptr<ReplicaSetMonitor>());
     }
@@ -58,7 +57,7 @@ namespace mongo {
     ReplicaSetMonitorManager::getOrCreateMonitor(const ConnectionString& connStr) {
         invariant(connStr.type() == ConnectionString::SET);
 
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
 
         shared_ptr<ReplicaSetMonitor>& monitor = _monitors[connStr.getSetName()];
         if (!monitor) {
@@ -74,7 +73,7 @@ namespace mongo {
     vector<string> ReplicaSetMonitorManager::getAllSetNames() {
         vector<string> allNames;
 
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
 
         for (const auto& entry : _monitors) {
             allNames.push_back(entry.first);
@@ -84,7 +83,7 @@ namespace mongo {
     }
 
     void ReplicaSetMonitorManager::removeMonitor(StringData setName) {
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
 
         ReplicaSetMonitorsMap::const_iterator it = _monitors.find(setName);
         if (it != _monitors.end()) {
@@ -93,14 +92,14 @@ namespace mongo {
     }
 
     void ReplicaSetMonitorManager::removeAllMonitors() {
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
 
         // Reset the StringMap, which will release all registered monitors
         _monitors = ReplicaSetMonitorsMap();
     }
 
     void ReplicaSetMonitorManager::report(BSONObjBuilder* builder) {
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
 
         for (const auto& monitorPair : _monitors) {
             BSONObjBuilder monitorInfo(builder->subobjStart(monitorPair.first));

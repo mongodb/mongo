@@ -74,7 +74,7 @@ namespace mongo {
             else {
                 _opCtx = opCtx;
             }
-            boost::lock_guard<Client> lk(*_opCtx->getClient());
+            stdx::lock_guard<Client> lk(*_opCtx->getClient());
             push_nolock(curOp);
         }
 

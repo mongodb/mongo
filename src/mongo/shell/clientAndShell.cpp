@@ -53,7 +53,7 @@ namespace mongo {
 
     void dbexit( ExitCode returnCode, const char *whyMsg ) {
         {
-            boost::lock_guard<boost::mutex> lk( shell_utils::mongoProgramOutputMutex );
+            stdx::lock_guard<stdx::mutex> lk( shell_utils::mongoProgramOutputMutex );
             dbexitCalled = true;
         }
 

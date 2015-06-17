@@ -74,7 +74,6 @@
 #include "mongo/db/storage/mmap_v1/dur.h"
 
 #include <boost/thread/condition_variable.hpp>
-#include <boost/thread/mutex.hpp>
 #include <boost/thread/thread.hpp>
 #include <iomanip>
 #include <utility>
@@ -84,14 +83,15 @@
 #include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/storage/mmap_v1/aligned_builder.h"
-#include "mongo/db/storage/mmap_v1/durable_mapped_file.h"
 #include "mongo/db/storage/mmap_v1/dur_commitjob.h"
 #include "mongo/db/storage/mmap_v1/dur_journal.h"
 #include "mongo/db/storage/mmap_v1/dur_journal_writer.h"
 #include "mongo/db/storage/mmap_v1/dur_recover.h"
 #include "mongo/db/storage/mmap_v1/dur_stats.h"
+#include "mongo/db/storage/mmap_v1/durable_mapped_file.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
 #include "mongo/db/storage_options.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/synchronization.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
@@ -113,7 +113,7 @@ namespace dur {
 namespace {
 
     // Used to activate the flush thread
-    boost::mutex flushMutex;
+    stdx::mutex flushMutex;
     boost::condition_variable flushRequested;
 
     // This is waited on for getlasterror acknowledgements. It means that data has been written to
@@ -697,7 +697,7 @@ namespace {
             }
 
             try {
-                boost::unique_lock<boost::mutex> lock(flushMutex);
+                stdx::unique_lock<stdx::mutex> lock(flushMutex);
 
                 for (unsigned i = 0; i <= 2; i++) {
                     if (boost::cv_status::no_timeout == flushRequested.wait_for(

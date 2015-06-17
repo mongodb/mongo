@@ -105,7 +105,7 @@ namespace repl {
         HostAndPort _target;
 
         // Protects member data of this Reporter.
-        mutable boost::mutex _mutex;
+        mutable stdx::mutex _mutex;
 
         // Stores the most recent Status returned from the ReplicationExecutor.
         Status _status;

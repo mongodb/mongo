@@ -125,7 +125,7 @@ namespace mongo {
     }
 
     void FileAllocator::requestAllocation( const string &name, long &size ) {
-        boost::lock_guard<boost::mutex> lk( _pendingMutex );
+        stdx::lock_guard<stdx::mutex> lk( _pendingMutex );
         if ( _failed )
             return;
         long oldSize = prevSize( name );
@@ -139,7 +139,7 @@ namespace mongo {
     }
 
     void FileAllocator::allocateAsap( const string &name, unsigned long long &size ) {
-        boost::unique_lock<boost::mutex> lk( _pendingMutex );
+        stdx::unique_lock<stdx::mutex> lk( _pendingMutex );
 
         // In case the allocator is in failed state, check once before starting so that subsequent
         // requests for the same database would fail fast after the first one has failed.
@@ -172,7 +172,7 @@ namespace mongo {
     void FileAllocator::waitUntilFinished() const {
         if ( _failed )
             return;
-        boost::unique_lock<boost::mutex> lk( _pendingMutex );
+        stdx::unique_lock<stdx::mutex> lk( _pendingMutex );
         while( _pending.size() != 0 )
             _pendingUpdated.wait(lk);
     }
@@ -359,7 +359,7 @@ namespace mongo {
         }
         while( 1 ) {
             {
-                boost::unique_lock<boost::mutex> lk( fa->_pendingMutex );
+                stdx::unique_lock<stdx::mutex> lk( fa->_pendingMutex );
                 if ( fa->_pending.size() == 0 )
                     fa->_pendingUpdated.wait(lk);
             }
@@ -367,7 +367,7 @@ namespace mongo {
                 string name;
                 long size = 0;
                 {
-                    boost::lock_guard<boost::mutex> lk( fa->_pendingMutex );
+                    stdx::lock_guard<stdx::mutex> lk( fa->_pendingMutex );
                     if ( fa->_pending.size() == 0 )
                         break;
                     name = fa->_pending.front();
@@ -439,20 +439,20 @@ namespace mongo {
                     }
 
                     {
-                        boost::lock_guard<boost::mutex> lk(fa->_pendingMutex);
+                        stdx::lock_guard<stdx::mutex> lk(fa->_pendingMutex);
                         fa->_failed = true;
 
                         // TODO: Should we remove the file from pending?
                         fa->_pendingUpdated.notify_all();
                     }
-                    
-                    
+
+
                     sleepsecs(10);
                     continue;
                 }
 
                 {
-                    boost::lock_guard<boost::mutex> lk( fa->_pendingMutex );
+                    stdx::lock_guard<stdx::mutex> lk( fa->_pendingMutex );
                     fa->_pendingSize.erase( name );
                     fa->_pending.pop_front();
                     fa->_pendingUpdated.notify_all();

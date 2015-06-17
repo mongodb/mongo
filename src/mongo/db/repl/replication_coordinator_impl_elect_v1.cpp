@@ -91,7 +91,7 @@ namespace {
         invariant(!_voteRequester);
         invariant(!_freshnessChecker);
 
-        boost::unique_lock<boost::mutex> lk(_mutex);
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
         switch (_rsConfigState) {
         case kConfigSteady:
             break;

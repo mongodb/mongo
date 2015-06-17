@@ -99,7 +99,7 @@ namespace repl {
     }
 
     void SyncSourceFeedback::forwardSlaveProgress() {
-        boost::unique_lock<boost::mutex> lock(_mtx);
+        stdx::unique_lock<stdx::mutex> lock(_mtx);
         _positionChanged = true;
         _cond.notify_all();
     }
@@ -112,7 +112,7 @@ namespace repl {
         }
         BSONObjBuilder cmd;
         {
-            boost::unique_lock<boost::mutex> lock(_mtx);
+            stdx::unique_lock<stdx::mutex> lock(_mtx);
             // the command could not be created, likely because the node was removed from the set
             if (!replCoord->prepareReplSetUpdatePositionCommand(&cmd)) {
                 return Status::OK();
@@ -150,7 +150,7 @@ namespace repl {
     }
 
     void SyncSourceFeedback::shutdown() {
-        boost::unique_lock<boost::mutex> lock(_mtx);
+        stdx::unique_lock<stdx::mutex> lock(_mtx);
         _shutdownSignaled = true;
         _cond.notify_all();
     }
@@ -161,7 +161,7 @@ namespace repl {
         ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
         while (true) { // breaks once _shutdownSignaled is true
             {
-                boost::unique_lock<boost::mutex> lock(_mtx);
+                stdx::unique_lock<stdx::mutex> lock(_mtx);
                 while (!_positionChanged && !_shutdownSignaled) {
                     _cond.wait(lock);
                 }
@@ -188,13 +188,13 @@ namespace repl {
                 // fix connection if need be
                 if (target.empty()) {
                     sleepmillis(500);
-                    boost::unique_lock<boost::mutex> lock(_mtx);
+                    stdx::unique_lock<stdx::mutex> lock(_mtx);
                     _positionChanged = true;
                     continue;
                 }
                 if (!_connect(txn.get(), target)) {
                     sleepmillis(500);
-                    boost::unique_lock<boost::mutex> lock(_mtx);
+                    stdx::unique_lock<stdx::mutex> lock(_mtx);
                     _positionChanged = true;
                     continue;
                 }
@@ -202,7 +202,7 @@ namespace repl {
             Status status = updateUpstream(txn.get());
             if (!status.isOK()) {
                 sleepmillis(500);
-                boost::unique_lock<boost::mutex> lock(_mtx);
+                stdx::unique_lock<stdx::mutex> lock(_mtx);
                 _positionChanged = true;
             }
         }

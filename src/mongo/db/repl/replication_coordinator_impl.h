@@ -29,14 +29,12 @@
 #pragma once
 
 #include <boost/thread.hpp>
-#include <boost/thread/mutex.hpp>
 #include <boost/thread/condition_variable.hpp>
 #include <vector>
 #include <memory>
 
 #include "mongo/base/status.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/service_context.h"
 #include "mongo/db/repl/data_replicator.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/optime.h"
@@ -46,9 +44,11 @@
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/update_position_args.h"
+#include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/unordered_map.h"
 #include "mongo/platform/unordered_set.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
@@ -499,7 +499,7 @@ namespace repl {
          */
         ReplicationCoordinator::StatusAndDuration _awaitReplication_inlock(
                 const Timer* timer,
-                boost::unique_lock<boost::mutex>* lock,
+                stdx::unique_lock<stdx::mutex>* lock,
                 OperationContext* txn,
                 const OpTime& opTime,
                 const WriteConcernOptions& writeConcern);
@@ -583,7 +583,7 @@ namespace repl {
          * This function has the same rules for "opTime" as setMyLastOptime(), unless
          * "isRollbackAllowed" is true.
          */
-        void _setMyLastOptime_inlock(boost::unique_lock<boost::mutex>* lock,
+        void _setMyLastOptime_inlock(stdx::unique_lock<stdx::mutex>* lock,
                                      const OpTime& opTime,
                                      bool isRollbackAllowed);
 
@@ -910,7 +910,7 @@ namespace repl {
         // (I)  Independently synchronized, see member variable comment.
 
         // Protects member data of this ReplicationCoordinator.
-        mutable boost::mutex _mutex;                                                      // (S)
+        mutable stdx::mutex _mutex;                                                      // (S)
 
         // Handles to actively queued heartbeats.
         HeartbeatHandles _heartbeatHandles;                                               // (X)

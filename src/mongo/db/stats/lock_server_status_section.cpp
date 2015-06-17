@@ -60,7 +60,7 @@ namespace {
 
                 invariant(client);
                 ++numTotal;
-                boost::unique_lock<Client> uniqueLock(*client);
+                stdx::unique_lock<Client> uniqueLock(*client);
 
                 const OperationContext* opCtx = client->getOperationContext();
                 if (opCtx == NULL) continue;

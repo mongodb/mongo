@@ -33,7 +33,6 @@
 #include "mongo/db/auth/authorization_manager.h"
 
 #include <boost/bind.hpp>
-#include <boost/thread/mutex.hpp>
 #include <memory>
 #include <string>
 #include <vector>
@@ -58,6 +57,7 @@
 #include "mongo/platform/compiler.h"
 #include "mongo/platform/unordered_map.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -248,7 +248,7 @@ namespace mongo {
         OID _startGeneration;
         bool _isThisGuardInFetchPhase;
         AuthorizationManager* _authzManager;
-        boost::unique_lock<boost::mutex> _lock;
+        stdx::unique_lock<stdx::mutex> _lock;
     };
 
     AuthorizationManager::AuthorizationManager(
@@ -312,7 +312,7 @@ namespace mongo {
     }
 
     bool AuthorizationManager::hasAnyPrivilegeDocuments(OperationContext* txn) {
-        boost::unique_lock<boost::mutex> lk(_privilegeDocsExistMutex);
+        stdx::unique_lock<stdx::mutex> lk(_privilegeDocsExistMutex);
         if (_privilegeDocsExist) {
             // If we know that a user exists, don't re-check.
             return true;

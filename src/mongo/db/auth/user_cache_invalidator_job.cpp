@@ -31,7 +31,6 @@
 
 #include "mongo/db/auth/user_cache_invalidator_job.h"
 
-#include <boost/thread/mutex.hpp>
 #include <string>
 
 #include "mongo/base/status.h"
@@ -43,6 +42,7 @@
 #include "mongo/db/server_parameters.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/grid.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/background.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
@@ -53,7 +53,7 @@ namespace {
 
     // How often to check with the config servers whether authorization information has changed.
     int userCacheInvalidationIntervalSecs = 30; // 30 second default
-    boost::mutex invalidationIntervalMutex;
+    stdx::mutex invalidationIntervalMutex;
     boost::condition_variable invalidationIntervalChangedCondition;
     Date_t lastInvalidationTime;
 
@@ -81,7 +81,7 @@ namespace {
         using ExportedServerParameter<int>::set;
 
         virtual Status set( const int& newValue ) {
-            boost::unique_lock<boost::mutex> lock(invalidationIntervalMutex);
+            stdx::unique_lock<stdx::mutex> lock(invalidationIntervalMutex);
             Status status = ExportedServerParameter<int>::set(newValue);
             invalidationIntervalChangedCondition.notify_all();
             return status;
@@ -134,7 +134,7 @@ namespace {
         lastInvalidationTime = Date_t::now();
 
         while (true) {
-            boost::unique_lock<boost::mutex> lock(invalidationIntervalMutex);
+            stdx::unique_lock<stdx::mutex> lock(invalidationIntervalMutex);
             Date_t sleepUntil = lastInvalidationTime + Seconds(userCacheInvalidationIntervalSecs);
             Date_t now = Date_t::now();
             while (now < sleepUntil) {

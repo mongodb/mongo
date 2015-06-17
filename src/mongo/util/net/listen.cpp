@@ -247,7 +247,7 @@ namespace mongo {
 
         {
             // Wake up any threads blocked in waitUntilListening()
-            boost::lock_guard<boost::mutex> lock(_readyMutex);
+            stdx::lock_guard<stdx::mutex> lock(_readyMutex);
             _ready = true;
             _readyCondition.notify_all();
         }
@@ -422,7 +422,7 @@ namespace mongo {
 
         {
             // Wake up any threads blocked in waitUntilListening()
-            boost::lock_guard<boost::mutex> lock(_readyMutex);
+            stdx::lock_guard<stdx::mutex> lock(_readyMutex);
             _ready = true;
             _readyCondition.notify_all();
         }
@@ -571,7 +571,7 @@ namespace mongo {
     }
 
     void Listener::waitUntilListening() const {
-        boost::unique_lock<boost::mutex> lock(_readyMutex);
+        stdx::unique_lock<stdx::mutex> lock(_readyMutex);
         while (!_ready) {
             _readyCondition.wait(lock);
         }
@@ -642,7 +642,7 @@ namespace mongo {
         std::set<std::string>* paths;
 
         {
-            boost::lock_guard<boost::mutex> lk( _mutex );
+            stdx::lock_guard<stdx::mutex> lk( _mutex );
             sockets = _sockets;
             _sockets = new std::set<int>();
             paths = _socketPaths;

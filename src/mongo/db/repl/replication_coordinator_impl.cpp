@@ -79,7 +79,7 @@ namespace repl {
 namespace {
     using executor::NetworkInterface;
 
-    void lockAndCall(boost::unique_lock<boost::mutex>* lk, const stdx::function<void ()>& fn) {
+    void lockAndCall(stdx::unique_lock<stdx::mutex>* lk, const stdx::function<void ()>& fn) {
         if (!lk->owns_lock()) {
             lk->lock();
         }
@@ -228,14 +228,14 @@ namespace {
     ReplicationCoordinatorImpl::~ReplicationCoordinatorImpl() {}
 
     void ReplicationCoordinatorImpl::waitForStartUpComplete() {
-        boost::unique_lock<boost::mutex> lk(_mutex);
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
         while (_rsConfigState == kConfigPreStart || _rsConfigState == kConfigStartingUp) {
             _rsConfigStateChange.wait(lk);
         }
     }
 
     ReplicaSetConfig ReplicationCoordinatorImpl::getReplicaSetConfig_forTest() {
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         return _rsConfig;
     }
 
@@ -337,7 +337,7 @@ namespace {
             }
         }
 
-        boost::unique_lock<boost::mutex> lk(_mutex);
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
         invariant(_rsConfigState == kConfigStartingUp);
         const PostMemberStateUpdateAction action =
             _setCurrentRSConfig_inlock(localConfig, myIndex.getValue());
@@ -352,7 +352,7 @@ namespace {
 
     void ReplicationCoordinatorImpl::startReplication(OperationContext* txn) {
         if (!isReplEnabled()) {
-            boost::lock_guard<boost::mutex> lk(_mutex);
+            stdx::lock_guard<stdx::mutex> lk(_mutex);
             _setConfigState_inlock(kConfigReplicationDisabled);
             return;
         }
@@ -360,7 +360,7 @@ namespace {
         {
             OID rid = _externalState->ensureMe(txn);
 
-            boost::lock_guard<boost::mutex> lk(_mutex);
+            stdx::lock_guard<stdx::mutex> lk(_mutex);
             fassert(18822, !_inShutdown);
             _setConfigState_inlock(kConfigStartingUp);
             _myRID = rid;
@@ -381,7 +381,7 @@ namespace {
         if (doneLoadingConfig) {
             // If we're not done loading the config, then the config state will be set by
             // _finishLoadLocalConfig.
-            boost::lock_guard<boost::mutex> lk(_mutex);
+            stdx::lock_guard<stdx::mutex> lk(_mutex);
             invariant(!_rsConfig.isInitialized());
             _setConfigState_inlock(kConfigUninitialized);
         }
@@ -399,7 +399,7 @@ namespace {
         }
 
         {
-            boost::lock_guard<boost::mutex> lk(_mutex);
+            stdx::lock_guard<stdx::mutex> lk(_mutex);
             fassert(28533, !_inShutdown);
             _inShutdown = true;
             if (_rsConfigState == kConfigPreStart) {
@@ -430,7 +430,7 @@ namespace {
     }
 
     MemberState ReplicationCoordinatorImpl::getMemberState() const {
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         return _getMemberState_inlock();
     }
 
@@ -439,7 +439,7 @@ namespace {
     }
 
     Seconds ReplicationCoordinatorImpl::getSlaveDelaySecs() const {
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         invariant(_rsConfig.isInitialized());
         uassert(28524,
                 "Node not a member of the current set configuration",
@@ -530,7 +530,7 @@ namespace {
             return;
         }
 
-        boost::unique_lock<boost::mutex> lk(_mutex);
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
         _topCoord->setFollowerMode(newState.s);
 
         const PostMemberStateUpdateAction action =
@@ -542,7 +542,7 @@ namespace {
     }
 
     bool ReplicationCoordinatorImpl::isWaitingForApplierToDrain() {
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         return _isWaitingForDrainToComplete;
     }
 
@@ -569,7 +569,7 @@ namespace {
         // external writes will be processed.  This is important so that a new temp collection isn't
         // introduced on the new primary before we drop all the temp collections.
 
-        boost::unique_lock<boost::mutex> lk(_mutex);
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
         if (!_isWaitingForDrainToComplete) {
             return;
         }
@@ -693,7 +693,7 @@ namespace {
 
     Status ReplicationCoordinatorImpl::setLastOptimeForSlave(const OID& rid,
                                                              const Timestamp& ts) {
-        boost::unique_lock<boost::mutex> lock(_mutex);
+        stdx::unique_lock<stdx::mutex> lock(_mutex);
         massert(28576,
                 "Received an old style replication progress update, which is only used for Master/"
                     "Slave replication now, but this node is not using Master/Slave replication. "
@@ -731,18 +731,18 @@ namespace {
     }
 
     void ReplicationCoordinatorImpl::setMyLastOptime(const OpTime& opTime) {
-        boost::unique_lock<boost::mutex> lock(_mutex);
+        stdx::unique_lock<stdx::mutex> lock(_mutex);
         _setMyLastOptime_inlock(&lock, opTime, false);
     }
 
     void ReplicationCoordinatorImpl::resetMyLastOptime() {
-        boost::unique_lock<boost::mutex> lock(_mutex);
+        stdx::unique_lock<stdx::mutex> lock(_mutex);
         // Reset to uninitialized OpTime
         _setMyLastOptime_inlock(&lock, OpTime(), true);
     }
 
     void ReplicationCoordinatorImpl::_setMyLastOptime_inlock(
-            boost::unique_lock<boost::mutex>* lock, const OpTime& opTime, bool isRollbackAllowed) {
+            stdx::unique_lock<stdx::mutex>* lock, const OpTime& opTime, bool isRollbackAllowed) {
         invariant(lock->owns_lock());
         SlaveInfo* mySlaveInfo = &_slaveInfo[_getMyIndexInSlaveInfo_inlock()];
         invariant(isRollbackAllowed || mySlaveInfo->opTime <= opTime);
@@ -768,7 +768,7 @@ namespace {
     }
 
     OpTime ReplicationCoordinatorImpl::getMyLastOptime() const {
-        boost::lock_guard<boost::mutex> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
         return _getMyLastOptime_inlock();
     }
 
@@ -797,7 +797,7 @@ namespace {
 #endif
 
         Timer timer;
-        boost::unique_lock<boost::mutex> lock(_mutex);
+        stdx::unique_lock<stdx::mutex> lock(_mutex);
 
         while (ts > _getMyLastOptime_inlock()) {
             Status interruptedStatus = txn->checkForInterruptNoAssert();
@@ -853,7 +853,7 @@ namespace {
     Status ReplicationCoordinatorImpl::setLastOptime_forTest(long long cfgVer,
                                                              long long memberId,
                                                              const OpTime& opTime) {
-        boost::lock_guard<boost::mutex> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
         invariant(getReplicationMode() == modeReplSet);
 
         const UpdatePositionArgs::UpdateInfo update(OID(), opTime, cfgVer, memberId);
@@ -925,7 +925,7 @@ namespace {
     }
 
     void ReplicationCoordinatorImpl::interrupt(unsigned opId) {
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         for (std::vector<WaiterInfo*>::iterator it = _replicationWaiterList.begin();
                 it != _replicationWaiterList.end(); ++it) {
             WaiterInfo* info = *it;
@@ -949,7 +949,7 @@ namespace {
     }
 
     void ReplicationCoordinatorImpl::interruptAll() {
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         for (std::vector<WaiterInfo*>::iterator it = _replicationWaiterList.begin();
                 it != _replicationWaiterList.end(); ++it) {
             WaiterInfo* info = *it;
@@ -1045,7 +1045,7 @@ namespace {
             const OpTime& opTime,
             const WriteConcernOptions& writeConcern) {
         Timer timer;
-        boost::unique_lock<boost::mutex> lock(_mutex);
+        stdx::unique_lock<stdx::mutex> lock(_mutex);
         return _awaitReplication_inlock(&timer, &lock, txn, opTime, writeConcern);
     }
 
@@ -1054,7 +1054,7 @@ namespace {
                     OperationContext* txn,
                     const WriteConcernOptions& writeConcern) {
         Timer timer;
-        boost::unique_lock<boost::mutex> lock(_mutex);
+        stdx::unique_lock<stdx::mutex> lock(_mutex);
         return _awaitReplication_inlock(
                 &timer,
                 &lock,
@@ -1065,7 +1065,7 @@ namespace {
 
     ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorImpl::_awaitReplication_inlock(
             const Timer* timer,
-            boost::unique_lock<boost::mutex>* lock,
+            stdx::unique_lock<stdx::mutex>* lock,
             OperationContext* txn,
             const OpTime& opTime,
             const WriteConcernOptions& writeConcern) {
@@ -1295,7 +1295,7 @@ namespace {
                                                     this,
                                                     stdx::placeholders::_1));
 
-            boost::unique_lock<boost::mutex> lk(_mutex);
+            stdx::unique_lock<stdx::mutex> lk(_mutex);
             const PostMemberStateUpdateAction action =
                 _updateMemberStateFromTopologyCoordinator_inlock();
             lk.unlock();
@@ -1353,7 +1353,7 @@ namespace {
 
     bool ReplicationCoordinatorImpl::isMasterForReportingPurposes() {
         if (_settings.usingReplSets()) {
-            boost::lock_guard<boost::mutex> lock(_mutex);
+            stdx::lock_guard<stdx::mutex> lock(_mutex);
             if (getReplicationMode() == modeReplSet && _getMemberState_inlock().primary()) {
                 return true;
             }
@@ -1445,7 +1445,7 @@ namespace {
             // always enforce on local
             return false;
         }
-        boost::lock_guard<boost::mutex> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
         if (getReplicationMode() != modeReplSet) {
             return false;
         }
@@ -1463,12 +1463,12 @@ namespace {
     }
 
     OID ReplicationCoordinatorImpl::getElectionId() {
-        boost::lock_guard<boost::mutex> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
         return _electionId;
     }
 
     OID ReplicationCoordinatorImpl::getMyRID() const {
-        boost::lock_guard<boost::mutex> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
         return _getMyRID_inlock();
     }
 
@@ -1477,7 +1477,7 @@ namespace {
     }
 
     int ReplicationCoordinatorImpl::getMyId() const {
-        boost::lock_guard<boost::mutex> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
         return _getMyId_inlock();
     }
 
@@ -1488,7 +1488,7 @@ namespace {
 
     bool ReplicationCoordinatorImpl::prepareReplSetUpdatePositionCommand(
             BSONObjBuilder* cmdBuilder) {
-        boost::lock_guard<boost::mutex> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
         invariant(_rsConfig.isInitialized());
         // do not send updates if we have been removed from the config
         if (_selfIndex == -1) {
@@ -1572,7 +1572,7 @@ namespace {
     }
 
     void ReplicationCoordinatorImpl::appendSlaveInfoData(BSONObjBuilder* result) {
-        boost::lock_guard<boost::mutex> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
         BSONArrayBuilder replicationProgress(result->subarrayStart("replicationProgress"));
         {
             for (SlaveInfoVector::const_iterator itr = _slaveInfo.begin();
@@ -1594,12 +1594,12 @@ namespace {
     }
 
     ReplicaSetConfig ReplicationCoordinatorImpl::getConfig() const {
-        boost::lock_guard<boost::mutex> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
         return _rsConfig;
     }
 
     void ReplicationCoordinatorImpl::processReplSetGetConfig(BSONObjBuilder* result) {
-        boost::lock_guard<boost::mutex> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
         result->append("config", _rsConfig.toBSON());
     }
 
@@ -1657,7 +1657,7 @@ namespace {
             return;
         }
 
-        boost::unique_lock<boost::mutex> lk(_mutex);
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
         if (_getMemberState_inlock().primary()) {
             *result = Status(ErrorCodes::NotSecondary, "primaries can't modify maintenance mode");
             return;
@@ -1749,7 +1749,7 @@ namespace {
     Status ReplicationCoordinatorImpl::processHeartbeat(const ReplSetHeartbeatArgs& args,
                                                         ReplSetHeartbeatResponse* response) {
         {
-            boost::lock_guard<boost::mutex> lock(_mutex);
+            stdx::lock_guard<stdx::mutex> lock(_mutex);
             if (_rsConfigState == kConfigPreStart || _rsConfigState == kConfigStartingUp) {
                 return Status(ErrorCodes::NotYetInitialized,
                               "Received heartbeat while still initializing replication system");
@@ -1808,7 +1808,7 @@ namespace {
 
         log() << "replSetReconfig admin command received from client";
 
-        boost::unique_lock<boost::mutex> lk(_mutex);
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
 
         while (_rsConfigState == kConfigPreStart || _rsConfigState == kConfigStartingUp) {
             _rsConfigStateChange.wait(lk);
@@ -1931,7 +1931,7 @@ namespace {
             const ReplicaSetConfig& newConfig,
             int myIndex) {
 
-        boost::unique_lock<boost::mutex> lk(_mutex);
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
         invariant(_rsConfigState == kConfigReconfiguring);
         invariant(_rsConfig.isInitialized());
         const PostMemberStateUpdateAction action = _setCurrentRSConfig_inlock(newConfig, myIndex);
@@ -1944,7 +1944,7 @@ namespace {
                                                               BSONObjBuilder* resultObj) {
         log() << "replSetInitiate admin command received from client";
 
-        boost::unique_lock<boost::mutex> lk(_mutex);
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
         if (!_settings.usingReplSets()) {
             return Status(ErrorCodes::NoReplicationEnabled, "server is not running with --replSet");
         }
@@ -2035,7 +2035,7 @@ namespace {
             const ReplicaSetConfig& newConfig,
             int myIndex) {
 
-        boost::unique_lock<boost::mutex> lk(_mutex);
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
         invariant(_rsConfigState == kConfigInitiating);
         invariant(!_rsConfig.isInitialized());
         const PostMemberStateUpdateAction action = _setCurrentRSConfig_inlock(newConfig, myIndex);
@@ -2120,7 +2120,7 @@ namespace {
             _externalState->clearShardingState();
             break;
         case kActionWinElection: {
-            boost::unique_lock<boost::mutex> lk(_mutex);
+            stdx::unique_lock<stdx::mutex> lk(_mutex);
             _electionId = OID::gen();
             _topCoord->processWinElection(_electionId, getNextGlobalTimestamp());
             _isWaitingForDrainToComplete = true;
@@ -2138,13 +2138,13 @@ namespace {
     }
 
     Status ReplicationCoordinatorImpl::processReplSetGetRBID(BSONObjBuilder* resultObj) {
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         resultObj->append("rbid", _rbid);
         return Status::OK();
     }
 
     void ReplicationCoordinatorImpl::incrementRollbackID() {
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         ++_rbid;
     }
 
@@ -2263,7 +2263,7 @@ namespace {
     Status ReplicationCoordinatorImpl::processReplSetUpdatePosition(
             const UpdatePositionArgs& updates, long long* configVersion) {
 
-        boost::unique_lock<boost::mutex> lock(_mutex);
+        stdx::unique_lock<stdx::mutex> lock(_mutex);
         Status status = Status::OK();
         bool somethingChanged = false;
         for (UpdatePositionArgs::UpdateIterator update = updates.updatesBegin();
@@ -2290,7 +2290,7 @@ namespace {
                                                         const HandshakeArgs& handshake) {
         LOG(2) << "Received handshake " << handshake.toBSON();
 
-        boost::unique_lock<boost::mutex> lock(_mutex);
+        stdx::unique_lock<stdx::mutex> lock(_mutex);
 
         if (getReplicationMode() != modeMasterSlave) {
             return Status(ErrorCodes::IllegalOperation,
@@ -2313,7 +2313,7 @@ namespace {
     }
 
     bool ReplicationCoordinatorImpl::buildsIndexes() {
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         if (_selfIndex == -1) {
             return true;
         }
@@ -2323,7 +2323,7 @@ namespace {
 
     std::vector<HostAndPort> ReplicationCoordinatorImpl::getHostsWrittenTo(const OpTime& op) {
         std::vector<HostAndPort> hosts;
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         for (size_t i = 0; i < _slaveInfo.size(); ++i) {
             const SlaveInfo& slaveInfo = _slaveInfo[i];
             if (slaveInfo.opTime < op) {
@@ -2340,7 +2340,7 @@ namespace {
     }
 
     std::vector<HostAndPort> ReplicationCoordinatorImpl::getOtherNodesInReplSet() const {
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         invariant(_settings.usingReplSets());
 
         std::vector<HostAndPort> nodes;
@@ -2359,7 +2359,7 @@ namespace {
 
     Status ReplicationCoordinatorImpl::checkIfWriteConcernCanBeSatisfied(
             const WriteConcernOptions& writeConcern) const {
-        boost::lock_guard<boost::mutex> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
         return _checkIfWriteConcernCanBeSatisfied_inlock(writeConcern);
     }
 
@@ -2384,7 +2384,7 @@ namespace {
     }
 
     WriteConcernOptions ReplicationCoordinatorImpl::getGetLastErrorDefault() {
-        boost::lock_guard<boost::mutex> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
         if (_rsConfig.isInitialized()) {
             return _rsConfig.getDefaultWriteConcern();
         }
@@ -2489,7 +2489,7 @@ namespace {
         else {
             lastOpTime = lastOpTimeStatus.getValue();
         }
-        boost::unique_lock<boost::mutex> lk(_mutex);
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
         _setMyLastOptime_inlock(&lk, lastOpTime, true);
         _externalState->setGlobalTimestamp(lastOpTime.getTimestamp());
     }
@@ -2551,7 +2551,7 @@ namespace {
     }
 
     OpTime ReplicationCoordinatorImpl::getLastCommittedOpTime() const {
-        boost::unique_lock<boost::mutex> lk(_mutex);
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
         return _lastCommittedOpTime;
     }
 
@@ -2602,7 +2602,7 @@ namespace {
             return;
         }
 
-        boost::unique_lock<boost::mutex> lk(_mutex);
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
         _topCoord->processReplSetRequestVotes(args, response, getMyLastOptime());
         *result = Status::OK();
     }
@@ -2659,7 +2659,7 @@ namespace {
     Status ReplicationCoordinatorImpl::processHeartbeatV1(const ReplSetHeartbeatArgsV1& args,
                                                           ReplSetHeartbeatResponse* response) {
         {
-            boost::lock_guard<boost::mutex> lock(_mutex);
+            stdx::lock_guard<stdx::mutex> lock(_mutex);
             if (_rsConfigState == kConfigPreStart || _rsConfigState == kConfigStartingUp) {
                 return Status(ErrorCodes::NotYetInitialized,
                               "Received heartbeat while still initializing replication system");

@@ -138,7 +138,7 @@ namespace mongo {
         /**
          * Guards _roleGraphState and _roleGraph.
          */
-        boost::mutex _roleGraphMutex;
+        stdx::mutex _roleGraphMutex;
     };
 
 } // namespace mongo

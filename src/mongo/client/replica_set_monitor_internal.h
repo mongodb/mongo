@@ -162,7 +162,7 @@ namespace mongo {
          */
         void checkInvariants() const;
 
-        boost::mutex mutex; // must hold this to access any other member or method (except name).
+        stdx::mutex mutex; // must hold this to access any other member or method (except name).
 
         // If Refresher::getNextStep returns WAIT, you should wait on the condition_variable,
         // releasing mutex. It will be notified when either getNextStep will return something other

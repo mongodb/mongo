@@ -88,7 +88,7 @@ namespace {
         invariant(!_freshnessChecker);
         invariant(!_electCmdRunner);
 
-        boost::unique_lock<boost::mutex> lk(_mutex);
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
         switch (_rsConfigState) {
         case kConfigSteady:
             break;

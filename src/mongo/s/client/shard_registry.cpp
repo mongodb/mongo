@@ -32,8 +32,6 @@
 
 #include "mongo/s/client/shard_registry.h"
 
-#include <boost/thread/lock_guard.hpp>
-
 #include "mongo/client/connection_string.h"
 #include "mongo/client/remote_command_runner_impl.h"
 #include "mongo/client/remote_command_targeter.h"
@@ -43,6 +41,7 @@
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 

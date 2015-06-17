@@ -157,7 +157,7 @@ namespace mongo {
             Client* next();
 
         private:
-            boost::unique_lock<boost::mutex> _lock;
+            stdx::unique_lock<stdx::mutex> _lock;
             ClientSet::const_iterator _curr;
             ClientSet::const_iterator _end;
         };
@@ -310,7 +310,7 @@ namespace mongo {
          * Mutex used to synchronize access to mutable state of this ServiceContext instance,
          * including possibly by its subclasses.
          */
-        boost::mutex _mutex;
+        stdx::mutex _mutex;
 
     private:
         /**

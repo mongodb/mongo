@@ -376,7 +376,7 @@ namespace {
         _distLockManager->startUp();
 
         {
-            boost::lock_guard<boost::mutex> lk(_mutex);
+            stdx::lock_guard<stdx::mutex> lk(_mutex);
             _inShutdown = false;
             _consistentFromLastCheck = true;
         }
@@ -432,7 +432,7 @@ namespace {
     void CatalogManagerLegacy::shutDown() {
         LOG(1) << "CatalogManagerLegacy::shutDown() called.";
         {
-            boost::lock_guard<boost::mutex> lk(_mutex);
+            stdx::lock_guard<stdx::mutex> lk(_mutex);
             _inShutdown = true;
             _consistencyCheckerCV.notify_one();
         }
@@ -1704,7 +1704,7 @@ namespace {
     }
 
     void CatalogManagerLegacy::_consistencyChecker() {
-        boost::unique_lock<boost::mutex> lk(_mutex);
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
         while (!_inShutdown) {
             lk.unlock();
             const bool isConsistent = _checkConfigServersConsistent();
@@ -1718,7 +1718,7 @@ namespace {
     }
 
     bool CatalogManagerLegacy::_isConsistentFromLastCheck() {
-        boost::unique_lock<boost::mutex> lk(_mutex);
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
         return _consistentFromLastCheck;
     }
 

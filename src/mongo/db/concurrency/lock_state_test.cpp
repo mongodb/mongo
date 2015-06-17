@@ -260,7 +260,7 @@ namespace {
 
     TEST(Locker, PerformanceBoostSharedMutex) {
         for (int numLockers = 1; numLockers <= 64; numLockers = numLockers * 2) {
-            boost::mutex mtx;
+            stdx::mutex mtx;
 
             // Do some warm-up loops
             for (int i = 0; i < 1000; i++) {

@@ -33,11 +33,10 @@
 #include <map>
 #include <string>
 
-#include <boost/thread/mutex.hpp>
-
 #include "mongo/db/storage/kv/kv_catalog.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 
@@ -111,7 +110,7 @@ namespace mongo {
 
         typedef std::map<std::string,KVDatabaseCatalogEntry*> DBMap;
         DBMap _dbs;
-        mutable boost::mutex _dbsLock;
+        mutable stdx::mutex _dbsLock;
     };
 
 }

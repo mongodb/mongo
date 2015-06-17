@@ -56,13 +56,13 @@ namespace {
     }
 
     void LegacyDistLockManager::startUp() {
-        boost::lock_guard<boost::mutex> sl(_mutex);
+        stdx::lock_guard<stdx::mutex> sl(_mutex);
         invariant(!_pinger);
         _pinger = stdx::make_unique<LegacyDistLockPinger>();
     }
 
     void LegacyDistLockManager::shutDown() {
-        boost::unique_lock<boost::mutex> sl(_mutex);
+        stdx::unique_lock<stdx::mutex> sl(_mutex);
         _isStopped = true;
 
         while (!_lockMap.empty()) {
@@ -83,7 +83,7 @@ namespace {
         auto distLock = stdx::make_unique<DistributedLock>(_configServer, name.toString());
 
         {
-            boost::lock_guard<boost::mutex> sl(_mutex);
+            stdx::lock_guard<stdx::mutex> sl(_mutex);
 
             if (_isStopped) {
                 return Status(ErrorCodes::LockBusy, "legacy distlock manager is stopped");
@@ -142,7 +142,7 @@ namespace {
                 dassert(lock.isLockIDSet());
 
                 {
-                    boost::lock_guard<boost::mutex> sl(_mutex);
+                    stdx::lock_guard<stdx::mutex> sl(_mutex);
                     _lockMap.insert(std::make_pair(lock.getLockID(), std::move(distLock)));
                 }
 
@@ -175,7 +175,7 @@ namespace {
         unique_ptr<DistributedLock> distLock;
 
         {
-            boost::lock_guard<boost::mutex> sl(_mutex);
+            stdx::lock_guard<stdx::mutex> sl(_mutex);
             auto iter = _lockMap.find(lockHandle);
             invariant(iter != _lockMap.end());
 
@@ -188,7 +188,7 @@ namespace {
         }
 
         {
-            boost::lock_guard<boost::mutex> sl(_mutex);
+            stdx::lock_guard<stdx::mutex> sl(_mutex);
             if (_lockMap.empty()) {
                 _noLocksCV.notify_all();
             }
@@ -207,7 +207,7 @@ namespace {
 
         {
             // Assumption: lockHandles are never shared across threads.
-            boost::lock_guard<boost::mutex> sl(_mutex);
+            stdx::lock_guard<stdx::mutex> sl(_mutex);
             auto iter = _lockMap.find(lockHandle);
             invariant(iter != _lockMap.end());
 
@@ -218,7 +218,7 @@ namespace {
     }
 
     void LegacyDistLockManager::enablePinger(bool enable) {
-        boost::lock_guard<boost::mutex> sl(_mutex);
+        stdx::lock_guard<stdx::mutex> sl(_mutex);
         _pingerEnabled = enable;
     }
 

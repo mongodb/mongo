@@ -44,13 +44,13 @@ namespace mongo {
     public:
         TaskGroup() : _c(), _killCount(0), _targetKillCount(0) { }
         void noteKill() {
-            boost::lock_guard<boost::mutex> lk(_m);
+            stdx::lock_guard<stdx::mutex> lk(_m);
             ++_killCount;
             if (_killCount >= _targetKillCount)
                 _c.notify_one();
         }
         void waitForKillCount(uint64_t target) {
-            boost::unique_lock<boost::mutex> lk(_m);
+            stdx::unique_lock<stdx::mutex> lk(_m);
             _targetKillCount = target;
             while (_killCount < _targetKillCount)
                 _c.wait(lk);

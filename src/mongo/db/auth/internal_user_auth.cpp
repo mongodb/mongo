@@ -49,7 +49,7 @@ namespace mongo {
     // guarded by the authParams mutex
     static BSONObj authParams;
 
-    static boost::mutex authParamMutex;
+    static stdx::mutex authParamMutex;
 
     bool isInternalAuthSet() {
        return authParamsSet;
@@ -59,7 +59,7 @@ namespace mongo {
         if (!isInternalAuthSet()) {
             authParamsSet = true;
         }
-        boost::lock_guard<boost::mutex> lk(authParamMutex);
+        stdx::lock_guard<stdx::mutex> lk(authParamMutex);
 
         if (authParamsIn["mechanism"].String() != "SCRAM-SHA-1") {
             authParams = authParamsIn.copy();
@@ -83,7 +83,7 @@ namespace mongo {
             return BSONObj();
         }
 
-        boost::lock_guard<boost::mutex> lk(authParamMutex);
+        stdx::lock_guard<stdx::mutex> lk(authParamMutex);
         return authParams.copy();
     }
 

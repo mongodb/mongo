@@ -31,11 +31,11 @@
 #include <string>
 
 #include <boost/thread/condition.hpp>
-#include <boost/thread/mutex.hpp>
 
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/timer.h"
 
 namespace pcrecpp {
@@ -321,7 +321,7 @@ namespace mongo {
         void onWorkerFinished();
 
     private:
-        boost::mutex _mutex;
+        stdx::mutex _mutex;
         boost::condition _stateChangeCondition;
         unsigned _numUnstartedWorkers;
         unsigned _numActiveWorkers;
@@ -449,7 +449,7 @@ namespace mongo {
 
     private:
         // TODO: Same as for createWithConfig.
-        static boost::mutex _staticMutex;
+        static stdx::mutex _staticMutex;
         static std::map< OID, BenchRunner* > _activeRuns;
 
         OID _oid;

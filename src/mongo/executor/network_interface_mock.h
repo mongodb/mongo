@@ -28,12 +28,12 @@
 
 #pragma once
 
-#include <boost/thread/mutex.hpp>
 #include <boost/thread/condition_variable.hpp>
 #include <map>
 
 #include "mongo/executor/network_interface.h"
 #include "mongo/stdx/list.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -180,7 +180,7 @@ namespace executor {
         /**
          * Implementation of waitForWork*.
          */
-        void _waitForWork_inlock(boost::unique_lock<boost::mutex>* lk);
+        void _waitForWork_inlock(stdx::unique_lock<stdx::mutex>* lk);
 
         /**
          * Returns true if there are ready requests for the network thread to service.
@@ -202,12 +202,12 @@ namespace executor {
          * reaquire "lk" several times, but will not return until the executor has blocked
          * in waitFor*.
          */
-        void _runReadyNetworkOperations_inlock(boost::unique_lock<boost::mutex>* lk);
+        void _runReadyNetworkOperations_inlock(stdx::unique_lock<stdx::mutex>* lk);
 
         // Mutex that synchronizes access to mutable data in this class and its subclasses.
         // Fields guarded by the mutex are labled (M), below, and those that are read-only
         // in multi-threaded execution, and so unsynchronized, are labeled (R).
-        boost::mutex _mutex;
+        stdx::mutex _mutex;
 
         // Condition signaled to indicate that the network processing thread should wake up.
         boost::condition_variable _shouldWakeNetworkCondition;   // (M)

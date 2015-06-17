@@ -39,7 +39,7 @@ namespace mongo {
     using std::string;
     using std::vector;
 
-    typedef boost::unique_lock<boost::mutex> boost_unique_lock;
+    typedef stdx::unique_lock<stdx::mutex> boost_unique_lock;
 
     HostThreadPool::HostThreadPool(int poolSize, bool scopeAllWork) :
         _scopeAllWork(scopeAllWork), _context(new PoolContext) {

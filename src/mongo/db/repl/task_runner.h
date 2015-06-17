@@ -29,11 +29,11 @@
 #pragma once
 
 #include <boost/thread/condition.hpp>
-#include <boost/thread/mutex.hpp>
 #include <list>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 
@@ -152,7 +152,7 @@ namespace repl {
         CreateOperationContextFn _createOperationContext;
 
         // Protects member data of this TaskRunner.
-        mutable boost::mutex _mutex;
+        mutable stdx::mutex _mutex;
 
         boost::condition _condition;
 

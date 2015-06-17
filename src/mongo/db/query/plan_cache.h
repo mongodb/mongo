@@ -30,7 +30,6 @@
 
 #include <set>
 #include <boost/optional/optional.hpp>
-#include <boost/thread/mutex.hpp>
 
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/query/canonical_query.h"
@@ -39,6 +38,7 @@
 #include "mongo/db/query/plan_cache_indexability.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 
@@ -400,7 +400,7 @@ namespace mongo {
         LRUKeyValue<PlanCacheKey, PlanCacheEntry> _cache;
 
         // Protects _cache.
-        mutable boost::mutex _cacheMutex;
+        mutable stdx::mutex _cacheMutex;
 
         // Counter for write notifications since initialization or last clear() invocation.  Starts
         // at 0.

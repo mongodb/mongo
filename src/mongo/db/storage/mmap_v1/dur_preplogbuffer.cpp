@@ -136,7 +136,7 @@ namespace mongo {
             (although not assured) that it is journaled here once.
         */
         static void prepBasicWrites(AlignedBuilder& bb, const std::vector<WriteIntent>& intents) {
-            boost::lock_guard<boost::mutex> lk(privateViews._mutex());
+            stdx::lock_guard<stdx::mutex> lk(privateViews._mutex());
 
             // Each time write intents switch to a different database we journal a JDbContext.
             // Switches will be rare as we sort by memory location first and we batch commit.

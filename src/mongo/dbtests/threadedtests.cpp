@@ -757,14 +757,14 @@ namespace ThreadedTests {
             Hotel( int nRooms ) : _nRooms( nRooms ), _checkedIn( 0 ), _maxRooms( 0 ) {}
 
             void checkIn(){
-                boost::lock_guard<boost::mutex> lk( _frontDesk );
+                stdx::lock_guard<stdx::mutex> lk( _frontDesk );
                 _checkedIn++;
                 verify( _checkedIn <= _nRooms );
                 if( _checkedIn > _maxRooms ) _maxRooms = _checkedIn;
             }
 
             void checkOut(){
-                boost::lock_guard<boost::mutex> lk( _frontDesk );
+                stdx::lock_guard<stdx::mutex> lk( _frontDesk );
                 _checkedIn--;
                 verify( _checkedIn >= 0 );
             }

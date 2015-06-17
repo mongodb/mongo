@@ -69,7 +69,7 @@ namespace repl {
 
     private:
         // Guards starting threads and setting _startedThreads
-        boost::mutex _threadMutex;
+        stdx::mutex _threadMutex;
 
         // True when the threads have been started
         bool _startedThreads;
@@ -89,7 +89,7 @@ namespace repl {
         std::unique_ptr<boost::thread> _producerThread;
 
         // Mutex guarding the _nextThreadId value to prevent concurrent incrementing.
-        boost::mutex _nextThreadIdMutex;
+        stdx::mutex _nextThreadIdMutex;
         // Number used to uniquely name threads.
         long long _nextThreadId;
     };

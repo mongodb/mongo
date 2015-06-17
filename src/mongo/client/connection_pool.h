@@ -28,13 +28,13 @@
 
 #pragma once
 
-#include <boost/thread/mutex.hpp>
 #include <map>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/platform/unordered_map.h"
 #include "mongo/stdx/list.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 
@@ -188,7 +188,7 @@ namespace mongo {
         const int _messagingPortTags;
 
         // Mutex guarding members of the connection pool
-        boost::mutex _mutex;
+        stdx::mutex _mutex;
 
         // Map from HostAndPort to idle connections.
         HostConnectionMap _connections;

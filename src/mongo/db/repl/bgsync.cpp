@@ -68,7 +68,7 @@ namespace {
     MONGO_FP_DECLARE(rsBgSyncProduce);
 
     BackgroundSync* BackgroundSync::s_instance = 0;
-    boost::mutex BackgroundSync::s_mutex;
+    stdx::mutex BackgroundSync::s_mutex;
 
     //The number and time spent reading batches off the network
     static TimerStats getmoreReplStats;
@@ -119,7 +119,7 @@ namespace {
     }
 
     BackgroundSync* BackgroundSync::get() {
-        boost::unique_lock<boost::mutex> lock(s_mutex);
+        stdx::unique_lock<stdx::mutex> lock(s_mutex);
         if (s_instance == NULL && !inShutdown()) {
             s_instance = new BackgroundSync();
         }
@@ -127,7 +127,7 @@ namespace {
     }
 
     void BackgroundSync::shutdown() {
-        boost::lock_guard<boost::mutex> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
 
         // Clear the buffer in case the producerThread is waiting in push() due to a full queue.
         invariant(inShutdown());
@@ -140,7 +140,7 @@ namespace {
     }
 
     void BackgroundSync::notify(OperationContext* txn) {
-        boost::lock_guard<boost::mutex> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
 
         // If all ops in the buffer have been applied, unblock waitForRepl (if it's waiting)
         if (_buffer.empty()) {
@@ -206,7 +206,7 @@ namespace {
         // this oplog reader does not do a handshake because we don't want the server it's syncing
         // from to track how far it has synced
         {
-            boost::unique_lock<boost::mutex> lock(_mutex);
+            stdx::unique_lock<stdx::mutex> lock(_mutex);
             if (_lastOpTimeFetched.isNull()) {
                 // then we're initial syncing and we're still waiting for this to be set
                 lock.unlock();
@@ -232,7 +232,7 @@ namespace {
         // find a target to sync from the last optime fetched
         OpTime lastOpTimeFetched;
         {
-            boost::unique_lock<boost::mutex> lock(_mutex);
+            stdx::unique_lock<stdx::mutex> lock(_mutex);
             lastOpTimeFetched = _lastOpTimeFetched;
             _syncSourceHost = HostAndPort();
         }
@@ -240,7 +240,7 @@ namespace {
         _syncSourceReader.connectToSyncSource(txn, lastOpTimeFetched, _replCoord);
 
         {
-            boost::unique_lock<boost::mutex> lock(_mutex);
+            stdx::unique_lock<stdx::mutex> lock(_mutex);
             // no server found
             if (_syncSourceReader.getHost().empty()) {
                 lock.unlock();
@@ -311,7 +311,7 @@ namespace {
                     // If there is still no data from upstream, check a few more things
                     // and then loop back for another pass at getting more data
                     {
-                        boost::unique_lock<boost::mutex> lock(_mutex);
+                        stdx::unique_lock<stdx::mutex> lock(_mutex);
                         if (_pause) {
                             return;
                         }
@@ -341,7 +341,7 @@ namespace {
             opsReadStats.increment();
 
             {
-                boost::unique_lock<boost::mutex> lock(_mutex);
+                stdx::unique_lock<stdx::mutex> lock(_mutex);
                 _appliedBuffer = false;
             }
 
@@ -354,7 +354,7 @@ namespace {
             _buffer.push(o);
 
             {
-                boost::unique_lock<boost::mutex> lock(_mutex);
+                stdx::unique_lock<stdx::mutex> lock(_mutex);
                 _lastFetchedHash = o["h"].numberLong();
                 _lastOpTimeFetched = extractOpTime(o);
                 LOG(3) << "lastOpTimeFetched: " << _lastOpTimeFetched;
@@ -461,17 +461,17 @@ namespace {
     }
 
     HostAndPort BackgroundSync::getSyncTarget() {
-        boost::unique_lock<boost::mutex> lock(_mutex);
+        stdx::unique_lock<stdx::mutex> lock(_mutex);
         return _syncSourceHost;
     }
 
     void BackgroundSync::clearSyncTarget() {
-        boost::unique_lock<boost::mutex> lock(_mutex);
+        stdx::unique_lock<stdx::mutex> lock(_mutex);
         _syncSourceHost = HostAndPort();
     }
 
     void BackgroundSync::stop() {
-        boost::lock_guard<boost::mutex> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
 
         _pause = true;
         _syncSourceHost = HostAndPort();
@@ -485,7 +485,7 @@ namespace {
         massert(16235, "going to start syncing, but buffer is not empty", _buffer.empty());
 
         long long updatedLastAppliedHash = _readLastAppliedHash(txn);
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         _pause = false;
 
         // reset _last fields with current oplog data
@@ -498,14 +498,14 @@ namespace {
     }
 
     void BackgroundSync::waitUntilPaused() {
-        boost::unique_lock<boost::mutex> lock(_mutex);
+        stdx::unique_lock<stdx::mutex> lock(_mutex);
         while (!_pause) {
             _pausedCondition.wait(lock);
         }
     }
 
     long long BackgroundSync::getLastAppliedHash() const {
-        boost::lock_guard<boost::mutex> lck(_mutex);
+        stdx::lock_guard<stdx::mutex> lck(_mutex);
         return _lastAppliedHash;
     }
 
@@ -514,13 +514,13 @@ namespace {
     }
 
     void BackgroundSync::setLastAppliedHash(long long newHash) {
-        boost::lock_guard<boost::mutex> lck(_mutex);
+        stdx::lock_guard<stdx::mutex> lck(_mutex);
         _lastAppliedHash = newHash;
     }
 
     void BackgroundSync::loadLastAppliedHash(OperationContext* txn) {
         long long result = _readLastAppliedHash(txn);
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         _lastAppliedHash = result;
     }
 
@@ -558,17 +558,17 @@ namespace {
     }
 
     bool BackgroundSync::getInitialSyncRequestedFlag() {
-        boost::lock_guard<boost::mutex> lock(_initialSyncMutex);
+        stdx::lock_guard<stdx::mutex> lock(_initialSyncMutex);
         return _initialSyncRequestedFlag;
     }
 
     void BackgroundSync::setInitialSyncRequestedFlag(bool value) {
-        boost::lock_guard<boost::mutex> lock(_initialSyncMutex);
+        stdx::lock_guard<stdx::mutex> lock(_initialSyncMutex);
         _initialSyncRequestedFlag = value;
     }
 
     void BackgroundSync::pushTestOpToBuffer(const BSONObj& op) {
-        boost::lock_guard<boost::mutex> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
         _buffer.push(op);
     }
 

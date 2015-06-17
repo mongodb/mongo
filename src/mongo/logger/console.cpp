@@ -43,13 +43,13 @@ namespace {
      *
      * At process start, the loader initializes "consoleMutex" to NULL.  At some point during static
      * initialization, the static initialization process, running in the one and only extant thread,
-     * allocates a new boost::mutex on the heap and assigns consoleMutex to point to it.  While
+     * allocates a new stdx::mutex on the heap and assigns consoleMutex to point to it.  While
      * consoleMutex is still NULL, we know that there is only one thread extant, so it is safe to
      * skip locking the consoleMutex in the Console constructor.  Once the mutex is initialized,
      * users of Console can start acquiring it.
      */
 
-    boost::mutex *consoleMutex = new boost::mutex;
+    stdx::mutex *consoleMutex = new stdx::mutex;
 
 #if defined(_WIN32)
     /**
@@ -235,7 +235,7 @@ std::ostream* windowsOutputStream = getWindowsOutputStream();
 
     Console::Console() : _consoleLock() {
         if (consoleMutex) {
-            boost::unique_lock<boost::mutex> lk(*consoleMutex);
+            stdx::unique_lock<stdx::mutex> lk(*consoleMutex);
             lk.swap(_consoleLock);
         }
     }

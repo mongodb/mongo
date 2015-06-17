@@ -32,10 +32,9 @@
 
 #include <map>
 
-#include <boost/thread/mutex.hpp>
-
-#include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/mmap_v1/record_access_tracker.h"
+#include "mongo/db/storage/storage_engine.h"
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 
@@ -92,7 +91,7 @@ namespace mongo {
         static void _listDatabases( const std::string& directory,
                                     std::vector<std::string>* out );
 
-        boost::mutex _entryMapMutex;
+        stdx::mutex _entryMapMutex;
         typedef std::map<std::string,MMAPV1DatabaseCatalogEntry*> EntryMap;
         EntryMap _entryMap;
 

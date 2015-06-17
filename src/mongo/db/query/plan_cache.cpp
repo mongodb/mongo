@@ -581,7 +581,7 @@ namespace {
         entry->sort = pq.getSort().getOwned();
         entry->projection = pq.getProj().getOwned();
 
-        boost::lock_guard<boost::mutex> cacheLock(_cacheMutex);
+        stdx::lock_guard<stdx::mutex> cacheLock(_cacheMutex);
         std::unique_ptr<PlanCacheEntry> evictedEntry = _cache.add(computeKey(query), entry);
 
         if (NULL != evictedEntry.get()) {
@@ -597,7 +597,7 @@ namespace {
         PlanCacheKey key = computeKey(query);
         verify(crOut);
 
-        boost::lock_guard<boost::mutex> cacheLock(_cacheMutex);
+        stdx::lock_guard<stdx::mutex> cacheLock(_cacheMutex);
         PlanCacheEntry* entry;
         Status cacheStatus = _cache.get(key, &entry);
         if (!cacheStatus.isOK()) {
@@ -617,7 +617,7 @@ namespace {
         std::unique_ptr<PlanCacheEntryFeedback> autoFeedback(feedback);
         PlanCacheKey ck = computeKey(cq);
 
-        boost::lock_guard<boost::mutex> cacheLock(_cacheMutex);
+        stdx::lock_guard<stdx::mutex> cacheLock(_cacheMutex);
         PlanCacheEntry* entry;
         Status cacheStatus = _cache.get(ck, &entry);
         if (!cacheStatus.isOK()) {
@@ -634,12 +634,12 @@ namespace {
     }
 
     Status PlanCache::remove(const CanonicalQuery& canonicalQuery) {
-        boost::lock_guard<boost::mutex> cacheLock(_cacheMutex);
+        stdx::lock_guard<stdx::mutex> cacheLock(_cacheMutex);
         return _cache.remove(computeKey(canonicalQuery));
     }
 
     void PlanCache::clear() {
-        boost::lock_guard<boost::mutex> cacheLock(_cacheMutex);
+        stdx::lock_guard<stdx::mutex> cacheLock(_cacheMutex);
         _cache.clear();
         _writeOperations.store(0);
     }
@@ -656,7 +656,7 @@ namespace {
         PlanCacheKey key = computeKey(query);
         verify(entryOut);
 
-        boost::lock_guard<boost::mutex> cacheLock(_cacheMutex);
+        stdx::lock_guard<stdx::mutex> cacheLock(_cacheMutex);
         PlanCacheEntry* entry;
         Status cacheStatus = _cache.get(key, &entry);
         if (!cacheStatus.isOK()) {
@@ -670,7 +670,7 @@ namespace {
     }
 
     std::vector<PlanCacheEntry*> PlanCache::getAllEntries() const {
-        boost::lock_guard<boost::mutex> cacheLock(_cacheMutex);
+        stdx::lock_guard<stdx::mutex> cacheLock(_cacheMutex);
         std::vector<PlanCacheEntry*> entries;
         typedef std::list< std::pair<PlanCacheKey, PlanCacheEntry*> >::const_iterator ConstIterator;
         for (ConstIterator i = _cache.begin(); i != _cache.end(); i++) {
@@ -682,12 +682,12 @@ namespace {
     }
 
     bool PlanCache::contains(const CanonicalQuery& cq) const {
-        boost::lock_guard<boost::mutex> cacheLock(_cacheMutex);
+        stdx::lock_guard<stdx::mutex> cacheLock(_cacheMutex);
         return _cache.hasKey(computeKey(cq));
     }
 
     size_t PlanCache::size() const {
-        boost::lock_guard<boost::mutex> cacheLock(_cacheMutex);
+        stdx::lock_guard<stdx::mutex> cacheLock(_cacheMutex);
         return _cache.size();
     }
 

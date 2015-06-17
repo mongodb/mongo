@@ -34,17 +34,14 @@
 #include <vector>
 #include <boost/version.hpp>
 
-#if BOOST_VERSION >= 105300
-#include <boost/thread/lock_guard.hpp>
-#endif
-
 #include "mongo/base/disallow_copying.h"
-#include "mongo/base/string_data.h"
 #include "mongo/base/status.h"
-#include "mongo/util/concurrency/mutex.h"
+#include "mongo/base/string_data.h"
 #include "mongo/logger/appender.h"
 #include "mongo/logger/message_event.h"
 #include "mongo/logger/tee.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/util/concurrency/mutex.h"
 
 namespace mongo {
 
@@ -121,7 +118,7 @@ namespace mongo {
 
         const char* getLine_inlock(unsigned lineNumber) const;
 
-        boost::mutex _mutex;  // Guards all non-static data.
+        stdx::mutex _mutex;  // Guards all non-static data.
         char lines[N][C];
         unsigned h; // current position
         unsigned n; // number of lines stores 0 o N
@@ -168,7 +165,7 @@ namespace mongo {
 
     private:
         const RamLog* _ramlog;
-        boost::lock_guard<boost::mutex> _lock;
+        stdx::lock_guard<stdx::mutex> _lock;
         unsigned _nextLineIndex;
     };
 
