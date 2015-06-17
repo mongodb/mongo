@@ -28,9 +28,8 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
 
-#include <boost/thread.hpp>
-
 #include "mongo/db/global_timestamp.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/log.h"
 

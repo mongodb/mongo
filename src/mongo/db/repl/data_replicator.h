@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include <boost/thread.hpp>
 #include <vector>
 
 #include "mongo/platform/basic.h"
@@ -44,6 +43,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/reporter.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/queue.h"
 

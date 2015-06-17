@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/thread/thread.hpp>
 #include <deque>
 #include <set>
 #include <string>
@@ -40,6 +39,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/concurrency/synchronization.h"
 #include "mongo/util/time_support.h"
@@ -200,7 +200,7 @@ namespace mongo {
         std::unique_ptr<RangeDeleterEnv> _env;
 
         // Initially not active. Must be started explicitly.
-        std::unique_ptr<boost::thread> _worker;
+        std::unique_ptr<stdx::thread> _worker;
 
         // Protects _stopRequested.
         mutable mutex _stopMutex;

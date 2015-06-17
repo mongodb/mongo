@@ -34,7 +34,6 @@
 
 #include <boost/exception/diagnostic_information.hpp>
 #include <boost/exception/exception.hpp>
-#include <boost/thread.hpp>
 #include <csignal>
 #include <exception>
 #include <iostream>
@@ -46,6 +45,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/logger/log_domain.h"
 #include "mongo/logger/logger.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/debugger.h"

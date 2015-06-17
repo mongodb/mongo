@@ -31,10 +31,9 @@
 
 #include "mongo/util/concurrency/old_thread_pool.h"
 
-#include <boost/thread/thread.hpp>
-
-#include "mongo/util/concurrency/mvar.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/concurrency/mvar.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -68,7 +67,7 @@ private:
     OldThreadPool& _owner;
     MVar<Task> _task;
     bool _is_done; // only used for error detection
-    boost::thread _thread;
+    stdx::thread _thread;
 
     void loop(const std::string& threadName) {
         setThreadName(threadName);
@@ -109,7 +108,7 @@ OldThreadPool::OldThreadPool(const DoNotStartThreadsTag&,
 }
 
 void OldThreadPool::startThreads() {
-    boost::lock_guard<boost::mutex> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     for (int i = 0; i < _nThreads; ++i) {
         const std::string threadName(_threadNamePrefix.empty() ?
                                      _threadNamePrefix :
@@ -137,14 +136,14 @@ OldThreadPool::~OldThreadPool() {
 }
 
 void OldThreadPool::join() {
-    boost::unique_lock<boost::mutex> lock(_mutex);
+    stdx::unique_lock<stdx::mutex> lock(_mutex);
     while(_tasksRemaining) {
         _condition.wait(lock);
     }
 }
 
 void OldThreadPool::schedule(Task task) {
-    boost::lock_guard<boost::mutex> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
 
     _tasksRemaining++;
 
@@ -159,7 +158,7 @@ void OldThreadPool::schedule(Task task) {
 
 // should only be called by a worker from the worker thread
 void OldThreadPool::task_done(Worker* worker) {
-    boost::lock_guard<boost::mutex> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
 
     if (!_tasks.empty()) {
         worker->set_task(_tasks.front());

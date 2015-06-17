@@ -42,19 +42,18 @@
 #include <iostream>
 
 #include <boost/filesystem/operations.hpp>
-#include <boost/thread/thread.hpp>
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
-#include "mongo/db/storage/mmap_v1/mmap.h"
 #include "mongo/db/storage/mmap_v1/logfile.h"
+#include "mongo/db/storage/mmap_v1/mmap.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/util/allocator.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/processinfo.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
-#include "mongo/util/processinfo.h"
-
 
 using namespace std;
 using namespace mongo;
@@ -211,7 +210,7 @@ void go() {
 
         syncDelaySecs = options["syncDelay"].numberInt();
         if( syncDelaySecs ) {
-            boost::thread t(syncThread);
+            stdx::thread t(syncThread);
         }
     }
 
@@ -236,7 +235,7 @@ void go() {
             if( nthr < wthr ) {
                 while( nthr < wthr && nthr < d ) {
                     nthr++;
-                    boost::thread w(workerThread);
+                    stdx::thread w(workerThread);
                 }
                 cout << "new thread, total running : " << nthr << endl;
                 d *= 2;

@@ -35,18 +35,17 @@
 #include "mongo/shell/bench.h"
 
 #include <pcrecpp.h>
-
-#include <boost/thread/thread.hpp>
 #include <iostream>
 
-#include "mongo/db/namespace_string.h"
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/scripting/bson_template_evaluator.h"
 #include "mongo/scripting/engine.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/util/log.h"
 #include "mongo/util/md5.h"
-#include "mongo/util/timer.h"
 #include "mongo/util/time_support.h"
+#include "mongo/util/timer.h"
 #include "mongo/util/version.h"
 
 // ---------------------------------
@@ -341,7 +340,7 @@ namespace mongo {
     BenchRunWorker::~BenchRunWorker() {}
 
     void BenchRunWorker::start() {
-        boost::thread(stdx::bind(&BenchRunWorker::run, this));
+        stdx::thread(stdx::bind(&BenchRunWorker::run, this));
     }
 
     bool BenchRunWorker::shouldStop() const {

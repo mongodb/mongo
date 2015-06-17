@@ -36,13 +36,12 @@
 
 #pragma once
 
-#include <boost/thread/thread.hpp>
-
 #include "mongo/db/client_basic.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/unordered_set.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/spin_lock.h"
 #include "mongo/util/concurrency/threadlocal.h"
 
@@ -133,7 +132,7 @@ namespace mongo {
         const std::string _desc;
 
         // OS id of the thread, which owns this client
-        const boost::thread::id _threadId;
+        const stdx::thread::id _threadId;
 
         // > 0 for things "conn", 0 otherwise
         const ConnectionId _connectionId;

@@ -32,7 +32,6 @@
 #include "mongo/client/replica_set_monitor.h"
 
 #include <algorithm>
-#include <boost/thread.hpp>
 #include <boost/thread/condition.hpp>
 #include <limits>
 
@@ -40,6 +39,7 @@
 #include "mongo/client/connpool.h"
 #include "mongo/client/global_conn_pool.h"
 #include "mongo/client/replica_set_monitor_internal.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/util/background.h"
 #include "mongo/util/concurrency/mutex.h" // for StaticObserver
 #include "mongo/util/debug_util.h"
@@ -640,7 +640,7 @@ namespace {
             if (configChangeHook) {
                 // call from a separate thread to avoid blocking and holding lock while potentially
                 // going over the network
-                boost::thread bg(configChangeHook, _set->name, _set->getServerAddress());
+                stdx::thread bg(configChangeHook, _set->name, _set->getServerAddress());
                 bg.detach();
             }
         }

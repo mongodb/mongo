@@ -32,7 +32,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <boost/thread/thread.hpp>
 #include <fstream>
 #include <memory>
 
@@ -59,7 +58,6 @@
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/exec/delete.h"
 #include "mongo/db/exec/update.h"
-#include "mongo/db/service_context.h"
 #include "mongo/db/global_timestamp.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/introspect.h"
@@ -81,6 +79,7 @@
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage_options.h"
@@ -92,14 +91,15 @@
 #include "mongo/rpc/legacy_reply_builder.h"
 #include "mongo/rpc/legacy_request.h"
 #include "mongo/rpc/legacy_request_builder.h"
-#include "mongo/rpc/request_interface.h"
 #include "mongo/rpc/metadata.h"
+#include "mongo/rpc/request_interface.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/d_state.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/stale_exception.h" // for SendStaleConfigException
 #include "mongo/scripting/engine.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
@@ -1253,7 +1253,7 @@ namespace {
 
         /* must do this before unmapping mem or you may get a seg fault */
         log(LogComponent::kNetwork) << "shutdown: going to close sockets..." << endl;
-        boost::thread close_socket_thread( stdx::bind(MessagingPort::closeAllSockets, 0) );
+        stdx::thread close_socket_thread( stdx::bind(MessagingPort::closeAllSockets, 0) );
 
         getGlobalServiceContext()->shutdownGlobalStorageEngineCleanly();
     }

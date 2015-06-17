@@ -193,7 +193,7 @@ namespace mongo {
 
     void RangeDeleter::startWorkers() {
         if (!_worker) {
-            _worker.reset(new boost::thread(stdx::bind(&RangeDeleter::doWork, this)));
+            _worker.reset(new stdx::thread(stdx::bind(&RangeDeleter::doWork, this)));
         }
     }
 

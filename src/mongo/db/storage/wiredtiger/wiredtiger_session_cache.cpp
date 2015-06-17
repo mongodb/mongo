@@ -31,12 +31,11 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
 
-#include <boost/thread.hpp>
-
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/util/log.h"
 
 namespace mongo {

@@ -29,7 +29,6 @@
 #include "mongo/platform/basic.h"
 
 #include <map>
-#include <boost/thread/thread.hpp>
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -38,6 +37,7 @@
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -159,7 +159,7 @@ namespace {
         NetworkInterfaceMock* net;
         StorageInterfaceMock* storage;
         ReplicationExecutor executor;
-        boost::thread executorThread;
+        stdx::thread executorThread;
         const ReplicationExecutor::EventHandle goEvent;
         const ReplicationExecutor::EventHandle event2;
         const ReplicationExecutor::EventHandle event3;
@@ -213,7 +213,7 @@ namespace {
 
         ReplicationExecutor::EventHandle neverSignaledEvent =
             unittest::assertGet(executor.makeEvent());
-        boost::thread neverSignaledWaiter(stdx::bind(&ReplicationExecutor::waitForEvent,
+        stdx::thread neverSignaledWaiter(stdx::bind(&ReplicationExecutor::waitForEvent,
                                                      &executor,
                                                      neverSignaledEvent));
         ReplicationExecutor::CallbackHandle shutdownCallback = unittest::assertGet(

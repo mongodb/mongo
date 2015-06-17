@@ -28,8 +28,6 @@
  *    then also delete it in the license file.
  */
 
-#include <boost/thread/thread.hpp>
-
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/db.h"
 #include "mongo/db/db_raii.h"
@@ -37,6 +35,7 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/json.h"
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/stdx/thread.h"
 
 #include "mongo/dbtests/dbtests.h"
 

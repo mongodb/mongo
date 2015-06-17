@@ -26,9 +26,8 @@
  *    then also delete it in the license file.
  */
 
-#include <boost/thread/thread.hpp>
-
 #include "mongo/stdx/functional.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/spin_lock.h"
 #include "mongo/util/timer.h"
@@ -37,6 +36,8 @@ namespace {
 
     using mongo::SpinLock;
     using mongo::Timer;
+
+    namespace stdx = mongo::stdx;
 
     class LockTester {
     public:
@@ -48,7 +49,7 @@ namespace {
         }
 
         void start( int increments ) {
-            _t = new boost::thread( mongo::stdx::bind(&LockTester::test, this, increments) );
+            _t = new stdx::thread( mongo::stdx::bind(&LockTester::test, this, increments) );
         }
 
         void join() {
@@ -63,7 +64,7 @@ namespace {
         SpinLock*      _spin;     // not owned here
         int*           _counter;  // not owned here
         int            _requests;
-        boost::thread* _t;
+        stdx::thread* _t;
 
         void test( int increments ) {
             while ( increments-- > 0 ) {

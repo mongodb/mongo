@@ -32,8 +32,6 @@
 
 #include "mongo/s/server.h"
 
-#include <boost/thread/thread.hpp>
-
 #include "mongo/base/init.h"
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
@@ -62,8 +60,8 @@
 #include "mongo/platform/process_id.h"
 #include "mongo/s/balance.h"
 #include "mongo/s/catalog/legacy/catalog_manager_legacy.h"
-#include "mongo/s/client/sharding_connection_hook.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/client/sharding_connection_hook.h"
 #include "mongo/s/config.h"
 #include "mongo/s/cursors.h"
 #include "mongo/s/grid.h"
@@ -71,6 +69,7 @@
 #include "mongo/s/request.h"
 #include "mongo/s/version_mongos.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/util/admin_access.h"
 #include "mongo/util/cmdline_utils/censor_cmdline.h"
 #include "mongo/util/concurrency/thread_name.h"
@@ -265,7 +264,7 @@ static ExitCode runMongosServer( bool doUpgrade ) {
                                                 new NoAdminAccess()));
         dbWebServer->setupSockets();
 
-        boost::thread web(stdx::bind(&webServerListenThread, dbWebServer));
+        stdx::thread web(stdx::bind(&webServerListenThread, dbWebServer));
         web.detach();
     }
 

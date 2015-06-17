@@ -29,13 +29,13 @@
 #pragma once
 
 #include <boost/thread/condition_variable.hpp>
-#include <boost/thread/thread.hpp>
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/stdx/thread.h"
 
 namespace mongo {
 
@@ -320,7 +320,7 @@ namespace mongo {
         const bool _scopeAllWork;
 
         // For now, only modified in the constructor and destructor, but non-const
-        std::vector<boost::thread*> _threads;
+        std::vector<stdx::thread*> _threads;
 
         // Shared work and worker activity information
         std::shared_ptr<PoolContext> _context;

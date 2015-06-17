@@ -32,7 +32,6 @@
 #include "mongo/scripting/v8-3.25_utils.h"
 
 #include <boost/thread/condition_variable.hpp>
-#include <boost/thread/thread.hpp>
 #include <iostream>
 #include <map>
 #include <sstream>
@@ -42,6 +41,7 @@
 #include "mongo/scripting/engine_v8-3.25.h"
 #include "mongo/scripting/v8-3.25_db.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -121,7 +121,7 @@ namespace mongo {
         void start() {
             jsassert(!_started, "Thread already started");
             JSThread jt(*this);
-            _thread.reset(new boost::thread(jt));
+            _thread.reset(new stdx::thread(jt));
             _started = true;
         }
         void join() {
@@ -237,7 +237,7 @@ namespace mongo {
 
         bool _started;
         bool _done;
-        unique_ptr<boost::thread> _thread;
+        unique_ptr<stdx::thread> _thread;
         std::shared_ptr<SharedData> _sharedData;
     };
 

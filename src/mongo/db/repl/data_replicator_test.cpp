@@ -182,7 +182,7 @@ namespace {
         }
 
         void run() {
-            _thread.reset(new boost::thread(stdx::bind(&InitialSyncBackgroundRunner::_run, this)));
+            _thread.reset(new stdx::thread(stdx::bind(&InitialSyncBackgroundRunner::_run, this)));
             sleepmillis(2); // sleep to let new thread run initialSync so it schedules work
         }
 
@@ -196,7 +196,7 @@ namespace {
 
         DataReplicator* _dr;
         TimestampStatus _result;
-        std::unique_ptr<boost::thread> _thread;
+        std::unique_ptr<stdx::thread> _thread;
     };
 
     class InitialSyncTest : public DataReplicatorTest {

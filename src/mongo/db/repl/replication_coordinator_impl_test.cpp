@@ -30,7 +30,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <boost/thread.hpp>
 #include <future>
 #include <iostream>
 #include <memory>
@@ -57,6 +56,7 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
@@ -242,7 +242,7 @@ namespace {
         hbArgs.setSenderId(0);
 
         Status status(ErrorCodes::InternalError, "Not set");
-        boost::thread prsiThread(stdx::bind(doReplSetInitiate, getReplCoord(), &status));
+        stdx::thread prsiThread(stdx::bind(doReplSetInitiate, getReplCoord(), &status));
         const Date_t startDate = getNet()->now();
         getNet()->enterNetwork();
         const NetworkInterfaceMock::NetworkOperationIterator noi = getNet()->getNextReadyRequest();
@@ -273,7 +273,7 @@ namespace {
         hbArgs.setSenderId(0);
 
         Status status(ErrorCodes::InternalError, "Not set");
-        boost::thread prsiThread(stdx::bind(doReplSetInitiate, getReplCoord(), &status));
+        stdx::thread prsiThread(stdx::bind(doReplSetInitiate, getReplCoord(), &status));
         const Date_t startDate = getNet()->now();
         getNet()->enterNetwork();
         const NetworkInterfaceMock::NetworkOperationIterator noi = getNet()->getNextReadyRequest();
@@ -674,7 +674,7 @@ namespace {
 
         void start(OperationContext* txn) {
             ASSERT(!_finished);
-            _thread.reset(new boost::thread(stdx::bind(&ReplicationAwaiter::_awaitReplication,
+            _thread.reset(new stdx::thread(stdx::bind(&ReplicationAwaiter::_awaitReplication,
                                                        this,
                                                        txn)));
         }
@@ -698,7 +698,7 @@ namespace {
         OpTime _optime;
         WriteConcernOptions _writeConcern;
         ReplicationCoordinator::StatusAndDuration _result;
-        std::unique_ptr<boost::thread> _thread;
+        std::unique_ptr<stdx::thread> _thread;
     };
 
     TEST_F(ReplCoordTest, AwaitReplicationNumberOfNodesBlocking) {
@@ -1084,7 +1084,7 @@ namespace {
 
         void start(OperationContext* txn) {
             ASSERT(!_finished);
-            _thread.reset(new boost::thread(stdx::bind(&StepDownRunner::_stepDown,
+            _thread.reset(new stdx::thread(stdx::bind(&StepDownRunner::_stepDown,
                                                        this,
                                                        txn)));
         }
@@ -1117,7 +1117,7 @@ namespace {
         ReplicationCoordinatorImpl* _replCoord;
         bool _finished;
         Status _result;
-        std::unique_ptr<boost::thread> _thread;
+        std::unique_ptr<stdx::thread> _thread;
         bool _force;
         Milliseconds _waitTime;
         Milliseconds _stepDownTime;
@@ -1706,7 +1706,7 @@ namespace {
 
         // reconfig
         Status status(ErrorCodes::InternalError, "Not Set");
-        boost::thread reconfigThread(stdx::bind(doReplSetReconfig, getReplCoord(), &status));
+        stdx::thread reconfigThread(stdx::bind(doReplSetReconfig, getReplCoord(), &status));
 
         NetworkInterfaceMock* net = getNet();
         getNet()->enterNetwork();
@@ -1776,7 +1776,7 @@ namespace {
 
         // reconfig to fewer nodes
         Status status(ErrorCodes::InternalError, "Not Set");
-        boost::thread reconfigThread(stdx::bind(doReplSetReconfigToFewer, getReplCoord(), &status));
+        stdx::thread reconfigThread(stdx::bind(doReplSetReconfigToFewer, getReplCoord(), &status));
 
         NetworkInterfaceMock* net = getNet();
         getNet()->enterNetwork();
@@ -1844,7 +1844,7 @@ namespace {
 
         // reconfig to three nodes
         Status status(ErrorCodes::InternalError, "Not Set");
-        boost::thread reconfigThread(stdx::bind(doReplSetReconfig, getReplCoord(), &status));
+        stdx::thread reconfigThread(stdx::bind(doReplSetReconfig, getReplCoord(), &status));
 
         NetworkInterfaceMock* net = getNet();
         getNet()->enterNetwork();

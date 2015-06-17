@@ -33,7 +33,6 @@
 
 #include "mongo/shell/shell_utils_launcher.h"
 
-#include <boost/thread/thread.hpp>
 #include <iostream>
 #include <map>
 #include <signal.h>
@@ -54,6 +53,7 @@
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/shell/shell_utils.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/util/log.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/scopeguard.h"
@@ -550,14 +550,14 @@ namespace mongo {
             _nokillop = true;
             ProgramRunner r( a );
             r.start();
-            boost::thread t( r );
+            stdx::thread t( r );
             return BSON( string( "" ) << r.pid().asLongLong() );
         }
 
         BSONObj RunMongoProgram( const BSONObj &a, void* data ) {
             ProgramRunner r( a );
             r.start();
-            boost::thread t( r );
+            stdx::thread t( r );
             int exit_code = -123456; // sentinel value
             wait_for_pid( r.pid(), true, &exit_code );
             if ( r.port() > 0 ) {
@@ -572,7 +572,7 @@ namespace mongo {
         BSONObj RunProgram(const BSONObj &a, void* data) {
             ProgramRunner r( a );
             r.start();
-            boost::thread t( r );
+            stdx::thread t( r );
             int exit_code = -123456; // sentinel value
             wait_for_pid(r.pid(), true,  &exit_code);
             registry.deletePid( r.pid() );

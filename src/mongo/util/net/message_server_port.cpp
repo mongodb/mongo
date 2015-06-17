@@ -31,7 +31,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <boost/thread/thread.hpp>
 #include <memory>
 
 #include "mongo/base/disallow_copying.h"
@@ -40,6 +39,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/synchronization.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/concurrency/ticketholder.h"
@@ -115,7 +115,7 @@ namespace {
             try {
 #ifndef __linux__  // TODO: consider making this ifdef _WIN32
                 {
-                    boost::thread thr(stdx::bind(&handleIncomingMsg, portWithHandler.get()));
+                    stdx::thread thr(stdx::bind(&handleIncomingMsg, portWithHandler.get()));
                 }
 #else
                 pthread_attr_t attrs;

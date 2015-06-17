@@ -28,8 +28,7 @@
 
 #pragma once
 
-#include <boost/thread/thread.hpp>
-
+#include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -92,7 +91,7 @@ namespace repl {
         executor::NetworkInterfaceMock* _net;
         StorageInterfaceMock* _storage;
         unique_ptr<ReplicationExecutor> _executor;
-        unique_ptr<boost::thread> _executorThread;
+        unique_ptr<stdx::thread> _executorThread;
     };
 
 }  // namespace repl

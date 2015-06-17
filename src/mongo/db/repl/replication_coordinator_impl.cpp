@@ -33,7 +33,6 @@
 #include "mongo/db/repl/replication_coordinator_impl.h"
 
 #include <algorithm>
-#include <boost/thread.hpp>
 #include <limits>
 
 #include "mongo/base/status.h"
@@ -47,9 +46,9 @@
 #include "mongo/db/repl/freshness_checker.h"
 #include "mongo/db/repl/handshake_args.h"
 #include "mongo/db/repl/is_master_response.h"
+#include "mongo/db/repl/last_vote.h"
 #include "mongo/db/repl/read_after_optime_args.h"
 #include "mongo/db/repl/read_after_optime_response.h"
-#include "mongo/db/repl/last_vote.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_set_declare_election_winner_args.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
@@ -67,6 +66,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
@@ -374,7 +374,7 @@ namespace {
             return;
         }
 
-        _topCoordDriverThread.reset(new boost::thread(stdx::bind(&ReplicationExecutor::run,
+        _topCoordDriverThread.reset(new stdx::thread(stdx::bind(&ReplicationExecutor::run,
                                                                  &_replExecutor)));
 
         bool doneLoadingConfig = _startLoadLocalConfig(txn);

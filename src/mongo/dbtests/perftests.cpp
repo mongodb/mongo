@@ -50,6 +50,7 @@
 
 #include "mongo/config.h"
 #include "mongo/db/client.h"
+#include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/db.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/json.h"
@@ -57,19 +58,19 @@
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/storage/mmap_v1/btree/key.h"
 #include "mongo/db/storage/mmap_v1/compress.h"
-#include "mongo/db/storage/mmap_v1/durable_mapped_file.h"
 #include "mongo/db/storage/mmap_v1/dur_stats.h"
+#include "mongo/db/storage/mmap_v1/durable_mapped_file.h"
 #include "mongo/db/storage/mmap_v1/mmap.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/dbtests/framework_options.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/util/allocator.h"
 #include "mongo/util/checksum.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
 #include "mongo/util/timer.h"
 #include "mongo/util/version.h"
-#include "mongo/db/concurrency/lock_state.h"
 
 namespace PerfTests {
 
@@ -407,7 +408,7 @@ namespace PerfTests {
                 return 0;
             }
             unsigned long long counter = 0;
-            boost::thread athread(stdx::bind(&B::thread, this, &counter));
+            stdx::thread athread(stdx::bind(&B::thread, this, &counter));
             unsigned long long child = launchThreads(remaining - 1);
             athread.join();
             unsigned long long accum = child + counter;
@@ -1404,7 +1405,7 @@ namespace PerfTests {
         All() : Suite( "perf" ) { }
 
         Result * run( const string& filter, int runsPerTest ) {
-            boost::thread a(t);
+            stdx::thread a(t);
             Result * res = Suite::run(filter, runsPerTest);
             a.join();
             return res;

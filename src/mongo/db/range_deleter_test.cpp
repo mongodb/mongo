@@ -26,7 +26,6 @@
  *    it in the license file.
  */
 
-#include <boost/thread.hpp>
 #include <string>
 
 #include "mongo/db/field_parser.h"
@@ -37,6 +36,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
@@ -53,6 +53,8 @@ namespace {
     using mongo::RangeDeleterMockEnv;
     using mongo::RangeDeleterOptions;
     using mongo::OperationContext;
+
+    namespace stdx = mongo::stdx;
 
     OperationContext* const noTxn = NULL; // MockEnv doesn't need txn XXX SERVER-13931
 
@@ -207,7 +209,7 @@ namespace {
                                                    BSON("x" << 10),
                                                    BSON("x" << 1)));
         deleterOption.waitForOpenCursors = true;
-        boost::thread deleterThread = boost::thread(mongo::stdx::bind(
+        stdx::thread deleterThread = stdx::thread(mongo::stdx::bind(
                                                             rangeDeleterDeleteNow,
                                                             &deleter,
                                                             noTxn,
@@ -264,7 +266,7 @@ namespace {
                                                    BSON("x" << 10),
                                                    BSON("x" << 1)));
         deleterOption.waitForOpenCursors = true;
-        boost::thread deleterThread = boost::thread(mongo::stdx::bind(
+        stdx::thread deleterThread = stdx::thread(mongo::stdx::bind(
                                                             rangeDeleterDeleteNow,
                                                             &deleter,
                                                             noTxn,

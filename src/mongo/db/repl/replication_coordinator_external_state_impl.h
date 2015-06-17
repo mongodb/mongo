@@ -28,12 +28,11 @@
 
 #pragma once
 
-#include <boost/thread.hpp>
-
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/repl/replication_coordinator_external_state.h"
 #include "mongo/db/repl/sync_source_feedback.h"
+#include "mongo/stdx/thread.h"
 
 namespace mongo {
 namespace repl {
@@ -80,13 +79,13 @@ namespace repl {
         SyncSourceFeedback _syncSourceFeedback;
 
         // Thread running SyncSourceFeedback::run().
-        std::unique_ptr<boost::thread> _syncSourceFeedbackThread;
+        std::unique_ptr<stdx::thread> _syncSourceFeedbackThread;
 
         // Thread running runSyncThread().
-        std::unique_ptr<boost::thread> _applierThread;
+        std::unique_ptr<stdx::thread> _applierThread;
 
         // Thread running BackgroundSync::producerThread().
-        std::unique_ptr<boost::thread> _producerThread;
+        std::unique_ptr<stdx::thread> _producerThread;
 
         // Mutex guarding the _nextThreadId value to prevent concurrent incrementing.
         stdx::mutex _nextThreadIdMutex;

@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/thread.hpp>
 #include <boost/thread/condition_variable.hpp>
 #include <vector>
 #include <memory>
@@ -49,6 +48,7 @@
 #include "mongo/platform/unordered_map.h"
 #include "mongo/platform/unordered_set.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
@@ -941,7 +941,7 @@ namespace repl {
 
         // Thread that drives actions in the topology coordinator
         // Set in startReplication() and thereafter accessed in shutdown.
-        std::unique_ptr<boost::thread> _topCoordDriverThread;                           // (I)
+        std::unique_ptr<stdx::thread> _topCoordDriverThread;                           // (I)
 
         // Our RID, used to identify us to our sync source when sending replication progress
         // updates upstream.  Set once in startReplication() and then never modified again.

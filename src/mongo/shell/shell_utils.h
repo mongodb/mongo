@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include <boost/thread/mutex.hpp>
-
 #include "mongo/db/jsobj.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/mutex.h"

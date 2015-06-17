@@ -30,19 +30,19 @@
 
 #include "mongo/platform/basic.h"
 
-#include <boost/thread.hpp>
 #include <iostream>
 #include <signal.h>
 
 #include "mongo/base/initializer.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/dbmessage.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/tools/mongobridge_options.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/listen.h"
 #include "mongo/util/net/message.h"
-#include "mongo/util/stacktrace.h"
 #include "mongo/util/quick_exit.h"
+#include "mongo/util/stacktrace.h"
 #include "mongo/util/text.h"
 #include "mongo/util/timer.h"
 
@@ -139,7 +139,7 @@ public:
     virtual void acceptedMP(MessagingPort *mp) {
         ports.insert( mp );
         Forwarder f( *mp );
-        boost::thread t( f );
+        stdx::thread t( f );
     }
 };
 

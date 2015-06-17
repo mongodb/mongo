@@ -29,13 +29,13 @@
 #pragma once
 
 #include <boost/thread/condition.hpp>
-#include <boost/thread/thread.hpp>
 #include <string>
 #include <vector>
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/s/catalog/catalog_manager.h"
+#include "mongo/stdx/thread.h"
 
 namespace mongo {
 
@@ -201,7 +201,7 @@ namespace mongo {
         bool _consistentFromLastCheck = false;
 
         // Thread that runs dbHash on config servers for checking data consistency.
-        boost::thread _consistencyCheckerThread;
+        stdx::thread _consistencyCheckerThread;
 
         // condition variable used by the consistency checker thread to wait
         // for <= 60s, on every iteration, until shutDown is called

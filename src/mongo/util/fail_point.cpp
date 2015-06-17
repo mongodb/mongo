@@ -30,9 +30,8 @@
 
 #include "mongo/util/fail_point.h"
 
-#include <boost/thread.hpp>
-
 #include "mongo/platform/random.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/threadlocal.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"

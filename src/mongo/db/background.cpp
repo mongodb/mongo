@@ -32,11 +32,11 @@
 
 #include "mongo/db/background.h"
 
-#include <boost/thread.hpp>
 #include <iostream>
 #include <string>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/map_util.h"
 #include "mongo/util/mongoutils/str.h"

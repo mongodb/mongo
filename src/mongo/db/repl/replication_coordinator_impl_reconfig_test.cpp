@@ -211,7 +211,7 @@ namespace {
         simulateSuccessfulElection();
 
         Status status(ErrorCodes::InternalError, "Not Set");
-        boost::thread reconfigThread(stdx::bind(doReplSetReconfig, getReplCoord(), &status));
+        stdx::thread reconfigThread(stdx::bind(doReplSetReconfig, getReplCoord(), &status));
 
         NetworkInterfaceMock* net = getNet();
         getNet()->enterNetwork();
@@ -249,7 +249,7 @@ namespace {
         Status status(ErrorCodes::InternalError, "Not Set");
         getExternalState()->setStoreLocalConfigDocumentStatus(Status(ErrorCodes::OutOfDiskSpace,
                                                                      "The test set this"));
-        boost::thread reconfigThread(stdx::bind(doReplSetReconfig, getReplCoord(), &status));
+        stdx::thread reconfigThread(stdx::bind(doReplSetReconfig, getReplCoord(), &status));
 
         NetworkInterfaceMock* net = getNet();
         getNet()->enterNetwork();
@@ -286,7 +286,7 @@ namespace {
 
         Status status(ErrorCodes::InternalError, "Not Set");
         // first reconfig
-        boost::thread reconfigThread(stdx::bind(doReplSetReconfig, getReplCoord(), &status));
+        stdx::thread reconfigThread(stdx::bind(doReplSetReconfig, getReplCoord(), &status));
         getNet()->enterNetwork();
         getNet()->blackHole(getNet()->getNextReadyRequest());
         getNet()->exitNetwork();
@@ -320,7 +320,7 @@ namespace {
 
         // initiate
         Status status(ErrorCodes::InternalError, "Not Set");
-        boost::thread initateThread(stdx::bind(doReplSetInitiate, getReplCoord(), &status));
+        stdx::thread initateThread(stdx::bind(doReplSetInitiate, getReplCoord(), &status));
         getNet()->enterNetwork();
         getNet()->blackHole(getNet()->getNextReadyRequest());
         getNet()->exitNetwork();
@@ -358,7 +358,7 @@ namespace {
         simulateSuccessfulElection();
 
         Status status(ErrorCodes::InternalError, "Not Set");
-        boost::thread reconfigThread(stdx::bind(doReplSetReconfig, getReplCoord(), &status));
+        stdx::thread reconfigThread(stdx::bind(doReplSetReconfig, getReplCoord(), &status));
 
         NetworkInterfaceMock* net = getNet();
         getNet()->enterNetwork();
@@ -449,7 +449,7 @@ namespace {
 
         // start reconfigThread
         Status status(ErrorCodes::InternalError, "Not Set");
-        boost::thread reconfigThread(stdx::bind(doReplSetReconfig, getReplCoord(), &status));
+        stdx::thread reconfigThread(stdx::bind(doReplSetReconfig, getReplCoord(), &status));
 
         // wait for reconfigThread to create network requests to ensure the replication coordinator
         // is in state kConfigReconfiguring

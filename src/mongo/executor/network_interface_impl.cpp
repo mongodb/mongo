@@ -94,7 +94,7 @@ namespace {
         const std::string threadName(str::stream() << "ReplExecNetThread-" << _nextThreadId++);
         try {
             _threads.push_back(
-                    std::make_shared<boost::thread>(
+                    std::make_shared<stdx::thread>(
                             stdx::bind(&NetworkInterfaceImpl::_requestProcessorThreadBody,
                                        this,
                                        threadName)));
@@ -128,7 +128,7 @@ namespace {
         _commandRunner.shutdown();
         std::for_each(threadsToJoin.begin(),
                       threadsToJoin.end(),
-                      stdx::bind(&boost::thread::join, stdx::placeholders::_1));
+                      stdx::bind(&stdx::thread::join, stdx::placeholders::_1));
     }
 
     void NetworkInterfaceImpl::signalWorkAvailable() {

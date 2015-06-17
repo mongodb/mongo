@@ -531,7 +531,7 @@ namespace {
     // On client OSes, SERVICE_CONTROL_SHUTDOWN has a 5 second timeout configured in
     // HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control
     static void serviceStop() {
-        boost::thread serviceWorkerThread(serviceStopWorker);
+        stdx::thread serviceWorkerThread(serviceStopWorker);
 
         // We periodically check if we are done exiting by polling at half of each wait interval
         //

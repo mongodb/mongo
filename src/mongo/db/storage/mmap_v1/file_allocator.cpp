@@ -33,7 +33,6 @@
 
 #include "mongo/db/storage/mmap_v1/file_allocator.h"
 
-#include <boost/thread.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <errno.h>
 #include <fcntl.h>
@@ -54,6 +53,7 @@
 #include "mongo/db/storage/paths.h"
 #include "mongo/platform/posix_fadvise.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/fail_point_service.h"
@@ -121,7 +121,7 @@ namespace mongo {
 
 
     void FileAllocator::start() {
-        boost::thread t( stdx::bind( &FileAllocator::run , this ) );
+        stdx::thread t( stdx::bind( &FileAllocator::run , this ) );
     }
 
     void FileAllocator::requestAllocation( const string &name, long &size ) {

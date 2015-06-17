@@ -419,7 +419,7 @@ namespace {
                           "Data inconsistency detected amongst config servers");
         }
 
-        boost::thread t(stdx::bind(&CatalogManagerLegacy::_consistencyChecker, this));
+        stdx::thread t(stdx::bind(&CatalogManagerLegacy::_consistencyChecker, this));
         _consistencyCheckerThread.swap(t);
 
         return Status::OK();

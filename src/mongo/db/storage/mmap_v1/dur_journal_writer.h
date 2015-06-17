@@ -28,11 +28,10 @@
 
 #pragma once
 
-#include <boost/thread/thread.hpp>
-
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/storage/mmap_v1/aligned_builder.h"
 #include "mongo/db/storage/mmap_v1/dur_journalformat.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/synchronization.h"
 #include "mongo/util/queue.h"
 
@@ -171,7 +170,7 @@ namespace dur {
         NotifyAll* const _applyToDataFilesNotify;
 
         // Wraps and controls the journal writer thread
-        boost::thread _journalWriterThreadHandle;
+        stdx::thread _journalWriterThreadHandle;
 
         // Indicates that shutdown has been requested. Used for idempotency of the shutdown call.
         bool _shutdownRequested;

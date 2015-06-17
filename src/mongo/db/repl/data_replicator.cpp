@@ -33,7 +33,6 @@
 #include "data_replicator.h"
 
 #include <algorithm>
-#include <boost/thread.hpp>
 #include <thread>
 
 #include "mongo/base/status.h"
@@ -45,15 +44,16 @@
 #include "mongo/db/repl/database_cloner.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
+#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/queue.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
-#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 namespace repl {

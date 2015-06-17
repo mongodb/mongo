@@ -33,7 +33,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <boost/thread.hpp>
 #include <boost/version.hpp>
 #include <iostream>
 
@@ -48,12 +47,13 @@
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/mvar.h"
-#include "mongo/util/concurrency/rwlock.h"
 #include "mongo/util/concurrency/old_thread_pool.h"
-#include "mongo/util/timer.h"
+#include "mongo/util/concurrency/rwlock.h"
 #include "mongo/util/concurrency/synchronization.h"
+#include "mongo/util/concurrency/old_thread_pool.h"
 #include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/log.h"
+#include "mongo/util/timer.h"
 
 namespace ThreadedTests {
 
@@ -81,10 +81,10 @@ namespace ThreadedTests {
 
     private:
         void launch_subthreads(int remaining) {
-            if (!remaining) 
+            if (!remaining)
                 return;
 
-            boost::thread athread(stdx::bind(&ThreadedTest::subthread, this, remaining));
+            stdx::thread athread(stdx::bind(&ThreadedTest::subthread, this, remaining));
             launch_subthreads(remaining - 1);
             athread.join();
         }
@@ -136,7 +136,7 @@ namespace ThreadedTests {
                     Lock::GlobalRead r(txn.lockState());
                     ASSERT(txn.lockState()->isReadLocked());
                 }
-                else if( i % 7 == 4 && 
+                else if( i % 7 == 4 &&
                          tnumber == 1 /*only one upgrader legal*/ ) {
                     Lock::GlobalWrite w(txn.lockState());
                     ASSERT( txn.lockState()->isW() );
@@ -173,9 +173,9 @@ namespace ThreadedTests {
                     }
                 }
                 else if( i % 7 == 6 ) {
-                    if( i > N/2 ) { 
+                    if( i > N/2 ) {
                         int q = i % 11;
-                        if( q == 0 ) { 
+                        if( q == 0 ) {
                             ScopedTransaction scopedXact(&txn, MODE_IS);
 
                             Lock::DBLock r(txn.lockState(), "foo", MODE_S);
@@ -190,7 +190,7 @@ namespace ThreadedTests {
                         }
                         else if( q == 1 ) {
                             // test locking local only -- with no preceding lock
-                            { 
+                            {
                                 ScopedTransaction scopedXact(&txn, MODE_IS);
                                 Lock::DBLock x(txn.lockState(), "local", MODE_S);
                             }
@@ -209,7 +209,7 @@ namespace ThreadedTests {
                                 Lock::DBLock  x(txn.lockState(), "admin", MODE_S);
                             }
 
-                            { 
+                            {
                                 ScopedTransaction scopedXact(&txn, MODE_IX);
                                 Lock::DBLock x(txn.lockState(), "admin", MODE_X);
                             }
@@ -220,13 +220,13 @@ namespace ThreadedTests {
                             Lock::DBLock x(txn.lockState(), "foo", MODE_X);
                             Lock::DBLock y(txn.lockState(), "admin", MODE_S);
                         }
-                        else if( q == 4 ) { 
+                        else if( q == 4 ) {
                             ScopedTransaction scopedXact(&txn, MODE_IS);
 
                             Lock::DBLock x(txn.lockState(), "foo2", MODE_S);
                             Lock::DBLock y(txn.lockState(), "admin", MODE_S);
                         }
-                        else { 
+                        else {
                             ScopedTransaction scopedXact(&txn, MODE_IX);
 
                             Lock::DBLock w(txn.lockState(), "foo", MODE_X);
@@ -239,7 +239,7 @@ namespace ThreadedTests {
                             Lock::DBLock r3(txn.lockState(), "local", MODE_S);
                         }
                     }
-                    else { 
+                    else {
                         ScopedTransaction scopedXact(&txn, MODE_IS);
 
                         Lock::DBLock r(txn.lockState(), "foo", MODE_S);
@@ -339,9 +339,9 @@ namespace ThreadedTests {
         }
     };
 
-    class RWLockTest1 { 
+    class RWLockTest1 {
     public:
-        void run() { 
+        void run() {
             RWLock lk( "eliot" );
             {
                 rwlock r( lk , true , 1000 );
@@ -349,7 +349,7 @@ namespace ThreadedTests {
         }
     };
 
-    class RWLockTest2 { 
+    class RWLockTest2 {
     public:
         static void worker1( RWLockRecursiveNongreedy * lk , AtomicUInt32 * x ) {
             x->fetchAndAdd(1); // 1
@@ -360,22 +360,22 @@ namespace ThreadedTests {
             RWLockRecursiveNongreedy::Shared c(*lk);
             x->fetchAndAdd(1);
         }
-        void run() { 
+        void run() {
             /**
              * note: this test will deadlock if the code breaks
-             */            
+             */
             RWLockRecursiveNongreedy lk( "eliot2" , 120 * 1000 );
             cout << "RWLock impl: " << lk.implType() << endl;
-            unique_ptr<RWLockRecursiveNongreedy::Shared> a( new RWLockRecursiveNongreedy::Shared(lk) );            
+            unique_ptr<RWLockRecursiveNongreedy::Shared> a( new RWLockRecursiveNongreedy::Shared(lk) );
             AtomicUInt32 x1(0);
             cout << "A : " << &x1 << endl;
-            boost::thread t1( stdx::bind( worker1 , &lk , &x1 ) );
+            stdx::thread t1( stdx::bind( worker1 , &lk , &x1 ) );
             while ( ! x1.load() );
             verify( x1.load() == 1 );
             sleepmillis( 500 );
-            verify( x1.load() == 1 );            
+            verify( x1.load() == 1 );
             AtomicUInt32 x2(0);
-            boost::thread t2( stdx::bind( worker2, &lk , &x2 ) );
+            stdx::thread t2( stdx::bind( worker2, &lk , &x2 ) );
             t2.join();
             verify( x2.load() == 1 );
             a.reset();
@@ -385,40 +385,40 @@ namespace ThreadedTests {
                 sleepmillis(1);
             }
             verify( x1.load() == 2 );
-            t1.join();            
+            t1.join();
         }
     };
 
-    class RWLockTest3 { 
-    public:        
+    class RWLockTest3 {
+    public:
         static void worker2( RWLockRecursiveNongreedy * lk , AtomicUInt32 * x ) {
     	    verify( ! lk->__lock_try(0) );
             RWLockRecursiveNongreedy::Shared c( *lk  );
             x->fetchAndAdd(1);
         }
 
-        void run() { 
+        void run() {
             /**
              * note: this test will deadlock if the code breaks
              */
-            
+
             RWLockRecursiveNongreedy lk( "eliot2" , 120 * 1000 );
-            
+
             unique_ptr<RWLockRecursiveNongreedy::Shared> a( new RWLockRecursiveNongreedy::Shared( lk ) );
-            
+
             AtomicUInt32 x2(0);
 
-            boost::thread t2( stdx::bind( worker2, &lk , &x2 ) );
+            stdx::thread t2( stdx::bind( worker2, &lk , &x2 ) );
             t2.join();
             verify( x2.load() == 1 );
 
-            a.reset();            
+            a.reset();
         }
     };
 
-    class RWLockTest4 { 
+    class RWLockTest4 {
     public:
-        
+
 #if defined(__linux__) || defined(__APPLE__)
         static void worker1( pthread_rwlock_t * lk , AtomicUInt32 * x ) {
             x->fetchAndAdd(1); // 1
@@ -441,30 +441,30 @@ namespace ThreadedTests {
             pthread_rwlock_unlock( lk );
         }
 #endif
-        void run() { 
+        void run() {
             /**
              * note: this test will deadlock if the code breaks
              */
-      
-#if defined(__linux__) || defined(__APPLE__)      
-            
+
+#if defined(__linux__) || defined(__APPLE__)
+
             // create
             pthread_rwlock_t lk;
             verify( pthread_rwlock_init( &lk , 0 ) == 0 );
-            
+
             // read lock
             verify( pthread_rwlock_rdlock( &lk ) == 0 );
-            
+
             AtomicUInt32 x1(0);
-            boost::thread t1( stdx::bind( worker1 , &lk , &x1 ) );
+            stdx::thread t1( stdx::bind( worker1 , &lk , &x1 ) );
             while ( ! x1.load() );
             verify( x1.load() == 1 );
             sleepmillis( 500 );
             verify( x1.load() == 1 );
-            
+
             AtomicUInt32 x2(0);
 
-            boost::thread t2( stdx::bind( worker2, &lk , &x2 ) );
+            stdx::thread t2( stdx::bind( worker2, &lk , &x2 ) );
             t2.join();
             verify( x2.load() == 1 );
 
@@ -478,11 +478,11 @@ namespace ThreadedTests {
 
             verify( x1.load() == 2 );
             t1.join();
-#endif            
+#endif
         }
     };
 
-    // we don't use upgrade so that part is not important currently but the other aspects of this test are 
+    // we don't use upgrade so that part is not important currently but the other aspects of this test are
     // interesting; it would be nice to do analogous tests for SimpleRWLock and QLock
     class UpgradableTest : public ThreadedTest<7> {
         RWLock m;
@@ -493,9 +493,9 @@ namespace ThreadedTests {
         virtual void subthread(int x) {
             Client::initThread("utest");
 
-            /* r = get a read lock 
+            /* r = get a read lock
                R = get a read lock and we expect it to be fast
-               u = get upgradable 
+               u = get upgradable
                U = get upgradable and we expect it to be fast
                w = get a write lock
             */
@@ -510,7 +510,7 @@ namespace ThreadedTests {
             int Z = 1;
             LOG(Z) << x << ' ' << what[x] << " request" << endl;
             char ch = what[x];
-            switch( ch ) { 
+            switch( ch ) {
             case 'w':
                 {
                     m.lock();
@@ -557,8 +557,8 @@ namespace ThreadedTests {
                     m.lock_shared();
                     LOG(Z) << x << ' ' << ch << " got " << endl;
                     if( what[x] == 'R' ) {
-                        if( t.millis() > 15 ) { 
-                            // commented out for less chatter, we aren't using upgradeable anyway right now: 
+                        if( t.millis() > 15 ) {
+                            // commented out for less chatter, we aren't using upgradeable anyway right now:
                             // log() << x << " info: when in upgradable, write locks are still greedy on this platform" << endl;
                         }
                     }
@@ -573,9 +573,9 @@ namespace ThreadedTests {
         }
     };
 
-    void sleepalittle() { 
+    void sleepalittle() {
         Timer t;
-        while( 1 ) { 
+        while( 1 ) {
             stdx::this_thread::yield();
             if( t.micros() > 8 )
                 break;
@@ -584,7 +584,7 @@ namespace ThreadedTests {
 
     int once;
 
-    /* This test is to see how long it takes to get a lock after there has been contention -- the OS 
+    /* This test is to see how long it takes to get a lock after there has been contention -- the OS
          will need to reschedule us. if a spinlock, it will be fast of course, but these aren't spin locks.
        Experimenting with different # of threads would be a good idea.
     */
@@ -606,7 +606,7 @@ namespace ThreadedTests {
         char pad3[128];
         volatile int k;
 
-        virtual void validate() { 
+        virtual void validate() {
             if( once++ == 0 ) {
                 // <= 1.35 we use a different rwmutex impl so worth noting
                 cout << "Boost version : " << BOOST_VERSION << endl;
@@ -615,20 +615,20 @@ namespace ThreadedTests {
              " Slack useful work fraction: " << ((double)a)/b << " locks:" << locks << endl;
         }
         void watch() {
-            while( 1 ) { 
+            while( 1 ) {
                 b++;
                 //__sync_synchronize();
-                if( k ) { 
+                if( k ) {
                     a++;
                 }
                 sleepmillis(0);
-                if( done ) 
+                if( done )
                     break;
             }
         }
         volatile bool done;
         virtual void subthread(int x) {
-            if( x == 1 ) { 
+            if( x == 1 ) {
                 watch();
                 return;
             }
@@ -663,25 +663,25 @@ namespace ThreadedTests {
         }
     private:
         unsigned a, b;
-        virtual void validate() { 
+        virtual void validate() {
             cout << "CondSlack useful work fraction: " << ((double)a)/b << " locks:" << locks << endl;
         }
         unsigned locks;
         volatile int k;
         void watch() {
-            while( 1 ) { 
+            while( 1 ) {
                 b++;
-                if( k ) { 
+                if( k ) {
                     a++;
                 }
                 sleepmillis(0);
-                if( done ) 
+                if( done )
                     break;
             }
         }
         volatile bool done;
         virtual void subthread(int x) {
-            if( x == 1 ) { 
+            if( x == 1 ) {
                 n.notifyOne();
                 watch();
                 return;
@@ -693,7 +693,7 @@ namespace ThreadedTests {
                 k = 1;
                 // not very long, we'd like to simulate about 100K locks per second
                 sleepalittle();
-                k = 0; 
+                k = 0;
                 locks++;
                 n.notifyOne();
                 if( done ||  t.millis() > 1500 )
@@ -715,7 +715,7 @@ namespace ThreadedTests {
             _barrier.wait();
             int Z = 0;
             Client::initThread("utest");
-            if( x == 1 ) { 
+            if( x == 1 ) {
                 LOG(Z) << mongo::curTimeMillis64() % 10000 << " 1" << endl;
                 rwlock_shared lk(m);
                 sleepmillis(400);
@@ -819,7 +819,7 @@ namespace ThreadedTests {
             add< WriteLocksAreGreedy >();
 
             // Slack is a test to see how long it takes for another thread to pick up
-            // and begin work after another relinquishes the lock.  e.g. a spin lock 
+            // and begin work after another relinquishes the lock.  e.g. a spin lock
             // would have very little slack.
             add< Slack<SimpleMutex,SimpleMutex::scoped_lock> >();
             add< Slack<SimpleRWLock,SimpleRWLock::Exclusive> >();

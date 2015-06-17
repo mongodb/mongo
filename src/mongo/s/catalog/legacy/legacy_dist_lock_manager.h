@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/thread.hpp>
 #include <map>
 #include <memory>
 
@@ -38,6 +37,7 @@
 #include "mongo/s/catalog/legacy/distlock.h"
 #include "mongo/s/catalog/legacy/legacy_dist_lock_pinger.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/stdx/thread.h"
 
 namespace mongo {
 

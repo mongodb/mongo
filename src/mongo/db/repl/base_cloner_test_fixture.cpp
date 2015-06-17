@@ -30,9 +30,9 @@
 
 #include "mongo/db/repl/base_cloner_test_fixture.h"
 
-#include <boost/thread.hpp>
 #include <memory>
 
+#include "mongo/stdx/thread.h"
 #include "mongo/db/jsobj.h"
 
 namespace mongo {

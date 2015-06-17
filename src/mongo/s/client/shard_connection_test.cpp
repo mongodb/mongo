@@ -25,6 +25,8 @@
  *    then also delete it in the license file.
  */
 
+#include <vector>
+
 #include "mongo/base/init.h"
 #include "mongo/client/connpool.h"
 #include "mongo/db/auth/authorization_manager.h"
@@ -38,10 +40,8 @@
 #include "mongo/platform/cstdint.h"
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
-
-#include <vector>
-#include <boost/thread/thread.hpp>
 
 /**
  * Tests for ShardConnection, particularly in connection pool management.

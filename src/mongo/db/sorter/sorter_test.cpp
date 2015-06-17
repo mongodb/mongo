@@ -31,9 +31,9 @@
 #include "mongo/db/sorter/sorter.h"
 
 #include <boost/filesystem.hpp>
-#include <boost/thread.hpp>
 
 #include "mongo/config.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/mongoutils/str.h"
@@ -361,7 +361,7 @@ namespace mongo {
                         makeSorter(opts, IWComparator(DESC))
                     };
 
-                    boost::thread inBackground(&Basic::addData, this, sorters[0]);
+                    stdx::thread inBackground(&Basic::addData, this, sorters[0]);
                     addData(sorters[1]);
                     inBackground.join();
 

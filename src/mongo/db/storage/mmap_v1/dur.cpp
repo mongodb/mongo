@@ -74,7 +74,7 @@
 #include "mongo/db/storage/mmap_v1/dur.h"
 
 #include <boost/thread/condition_variable.hpp>
-#include <boost/thread/thread.hpp>
+
 #include <iomanip>
 #include <utility>
 
@@ -92,6 +92,7 @@
 #include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/synchronization.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
@@ -219,7 +220,7 @@ namespace {
         void start();
 
     private:
-        boost::thread _durThreadHandle;
+        stdx::thread _durThreadHandle;
     };
 
 
@@ -605,7 +606,7 @@ namespace {
 
     void DurableImpl::start() {
         // Start the durability thread
-        boost::thread t(durThread);
+        stdx::thread t(durThread);
         _durThreadHandle.swap(t);
     }
 

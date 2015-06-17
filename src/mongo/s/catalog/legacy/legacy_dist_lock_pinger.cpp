@@ -32,12 +32,11 @@
 
 #include "mongo/s/catalog/legacy/legacy_dist_lock_pinger.h"
 
-#include <boost/thread.hpp>
-
 #include "mongo/client/connpool.h"
 #include "mongo/s/catalog/legacy/distlock.h"
 #include "mongo/s/type_lockpings.h"
 #include "mongo/s/type_locks.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 
@@ -264,7 +263,7 @@ namespace {
 
         {
             stdx::lock_guard<stdx::mutex> lk(_mutex);
-            boost::thread thread(stdx::bind(&LegacyDistLockPinger::distLockPingThread,
+            stdx::thread thread(stdx::bind(&LegacyDistLockPinger::distLockPingThread,
                                             this,
                                             conn,
                                             getJSTimeVirtualThreadSkew(),

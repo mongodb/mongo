@@ -31,10 +31,10 @@
 #include <string>
 
 #include <boost/thread/condition.hpp>
-#include <boost/thread/mutex.hpp>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 
@@ -86,7 +86,7 @@ namespace mongo {
 
     private:
         class Worker;
-        boost::mutex _mutex;
+        stdx::mutex _mutex;
         boost::condition _condition;
 
         std::list<Worker*> _freeWorkers; //used as LIFO stack (always front)
