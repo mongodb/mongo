@@ -1233,9 +1233,11 @@ namespace {
                 StatusWith<ChunkType> chunkRes = ChunkType::fromBSON(chunkObj);
                 if (!chunkRes.isOK()) {
                     conn.done();
-                    return Status(ErrorCodes::FailedToParse,
-                                  str::stream() << "Failed to parse chunk BSONObj: "
-                                                << chunkRes.getStatus().reason());
+                    chunks->clear();
+                    return {ErrorCodes::FailedToParse,
+                            stream() << "Failed to parse chunk with id ("
+                                     << chunkObj[ChunkType::name()].toString() << "): "
+                                     << chunkRes.getStatus().reason()};
                 }
 
                 chunks->push_back(chunkRes.getValue());

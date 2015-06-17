@@ -281,7 +281,35 @@ namespace {
     Status CatalogManagerReplicaSet::getChunks(const Query& query,
                                                int nToReturn,
                                                vector<ChunkType>* chunks) {
-        return notYetImplemented;
+
+        auto configShard = grid.shardRegistry()->findIfExists("config");
+        auto readHostStatus = configShard->getTargeter()->findHost(kConfigReadSelector);
+        if (!readHostStatus.isOK()) {
+            return readHostStatus.getStatus();
+        }
+
+        auto findStatus = _find(readHostStatus.getValue(),
+                                NamespaceString(ChunkType::ConfigNS),
+                                query.obj,
+                                0); // no limit
+        if (!findStatus.isOK()) {
+            return findStatus.getStatus();
+        }
+
+        for (const BSONObj& obj : findStatus.getValue()) {
+            auto chunkRes = ChunkType::fromBSON(obj);
+            if (!chunkRes.isOK()) {
+                chunks->clear();
+                return {ErrorCodes::FailedToParse,
+                        stream() << "Failed to parse chunk with id ("
+                                 << obj[ChunkType::name()].toString() << "): "
+                                 << chunkRes.getStatus().reason()};
+            }
+
+            chunks->push_back(chunkRes.getValue());
+        }
+
+        return Status::OK();
     }
 
     Status CatalogManagerReplicaSet::getTagsForCollection(const std::string& collectionNs,

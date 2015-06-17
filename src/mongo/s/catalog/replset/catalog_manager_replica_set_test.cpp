@@ -33,15 +33,18 @@
 #include <chrono>
 #include <future>
 
+#include "mongo/client/dbclientinterface.h"
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/catalog/replset/catalog_manager_replica_set.h"
 #include "mongo/s/catalog/replset/catalog_manager_replica_set_test_fixture.h"
+#include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog/type_shard.h"
+#include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/s/write_ops/batched_update_request.h"
@@ -378,6 +381,147 @@ namespace {
                 s1.toBSON(),
                 BSONObj() // empty document is invalid
             };
+        });
+
+        future.get();
+    }
+
+    TEST_F(CatalogManagerReplSetTestFixture, GetChunksForNS) {
+        RemoteCommandTargeterMock* targeter =
+            RemoteCommandTargeterMock::get(shardRegistry()->findIfExists("config")->getTargeter());
+        targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+
+        OID oid = OID::gen();
+
+        ChunkType chunkA;
+        chunkA.setName("chunk0000");
+        chunkA.setNS("TestDB.TestColl");
+        chunkA.setMin(BSON("a" << 1));
+        chunkA.setMax(BSON("a" << 100));
+        chunkA.setVersion({ 1, 2, oid });
+        chunkA.setShard("shard0000");
+
+        ChunkType chunkB;
+        chunkB.setName("chunk0001");
+        chunkB.setNS("TestDB.TestColl");
+        chunkB.setMin(BSON("a" << 100));
+        chunkB.setMax(BSON("a" << 200));
+        chunkB.setVersion({ 3, 4, oid });
+        chunkB.setShard("shard0001");
+
+        ChunkVersion queryChunkVersion({ 1, 2, oid });
+
+        const Query chunksQuery(BSON(ChunkType::ns("TestDB.TestColl") <<
+                                     ChunkType::DEPRECATED_lastmod() <<
+                                        BSON("$gte" << static_cast<long long>(
+                                                            queryChunkVersion.toLong()))));
+
+        auto future = async(std::launch::async, [this, &chunksQuery] {
+            vector<ChunkType> chunks;
+
+            ASSERT_OK(catalogManager()->getChunks(chunksQuery, 0, &chunks));
+            ASSERT_EQ(2, chunks.size());
+
+            return chunks;
+        });
+
+        onFindCommand([&chunksQuery, chunkA, chunkB](const RemoteCommandRequest& request) {
+            const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
+            ASSERT_EQ(nss.toString(), ChunkType::ConfigNS);
+
+            auto query = assertGet(LiteParsedQuery::fromFindCommand(nss, request.cmdObj, false));
+
+            ASSERT_EQ(query->ns(), ChunkType::ConfigNS);
+            ASSERT_EQ(query->getFilter(), chunksQuery.getFilter());
+
+            return vector<BSONObj>{ chunkA.toBSON(), chunkB.toBSON() };
+        });
+
+        const auto& chunks = future.get();
+        ASSERT_EQ(chunkA.toBSON(), chunks[0].toBSON());
+        ASSERT_EQ(chunkB.toBSON(), chunks[1].toBSON());
+    }
+
+    TEST_F(CatalogManagerReplSetTestFixture, GetChunksForNSNoChunks) {
+        RemoteCommandTargeterMock* targeter =
+            RemoteCommandTargeterMock::get(shardRegistry()->findIfExists("config")->getTargeter());
+        targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+
+        ChunkVersion queryChunkVersion({ 1, 2, OID::gen() });
+
+        const Query chunksQuery(BSON(ChunkType::ns("TestDB.TestColl") <<
+                                     ChunkType::DEPRECATED_lastmod() <<
+                                        BSON("$gte" << static_cast<long long>(
+                                                            queryChunkVersion.toLong()))));
+
+        auto future = async(std::launch::async, [this, &chunksQuery] {
+            vector<ChunkType> chunks;
+
+            ASSERT_OK(catalogManager()->getChunks(chunksQuery, 0, &chunks));
+            ASSERT_EQ(0, chunks.size());
+        });
+
+        onFindCommand([&chunksQuery](const RemoteCommandRequest& request) {
+            const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
+            ASSERT_EQ(nss.toString(), ChunkType::ConfigNS);
+
+            auto query = assertGet(LiteParsedQuery::fromFindCommand(nss, request.cmdObj, false));
+
+            ASSERT_EQ(query->ns(), ChunkType::ConfigNS);
+            ASSERT_EQ(query->getFilter(), chunksQuery.getFilter());
+
+            return vector<BSONObj>{ };
+        });
+
+        future.get();
+    }
+
+    TEST_F(CatalogManagerReplSetTestFixture, GetChunksForNSInvalidChunk) {
+        RemoteCommandTargeterMock* targeter =
+            RemoteCommandTargeterMock::get(shardRegistry()->findIfExists("config")->getTargeter());
+        targeter->setFindHostReturnValue(HostAndPort("TestHost1"));
+
+        ChunkVersion queryChunkVersion({ 1, 2, OID::gen() });
+
+        const Query chunksQuery(BSON(ChunkType::ns("TestDB.TestColl") <<
+                                     ChunkType::DEPRECATED_lastmod() <<
+                                        BSON("$gte" << static_cast<long long>(
+                                                            queryChunkVersion.toLong()))));
+
+        auto future = async(std::launch::async, [this, &chunksQuery] {
+            vector<ChunkType> chunks;
+            Status status = catalogManager()->getChunks(chunksQuery, 0, &chunks);
+
+            ASSERT_EQUALS(ErrorCodes::FailedToParse, status);
+            ASSERT_EQ(0, chunks.size());
+        });
+
+        onFindCommand([&chunksQuery](const RemoteCommandRequest& request) {
+            const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
+            ASSERT_EQ(nss.toString(), ChunkType::ConfigNS);
+
+            auto query = assertGet(LiteParsedQuery::fromFindCommand(nss, request.cmdObj, false));
+
+            ASSERT_EQ(query->ns(), ChunkType::ConfigNS);
+            ASSERT_EQ(query->getFilter(), chunksQuery.getFilter());
+
+            ChunkType chunkA;
+            chunkA.setName("chunk0000");
+            chunkA.setNS("TestDB.TestColl");
+            chunkA.setMin(BSON("a" << 1));
+            chunkA.setMax(BSON("a" << 100));
+            chunkA.setVersion({ 1, 2, OID::gen() });
+            chunkA.setShard("shard0000");
+
+            ChunkType chunkB;
+            chunkB.setName("chunk0001");
+            chunkB.setNS("TestDB.TestColl");
+            chunkB.setMin(BSON("a" << 100));
+            chunkB.setMax(BSON("a" << 200));
+            chunkB.setVersion({ 3, 4, OID::gen() });
+            // Missing shard id
+
+            return vector<BSONObj>{ chunkA.toBSON(), chunkB.toBSON() };
         });
 
         future.get();
