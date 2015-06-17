@@ -31,62 +31,24 @@
 
 #include "mongo/util/concurrency/old_thread_pool.h"
 
-#include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/concurrency/mvar.h"
-#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
+namespace {
 
-// Worker thread
-class OldThreadPool::Worker {
-public:
-    explicit Worker(OldThreadPool& owner, const std::string& threadName)
-        : _owner(owner), _is_done(true), _thread(stdx::bind(&Worker::loop, this, threadName)) {}
-
-    // destructor will block until current operation is completed
-    // Acts as a "join" on this thread
-    ~Worker() {
-        _task.put(Task());
-        _thread.join();
+ThreadPool::Options makeOptions(int nThreads, const std::string& threadNamePrefix) {
+    fassert(28706, nThreads > 0);
+    ThreadPool::Options options;
+    if (!threadNamePrefix.empty()) {
+        options.threadNamePrefix = threadNamePrefix;
+        options.poolName = str::stream() << threadNamePrefix << "Pool";
     }
+    options.maxThreads = options.minThreads = static_cast<size_t>(nThreads);
+    return options;
+}
 
-    void set_task(Task& func) {
-        invariant(func);
-        invariant(_is_done);
-        _is_done = false;
-
-        _task.put(func);
-    }
-
-private:
-    OldThreadPool& _owner;
-    MVar<Task> _task;
-    bool _is_done;  // only used for error detection
-    stdx::thread _thread;
-
-    void loop(const std::string& threadName) {
-        setThreadName(threadName);
-        while (true) {
-            Task task = _task.take();
-            if (!task)
-                break;  // ends the thread
-
-            try {
-                task();
-            } catch (DBException& e) {
-                log() << "Unhandled DBException: " << e.toString();
-            } catch (std::exception& e) {
-                log() << "Unhandled std::exception in worker thread: " << e.what();
-            } catch (...) {
-                log() << "Unhandled non-exception in worker thread";
-            }
-            _is_done = true;
-            _owner.task_done(this);
-        }
-    }
-};
+}  // namespace
 
 OldThreadPool::OldThreadPool(int nThreads, const std::string& threadNamePrefix)
     : OldThreadPool(DoNotStartThreadsTag(), nThreads, threadNamePrefix) {
@@ -96,69 +58,18 @@ OldThreadPool::OldThreadPool(int nThreads, const std::string& threadNamePrefix)
 OldThreadPool::OldThreadPool(const DoNotStartThreadsTag&,
                              int nThreads,
                              const std::string& threadNamePrefix)
-    : _tasksRemaining(0), _nThreads(nThreads), _threadNamePrefix(threadNamePrefix) {}
+    : _pool(makeOptions(nThreads, threadNamePrefix)) {}
 
 void OldThreadPool::startThreads() {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
-    for (int i = 0; i < _nThreads; ++i) {
-        const std::string threadName(_threadNamePrefix.empty() ? _threadNamePrefix : str::stream()
-                                             << _threadNamePrefix << i);
-        Worker* worker = new Worker(*this, threadName);
-        if (_tasks.empty()) {
-            _freeWorkers.push_front(worker);
-        } else {
-            worker->set_task(_tasks.front());
-            _tasks.pop_front();
-        }
-    }
-}
-
-OldThreadPool::~OldThreadPool() {
-    join();
-
-    invariant(_tasksRemaining == 0);
-
-    while (!_freeWorkers.empty()) {
-        delete _freeWorkers.front();
-        _freeWorkers.pop_front();
-    }
+    _pool.startup();
 }
 
 void OldThreadPool::join() {
-    stdx::unique_lock<stdx::mutex> lock(_mutex);
-    while (_tasksRemaining) {
-        _condition.wait(lock);
-    }
+    _pool.waitForIdle();
 }
 
 void OldThreadPool::schedule(Task task) {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
-
-    _tasksRemaining++;
-
-    if (!_freeWorkers.empty()) {
-        _freeWorkers.front()->set_task(task);
-        _freeWorkers.pop_front();
-    } else {
-        _tasks.push_back(task);
-    }
-}
-
-// should only be called by a worker from the worker thread
-void OldThreadPool::task_done(Worker* worker) {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
-
-    if (!_tasks.empty()) {
-        worker->set_task(_tasks.front());
-        _tasks.pop_front();
-    } else {
-        _freeWorkers.push_front(worker);
-    }
-
-    _tasksRemaining--;
-
-    if (_tasksRemaining == 0)
-        _condition.notify_all();
+    fassert(28705, _pool.schedule(task));
 }
 
 }  // namespace mongo

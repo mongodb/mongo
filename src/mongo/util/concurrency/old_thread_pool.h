@@ -27,19 +27,19 @@
 
 #pragma once
 
-#include <list>
 #include <string>
 
 #include "mongo/base/disallow_copying.h"
-#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/functional.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/util/concurrency/thread_pool.h"
 
 namespace mongo {
 
 /**
  * Implementation of a fixed-size pool of threads that can perform scheduled
  * tasks.
+ *
+ * Deprecated.  Use ThreadPool from thread_pool.h, instead.
  */
 class OldThreadPool {
     MONGO_DISALLOW_COPYING(OldThreadPool);
@@ -52,10 +52,6 @@ public:
     explicit OldThreadPool(const DoNotStartThreadsTag&,
                            int nThreads = 8,
                            const std::string& threadNamePrefix = "");
-
-    // blocks until all tasks are complete (tasks_remaining() == 0)
-    // You should not call schedule while in the destructor
-    ~OldThreadPool();
 
     // Launches the worker threads; call exactly once, if and only if
     // you used the DoNotStartThreadsTag form of the constructor.
@@ -92,24 +88,8 @@ public:
         schedule(stdx::bind(f, a, b, c, d, e));
     }
 
-    int tasks_remaining() {
-        return _tasksRemaining;
-    }
-
 private:
-    class Worker;
-    stdx::mutex _mutex;
-    stdx::condition_variable _condition;
-
-    std::list<Worker*> _freeWorkers;  // used as LIFO stack (always front)
-    std::list<Task> _tasks;           // used as FIFO queue (push_back, pop_front)
-    int _tasksRemaining;              // in queue + currently processing
-    int _nThreads;  // only used for sanity checking. could be removed in the future.
-    const std::string _threadNamePrefix;  // used for logging/diagnostics
-
-    // should only be called by a worker from the worker's thread
-    void task_done(Worker* worker);
-    friend class Worker;
+    ThreadPool _pool;
 };
 
 }  // namespace mongo

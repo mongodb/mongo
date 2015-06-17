@@ -46,7 +46,6 @@
 #include "mongo/platform/bits.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/thread.h"
-#include "mongo/util/concurrency/mvar.h"
 #include "mongo/util/concurrency/old_thread_pool.h"
 #include "mongo/util/concurrency/rwlock.h"
 #include "mongo/util/concurrency/synchronization.h"
@@ -271,27 +270,6 @@ class IsAtomicWordAtomic : public ThreadedTest<> {
 
         u.fetchAndSubtract(WordType(1));
         ASSERT_NOT_GREATER_THAN(u.load(), WordType(0));
-    }
-};
-
-class MVarTest : public ThreadedTest<> {
-    static const int iterations = 10000;
-    MVar<int> target;
-
-public:
-    MVarTest() : target(0) {}
-    void subthread(int) {
-        for (int i = 0; i < iterations; i++) {
-            int val = target.take();
-#if BOOST_VERSION >= 103500
-            // increase chances of catching failure
-            stdx::this_thread::yield();
-#endif
-            target.put(val + 1);
-        }
-    }
-    void validate() {
-        ASSERT_EQUALS(target.take(), nthreads * iterations);
     }
 };
 
@@ -805,7 +783,6 @@ public:
 
         add<IsAtomicWordAtomic<AtomicUInt32>>();
         add<IsAtomicWordAtomic<AtomicUInt64>>();
-        add<MVarTest>();
         add<ThreadPoolTest>();
 
         add<RWLockTest1>();
