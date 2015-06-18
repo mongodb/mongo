@@ -39,8 +39,9 @@
 #include "mongo/platform/basic.h"
 
 #include <boost/filesystem/operations.hpp>
-#include <boost/thread/thread.hpp>
 #include <boost/thread/condition.hpp>
+#include <boost/thread/mutex.hpp>
+#include <boost/thread/thread.hpp>
 #include <boost/version.hpp>
 #include <iomanip>
 #include <iostream>
@@ -534,7 +535,7 @@ namespace PerfTests {
 
     RWLock lk("testrw");
     SimpleMutex m("simptst");
-    stdx::mutex mboost;
+    boost::mutex mboost;
     boost::timed_mutex mboost_timed;
     std::mutex mstd;
     std::timed_mutex mstd_timed;
@@ -552,11 +553,11 @@ namespace PerfTests {
     };
     class boostmutexspeed : public B {
     public:
-        string name() { return "stdx::mutex"; }
+        string name() { return "boost::mutex"; }
         virtual int howLongMillis() { return 500; }
         virtual bool showDurStats() { return false; }
         void timed() {
-            stdx::lock_guard<stdx::mutex> lk(mboost);
+            boost::lock_guard<boost::mutex> lk(mboost);
         }
     };
     class boosttimed_mutexspeed : public B {
@@ -565,7 +566,7 @@ namespace PerfTests {
         virtual int howLongMillis() { return 500; }
         virtual bool showDurStats() { return false; }
         void timed() {
-            stdx::lock_guard<boost::timed_mutex> lk(mboost_timed);
+            boost::lock_guard<boost::timed_mutex> lk(mboost_timed);
         }
     };
     class simplemutexspeed : public B {
