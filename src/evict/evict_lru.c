@@ -1579,8 +1579,7 @@ __wt_cache_dump(WT_SESSION_IMPL *session)
 		    &next_walk, NULL, WT_READ_CACHE | WT_READ_NO_WAIT) == 0 &&
 		    next_walk != NULL) {
 			page = next_walk->page;
-			if (page->type == WT_PAGE_COL_INT ||
-			    page->type == WT_PAGE_ROW_INT)
+			if (WT_PAGE_IS_INTERNAL(page))
 				++file_intl_pages;
 			else
 				++file_leaf_pages;
