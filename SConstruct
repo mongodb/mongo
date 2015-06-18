@@ -2068,6 +2068,20 @@ def doConfigure(myenv):
                     boostlib,
                     [boostlib + suffix for suffix in boostSuffixList],
                     language='C++')
+    else:
+        # For the built in boost, we can set these without risking ODR violations, so do so.
+        conf.env.Append(
+            CPPDEFINES=[
+                # We don't want interruptions because we don't use
+                # them and they have a performance cost.
+                "BOOST_THREAD_DONT_PROVIDE_INTERRUPTIONS",
+
+                # We believe that none of our platforms are affected
+                # by the EINTR bug. Setting this avoids a retry loop
+                # in boosts mutex.hpp that we don't want to pay for.
+                "BOOST_THREAD_HAS_NO_EINTR_BUG",
+            ],
+        )
 
     if posix_system:
         conf.env.SetConfigHeaderDefine("MONGO_CONFIG_HAVE_HEADER_UNISTD_H")

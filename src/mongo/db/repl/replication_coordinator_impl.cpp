@@ -1144,14 +1144,12 @@ namespace {
                                                   waitTime);
             }
 
-            try {
-                if (waitTime == Microseconds::max()) {
-                    condVar.wait(*lock);
-                }
-                else {
-                    condVar.wait_for(*lock, waitTime);
-                }
-            } catch (const boost::thread_interrupted&) {}
+            if (waitTime == Microseconds::max()) {
+                condVar.wait(*lock);
+            }
+            else {
+                condVar.wait_for(*lock, waitTime);
+            }
         }
 
         Status status = _checkIfWriteConcernCanBeSatisfied_inlock(writeConcern);
