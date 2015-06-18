@@ -245,6 +245,29 @@ TEST_F(CatalogManagerReplSetTestFixture, UpdateCollectionNotMaster) {
     future.wait_for(kFutureTimeout);
 }
 
+TEST_F(CatalogManagerReplSetTestFixture, UpdateCollectionNotMasterFromTargeter) {
+    RemoteCommandTargeterMock* targeter =
+        RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());
+    targeter->setFindHostReturnValue(Status(ErrorCodes::NotMaster, "not master"));
+
+    CollectionType collection;
+    collection.setNs(NamespaceString("db.coll"));
+    collection.setUpdatedAt(network()->now());
+    collection.setUnique(true);
+    collection.setEpoch(OID::gen());
+    collection.setKeyPattern(KeyPattern(BSON("_id" << 1)));
+
+    auto future = async(std::launch::async,
+                        [this, collection] {
+                            auto status = catalogManager()->updateCollection(
+                                collection.getNs().toString(), collection);
+                            ASSERT_EQUALS(ErrorCodes::NotMaster, status);
+                        });
+
+    // Now wait for the updateCollection call to return
+    future.wait_for(kFutureTimeout);
+}
+
 TEST_F(CatalogManagerReplSetTestFixture, UpdateCollectionNotMasterRetrySuccess) {
     RemoteCommandTargeterMock* targeter =
         RemoteCommandTargeterMock::get(shardRegistry()->getShard("config")->getTargeter());

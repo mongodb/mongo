@@ -56,6 +56,7 @@
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/hostandport.h"
@@ -391,39 +392,12 @@ bool CatalogManagerReplicaSet::runUserManagementWriteCommand(const std::string& 
         return Command::appendCommandStatus(*result, scopedDistLock.getStatus());
     }
 
-    auto targeter = grid.shardRegistry()->getShard("config")->getTargeter();
-
-    Status notMasterStatus{ErrorCodes::InternalError, "status not set"};
-    for (int i = 0; i < kNotMasterNumRetries; ++i) {
-        auto target = targeter->findHost(kConfigWriteSelector);
-        if (!target.isOK()) {
-            if (ErrorCodes::NotMaster == target.getStatus()) {
-                notMasterStatus = target.getStatus();
-                sleepmillis(kNotMasterRetryInterval.count());
-                continue;
-            }
-            return Command::appendCommandStatus(*result, target.getStatus());
-        }
-
-        auto response = grid.shardRegistry()->runCommand(target.getValue(), dbname, cmdObj);
-        if (!response.isOK()) {
-            return Command::appendCommandStatus(*result, response.getStatus());
-        }
-
-        Status commandStatus = Command::getStatusFromCommandResult(response.getValue());
-        if (ErrorCodes::NotMaster == commandStatus) {
-            notMasterStatus = commandStatus;
-            sleepmillis(kNotMasterRetryInterval.count());
-            continue;
-        }
-
-        result->appendElements(response.getValue());
-
-        return commandStatus.isOK();
+    auto response = _runConfigServerCommandWithNotMasterRetries(dbname, cmdObj);
+    if (!response.isOK()) {
+        return Command::appendCommandStatus(*result, response.getStatus());
     }
-
-    invariant(ErrorCodes::NotMaster == notMasterStatus);
-    return Command::appendCommandStatus(*result, notMasterStatus);
+    result->appendElements(response.getValue());
+    return Command::getStatusFromCommandResult(response.getValue()).isOK();
 }
 
 bool CatalogManagerReplicaSet::runUserManagementReadCommand(const std::string& dbname,
@@ -443,7 +417,6 @@ bool CatalogManagerReplicaSet::runUserManagementReadCommand(const std::string& d
     result->appendElements(resultStatus.getValue());
 
     return Command::getStatusFromCommandResult(resultStatus.getValue()).isOK();
-    return false;
 }
 
 Status CatalogManagerReplicaSet::applyChunkOpsDeprecated(const BSONArray& updateOps,
@@ -461,51 +434,58 @@ void CatalogManagerReplicaSet::writeConfigServerDirect(const BatchedCommandReque
     std::string dbname = batchRequest.getNSS().db().toString();
     invariant(dbname == "config" || dbname == "admin");
     const BSONObj cmdObj = batchRequest.toBSON();
+
+    auto response = _runConfigServerCommandWithNotMasterRetries(dbname, cmdObj);
+    if (!response.isOK()) {
+        _toBatchError(response.getStatus(), batchResponse);
+        return;
+    }
+
+    string errmsg;
+    if (!batchResponse->parseBSON(response.getValue(), &errmsg)) {
+        _toBatchError(Status(ErrorCodes::FailedToParse,
+                             str::stream() << "Failed to parse config server response: " << errmsg),
+                      batchResponse);
+    }
+}
+
+StatusWith<BSONObj> CatalogManagerReplicaSet::_runConfigServerCommandWithNotMasterRetries(
+    const std::string& dbname, const BSONObj& cmdObj) {
     auto targeter = grid.shardRegistry()->getShard("config")->getTargeter();
 
-    Status notMasterStatus{ErrorCodes::InternalError, "status not set"};
     for (int i = 0; i < kNotMasterNumRetries; ++i) {
         auto target = targeter->findHost(kConfigWriteSelector);
         if (!target.isOK()) {
             if (ErrorCodes::NotMaster == target.getStatus()) {
-                notMasterStatus = target.getStatus();
+                if (i == kNotMasterNumRetries - 1) {
+                    // If we're out of retries don't bother sleeping, just return.
+                    return target.getStatus();
+                }
                 sleepmillis(kNotMasterRetryInterval.count());
                 continue;
             }
-            _toBatchError(target.getStatus(), batchResponse);
-            return;
+            return target.getStatus();
         }
 
-        auto resultStatus = grid.shardRegistry()->runCommand(
-            target.getValue(), batchRequest.getNSS().db().toString(), batchRequest.toBSON());
-
-        if (!resultStatus.isOK()) {
-            _toBatchError(resultStatus.getStatus(), batchResponse);
-            return;
+        auto response = grid.shardRegistry()->runCommand(target.getValue(), dbname, cmdObj);
+        if (!response.isOK()) {
+            return response.getStatus();
         }
 
-        const BSONObj& commandResponse = resultStatus.getValue();
-
-        Status commandStatus = getStatusFromCommandResult(commandResponse);
-        if (commandStatus == ErrorCodes::NotMaster) {
-            notMasterStatus = commandStatus;
+        Status commandStatus = Command::getStatusFromCommandResult(response.getValue());
+        if (ErrorCodes::NotMaster == commandStatus) {
+            if (i == kNotMasterNumRetries - 1) {
+                // If we're out of retries don't bother sleeping, just return.
+                return commandStatus;
+            }
             sleepmillis(kNotMasterRetryInterval.count());
             continue;
         }
 
-        string errmsg;
-        if (!batchResponse->parseBSON(commandResponse, &errmsg)) {
-            _toBatchError(
-                Status(ErrorCodes::FailedToParse,
-                       str::stream() << "Failed to parse config server response: " << errmsg),
-                batchResponse);
-            return;
-        }
-        return;  // The normal case return point.
+        return response.getValue();
     }
 
-    invariant(ErrorCodes::NotMaster == notMasterStatus);
-    _toBatchError(notMasterStatus, batchResponse);
+    MONGO_UNREACHABLE;
 }
 
 }  // namespace mongo
