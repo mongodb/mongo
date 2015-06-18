@@ -42,69 +42,69 @@ namespace {
     using unittest::assertGet;
 
     TEST(LiteParsedQueryTest, InitSortOrder) {
-        ASSERT_OK(LiteParsedQuery::make("testns",
-                                        0,
-                                        1,
-                                        0,
-                                        BSONObj(),
-                                        BSONObj(),
-                                        fromjson("{a: 1}"),
-                                        BSONObj(),
-                                        BSONObj(),
-                                        BSONObj(),
-                                        false,  // snapshot
-                                        false)  // explain
+        ASSERT_OK(LiteParsedQuery::makeAsOpQuery("testns",
+                                                 0,
+                                                 1,
+                                                 0,
+                                                 BSONObj(),
+                                                 BSONObj(),
+                                                 fromjson("{a: 1}"),
+                                                 BSONObj(),
+                                                 BSONObj(),
+                                                 BSONObj(),
+                                                 false,  // snapshot
+                                                 false)  // explain
                     .getStatus());
     }
 
     TEST(LiteParsedQueryTest, InitSortOrderString) {
-        ASSERT_NOT_OK(LiteParsedQuery::make("testns",
-                                            0,
-                                            1,
-                                            0,
-                                            BSONObj(),
-                                            BSONObj(),
-                                            fromjson("{a: \"\"}"),
-                                            BSONObj(),
-                                            BSONObj(),
-                                            BSONObj(),
-                                            false,  // snapshot
-                                            false)  // explain
+        ASSERT_NOT_OK(LiteParsedQuery::makeAsOpQuery("testns",
+                                                     0,
+                                                     1,
+                                                     0,
+                                                     BSONObj(),
+                                                     BSONObj(),
+                                                     fromjson("{a: \"\"}"),
+                                                     BSONObj(),
+                                                     BSONObj(),
+                                                     BSONObj(),
+                                                     false,  // snapshot
+                                                     false)  // explain
                         .getStatus());
     }
 
     TEST(LiteParsedQueryTest, GetFilter) {
         unique_ptr<LiteParsedQuery> lpq(
-            assertGet(LiteParsedQuery::make("testns",
-                                            5,
-                                            6,
-                                            9,
-                                            BSON("x" << 5),
-                                            BSONObj(),
-                                            BSONObj(),
-                                            BSONObj(),
-                                            BSONObj(),
-                                            BSONObj(),
-                                            false, // snapshot
-                                            false))); // explain
+            assertGet(LiteParsedQuery::makeAsOpQuery("testns",
+                                                     5,
+                                                     6,
+                                                     9,
+                                                     BSON("x" << 5),
+                                                     BSONObj(),
+                                                     BSONObj(),
+                                                     BSONObj(),
+                                                     BSONObj(),
+                                                     BSONObj(),
+                                                     false, // snapshot
+                                                     false))); // explain
 
         ASSERT_EQUALS(BSON("x" << 5 ), lpq->getFilter());
     }
 
     TEST(LiteParsedQueryTest, NumToReturn) {
         unique_ptr<LiteParsedQuery> lpq(
-            assertGet(LiteParsedQuery::make("testns",
-                                            5,
-                                            6,
-                                            9,
-                                            BSON("x" << 5),
-                                            BSONObj(),
-                                            BSONObj(),
-                                            BSONObj(),
-                                            BSONObj(),
-                                            BSONObj(),
-                                            false,      // snapshot
-                                            false)));   // explain
+            assertGet(LiteParsedQuery::makeAsOpQuery("testns",
+                                                     5,
+                                                     6,
+                                                     9,
+                                                     BSON("x" << 5),
+                                                     BSONObj(),
+                                                     BSONObj(),
+                                                     BSONObj(),
+                                                     BSONObj(),
+                                                     BSONObj(),
+                                                     false,      // snapshot
+                                                     false)));   // explain
 
         ASSERT_EQUALS(6, lpq->getBatchSize());
         ASSERT(lpq->wantMore());
@@ -112,68 +112,68 @@ namespace {
 
     TEST(LiteParsedQueryTest, NumToReturnNegative) {
         unique_ptr<LiteParsedQuery> lpq(
-            assertGet(LiteParsedQuery::make("testns",
-                                            5,
-                                            -6,
-                                            9,
-                                            BSON("x" << 5),
-                                            BSONObj(),
-                                            BSONObj(),
-                                            BSONObj(),
-                                            BSONObj(),
-                                            BSONObj(),
-                                            false,      // snapshot
-                                            false)));   // explain
+            assertGet(LiteParsedQuery::makeAsOpQuery("testns",
+                                                     5,
+                                                     -6,
+                                                     9,
+                                                     BSON("x" << 5),
+                                                     BSONObj(),
+                                                     BSONObj(),
+                                                     BSONObj(),
+                                                     BSONObj(),
+                                                     BSONObj(),
+                                                     false,      // snapshot
+                                                     false)));   // explain
 
         ASSERT_EQUALS(6, lpq->getBatchSize());
         ASSERT(!lpq->wantMore());
     }
 
     TEST(LiteParsedQueryTest, MinFieldsNotPrefixOfMax) {
-        ASSERT_NOT_OK(LiteParsedQuery::make("testns",
-                                            0,
-                                            0,
-                                            0,
-                                            BSONObj(),
-                                            BSONObj(),
-                                            BSONObj(),
-                                            BSONObj(),
-                                            fromjson("{a: 1}"),
-                                            fromjson("{b: 1}"),
-                                            false,  // snapshot
-                                            false)  // explain
+        ASSERT_NOT_OK(LiteParsedQuery::makeAsOpQuery("testns",
+                                                     0,
+                                                     0,
+                                                     0,
+                                                     BSONObj(),
+                                                     BSONObj(),
+                                                     BSONObj(),
+                                                     BSONObj(),
+                                                     fromjson("{a: 1}"),
+                                                     fromjson("{b: 1}"),
+                                                     false,  // snapshot
+                                                     false)  // explain
                         .getStatus());
     }
 
     TEST(LiteParsedQueryTest, MinFieldsMoreThanMax) {
-        ASSERT_NOT_OK(LiteParsedQuery::make("testns",
-                                            0,
-                                            0,
-                                            0,
-                                            BSONObj(),
-                                            BSONObj(),
-                                            BSONObj(),
-                                            BSONObj(),
-                                            fromjson("{a: 1, b: 1}"),
-                                            fromjson("{a: 1}"),
-                                            false,  // snapshot
-                                            false)  // explain
+        ASSERT_NOT_OK(LiteParsedQuery::makeAsOpQuery("testns",
+                                                     0,
+                                                     0,
+                                                     0,
+                                                     BSONObj(),
+                                                     BSONObj(),
+                                                     BSONObj(),
+                                                     BSONObj(),
+                                                     fromjson("{a: 1, b: 1}"),
+                                                     fromjson("{a: 1}"),
+                                                     false,  // snapshot
+                                                     false)  // explain
                         .getStatus());
     }
 
     TEST(LiteParsedQueryTest, MinFieldsLessThanMax) {
-        ASSERT_NOT_OK(LiteParsedQuery::make("testns",
-                                            0,
-                                            0,
-                                            0,
-                                            BSONObj(),
-                                            BSONObj(),
-                                            BSONObj(),
-                                            BSONObj(),
-                                            fromjson("{a: 1}"),
-                                            fromjson("{a: 1, b: 1}"),
-                                            false,  // snapshot
-                                            false)  // explain
+        ASSERT_NOT_OK(LiteParsedQuery::makeAsOpQuery("testns",
+                                                     0,
+                                                     0,
+                                                     0,
+                                                     BSONObj(),
+                                                     BSONObj(),
+                                                     BSONObj(),
+                                                     BSONObj(),
+                                                     fromjson("{a: 1}"),
+                                                     fromjson("{a: 1, b: 1}"),
+                                                     false,  // snapshot
+                                                     false)  // explain
                         .getStatus());
     }
 
@@ -184,18 +184,18 @@ namespace {
                                       const BSONObj& sort) {
 
         unique_ptr<LiteParsedQuery> lpq(
-            assertGet(LiteParsedQuery::make("testns",
-                                            0,
-                                            0,
-                                            0,
-                                            query,
-                                            proj,
-                                            sort,
-                                            BSONObj(),
-                                            BSONObj(),
-                                            BSONObj(),
-                                            false,      // snapshot
-                                            false)));   // explain
+            assertGet(LiteParsedQuery::makeAsOpQuery("testns",
+                                                     0,
+                                                     0,
+                                                     0,
+                                                     query,
+                                                     proj,
+                                                     sort,
+                                                     BSONObj(),
+                                                     BSONObj(),
+                                                     BSONObj(),
+                                                     false,      // snapshot
+                                                     false)));   // explain
     }
 
     //
@@ -213,18 +213,18 @@ namespace {
     }
 
     TEST(LiteParsedQueryTest, ForbidNonMetaSortOnFieldWithMetaProject) {
-        ASSERT_NOT_OK(LiteParsedQuery::make("testns",
-                                            0,
-                                            0,
-                                            0,
-                                            BSONObj(),
-                                            fromjson("{a: {$meta: \"textScore\"}}"),
-                                            fromjson("{a: 1}"),
-                                            BSONObj(),
-                                            BSONObj(),
-                                            BSONObj(),
-                                            false,  // snapshot
-                                            false)  // explain
+        ASSERT_NOT_OK(LiteParsedQuery::makeAsOpQuery("testns",
+                                                     0,
+                                                     0,
+                                                     0,
+                                                     BSONObj(),
+                                                     fromjson("{a: {$meta: \"textScore\"}}"),
+                                                     fromjson("{a: 1}"),
+                                                     BSONObj(),
+                                                     BSONObj(),
+                                                     BSONObj(),
+                                                     false,  // snapshot
+                                                     false)  // explain
                         .getStatus());
 
         assertLiteParsedQuerySuccess(BSONObj(),
@@ -233,33 +233,70 @@ namespace {
     }
 
     TEST(LiteParsedQueryTest, ForbidMetaSortOnFieldWithoutMetaProject) {
-        ASSERT_NOT_OK(LiteParsedQuery::make("testns",
-                                            0,
-                                            0,
-                                            0,
-                                            BSONObj(),
-                                            fromjson("{a: 1}"),
-                                            fromjson("{a: {$meta: \"textScore\"}}"),
-                                            BSONObj(),
-                                            BSONObj(),
-                                            BSONObj(),
-                                            false,  // snapshot
-                                            false)  // explain
+        ASSERT_NOT_OK(LiteParsedQuery::makeAsOpQuery("testns",
+                                                     0,
+                                                     0,
+                                                     0,
+                                                     BSONObj(),
+                                                     fromjson("{a: 1}"),
+                                                     fromjson("{a: {$meta: \"textScore\"}}"),
+                                                     BSONObj(),
+                                                     BSONObj(),
+                                                     BSONObj(),
+                                                     false,  // snapshot
+                                                     false)  // explain
                         .getStatus());
 
-        ASSERT_NOT_OK(LiteParsedQuery::make("testns",
-                                            0,
-                                            0,
-                                            0,
-                                            BSONObj(),
-                                            fromjson("{b: 1}"),
-                                            fromjson("{a: {$meta: \"textScore\"}}"),
-                                            BSONObj(),
-                                            BSONObj(),
-                                            BSONObj(),
-                                            false,  // snapshot
-                                            false)  // explain
+        ASSERT_NOT_OK(LiteParsedQuery::makeAsOpQuery("testns",
+                                                     0,
+                                                     0,
+                                                     0,
+                                                     BSONObj(),
+                                                     fromjson("{b: 1}"),
+                                                     fromjson("{a: {$meta: \"textScore\"}}"),
+                                                     BSONObj(),
+                                                     BSONObj(),
+                                                     BSONObj(),
+                                                     false,  // snapshot
+                                                     false)  // explain
                         .getStatus());
+    }
+
+    TEST(LiteParsedQueryTest, MakeFindCmd) {
+        auto result = LiteParsedQuery::makeAsFindCmd("testns", BSON("x" << 1), 2);
+        ASSERT_OK(result.getStatus());
+
+        auto&& lpq = result.getValue();
+        ASSERT_EQUALS("testns", lpq->ns());
+        ASSERT_EQUALS(BSON("x" << 1), lpq->getFilter());
+        ASSERT_EQUALS(2, lpq->getLimit());
+
+        ASSERT_EQUALS(BSONObj(), lpq->getProj());
+        ASSERT_EQUALS(BSONObj(), lpq->getSort());
+        ASSERT_EQUALS(BSONObj(), lpq->getHint());
+        ASSERT_EQUALS(BSONObj(), lpq->getMin());
+        ASSERT_EQUALS(BSONObj(), lpq->getMax());
+
+        ASSERT_EQUALS(0, lpq->getSkip());
+        ASSERT_EQUALS(0, lpq->getMaxScan());
+        ASSERT_EQUALS(0, lpq->getMaxTimeMS());
+        ASSERT_EQUALS(0, lpq->getOptions());
+
+        ASSERT_FALSE(lpq->getBatchSize());
+
+        ASSERT_FALSE(lpq->fromFindCommand());
+        ASSERT_FALSE(lpq->isExplain());
+        ASSERT_FALSE(lpq->returnKey());
+        ASSERT_FALSE(lpq->showRecordId());
+        ASSERT_FALSE(lpq->isSnapshot());
+        ASSERT_FALSE(lpq->hasReadPref());
+        ASSERT_FALSE(lpq->isTailable());
+        ASSERT_FALSE(lpq->isSlaveOk());
+        ASSERT_FALSE(lpq->isOplogReplay());
+        ASSERT_FALSE(lpq->isNoCursorTimeout());
+        ASSERT_FALSE(lpq->isAwaitData());
+        ASSERT_FALSE(lpq->isExhaust());
+        ASSERT_FALSE(lpq->isPartial());
     }
 
     //
@@ -749,18 +786,18 @@ namespace {
 
     TEST(LiteParsedQueryTest, ParseCommandNotFromFindCommand) {
         std::unique_ptr<LiteParsedQuery> lpq(
-            assertGet(LiteParsedQuery::make("testns",
-                                            5,
-                                            6,
-                                            9,
-                                            BSON( "x" << 5 ),
-                                            BSONObj(),
-                                            BSONObj(),
-                                            BSONObj(),
-                                            BSONObj(),
-                                            BSONObj(),
-                                            false,      // snapshot
-                                            false)));   // explain
+            assertGet(LiteParsedQuery::makeAsOpQuery("testns",
+                                                     5,
+                                                     6,
+                                                     9,
+                                                     BSON( "x" << 5 ),
+                                                     BSONObj(),
+                                                     BSONObj(),
+                                                     BSONObj(),
+                                                     BSONObj(),
+                                                     BSONObj(),
+                                                     false,      // snapshot
+                                                     false)));   // explain
         ASSERT(!lpq->fromFindCommand());
     }
 
