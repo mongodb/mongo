@@ -94,10 +94,6 @@ namespace {
 
 }  // namespace
 
-    void DBClientCursor::_finishConsInit() {
-        _originalHost = _client->getServerAddress();
-    }
-
     int DBClientCursor::nextBatchSize() {
 
         if ( nToReturn == 0 )
@@ -112,8 +108,6 @@ namespace {
     void DBClientCursor::_assembleInit( Message& toSend ) {
         // If we haven't gotten a cursorId yet, we need to issue a new query or command.
         if ( !cursorId ) {
-            auto nss = NamespaceString(ns);
-
             // HACK:
             // Unfortunately, this code is used by the shell to run commands,
             // so we need to allow the shell to send invalid options so that we can
@@ -124,9 +118,9 @@ namespace {
             bool hasValidNToReturnForCommand = (nToReturn == 1 || nToReturn == -1);
             bool hasValidFlagsForCommand = !(opts & mongo::QueryOption_Exhaust);
 
-            if (nss.isCommand() && hasValidNToReturnForCommand && hasValidFlagsForCommand) {
+            if (_isCommand && hasValidNToReturnForCommand && hasValidFlagsForCommand) {
                 toSend = *assembleCommandRequest(_client,
-                                                 nss.db(),
+                                                 nsToDatabaseSubstring(ns),
                                                  opts,
                                                  query);
                 return;
@@ -294,9 +288,8 @@ namespace {
     }
 
     void DBClientCursor::dataReceived( bool& retry, string& host ) {
-        NamespaceString nss(ns);
         // If this is a reply to our initial command request.
-        if (nss.isCommand() && cursorId == 0) {
+        if (_isCommand && cursorId == 0) {
             commandDataReceived();
             return;
         }
@@ -458,6 +451,64 @@ namespace {
         _client = 0;
         _lazyHost = "";
     }
+
+    DBClientCursor::DBClientCursor(DBClientBase* client,
+                                   const std::string& ns,
+                                   const BSONObj& query,
+                                   int nToReturn,
+                                   int nToSkip,
+                                   const BSONObj* fieldsToReturn,
+                                   int queryOptions,
+                                   int batchSize)
+        : DBClientCursor(client,
+                         ns,
+                         query,
+                         0, // cursorId
+                         nToReturn,
+                         nToSkip,
+                         fieldsToReturn,
+                         queryOptions,
+                         batchSize) {}
+
+    DBClientCursor::DBClientCursor(DBClientBase* client,
+                                   const std::string& ns,
+                                   long long cursorId,
+                                   int nToReturn,
+                                   int queryOptions)
+        : DBClientCursor(client,
+                         ns,
+                         BSONObj(), // query
+                         cursorId,
+                         nToReturn,
+                         0, // nToSkip
+                         nullptr, // fieldsToReturn
+                         queryOptions,
+                         0) {} // batchSize
+
+    DBClientCursor::DBClientCursor(DBClientBase* client,
+                                   const std::string& ns,
+                                   const BSONObj& query,
+                                   long long cursorId,
+                                   int nToReturn,
+                                   int nToSkip,
+                                   const BSONObj* fieldsToReturn,
+                                   int queryOptions,
+                                   int batchSize)
+        : _client(client),
+          _originalHost(_client->getServerAddress()),
+          ns(ns),
+          _isCommand(nsIsFull(ns) ? nsToCollectionSubstring(ns) == "$cmd" : false),
+          query(query),
+          nToReturn(nToReturn),
+          haveLimit(nToReturn > 0 && !(queryOptions & QueryOption_CursorTailable)),
+          nToSkip(nToSkip),
+          fieldsToReturn(fieldsToReturn),
+          opts(queryOptions),
+          batchSize(batchSize == 1 ? 2 : batchSize),
+          resultFlags(0),
+          cursorId(cursorId),
+          _ownCursor(true),
+          wasError(false) {}
 
     DBClientCursor::~DBClientCursor() {
         DESTRUCTOR_GUARD (

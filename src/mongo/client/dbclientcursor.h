@@ -31,6 +31,7 @@
 
 #include <stack>
 
+#include "mongo/base/disallow_copying.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
@@ -56,6 +57,7 @@ namespace mongo {
 
     /** Queries return a cursor object */
     class DBClientCursor : public DBClientCursorInterface {
+        MONGO_DISALLOW_COPYING(DBClientCursor);
     public:
         /** If true, safe to call next().  Requests more from server if necessary. */
         bool more();
@@ -135,39 +137,20 @@ namespace mongo {
         /// Change batchSize after construction. Can change after requesting first batch.
         void setBatchSize(int newBatchSize) { batchSize = newBatchSize; }
 
-        DBClientCursor( DBClientBase* client, const std::string &_ns, BSONObj _query, int _nToReturn,
-                        int _nToSkip, const BSONObj *_fieldsToReturn, int queryOptions , int bs ) :
-            _client(client),
-            ns(_ns),
-            query(_query),
-            nToReturn(_nToReturn),
-            haveLimit( _nToReturn > 0 && !(queryOptions & QueryOption_CursorTailable)),
-            nToSkip(_nToSkip),
-            fieldsToReturn(_fieldsToReturn),
-            opts(queryOptions),
-            batchSize(bs==1?2:bs),
-            resultFlags(0),
-            cursorId(),
-            _ownCursor( true ),
-            wasError( false ) {
-            _finishConsInit();
-        }
+        DBClientCursor(DBClientBase* client,
+                       const std::string& ns,
+                       const BSONObj& query,
+                       int nToReturn,
+                       int nToSkip,
+                       const BSONObj* fieldsToReturn,
+                       int queryOptions,
+                       int bs);
 
-        DBClientCursor( DBClientBase* client, const std::string &_ns, long long _cursorId, int _nToReturn, int options ) :
-            _client(client),
-            ns(_ns),
-            nToReturn( _nToReturn ),
-            haveLimit( _nToReturn > 0 && !(options & QueryOption_CursorTailable)),
-            nToSkip(0),
-            fieldsToReturn(0),
-            opts( options ),
-            batchSize(0),
-            resultFlags(0),
-            cursorId(_cursorId),
-            _ownCursor(true),
-            wasError(false) {
-            _finishConsInit();
-        }
+        DBClientCursor(DBClientBase* client,
+                       const std::string& ns,
+                       long long cursorId,
+                       int nToReturn,
+                       int options );
 
         virtual ~DBClientCursor();
 
@@ -215,17 +198,29 @@ namespace mongo {
             Batch() : m( new Message() ), nReturned(), pos(), data() { }
         };
 
+        /**
+         * For exhaust. Used in DBClientConnection.
+         */
+        void exhaustReceiveMore();
+
     private:
-        friend class DBClientBase;
-        friend class DBClientConnection;
+        DBClientCursor(DBClientBase* client,
+                       const std::string& ns,
+                       const BSONObj& query,
+                       long long cursorId,
+                       int nToReturn,
+                       int nToSkip,
+                       const BSONObj* fieldsToReturn,
+                       int queryOptions,
+                       int bs);
 
         int nextBatchSize();
-        void _finishConsInit();
 
         Batch batch;
         DBClientBase* _client;
         std::string _originalHost;
-        std::string ns;
+        const std::string ns;
+        const bool _isCommand;
         BSONObj query;
         int nToReturn;
         bool haveLimit;
@@ -252,14 +247,9 @@ namespace mongo {
         void commandDataReceived();
 
         void requestMore();
-        void exhaustReceiveMore(); // for exhaust
 
         // Don't call from a virtual function
         void _assertIfNull() const { uassert(13348, "connection died", this); }
-
-        // non-copyable , non-assignable
-        DBClientCursor( const DBClientCursor& );
-        DBClientCursor& operator=( const DBClientCursor& );
 
         // init pieces
         void _assembleInit( Message& toSend );
