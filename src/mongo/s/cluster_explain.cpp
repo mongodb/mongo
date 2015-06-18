@@ -213,8 +213,8 @@ namespace mongo {
 
             singleShardBob.append("shardName", shardResults[i].shardTargetId);
             {
-                const auto& shard =
-                    grid.shardRegistry()->findIfExists(shardResults[i].shardTargetId);
+                const auto shard =
+                    grid.shardRegistry()->getShard(shardResults[i].shardTargetId);
                 singleShardBob.append("connectionString", shard->getConnString().toString());
             }
             appendIfRoom(&singleShardBob, serverInfo, "serverInfo");

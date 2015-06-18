@@ -1273,7 +1273,7 @@ namespace {
             // Resolve the shard connection strings.
             {
                 std::shared_ptr<Shard> fromShard =
-                    grid.shardRegistry()->findIfExists(fromShardName);
+                    grid.shardRegistry()->getShard(fromShardName);
                 uassert(28674,
                         str::stream() << "Source shard " << fromShardName
                                       << " is missing. This indicates metadata corruption.",
@@ -1281,7 +1281,7 @@ namespace {
 
                 fromShardCS = fromShard->getConnString();
 
-                std::shared_ptr<Shard> toShard = grid.shardRegistry()->findIfExists(toShardName);
+                std::shared_ptr<Shard> toShard = grid.shardRegistry()->getShard(toShardName);
                 uassert(28675,
                         str::stream() << "Destination shard " << toShardName
                                       << " is missing. This indicates metadata corruption.",

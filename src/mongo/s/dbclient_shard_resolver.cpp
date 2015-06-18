@@ -43,7 +43,7 @@ namespace mongo {
                                                   ConnectionString* shardHost) const {
 
         // Internally uses our shard cache, does no reload
-        std::shared_ptr<Shard> shard = grid.shardRegistry()->findIfExists(shardName);
+        std::shared_ptr<Shard> shard = grid.shardRegistry()->getShard(shardName);
         if (!shard) {
             return Status(ErrorCodes::ShardNotFound,
                           str::stream() << "unknown shard name " << shardName);

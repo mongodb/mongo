@@ -178,7 +178,7 @@ namespace {
             return dbt;
         }
 
-        const auto& configShard = grid.shardRegistry()->findIfExists("config");
+        const auto configShard = grid.shardRegistry()->getShard("config");
         const auto readHost = configShard->getTargeter()->findHost(kConfigReadSelector);
         if (!readHost.isOK()) {
             return readHost.getStatus();
@@ -224,7 +224,7 @@ namespace {
     }
 
     StatusWith<CollectionType> CatalogManagerReplicaSet::getCollection(const std::string& collNs) {
-        auto configShard = grid.shardRegistry()->findIfExists("config");
+        auto configShard = grid.shardRegistry()->getShard("config");
 
         auto readHostStatus = configShard->getTargeter()->findHost(kConfigReadSelector);
         if (!readHostStatus.isOK()) {
@@ -282,7 +282,7 @@ namespace {
                                                int nToReturn,
                                                vector<ChunkType>* chunks) {
 
-        auto configShard = grid.shardRegistry()->findIfExists("config");
+        auto configShard = grid.shardRegistry()->getShard("config");
         auto readHostStatus = configShard->getTargeter()->findHost(kConfigReadSelector);
         if (!readHostStatus.isOK()) {
             return readHostStatus.getStatus();
@@ -323,7 +323,7 @@ namespace {
     }
 
     Status CatalogManagerReplicaSet::getAllShards(vector<ShardType>* shards) {
-        const auto& configShard = grid.shardRegistry()->findIfExists("config");
+        const auto configShard = grid.shardRegistry()->getShard("config");
         const auto readHost = configShard->getTargeter()->findHost(kConfigReadSelector);
         if (!readHost.isOK()) {
             return readHost.getStatus();
@@ -368,7 +368,7 @@ namespace {
             return Command::appendCommandStatus(*result, scopedDistLock.getStatus());
         }
 
-        auto targeter = grid.shardRegistry()->findIfExists("config")->getTargeter();
+        auto targeter = grid.shardRegistry()->getShard("config")->getTargeter();
 
         Status notMasterStatus{ErrorCodes::InternalError, "status not set"};
         for (int i = 0; i < kNotMasterNumRetries; ++i) {
@@ -407,7 +407,7 @@ namespace {
     bool CatalogManagerReplicaSet::runUserManagementReadCommand(const std::string& dbname,
                                                                 const BSONObj& cmdObj,
                                                                 BSONObjBuilder* result) {
-        auto targeter = grid.shardRegistry()->findIfExists("config")->getTargeter();
+        auto targeter = grid.shardRegistry()->getShard("config")->getTargeter();
         auto target = targeter->findHost(kConfigReadSelector);
         if (!target.isOK()) {
             return Command::appendCommandStatus(*result, target.getStatus());
@@ -440,7 +440,7 @@ namespace {
         std::string dbname = batchRequest.getNSS().db().toString();
         invariant (dbname == "config" || dbname == "admin");
         const BSONObj cmdObj = batchRequest.toBSON();
-        auto targeter = grid.shardRegistry()->findIfExists("config")->getTargeter();
+        auto targeter = grid.shardRegistry()->getShard("config")->getTargeter();
 
         Status notMasterStatus{ErrorCodes::InternalError, "status not set"};
         for (int i = 0; i < kNotMasterNumRetries; ++i) {

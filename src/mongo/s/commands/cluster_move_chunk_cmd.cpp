@@ -144,7 +144,7 @@ namespace {
                 return false;
             }
 
-            const auto& to = grid.shardRegistry()->findIfExists(toString);
+            const auto to = grid.shardRegistry()->getShard(toString);
             if (!to) {
                 string msg(str::stream() <<
                            "Could not move chunk in '" << nss.ns() <<
@@ -221,7 +221,7 @@ namespace {
             }
 
             {
-                const auto& from = grid.shardRegistry()->findIfExists(chunk->getShardId());
+                const auto from = grid.shardRegistry()->getShard(chunk->getShardId());
                 if (from->getId() == to->getId()) {
                     errmsg = "that chunk is already on that shard";
                     return false;

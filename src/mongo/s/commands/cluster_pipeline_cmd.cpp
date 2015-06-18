@@ -229,7 +229,7 @@ namespace {
 
             // Run merging command on primary shard of database. Need to use ShardConnection so
             // that the merging mongod is sent the config servers on connection init.
-            const auto& shard = grid.shardRegistry()->findIfExists(conf->getPrimaryId());
+            const auto shard = grid.shardRegistry()->getShard(conf->getPrimaryId());
             ShardConnection conn(shard->getConnString(), outputNsOrEmpty);
             BSONObj mergedResults = aggRunCommand(conn.get(),
                                                   dbname,
@@ -412,7 +412,7 @@ namespace {
                                          int queryOptions) {
 
         // Temporary hack. See comment on declaration for details.
-        const auto& shard = grid.shardRegistry()->findIfExists(conf->getPrimaryId());
+        const auto shard = grid.shardRegistry()->getShard(conf->getPrimaryId());
         ShardConnection conn(shard->getConnString(), "");
         BSONObj result = aggRunCommand(conn.get(), conf->name(), cmd, queryOptions);
         conn.done();

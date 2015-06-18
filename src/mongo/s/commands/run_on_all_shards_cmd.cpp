@@ -83,7 +83,7 @@ namespace mongo {
         // TODO: Future is deprecated, replace with commandOp()
         std::list< std::shared_ptr<Future::CommandResult> > futures;
         for (const ShardId& shardId : shardIds) {
-            const auto& shard = grid.shardRegistry()->findIfExists(shardId);
+            const auto shard = grid.shardRegistry()->getShard(shardId);
             if (!shard) {
                 continue;
             }

@@ -264,7 +264,7 @@ namespace mongo {
         map<int, string> oids;
 
         for (const ShardId& shardId : all) {
-            const auto& s = grid.shardRegistry()->findIfExists(shardId);
+            const auto s = grid.shardRegistry()->getShard(shardId);
             if (!s) {
                 continue;
             }
@@ -281,7 +281,7 @@ namespace mongo {
                           << " and " << oids[x];
                     s->runCommand("admin", BSON("features" << 1 << "oidReset" << 1));
 
-                    const auto& otherShard = grid.shardRegistry()->findIfExists(oids[x]);
+                    const auto otherShard = grid.shardRegistry()->getShard(oids[x]);
                     if (otherShard) {
                         otherShard->runCommand("admin", BSON("features" << 1 << "oidReset" << 1));
                     }

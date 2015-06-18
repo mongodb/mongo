@@ -96,7 +96,7 @@ namespace {
             log() << "want to kill op: " << opToKill;
 
             // Will throw if shard id is not found
-            auto shard = grid.shardRegistry()->findIfExists(shardIdent);
+            auto shard = grid.shardRegistry()->getShard(shardIdent);
             if (!shard) {
                 return appendCommandStatus(result,
                                            Status(ErrorCodes::ShardNotFound,

@@ -522,7 +522,7 @@ namespace {
         collectionDetail.append("collection", ns);
         string dbPrimaryShardStr;
         {
-            const auto& shard = grid.shardRegistry()->findIfExists(dbPrimaryShardId);
+            const auto shard = grid.shardRegistry()->getShard(dbPrimaryShardId);
             dbPrimaryShardStr = shard->toString();
         }
         collectionDetail.append("primary", dbPrimaryShardStr);
@@ -566,7 +566,7 @@ namespace {
             }
 
             try {
-                const auto& shard = grid.shardRegistry()->findIfExists(dbPrimaryShardId);
+                const auto shard = grid.shardRegistry()->getShard(dbPrimaryShardId);
                 ShardConnection conn(shard->getConnString(), ns);
                 bool isVersionSet = conn.setVersion();
                 conn.done();
@@ -992,7 +992,7 @@ namespace {
 
         // Delete data from all mongods
         for (vector<ShardType>::const_iterator i = allShards.begin(); i != allShards.end(); i++) {
-            const auto& shard = grid.shardRegistry()->findIfExists(i->getName());
+            const auto shard = grid.shardRegistry()->getShard(i->getName());
             ScopedDbConnection conn(shard->getConnString());
 
             BSONObj info;
@@ -1042,7 +1042,7 @@ namespace {
         LOG(1) << "dropCollection " << collectionNs << " chunk data deleted";
 
         for (vector<ShardType>::const_iterator i = allShards.begin(); i != allShards.end(); i++) {
-            const auto& shard = grid.shardRegistry()->findIfExists(i->getName());
+            const auto shard = grid.shardRegistry()->getShard(i->getName());
             ScopedDbConnection conn(shard->getConnString());
 
             BSONObj res;

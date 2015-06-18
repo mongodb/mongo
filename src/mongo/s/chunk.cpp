@@ -128,7 +128,7 @@ namespace {
 
         log() << "moving chunk (auto): " << toMove->toString() << " to: " << newLocation;
 
-        shared_ptr<Shard> newShard = grid.shardRegistry()->findIfExists(newLocation);
+        shared_ptr<Shard> newShard = grid.shardRegistry()->getShard(newLocation);
         if (!newShard) {
             warning() << "Newly selected shard " << newLocation << " could not be found.";
             return false;
@@ -177,7 +177,7 @@ namespace {
         uassert( 13327 ,  "Chunk ns must match server ns" , ns == _manager->getns() );
 
         {
-            const auto& shard = grid.shardRegistry()->findIfExists(_shardId);
+            const auto shard = grid.shardRegistry()->getShard(_shardId);
             uassert(10171, "Chunk needs a server", shard);
         }
 
@@ -489,13 +489,13 @@ namespace {
         log() << "moving chunk ns: " << _manager->getns() << " moving ( " << toString() << ") "
               << getShardId() << " -> " << toShardId;
 
-        const auto& from = grid.shardRegistry()->findIfExists(getShardId());
+        const auto from = grid.shardRegistry()->getShard(getShardId());
 
         BSONObjBuilder builder;
         builder.append("moveChunk", _manager->getns());
         builder.append("from", from->getConnString().toString());
         {
-            const auto& toShard = grid.shardRegistry()->findIfExists(toShardId);
+            const auto toShard = grid.shardRegistry()->getShard(toShardId);
             builder.append("to", toShard->getConnString().toString());
         }
         // NEEDED FOR 2.0 COMPATIBILITY
@@ -619,7 +619,7 @@ namespace {
 
                 ChunkType chunkToMove;
                 {
-                    const auto& shard = grid.shardRegistry()->findIfExists(getShardId());
+                    const auto shard = grid.shardRegistry()->getShard(getShardId());
                     chunkToMove.setShard(shard->toString());
                 }
                 chunkToMove.setMin(range["min"].embeddedObject());
@@ -644,7 +644,7 @@ namespace {
     }
 
     const ConnectionString& Chunk::_getShardConnectionString() const {
-        const auto& shard = grid.shardRegistry()->findIfExists(getShardId());
+        const auto shard = grid.shardRegistry()->getShard(getShardId());
         return shard->getConnString();
     }
 

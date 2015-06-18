@@ -255,12 +255,11 @@ namespace mongo {
             }
 
             for (const ShardType& shardData : shards) {
-                std::shared_ptr<Shard> shard =
-                    grid.shardRegistry()->findIfExists(shardData.getName());
+                std::shared_ptr<Shard> shard = grid.shardRegistry()->getShard(shardData.getName());
 
                 // The shard must still exist in the registry. If it doesn't, which may happen in
                 // the very low proability case that it gets dropped between the call to
-                // getAllShards above and the call to findIfExists, just don't account for it since
+                // getAllShards above and the call to getShard, just don't account for it since
                 // it is missing anyways.
                 if (!shard) {
                     warning() << "Shard [" << shardData.getName() << "] was not found. Skipping.";

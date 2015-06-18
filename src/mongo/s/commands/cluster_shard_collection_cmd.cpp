@@ -176,7 +176,7 @@ namespace {
             // The rest of the checks require a connection to the primary db
             ConnectionString shardConnString;
             {
-                const auto& shard = grid.shardRegistry()->findIfExists(config->getPrimaryId());
+                const auto shard = grid.shardRegistry()->getShard(config->getPrimaryId());
                 shardConnString = shard->getConnString();
             }
             ScopedDbConnection conn(shardConnString);
@@ -434,7 +434,7 @@ namespace {
                 int i = 0;
                 for (ChunkMap::const_iterator c = chunkMap.begin(); c != chunkMap.end(); ++c, ++i){
                     const ShardId& shardId = shardIds[i % numShards];
-                    const auto& to = grid.shardRegistry()->findIfExists(shardId);
+                    const auto to = grid.shardRegistry()->getShard(shardId);
                     if (!to) {
                         continue;
                     }

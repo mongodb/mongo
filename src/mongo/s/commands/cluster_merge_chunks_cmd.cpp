@@ -176,7 +176,7 @@ namespace {
 
             // Throws, but handled at level above.  Don't want to rewrap to preserve exception
             // formatting.
-            const auto& shard = grid.shardRegistry()->findIfExists(firstChunk->getShardId());
+            const auto shard = grid.shardRegistry()->getShard(firstChunk->getShardId());
             if (!shard) {
                 return appendCommandStatus(result,
                                            Status(ErrorCodes::ShardNotFound,

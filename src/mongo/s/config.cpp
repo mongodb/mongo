@@ -172,7 +172,7 @@ namespace mongo {
 
         uassert(10178,
                 "no primary!",
-                grid.shardRegistry()->findIfExists(_primaryId));
+                grid.shardRegistry()->getShard(_primaryId));
         return _primaryId;
     }
 
@@ -235,7 +235,7 @@ namespace mongo {
             // No namespace
             if( i == _collections.end() ){
                 // If we don't know about this namespace, it's unsharded by default
-                primary = grid.shardRegistry()->findIfExists(_primaryId);
+                primary = grid.shardRegistry()->getShard(_primaryId);
             }
             else {
                 CollectionInfo& cInfo = i->second;
@@ -247,7 +247,7 @@ namespace mongo {
                     manager = cInfo.getCM();
                 }
                 else{
-                    primary = grid.shardRegistry()->findIfExists(_primaryId);
+                    primary = grid.shardRegistry()->getShard(_primaryId);
                 }
             }
         }
@@ -422,7 +422,7 @@ namespace mongo {
     }
 
     void DBConfig::setPrimary(const std::string& s) {
-        const auto& shard = grid.shardRegistry()->findIfExists(s);
+        const auto shard = grid.shardRegistry()->getShard(s);
 
         stdx::lock_guard<stdx::mutex> lk( _lock );
         _primaryId = shard->getId();
@@ -563,7 +563,7 @@ namespace mongo {
 
         // 3
         {
-            const auto& shard = grid.shardRegistry()->findIfExists(_primaryId);
+            const auto shard = grid.shardRegistry()->getShard(_primaryId);
             ScopedDbConnection conn(shard->getConnString(), 30.0);
             BSONObj res;
                 if ( ! conn->dropDatabase( _name , &res ) ) {
@@ -575,7 +575,7 @@ namespace mongo {
 
         // 4
         for (const ShardId& shardId : shardIds) {
-            const auto& shard = grid.shardRegistry()->findIfExists(shardId);
+            const auto shard = grid.shardRegistry()->getShard(shardId);
             if (!shard) {
                 continue;
             }

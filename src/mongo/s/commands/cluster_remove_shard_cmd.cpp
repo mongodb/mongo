@@ -88,7 +88,7 @@ namespace {
 
             const string target = cmdObj.firstElement().valuestrsafe();
 
-            const auto& s = grid.shardRegistry()->findIfExists(target);
+            const auto s = grid.shardRegistry()->getShard(target);
             if (!s) {
                 string msg(str::stream() <<
                            "Could not drop shard '" << target <<

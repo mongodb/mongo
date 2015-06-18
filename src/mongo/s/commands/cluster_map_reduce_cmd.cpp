@@ -284,7 +284,7 @@ namespace {
             if (!shardedInput && !shardedOutput && !customOutDB) {
                 LOG(1) << "simple MR, just passthrough";
 
-                const auto& shard = grid.shardRegistry()->findIfExists(confIn->getPrimaryId());
+                const auto shard = grid.shardRegistry()->getShard(confIn->getPrimaryId());
                 ShardConnection conn(shard->getConnString(), "");
 
                 BSONObj res;
@@ -331,8 +331,8 @@ namespace {
                     // Need to gather list of all servers even if an error happened
                     string server;
                     {
-                        const auto& shard =
-                            grid.shardRegistry()->findIfExists(mrResult.shardTargetId);
+                        const auto shard =
+                            grid.shardRegistry()->getShard(mrResult.shardTargetId);
                         server = shard->getConnString().toString();
                     }
                     servers.insert(server);
@@ -421,7 +421,7 @@ namespace {
             BSONObj singleResult;
 
             if (!shardedOutput) {
-                const auto& shard = grid.shardRegistry()->findIfExists(confOut->getPrimaryId());
+                const auto shard = grid.shardRegistry()->getShard(confOut->getPrimaryId());
                 LOG(1) << "MR with single shard output, NS=" << finalColLong
                        << " primary=" << shard->toString();
 
@@ -502,8 +502,8 @@ namespace {
                     for (const auto& mrResult : mrCommandResults) {
                         string server;
                         {
-                            const auto& shard =
-                                grid.shardRegistry()->findIfExists(mrResult.shardTargetId);
+                            const auto shard =
+                                grid.shardRegistry()->getShard(mrResult.shardTargetId);
                             server = shard->getConnString().toString();
                         }
                         singleResult = mrResult.result;

@@ -480,7 +480,7 @@ namespace mongo {
                      end = _cursorMap.end();
                  i != end;
                  ++i) {
-                const auto& shard = grid.shardRegistry()->findIfExists(i->first);
+                const auto shard = grid.shardRegistry()->getShard(i->first);
                 if (!shard) {
                     continue;
                 }
@@ -575,7 +575,7 @@ namespace mongo {
 
         // Setup conn
         if (!state->conn) {
-            const auto& shard = grid.shardRegistry()->findIfExists(shardId);
+            const auto shard = grid.shardRegistry()->getShard(shardId);
             state->conn.reset(new ShardConnection(shard->getConnString(), ns, manager));
         }
 
@@ -1161,7 +1161,7 @@ namespace mongo {
             _cursors[ index ].reset( mdata.pcState->cursor.get(), &mdata );
 
             {
-                const auto& shard = grid.shardRegistry()->findIfExists(i->first);
+                const auto shard = grid.shardRegistry()->getShard(i->first);
                 _servers.insert(shard->getConnString().toString());
             }
 
@@ -1187,7 +1187,7 @@ namespace mongo {
     }
 
     std::shared_ptr<Shard> ParallelSortClusteredCursor::getQueryShard() {
-        return grid.shardRegistry()->findIfExists(_cursorMap.begin()->first);
+        return grid.shardRegistry()->getShard(_cursorMap.begin()->first);
     }
 
     void ParallelSortClusteredCursor::getQueryShardIds(set<ShardId>& shardIds) {

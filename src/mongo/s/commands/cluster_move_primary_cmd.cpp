@@ -130,7 +130,7 @@ namespace {
                 return false;
             }
 
-            shared_ptr<Shard> toShard = grid.shardRegistry()->findIfExists(to);
+            shared_ptr<Shard> toShard = grid.shardRegistry()->getShard(to);
             if (!toShard) {
                 string msg(str::stream() << "Could not move database '" << dbname
                                          << "' to shard '" << to
@@ -141,7 +141,7 @@ namespace {
             }
 
             shared_ptr<Shard> fromShard =
-                grid.shardRegistry()->findIfExists(config->getPrimaryId());
+                grid.shardRegistry()->getShard(config->getPrimaryId());
             invariant(fromShard);
 
             if (fromShard->getConnString().sameLogicalEndpoint(toShard->getConnString())) {

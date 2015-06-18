@@ -77,7 +77,10 @@ namespace executor {
 
         void reload();
 
-        std::shared_ptr<Shard> findIfExists(const ShardId& shardId);
+        /**
+         * Returns shared pointer to shard object with given shard id.
+         */
+        std::shared_ptr<Shard> getShard(const ShardId& shardId);
 
         /**
          * Lookup shard by replica set name. Returns nullptr if the name can't be found.

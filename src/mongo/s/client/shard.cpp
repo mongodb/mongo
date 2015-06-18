@@ -153,7 +153,7 @@ namespace mongo {
             }
         }
 
-        auto bestShard = grid.shardRegistry()->findIfExists(all[0]);
+        auto bestShard = grid.shardRegistry()->getShard(all[0]);
         if (!bestShard) {
             return nullptr;
         }
@@ -161,7 +161,7 @@ namespace mongo {
         ShardStatus bestStatus = bestShard->getStatus();
 
         for (size_t i = 1; i < all.size(); i++) {
-            const auto& shard = grid.shardRegistry()->findIfExists(all[i]);
+            const auto shard = grid.shardRegistry()->getShard(all[i]);
             if (!shard) {
                 continue;
             }

@@ -90,7 +90,7 @@ namespace {
         }
 
         string shardFor(const string& hostName) const final {
-            const auto& shard = grid.shardRegistry()->findIfExists(hostName);
+            const auto shard = grid.shardRegistry()->getShard(hostName);
             return shard->getId();
         }
 
@@ -261,7 +261,7 @@ namespace {
             for (ShardVersionMap::iterator it = shardVersions->begin();
                  it != shardVersions->end(); ) {
 
-                shared_ptr<Shard> shard = grid.shardRegistry()->findIfExists(it->first);
+                shared_ptr<Shard> shard = grid.shardRegistry()->getShard(it->first);
                 if (shard) {
                     shardIds.insert(it->first);
                     ++it;
@@ -342,7 +342,7 @@ namespace {
         if ( !initPoints || !initPoints->size() ) {
             // discover split points
             {
-                const auto& primaryShard = grid.shardRegistry()->findIfExists(primaryShardId);
+                const auto primaryShard = grid.shardRegistry()->getShard(primaryShardId);
                 // get stats to see if there is any data
                 ScopedDbConnection shardConn(primaryShard->getConnString());
 

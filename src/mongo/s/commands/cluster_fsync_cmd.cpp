@@ -85,7 +85,7 @@ namespace {
             grid.shardRegistry()->getAllShardIds(&shardIds);
 
             for (const ShardId& shardId : shardIds) {
-                const auto& s = grid.shardRegistry()->findIfExists(shardId);
+                const auto s = grid.shardRegistry()->getShard(shardId);
                 if (!s) {
                     continue;
                 }

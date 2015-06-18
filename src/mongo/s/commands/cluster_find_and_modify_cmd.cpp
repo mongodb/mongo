@@ -92,7 +92,7 @@ namespace {
             shared_ptr<Shard> shard;
 
             if (!conf->isShardingEnabled() || !conf->isSharded(ns)) {
-                shard = grid.shardRegistry()->findIfExists(conf->getPrimaryId());
+                shard = grid.shardRegistry()->getShard(conf->getPrimaryId());
             }
             else {
                 shared_ptr<ChunkManager> chunkMgr = _getChunkManager(conf, ns);
@@ -107,7 +107,7 @@ namespace {
                 BSONObj shardKey = status.getValue();
                 ChunkPtr chunk = chunkMgr->findIntersectingChunk(shardKey);
 
-                shard = grid.shardRegistry()->findIfExists(chunk->getShardId());
+                shard = grid.shardRegistry()->getShard(chunk->getShardId());
             }
 
             BSONObjBuilder explainCmd;
@@ -219,7 +219,7 @@ namespace {
 
             BSONObj res;
 
-            const auto& shard = grid.shardRegistry()->findIfExists(shardId);
+            const auto shard = grid.shardRegistry()->getShard(shardId);
             ShardConnection conn(shard->getConnString(), ns);
             bool ok = conn->runCommand(conf->name(), cmdObj, res);
             conn.done();

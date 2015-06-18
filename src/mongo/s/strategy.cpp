@@ -114,7 +114,7 @@ namespace mongo {
             set<ShardId> shardIds;
             cm->getAllShardIds(&shardIds);
             verify(shardIds.size() > 0);
-            shard = grid.shardRegistry()->findIfExists(*shardIds.begin());
+            shard = grid.shardRegistry()->getShard(*shardIds.begin());
         }
 
         ShardConnection dbcon(shard->getConnString(), r.getns());
@@ -484,7 +484,7 @@ namespace mongo {
             CommandResult result;
             result.target = host;
             {
-                const auto& shard = grid.shardRegistry()->findIfExists(host.toString());
+                const auto shard = grid.shardRegistry()->getShard(host.toString());
                 result.shardTargetId = shard->getId();
             }
             result.result = response.toBSON();
@@ -519,7 +519,7 @@ namespace mongo {
             return Status(ErrorCodes::IllegalOperation, ss);
         }
 
-        const auto& primaryShard = grid.shardRegistry()->findIfExists(conf->getPrimaryId());
+        const auto primaryShard = grid.shardRegistry()->getShard(conf->getPrimaryId());
 
         BSONObj shardResult;
         try {

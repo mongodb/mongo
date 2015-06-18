@@ -97,7 +97,7 @@ namespace mongo {
         }
     }
 
-    shared_ptr<Shard> ShardRegistry::findIfExists(const ShardId& shardId) {
+    shared_ptr<Shard> ShardRegistry::getShard(const ShardId& shardId) {
         shared_ptr<Shard> shard = _findUsingLookUp(shardId);
         if (shard) {
             return shard;

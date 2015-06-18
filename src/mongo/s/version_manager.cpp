@@ -199,7 +199,7 @@ namespace mongo {
             // Check to see if this is actually a shard and not a single config server
             // NOTE: Config servers are registered only by the name "config" in the shard cache, not
             // by host, so lookup by host will fail unless the host is also a shard.
-            const auto& shard = grid.shardRegistry()->findIfExists(conn->getServerAddress());
+            const auto shard = grid.shardRegistry()->getShard(conn->getServerAddress());
             if (!shard) {
                 return false;
             }
@@ -306,8 +306,7 @@ namespace mongo {
             officialSequenceNumber = manager->getSequenceNumber();
         }
 
-        const auto& shard =
-            grid.shardRegistry()->findIfExists(conn->getServerAddress());
+        const auto shard = grid.shardRegistry()->getShard(conn->getServerAddress());
         uassert(ErrorCodes::ShardNotFound,
                 str::stream() << conn->getServerAddress() << " is not recognized as a shard",
                 shard);

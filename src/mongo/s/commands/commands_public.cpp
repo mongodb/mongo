@@ -117,7 +117,7 @@ namespace mongo {
                               DBConfigPtr conf,
                               const BSONObj& cmdObj,
                               int options, BSONObjBuilder& result) {
-                const auto& shard = grid.shardRegistry()->findIfExists(conf->getPrimaryId());
+                const auto shard = grid.shardRegistry()->getShard(conf->getPrimaryId());
                 ShardConnection conn(shard->getConnString(), "");
 
                 BSONObj res;
@@ -644,7 +644,7 @@ namespace mongo {
 
                     {
                         const auto& shard =
-                            grid.shardRegistry()->findIfExists(confFrom->getPrimaryId());
+                            grid.shardRegistry()->getShard(confFrom->getPrimaryId());
                         b.append("fromhost", shard->getConnString().toString());
                     }
                     BSONObj fixed = b.obj();
@@ -703,7 +703,7 @@ namespace mongo {
                 cm->getAllShardIds(&shardIds);
 
                 for (const ShardId& shardId : shardIds) {
-                    const auto& shard = grid.shardRegistry()->findIfExists(shardId);
+                    const auto shard = grid.shardRegistry()->getShard(shardId);
                     if (!shard) {
                         continue;
                     }
@@ -877,7 +877,7 @@ namespace mongo {
                 set<ShardId> shardIds;
                 cm->getShardIdsForRange(shardIds, min, max);
                 for (const ShardId& shardId : shardIds) {
-                    const auto& shard = grid.shardRegistry()->findIfExists(shardId);
+                    const auto shard = grid.shardRegistry()->getShard(shardId);
                     if (!shard) {
                         continue;
                     }
@@ -1058,7 +1058,7 @@ namespace mongo {
                 int size = 32;
 
                 for (const ShardId& shardId : shardIds) {
-                    const auto& shard = grid.shardRegistry()->findIfExists(shardId);
+                    const auto shard = grid.shardRegistry()->getShard(shardId);
                     if (!shard) {
                         continue;
                     }
@@ -1263,7 +1263,7 @@ namespace mongo {
                 list< shared_ptr<Future::CommandResult> > futures;
                 BSONArrayBuilder shardArray;
                 for (const ShardId& shardId : shardIds) {
-                    const auto& shard = grid.shardRegistry()->findIfExists(shardId);
+                    const auto shard = grid.shardRegistry()->getShard(shardId);
                     if (!shard) {
                         continue;
                     }
@@ -1455,7 +1455,7 @@ namespace mongo {
                 shared_ptr<DBConfig> conf = status.getValue();
                 bool retval = passthrough( conf, cmdObj, result );
 
-                const auto& shard = grid.shardRegistry()->findIfExists(conf->getPrimaryId());
+                const auto shard = grid.shardRegistry()->getShard(conf->getPrimaryId());
                 Status storeCursorStatus = storePossibleCursor(shard->getConnString().toString(),
                                                                result.asTempObj());
                 if (!storeCursorStatus.isOK()) {
@@ -1488,7 +1488,7 @@ namespace mongo {
                 auto conf = uassertStatusOK(grid.catalogCache()->getDatabase(dbName));
                 bool retval = passthrough( conf, cmdObj, result );
 
-                const auto& shard = grid.shardRegistry()->findIfExists(conf->getPrimaryId());
+                const auto shard = grid.shardRegistry()->getShard(conf->getPrimaryId());
                 Status storeCursorStatus = storePossibleCursor(shard->getConnString().toString(),
                                                                result.asTempObj());
                 if (!storeCursorStatus.isOK()) {

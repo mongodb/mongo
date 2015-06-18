@@ -288,7 +288,7 @@ namespace {
             // Now only check top-level shard connections
             for (const ShardId& shardId : all) {
                 try {
-                    const auto& shard = grid.shardRegistry()->findIfExists(shardId);
+                    const auto shard = grid.shardRegistry()->getShard(shardId);
                     if (!shard) {
                         continue;
                     }
@@ -534,7 +534,7 @@ namespace {
 
         ShardId shardId;
         {
-            const auto& shard = grid.shardRegistry()->findIfExists(conn.getServerAddress());
+            const auto shard = grid.shardRegistry()->getShard(conn.getServerAddress());
             shardId = shard->getId();
             cmdBuilder.append("shard", shardId);
             cmdBuilder.append("shardHost", shard->getConnString().toString());
