@@ -13,3 +13,5 @@ leak:mongo::getThreadName
 # lets just ignore v8 for now. If we upgrade to newer v8
 # try removing this suppression
 leak:v8::
+
+leak:glob64
