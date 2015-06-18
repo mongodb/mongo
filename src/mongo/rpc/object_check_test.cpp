@@ -64,8 +64,6 @@ namespace {
         {
             // mess up the data
             DataRangeCursor drc(begin(buf), end(buf));
-            auto maxIntLE = LittleEndian<int>(std::numeric_limits<int>::max());
-
             // skip past size so we don't trip any sanity checks.
             drc.advance(4);  // skip size
             while (drc.writeAndAdvance(0xFF).isOK()) ;
