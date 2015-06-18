@@ -57,28 +57,24 @@ namespace mongo {
                                                                             bool isExplain);
 
         /**
-         * Constructs a LiteParseQuery object as though it is from a legacy QueryMessage.
+         * Short and long forms for constructing a new LiteParsedQuery.
          */
-        static StatusWith<std::unique_ptr<LiteParsedQuery>> makeAsOpQuery(const std::string& ns,
-                                                                          int ntoskip,
-                                                                          int ntoreturn,
-                                                                          int queryoptions,
-                                                                          const BSONObj& query,
-                                                                          const BSONObj& proj,
-                                                                          const BSONObj& sort,
-                                                                          const BSONObj& hint,
-                                                                          const BSONObj& minObj,
-                                                                          const BSONObj& maxObj,
-                                                                          bool snapshot,
-                                                                          bool explain);
+        static StatusWith<std::unique_ptr<LiteParsedQuery>> make(const std::string& ns,
+                                                                 int ntoreturn,
+                                                                 const BSONObj& query);
 
-        /**
-         * Constructs a LiteParseQuery object that can be used to serialize to find command
-         * BSON object.
-         */
-        static StatusWith<std::unique_ptr<LiteParsedQuery>> makeAsFindCmd(const std::string& ns,
-                                                                          const BSONObj& query,
-                                                                          int limit);
+        static StatusWith<std::unique_ptr<LiteParsedQuery>> make(const std::string& ns,
+                                                                 int ntoskip,
+                                                                 int ntoreturn,
+                                                                 int queryoptions,
+                                                                 const BSONObj& query,
+                                                                 const BSONObj& proj,
+                                                                 const BSONObj& sort,
+                                                                 const BSONObj& hint,
+                                                                 const BSONObj& minObj,
+                                                                 const BSONObj& maxObj,
+                                                                 bool snapshot,
+                                                                 bool explain);
 
         /**
          * Converts this LPQ into a find command.
@@ -222,16 +218,6 @@ namespace mongo {
          * This contains flags such as tailable, exhaust, and noCursorTimeout.
          */
         void initFromInt(int options);
-
-        /**
-         * Add the meta projection to this object if needed.
-         */
-        void addMetaProjection();
-
-        /**
-         * Returns OK if this is valid in the find command context.
-         */
-        Status validateFindCmd();
 
         std::string _ns;
 

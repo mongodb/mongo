@@ -101,18 +101,18 @@ namespace {
         // Passes in default values for LiteParsedQuery.
         // Filter inside LiteParsedQuery is not used.
         unique_ptr<LiteParsedQuery> lpq(
-            assertGet(LiteParsedQuery::makeAsOpQuery(ns,
-                                                     0,
-                                                     0,
-                                                     0,
-                                                     BSONObj(),
-                                                     BSONObj(),
-                                                     BSONObj(),
-                                                     BSONObj(),
-                                                     BSONObj(),
-                                                     BSONObj(),
-                                                     false,      // snapshot
-                                                     false)));   // explain
+            assertGet(LiteParsedQuery::make(ns,
+                                            0,
+                                            0,
+                                            0,
+                                            BSONObj(),
+                                            BSONObj(),
+                                            BSONObj(),
+                                            BSONObj(),
+                                            BSONObj(),
+                                            BSONObj(),
+                                            false,      // snapshot
+                                            false)));   // explain
 
         // Valid: regular TEXT.
         ASSERT_OK(isValid("{$text: {$search: 's'}}", *lpq));
@@ -173,18 +173,18 @@ namespace {
         // Passes in default values for LiteParsedQuery.
         // Filter inside LiteParsedQuery is not used.
         unique_ptr<LiteParsedQuery> lpq(
-            assertGet(LiteParsedQuery::makeAsOpQuery(ns,
-                                                     0,
-                                                     0,
-                                                     0,
-                                                     BSONObj(),
-                                                     BSONObj(),
-                                                     BSONObj(),
-                                                     BSONObj(),
-                                                     BSONObj(),
-                                                     BSONObj(),
-                                                     false,      // snapshot
-                                                     false)));   // explain
+            assertGet(LiteParsedQuery::make(ns,
+                                            0,
+                                            0,
+                                            0,
+                                            BSONObj(),
+                                            BSONObj(),
+                                            BSONObj(),
+                                            BSONObj(),
+                                            BSONObj(),
+                                            BSONObj(),
+                                            false,      // snapshot
+                                            false)));   // explain
 
         // Valid: regular GEO_NEAR.
         ASSERT_OK(isValid("{a: {$near: [0, 0]}}", *lpq));
@@ -257,18 +257,18 @@ namespace {
         // Passes in default values for LiteParsedQuery.
         // Filter inside LiteParsedQuery is not used.
         unique_ptr<LiteParsedQuery> lpq(
-            assertGet(LiteParsedQuery::makeAsOpQuery(ns,
-                                                     0,
-                                                     0,
-                                                     0,
-                                                     BSONObj(),
-                                                     BSONObj(),
-                                                     BSONObj(),
-                                                     BSONObj(),
-                                                     BSONObj(),
-                                                     BSONObj(),
-                                                     false,      // snapshot
-                                                     false)));   // explain
+            assertGet(LiteParsedQuery::make(ns,
+                                            0,
+                                            0,
+                                            0,
+                                            BSONObj(),
+                                            BSONObj(),
+                                            BSONObj(),
+                                            BSONObj(),
+                                            BSONObj(),
+                                            BSONObj(),
+                                            false,      // snapshot
+                                            false)));   // explain
 
         // Invalid: TEXT and GEO_NEAR.
         ASSERT_NOT_OK(isValid("{$text: {$search: 's'}, a: {$near: [0, 0]}}", *lpq));
@@ -292,18 +292,18 @@ namespace {
         // Filter inside LiteParsedQuery is not used.
         BSONObj sort = fromjson("{$natural: 1}");
         unique_ptr<LiteParsedQuery> lpq(
-            assertGet(LiteParsedQuery::makeAsOpQuery(ns,
-                                                     0,
-                                                     0,
-                                                     0,
-                                                     BSONObj(),
-                                                     BSONObj(),
-                                                     sort,
-                                                     BSONObj(),
-                                                     BSONObj(),
-                                                     BSONObj(),
-                                                     false,      // snapshot
-                                                     false)));   // explain
+            assertGet(LiteParsedQuery::make(ns,
+                                            0,
+                                            0,
+                                            0,
+                                            BSONObj(),
+                                            BSONObj(),
+                                            sort,
+                                            BSONObj(),
+                                            BSONObj(),
+                                            BSONObj(),
+                                            false,      // snapshot
+                                            false)));   // explain
 
         // Invalid: TEXT and {$natural: 1} sort order.
         ASSERT_NOT_OK(isValid("{$text: {$search: 's'}}", *lpq));
@@ -314,18 +314,18 @@ namespace {
         // Filter inside LiteParsedQuery is not used.
         BSONObj sort = fromjson("{$natural: -1}");
         unique_ptr<LiteParsedQuery> lpq(
-            assertGet(LiteParsedQuery::makeAsOpQuery(ns,
-                                                     0,
-                                                     0,
-                                                     0,
-                                                     BSONObj(),
-                                                     BSONObj(),
-                                                     sort,
-                                                     BSONObj(),
-                                                     BSONObj(),
-                                                     BSONObj(),
-                                                     false,      // snapshot
-                                                     false)));   // explain
+            assertGet(LiteParsedQuery::make(ns,
+                                            0,
+                                            0,
+                                            0,
+                                            BSONObj(),
+                                            BSONObj(),
+                                            sort,
+                                            BSONObj(),
+                                            BSONObj(),
+                                            BSONObj(),
+                                            false,      // snapshot
+                                            false)));   // explain
 
         // Invalid: TEXT and {$natural: -1} sort order.
         ASSERT_NOT_OK(isValid("{$text: {$search: 's'}}", *lpq));
@@ -336,18 +336,18 @@ namespace {
         // Filter inside LiteParsedQuery is not used.
         BSONObj hint = fromjson("{a: 1}");
         unique_ptr<LiteParsedQuery> lpq(
-            assertGet(LiteParsedQuery::makeAsOpQuery(ns,
-                                                     0,
-                                                     0,
-                                                     0,
-                                                     BSONObj(),
-                                                     BSONObj(),
-                                                     BSONObj(),
-                                                     hint,
-                                                     BSONObj(),
-                                                     BSONObj(),
-                                                     false,      // snapshot
-                                                     false)));   // explain
+            assertGet(LiteParsedQuery::make(ns,
+                                            0,
+                                            0,
+                                            0,
+                                            BSONObj(),
+                                            BSONObj(),
+                                            BSONObj(),
+                                            hint,
+                                            BSONObj(),
+                                            BSONObj(),
+                                            false,      // snapshot
+                                            false)));   // explain
 
         // Invalid: TEXT and {$natural: -1} sort order.
         ASSERT_NOT_OK(isValid("{$text: {$search: 's'}}", *lpq));
@@ -359,18 +359,18 @@ namespace {
         // Filter inside LiteParsedQuery is not used.
         BSONObj sort = fromjson("{$natural: 1}");
         unique_ptr<LiteParsedQuery> lpq(
-            assertGet(LiteParsedQuery::makeAsOpQuery(ns,
-                                                     0,
-                                                     0,
-                                                     0,
-                                                     BSONObj(),
-                                                     BSONObj(),
-                                                     sort,
-                                                     BSONObj(),
-                                                     BSONObj(),
-                                                     BSONObj(),
-                                                     false,      // snapshot
-                                                     false)));   // explain
+            assertGet(LiteParsedQuery::make(ns,
+                                            0,
+                                            0,
+                                            0,
+                                            BSONObj(),
+                                            BSONObj(),
+                                            sort,
+                                            BSONObj(),
+                                            BSONObj(),
+                                            BSONObj(),
+                                            false,      // snapshot
+                                            false)));   // explain
 
         // Invalid: GEO_NEAR and {$natural: 1} sort order.
         ASSERT_NOT_OK(isValid("{a: {$near: {$geometry: {type: 'Point', coordinates: [0, 0]}}}}",
@@ -383,18 +383,18 @@ namespace {
         // Filter inside LiteParsedQuery is not used.
         BSONObj hint = fromjson("{$natural: 1}");
         unique_ptr<LiteParsedQuery> lpq(
-            assertGet(LiteParsedQuery::makeAsOpQuery(ns,
-                                                     0,
-                                                     0,
-                                                     0,
-                                                     BSONObj(),
-                                                     BSONObj(),
-                                                     BSONObj(),
-                                                     hint,
-                                                     BSONObj(),
-                                                     BSONObj(),
-                                                     false,      // snapshot
-                                                     false)));   // explain
+            assertGet(LiteParsedQuery::make(ns,
+                                            0,
+                                            0,
+                                            0,
+                                            BSONObj(),
+                                            BSONObj(),
+                                            BSONObj(),
+                                            hint,
+                                            BSONObj(),
+                                            BSONObj(),
+                                            false,      // snapshot
+                                            false)));   // explain
 
         // Invalid: GEO_NEAR and {$natural: 1} hint.
         ASSERT_NOT_OK(isValid("{a: {$near: {$geometry: {type: 'Point', coordinates: [0, 0]}}}}",
@@ -406,18 +406,18 @@ namespace {
         // Filter inside LiteParsedQuery is not used.
         bool snapshot = true;
         unique_ptr<LiteParsedQuery> lpq(
-            assertGet(LiteParsedQuery::makeAsOpQuery(ns,
-                                                     0,
-                                                     0,
-                                                     0,
-                                                     BSONObj(),
-                                                     BSONObj(),
-                                                     BSONObj(),
-                                                     BSONObj(),
-                                                     BSONObj(),
-                                                     BSONObj(),
-                                                     snapshot,
-                                                     false)));   // explain
+            assertGet(LiteParsedQuery::make(ns,
+                                            0,
+                                            0,
+                                            0,
+                                            BSONObj(),
+                                            BSONObj(),
+                                            BSONObj(),
+                                            BSONObj(),
+                                            BSONObj(),
+                                            BSONObj(),
+                                            snapshot,
+                                            false)));   // explain
 
         // Invalid: TEXT and snapshot.
         ASSERT_NOT_OK(isValid("{$text: {$search: 's'}}", *lpq));

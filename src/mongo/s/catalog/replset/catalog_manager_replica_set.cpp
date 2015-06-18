@@ -456,7 +456,7 @@ namespace {
         };
 
         unique_ptr<LiteParsedQuery> findCmd(
-            fassertStatusOK(28688, LiteParsedQuery::makeAsFindCmd(nss.toString(), query, limit)));
+            fassertStatusOK(28688, LiteParsedQuery::make(nss.toString(), limit, query)));
 
         QueryFetcher fetcher(grid.shardRegistry()->getExecutor(),
                              host,

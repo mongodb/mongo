@@ -244,18 +244,18 @@ namespace {
 
         // 0, 0, 0 is 'ntoskip', 'ntoreturn', and 'queryoptions'
         // false, false is 'snapshot' and 'explain'
-        auto lpqStatus = LiteParsedQuery::makeAsOpQuery(baseQuery.ns(),
-                                                        0,
-                                                        0,
-                                                        0,
-                                                        baseQuery.getParsed().getFilter(),
-                                                        baseQuery.getParsed().getProj(),
-                                                        baseQuery.getParsed().getSort(),
-                                                        emptyObj,
-                                                        emptyObj,
-                                                        emptyObj,
-                                                        false,
-                                                        false);
+        auto lpqStatus = LiteParsedQuery::make(baseQuery.ns(),
+                                               0,
+                                               0,
+                                               0,
+                                               baseQuery.getParsed().getFilter(),
+                                               baseQuery.getParsed().getProj(),
+                                               baseQuery.getParsed().getSort(),
+                                               emptyObj,
+                                               emptyObj,
+                                               emptyObj,
+                                               false,
+                                               false);
         if (!lpqStatus.isOK()) {
             return lpqStatus.getStatus();
         }
@@ -287,18 +287,18 @@ namespace {
         // Pass empty sort and projection.
         BSONObj emptyObj;
 
-        auto lpqStatus = LiteParsedQuery::makeAsOpQuery(ns,
-                                                        skip,
-                                                        limit,
-                                                        0,
-                                                        query,
-                                                        proj,
-                                                        sort,
-                                                        hint,
-                                                        minObj,
-                                                        maxObj,
-                                                        snapshot,
-                                                        explain);
+        auto lpqStatus = LiteParsedQuery::make(ns,
+                                               skip,
+                                               limit,
+                                               0,
+                                               query,
+                                               proj,
+                                               sort,
+                                               hint,
+                                               minObj,
+                                               maxObj,
+                                               snapshot,
+                                               explain);
         if (!lpqStatus.isOK()) {
             return lpqStatus.getStatus();
         }
