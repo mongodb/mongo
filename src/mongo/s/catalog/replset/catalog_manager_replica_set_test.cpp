@@ -420,7 +420,7 @@ namespace {
             vector<ChunkType> chunks;
 
             ASSERT_OK(catalogManager()->getChunks(chunksQuery, 0, &chunks));
-            ASSERT_EQ(2, chunks.size());
+            ASSERT_EQ(2U, chunks.size());
 
             return chunks;
         });
