@@ -35,7 +35,6 @@
 #include <list>
 #include <set>
 
-
 #include "mongo/db/jsobj.h"
 #include "mongo/client/parallel.h"
 #include "mongo/s/client/shard.h"
@@ -47,10 +46,13 @@ namespace mongo {
 
     RunOnAllShardsCommand::RunOnAllShardsCommand(const char* name,
                                                  const char* oldName,
-                                                 bool useShardConn)
-        : Command(name, false, oldName)
-        , _useShardConn(useShardConn)
-    {}
+                                                 bool useShardConn,
+                                                 bool implicitCreateDb)
+        : Command(name, false, oldName),
+          _useShardConn(useShardConn),
+          _implicitCreateDb(implicitCreateDb) {
+
+    }
 
     void RunOnAllShardsCommand::aggregateResults(const std::vector<ShardAndReply>& results,
                                                  BSONObjBuilder& output)
@@ -77,11 +79,15 @@ namespace mongo {
                                     BSONObjBuilder& output) {
 
         LOG(1) << "RunOnAllShardsCommand db: " << dbName << " cmd:" << cmdObj;
+
+        if (_implicitCreateDb) {
+            uassertStatusOK(grid.implicitCreateDb(dbName));
+        }
+
         std::vector<ShardId> shardIds;
         getShardIds(dbName, cmdObj, shardIds);
 
-        // TODO: Future is deprecated, replace with commandOp()
-        std::list< std::shared_ptr<Future::CommandResult> > futures;
+        std::list<std::shared_ptr<Future::CommandResult>> futures;
         for (const ShardId& shardId : shardIds) {
             const auto shard = grid.shardRegistry()->getShard(shardId);
             if (!shard) {

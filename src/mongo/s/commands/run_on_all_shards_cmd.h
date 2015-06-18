@@ -52,10 +52,10 @@ namespace mongo {
      */
     class RunOnAllShardsCommand : public Command {
     public:
-
         RunOnAllShardsCommand(const char* name,
                               const char* oldName=NULL,
-                              bool useShardConn=false);
+                              bool useShardConn=false,
+                              bool implicitCreateDb=false);
 
         bool slaveOk() const override { return true; }
         bool adminOnly() const override { return false; }
@@ -87,7 +87,11 @@ namespace mongo {
                  BSONObjBuilder& output) final;
 
     private:
-        bool _useShardConn; // use ShardConnection as opposed to ScopedDbConnection
+        // Use ShardConnection as opposed to ScopedDbConnection
+        const bool _useShardConn;
+
+        // Whether the requested database should be created implicitly
+        const bool _implicitCreateDb;
     };
 
 }  // namespace mongo

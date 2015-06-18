@@ -1,11 +1,8 @@
 (function() {
     'use strict';
 
-    var t = db.create_indexes;
-    t.drop();
-
-    // TODO: revisit this after createIndexes api stabilizes.
     var isMongos = ("isdbgrid" == db.runCommand("ismaster").msg);
+
     var extractResult = function(obj) {
         if (!isMongos) return obj;
 
@@ -34,7 +31,24 @@
         return result;
     };
 
+    var dbTest = db.getSisterDB('create_indexes_db');
+    dbTest.dropDatabase();
 
+    // Database does not exist
+    var collDbNotExist = dbTest.create_indexes_no_db;
+    var res = assert.commandWorked(collDbNotExist.runCommand(
+                                                'createIndexes',
+                                                {indexes: [{key: {x: 1}, name: 'x_1'}]}));
+    res = extractResult( res );
+    assert( res.createdCollectionAutomatically );
+    assert.eq( 1, res.numIndexesBefore );
+    assert.eq( 2, res.numIndexesAfter );
+    assert.isnull(res.note,
+                  'createIndexes.note should not be present in results when adding a new index: ' +
+                  tojson(res));
+
+    // Collection does not exist, but database does
+    var t = dbTest.create_indexes;
     var res = assert.commandWorked(t.runCommand('createIndexes',
                                                 {indexes: [{key: {x: 1}, name: 'x_1'}]}));
     res = extractResult( res );
@@ -45,10 +59,12 @@
                   'createIndexes.note should not be present in results when adding a new index: ' +
                   tojson(res));
 
+    // Both database and collection exist
     res = assert.commandWorked(t.runCommand('createIndexes',
                                             {indexes: [{key: {x: 1}, name: 'x_1'}]}));
     res = extractResult( res );
-    assert.eq( 2, res.numIndexesBefore );
+    assert(!res.createdCollectionAutomatically);
+    assert.eq(2, res.numIndexesBefore);
     assert.eq(2, res.numIndexesAfter,
               'numIndexesAfter missing from createIndexes result when adding a duplicate index: ' +
               tojson(res));

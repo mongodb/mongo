@@ -32,7 +32,6 @@
 
 #include "mongo/platform/basic.h"
 
-
 #include "mongo/client/connpool.h"
 #include "mongo/client/parallel.h"
 #include "mongo/db/auth/action_set.h"
@@ -61,7 +60,6 @@
 #include "mongo/s/version_manager.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/log.h"
-#include "mongo/util/net/message.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {
@@ -133,8 +131,10 @@ namespace mongo {
         public:
             AllShardsCollectionCommand(const char* n,
                                        const char* oldname = NULL,
-                                       bool useShardConn = false):
-                                           RunOnAllShardsCommand(n, oldname, useShardConn) {
+                                       bool useShardConn = false,
+                                       bool implicitCreateDb = false)
+                : RunOnAllShardsCommand(n, oldname, useShardConn, implicitCreateDb) {
+
             }
 
             virtual void getShardIds(const string& dbName,
@@ -202,7 +202,8 @@ namespace mongo {
             CreateIndexesCmd():
                 AllShardsCollectionCommand("createIndexes",
                                            NULL, /* oldName */
-                                           true /* use ShardConnection */) {
+                                           true /* use ShardConnection */,
+                                           true /* implicit create db */) {
                 // createIndexes command should use ShardConnection so the getLastError would
                 // be able to properly enforce the write concern (via the saveGLEStats callback).
             }
@@ -369,83 +370,6 @@ namespace mongo {
                 output.appendBool("valid", true);
             }
         } validateCmd;
-
-        class RepairDatabaseCmd : public RunOnAllShardsCommand {
-        public:
-            RepairDatabaseCmd() :  RunOnAllShardsCommand("repairDatabase") {}
-            virtual void addRequiredPrivileges(const std::string& dbname,
-                                               const BSONObj& cmdObj,
-                                               std::vector<Privilege>* out) {
-                ActionSet actions;
-                actions.addAction(ActionType::repairDatabase);
-                out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
-            }
-        } repairDatabaseCmd;
-
-        class DBStatsCmd : public RunOnAllShardsCommand {
-        public:
-            DBStatsCmd() :  RunOnAllShardsCommand("dbStats", "dbstats") {}
-            virtual void addRequiredPrivileges(const std::string& dbname,
-                                               const BSONObj& cmdObj,
-                                               std::vector<Privilege>* out) {
-                ActionSet actions;
-                actions.addAction(ActionType::dbStats);
-                out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
-            }
-
-            virtual void aggregateResults(const vector<ShardAndReply>& results,
-                                          BSONObjBuilder& output) {
-                long long objects = 0;
-                long long unscaledDataSize = 0;
-                long long dataSize = 0;
-                long long storageSize = 0;
-                long long numExtents = 0;
-                long long indexes = 0;
-                long long indexSize = 0;
-                long long fileSize = 0;
-
-                long long freeListNum = 0;
-                long long freeListSize = 0;
-
-                for (vector<ShardAndReply>::const_iterator it(results.begin()), end(results.end());
-                     it != end; ++it) {
-                    const BSONObj& b = std::get<1>(*it);
-                    objects     += b["objects"].numberLong();
-                    unscaledDataSize    += b["avgObjSize"].numberLong() * b["objects"].numberLong();
-                    dataSize    += b["dataSize"].numberLong();
-                    storageSize += b["storageSize"].numberLong();
-                    numExtents  += b["numExtents"].numberLong();
-                    indexes     += b["indexes"].numberLong();
-                    indexSize   += b["indexSize"].numberLong();
-                    fileSize    += b["fileSize"].numberLong();
-
-                    if ( b["extentFreeList"].isABSONObj() ) {
-                        freeListNum += b["extentFreeList"].Obj()["num"].numberLong();
-                        freeListSize += b["extentFreeList"].Obj()["totalSize"].numberLong();
-                    }
-                }
-
-                //result.appendNumber( "collections" , ncollections ); //TODO: need to find a good way to get this
-                output.appendNumber( "objects" , objects );
-                /* avgObjSize on mongod is not scaled based on the argument to db.stats(), so we use
-                 * unscaledDataSize here for consistency.  See SERVER-7347. */
-                output.append      ( "avgObjSize" , objects == 0 ? 0 : double(unscaledDataSize) /
-                                                                       double(objects) );
-                output.appendNumber( "dataSize" , dataSize );
-                output.appendNumber( "storageSize" , storageSize);
-                output.appendNumber( "numExtents" , numExtents );
-                output.appendNumber( "indexes" , indexes );
-                output.appendNumber( "indexSize" , indexSize );
-                output.appendNumber( "fileSize" , fileSize );
-
-                {
-                    BSONObjBuilder extentFreeList( output.subobjStart( "extentFreeList" ) );
-                    extentFreeList.appendNumber( "num", freeListNum );
-                    extentFreeList.appendNumber( "totalSize", freeListSize );
-                    extentFreeList.done();
-                }
-            }
-        } DBStatsCmdObj;
 
         class CreateCmd : public PublicGridCommand {
         public:
