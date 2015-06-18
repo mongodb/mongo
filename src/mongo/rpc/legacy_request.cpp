@@ -41,8 +41,13 @@ namespace rpc {
     LegacyRequest::LegacyRequest(const Message *message)
         : _message(std::move(message))
         , _dbMessage(*message)
-        , _queryMessage(_dbMessage)
-        , _database(nsToDatabase(_queryMessage.ns)) {
+        , _queryMessage(_dbMessage) {
+
+        _database = nsToDatabaseSubstring(_queryMessage.ns);
+
+        uassert(ErrorCodes::InvalidNamespace,
+                str::stream() << "Invalid database name: '" << _database << "'",
+                NamespaceString::validDBName(_database));
 
         std::tie(_upconvertedCommandArgs, _upconvertedMetadata) = uassertStatusOK(
             rpc::upconvertRequestMetadata(std::move(_queryMessage.query),

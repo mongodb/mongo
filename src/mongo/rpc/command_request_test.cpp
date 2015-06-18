@@ -34,14 +34,16 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/rpc/command_request.h"
+#include "mongo/rpc/command_request_builder.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/net/message.h"
+#include "mongo/util/assert_util.h"
 
 namespace {
 
     using namespace mongo;
 
-    TEST(RequestTest, ParseAllFields) {
+    TEST(CommandRequest, ParseAllFields) {
         std::vector<char> opCommandData;
 
         using std::begin;
@@ -106,4 +108,15 @@ namespace {
 
         ASSERT_TRUE(inputDocRangeIter == inputDocRange.end());
     }
+
+    TEST(CommandRequest, InvalidNSThrows) {
+        rpc::CommandRequestBuilder crb;
+        crb.setDatabase("foo////!!!!<><><>");
+        crb.setCommandName("foo");
+        crb.setMetadata(BSONObj());
+        crb.setCommandArgs(BSON("ping" << 1));
+        auto msg = crb.done();
+        ASSERT_THROWS(rpc::CommandRequest{msg.get()}, AssertionException);
+    }
+
 }  // namespace

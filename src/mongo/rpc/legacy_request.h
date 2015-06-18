@@ -96,7 +96,7 @@ namespace rpc {
         // for now getMetadata() is a no op
         DbMessage _dbMessage;
         QueryMessage _queryMessage;
-        std::string _database;
+        StringData _database;
 
         BSONObj _upconvertedMetadata;
         BSONObj _upconvertedCommandArgs;

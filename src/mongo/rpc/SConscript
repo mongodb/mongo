@@ -143,12 +143,13 @@ env.CppUnitTest(
         'rpc_test',
     ],
     source=[
+        'command_reply_builder_test.cpp',
         'command_reply_test.cpp',
         'command_request_builder_test.cpp',
         'command_request_test.cpp',
+        'legacy_request_test.cpp',
         'object_check_test.cpp',
         'protocol_test.cpp',
-        'command_reply_builder_test.cpp',
     ],
     LIBDEPS=[
         'rpc',

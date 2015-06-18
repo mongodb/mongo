@@ -245,13 +245,8 @@ namespace {
         rpc::LegacyReplyBuilder builder{};
 
         try {
+            // This will throw if the request is on an invalid namespace.
             rpc::LegacyRequest request{&message};
-            // Do the namespace validity check under the try/catch block so it does not cause the
-            // connection to be terminated.
-            uassert(ErrorCodes::InvalidNamespace,
-                    str::stream() << "Invalid ns [" << request.getDatabase() << ".$cmd" << "]",
-                    NamespaceString::validDBName(request.getDatabase()));
-
             // Auth checking for Commands happens later.
             int nToReturn = queryMessage.ntoreturn;
             beginQueryOp(txn, nss, queryMessage.query, nToReturn, queryMessage.ntoskip);

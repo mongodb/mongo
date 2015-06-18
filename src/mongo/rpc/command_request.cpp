@@ -38,6 +38,7 @@
 #include "mongo/base/data_type_terminated.h"
 #include "mongo/base/data_type_validated.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/rpc/object_check.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
@@ -75,6 +76,10 @@ namespace rpc {
                                      << " bytes. Got: " << _database,
                 (_database.size() >= kMinDatabaseLength) &&
                 (_database.size() <= kMaxDatabaseLength));
+
+        uassert(ErrorCodes::InvalidNamespace,
+                str::stream() << "Invalid database name: '" << _database << "'",
+                NamespaceString::validDBName(_database));
 
         _commandName = uassertStatusOK(cur.readAndAdvance<Terminated<'\0', StringData>>());
 
