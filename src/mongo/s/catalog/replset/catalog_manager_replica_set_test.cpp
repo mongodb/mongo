@@ -360,7 +360,7 @@ namespace {
             Status status = catalogManager()->getAllShards(&shards);
 
             ASSERT_NOT_OK(status);
-            ASSERT(shards.size() == 0);
+            ASSERT_EQ(0U, shards.size());
         });
 
         onFindCommand([](const RemoteCommandRequest& request) {
@@ -458,7 +458,7 @@ namespace {
             vector<ChunkType> chunks;
 
             ASSERT_OK(catalogManager()->getChunks(chunksQuery, 0, &chunks));
-            ASSERT_EQ(0, chunks.size());
+            ASSERT_EQ(0U, chunks.size());
         });
 
         onFindCommand([&chunksQuery](const RemoteCommandRequest& request) {
@@ -493,7 +493,7 @@ namespace {
             Status status = catalogManager()->getChunks(chunksQuery, 0, &chunks);
 
             ASSERT_EQUALS(ErrorCodes::FailedToParse, status);
-            ASSERT_EQ(0, chunks.size());
+            ASSERT_EQ(0U, chunks.size());
         });
 
         onFindCommand([&chunksQuery](const RemoteCommandRequest& request) {
