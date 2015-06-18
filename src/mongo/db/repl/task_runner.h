@@ -28,10 +28,10 @@
 
 #pragma once
 
-#include <boost/thread/condition.hpp>
 #include <list>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 
@@ -149,7 +149,7 @@ namespace repl {
         // Protects member data of this TaskRunner.
         mutable stdx::mutex _mutex;
 
-        boost::condition _condition;
+        stdx::condition_variable _condition;
 
         // _active is true when there are scheduled tasks in the task queue or
         // when a task is being run by the task runner.

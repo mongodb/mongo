@@ -30,7 +30,6 @@
 
 #include "mongo/db/commands/fsync.h"
 
-#include <boost/thread/condition.hpp>
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -45,13 +44,14 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
-#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/storage/storage_engine.h"
-#include "mongo/db/client.h"
-#include "mongo/db/operation_context_impl.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/util/background.h"
 #include "mongo/util/log.h"
 
@@ -89,8 +89,8 @@ namespace mongo {
         SimpleMutex m; // protects locked var above
         string err;
 
-        boost::condition _threadSync;
-        boost::condition _unlockSync;
+        stdx::condition_variable_any _threadSync;
+        stdx::condition_variable_any _unlockSync;
 
         FSyncCommand() : Command( "fsync" ), m("lockfsync") { locked=false; pendingUnlock=false; }
         virtual bool isWriteCommandForConfigServer() const { return false; }

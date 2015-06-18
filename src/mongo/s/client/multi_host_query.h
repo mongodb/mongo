@@ -28,11 +28,11 @@
 
 #pragma once
 
-#include <boost/thread/condition_variable.hpp>
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
@@ -178,7 +178,7 @@ namespace mongo {
         typedef std::map<ConnectionString, StatusWith<DBClientCursor*> > ResultMap;
         ResultMap _results;
 
-        boost::condition_variable _nextResultCV;
+        stdx::condition_variable _nextResultCV;
     };
 
     /**
@@ -302,11 +302,11 @@ namespace mongo {
 
             // The scheduled work
             std::deque<Callback> scheduled;
-            boost::condition_variable workScheduledCV;
+            stdx::condition_variable workScheduledCV;
 
             // How many workers are currently active
             int numActiveWorkers;
-            boost::condition_variable isIdleCV;
+            stdx::condition_variable isIdleCV;
 
             // Whether the pool has been disposed of
             bool isPoolActive;

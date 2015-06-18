@@ -211,13 +211,13 @@ namespace mongo {
         // No delete is in progress. Used to make sure that there is no activity
         // in this deleter, and therefore is safe to destroy it. Must be used in
         // conjunction with _stopRequested.
-        boost::condition _nothingInProgressCV;
+        stdx::condition_variable _nothingInProgressCV;
 
         // Protects all the data structure below this.
         mutable mutex _queueMutex;
 
         // _taskQueue has a task ready to work on.
-        boost::condition _taskQueueNotEmptyCV;
+        stdx::condition_variable _taskQueueNotEmptyCV;
 
         // Queue for storing the list of ranges that have cursors pending on it.
         //

@@ -30,8 +30,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <boost/thread/condition.hpp>
-
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/db_raii.h"
@@ -43,6 +41,7 @@
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/dbtests/dbtests.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
 
 namespace DocumentSourceTests {
@@ -300,7 +299,7 @@ namespace DocumentSourceTests {
         private:
             int _value;
             mutable mongo::mutex _mutex;
-            mutable boost::condition _condition;
+            mutable stdx::condition_variable _condition;
         };
 
 

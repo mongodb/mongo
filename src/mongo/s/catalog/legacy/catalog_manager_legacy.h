@@ -28,13 +28,13 @@
 
 #pragma once
 
-#include <boost/thread/condition.hpp>
 #include <string>
 #include <vector>
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/s/catalog/catalog_manager.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
 
 namespace mongo {
@@ -205,7 +205,7 @@ namespace mongo {
 
         // condition variable used by the consistency checker thread to wait
         // for <= 60s, on every iteration, until shutDown is called
-        boost::condition _consistencyCheckerCV;
+        stdx::condition_variable _consistencyCheckerCV;
     };
 
 } // namespace mongo

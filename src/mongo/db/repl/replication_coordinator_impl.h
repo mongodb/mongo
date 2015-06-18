@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/thread/condition_variable.hpp>
 #include <vector>
 #include <memory>
 
@@ -47,6 +46,7 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/unordered_map.h"
 #include "mongo/platform/unordered_set.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/net/hostandport.h"
@@ -982,7 +982,7 @@ namespace repl {
         bool _isWaitingForDrainToComplete;                                                // (M)
 
         // Used to signal threads waiting for changes to _rsConfigState.
-        boost::condition_variable _rsConfigStateChange;                                   // (M)
+        stdx::condition_variable _rsConfigStateChange;                                   // (M)
 
         // Represents the configuration state of the coordinator, which controls how and when
         // _rsConfig may change.  See the state transition diagram in the type definition of

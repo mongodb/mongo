@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/thread/condition_variable.hpp>
 #include <memory>
 #include <string>
 
@@ -45,6 +44,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/platform/unordered_map.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 
@@ -406,7 +406,7 @@ namespace mongo {
          * Condition used to signal that it is OK for another CacheGuard to enter a fetch phase.
          * Manipulated via CacheGuard.
          */
-        boost::condition_variable _fetchPhaseIsReady;
+        stdx::condition_variable _fetchPhaseIsReady;
     };
 
 } // namespace mongo

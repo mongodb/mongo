@@ -31,7 +31,6 @@
 
 #include "mongo/scripting/v8-3.25_utils.h"
 
-#include <boost/thread/condition_variable.hpp>
 #include <iostream>
 #include <map>
 #include <sstream>
@@ -40,6 +39,7 @@
 #include "mongo/platform/cstdint.h"
 #include "mongo/scripting/engine_v8-3.25.h"
 #include "mongo/scripting/v8-3.25_db.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/log.h"
@@ -245,7 +245,7 @@ namespace mongo {
     private:
         struct Latch {
             Latch(int32_t count) : count(count) {}
-            boost::condition_variable cv;
+            stdx::condition_variable cv;
             stdx::mutex mutex;
             int32_t count;
         };

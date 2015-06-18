@@ -245,18 +245,18 @@ namespace mongo {
     }
 
     void BenchRunState::waitForState(State awaitedState) {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
 
         switch ( awaitedState ) {
         case BRS_RUNNING:
             while ( _numUnstartedWorkers > 0 ) {
                 massert( 16147, "Already finished.", _numUnstartedWorkers + _numActiveWorkers > 0 );
-                _stateChangeCondition.wait( _mutex );
+                _stateChangeCondition.wait( lk );
             }
             break;
         case BRS_FINISHED:
             while ( _numUnstartedWorkers + _numActiveWorkers > 0 ) {
-                _stateChangeCondition.wait( _mutex );
+                _stateChangeCondition.wait( lk );
             }
             break;
         default:

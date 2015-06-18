@@ -29,9 +29,9 @@
 
 #pragma once
 
-#include <boost/thread/condition.hpp>
+#include "mongo/stdx/condition_variable.h"
 
-#include "mutex.h"
+#include "mongo/util/concurrency/mutex.h"
 
 namespace mongo {
 
@@ -81,7 +81,7 @@ namespace mongo {
         mongo::mutex _mutex;          // protects state below
         unsigned long long lookFor;
         unsigned long long cur;
-        boost::condition _condition;  // cond over _notified being true
+        stdx::condition_variable _condition;  // cond over _notified being true
     };
 
     /** establishes a synchronization point between threads. N threads are waits and one is notifier.
@@ -112,7 +112,7 @@ namespace mongo {
 
     private:
         mongo::mutex _mutex;
-        boost::condition _condition;
+        stdx::condition_variable _condition;
         When _lastDone;
         When _lastReturned;
         unsigned _nWaiting;

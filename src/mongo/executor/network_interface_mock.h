@@ -28,10 +28,10 @@
 
 #pragma once
 
-#include <boost/thread/condition_variable.hpp>
 #include <map>
 
 #include "mongo/executor/network_interface.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/list.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/time_support.h"
@@ -210,10 +210,10 @@ namespace executor {
         stdx::mutex _mutex;
 
         // Condition signaled to indicate that the network processing thread should wake up.
-        boost::condition_variable _shouldWakeNetworkCondition;   // (M)
+        stdx::condition_variable _shouldWakeNetworkCondition;   // (M)
 
         // Condition signaled to indicate that the executor run thread should wake up.
-        boost::condition_variable _shouldWakeExecutorCondition;  // (M)
+        stdx::condition_variable _shouldWakeExecutorCondition;  // (M)
 
         // Bitmask indicating which threads are runnable.
         int _waitingToRunMask;                                   // (M)

@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/thread/condition_variable.hpp>
 #include <string>
 #include <thread>
 
@@ -42,6 +41,7 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/platform/random.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/list.h"
 #include "mongo/stdx/mutex.h"
@@ -306,7 +306,7 @@ namespace repl {
         std::unique_ptr<StorageInterface> _storageInterface;
         stdx::mutex _mutex;
         stdx::mutex _terribleExLockSyncMutex;
-        boost::condition_variable _noMoreWaitingThreads;
+        stdx::condition_variable _noMoreWaitingThreads;
         WorkQueue _freeQueue;
         WorkQueue _readyQueue;
         WorkQueue _dbWorkInProgressQueue;
@@ -398,7 +398,7 @@ namespace repl {
 
         // All members other than _executor are protected by the executor's _mutex.
         bool _isSignaled;
-        boost::condition_variable _isSignaledCondition;
+        stdx::condition_variable _isSignaledCondition;
         EventList::iterator _iter;
         WorkQueue _waiters;
     };

@@ -37,9 +37,9 @@
 #include <map>
 #include <set>
 #include <boost/version.hpp>
-#include <boost/thread/condition.hpp>
 
 #include "mongo/config.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/rwlockimpl.h"

@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <boost/thread/condition.hpp>
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
@@ -38,6 +37,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/last_vote.h"
 #include "mongo/db/repl/replication_coordinator_external_state.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/net/hostandport.h"
 
@@ -132,10 +132,10 @@ namespace repl {
         Status _storeLocalLastVoteDocumentStatus;
         // mutex and cond var for controlling stroeLocalConfigDocument()'s hanging
         stdx::mutex _shouldHangConfigMutex;
-        boost::condition _shouldHangConfigCondVar;
+        stdx::condition_variable _shouldHangConfigCondVar;
         // mutex and cond var for controlling stroeLocalLastVoteDocument()'s hanging
         stdx::mutex _shouldHangLastVoteMutex;
-        boost::condition _shouldHangLastVoteCondVar;
+        stdx::condition_variable _shouldHangLastVoteCondVar;
         bool _storeLocalConfigDocumentShouldHang;
         bool _storeLocalLastVoteDocumentShouldHang;
         bool _connectionsClosed;

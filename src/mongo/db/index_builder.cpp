@@ -57,7 +57,7 @@ namespace {
     // parent thread has not yet synchronized with it.
     bool _bgIndexStarting(false);
     stdx::mutex _bgIndexStartingMutex;
-    boost::condition_variable _bgIndexStartingCondVar;
+    stdx::condition_variable _bgIndexStartingCondVar;
 
     void _setBgIndexStarting() {
         stdx::lock_guard<stdx::mutex> lk(_bgIndexStartingMutex);

@@ -32,13 +32,13 @@
 #include "mongo/client/replica_set_monitor.h"
 
 #include <algorithm>
-#include <boost/thread/condition.hpp>
 #include <limits>
 
-#include "mongo/db/server_options.h"
 #include "mongo/client/connpool.h"
 #include "mongo/client/global_conn_pool.h"
 #include "mongo/client/replica_set_monitor_internal.h"
+#include "mongo/db/server_options.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/background.h"
 #include "mongo/util/concurrency/mutex.h" // for StaticObserver
@@ -184,7 +184,7 @@ namespace {
         mongo::mutex _monitorMutex;
         bool _started;
 
-        boost::condition _stopRequestedCV;
+        stdx::condition_variable _stopRequestedCV;
         bool _stopRequested;
     } replicaSetMonitorWatcher;
 

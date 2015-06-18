@@ -30,9 +30,8 @@
 #include <list>
 #include <string>
 
-#include <boost/thread/condition.hpp>
-
 #include "mongo/base/disallow_copying.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 
@@ -87,7 +86,7 @@ namespace mongo {
     private:
         class Worker;
         stdx::mutex _mutex;
-        boost::condition _condition;
+        stdx::condition_variable _condition;
 
         std::list<Worker*> _freeWorkers; //used as LIFO stack (always front)
         std::list<Task> _tasks; //used as FIFO queue (push_back, pop_front)

@@ -28,11 +28,10 @@
 
 #pragma once
 
-#include <boost/thread/condition.hpp>
-
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/queue.h"
 
@@ -152,9 +151,9 @@ namespace repl {
 
         // if produce thread should be running
         bool _pause;
-        boost::condition _pausedCondition;
+        stdx::condition_variable _pausedCondition;
         bool _appliedBuffer;
-        boost::condition _appliedBufferCondition;
+        stdx::condition_variable _appliedBufferCondition;
 
         HostAndPort _syncSourceHost;
 

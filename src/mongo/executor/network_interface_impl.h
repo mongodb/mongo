@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include <boost/thread/condition_variable.hpp>
 #include <vector>
 
 #include "mongo/client/remote_command_runner_impl.h"
 #include "mongo/executor/network_interface.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/list.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
@@ -124,7 +124,7 @@ namespace executor {
         stdx::mutex _mutex;
 
         // Condition signaled to indicate that there is work in the _pending queue.
-        boost::condition_variable _hasPending;
+        stdx::condition_variable _hasPending;
 
         // Queue of yet-to-be-executed network operations.
         CommandDataList _pending;
@@ -144,7 +144,7 @@ namespace executor {
 
         // Condition signaled to indicate that the executor, blocked in waitForWorkUntil or
         // waitForWork, should wake up.
-        boost::condition_variable _isExecutorRunnableCondition;
+        stdx::condition_variable _isExecutorRunnableCondition;
 
         // Flag indicating whether or not the executor associated with this interface is runnable.
         bool _isExecutorRunnable;

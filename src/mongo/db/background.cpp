@@ -36,6 +36,7 @@
 #include <string>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/map_util.h"
@@ -61,7 +62,7 @@ namespace {
 
     private:
         int _opsInProgCount;
-        boost::condition_variable _noOpsInProg;
+        stdx::condition_variable _noOpsInProg;
     };
 
     typedef StringMap<std::shared_ptr<BgInfo> > BgInfoMap;

@@ -54,7 +54,7 @@ namespace {
     // How often to check with the config servers whether authorization information has changed.
     int userCacheInvalidationIntervalSecs = 30; // 30 second default
     stdx::mutex invalidationIntervalMutex;
-    boost::condition_variable invalidationIntervalChangedCondition;
+    stdx::condition_variable invalidationIntervalChangedCondition;
     Date_t lastInvalidationTime;
 
     class ExportedInvalidationIntervalParameter : public ExportedServerParameter<int> {

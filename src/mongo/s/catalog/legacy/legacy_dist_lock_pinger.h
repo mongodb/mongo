@@ -35,6 +35,7 @@
 #include "mongo/base/status.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/s/catalog/dist_lock_manager.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/mutex.h"
@@ -116,7 +117,7 @@ namespace mongo {
         mongo::mutex _mutex;
 
         // Triggered everytime a pinger thread is stopped.
-        boost::condition_variable _pingStoppedCV;                                        // (M)
+        stdx::condition_variable _pingStoppedCV;                                        // (M)
 
         // pingID -> thread
         // This can contain multiple elements in tests, but in tne normal case, this will

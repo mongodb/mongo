@@ -104,7 +104,7 @@ namespace {
     // Synchronizes the section where a new Timestamp is generated and when it actually
     // appears in the oplog.
     mongo::mutex newOpMutex;
-    boost::condition newTimestampNotifier;
+    stdx::condition_variable newTimestampNotifier;
 
     static std::string _oplogCollectionName;
 

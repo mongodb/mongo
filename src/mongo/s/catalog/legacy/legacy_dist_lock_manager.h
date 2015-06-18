@@ -72,7 +72,7 @@ namespace mongo {
         const ConnectionString _configServer;
 
         stdx::mutex _mutex;
-        boost::condition_variable _noLocksCV;
+        stdx::condition_variable _noLocksCV;
         std::map<DistLockHandle, std::unique_ptr<DistributedLock>> _lockMap;
 
         std::unique_ptr<LegacyDistLockPinger> _pinger;

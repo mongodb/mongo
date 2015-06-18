@@ -63,7 +63,7 @@ namespace mongo {
 
         // These two go together to implement the conditional variable pattern.
         stdx::mutex _mutex;
-        boost::condition_variable _cond;
+        stdx::condition_variable _cond;
 
         // Result from the last call to notify
         LockResult _result;

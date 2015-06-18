@@ -30,11 +30,10 @@
 
 #include <string>
 
-#include <boost/thread/condition.hpp>
-
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/timer.h"
 
@@ -322,7 +321,7 @@ namespace mongo {
 
     private:
         stdx::mutex _mutex;
-        boost::condition _stateChangeCondition;
+        stdx::condition_variable _stateChangeCondition;
         unsigned _numUnstartedWorkers;
         unsigned _numActiveWorkers;
         AtomicUInt32 _isShuttingDown;

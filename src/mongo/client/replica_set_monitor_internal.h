@@ -33,7 +33,6 @@
 
 #pragma once
 
-#include <boost/thread/condition.hpp>
 #include <deque>
 #include <set>
 #include <string>
@@ -45,6 +44,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/cstdint.h"
 #include "mongo/platform/random.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
@@ -171,7 +171,7 @@ namespace mongo {
         // progress.
         // TODO consider splitting cv into two: one for when looking for a master, one for all other
         // cases.
-        boost::condition_variable cv;
+        stdx::condition_variable cv;
 
         const std::string name; // safe to read outside lock since it is const
         int consecutiveFailedScans;

@@ -31,8 +31,8 @@
 
 #include <list>
 #include <boost/filesystem/path.hpp>
-#include <boost/thread/condition.hpp>
 
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/util/concurrency/mutex.h"
 
 namespace mongo {
@@ -92,7 +92,7 @@ namespace mongo {
         std::string makeTempFileName( boost::filesystem::path root );
 
         mutable mongo::mutex _pendingMutex;
-        mutable boost::condition _pendingUpdated;
+        mutable stdx::condition_variable _pendingUpdated;
 
         std::list< std::string > _pending;
         mutable std::map< std::string, long > _pendingSize;

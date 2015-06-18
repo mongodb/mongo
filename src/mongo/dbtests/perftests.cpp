@@ -64,6 +64,7 @@
 #include "mongo/db/storage_options.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/dbtests/framework_options.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/allocator.h"
 #include "mongo/util/checksum.h"
@@ -541,7 +542,7 @@ namespace PerfTests {
     std::mutex mstd;
     std::timed_mutex mstd_timed;
     SpinLock s;
-    boost::condition c;
+    stdx::condition_variable c;
 
     class NotifyOne : public B {
     public:

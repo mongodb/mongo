@@ -34,6 +34,7 @@ namespace mongo {
 namespace stdx {
 
     using condition_variable = boost::condition_variable;
+    using condition_variable_any = boost::condition_variable_any;
     using cv_status = boost::cv_status;
 
 }  // namespace stdx

@@ -29,10 +29,9 @@
 
 #pragma once
 
-#include <boost/thread/condition.hpp>
-
 #include "mongo/client/constants.h"
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/net/hostandport.h"
 
@@ -85,7 +84,7 @@ namespace repl {
         // protects cond, _shutdownSignaled, and _positionChanged.
         stdx::mutex _mtx;
         // used to alert our thread of changes which need to be passed up the chain
-        boost::condition _cond;
+        stdx::condition_variable _cond;
         // used to indicate a position change which has not yet been pushed along
         bool _positionChanged;
         // Once this is set to true the _run method will terminate

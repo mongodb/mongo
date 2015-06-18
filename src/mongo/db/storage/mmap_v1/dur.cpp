@@ -73,8 +73,6 @@
 
 #include "mongo/db/storage/mmap_v1/dur.h"
 
-#include <boost/thread/condition_variable.hpp>
-
 #include <iomanip>
 #include <utility>
 
@@ -91,6 +89,7 @@
 #include "mongo/db/storage/mmap_v1/durable_mapped_file.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
 #include "mongo/db/storage_options.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/synchronization.h"
@@ -115,7 +114,7 @@ namespace {
 
     // Used to activate the flush thread
     stdx::mutex flushMutex;
-    boost::condition_variable flushRequested;
+    stdx::condition_variable flushRequested;
 
     // This is waited on for getlasterror acknowledgements. It means that data has been written to
     // the journal, but not necessarily applied to the shared view, so it is all right to

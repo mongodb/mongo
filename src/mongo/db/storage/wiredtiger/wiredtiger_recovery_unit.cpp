@@ -30,8 +30,6 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
 
-#include <boost/thread/condition.hpp>
-
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/init.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -40,6 +38,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/log.h"
@@ -74,7 +73,7 @@ namespace mongo {
             AtomicUInt32 numWaitingForSync;
 
             stdx::mutex mutex; // this just protects lastSyncTime
-            boost::condition condvar;
+            stdx::condition_variable condvar;
             long long lastSyncTime;
         } waitUntilDurableData;
     }
