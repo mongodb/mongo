@@ -33,6 +33,7 @@
 #include <string>
 
 #include "mongo/db/range_deleter.h"
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 
@@ -139,14 +140,14 @@ namespace mongo {
         // mutex acquisition ordering:
         // _envStatMutex -> _pauseDeleteMutex -> _deleteListMutex -> _cursorMapMutex
 
-        mutable mutex _deleteListMutex;
+        mutable stdx::mutex _deleteListMutex;
         std::vector<DeletedRange> _deleteList;
 
-        mutex _cursorMapMutex;
+        stdx::mutex _cursorMapMutex;
         std::map<std::string, std::set<CursorId> > _cursorMap;
 
         // Protects _pauseDelete & _pausedCount
-        mutex _pauseDeleteMutex;
+        stdx::mutex _pauseDeleteMutex;
         stdx::condition_variable _pausedCV;
         bool _pauseDelete;
 
@@ -156,7 +157,7 @@ namespace mongo {
         stdx::condition_variable _pausedDeleteChangeCV;
 
         // Protects all variables below this line.
-        mutex _envStatMutex;
+        stdx::mutex _envStatMutex;
 
         // Keeps track of the number of times getCursorIds was called.
         uint64_t _getCursorsCallCount;

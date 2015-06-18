@@ -227,8 +227,7 @@ namespace mongo {
     // Rolling
     //
 
-    RecordAccessTracker::Rolling::Rolling()
-        : _lock( "ps::Rolling" ){
+    RecordAccessTracker::Rolling::Rolling() {
         _curSlice = 0;
         _lastRotate = Listener::getElapsedTimeMillis();
     }
@@ -236,7 +235,7 @@ namespace mongo {
     bool RecordAccessTracker::Rolling::access(size_t region, short offset, bool doHalf) {
         int regionHash = hash(region);
 
-        SimpleMutex::scoped_lock lk(_lock);
+        stdx::lock_guard<SimpleMutex> lk(_lock);
 
         static int rarelyCount = 0;
         if (rarelyCount++ % (2048 / BigHashSize) == 0) {

@@ -28,7 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/util/concurrency/mutex.h"
+#include "mongo/util/static_observer.h"
 
 namespace mongo {
 

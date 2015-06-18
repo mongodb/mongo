@@ -29,12 +29,12 @@
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
 
 #include "mongo/db/global_timestamp.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
-#include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/log.h"
 
 namespace {
-    mongo::mutex globalTimestampMutex;
+    mongo::stdx::mutex globalTimestampMutex;
     mongo::Timestamp globalTimestamp(0, 0);
 
     bool skewed(const mongo::Timestamp& val) {

@@ -399,7 +399,7 @@ namespace {
         // Migration time: lock each partition in turn and transfer its requests, if any
         while(partitioned()) {
             LockManager::Partition* partition = partitions.back();
-            SimpleMutex::scoped_lock scopedLock(partition->mutex);
+            stdx::lock_guard<SimpleMutex> scopedLock(partition->mutex);
 
             LockManager::Partition::Map::iterator it = partition->data.find(resourceId);
             if (it != partition->data.end()) {
@@ -459,7 +459,7 @@ namespace {
         // For intent modes, try the PartitionedLockHead
         if (request->partitioned) {
             Partition* partition = _getPartition(request);
-            SimpleMutex::scoped_lock scopedLock(partition->mutex);
+            stdx::lock_guard<SimpleMutex> scopedLock(partition->mutex);
 
             // Fast path for intent locks
             PartitionedLockHead* partitionedLock = partition->find(resId);
@@ -475,7 +475,7 @@ namespace {
 
         // Use regular LockHead, maybe start partitioning
         LockBucket* bucket = _getBucket(resId);
-        SimpleMutex::scoped_lock scopedLock(bucket->mutex);
+        stdx::lock_guard<SimpleMutex> scopedLock(bucket->mutex);
 
         LockHead* lock = bucket->findOrInsert(resId);
 
@@ -483,7 +483,7 @@ namespace {
         if (request->partitioned && !(lock->grantedModes & (~intentModes))
             && !lock->conflictModes) {
             Partition* partition = _getPartition(request);
-            SimpleMutex::scoped_lock scopedLock(partition->mutex);
+            stdx::lock_guard<SimpleMutex> scopedLock(partition->mutex);
             PartitionedLockHead* partitionedLock = partition->findOrInsert(resId);
             invariant(partitionedLock);
             lock->partitions.push_back(partition);
@@ -524,7 +524,7 @@ namespace {
                                                         LockConflictsTable[newMode]);
 
         LockBucket* bucket = _getBucket(resId);
-        SimpleMutex::scoped_lock scopedLock(bucket->mutex);
+        stdx::lock_guard<SimpleMutex> scopedLock(bucket->mutex);
 
         LockBucket::Map::iterator it = bucket->data.find(resId);
         invariant(it != bucket->data.end());
@@ -595,7 +595,7 @@ namespace {
             invariant(request->status == LockRequest::STATUS_GRANTED
                       || request->status == LockRequest::STATUS_CONVERTING);
             Partition* partition = _getPartition(request);
-            SimpleMutex::scoped_lock scopedLock(partition->mutex);
+            stdx::lock_guard<SimpleMutex> scopedLock(partition->mutex);
             //  Fast path: still partitioned.
             if (request->partitionedLock) {
                 request->partitionedLock->grantedList.remove(request);
@@ -608,7 +608,7 @@ namespace {
 
         LockHead* lock = request->lock;
         LockBucket* bucket = _getBucket(lock->resourceId);
-        SimpleMutex::scoped_lock scopedLock(bucket->mutex);
+        stdx::lock_guard<SimpleMutex> scopedLock(bucket->mutex);
 
         if (request->status == LockRequest::STATUS_GRANTED) {
             // This releases a currently held lock and is the most common path, so it should be
@@ -668,7 +668,7 @@ namespace {
         LockHead* lock = request->lock;
 
         LockBucket* bucket = _getBucket(lock->resourceId);
-        SimpleMutex::scoped_lock scopedLock(bucket->mutex);
+        stdx::lock_guard<SimpleMutex> scopedLock(bucket->mutex);
 
         lock->incGrantedModeCount(newMode);
         lock->decGrantedModeCount(request->mode);
@@ -681,7 +681,7 @@ namespace {
         size_t deletedLockHeads = 0;
         for (unsigned i = 0; i < _numLockBuckets; i++) {
             LockBucket* bucket = &_lockBuckets[i];
-            SimpleMutex::scoped_lock scopedLock(bucket->mutex);
+            stdx::lock_guard<SimpleMutex> scopedLock(bucket->mutex);
 
             LockBucket::Map::iterator it = bucket->data.begin();
             while (it != bucket->data.end()) {
@@ -821,7 +821,7 @@ namespace {
 
         for (unsigned i = 0; i < _numLockBuckets; i++) {
             LockBucket* bucket = &_lockBuckets[i];
-            SimpleMutex::scoped_lock scopedLock(bucket->mutex);
+            stdx::lock_guard<SimpleMutex> scopedLock(bucket->mutex);
 
             if (!bucket->data.empty()) {
                 _dumpBucket(bucket);
@@ -971,7 +971,7 @@ namespace {
     void DeadlockDetector::_processNextNode(const UnprocessedNode& node) {
         // Locate the request
         LockManager::LockBucket* bucket = _lockMgr._getBucket(node.resId);
-        SimpleMutex::scoped_lock scopedLock(bucket->mutex);
+        stdx::lock_guard<SimpleMutex> scopedLock(bucket->mutex);
 
         LockManager::LockBucket::Map::const_iterator iter = bucket->data.find(node.resId);
         if (iter == bucket->data.end()) {

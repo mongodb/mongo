@@ -141,8 +141,7 @@ namespace mongo {
     }
 
     GlobalCursorIdCache::GlobalCursorIdCache()
-        : _mutex( "GlobalCursorIdCache" ),
-          _nextId( 0 ),
+        : _nextId( 0 ),
           _secureRandom() {
     }
 
@@ -150,7 +149,7 @@ namespace mongo {
     }
 
     int64_t GlobalCursorIdCache::nextSeed() {
-        SimpleMutex::scoped_lock lk( _mutex );
+        stdx::lock_guard<SimpleMutex> lk( _mutex );
         if ( !_secureRandom )
             _secureRandom.reset(SecureRandom::create());
         return _secureRandom->nextInt64();
@@ -159,7 +158,7 @@ namespace mongo {
     unsigned GlobalCursorIdCache::created( const std::string& ns ) {
         static const unsigned MAX_IDS = 1000 * 1000 * 1000;
 
-        SimpleMutex::scoped_lock lk( _mutex );
+        stdx::lock_guard<SimpleMutex> lk( _mutex );
 
         fassert( 17359, _idToNS.size() < MAX_IDS );
 
@@ -177,7 +176,7 @@ namespace mongo {
     }
 
     void GlobalCursorIdCache::destroyed( unsigned id, const std::string& ns ) {
-        SimpleMutex::scoped_lock lk( _mutex );
+        stdx::lock_guard<SimpleMutex> lk( _mutex );
         invariant( ns == _idToNS[id] );
         _idToNS.erase( id );
     }
@@ -195,7 +194,7 @@ namespace mongo {
             ns = pin.c()->ns();
         }
         else {
-            SimpleMutex::scoped_lock lk(_mutex);
+            stdx::lock_guard<SimpleMutex> lk(_mutex);
             unsigned nsid = idFromCursorId(id);
             Map::const_iterator it = _idToNS.find(nsid);
             if (it == _idToNS.end()) {
@@ -250,7 +249,7 @@ namespace mongo {
         // Compute the set of collection names that we have to time out cursors for.
         vector<string> todo;
         {
-            SimpleMutex::scoped_lock lk( _mutex );
+            stdx::lock_guard<SimpleMutex> lk( _mutex );
             for ( Map::const_iterator i = _idToNS.begin(); i != _idToNS.end(); ++i ) {
                 if (globalCursorManager->ownsCursorId(cursorIdFromParts(i->first, 0))) {
                     // Skip the global cursor manager, since we handle it above (and it's not
@@ -317,8 +316,7 @@ namespace mongo {
 
 
     CursorManager::CursorManager( StringData ns )
-        : _nss( ns ),
-          _mutex( "CursorManager" ) {
+        : _nss( ns ) {
         _collectionCacheRuntimeId = globalCursorIdCache->created( _nss.ns() );
         _random.reset( new PseudoRandom( globalCursorIdCache->nextSeed() ) );
     }
@@ -330,7 +328,7 @@ namespace mongo {
 
     void CursorManager::invalidateAll(bool collectionGoingAway,
                                       const std::string& reason) {
-        SimpleMutex::scoped_lock lk( _mutex );
+        stdx::lock_guard<SimpleMutex> lk( _mutex );
 
         for ( ExecSet::iterator it = _nonCachedExecutors.begin();
               it != _nonCachedExecutors.end();
@@ -407,7 +405,7 @@ namespace mongo {
             return;
         }
 
-        SimpleMutex::scoped_lock lk( _mutex );
+        stdx::lock_guard<SimpleMutex> lk( _mutex );
 
         for ( ExecSet::iterator it = _nonCachedExecutors.begin();
               it != _nonCachedExecutors.end();
@@ -426,7 +424,7 @@ namespace mongo {
     }
 
     std::size_t CursorManager::timeoutCursors( int millisSinceLastCall ) {
-        SimpleMutex::scoped_lock lk( _mutex );
+        stdx::lock_guard<SimpleMutex> lk( _mutex );
 
         vector<ClientCursor*> toDelete;
 
@@ -448,18 +446,18 @@ namespace mongo {
     }
 
     void CursorManager::registerExecutor( PlanExecutor* exec ) {
-        SimpleMutex::scoped_lock lk(_mutex);
+        stdx::lock_guard<SimpleMutex> lk(_mutex);
         const std::pair<ExecSet::iterator, bool> result = _nonCachedExecutors.insert(exec);
         invariant(result.second); // make sure this was inserted
     }
 
     void CursorManager::deregisterExecutor( PlanExecutor* exec ) {
-        SimpleMutex::scoped_lock lk(_mutex);
+        stdx::lock_guard<SimpleMutex> lk(_mutex);
         _nonCachedExecutors.erase(exec);
     }
 
     ClientCursor* CursorManager::find( CursorId id, bool pin ) {
-        SimpleMutex::scoped_lock lk( _mutex );
+        stdx::lock_guard<SimpleMutex> lk( _mutex );
         CursorMap::const_iterator it = _cursors.find( id );
         if ( it == _cursors.end() )
             return NULL;
@@ -476,7 +474,7 @@ namespace mongo {
     }
 
     void CursorManager::unpin( ClientCursor* cursor ) {
-        SimpleMutex::scoped_lock lk( _mutex );
+        stdx::lock_guard<SimpleMutex> lk( _mutex );
 
         invariant( cursor->isPinned() );
         cursor->unsetPinned();
@@ -487,7 +485,7 @@ namespace mongo {
     }
 
     void CursorManager::getCursorIds( std::set<CursorId>* openCursors ) const {
-        SimpleMutex::scoped_lock lk( _mutex );
+        stdx::lock_guard<SimpleMutex> lk( _mutex );
 
         for ( CursorMap::const_iterator i = _cursors.begin(); i != _cursors.end(); ++i ) {
             ClientCursor* cc = i->second;
@@ -496,7 +494,7 @@ namespace mongo {
     }
 
     size_t CursorManager::numCursors() const {
-        SimpleMutex::scoped_lock lk( _mutex );
+        stdx::lock_guard<SimpleMutex> lk( _mutex );
         return _cursors.size();
     }
 
@@ -512,19 +510,19 @@ namespace mongo {
 
     CursorId CursorManager::registerCursor( ClientCursor* cc ) {
         invariant( cc );
-        SimpleMutex::scoped_lock lk( _mutex );
+        stdx::lock_guard<SimpleMutex> lk( _mutex );
         CursorId id = _allocateCursorId_inlock();
         _cursors[id] = cc;
         return id;
     }
 
     void CursorManager::deregisterCursor( ClientCursor* cc ) {
-        SimpleMutex::scoped_lock lk( _mutex );
+        stdx::lock_guard<SimpleMutex> lk( _mutex );
         _deregisterCursor_inlock( cc );
     }
 
     bool CursorManager::eraseCursor(OperationContext* txn, CursorId id, bool checkAuth) {
-        SimpleMutex::scoped_lock lk( _mutex );
+        stdx::lock_guard<SimpleMutex> lk( _mutex );
 
         CursorMap::iterator it = _cursors.find( id );
         if ( it == _cursors.end() ) {

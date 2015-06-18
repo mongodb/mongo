@@ -65,7 +65,7 @@ namespace mongo {
             unsigned long long curFileId() const { return _curFileId; }
 
             void assureLogFileOpen() {
-                SimpleMutex::scoped_lock lk(_curLogFileMutex);
+                stdx::lock_guard<SimpleMutex> lk(_curLogFileMutex);
                 if( _curLogFile == 0 )
                     _open();
             }

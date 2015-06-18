@@ -591,7 +591,7 @@ namespace ThreadedTests {
     template <class whichmutex, class scoped>
     class Slack : public ThreadedTest<17> {
     public:
-        Slack() : m("slack") {
+        Slack() {
             k = 0;
             done = false;
             a = b = 0;
@@ -769,7 +769,7 @@ namespace ThreadedTests {
                 verify( _checkedIn >= 0 );
             }
 
-            mongo::mutex _frontDesk;
+            stdx::mutex _frontDesk;
             int _nRooms;
             int _checkedIn;
             int _maxRooms;
@@ -821,7 +821,7 @@ namespace ThreadedTests {
             // Slack is a test to see how long it takes for another thread to pick up
             // and begin work after another relinquishes the lock.  e.g. a spin lock
             // would have very little slack.
-            add< Slack<SimpleMutex,SimpleMutex::scoped_lock> >();
+            add< Slack<SimpleMutex,stdx::lock_guard<SimpleMutex>> >();
             add< Slack<SimpleRWLock,SimpleRWLock::Exclusive> >();
             add< CondSlack >();
 

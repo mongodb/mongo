@@ -80,7 +80,7 @@ namespace {
             return;
 
         //cout << "record: " << ns << "\t" << op << "\t" << command << endl;
-        SimpleMutex::scoped_lock lk(_lock);
+        stdx::lock_guard<SimpleMutex> lk(_lock);
 
         if ( ( command || op == dbQuery ) && ns == _lastDropped ) {
             _lastDropped = "";
@@ -138,18 +138,18 @@ namespace {
     }
 
     void Top::collectionDropped( StringData ns ) {
-        SimpleMutex::scoped_lock lk(_lock);
+        stdx::lock_guard<SimpleMutex> lk(_lock);
         _usage.erase(ns);
         _lastDropped = ns.toString();
     }
 
     void Top::cloneMap(Top::UsageMap& out) const {
-        SimpleMutex::scoped_lock lk(_lock);
+        stdx::lock_guard<SimpleMutex> lk(_lock);
         out = _usage;
     }
 
     void Top::append( BSONObjBuilder& b ) {
-        SimpleMutex::scoped_lock lk( _lock );
+        stdx::lock_guard<SimpleMutex> lk( _lock );
         _appendToUsageMap( b, _usage );
     }
 

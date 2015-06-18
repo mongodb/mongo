@@ -46,7 +46,7 @@ namespace mongo {
     public:
         static Top& get(ServiceContext* service);
 
-        Top() : _lock("Top") { }
+        Top() = default;
 
         struct UsageData {
             UsageData() : time(0), count(0) {}

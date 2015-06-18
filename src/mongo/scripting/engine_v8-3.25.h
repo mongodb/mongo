@@ -514,7 +514,7 @@ namespace mongo {
         typedef unordered_map<const char*, v8::Eternal<v8::String> > StrLitMap;
         StrLitMap _strLitMap;
 
-        mongo::mutex _interruptLock; // protects interruption-related flags
+        stdx::mutex _interruptLock; // protects interruption-related flags
         bool _inNativeExecution;     // protected by _interruptLock
         bool _pendingKill;           // protected by _interruptLock
         unsigned int _opId;          // op id for this scope
@@ -563,7 +563,7 @@ namespace mongo {
         DeadlineMonitor<V8Scope>* getDeadlineMonitor() { return &_deadlineMonitor; }
 
         typedef std::map<unsigned, V8Scope*> OpIdToScopeMap;
-        mongo::mutex _globalInterruptLock;  // protects map of all operation ids -> scope
+        stdx::mutex _globalInterruptLock;  // protects map of all operation ids -> scope
         OpIdToScopeMap _opToScopeMap;       // map of mongo op ids to scopes (protected by
                                             // _globalInterruptLock).
         DeadlineMonitor<V8Scope> _deadlineMonitor;

@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/mutex.h"
 
 namespace mongo {
@@ -163,7 +164,7 @@ namespace mongo {
         // Optionally attached by user
         std::unique_ptr<QueryHandler> _customQueryHandler;
 
-        mongo::mutex _mutex;
+        stdx::mutex _mutex;
         std::map<std::string,int> _lockTypes;
         // End mutex
 

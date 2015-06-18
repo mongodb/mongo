@@ -103,7 +103,7 @@ namespace mongo {
         }
 
         // protects _map
-        mongo::mutex _mutex;
+        stdx::mutex _mutex;
 
         // a map from a connection into ChunkManager's sequence number for each namespace
         typedef map<unsigned long long, map<string,unsigned long long> > SequenceMap;

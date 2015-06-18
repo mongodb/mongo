@@ -298,7 +298,7 @@ namespace DocumentSourceTests {
             }
         private:
             int _value;
-            mutable mongo::mutex _mutex;
+            mutable stdx::mutex _mutex;
             mutable stdx::condition_variable _condition;
         };
 

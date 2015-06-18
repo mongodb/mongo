@@ -35,6 +35,7 @@
 
 #include "mongo/db/storage/mmap_v1/durable_mapped_file.h"
 #include "mongo/db/storage/mmap_v1/file_allocator.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/log.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/text.h"
@@ -69,7 +70,7 @@ namespace mongo {
     //   2. Prevents calls to VirtualProtect while we remapping files.
     // Lock Ordering:
     //  - If taken, must be after previewViews._m to prevent deadlocks
-    mutex mapViewMutex;
+    stdx::mutex mapViewMutex;
 
     MAdvise::MAdvise(void *,unsigned, Advice) { }
     MAdvise::~MAdvise() { }
@@ -84,7 +85,7 @@ namespace mongo {
     //  placing memory mapped files in memory
     // Lock Ordering:
     //  No restrictions
-    static SimpleMutex _nextMemoryMappedFileLocationMutex("nextMemoryMappedFileLocationMutex");
+    static SimpleMutex _nextMemoryMappedFileLocationMutex;
 
     unsigned long long AlignNumber(unsigned long long number, unsigned long long granularity)
     {
@@ -95,7 +96,7 @@ namespace mongo {
         if (4 == sizeof(void*)) {
             return 0;
         }
-        SimpleMutex::scoped_lock lk(_nextMemoryMappedFileLocationMutex);
+        stdx::lock_guard<SimpleMutex> lk(_nextMemoryMappedFileLocationMutex);
 
         static unsigned long long granularity = 0;
 
@@ -359,7 +360,7 @@ namespace mongo {
         return view;
     }
 
-    extern mutex mapViewMutex;
+    extern stdx::mutex mapViewMutex;
 
     void* MemoryMappedFile::createPrivateMap() {
         verify( maphandle );

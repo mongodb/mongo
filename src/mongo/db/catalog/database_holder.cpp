@@ -84,7 +84,7 @@ namespace {
         const StringData db = _todb(ns);
         invariant(txn->lockState()->isDbLockedForMode(db, MODE_IS));
 
-        SimpleMutex::scoped_lock lk(_m);
+        stdx::lock_guard<SimpleMutex> lk(_m);
         DBs::const_iterator it = _dbs.find(db);
         if (it != _dbs.end()) {
             return it->second;
@@ -141,7 +141,7 @@ namespace {
         // no way we can insert two different databases for the same name.
         db = new Database(txn, dbname, entry);
 
-        SimpleMutex::scoped_lock lk(_m);
+        stdx::lock_guard<SimpleMutex> lk(_m);
         _dbs[dbname] = db;
 
         return db;
@@ -154,7 +154,7 @@ namespace {
 
         const StringData dbName = _todb(ns);
 
-        SimpleMutex::scoped_lock lk(_m);
+        stdx::lock_guard<SimpleMutex> lk(_m);
 
         DBs::const_iterator it = _dbs.find(dbName);
         if (it == _dbs.end()) {
@@ -171,7 +171,7 @@ namespace {
     bool DatabaseHolder::closeAll(OperationContext* txn, BSONObjBuilder& result, bool force) {
         invariant(txn->lockState()->isW());
 
-        SimpleMutex::scoped_lock lk(_m);
+        stdx::lock_guard<SimpleMutex> lk(_m);
 
         set< string > dbs;
         for ( DBs::const_iterator i = _dbs.begin(); i != _dbs.end(); ++i ) {

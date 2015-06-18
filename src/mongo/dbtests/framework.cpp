@@ -50,9 +50,9 @@
 #include "mongo/s/d_state.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/catalog/legacy/legacy_dist_lock_manager.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/background.h"
-#include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 #include "mongo/util/version.h"
@@ -66,7 +66,7 @@ namespace mongo {
 
     namespace dbtests {
 
-        mutex globalCurrentTestNameMutex;
+        stdx::mutex globalCurrentTestNameMutex;
         std::string globalCurrentTestName;
 
         class TestWatchDog : public BackgroundJob {

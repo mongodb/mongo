@@ -280,7 +280,7 @@ namespace mongo {
                                   ChunkVersion* latestShardVersion );
 
         // protects state below
-        mongo::mutex _mutex;
+        stdx::mutex _mutex;
 
         // Whether ::initialize has been called
         bool _enabled;

@@ -79,7 +79,7 @@ namespace {
         void appendInfo(BSONObjBuilder& b);
 
     private:
-        mongo::mutex _mutex;
+        stdx::mutex _mutex;
         set<const ClientConnections*> _clientConnections;
 
     } activeClientConnections;

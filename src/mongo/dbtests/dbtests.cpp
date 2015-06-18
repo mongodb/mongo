@@ -48,6 +48,7 @@
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/signal_handlers_synchronous.h"
 #include "mongo/util/startup_test.h"
+#include "mongo/util/static_observer.h"
 #include "mongo/util/text.h"
 
 namespace mongo {

@@ -131,7 +131,7 @@ namespace mongo {
                              const std::string& lockName,
                              const DistLockPingInfo& pd);
 
-            mongo::mutex _mutex;
+            stdx::mutex _mutex;
             std::map< std::pair<std::string, std::string>, DistLockPingInfo > _lastPings;
         };
 

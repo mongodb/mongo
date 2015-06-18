@@ -128,7 +128,7 @@ namespace mongo {
         void doTimeouts();
         void startTimeoutThread();
     private:
-        mutable mongo::mutex _mutex;
+        mutable stdx::mutex _mutex;
 
         PseudoRandom _random;
 

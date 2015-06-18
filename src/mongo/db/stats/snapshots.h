@@ -96,7 +96,7 @@ namespace mongo {
         StatusWith<SnapshotDiff> computeDelta();
 
     private:
-        mongo::mutex _lock;
+        stdx::mutex _lock;
         static const int kNumSnapshots = 2;
         SnapshotData _snapshots[kNumSnapshots];
         int _loc;

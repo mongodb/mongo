@@ -40,6 +40,7 @@
 #include "mongo/shell/shell_options.h"
 #include "mongo/shell/shell_utils_extended.h"
 #include "mongo/shell/shell_utils_launcher.h"
+#include "mongo/util/concurrency/threadlocal.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/text.h"
@@ -371,6 +372,6 @@ namespace mongo {
         }
 
 
-        mongo::mutex &mongoProgramOutputMutex(*(new stdx::mutex()));
+        stdx::mutex &mongoProgramOutputMutex(*(new stdx::mutex()));
     }
 }

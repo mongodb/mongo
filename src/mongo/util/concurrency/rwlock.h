@@ -33,6 +33,7 @@
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/concurrency/rwlockimpl.h"
 #include "mongo/util/concurrency/simplerwlock.h"
+#include "mongo/util/concurrency/threadlocal.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/time_support.h"
 

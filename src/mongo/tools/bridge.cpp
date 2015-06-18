@@ -43,6 +43,7 @@
 #include "mongo/util/net/message.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/stacktrace.h"
+#include "mongo/util/static_observer.h"
 #include "mongo/util/text.h"
 #include "mongo/util/timer.h"
 

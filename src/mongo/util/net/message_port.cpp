@@ -113,7 +113,7 @@ namespace mongo {
 
     class Ports {
         std::set<MessagingPort*> ports;
-        mongo::mutex m;
+        stdx::mutex m;
     public:
         Ports() : ports() {}
         void closeAll(unsigned skip_mask) {

@@ -105,7 +105,7 @@ namespace mongo {
         // completed. In the former case, we assume no threads are present, so we do not need
         // to use the mutex. When present, the mutex protects 'runner' and 'runnerDestroyed'
         // below.
-        SimpleMutex* const runnerMutex = new SimpleMutex("PeriodicTaskRunner");
+        SimpleMutex* const runnerMutex = new SimpleMutex;
 
         // A scoped lock like object that only locks/unlocks the mutex if it exists.
         class ConditionalScopedLock {

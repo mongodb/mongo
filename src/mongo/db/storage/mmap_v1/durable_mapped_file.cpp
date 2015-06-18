@@ -107,7 +107,7 @@ namespace mongo {
         }
     }
 
-    extern mutex mapViewMutex;
+    extern stdx::mutex mapViewMutex;
 
     __declspec(noinline) void PointerToDurableMappedFile::makeChunkWritable(size_t chunkno) {
         stdx::lock_guard<stdx::mutex> lkPrivateViews(_m);

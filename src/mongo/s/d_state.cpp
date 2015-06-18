@@ -887,7 +887,7 @@ namespace mongo {
     }
 
     void ShardedConnectionInfo::addHook() {
-        static mongo::mutex lock;
+        static stdx::mutex lock;
         static bool done = false;
 
         stdx::lock_guard<stdx::mutex> lk(lock);

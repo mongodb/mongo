@@ -249,7 +249,7 @@ namespace mongo {
 
         typedef std::map<PoolKey,PoolForHost,poolKeyCompare> PoolMap; // servername -> pool
 
-        mongo::mutex _mutex;
+        stdx::mutex _mutex;
         std::string _name;
 
         // The maximum number of connections we'll save in the pool per-host

@@ -41,7 +41,7 @@
 #include "mongo/db/storage/mmap_v1/extent_manager.h"
 #include "mongo/db/storage/mmap_v1/record_access_tracker.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/util/concurrency/mutex.h"
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 
@@ -238,7 +238,7 @@ namespace mongo {
             void push_back(DataFile* val);
 
         private:
-            mutex _writersMutex;
+            stdx::mutex _writersMutex;
             AtomicInt32 _size; // number of files in the array
             DataFile* _files[DiskLoc::MaxFiles];
         };

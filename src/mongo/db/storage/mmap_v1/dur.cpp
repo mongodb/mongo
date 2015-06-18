@@ -534,7 +534,7 @@ namespace {
     void DurableImpl::declareWriteIntents(
         const std::vector<std::pair<void*, unsigned> >& intents) {
         typedef std::vector<std::pair<void*, unsigned> > Intents;
-        SimpleMutex::scoped_lock lk(commitJob.groupCommitMutex);
+        stdx::lock_guard<SimpleMutex> lk(commitJob.groupCommitMutex);
         for (Intents::const_iterator it(intents.begin()), end(intents.end()); it != end; ++it) {
             commitJob.note(it->first, it->second);
         }

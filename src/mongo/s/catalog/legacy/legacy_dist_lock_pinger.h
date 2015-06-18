@@ -114,7 +114,7 @@ namespace mongo {
         //
         // (M)  Must hold _mutex for access.
 
-        mongo::mutex _mutex;
+        stdx::mutex _mutex;
 
         // Triggered everytime a pinger thread is stopped.
         stdx::condition_variable _pingStoppedCV;                                        // (M)

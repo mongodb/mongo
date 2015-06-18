@@ -56,7 +56,7 @@ namespace mongo {
                 _c.wait(lk);
         }
     private:
-        mongo::mutex _m;
+        stdx::mutex _m;
         stdx::condition_variable _c;
         uint64_t _killCount;
         uint64_t _targetKillCount;

@@ -103,7 +103,7 @@ namespace {
 
     // Synchronizes the section where a new Timestamp is generated and when it actually
     // appears in the oplog.
-    mongo::mutex newOpMutex;
+    stdx::mutex newOpMutex;
     stdx::condition_variable newTimestampNotifier;
 
     static std::string _oplogCollectionName;

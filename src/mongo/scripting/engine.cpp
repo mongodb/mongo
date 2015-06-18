@@ -367,7 +367,7 @@ namespace {
 
         typedef std::deque<ScopeAndPool> Pools; // More-recently used Scopes are kept at the front.
         Pools _pools;    // protected by _mutex
-        mongo::mutex _mutex;
+        stdx::mutex _mutex;
     };
 
     ScopeCache scopeCache;

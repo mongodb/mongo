@@ -92,7 +92,7 @@ namespace mongo {
         stdx::condition_variable_any _threadSync;
         stdx::condition_variable_any _unlockSync;
 
-        FSyncCommand() : Command( "fsync" ), m("lockfsync") { locked=false; pendingUnlock=false; }
+        FSyncCommand() : Command( "fsync" ) { locked=false; pendingUnlock=false; }
         virtual bool isWriteCommandForConfigServer() const { return false; }
         virtual bool slaveOk() const { return true; }
         virtual bool adminOnly() const { return true; }
@@ -125,7 +125,7 @@ namespace mongo {
                     return false;
                 }
 
-                SimpleMutex::scoped_lock lk(m);
+                stdx::lock_guard<SimpleMutex> lk(m);
                 err = "";
                 
                 (new FSyncLockThread())->go();
@@ -211,16 +211,16 @@ namespace mongo {
 
     } unlockFsyncCmd;
 
-    SimpleMutex filesLockedFsync("filesLockedFsync");
+    SimpleMutex filesLockedFsync;
 
     void FSyncLockThread::doRealWork() {
-        SimpleMutex::scoped_lock lkf(filesLockedFsync);
+        stdx::lock_guard<SimpleMutex> lkf(filesLockedFsync);
 
         OperationContextImpl txn;
         ScopedTransaction transaction(&txn, MODE_X);
         Lock::GlobalWrite global(txn.lockState()); // No WriteUnitOfWork needed
 
-        SimpleMutex::scoped_lock lk(fsyncCmd.m);
+        stdx::lock_guard<SimpleMutex> lk(fsyncCmd.m);
 
         invariant(!fsyncCmd.locked);    // impossible to get here if locked is true
         try {
@@ -271,7 +271,7 @@ namespace mongo {
     namespace {
         // @return true if unlocked
         bool unlockFsync() {
-            SimpleMutex::scoped_lock lk( fsyncCmd.m );
+            stdx::lock_guard<SimpleMutex> lk( fsyncCmd.m );
             if( !fsyncCmd.locked ) {
                 return false;
             }

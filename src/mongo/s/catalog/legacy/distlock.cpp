@@ -31,13 +31,13 @@
 
 #include "mongo/s/catalog/legacy/distlock.h"
 
-
 #include "mongo/db/server_options.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/client/connpool.h"
 #include "mongo/s/type_locks.h"
 #include "mongo/s/type_lockpings.h"
 #include "mongo/util/concurrency/thread_name.h"
+#include "mongo/util/concurrency/threadlocal.h"
 #include "mongo/util/log.h"
 #include "mongo/util/timer.h"
 
@@ -60,11 +60,11 @@ namespace mongo {
      * Module initialization
      */
 
-    static SimpleMutex _cachedProcessMutex("distlock_initmodule");
+    static SimpleMutex _cachedProcessMutex;
     static string* _cachedProcessString = NULL;
 
     static void initModule() {
-        SimpleMutex::scoped_lock lk(_cachedProcessMutex);
+        stdx::lock_guard<SimpleMutex> lk(_cachedProcessMutex);
         if (_cachedProcessString) {
             // someone got the lock before us
             return;

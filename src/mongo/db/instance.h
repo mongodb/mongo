@@ -50,7 +50,7 @@ namespace mongo {
            7 = log a few reads, and all writes.
         */
         int level;
-        mongo::mutex mutex;
+        stdx::mutex mutex;
         void openFile();
 
     public:

@@ -63,7 +63,6 @@ namespace dur {
 
 
     CommitJob::CommitJob() :
-        groupCommitMutex("groupCommit"),
         _hasWritten(false),
         _lastNotedPos(0),
         _bytes(0) {
@@ -75,7 +74,7 @@ namespace dur {
     }
 
     void CommitJob::noteOp(shared_ptr<DurOp> p) {
-        SimpleMutex::scoped_lock lk(groupCommitMutex);
+        stdx::lock_guard<SimpleMutex> lk(groupCommitMutex);
         _hasWritten = true;
         _durOps.push_back(p);
     }

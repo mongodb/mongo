@@ -91,7 +91,7 @@ namespace mongo {
         // generate a unique name for temporary files
         std::string makeTempFileName( boost::filesystem::path root );
 
-        mutable mongo::mutex _pendingMutex;
+        mutable stdx::mutex _pendingMutex;
         mutable stdx::condition_variable _pendingUpdated;
 
         std::list< std::string > _pending;

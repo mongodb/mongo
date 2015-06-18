@@ -924,8 +924,8 @@ namespace {
     static unsigned long long baseFiletime = 0;
     static unsigned long long basePerfCounter = 0;
     static unsigned long long resyncInterval = 0;
-    static SimpleMutex _curTimeMicros64ReadMutex("curTimeMicros64Read");
-    static SimpleMutex _curTimeMicros64ResyncMutex("curTimeMicros64Resync");
+    static SimpleMutex _curTimeMicros64ReadMutex;
+    static SimpleMutex _curTimeMicros64ResyncMutex;
 
     typedef WINBASEAPI VOID (WINAPI *pGetSystemTimePreciseAsFileTime)
         (_Out_ LPFILETIME lpSystemTimeAsFileTime);
@@ -943,7 +943,7 @@ namespace {
     }
 
     static unsigned long long resyncTime() {
-        SimpleMutex::scoped_lock lkResync(_curTimeMicros64ResyncMutex);
+        stdx::lock_guard<SimpleMutex> lkResync(_curTimeMicros64ResyncMutex);
         unsigned long long ftOld;
         unsigned long long ftNew;
         ftOld = ftNew = getFiletime();
@@ -955,7 +955,7 @@ namespace {
 
         // Make sure that we use consistent values for baseFiletime and basePerfCounter.
         //
-        SimpleMutex::scoped_lock lkRead(_curTimeMicros64ReadMutex);
+        stdx::lock_guard<SimpleMutex> lkRead(_curTimeMicros64ReadMutex);
         baseFiletime = ftNew;
         basePerfCounter = newPerfCounter;
         resyncInterval = 60 * SystemTickSource::get()->getTicksPerSecond();
@@ -986,7 +986,7 @@ namespace {
 
         // Make sure that we use consistent values for baseFiletime and basePerfCounter.
         //
-        SimpleMutex::scoped_lock lkRead(_curTimeMicros64ReadMutex);
+        stdx::lock_guard<SimpleMutex> lkRead(_curTimeMicros64ReadMutex);
 
         // Compute the current time in FILETIME format by adding our base FILETIME and an offset
         // from that time based on QueryPerformanceCounter.  The math is (logically) to compute the

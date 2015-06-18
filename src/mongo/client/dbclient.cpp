@@ -53,6 +53,7 @@
 #include "mongo/s/stale_exception.h"  // for RecvStaleConfigException
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/debug_util.h"
@@ -76,11 +77,11 @@ namespace {
     const char* const saslCommandUserSourceFieldName = "userSource";
 
 #ifdef MONGO_CONFIG_SSL
-    static SimpleMutex s_mtx("SSLManager");
+    static SimpleMutex s_mtx;
     static SSLManagerInterface* s_sslMgr(NULL);
 
     SSLManagerInterface* sslManager() {
-        SimpleMutex::scoped_lock lk(s_mtx);
+        stdx::lock_guard<SimpleMutex> lk(s_mtx);
         if (s_sslMgr) {
             return s_sslMgr;
         }

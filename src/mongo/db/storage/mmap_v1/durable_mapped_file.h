@@ -33,6 +33,7 @@
 
 #include "mongo/db/storage/mmap_v1/mmap.h"
 #include "mongo/db/storage/paths.h"
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 
@@ -197,7 +198,7 @@ namespace mongo {
         DurableMappedFile* find(void *p, /*out*/ size_t& ofs);
 
         /** for doing many finds in a row with one lock operation */
-        mutex& _mutex() { return _m; }
+        stdx::mutex& _mutex() { return _m; }
 
         /** not-threadsafe, caller must hold _mutex() */
         DurableMappedFile* find_inlock(void *p, /*out*/ size_t& ofs);
@@ -224,7 +225,7 @@ namespace mongo {
         //  Protects internal consistency of data structure
         // Lock Ordering:
         //  Must be taken before MapViewMutex if both are taken to prevent deadlocks
-        mutex _m;
+        stdx::mutex _m;
         std::map<void*, DurableMappedFile*> _views;
 
 #ifdef _WIN32

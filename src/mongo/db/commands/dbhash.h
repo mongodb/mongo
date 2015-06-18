@@ -31,6 +31,7 @@
 #pragma once
 
 #include "mongo/db/commands.h"
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 
@@ -67,7 +68,7 @@ namespace mongo {
         std::string hashCollection( OperationContext* opCtx, Database* db, const std::string& fullCollectionName, bool* fromCache );
 
         std::map<std::string,std::string> _cachedHashed;
-        mutex _cachedHashedMutex;
+        stdx::mutex _cachedHashedMutex;
 
     };
 

@@ -31,6 +31,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/config.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/util/concurrency/threadlocal.h"
 
 namespace mongo {
 

@@ -100,7 +100,6 @@ namespace mongo {
     public:
         CmdGetNonce() :
             Command("getnonce"),
-            _randMutex("getnonce"),
             _random(SecureRandom::create()) {
         }
 
@@ -130,7 +129,7 @@ namespace mongo {
 
     private:
         nonce64 getNextNonce() {
-            SimpleMutex::scoped_lock lk(_randMutex);
+            stdx::lock_guard<SimpleMutex> lk(_randMutex);
             return _random->nextInt64();
         }
 

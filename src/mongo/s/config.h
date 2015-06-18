@@ -164,12 +164,12 @@ namespace mongo {
         bool _shardingEnabled;
 
         // Set of collections and lock to protect access
-        mongo::mutex _lock;
+        stdx::mutex _lock;
         CollectionInfoMap _collections;
 
         // Ensures that only one thread at a time loads collection configuration data from
         // the config server
-        mongo::mutex _hitConfigServerLock;
+        stdx::mutex _hitConfigServerLock;
     };
 
 

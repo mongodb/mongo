@@ -78,7 +78,7 @@ namespace mongo {
 
     // unique number for temporary file names
     unsigned long long FileAllocator::_uniqueNumber = 0;
-    static SimpleMutex _uniqueNumberMutex( "uniqueNumberMutex" );
+    static SimpleMutex _uniqueNumberMutex;
 
     MONGO_FP_DECLARE(allocateDiskFull);
 
@@ -336,7 +336,7 @@ namespace mongo {
             {
                 // increment temporary file name counter
                 // TODO: SERVER-6055 -- Unify temporary file name selection
-                SimpleMutex::scoped_lock lk(_uniqueNumberMutex);
+                stdx::lock_guard<SimpleMutex> lk(_uniqueNumberMutex);
                 thisUniqueNumber = _uniqueNumber;
                 ++_uniqueNumber;
             }
@@ -354,7 +354,7 @@ namespace mongo {
         {
             // initialize unique temporary file name counter
             // TODO: SERVER-6055 -- Unify temporary file name selection
-            SimpleMutex::scoped_lock lk(_uniqueNumberMutex);
+            stdx::lock_guard<SimpleMutex> lk(_uniqueNumberMutex);
             _uniqueNumber = curTimeMicros64();
         }
         while( 1 ) {

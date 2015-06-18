@@ -153,7 +153,7 @@ namespace mongo {
 
         ////////////////////////////////////////////////////////////////
 
-        SimpleMutex sslManagerMtx("SSL Manager");
+        SimpleMutex sslManagerMtx;
         SSLManagerInterface* theSSLManager = NULL;
         static const int BUFFER_SIZE = 8*1024;
         static const int DATE_LEN = 128;
@@ -323,7 +323,7 @@ namespace mongo {
     MONGO_INITIALIZER_WITH_PREREQUISITES(SSLManager,
                                         ("SetupOpenSSL"))
         (InitializerContext*) {
-        SimpleMutex::scoped_lock lck(sslManagerMtx);
+        stdx::lock_guard<SimpleMutex> lck(sslManagerMtx);
         if (sslGlobalParams.sslMode.load() != SSLParams::SSLMode_disabled) {
             theSSLManager = new SSLManager(sslGlobalParams, isSSLServer);
         }
@@ -336,7 +336,7 @@ namespace mongo {
     }
 
     SSLManagerInterface* getSSLManager() {
-        SimpleMutex::scoped_lock lck(sslManagerMtx);
+        stdx::lock_guard<SimpleMutex> lck(sslManagerMtx);
         if (theSSLManager)
             return theSSLManager;
         return NULL;

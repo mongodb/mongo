@@ -39,6 +39,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/concurrency/synchronization.h"
@@ -203,7 +204,7 @@ namespace mongo {
         std::unique_ptr<stdx::thread> _worker;
 
         // Protects _stopRequested.
-        mutable mutex _stopMutex;
+        mutable stdx::mutex _stopMutex;
 
         // If set, no other delete taks should be accepted.
         bool _stopRequested;
@@ -214,7 +215,7 @@ namespace mongo {
         stdx::condition_variable _nothingInProgressCV;
 
         // Protects all the data structure below this.
-        mutable mutex _queueMutex;
+        mutable stdx::mutex _queueMutex;
 
         // _taskQueue has a task ready to work on.
         stdx::condition_variable _taskQueueNotEmptyCV;
@@ -240,7 +241,7 @@ namespace mongo {
         size_t _deletesInProgress;
 
         // Protects _statsHistory
-        mutable mutex _statsHistoryMutex;
+        mutable stdx::mutex _statsHistoryMutex;
         std::deque<DeleteJobStats*> _statsHistory;
     };
 

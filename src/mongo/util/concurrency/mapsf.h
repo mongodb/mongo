@@ -65,16 +65,16 @@ namespace mongo {
 
         mapsf() : m("mapsf") { }
         void swap(M& rhs) {
-            SimpleMutex::scoped_lock lk(m);
+            stdx::lock_guard<SimpleMutex> lk(m);
             val.swap(rhs);
         }
         bool empty() {
-            SimpleMutex::scoped_lock lk(m);
+            stdx::lock_guard<SimpleMutex> lk(m);
             return val.empty();
         }
         // safe as we pass by value:
         mapped_type get(key_type k) {
-            SimpleMutex::scoped_lock lk(m);
+            stdx::lock_guard<SimpleMutex> lk(m);
             const_iterator i = val.find(k);
             if( i == val.end() )
                 return mapped_type();
@@ -83,7 +83,7 @@ namespace mongo {
         // think about deadlocks when using ref.  the other methods
         // above will always be safe as they are "leaf" operations.
         struct ref {
-            SimpleMutex::scoped_lock lk;
+            stdx::lock_guard<SimpleMutex> lk;
         public:
             M &r;
             ref(mapsf &m) : lk(m.m), r(m.val) { }

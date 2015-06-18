@@ -74,7 +74,7 @@ namespace mongo {
             void killOperationsOnAllConnections( bool withPrompt ) const;
         private:
             std::map<std::string,std::set<std::string> > _connectionUris;
-            mutable mongo::mutex _mutex;
+            mutable stdx::mutex _mutex;
         };
         
         extern ConnectionRegistry connectionRegistry;

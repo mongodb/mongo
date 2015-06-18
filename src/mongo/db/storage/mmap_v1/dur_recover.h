@@ -85,7 +85,7 @@ namespace mongo {
 
 
             // Set of memory mapped files and a mutex to protect them
-            mongo::mutex _mx;
+            stdx::mutex _mx;
             std::list<std::shared_ptr<DurableMappedFile> > _mmfs;
 
             // Are we in recovery or WRITETODATAFILES

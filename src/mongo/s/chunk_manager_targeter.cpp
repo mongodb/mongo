@@ -32,6 +32,8 @@
 
 #include "mongo/s/chunk_manager_targeter.h"
 
+#include <boost/thread/tss.hpp>
+
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/config.h"

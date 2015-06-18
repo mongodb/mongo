@@ -199,7 +199,7 @@ namespace mongo {
         };
 
         ProcessId _pid;
-        static mongo::mutex _sysInfoLock;
+        static stdx::mutex _sysInfoLock;
 
         static bool checkNumaEnabled();
 

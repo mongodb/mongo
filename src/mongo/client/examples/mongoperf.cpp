@@ -72,7 +72,7 @@ unsigned nThreadsRunning = 0;
 // as this is incremented A LOT, at some point this becomes a bottleneck if very high ops/second (in cache) things are happening.
 AtomicUInt32 iops;
 
-SimpleMutex m("mperf");
+SimpleMutex m;
 
 int syncDelaySecs = 0;
 

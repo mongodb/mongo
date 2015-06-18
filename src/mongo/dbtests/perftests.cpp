@@ -536,7 +536,7 @@ namespace PerfTests {
 #endif
 
     RWLock lk("testrw");
-    SimpleMutex m("simptst");
+    SimpleMutex m;
     boost::mutex mboost;
     boost::timed_mutex mboost_timed;
     std::mutex mstd;
@@ -577,7 +577,7 @@ namespace PerfTests {
         virtual int howLongMillis() { return 500; }
         virtual bool showDurStats() { return false; }
         void timed() {
-            SimpleMutex::scoped_lock lk(m);
+            stdx::lock_guard<SimpleMutex> lk(m);
         }
     };
 

@@ -365,7 +365,7 @@ namespace {
         // We must grab this because we're going to grab write locks later.
         // We hold this mutex the entire time we're writing; it doesn't matter
         // because all readers are blocked anyway.
-        SimpleMutex::scoped_lock fsynclk(filesLockedFsync);
+        stdx::lock_guard<SimpleMutex> fsynclk(filesLockedFsync);
 
         // stop all readers until we're done
         Lock::ParallelBatchWriterMode pbwm(txn->lockState());

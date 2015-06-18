@@ -45,7 +45,7 @@ namespace mongo {
      */
     class DatabaseHolder {
     public:
-        DatabaseHolder() : _m("dbholder") { }
+        DatabaseHolder() = default;
 
         /**
          * Retrieves an already opened database or returns NULL. Must be called with the database
@@ -81,7 +81,7 @@ namespace mongo {
          * lock is held, which would prevent database from disappearing or being created.
          */
         void getAllShortNames( std::set<std::string>& all ) const {
-            SimpleMutex::scoped_lock lk(_m);
+            stdx::lock_guard<SimpleMutex> lk(_m);
             for( DBs::const_iterator j=_dbs.begin(); j!=_dbs.end(); ++j ) {
                 all.insert( j->first );
             }

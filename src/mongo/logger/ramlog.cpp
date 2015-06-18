@@ -44,7 +44,7 @@ namespace mongo {
 
 namespace {
     typedef std::map<string,RamLog*> RM;
-    mongo::mutex* _namedLock = NULL;
+    stdx::mutex* _namedLock = NULL;
     RM*  _named = NULL;
 
 }  // namespace
@@ -206,7 +206,7 @@ namespace {
     RamLog* RamLog::get(const std::string& name) {
         if (!_namedLock) {
             // Guaranteed to happen before multi-threaded operation.
-            _namedLock = new mongo::mutex();
+            _namedLock = new stdx::mutex();
         }
 
         stdx::lock_guard<stdx::mutex> lk( *_namedLock );
@@ -251,7 +251,7 @@ namespace {
                 return Status(ErrorCodes::InternalError,
                               "Inconsistent intiailization of RamLogCatalog.");
             }
-            _namedLock = new mongo::mutex();
+            _namedLock = new stdx::mutex();
             _named = new RM();
         }
 

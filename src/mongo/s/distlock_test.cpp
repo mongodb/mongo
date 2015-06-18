@@ -33,6 +33,7 @@
 
 #include "mongo/s/catalog/legacy/distlock.h"
 
+#include <boost/thread/tss.hpp>
 #include <iostream>
 #include <vector>
 
@@ -375,7 +376,7 @@ namespace mongo {
         }
 
         // variables for test
-        thread_specific_ptr<DistributedLock> lock;
+        boost::thread_specific_ptr<DistributedLock> lock;
         AtomicUInt32 count;
         AtomicWord<bool> keepGoing;
 

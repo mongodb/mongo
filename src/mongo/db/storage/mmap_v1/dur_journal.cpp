@@ -160,7 +160,7 @@ namespace mongo {
 
         namespace {
             SecureRandom* mySecureRandom = NULL;
-            mongo::mutex mySecureRandomMutex;
+            stdx::mutex mySecureRandomMutex;
             int64_t getMySecureRandomNumber() {
                 stdx::lock_guard<stdx::mutex> lk( mySecureRandomMutex );
                 if ( ! mySecureRandom )
@@ -190,8 +190,7 @@ namespace mongo {
 
         const unsigned long long LsnShutdownSentinel = ~((unsigned long long)0);
 
-        Journal::Journal() :
-            _curLogFileMutex("JournalLfMutex") {
+        Journal::Journal() {
             _written = 0;
             _nextFileNumber = 0;
             _curLogFile = 0;
@@ -280,7 +279,7 @@ namespace mongo {
             if( _log )
                 log() << "journalCleanup..." << endl;
             try {
-                SimpleMutex::scoped_lock lk(_curLogFileMutex);
+                stdx::lock_guard<SimpleMutex> lk(_curLogFileMutex);
                 closeCurrentJournalFile();
                 removeJournalFiles();
             }
@@ -561,7 +560,7 @@ namespace mongo {
 
         void Journal::open() {
             verify( MongoFile::notifyPreFlush == preFlush );
-            SimpleMutex::scoped_lock lk(_curLogFileMutex);
+            stdx::lock_guard<SimpleMutex> lk(_curLogFileMutex);
             _open();
         }
 
@@ -694,8 +693,6 @@ namespace mongo {
 
         void Journal::_rotate() {
 
-            _curLogFileMutex.dassertLocked();
-
             if ( inShutdown() || !_curLogFile )
                 return;
 
@@ -777,7 +774,7 @@ namespace mongo {
             }
 
             try {
-                SimpleMutex::scoped_lock lk(_curLogFileMutex);
+                stdx::lock_guard<SimpleMutex> lk(_curLogFileMutex);
 
                 // must already be open -- so that _curFileId is correct for previous buffer building
                 verify( _curLogFile );

@@ -83,7 +83,7 @@ namespace {
      */
 
     void* saslMutexAlloc(void) {
-        return new SimpleMutex("sasl");
+        return new SimpleMutex;
     }
 
     int saslMutexLock(void* mutex) {

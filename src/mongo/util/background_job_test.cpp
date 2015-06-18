@@ -28,10 +28,10 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/server_options.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/background.h"
-#include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/concurrency/synchronization.h"
 #include "mongo/util/time_support.h"
 
@@ -39,7 +39,7 @@ namespace {
 
     using mongo::BackgroundJob;
     using mongo::MsgAssertionException;
-    using mongo::mutex;
+    using mongo::stdx::mutex;
     using mongo::Notification;
 
     namespace stdx = mongo::stdx;

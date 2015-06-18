@@ -130,7 +130,6 @@ namespace mongo {
         // These types describe the locks hash table
 
         struct LockBucket {
-            LockBucket() : mutex("LockManager") { }
             SimpleMutex mutex;
             typedef unordered_map<ResourceId, LockHead*> Map;
             Map data;
@@ -141,7 +140,6 @@ namespace mongo {
         // modes and potentially other modes that don't conflict with themselves. This avoids
         // contention on the regular LockHead in the lock manager.
         struct Partition {
-            Partition() : mutex("LockManager") { }
             PartitionedLockHead* find(ResourceId resId);
             PartitionedLockHead* findOrInsert(ResourceId resId);
             typedef unordered_map<ResourceId, PartitionedLockHead*> Map;

@@ -39,6 +39,7 @@
 #include "mongo/client/replica_set_monitor_internal.h"
 #include "mongo/db/server_options.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/background.h"
 #include "mongo/util/concurrency/mutex.h" // for StaticObserver
@@ -46,6 +47,7 @@
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 #include "mongo/util/string_map.h"
+#include "mongo/util/static_observer.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {
@@ -181,7 +183,7 @@ namespace {
         }
 
         // protects _started, _stopRequested
-        mongo::mutex _monitorMutex;
+        stdx::mutex _monitorMutex;
         bool _started;
 
         stdx::condition_variable _stopRequestedCV;
