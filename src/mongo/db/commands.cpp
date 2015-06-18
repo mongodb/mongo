@@ -450,15 +450,15 @@ namespace {
                                         const rpc::RequestInterface& request,
                                         Command* command) {
 
-        log() << "assertion while executing command '"
-              << request.getCommandName() << "' "
-              << "on database '"
-              << request.getDatabase() << "' "
-              << "with arguments '"
-              << command->getRedactedCopyForLogging(request.getCommandArgs()) << "' "
-              << "and metadata '"
-              << request.getMetadata() << "': "
-              << exception.toString();
+        LOG(1) << "assertion while executing command '"
+               << request.getCommandName() << "' "
+               << "on database '"
+               << request.getDatabase() << "' "
+               << "with arguments '"
+               << command->getRedactedCopyForLogging(request.getCommandArgs()) << "' "
+               << "and metadata '"
+               << request.getMetadata() << "': "
+               << exception.toString();
 
         _generateErrorResponse(txn, replyBuilder, exception);
     }
@@ -468,11 +468,11 @@ namespace {
                                         const DBException& exception,
                                         const rpc::RequestInterface& request) {
 
-        log() << "assertion while executing command '"
-              << request.getCommandName() << "' "
-              << "on database '"
-              << request.getDatabase() << "': "
-              << exception.toString();
+        LOG(1) << "assertion while executing command '"
+               << request.getCommandName() << "' "
+               << "on database '"
+               << request.getDatabase() << "': "
+               << exception.toString();
 
         _generateErrorResponse(txn, replyBuilder, exception);
     }
@@ -480,7 +480,7 @@ namespace {
     void Command::generateErrorResponse(OperationContext* txn,
                                         rpc::ReplyBuilderInterface* replyBuilder,
                                         const DBException& exception) {
-        log() << "assertion while executing command: " << exception.toString();
+        LOG(1) << "assertion while executing command: " << exception.toString();
         _generateErrorResponse(txn, replyBuilder, exception);
     }
 
