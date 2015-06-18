@@ -86,6 +86,10 @@ type Bar struct {
 	WaitTime time.Duration
 
 	stopChan chan struct{}
+
+	// hasRendered indicates that the bar has been rendered at least once
+	// and implies that when detaching should be rendered one more time
+	hasRendered bool
 }
 
 // Start starts the Bar goroutine. Once Start is called, a bar will
@@ -133,6 +137,7 @@ func (pb *Bar) formatCounts() (string, string) {
 
 // computes all necessary values renders to the bar's Writer
 func (pb *Bar) renderToWriter() {
+	pb.hasRendered = true
 	maxCount, currentCount := pb.Watching.Progress()
 	maxStr, currentStr := pb.formatCounts()
 	if maxCount == 0 {
@@ -152,6 +157,7 @@ func (pb *Bar) renderToWriter() {
 }
 
 func (pb *Bar) renderToGridRow(grid *text.GridWriter) {
+	pb.hasRendered = true
 	maxCount, currentCount := pb.Watching.Progress()
 	maxStr, currentStr := pb.formatCounts()
 	if maxCount == 0 {
@@ -180,6 +186,10 @@ func (pb *Bar) start() {
 	for {
 		select {
 		case <-pb.stopChan:
+			if pb.hasRendered {
+				// if we've rendered this bar at least once, render it one last time
+				pb.renderToWriter()
+			}
 			return
 		case <-ticker.C:
 			pb.renderToWriter()

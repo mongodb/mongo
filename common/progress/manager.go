@@ -66,6 +66,15 @@ func (manager *Manager) Detach(pb *Bar) {
 	manager.barsLock.Lock()
 	defer manager.barsLock.Unlock()
 
+	grid := &text.GridWriter{
+		ColumnPadding: GridPadding,
+	}
+	if pb.hasRendered {
+		// if we've rendered this bar at least once, render it one last time
+		pb.renderToGridRow(grid)
+	}
+	grid.FlushRows(manager.writer)
+
 	updatedBars := make([]*Bar, 0, len(manager.bars)-1)
 	for _, bar := range manager.bars {
 		// move all bars to the updated list except for the bar we want to detach
