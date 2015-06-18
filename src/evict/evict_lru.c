@@ -1590,10 +1590,13 @@ __wt_cache_dump(WT_SESSION_IMPL *session)
 		}
 		session->dhandle = NULL;
 
-		printf("cache dump: %s [%s]:"
+		printf("cache dump: %s%s%s%s:"
 		    " %" PRIu64 " intl pages, %" PRIu64 " leaf pages,"
 		    " %" PRIu64 "MB, %" PRIu64 "MB dirty\n",
-		    dhandle->name, dhandle->checkpoint,
+		    dhandle->name,
+		    dhandle->checkpoint == NULL ? "" : " [",
+		    dhandle->checkpoint == NULL ? "" : dhandle->checkpoint,
+		    dhandle->checkpoint == NULL ? "" : "]",
 		    file_intl_pages, file_leaf_pages,
 		    file_bytes >> 20, file_dirty >> 20);
 
