@@ -32,6 +32,7 @@
 
 #include "mongo/db/query/query_planner_test_fixture.h"
 
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/query/query_knobs.h"
 #include "mongo/db/query/query_planner.h"
@@ -42,7 +43,7 @@ namespace mongo {
 
     using unittest::assertGet;
 
-    const char* QueryPlannerTest::ns = "somebogusns";
+    const char* QueryPlannerTest::ns = "somebogus.ns";
 
     void QueryPlannerTest::setUp() {
         internalQueryPlannerEnableHashIntersection = true;
@@ -236,9 +237,12 @@ namespace mongo {
     void QueryPlannerTest::runQueryAsCommand(const BSONObj& cmdObj) {
         solns.clear();
 
+        const NamespaceString nss(ns);
+        invariant(nss.isValid());
+
         const bool isExplain = false;
         std::unique_ptr<LiteParsedQuery> lpq(
-            assertGet(LiteParsedQuery::fromFindCommand(ns, cmdObj, isExplain)));
+            assertGet(LiteParsedQuery::makeFromFindCommand(nss, cmdObj, isExplain)));
 
         CanonicalQuery* rawCq;
         WhereCallbackNoop whereCallback;

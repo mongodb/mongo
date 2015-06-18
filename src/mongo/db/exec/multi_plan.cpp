@@ -213,7 +213,7 @@ namespace mongo {
             numResults = std::min(static_cast<size_t>(*query.getParsed().getLimit()),
                                   numResults);
         }
-        else if (!query.getParsed().fromFindCommand() && query.getParsed().getBatchSize()) {
+        else if (!query.getParsed().isFromFindCommand() && query.getParsed().getBatchSize()) {
             numResults = std::min(static_cast<size_t>(*query.getParsed().getBatchSize()),
                                   numResults);
         }

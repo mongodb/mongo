@@ -84,7 +84,8 @@ namespace {
             const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
             ASSERT_EQ(nss.toString(), CollectionType::ConfigNS);
 
-            auto query = assertGet(LiteParsedQuery::fromFindCommand(nss, request.cmdObj, false));
+            auto query = assertGet(
+                LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
 
             // Ensure the query is correct
             ASSERT_EQ(query->ns(), CollectionType::ConfigNS);
@@ -134,7 +135,8 @@ namespace {
             const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
             ASSERT_EQ(nss.toString(), DatabaseType::ConfigNS);
 
-            auto query = assertGet(LiteParsedQuery::fromFindCommand(nss, request.cmdObj, false));
+            auto query = assertGet(
+                LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
 
             ASSERT_EQ(query->ns(), DatabaseType::ConfigNS);
             ASSERT_EQ(query->getFilter(), BSON(DatabaseType::name(expectedDb.getName())));
@@ -337,7 +339,8 @@ namespace {
             const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
             ASSERT_EQ(nss.toString(), ShardType::ConfigNS);
 
-            auto query = assertGet(LiteParsedQuery::fromFindCommand(nss, request.cmdObj, false));
+            auto query = assertGet(
+                LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
 
             ASSERT_EQ(query->ns(), ShardType::ConfigNS);
             ASSERT_EQ(query->getFilter(), BSONObj());
@@ -370,7 +373,8 @@ namespace {
             const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
             ASSERT_EQ(nss.toString(), ShardType::ConfigNS);
 
-            auto query = assertGet(LiteParsedQuery::fromFindCommand(nss, request.cmdObj, false));
+            auto query = assertGet(
+                LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
 
             ASSERT_EQ(query->ns(), ShardType::ConfigNS);
             ASSERT_EQ(query->getFilter(), BSONObj());
@@ -432,7 +436,8 @@ namespace {
             const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
             ASSERT_EQ(nss.toString(), ChunkType::ConfigNS);
 
-            auto query = assertGet(LiteParsedQuery::fromFindCommand(nss, request.cmdObj, false));
+            auto query = assertGet(
+                LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
 
             ASSERT_EQ(query->ns(), ChunkType::ConfigNS);
             ASSERT_EQ(query->getFilter(), chunksQuery.getFilter());
@@ -468,7 +473,8 @@ namespace {
             const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
             ASSERT_EQ(nss.toString(), ChunkType::ConfigNS);
 
-            auto query = assertGet(LiteParsedQuery::fromFindCommand(nss, request.cmdObj, false));
+            auto query = assertGet(
+                LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
 
             ASSERT_EQ(query->ns(), ChunkType::ConfigNS);
             ASSERT_EQ(query->getFilter(), chunksQuery.getFilter());
@@ -503,7 +509,8 @@ namespace {
             const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
             ASSERT_EQ(nss.toString(), ChunkType::ConfigNS);
 
-            auto query = assertGet(LiteParsedQuery::fromFindCommand(nss, request.cmdObj, false));
+            auto query = assertGet(
+                LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
 
             ASSERT_EQ(query->ns(), ChunkType::ConfigNS);
             ASSERT_EQ(query->getFilter(), chunksQuery.getFilter());

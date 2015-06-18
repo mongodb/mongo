@@ -90,10 +90,15 @@ namespace {
                                BSONObjBuilder* out) const {
 
             const string fullns = parseNs(dbname, cmdObj);
+            const NamespaceString nss(fullns);
+            if (!nss.isValid()) {
+                return {ErrorCodes::InvalidNamespace,
+                        str::stream() << "Invalid collection name: " << nss.ns()};
+            }
 
             // Parse the command BSON to a LiteParsedQuery.
             bool isExplain = true;
-            auto lpqStatus = LiteParsedQuery::fromFindCommand(fullns, cmdObj, isExplain);
+            auto lpqStatus = LiteParsedQuery::makeFromFindCommand(nss, cmdObj, isExplain);
             if (!lpqStatus.isOK()) {
                 return lpqStatus.getStatus();
             }

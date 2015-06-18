@@ -35,6 +35,7 @@
 
 namespace mongo {
 
+    class NamespaceString;
     class QueryMessage;
     class Status;
     template<typename T> class StatusWith;
@@ -52,9 +53,8 @@ namespace mongo {
          * Returns a heap allocated LiteParsedQuery on success or an error if 'cmdObj' is not well
          * formed.
          */
-        static StatusWith<std::unique_ptr<LiteParsedQuery>> fromFindCommand(const std::string& ns,
-                                                                            const BSONObj& cmdObj,
-                                                                            bool isExplain);
+        static StatusWith<std::unique_ptr<LiteParsedQuery>>
+            makeFromFindCommand(const NamespaceString& nss, const BSONObj& cmdObj, bool isExplain);
 
         /**
          * Short and long forms for constructing a new LiteParsedQuery.
@@ -146,7 +146,7 @@ namespace mongo {
         boost::optional<int> getBatchSize() const { return _batchSize; }
         bool wantMore() const { return _wantMore; }
 
-        bool fromFindCommand() const { return _fromCommand; }
+        bool isFromFindCommand() const { return _fromCommand; }
         bool isExplain() const { return _explain; }
 
         const std::string& getComment() const { return _comment; }

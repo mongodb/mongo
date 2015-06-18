@@ -103,10 +103,14 @@ namespace mongo {
                        BSONObjBuilder* out) const override {
             const std::string fullns = parseNs(dbname, cmdObj);
             const NamespaceString nss(fullns);
+            if (!nss.isValid()) {
+                return {ErrorCodes::InvalidNamespace,
+                        str::stream() << "Invalid collection name: " << nss.ns()};
+            }
 
             // Parse the command BSON to a LiteParsedQuery.
             const bool isExplain = true;
-            auto lpqStatus = LiteParsedQuery::fromFindCommand(fullns, cmdObj, isExplain);
+            auto lpqStatus = LiteParsedQuery::makeFromFindCommand(nss, cmdObj, isExplain);
             if (!lpqStatus.isOK()) {
                 return lpqStatus.getStatus();
             }
@@ -173,6 +177,11 @@ namespace mongo {
                  BSONObjBuilder& result) override {
             const std::string fullns = parseNs(dbname, cmdObj);
             const NamespaceString nss(fullns);
+            if (!nss.isValid()) {
+                return appendCommandStatus(result, {ErrorCodes::InvalidNamespace,
+                                                    str::stream() << "Invalid collection name: "
+                                                                  << nss.ns()});
+            }
 
             // Although it is a command, a find command gets counted as a query.
             globalOpCounters.gotQuery();
@@ -185,7 +194,7 @@ namespace mongo {
 
             // 1a) Parse the command BSON to a LiteParsedQuery.
             const bool isExplain = false;
-            auto lpqStatus = LiteParsedQuery::fromFindCommand(fullns, cmdObj, isExplain);
+            auto lpqStatus = LiteParsedQuery::makeFromFindCommand(nss, cmdObj, isExplain);
             if (!lpqStatus.isOK()) {
                 return appendCommandStatus(result, lpqStatus.getStatus());
             }

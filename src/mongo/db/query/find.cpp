@@ -149,7 +149,7 @@ namespace mongo {
             return false;
         }
 
-        if (!pq.fromFindCommand() && pq.getBatchSize() && *pq.getBatchSize() == 1) {
+        if (!pq.isFromFindCommand() && pq.getBatchSize() && *pq.getBatchSize() == 1) {
             return false;
         }
 

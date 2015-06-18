@@ -475,7 +475,7 @@ namespace mongo {
             // We have a true limit. The limit can be combined with the SORT stage.
             sort->limit = static_cast<size_t>(*lpq.getLimit()) + static_cast<size_t>(lpq.getSkip());
         }
-        else if (!lpq.fromFindCommand() && lpq.getBatchSize()) {
+        else if (!lpq.isFromFindCommand() && lpq.getBatchSize()) {
             // We have an ntoreturn specified by an OP_QUERY style find. This is used
             // by clients to mean both batchSize and limit.
             //
@@ -754,7 +754,7 @@ namespace mongo {
                 limit->children.push_back(solnRoot);
                 solnRoot = limit;
             }
-            else if (!lpq.fromFindCommand() && lpq.getBatchSize() && !lpq.wantMore()) {
+            else if (!lpq.isFromFindCommand() && lpq.getBatchSize() && !lpq.wantMore()) {
                 // We have a "legacy limit", i.e. a negative ntoreturn value from an OP_QUERY style
                 // find.
                 LimitNode* limit = new LimitNode();

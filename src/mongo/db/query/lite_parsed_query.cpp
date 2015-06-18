@@ -95,13 +95,13 @@ namespace {
 } // namespace
 
     // static
-    StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::fromFindCommand(
-            const std::string& fullns,
+    StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeFromFindCommand(
+            const NamespaceString& nss,
             const BSONObj& cmdObj,
             bool isExplain) {
 
         unique_ptr<LiteParsedQuery> pq(new LiteParsedQuery());
-        pq->_ns = fullns;
+        pq->_ns = nss.ns();
         pq->_fromCommand = true;
         pq->_explain = isExplain;
 
@@ -111,9 +111,10 @@ namespace {
             BSONElement el = it.next();
             const char* fieldName = el.fieldName();
             if (str::equals(fieldName, kCmdName)) {
-                // We've already parsed the namespace information contained in the 'find'
-                // field, so just move on.
-                continue;
+                Status status = checkFieldType(el, String);
+                if (!status.isOK()) {
+                    return status;
+                }
             }
             else if (str::equals(fieldName, kFilterField)) {
                 Status status = checkFieldType(el, Object);
