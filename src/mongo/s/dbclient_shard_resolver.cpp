@@ -86,7 +86,8 @@ namespace mongo {
         try {
             // This can throw when we don't find a master!
             HostAndPort masterHostAndPort = replMonitor->getMasterOrUassert();
-            *resolvedHost = fassertStatusOK(0, ConnectionString::parse(masterHostAndPort.toString()));
+            *resolvedHost = fassertStatusOK(28687,
+                                            ConnectionString::parse(masterHostAndPort.toString()));
             return Status::OK();
         }
         catch ( const DBException& ) {
