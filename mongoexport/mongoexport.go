@@ -8,6 +8,7 @@ import (
 	"github.com/mongodb/mongo-tools/common/json"
 	"github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/common/options"
+	"github.com/mongodb/mongo-tools/common/progress"
 	"github.com/mongodb/mongo-tools/common/util"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
@@ -15,12 +16,16 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 // Output types supported by mongoexport.
 const (
-	CSV  = "csv"
-	JSON = "json"
+	CSV                            = "csv"
+	JSON                           = "json"
+	progressBarLength              = 24
+	progressBarWaitTime            = time.Second
+	watchProgressorUpdateFrequency = 8000
 )
 
 // MongoExport is a container for the user-specified options and
@@ -149,6 +154,39 @@ func makeFieldSelector(fields string) bson.M {
 	return selector
 }
 
+// getCount returns an estimate of how many documents the cursor will fetch
+// It always returns Limit if there is a limit, assuming that in general
+// limits will less then the total possible.
+// If there is a query and no limit then it returns 0, because it's too expensive to count the query.
+// Otherwise it returns the count minus the skip
+func (exp *MongoExport) getCount() (c int, err error) {
+	session, err := exp.SessionProvider.GetSession()
+	if err != nil {
+		return 0, err
+	}
+	if exp.InputOpts != nil && exp.InputOpts.Limit != 0 {
+		return exp.InputOpts.Limit, nil
+	}
+	if exp.InputOpts != nil && exp.InputOpts.Query != "" {
+		return 0, nil
+	}
+	q := session.DB(exp.ToolOptions.Namespace.DB).C(exp.ToolOptions.Namespace.Collection).Find(nil)
+	c, err = q.Count()
+	if err != nil {
+		return 0, err
+	}
+	var skip int
+	if exp.InputOpts != nil {
+		skip = exp.InputOpts.Skip
+	}
+	if skip > c {
+		c = 0
+	} else {
+		c -= skip
+	}
+	return c, nil
+}
+
 // getCursor returns a cursor that can be iterated over to get all the documents
 // to export, based on the options given to mongoexport. Also returns the
 // associated session, so that it can be closed once the cursor is used up.
@@ -218,6 +256,25 @@ func (exp *MongoExport) getCursor() (*mgo.Iter, *mgo.Session, error) {
 // Internal function that handles exporting to the given writer. Used primarily
 // for testing, because it bypasses writing to the file system.
 func (exp *MongoExport) exportInternal(out io.Writer) (int64, error) {
+
+	max, err := exp.getCount()
+	if err != nil {
+		return 0, err
+	}
+
+	progressManager := progress.NewProgressBarManager(log.Writer(0), progressBarWaitTime)
+	progressManager.Start()
+	defer progressManager.Stop()
+
+	watchProgressor := progress.NewCounter(int64(max))
+	bar := &progress.Bar{
+		Name:      fmt.Sprintf("%v.%v", exp.ToolOptions.Namespace.DB, exp.ToolOptions.Namespace.Collection),
+		Watching:  watchProgressor,
+		BarLength: progressBarLength,
+	}
+	progressManager.Attach(bar)
+	defer progressManager.Detach(bar)
+
 	exportOutput, err := exp.getExportOutput(out)
 	if err != nil {
 		return 0, err
@@ -256,7 +313,11 @@ func (exp *MongoExport) exportInternal(out io.Writer) (int64, error) {
 			return docsCount, err
 		}
 		docsCount++
+		if docsCount%watchProgressorUpdateFrequency == 0 {
+			watchProgressor.Set(docsCount)
+		}
 	}
+	watchProgressor.Set(docsCount)
 	if err := cursor.Err(); err != nil {
 		return docsCount, err
 	}
