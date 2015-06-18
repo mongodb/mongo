@@ -310,7 +310,9 @@ namespace mongo {
         TickSource* getTickSource() const;
 
         /**
-         * Replaces the current tick source with a new one.
+         * Replaces the current tick source with a new one. In other words, the old tick source
+         * will be destroyed. So make sure that no one is using the old tick source when
+         * calling this.
          */
         void setTickSource(std::unique_ptr<TickSource> newSource);
 

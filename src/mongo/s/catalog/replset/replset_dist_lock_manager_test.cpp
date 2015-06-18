@@ -107,20 +107,6 @@ namespace {
             return _processID;
         }
 
-        /**
-         * Make the mock catalog use the mock tick source. Not thread-safe.
-         */
-        void useMockTickSource() {
-            _context.setTickSource(stdx::make_unique<TickSourceMock>());
-        }
-
-        /**
-         * Returns the mock tick source. Valid only if useMockTickSource was called.
-         */
-        TickSourceMock* getMockTickSource() {
-            return dynamic_cast<TickSourceMock*>(_context.getTickSource());
-        }
-
     protected:
         void setUp() override {
             _context.setTickSource(stdx::make_unique<SystemTickSource>());
@@ -133,13 +119,28 @@ namespace {
             _mgr.shutDown();
         }
 
-    private:
         TickSourceMock _tickSource;
         std::unique_ptr<DistLockCatalogMock> _dummyDoNotUse; // dummy placeholder
         DistLockCatalogMock* _mockCatalog;
         string _processID;
         ServiceContextNoop _context;
         ReplSetDistLockManager _mgr;
+    };
+
+    class RSDistLockMgrWithMockTickSource: public ReplSetDistLockManagerFixture {
+    public:
+        /**
+         * Returns the mock tick source.
+         */
+        TickSourceMock* getMockTickSource() {
+            return dynamic_cast<TickSourceMock*>(_context.getTickSource());
+        }
+
+    protected:
+        void setUp() override {
+            _context.setTickSource(stdx::make_unique<TickSourceMock>());
+            _mgr.startUp();
+        }
     };
 
     std::string mapToString(const std::map<OID, int>& map) {
@@ -231,7 +232,7 @@ namespace {
      * 3. Unlock (on destructor of ScopedDistLock).
      * 4. Check lock id used in lock and unlock are the same.
      */
-    TEST_F(ReplSetDistLockManagerFixture, LockSuccessAfterRetry) {
+    TEST_F(RSDistLockMgrWithMockTickSource, LockSuccessAfterRetry) {
         string lockName("test");
         string me("me");
         OID lastTS;
@@ -240,8 +241,6 @@ namespace {
 
         int retryAttempt = 0;
         const int kMaxRetryAttempt = 3;
-
-        useMockTickSource();
 
         LocksType goodLockDoc;
         goodLockDoc.setName(lockName);
@@ -368,7 +367,7 @@ namespace {
      * 3. Grab lock errors out on the fourth try.
      * 4. Make sure that unlock is called to cleanup the last lock attempted that error out.
      */
-    TEST_F(ReplSetDistLockManagerFixture, LockFailsAfterRetry) {
+    TEST_F(RSDistLockMgrWithMockTickSource, LockFailsAfterRetry) {
         string lockName("test");
         string me("me");
         OID lastTS;
@@ -377,8 +376,6 @@ namespace {
 
         int retryAttempt = 0;
         const int kMaxRetryAttempt = 3;
-
-        useMockTickSource();
 
         getMockCatalog()->expectGrabLock(
                 [this,
@@ -503,7 +500,7 @@ namespace {
      * 4. Checks result is error.
      * 5. Implicitly check that unlock is not called (default setting of mock catalog).
      */
-    TEST_F(ReplSetDistLockManagerFixture, LockRetryTimeout) {
+    TEST_F(RSDistLockMgrWithMockTickSource, LockRetryTimeout) {
         string lockName("test");
         string me("me");
         OID lastTS;
@@ -511,8 +508,6 @@ namespace {
         string whyMsg("because");
 
         int retryAttempt = 0;
-
-        useMockTickSource();
 
         getMockCatalog()->expectGrabLock(
                 [this,
