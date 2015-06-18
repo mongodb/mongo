@@ -132,7 +132,7 @@ namespace mongo {
                     queueUnlock(toUnlock);
                 }
                 else {
-                    LOG(0) << "distributed lock with" << LocksType::lockID()
+                    LOG(0) << "distributed lock with " << LocksType::lockID()
                            << ": " << toUnlock << "' unlocked.";
                 }
 
@@ -362,7 +362,7 @@ namespace mongo {
             queueUnlock(lockSessionID);
         }
         else {
-            LOG(0) << "distributed lock with" << LocksType::lockID()
+            LOG(0) << "distributed lock with " << LocksType::lockID()
                    << ": " << lockSessionID << "' unlocked.";
         }
     }
