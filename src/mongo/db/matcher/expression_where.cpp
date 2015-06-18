@@ -117,9 +117,12 @@ namespace mongo {
         const string userToken = AuthorizationSession::get(ClientBasic::getCurrent())
                                                           ->getAuthenticatedUserNamesToken();
 
-        _scope = globalScriptEngine->getPooledScope(_txn, _dbName, "where" + userToken);
-
-        _func = _scope->createFunction( _code.c_str() );
+        try {
+            _scope = globalScriptEngine->getPooledScope(_txn, _dbName, "where" + userToken);
+            _func = _scope->createFunction(_code.c_str());
+        } catch (...) {
+            return exceptionToStatus();
+        }
 
         if ( !_func )
             return Status( ErrorCodes::BadValue, "$where compile error" );
@@ -128,7 +131,7 @@ namespace mongo {
     }
 
     bool WhereMatchExpression::matches( const MatchableDocument* doc, MatchDetails* details ) const {
-        verify( _func );
+        uassert(28689, "$where compile error", _func);
         BSONObj obj = doc->toBSON();
 
         if ( ! _userScope.isEmpty() ) {
