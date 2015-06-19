@@ -47,6 +47,7 @@
 #include "mongo/logger/logger.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/thread_name.h"
+#include "mongo/util/concurrency/threadlocal.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/debugger.h"
 #include "mongo/util/exception_filter_win32.h"
@@ -112,26 +113,45 @@ private:
 
 MallocFreeOStream mallocFreeOStream;
 
-// This guards mallocFreeOStream. While locking a pthread_mutex isn't guaranteed to be
-// signal-safe, this file does it anyway. The assumption is that the main safety risk to locking
-// a mutex is that you could deadlock with yourself. That risk is protected against by only
-// locking the mutex in fatal functions that log then exit. There is a remaining risk that one
-// of these functions recurses (possible if logging segfaults while handing a segfault). This is
-// currently acceptable because if things are that broken, there is little we can do about it.
-//
-// If in the future, we decide to be more strict about posix signal safety, we could switch to
-// an atomic test-and-set loop, possibly with a mechanism for detecting signals raised while
-// handling other signals.
-stdx::mutex streamMutex;
+/**
+ * Instances of this type guard the mallocFreeOStream. While locking a mutex isn't guaranteed to
+ * be signal-safe, this file does it anyway. The assumption is that the main safety risk to
+ * locking a mutex is that you could deadlock with yourself. That risk is protected against by
+ * only locking the mutex in fatal functions that log then exit. There is a remaining risk that
+ * one of these functions recurses (possible if logging segfaults while handing a
+ * segfault). This is currently acceptable because if things are that broken, there is little we
+ * can do about it.
+ *
+ * If in the future, we decide to be more strict about posix signal safety, we could switch to
+ * an atomic test-and-set loop, possibly with a mechanism for detecting signals raised while
+ * handling other signals.
+ */
+class MallocFreeOStreamGuard {
+public:
+    explicit MallocFreeOStreamGuard() : _lk(_streamMutex, stdx::defer_lock) {
+        if (terminateDepth++) {
+            quickExit(EXIT_ABRUPT);
+        }
+        _lk.lock();
+    }
 
-// must hold streamMutex to call
+private:
+    static stdx::mutex _streamMutex;
+    static MONGO_TRIVIALLY_CONSTRUCTIBLE_THREAD_LOCAL int terminateDepth;
+    stdx::unique_lock<stdx::mutex> _lk;
+};
+stdx::mutex MallocFreeOStreamGuard::_streamMutex;
+MONGO_TRIVIALLY_CONSTRUCTIBLE_THREAD_LOCAL
+int MallocFreeOStreamGuard::terminateDepth = 0;
+
+// must hold MallocFreeOStreamGuard to call
 void writeMallocFreeStreamToLog() {
     logger::globalLogDomain()->append(logger::MessageEventEphemeral(
         Date_t::now(), logger::LogSeverity::Severe(), getThreadName(), mallocFreeOStream.str()));
     mallocFreeOStream.rewind();
 }
 
-// must hold streamMutex to call
+// must hold MallocFreeOStreamGuard to call
 void printSignalAndBacktrace(int signalNum) {
     mallocFreeOStream << "Got signal: " << signalNum << " (" << strsignal(signalNum) << ").\n";
     printStackTrace(mallocFreeOStream);
@@ -141,7 +161,7 @@ void printSignalAndBacktrace(int signalNum) {
 // this will be called in certain c++ error cases, for example if there are two active
 // exceptions
 void myTerminate() {
-    stdx::lock_guard<stdx::mutex> lk(streamMutex);
+    MallocFreeOStreamGuard lk{};
 
     // In c++11 we can recover the current exception to print it.
     if (std::exception_ptr eptr = std::current_exception()) {
@@ -195,7 +215,7 @@ void myTerminate() {
 }
 
 void abruptQuit(int signalNum) {
-    stdx::lock_guard<stdx::mutex> lk(streamMutex);
+    MallocFreeOStreamGuard lk{};
     printSignalAndBacktrace(signalNum);
 
     // Don't go through normal shutdown procedure. It may make things worse.
@@ -233,7 +253,7 @@ void myPureCallHandler() {
 #else
 
 void abruptQuitWithAddrSignal(int signalNum, siginfo_t* siginfo, void*) {
-    stdx::lock_guard<stdx::mutex> lk(streamMutex);
+    MallocFreeOStreamGuard lk{};
 
     const char* action = (signalNum == SIGSEGV || signalNum == SIGBUS) ? "access" : "operation";
     mallocFreeOStream << "Invalid " << action << " at address: " << siginfo->si_addr;
@@ -287,7 +307,7 @@ void setupSynchronousSignalHandlers() {
 }
 
 void reportOutOfMemoryErrorAndExit() {
-    stdx::lock_guard<stdx::mutex> lk(streamMutex);
+    MallocFreeOStreamGuard lk{};
     printStackTrace(mallocFreeOStream << "out of memory.\n");
     writeMallocFreeStreamToLog();
     quickExit(EXIT_ABRUPT);
