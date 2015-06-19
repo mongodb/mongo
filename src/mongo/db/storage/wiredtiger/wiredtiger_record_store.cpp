@@ -90,8 +90,6 @@ namespace {
 
     const std::string kWiredTigerEngineName = "wiredTiger";
 
-    const long long WiredTigerRecordStore::kCollectionScanOnCreationThreshold = 10000;
-
     class WiredTigerRecordStore::Cursor final : public RecordCursor {
     public:
         Cursor(OperationContext* txn,
@@ -418,8 +416,8 @@ namespace {
                 _sizeStorer->onCreate( this, numRecords, dataSize );
             }
 
-            if (_sizeStorer == NULL || _numRecords.load() < kCollectionScanOnCreationThreshold) {
-                LOG(1) << "doing scan of collection " << ns << " to get info";
+            else {
+                LOG(1) << "Doing scan of collection " << ns << " to get size and count info";
 
                 _numRecords.store(0);
                 _dataSize.store(0);
@@ -433,7 +431,6 @@ namespace {
                     _sizeStorer->storeToCache( _uri, _numRecords.load(), _dataSize.load() );
                 }
             }
-
         }
         else {
             _dataSize.store(0);

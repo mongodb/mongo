@@ -398,7 +398,7 @@ namespace {
             wtrs->setSizeStorer(sizeStorer.get());
             uri = wtrs->getURI();
 
-            expectedNumRecords = WiredTigerRecordStore::kCollectionScanOnCreationThreshold;
+            expectedNumRecords = 10000;
             expectedDataSize = expectedNumRecords * 2;
             {
                 unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
