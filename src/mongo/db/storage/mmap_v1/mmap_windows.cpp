@@ -228,7 +228,8 @@ void* MemoryMappedFile::map(const char* filenameIn, unsigned long long& length, 
     verify(fd == 0 && len == 0);  // can't open more than once
     setFilename(filenameIn);
     FileAllocator::get()->allocateAsap(filenameIn, length);
-    /* big hack here: Babble uses db names with colons.  doesn't seem to work on windows.  temporary perhaps. */
+    /* big hack here: Babble uses db names with colons.  doesn't seem to work on windows.  temporary
+     * perhaps. */
     char filename[256];
     strncpy(filename, filenameIn, 255);
     filename[255] = 0;

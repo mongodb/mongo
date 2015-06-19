@@ -337,7 +337,8 @@ inline int ConstView::dataLen() const {
 
 class Message {
 public:
-    // we assume here that a vector with initial size 0 does no allocation (0 is the default, but wanted to make it explicit).
+    // we assume here that a vector with initial size 0 does no allocation (0 is the default, but
+    // wanted to make it explicit).
     Message() : _buf(0), _data(0), _freeIt(false) {}
     Message(void* data, bool freeIt) : _buf(0), _data(0), _freeIt(false) {
         _setData(reinterpret_cast<char*>(data), freeIt);
@@ -493,7 +494,8 @@ private:
     }
     // if just one buffer, keep it in _buf, otherwise keep a sequence of buffers in _data
     char* _buf;
-    // byte buffer(s) - the first must contain at least a full MsgData unless using _buf for storage instead
+    // byte buffer(s) - the first must contain at least a full MsgData unless using _buf for storage
+    // instead
     typedef std::vector<std::pair<char*, int>> MsgVec;
     MsgVec _data;
     bool _freeIt;

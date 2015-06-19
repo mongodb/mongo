@@ -142,11 +142,13 @@ public:
     // The process ID.
 
     char _comm[128];
-    // The filename of the executable, in parentheses.  This is visible whether or not the executable is swapped out.
+    // The filename of the executable, in parentheses.  This is visible whether or not the
+    // executable is swapped out.
 
     char _state;
-    // One character from the string "RSDZTW" where R is running, S is sleeping in an interruptible wait, D is waiting  in  uninterruptible
-    //  disk sleep, Z is zombie, T is traced or stopped (on a signal), and W is paging.
+    // One character from the string "RSDZTW" where R is running, S is sleeping in an interruptible
+    // wait, D is waiting in uninterruptible disk sleep, Z is zombie, T is traced or stopped (on a
+    // signal), and W is paging.
 
     int _ppid;
     // The PID of the parent.
@@ -161,19 +163,23 @@ public:
     // The tty the process uses.
 
     int _tpgid;
-    // The process group ID of the process which currently owns the tty that the process is connected to.
+    // The process group ID of the process which currently owns the tty that the process is
+    // connected to.
 
     unsigned long _flags;  // %lu
-    // The  kernel flags word of the process. For bit meanings, see the PF_* defines in <linux/sched.h>.  Details depend on the kernel version.
+    // The  kernel flags word of the process. For bit meanings, see the PF_* defines in
+    // <linux/sched.h>.  Details depend on the kernel version.
 
     unsigned long _min_flt;  // %lu
-    // The number of minor faults the process has made which have not required loading a memory page from disk.
+    // The number of minor faults the process has made which have not required loading a memory page
+    // from disk.
 
     unsigned long _cmin_flt;  // %lu
     // The number of minor faults that the process
 
     unsigned long _maj_flt;  // %lu
-    // The number of major faults the process has made which have required loading a memory page from disk.
+    // The number of major faults the process has made which have required loading a memory page
+    // from disk.
 
     unsigned long _cmaj_flt;  // %lu
     // The number of major faults that the process
@@ -196,7 +202,8 @@ public:
     // number of threads
 
     unsigned long _alarm;
-    // The time in jiffies before the next SIGALRM is sent to the process due to an interval timer. (unused since 2.6.17)
+    // The time in jiffies before the next SIGALRM is sent to the process due to an interval timer.
+    // (unused since 2.6.17)
 
     unsigned long _start_time;  // %lu
     // The time in jiffies the process started after system boot.
@@ -205,8 +212,9 @@ public:
     // Virtual memory size in bytes.
 
     long _rss;  // %ld
-    // Resident Set Size: number of pages the process has in real memory, minus 3 for administrative purposes. This is just the pages which
-    // count  towards  text,  data, or stack space.  This does not include pages which have not been demand-loaded in, or which are swapped out
+    // Resident Set Size: number of pages the process has in real memory, minus 3 for administrative
+    // purposes. This is just the pages which count  towards  text,  data, or stack space.  This
+    // does not include pages which have not been demand-loaded in, or which are swapped out
 
     unsigned long _rss_rlim;  // %lu
     // Current limit in bytes on the rss of the process (usually 4294967295 on i386).
@@ -314,7 +322,8 @@ public:
         }
 
         // try known flat-text file locations
-        // format: Slackware-x86_64 13.0, Red Hat Enterprise Linux Server release 5.6 (Tikanga), etc.
+        // format: Slackware-x86_64 13.0, Red Hat Enterprise Linux Server release 5.6 (Tikanga),
+        // etc.
         typedef vector<string> pathvec;
         pathvec paths;
         pathvec::const_iterator i;

@@ -218,8 +218,8 @@ public:
     //    a filter on the entire tree.
     // 2. No fetches performed.  There will be a final fetch by the caller of buildIndexedDataAccess
     //    who set the value of inArrayOperator to true.
-    // 3. No compound indices are used and no bounds are combined.  These are incorrect in the context
-    //    of these operators.
+    // 3. No compound indices are used and no bounds are combined.  These are
+    //    incorrect in the context of these operators.
     //
 
     /**

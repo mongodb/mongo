@@ -34,19 +34,21 @@
        we could be in read lock for this
        for very large objects write directly to redo log in situ?
      WRITETOJOURNAL
-       we could be unlocked (the main db lock that is...) for this, with sufficient care, but there is some complexity
-         have to handle falling behind which would use too much ram (going back into a read lock would suffice to stop that).
-         for now (1.7.5/1.8.0) we are in read lock which is not ideal.
+       we could be unlocked (the main db lock that is...) for this, with sufficient care, but there
+       is some complexity have to handle falling behind which would use too much ram (going back
+       into a read lock would suffice to stop that). for now (1.7.5/1.8.0) we are in read lock which
+       is not ideal.
      WRITETODATAFILES
-       actually write to the database data files in this phase.  currently done by memcpy'ing the writes back to
-       the non-private MMF.  alternatively one could write to the files the traditional way; however the way our
-       storage engine works that isn't any faster (actually measured a tiny bit slower).
+       actually write to the database data files in this phase.  currently done by memcpy'ing the
+       writes back to the non-private MMF.  alternatively one could write to the files the
+       traditional way; however the way our storage engine works that isn't any faster (actually
+       measured a tiny bit slower).
      REMAPPRIVATEVIEW
-       we could in a write lock quickly flip readers back to the main view, then stay in read lock and do our real
-         remapping. with many files (e.g., 1000), remapping could be time consuming (several ms), so we don't want
-         to be too frequent.
-       there could be a slow down immediately after remapping as fresh copy-on-writes for commonly written pages will
-         be required.  so doing these remaps fractionally is helpful.
+       we could in a write lock quickly flip readers back to the main view, then stay in read lock
+       and do our real remapping. with many files (e.g., 1000), remapping could be time consuming
+       (several ms), so we don't want to be too frequent. there could be a slow down immediately
+       after remapping as fresh copy-on-writes for commonly written pages will
+       be required.  so doing these remaps fractionally is helpful.
 
    mutexes:
 

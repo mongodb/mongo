@@ -106,8 +106,8 @@ DistLockHandle LockException::getMustUnlockID() const {
 }
 
 /**
- * Create a new distributed lock, potentially with a custom sleep and takeover time.  If a custom sleep time is
- * specified (time between pings)
+ * Create a new distributed lock, potentially with a custom sleep and takeover time.  If a custom
+ * sleep time is specified (time between pings)
  */
 DistributedLock::DistributedLock(const ConnectionString& conn,
                                  const string& name,
@@ -155,8 +155,9 @@ const string& DistributedLock::getProcessId() const {
 }
 
 /**
- * Returns the remote time as reported by the cluster or server.  The maximum difference between the reported time
- * and the actual time on the remote server (at the completion of the function) is the maxNetSkew
+ * Returns the remote time as reported by the cluster or server.  The maximum difference between the
+ * reported time and the actual time on the remote server (at the completion of the function) is the
+ * maxNetSkew
  */
 Date_t DistributedLock::remoteTime(const ConnectionString& cluster, unsigned long long maxNetSkew) {
     ConnectionString server(*cluster.getServers().begin());
@@ -197,8 +198,8 @@ Date_t DistributedLock::remoteTime(const ConnectionString& cluster, unsigned lon
                                     13647);
     }
 
-    // Make sure that our delay is not more than 2x our maximum network skew, since this is the max our remote
-    // time value can be off by if we assume a response in the middle of the delay.
+    // Make sure that our delay is not more than 2x our maximum network skew, since this is the max
+    // our remote time value can be off by if we assume a response in the middle of the delay.
     if (delay > Milliseconds(maxNetSkew * 2)) {
         throw TimeNotFoundException(
             str::stream() << "server " << server.toString() << " in cluster " << cluster.toString()
@@ -227,7 +228,8 @@ bool DistributedLock::checkSkew(const ConnectionString& cluster,
             if (i == 0)
                 avgSkews.push_back(0);
 
-            // Could check if this is self, but shouldn't matter since local network connection should be fast.
+            // Could check if this is self, but shouldn't matter since local network connection
+            // should be fast.
             ConnectionString server(*si);
 
             vector<long long> skew;
@@ -375,7 +377,8 @@ bool DistributedLock::lock_try(const string& why, BSONObj* other, double timeout
                 LockpingsType::ConfigNS, o[LocksType::process()].wrap(LockpingsType::process()));
             if (lastPing.isEmpty()) {
                 LOG(logLvl) << "empty ping found for process in lock '" << lockName << "'" << endl;
-                // TODO:  Using 0 as a "no time found" value Will fail if dates roll over, but then, so will a lot.
+                // TODO:  Using 0 as a "no time found" value Will fail if dates roll over, but then,
+                // so will a lot.
                 lastPing = BSON(LockpingsType::process(o[LocksType::process()].String())
                                 << LockpingsType::ping(Date_t()));
             }
@@ -420,7 +423,8 @@ bool DistributedLock::lock_try(const string& why, BSONObj* other, double timeout
             } catch (LockException& e) {
                 // Remote server cannot be found / is not responsive
                 warning() << "Could not get remote time from " << _conn << causedBy(e);
-                // If our config server is having issues, forget all the pings until we can see it again
+                // If our config server is having issues, forget all the pings until we can see it
+                // again
                 resetLastPing();
             }
 
@@ -438,8 +442,8 @@ bool DistributedLock::lock_try(const string& why, BSONObj* other, double timeout
 
             if (elapsed > takeover) {
                 // Lock may forced, reset our timer if succeeds or fails
-                // Ensures that another timeout must happen if something borks up here, and resets our pristine
-                // ping state if acquired.
+                // Ensures that another timeout must happen if something borks up here, and resets
+                // our pristine ping state if acquired.
                 resetLastPing();
 
                 try {
@@ -464,7 +468,8 @@ bool DistributedLock::lock_try(const string& why, BSONObj* other, double timeout
                     BSONObj err = conn->getLastErrorDetailed();
                     string errMsg = DBClientWithCommands::getLastErrorString(err);
 
-                    // TODO: Clean up all the extra code to exit this method, probably with a refactor
+                    // TODO: Clean up all the extra code to exit this method, probably with a
+                    // refactor
                     if (!errMsg.empty() || !err["n"].type() || err["n"].numberInt() < 1) {
                         logErrMsgOrWarn(
                             "Could not force lock", lockName, errMsg, "(another force won");
@@ -475,8 +480,8 @@ bool DistributedLock::lock_try(const string& why, BSONObj* other, double timeout
                     }
 
                 } catch (UpdateNotTheSame&) {
-                    // Ok to continue since we know we forced at least one lock document, and all lock docs
-                    // are required for a lock to be held.
+                    // Ok to continue since we know we forced at least one lock document, and all
+                    // lock docs are required for a lock to be held.
                     warning() << "lock forcing " << lockName << " inconsistent" << endl;
                 } catch (const LockException&) {
                     // Let the exception go up and don't repackage the exception.
@@ -495,8 +500,9 @@ bool DistributedLock::lock_try(const string& why, BSONObj* other, double timeout
                 // are acquired.
                 resetLastPing();
 
-                // Test that the lock is held by trying to update the finalized state of the lock to the same state
-                // if it does not update or does not update on all servers, we can't re-enter.
+                // Test that the lock is held by trying to update the finalized state of the lock to
+                // the same state if it does not update or does not update on all servers, we can't
+                // re-enter.
                 try {
                     // Test the lock with the correct "ts" (OID) value
                     conn->update(LocksType::ConfigNS,
@@ -508,7 +514,8 @@ bool DistributedLock::lock_try(const string& why, BSONObj* other, double timeout
                     BSONObj err = conn->getLastErrorDetailed();
                     string errMsg = DBClientWithCommands::getLastErrorString(err);
 
-                    // TODO: Clean up all the extra code to exit this method, probably with a refactor
+                    // TODO: Clean up all the extra code to exit this method, probably with a
+                    // refactor
                     if (!errMsg.empty() || !err["n"].type() || err["n"].numberInt() < 1) {
                         logErrMsgOrWarn(
                             "Could not re-enter lock", lockName, errMsg, "(not sure lock is held");
@@ -541,7 +548,8 @@ bool DistributedLock::lock_try(const string& why, BSONObj* other, double timeout
 
             LOG(logLvl - 1) << "lock '" << lockName << "' successfully forced" << endl;
 
-            // We don't need the ts value in the query, since we will only ever replace locks with state=0.
+            // We don't need the ts value in the query, since we will only ever replace locks with
+            // state=0.
         }
         // Case 3: We have an expired lock
         else if (o[LocksType::lockID()].type()) {
@@ -549,8 +557,9 @@ bool DistributedLock::lock_try(const string& why, BSONObj* other, double timeout
         }
     }
 
-    // Always reset our ping if we're trying to get a lock, since getting a lock implies the lock state is open
-    // and no locks need to be forced.  If anything goes wrong, we don't want to remember an old lock.
+    // Always reset our ping if we're trying to get a lock, since getting a lock implies the lock
+    // state is open and no locks need to be forced.  If anything goes wrong, we don't want to
+    // remember an old lock.
     resetLastPing();
 
     bool gotLock = false;
@@ -607,10 +616,11 @@ bool DistributedLock::lock_try(const string& why, BSONObj* other, double timeout
                 indUpdate = indDB->findOne(LocksType::ConfigNS, BSON(LocksType::name(_name)));
 
                 // If we override this lock in any way, grab and protect it.
-                // We assume/ensure that if a process does not have all lock documents, it is no longer
-                // holding the lock.
-                // Note - finalized locks may compete too, but we know they've won already if competing
-                // in this round.  Cleanup of crashes during finalizing may take a few tries.
+                // We assume/ensure that if a process does not have all lock documents, it is no
+                // longer holding the lock.
+                // Note - finalized locks may compete too, but we know they've won already if
+                // competing in this round.  Cleanup of crashes during finalizing may take a few
+                // tries.
                 if (indUpdate[LocksType::lockID()] < lockDetails[LocksType::lockID()] ||
                     indUpdate[LocksType::state()].numberInt() == 0) {
                     BSONObj grabQuery =
@@ -622,8 +632,9 @@ bool DistributedLock::lock_try(const string& why, BSONObj* other, double timeout
                         BSON(LocksType::lockID(lockDetails[LocksType::lockID()].OID())
                              << LocksType::state(1));
 
-                    // Either our update will succeed, and we'll grab the lock, or it will fail b/c some other
-                    // process grabbed the lock (which will change the ts), but the lock will be set until forcing
+                    // Either our update will succeed, and we'll grab the lock, or it will fail b/c
+                    // some other process grabbed the lock (which will change the ts), but the lock
+                    // will be set until forcing
                     indDB->update(LocksType::ConfigNS, grabQuery, BSON("$set" << grabChanges));
 
                     indUpdate = indDB->findOne(LocksType::ConfigNS, BSON(LocksType::name(_name)));
@@ -687,11 +698,12 @@ bool DistributedLock::lock_try(const string& why, BSONObj* other, double timeout
 
     // Complete lock propagation
     if (gotLock) {
-        // This is now safe, since we know that no new locks will be placed on top of the ones we've checked for at
-        // least 15 minutes.  Sets the state = 2, so that future clients can determine that the lock is truly set.
-        // The invariant for rollbacks is that we will never force locks with state = 2 and active pings, since that
-        // indicates the lock is active, but this means the process creating/destroying them must explicitly poll
-        // when something goes wrong.
+        // This is now safe, since we know that no new locks will be placed on top of the ones we've
+        // checked for at least 15 minutes.  Sets the state = 2, so that future clients can
+        // determine that the lock is truly set. The invariant for rollbacks is that we will never
+        // force locks with state = 2 and active pings, since that indicates the lock is active, but
+        // this means the process creating/destroying them must explicitly poll when something goes
+        // wrong.
         try {
             BSONObjBuilder finalLockDetails;
             BSONObjIterator bi(lockDetails);

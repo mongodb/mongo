@@ -74,7 +74,8 @@ namespace mongo {
       std::string collection;
       int nToSkip;
       int nToReturn; // how many you want back as the beginning of the cursor data (0=no limit)
-                     // greater than zero is simply a hint on how many objects to send back per "cursor batch".
+                     // greater than zero is simply a hint on how many objects to send back per
+                     // "cursor batch".
                      // a negative number indicates a hard limit.
       JSObject query;
       [JSObject fieldsToReturn]

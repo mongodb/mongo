@@ -1,7 +1,8 @@
 /** @file perftests.cpp.cpp : unit tests relating to performance
 
-          The idea herein is tests that run fast and can be part of the normal CI suite.  So no tests herein that take
-          a long time to run.  Obviously we need those too, but they will be separate.
+          The idea herein is tests that run fast and can be part of the normal CI suite.  So no
+          tests herein that take a long time to run.  Obviously we need those too, but they will be
+          separate.
 
           These tests use DBDirectClient; they are a bit white-boxish.
 */
@@ -217,7 +218,8 @@ protected:
 
     virtual string name() = 0;
 
-    // how long to run test.  0 is a sentinel which means just run the timed() method once and time it.
+    // how long to run test.  0 is a sentinel which means just run the timed() method once and time
+    // it.
     virtual int howLongMillis() {
         return profiling ? 30000 : 5000;
     }
@@ -1232,7 +1234,8 @@ public:
 
     void prep() {
         {
-            // the checksum code assumes 'standard' rollover on addition overflows. let's check that:
+            // the checksum code assumes 'standard' rollover on addition overflows. let's check
+            // that:
             unsigned long long x = 0xffffffffffffffffULL;
             ASSERT(x + 2 == 1);
         }
@@ -1263,8 +1266,9 @@ public:
             ((char*&)p)[1]--;
             c.gen(p, sz);
             ASSERT(c != last);
-            ((char*&)p)
-                [1]++;  // check same data, different order, doesn't give same checksum (different longwords case)
+            // check same data, different order, doesn't give same checksum (different longwords
+            // case)
+            ((char*&)p)[1]++;
             ((char*&)p)[8]--;
             c.gen(p, sz);
             ASSERT(c != last);

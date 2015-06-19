@@ -84,12 +84,12 @@ public:
         return buf;
     }
 
-    /* NamespaceDetails::Extra was added after fact to allow chaining of data blocks to support more than 10 indexes
-       (more than 10 IndexDetails).  It's a bit hacky because of this late addition with backward
-       file support. */
+    /* NamespaceDetails::Extra was added after fact to allow chaining of data blocks to support more
+     * than 10 indexes (more than 10 IndexDetails).  It's a bit hacky because of this late addition
+     * with backward file support. */
     std::string extraName(int i) const;
-    bool isExtra()
-        const; /* ends with $extr... -- when true an extra block not a normal NamespaceDetails block */
+    /* ends with $extr... -- when true an extra block not a normal NamespaceDetails block */
+    bool isExtra() const;
 
     enum MaxNsLenValue {
         // Maximum possible length of name any namespace, including special ones like $extra.

@@ -87,7 +87,8 @@ public:
             return false;
         }
 
-        // using localhost in server names implies every other process must use localhost addresses too
+        // using localhost in server names implies every other process must use localhost addresses
+        // too
         std::vector<HostAndPort> serverAddrs = servers.getServers();
         for (size_t i = 0; i < serverAddrs.size(); i++) {
             if (serverAddrs[i].isLocalHost() != grid.allowLocalHost()) {

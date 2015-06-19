@@ -177,12 +177,12 @@ int BSONObj::woCompare(const BSONObj& r, const BSONObj& idxKey, bool considerFie
 
         int x;
         /*
-                        if( ordered && o.type() == String && strcmp(o.valuestr(), "ascii-proto") == 0 &&
-                            l.type() == String && r.type() == String ) {
-                            // note: no negative support yet, as this is just sort of a POC
-                            x = _stricmp(l.valuestr(), r.valuestr());
-                        }
-                        else*/ {
+                    if( ordered && o.type() == String && strcmp(o.valuestr(), "ascii-proto") == 0 &&
+                        l.type() == String && r.type() == String ) {
+                        // note: no negative support yet, as this is just sort of a POC
+                        x = _stricmp(l.valuestr(), r.valuestr());
+                    }
+                    else*/ {
             x = l.woCompare(r, considerFieldName);
             if (ordered && o.number() < 0)
                 x = -x;

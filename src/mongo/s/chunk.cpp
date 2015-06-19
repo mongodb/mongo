@@ -559,7 +559,8 @@ bool Chunk::splitIfShould(long dataWritten) const {
         }
 
         if (_maxIsInf() || _minIsInf()) {
-            // we don't want to reset _dataWritten since we kind of want to check the other side right away
+            // we don't want to reset _dataWritten since we kind of want to check the other side
+            // right away
         } else {
             // we're splitting, so should wait a bit
             _dataWritten = 0;

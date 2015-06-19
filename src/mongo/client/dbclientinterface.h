@@ -46,13 +46,13 @@ namespace mongo {
 
 /** the query field 'options' can have these bits set: */
 enum QueryOptions {
-    /** Tailable means cursor is not closed when the last data is retrieved.  rather, the cursor marks
-       the final object's position.  you can resume using the cursor later, from where it was located,
-       if more data were received.  Set on dbQuery and dbGetMore.
+    /** Tailable means cursor is not closed when the last data is retrieved.  rather, the cursor
+     * marks the final object's position.  you can resume using the cursor later, from where it was
+       located, if more data were received.  Set on dbQuery and dbGetMore.
 
        like any "latent cursor", the cursor may become invalid at some point -- for example if that
-       final object it references were deleted.  Thus, you should be prepared to requery if you get back
-       ResultFlag_CursorNotFound.
+       final object it references were deleted.  Thus, you should be prepared to requery if you get
+       back ResultFlag_CursorNotFound.
     */
     QueryOption_CursorTailable = 1 << 1,
 
@@ -70,21 +70,24 @@ enum QueryOptions {
     // an extended period of time.
     QueryOption_OplogReplay = 1 << 3,
 
-    /** The server normally times out idle cursors after an inactivity period to prevent excess memory uses
+    /** The server normally times out idle cursors after an inactivity period to prevent excess
+     * memory uses
         Set this option to prevent that.
     */
     QueryOption_NoCursorTimeout = 1 << 4,
 
-    /** Use with QueryOption_CursorTailable.  If we are at the end of the data, block for a while rather
-        than returning no data. After a timeout period, we do return as normal.
+    /** Use with QueryOption_CursorTailable.  If we are at the end of the data, block for a while
+     * rather than returning no data. After a timeout period, we do return as normal.
     */
     QueryOption_AwaitData = 1 << 5,
 
-    /** Stream the data down full blast in multiple "more" packages, on the assumption that the client
-        will fully read all data queried.  Faster when you are pulling a lot of data and know you want to
-        pull it all down.  Note: it is not allowed to not read all the data unless you close the connection.
+    /** Stream the data down full blast in multiple "more" packages, on the assumption that the
+     * client will fully read all data queried.  Faster when you are pulling a lot of data and know
+     * you want to pull it all down.  Note: it is not allowed to not read all the data unless you
+     * close the connection.
 
-        Use the query( stdx::function<void(const BSONObj&)> f, ... ) version of the connection's query()
+        Use the query( stdx::function<void(const BSONObj&)> f, ... ) version of the connection's
+        query()
         method, and it will take care of all the details for you.
     */
     QueryOption_Exhaust = 1 << 6,
@@ -151,7 +154,8 @@ enum ReservedOptions {
 class DBClientCursor;
 class DBClientCursorBatchIterator;
 
-/** Represents a Mongo query expression.  Typically one uses the QUERY(...) macro to construct a Query object.
+/** Represents a Mongo query expression.  Typically one uses the QUERY(...) macro to construct a
+ * Query object.
     Examples:
        QUERY( "age" << 33 << "school" << "UCLA" ).sort("name")
        QUERY( "age" << GT << 30 << LT << 50 )
@@ -169,7 +173,8 @@ public:
     Query(const char* json);
 
     /** Add a sort (ORDER BY) criteria to the query expression.
-        @param sortPattern the sort order template.  For example to order by name ascending, time descending:
+        @param sortPattern the sort order template.  For example to order by name ascending, time
+            descending:
           { name : 1, ts : -1 }
         i.e.
           BSON( "name" << 1 << "ts" << -1 )
@@ -205,14 +210,16 @@ public:
      */
     Query& maxKey(const BSONObj& val);
 
-    /** Return explain information about execution of this query instead of the actual query results.
-        Normally it is easier to use the mongo shell to run db.find(...).explain().
-    */
+    /** Return explain information about execution of this query instead of the actual query
+     * results.
+     *  Normally it is easier to use the mongo shell to run db.find(...).explain().
+     */
     Query& explain();
 
-    /** Use snapshot mode for the query.  Snapshot mode assures no duplicates are returned, or objects missed, which were
-        present at both the start and end of the query's execution (if an object is new during the query, or deleted during
-        the query, it may or may not be returned, even with snapshot mode).
+    /** Use snapshot mode for the query.  Snapshot mode assures no duplicates are returned, or
+     * objects missed, which were present at both the start and end of the query's execution (if an
+     * object is new during the query, or deleted during the query, it may or may not be returned,
+     * even with snapshot mode).
 
         Note that short query responses (less than 1MB) are always effectively snapshotted.
 
@@ -387,7 +394,8 @@ std::string nsGetCollection(const std::string& ns);
 class DBConnector {
 public:
     virtual ~DBConnector() {}
-    /** actualServer is set to the actual server where they call went if there was a choice (SlaveOk) */
+    /** actualServer is set to the actual server where they call went if there was a choice
+     * (SlaveOk) */
     virtual bool call(Message& toSend,
                       Message& response,
                       bool assertOk = true,
@@ -454,8 +462,8 @@ public:
                             const BSONObj* fieldsToReturn = 0,
                             int queryOptions = 0);
 
-    /** query N objects from the database into an array.  makes sense mostly when you want a small number of results.  if a huge number, use
-        query() and iterate the cursor.
+    /** query N objects from the database into an array.  makes sense mostly when you want a small
+     * number of results.  if a huge number, use query() and iterate the cursor.
     */
     void findN(std::vector<BSONObj>& out,
                const std::string& ns,
@@ -549,8 +557,8 @@ public:
 
         @param dbname database name.  Use "admin" for global administrative commands.
         @param cmd  the command object to execute.  For example, { ismaster : 1 }
-        @param info the result object the database returns. Typically has { ok : ..., errmsg : ... } fields
-               set.
+        @param info the result object the database returns. Typically has { ok : ..., errmsg : ... }
+                    fields set.
         @param options see enum QueryOptions - normally not needed to run a command
         @param auth if set, the BSONObj representation will be appended to the command object sent
 
@@ -589,9 +597,10 @@ public:
     /** Authorize access to a particular database.
         Authentication is separate for each database on the server -- you may authenticate for any
         number of databases on a single connection.
-        The "admin" database is special and once authenticated provides access to all databases on the
-        server.
-        @param      digestPassword  if password is plain text, set this to true.  otherwise assumed to be pre-digested
+        The "admin" database is special and once authenticated provides access to all databases on
+        the server.
+        @param      digestPassword  if password is plain text, set this to true.  otherwise assumed
+                                    to be pre-digested
         @param[out] authLevel       level of authentication for the given user
         @return true if successful
     */
@@ -633,8 +642,8 @@ public:
     virtual bool isMaster(bool& isMaster, BSONObj* info = 0);
 
     /**
-       Create a new collection in the database.  Normally, collection creation is automatic.  You would
-       use this function if you wish to specify special options on creation.
+       Create a new collection in the database.  Normally, collection creation is automatic.  You
+       would use this function if you wish to specify special options on creation.
 
        If the collection already exists, no action occurs.
 
@@ -721,9 +730,9 @@ public:
         return res;
     }
 
-    /** Perform a repair and compaction of the specified database.  May take a long time to run.  Disk space
-       must be available equal to the size of the database while repairing.
-    */
+    /** Perform a repair and compaction of the specified database.  May take a long time to run.
+     * Disk space must be available equal to the size of the database while repairing.
+     */
     bool repairDatabase(const std::string& dbname, BSONObj* info = 0) {
         return simpleCommand(dbname, info, "repairDatabase");
     }
@@ -733,8 +742,9 @@ public:
        Generally, you should dropDatabase() first as otherwise the copied information will MERGE
        into whatever data is already present in this database.
 
-       For security reasons this function only works when you are authorized to access the "admin" db.  However,
-       if you have access to said db, you can copy any database from one place to another.
+       For security reasons this function only works when you are authorized to access the "admin"
+       db.  However, if you have access to said db, you can copy any database from one place to
+       another.
        TODO: this needs enhancement to be more flexible in terms of security.
 
        This method provides a way to "rename" a database by copying it to a new db name and
@@ -753,15 +763,15 @@ public:
                       BSONObj* info = 0);
 
     /** Run javascript code on the database server.
-       dbname    database SavedContext in which the code runs. The javascript variable 'db' will be assigned
-                 to this database when the function is invoked.
+       dbname    database SavedContext in which the code runs. The javascript variable 'db' will be
+                 assigned to this database when the function is invoked.
        jscode    source code for a javascript function.
-       info      the command object which contains any information on the invocation result including
-                  the return value and other information.  If an error occurs running the jscode, error
-                 information will be in info.  (try "log() << info.toString()")
+       info      the command object which contains any information on the invocation result
+                 including the return value and other information.  If an error occurs running the
+                 jscode, error information will be in info.  (try "log() << info.toString()")
        retValue  return value from the jscode function.
-       args      args to pass to the jscode function.  when invoked, the 'args' variable will be defined
-                 for use by the jscode.
+       args      args to pass to the jscode function.  when invoked, the 'args' variable will be
+                 defined for use by the jscode.
 
        returns true if runs ok.
 
@@ -796,7 +806,8 @@ public:
         return eval(dbname, jscode, info, retValue, &args);
     }
 
-    /** eval invocation with one parm to server and one numeric field (either int or double) returned */
+    /** eval invocation with one parm to server and one numeric field (either int or double)
+     * returned */
     template <class T, class NumType>
     bool eval(const std::string& dbname, const std::string& jscode, T parm1, NumType& ret) {
         BSONObj info;
@@ -836,7 +847,8 @@ public:
        @param ns collection to be indexed
        @param keys the "key pattern" for the index.  e.g., { name : 1 }
        @param unique if true, indicates that key uniqueness should be enforced for this index
-       @param name if not specified, it will be created from the keys automatically (which is recommended)
+       @param name if not specified, it will be created from the keys automatically (which is
+              recommended)
        @param background build index in the background (see mongodb docs for details)
        @param v index version. leave at default value. (unit tests set this parameter.)
        @param ttl. The value of how many seconds before data should be removed from a collection.
@@ -996,7 +1008,8 @@ public:
      to specify a sort order.
      @param nToReturn n to return (i.e., limit).  0 = unlimited
      @param nToSkip start with the nth item
-     @param fieldsToReturn optional template of which fields to select. if unspecified, returns all fields
+     @param fieldsToReturn optional template of which fields to select. if unspecified,
+            returns all fields
      @param queryOptions see options enum at top of this file
 
      @return    cursor.   0 if error (connection failure)
@@ -1132,7 +1145,8 @@ public:
        If autoReconnect is true, you can try to use the DBClientConnection even when
        false was returned -- it will try to connect again.
 
-       @param serverHostname host to connect to.  can include port number ( 127.0.0.1 , 127.0.0.1:5555 )
+       @param serverHostname host to connect to.  can include port number ( 127.0.0.1 ,
+                               127.0.0.1:5555 )
     */
     void connect(const std::string& serverHostname) {
         std::string errmsg;

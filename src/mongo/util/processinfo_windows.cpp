@@ -437,7 +437,9 @@ bool ProcessInfo::blockInMemory(const void* start) {
         if (bstat) {
             for (int i=0; i<30; i++) {
                 if (wiex[i].BasicInfo.FaultingPc == 0) break;
-                cout << "faulting pc = " << wiex[i].BasicInfo.FaultingPc << " address = " << wiex[i].BasicInfo.FaultingVa << " thread id = " << wiex[i].FaultingThreadId << endl;
+                cout << "faulting pc = " << wiex[i].BasicInfo.FaultingPc <<
+                    " address = " << wiex[i].BasicInfo.FaultingVa <<
+                    " thread id = " << wiex[i].FaultingThreadId << endl;
             }
         }
 #endif

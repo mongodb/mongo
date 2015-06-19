@@ -135,9 +135,9 @@ bool FileCreatedOp::needFilesClosed() {
 }
 
 void FileCreatedOp::replay() {
-    // i believe the code assumes new files are filled with zeros.  thus we have to recreate the file,
-    // or rewrite at least, even if it were the right length.  perhaps one day we should change that
-    // although easier to avoid defects if we assume it is zeros perhaps.
+    // i believe the code assumes new files are filled with zeros.  thus we have to recreate the
+    // file, or rewrite at least, even if it were the right length.  perhaps one day we should
+    // change that although easier to avoid defects if we assume it is zeros perhaps.
     string full = _p.asFullPath();
     if (boost::filesystem::exists(full)) {
         try {

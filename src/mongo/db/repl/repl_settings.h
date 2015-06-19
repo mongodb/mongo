@@ -51,7 +51,10 @@ class ReplSettings {
 public:
     SlaveTypes slave;
 
-    /** true means we are master and doing replication.  if we are not writing to oplog, this won't be true. */
+    /**
+     * true means we are master and doing replication.  if we are not writing to oplog, this won't
+     * be true.
+     */
     bool master;
 
     bool fastsync;

@@ -78,7 +78,8 @@ public:
     }
 
     /** @param baseBuilder construct a BSONObjBuilder using an existing BufBuilder
-     *  This is for more efficient adding of subobjects/arrays. See docs for subobjStart for example.
+     *  This is for more efficient adding of subobjects/arrays. See docs for subobjStart for
+     *  example.
      */
     BSONObjBuilder(BufBuilder& baseBuilder)
         : _b(baseBuilder),
@@ -129,16 +130,16 @@ public:
 
     /** append element to the object we are building */
     BSONObjBuilder& append(const BSONElement& e) {
-        verify(
-            !e.eoo());  // do not append eoo, that would corrupt us. the builder auto appends when done() is called.
+        // do not append eoo, that would corrupt us. the builder auto appends when done() is called.
+        verify(!e.eoo());
         _b.appendBuf((void*)e.rawdata(), e.size());
         return *this;
     }
 
     /** append an element but with a new name */
     BSONObjBuilder& appendAs(const BSONElement& e, StringData fieldName) {
-        verify(
-            !e.eoo());  // do not append eoo, that would corrupt us. the builder auto appends when done() is called.
+        // do not append eoo, that would corrupt us. the builder auto appends when done() is called.
+        verify(!e.eoo());
         _b.appendNum((char)e.type());
         _b.appendStr(fieldName);
         _b.appendBuf((void*)e.value(), e.valuesize());
@@ -677,7 +678,8 @@ public:
         return false;
     }
 
-    /** @return true if we are using our own bufbuilder, and not an alternate that was given to us in our constructor */
+    /** @return true if we are using our own bufbuilder, and not an alternate that was given to us
+     * in our constructor */
     bool owned() const {
         return &_b == &_buf;
     }

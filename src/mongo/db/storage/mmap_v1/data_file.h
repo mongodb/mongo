@@ -126,8 +126,10 @@ class DataFileHeader {
 public:
     DataFileVersion version;
     int fileLength;
-    DiskLoc
-        unused; /* unused is the portion of the file that doesn't belong to any allocated extents. -1 = no more */
+    /**
+     * unused is the portion of the file that doesn't belong to any allocated extents. -1 = no more
+     */
+    DiskLoc unused;
     int unusedLength;
     DiskLoc freeListStart;
     DiskLoc freeListEnd;

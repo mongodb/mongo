@@ -146,7 +146,8 @@ public:
     }
 
     /**
-     * this is just an increasing number of how many ChunkManagers we have so we know if something has been updated
+     * this is just an increasing number of how many ChunkManagers we have so we know if something
+     * has been updated
      */
     unsigned long long getSequenceNumber() const {
         return _sequenceNumber;

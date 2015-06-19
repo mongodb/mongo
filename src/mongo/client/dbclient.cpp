@@ -851,17 +851,17 @@ bool DBClientWithCommands::exists(const string& ns) {
 
 void DBClientConnection::_auth(const BSONObj& params) {
     if (autoReconnect) {
-        /* note we remember the auth info before we attempt to auth -- if the connection is broken, we will
-           then have it for the next autoreconnect attempt.
-        */
+        /* note we remember the auth info before we attempt to auth -- if the connection is broken,
+         * we will then have it for the next autoreconnect attempt.
+         */
         authCache[params[saslCommandUserDBFieldName].str()] = params.getOwned();
     }
 
     DBClientBase::_auth(params);
 }
 
-/** query N objects from the database into an array.  makes sense mostly when you want a small number of results.  if a huge number, use
-    query() and iterate the cursor.
+/** query N objects from the database into an array.  makes sense mostly when you want a small
+ * number of results.  if a huge number, use query() and iterate the cursor.
  */
 void DBClientInterface::findN(vector<BSONObj>& out,
                               const string& ns,

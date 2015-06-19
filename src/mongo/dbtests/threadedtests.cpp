@@ -462,8 +462,8 @@ public:
     }
 };
 
-// we don't use upgrade so that part is not important currently but the other aspects of this test are
-// interesting; it would be nice to do analogous tests for SimpleRWLock and QLock
+// we don't use upgrade so that part is not important currently but the other aspects of this test
+// are interesting; it would be nice to do analogous tests for SimpleRWLock and QLock
 class UpgradableTest : public ThreadedTest<7> {
     RWLock m;
 
@@ -483,7 +483,7 @@ private:
         */
         //                    /-- verify upgrade can be done instantly while in a read lock already
         //                    |  /-- verify upgrade acquisition isn't greedy
-        //                    |  | /-- verify writes aren't greedy while in upgradable (or are they?)
+        //                    |  | /-- verify writes aren't greedy while in upgradable(or are they?)
         //                    v  v v
         const char* what = " RURuRwR";
 
@@ -535,8 +535,10 @@ private:
                 LOG(Z) << x << ' ' << ch << " got " << endl;
                 if (what[x] == 'R') {
                     if (t.millis() > 15) {
-                        // commented out for less chatter, we aren't using upgradeable anyway right now:
-                        // log() << x << " info: when in upgradable, write locks are still greedy on this platform" << endl;
+                        // commented out for less chatter, we aren't using upgradeable anyway right
+                        // now:
+                        // log() << x << " info: when in upgradable, write locks are still greedy "
+                        // "on this platform" << endl;
                     }
                 }
                 sleepmillis(200);
@@ -561,8 +563,8 @@ void sleepalittle() {
 int once;
 
 /* This test is to see how long it takes to get a lock after there has been contention -- the OS
-     will need to reschedule us. if a spinlock, it will be fast of course, but these aren't spin locks.
-   Experimenting with different # of threads would be a good idea.
+   will need to reschedule us. if a spinlock, it will be fast of course, but these aren't spin
+   locks. Experimenting with different # of threads would be a good idea.
 */
 template <class whichmutex, class scoped>
 class Slack : public ThreadedTest<17> {
@@ -720,8 +722,8 @@ private:
 };
 
 
-// Tests waiting on the TicketHolder by running many more threads than can fit into the "hotel", but only
-// max _nRooms threads should ever get in at once
+// Tests waiting on the TicketHolder by running many more threads than can fit into the "hotel", but
+// only max _nRooms threads should ever get in at once
 class TicketHolderWaits : public ThreadedTest<10> {
     static const int checkIns = 1000;
     static const int rooms = 3;
@@ -779,8 +781,8 @@ private:
     }
 
     virtual void validate() {
-        // This should always be true, assuming that it takes < 1 sec for the hardware to process a check-out/check-in
-        // Time for test is then ~ #threads / _nRooms * 2 seconds
+        // This should always be true, assuming that it takes < 1 sec for the hardware to process a
+        // check-out/check-in Time for test is then ~ #threads / _nRooms * 2 seconds
         verify(_hotel._maxRooms == _hotel._nRooms);
     }
 };

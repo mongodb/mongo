@@ -744,8 +744,9 @@ int killDb(int port, ProcessId _pid, int signal, const BSONObj& opt) {
     } else {
         registry.deletePid(pid);
     }
-    // FIXME I think the intention here is to do an extra sleep only when SIGKILL is sent to the child process.
-    // We may want to change the 4 below to 29, since values of i greater than that indicate we sent a SIGKILL.
+    // FIXME I think the intention here is to do an extra sleep only when SIGKILL is sent to the
+    // child process. We may want to change the 4 below to 29, since values of i greater than that
+    // indicate we sent a SIGKILL.
     if (i > 4 || signal == SIGKILL) {
         sleepmillis(4000);  // allow operating system to reclaim resources
     }

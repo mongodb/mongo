@@ -259,8 +259,8 @@ private:
     // Convention: (M)andatory, (O)ptional, (S)pecial rule.
     std::string _changeID;  // (M)  id for this change "<hostname>-<current_time>-<increment>"
     bool _isChangeIDSet;
-    std::string
-        _server;  // (M)  hostname of server that we are making the change on.  Does not include port.
+    // (M)  hostname of server that we are making the change on.  Does not include port.
+    std::string _server;
     bool _isServerSet;
     std::string _clientAddr;  // (M)  hostname:port of the client that made this change
     bool _isClientAddrSet;

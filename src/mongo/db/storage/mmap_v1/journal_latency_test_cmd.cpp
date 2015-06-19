@@ -121,7 +121,8 @@ public:
                     sleepmillis(4);
                 }
                 long long y = t2.micros() - 4 * N * 1000;
-                // not really trusting the timer granularity on all platforms so whichever is higher of x and y
+                // not really trusting the timer granularity on all platforms so whichever is higher
+                // of x and y
                 bb[pass].append("8KBWithPauses", max(x, y) / (N * 1000.0));
             }
             {

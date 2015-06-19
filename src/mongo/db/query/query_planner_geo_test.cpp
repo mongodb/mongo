@@ -601,15 +601,16 @@ TEST_F(QueryPlannerTest, CompoundGeoNoGeoPredicateMultikey) {
 /*
 TEST_F(QueryPlannerTest, SortOnGeoQuery) {
     addIndex(BSON("timestamp" << -1 << "position" << "2dsphere"));
-    BSONObj query = fromjson("{position: {$geoWithin: {$geometry: {type: \"Polygon\", coordinates: [[[1, 1], [1, 90], [180, 90], [180, 1], [1, 1]]]}}}}");
-    BSONObj sort = fromjson("{timestamp: -1}");
+    BSONObj query = fromjson("{position: {$geoWithin: {$geometry: {type: \"Polygon\", coordinates:
+    [[[1, 1], [1, 90], [180, 90], [180, 1], [1, 1]]]}}}}"); BSONObj sort = fromjson("{timestamp:
+    -1}");
     runQuerySortProj(query, sort, BSONObj());
 
     ASSERT_EQUALS(getNumSolutions(), 2U);
     assertSolutionExists("{sort: {pattern: {timestamp: -1}, limit: 0, "
                             "node: {cscan: {dir: 1}}}}");
-    assertSolutionExists("{fetch: {node: {ixscan: {pattern: {timestamp: -1, position: '2dsphere'}}}}}");
-}
+    assertSolutionExists("{fetch: {node: {ixscan: {pattern: {timestamp: -1, position:
+    '2dsphere'}}}}}"); }
 
 TEST_F(QueryPlannerTest, SortOnGeoQueryMultikey) {
     // true means multikey

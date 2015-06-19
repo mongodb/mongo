@@ -74,7 +74,8 @@ public:
         set(rhs.get());
     }
 
-    // == is not defined.  use get() == ... instead.  done this way so one thinks about if composing multiple operations
+    // == is not defined.  use get() == ... instead.  done this way so one thinks about if composing
+    // multiple operations
     bool operator==(const std::string& s) const;
 };
 }

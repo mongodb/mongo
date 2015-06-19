@@ -461,8 +461,8 @@ bool Balancer::_init() {
 
         // contact the config server and refresh shard information
         // checks that each shard is indeed a different process (no hostname mixup)
-        // these checks are redundant in that they're redone at every new round but we want to do them initially here
-        // so to catch any problem soon
+        // these checks are redundant in that they're redone at every new round but we want to do
+        // them initially here so to catch any problem soon
         Shard::reloadShardInfo();
         _checkOIDs();
 

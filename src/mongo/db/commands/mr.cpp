@@ -781,7 +781,8 @@ void State::init() {
     _scope->invoke(init, 0, 0, 0, true);
 
     // js function to run reduce on all keys
-    // redfunc = _scope->createFunction("for (var key in hashmap) {  print('Key is ' + key); list = hashmap[key]; ret = reduce(key, list); print('Value is ' + ret); };");
+    // redfunc = _scope->createFunction("for (var key in hashmap) {  print('Key is ' + key);
+    // list = hashmap[key]; ret = reduce(key, list); print('Value is ' + ret); };");
     _reduceAll = _scope->createFunction(
         "var map = _mrMap;"
         "var list, ret;"

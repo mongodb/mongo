@@ -48,7 +48,8 @@ inline std::string GetWinErrMsg(DWORD err) {
                     NULL);
     std::string errMsgStr = toUtf8String(errMsg);
     ::LocalFree(errMsg);
-    // FormatMessage() appends a newline to the end of error messages, we trim it because std::endl flushes the buffer.
+    // FormatMessage() appends a newline to the end of error messages, we trim it because std::endl
+    // flushes the buffer.
     errMsgStr = errMsgStr.erase(errMsgStr.length() - 2);
     std::ostringstream output;
     output << errMsgStr << " (" << err << ")";

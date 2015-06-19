@@ -788,8 +788,8 @@ Status RecordStoreV1Base::validate(OperationContext* txn,
 
                     if (loc.questionable()) {
                         if (isCapped() && !loc.isValid() && i == 1) {
-                            /* the constructor for NamespaceDetails intentionally sets deletedList[1] to invalid
-                               see comments in namespace.h
+                            /* the constructor for NamespaceDetails intentionally sets
+                             * deletedList[1] to invalid see comments in namespace.h
                             */
                             break;
                         }

@@ -69,7 +69,8 @@ unsigned long long len;  // file len
 const unsigned PG = 4096;
 unsigned nThreadsRunning = 0;
 
-// as this is incremented A LOT, at some point this becomes a bottleneck if very high ops/second (in cache) things are happening.
+// as this is incremented A LOT, at some point this becomes a bottleneck if very high ops/second (in
+// cache) things are happening.
 AtomicUInt32 iops;
 
 SimpleMutex m;
@@ -192,8 +193,9 @@ void go() {
         return;
     }
     lf = new LogFile(fname, true);
-    const unsigned sz = 1024 * 1024 *
-        32;  // needs to be big as we are using synchronousAppend.  if we used a regular MongoFile it wouldn't have to be
+    // needs to be big as we are using synchronousAppend.  if we used a regular MongoFile it
+    // wouldn't have to be
+    const unsigned sz = 1024 * 1024 * 32;
     char* buf = (char*)mongoMalloc(sz + 4096);
     const char* p = round(buf);
     for (unsigned long long i = 0; i < len; i += sz) {

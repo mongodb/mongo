@@ -157,7 +157,8 @@ bool planCacheContains(const PlanCache& planCache,
         PlanCacheEntry* entry = *i;
 
         // Canonicalizing query shape in cache entry to get cache key.
-        // Alternatively, we could add key to PlanCacheEntry but that would be used in one place only.
+        // Alternatively, we could add key to PlanCacheEntry but that would be used in one place
+        // only.
         ASSERT_OK(
             CanonicalQuery::canonicalize(ns, entry->query, entry->sort, entry->projection, &cqRaw));
         unique_ptr<CanonicalQuery> currentQuery(cqRaw);

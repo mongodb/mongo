@@ -74,8 +74,8 @@ protected:
      * after this returns, deleted if deleteSelf true.
      *
      * NOTE:
-     *   if run() throws, the exception will be caught within 'this' object and will ultimately lead to the
-     *   BackgroundJob's thread being finished, as if run() returned.
+     *   if run() throws, the exception will be caught within 'this' object and will ultimately lead
+     *   to the BackgroundJob's thread being finished, as if run() returned.
      *
      */
     virtual void run() = 0;

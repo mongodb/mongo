@@ -113,7 +113,8 @@ void appendReplicationInfo(OperationContext* txn, BSONObjBuilder& result, int le
 
             if (level > 1) {
                 wassert(!txn->lockState()->isLocked());
-                // note: there is no so-style timeout on this connection; perhaps we should have one.
+                // note: there is no so-style timeout on this connection; perhaps we should have
+                // one.
                 ScopedDbConnection conn(s["host"].valuestr());
 
                 DBClientConnection* cliConn = dynamic_cast<DBClientConnection*>(&conn.conn());

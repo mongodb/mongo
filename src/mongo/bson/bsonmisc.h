@@ -83,7 +83,8 @@ enum FieldCompareResult {
 
 /** Use BSON_ARRAY macro like BSON macro, but without keys
 
-    BSONArray arr = BSON_ARRAY( "hello" << 1 << BSON( "foo" << BSON_ARRAY( "bar" << "baz" << "qux" ) ) );
+    BSONArray arr = BSON_ARRAY( "hello" << 1 <<
+                        BSON( "foo" << BSON_ARRAY( "bar" << "baz" << "qux" ) ) );
 
  */
 #define BSON_ARRAY(x) ((::mongo::BSONArrayBuilder() << x).arr())
@@ -264,7 +265,8 @@ private:
 };
 
 /**
-   used in conjuction with BSONObjBuilder, allows for proper buffer size to prevent crazy memory usage
+   used in conjuction with BSONObjBuilder, allows for proper buffer size to prevent crazy memory
+   usage
  */
 class BSONSizeTracker {
 public:

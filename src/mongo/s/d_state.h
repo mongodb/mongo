@@ -325,8 +325,8 @@ public:
     }
 
 private:
-    bool
-        _forceVersionOk;  // if this is true, then chunk version #s aren't check, and all ops are allowed
+    // if this is true, then chunk version #s aren't check, and all ops are allowed
+    bool _forceVersionOk;
 
     typedef std::map<std::string, ChunkVersion> NSVersionMap;
     NSVersionMap _versions;

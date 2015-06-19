@@ -210,8 +210,8 @@ void DBConfig::getChunkManagerOrPrimary(const string& ns,
                                         std::shared_ptr<ChunkManager>& manager,
                                         std::shared_ptr<Shard>& primary) {
     // The logic here is basically that at any time, our collection can become sharded or unsharded
-    // via a command.  If we're not sharded, we want to send data to the primary, if sharded, we want
-    // to send data to the correct chunks, and we can't check both w/o the lock.
+    // via a command.  If we're not sharded, we want to send data to the primary, if sharded, we
+    // want to send data to the correct chunks, and we can't check both w/o the lock.
 
     manager.reset();
     primary.reset();
@@ -228,9 +228,10 @@ void DBConfig::getChunkManagerOrPrimary(const string& ns,
         } else {
             CollectionInfo& cInfo = i->second;
 
-            // TODO: we need to be careful about handling shardingEnabled, b/c in some places we seem to use and
-            // some we don't.  If we use this function in combination with just getChunkManager() on a slightly
-            // borked config db, we'll get lots of staleconfig retries
+            // TODO: we need to be careful about handling shardingEnabled, b/c in some places we
+            // seem to use and some we don't.  If we use this function in combination with just
+            // getChunkManager() on a slightly borked config db, we'll get lots of staleconfig
+            // retries
             if (_shardingEnabled && cInfo.isSharded()) {
                 manager = cInfo.getCM();
             } else {
@@ -294,7 +295,8 @@ std::shared_ptr<ChunkManager> DBConfig::getChunkManager(const string& ns,
     invariant(!key.isEmpty());
 
     // TODO: We need to keep this first one-chunk check in until we have a more efficient way of
-    // creating/reusing a chunk manager, as doing so requires copying the full set of chunks currently
+    // creating/reusing a chunk manager, as doing so requires copying the full set of chunks
+    // currently
     vector<ChunkType> newestChunk;
     if (oldVersion.isSet() && !forceReload) {
         uassertStatusOK(grid.catalogManager()->getChunks(

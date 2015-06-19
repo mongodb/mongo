@@ -43,9 +43,9 @@ namespace dur {
 
 /** DurOp - Operations we journal that aren't just basic writes.
  *
- *  Basic writes are logged as JEntry's, and indicated in ram temporarily as struct dur::WriteIntent.
- *  We don't make WriteIntent inherit from DurOp to keep it as lean as possible as there will be millions of
- *  them (we don't want a vtable for example there).
+ *  Basic writes are logged as JEntry's, and indicated in ram temporarily as struct
+ *  dur::WriteIntent. We don't make WriteIntent inherit from DurOp to keep it as lean as possible as
+ *  there will be millions of them (we don't want a vtable for example there).
  *
  *  For each op we want to journal, we define a subclass.
  */

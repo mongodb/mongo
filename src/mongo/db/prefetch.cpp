@@ -53,8 +53,8 @@ using std::string;
 
 namespace repl {
 namespace {
-// todo / idea: the prefetcher, when it fetches _id, on an upsert, will see if the record exists. if it does not,
-//              at write time, we can just do an insert, which will be faster.
+// todo / idea: the prefetcher, when it fetches _id, on an upsert, will see if the record exists. if
+// it does not, at write time, we can just do an insert, which will be faster.
 
 // The count (of batches) and time spent fetching pages before application
 //    -- meaning depends on the prefetch behavior: all, _id index, none, etc.)
@@ -69,9 +69,9 @@ void prefetchIndexPages(OperationContext* txn,
                         Collection* collection,
                         const BackgroundSync::IndexPrefetchConfig& prefetchConfig,
                         const BSONObj& obj) {
-    // do we want prefetchConfig to be (1) as-is, (2) for update ops only, or (3) configured per op type?
-    // One might want PREFETCH_NONE for updates, but it's more rare that it is a bad idea for inserts.
-    // #3 (per op), a big issue would be "too many knobs".
+    // do we want prefetchConfig to be (1) as-is, (2) for update ops only, or (3) configured per op
+    // type? One might want PREFETCH_NONE for updates, but it's more rare that it is a bad idea for
+    // inserts. #3 (per op), a big issue would be "too many knobs".
     switch (prefetchConfig) {
         case BackgroundSync::PREFETCH_NONE:
             return;

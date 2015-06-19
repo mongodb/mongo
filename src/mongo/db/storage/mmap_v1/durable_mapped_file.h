@@ -37,10 +37,11 @@
 
 namespace mongo {
 
-/** DurableMappedFile adds some layers atop memory mapped files - specifically our handling of private views & such.
-    if you don't care about journaling/durability (temp sort files & such) use MemoryMappedFile class,
-    not this.
-*/
+/**
+ * DurableMappedFile adds some layers atop memory mapped files - specifically our handling of
+ * private views & such. if you don't care about journaling/durability (temp sort files & such) use
+ * MemoryMappedFile class, not this.
+ */
 class DurableMappedFile : private MemoryMappedFile {
 protected:
     virtual void* viewForFlushing() {
@@ -276,6 +277,7 @@ inline void PointerToDurableMappedFile::makeWritable(void* privateView, unsigned
 inline void PointerToDurableMappedFile::makeWritable(void* _p, unsigned len) {}
 #endif
 
-// allows a pointer into any private view of a DurableMappedFile to be resolved to the DurableMappedFile object
+// allows a pointer into any private view of a DurableMappedFile to be resolved to the
+// DurableMappedFile object
 extern PointerToDurableMappedFile privateViews;
 }

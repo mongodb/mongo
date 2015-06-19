@@ -201,7 +201,8 @@ int KeyBson::woCompare(const KeyBson& r, const Ordering& o) const {
     return oldCompare(_o, r._o, o);
 }
 
-// woEqual could be made faster than woCompare but this is for backward compatibility so not worth a big effort
+// woEqual could be made faster than woCompare but this is for backward compatibility so not worth a
+// big effort
 bool KeyBson::woEqual(const KeyBson& r) const {
     return oldCompare(_o, r._o, nullOrdering) == 0;
 }
@@ -499,7 +500,8 @@ static int compare(const unsigned char*& l, const unsigned char*& r) {
             int llen = binDataCodeToLength(L);
             int diff = L - R;  // checks length and subtype simultaneously
             if (diff) {
-                // unfortunately nibbles are backwards to do subtype and len in one check (could bit swap...)
+                // unfortunately nibbles are backwards to do subtype and len in one check (could bit
+                // swap...)
                 int rlen = binDataCodeToLength(R);
                 if (llen != rlen)
                     return llen - rlen;

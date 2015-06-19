@@ -292,7 +292,8 @@ void installServiceOrDie(const wstring& serviceName,
 
     while (true) {
         // Make sure service doesn't already exist.
-        // TODO: Check to see if service is in "Deleting" status, suggest the user close down Services MMC snap-ins.
+        // TODO: Check to see if service is in "Deleting" status, suggest the user close down
+        // Services MMC snap-ins.
         schService = ::OpenService(schSCManager, serviceName.c_str(), SERVICE_ALL_ACCESS);
         if (schService != NULL) {
             log() << "There is already a service named '" << toUtf8String(serviceName)
@@ -380,13 +381,14 @@ void installServiceOrDie(const wstring& serviceName,
 #if 1
     if (!serviceInstalled) {
 #else
-    // This code sets the mongod service to auto-restart, forever.
-    // This might be a fine thing to do except that when mongod or Windows has a crash, the mongo.lock
-    // file is still around, so any attempt at a restart will immediately fail.  With auto-restart, we
-    // go into a loop, crashing and restarting, crashing and restarting, until someone comes in and
-    // disables the service or deletes the mongod.lock file.
+    // This code sets the mongod service to auto-restart, forever. This might be a fine thing to do
+    // except that when mongod or Windows has a crash, the mongo.lock file is still around, so any
+    // attempt at a restart will immediately fail.  With auto-restart, we go into a loop, crashing
+    // and restarting, crashing and restarting, until someone comes in and disables the service or
+    // deletes the mongod.lock file.
     //
-    // I'm leaving the old code here for now in case we solve this and are able to turn SC_ACTION_RESTART
+    // I'm leaving the old code here for now in case we solve this and are able to turn
+    // SC_ACTION_RESTART
     // back on.
     //
     if (serviceInstalled) {

@@ -174,7 +174,8 @@ private:
                               BSONObjBuilder& out);
 
     /*
-     * Operator method to support #RAND_INT_PLUS_THREAD : { key : { #RAND_INT_PLUS_THREAD: [10, 20] } }
+     * Operator method to support
+     *  #RAND_INT_PLUS_THREAD : { key : { #RAND_INT_PLUS_THREAD: [10, 20] } }
      * See #RAND_INT above for definition. This variation differs from the base in the
      * it uses the upper bound of the requested range to segment the ranges by
      * the thread_id of the TemplateEvaluator - thus

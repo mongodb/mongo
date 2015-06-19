@@ -97,8 +97,8 @@ public:
     DiskLoc capExtent;  // the "current" extent we're writing too for a capped collection
     DiskLoc capFirstNewRecord;
 
-    unsigned short
-        _dataFileVersion;  // NamespaceDetails version.  So we can do backward compatibility in the future. See filever.h
+    // NamespaceDetails version.  So we can do backward compatibility in the future. See filever.h
+    unsigned short _dataFileVersion;
     unsigned short _indexFileVersion;
 
     unsigned long long multiKeyIndexBits;
@@ -115,8 +115,8 @@ public:
     DiskLoc deletedListLarge[LargeBuckets];
 
     // Think carefully before using this. We need at least 8 bytes reserved to leave room for a
-    // DiskLoc pointing to more data (eg in a dummy MmapV1RecordHeader or Extent). There is still _reservedA
-    // above, but these are the final two reserved 8-byte regions.
+    // DiskLoc pointing to more data (eg in a dummy MmapV1RecordHeader or Extent). There is still
+    // _reservedA above, but these are the final two reserved 8-byte regions.
     char _reserved[8];
     /*-------- end data 496 bytes */
 public:

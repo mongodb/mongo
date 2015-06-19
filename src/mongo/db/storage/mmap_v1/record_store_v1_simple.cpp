@@ -300,8 +300,8 @@ void SimpleRecordStoreV1::_compactExtent(OperationContext* txn,
     fassert(17437, sourceExtent->validates(extentLoc));
 
     {
-        // The next/prev MmapV1RecordHeader pointers within the Extent might not be in order so we first
-        // page in the whole Extent sequentially.
+        // The next/prev MmapV1RecordHeader pointers within the Extent might not be in order so we
+        // first page in the whole Extent sequentially.
         // TODO benchmark on slow storage to verify this is measurably faster.
         log() << "compact paging in len=" << sourceExtent->length / 1000000.0 << "MB" << endl;
         Timer t;

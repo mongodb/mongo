@@ -681,7 +681,8 @@ TEST(BSONTemplateEvaluatorTest, NESTING) {
     ASSERT_LESS_THAN(randValue1, 5);
 
     // Test success when operators are arbitrarily nested within multiple elements
-    // {id: { foo: "hi", bar: { #op: [1, 5] }, baz: { baz_a: { #op, [5, 10] }, baz_b: { #op, [10, 15] }, baz_c: "bye" } }
+    // {id: { foo: "hi", bar: { #op: [1, 5] }, baz: { baz_a: { #op, [5, 10] }, baz_b: { #op, [10,
+    // 15] }, baz_c: "bye" } }
     BSONObjBuilder builder4;
     BSONObj barObj4 = BSON("#RAND_INT" << BSON_ARRAY(1 << 5));
     BSONObj bazObj4a = BSON("#RAND_INT" << BSON_ARRAY(5 << 10));

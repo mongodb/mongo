@@ -514,7 +514,8 @@ public:
 
         // use the average object size to estimate how many objects a full chunk would carry
         // do that while traversing the chunk's range using the sharding index, below
-        // there's a fair amount of slack before we determine a chunk is too large because object sizes will vary
+        // there's a fair amount of slack before we determine a chunk is too large because object
+        // sizes will vary
         unsigned long long maxRecsWhenFull;
         long long avgRecSize;
         const long long totalRecs = collection->numRecords(txn);
@@ -936,7 +937,8 @@ public:
     }
 } initialCloneCommand;
 
-// Tests can pause / resume moveChunk's progress at each step by enabling / disabling each fail point.
+// Tests can pause / resume moveChunk's progress at each step by enabling / disabling each fail
+// point.
 MONGO_FP_DECLARE(moveChunkHangAtStep1);
 MONGO_FP_DECLARE(moveChunkHangAtStep2);
 MONGO_FP_DECLARE(moveChunkHangAtStep3);
@@ -1466,8 +1468,8 @@ public:
             log() << "moveChunk setting version to: " << myVersion << migrateLog;
 
             // 5.b
-            // we're under the collection lock here, too, so we can undo the chunk donation because no other state change
-            // could be ongoing
+            // we're under the collection lock here, too, so we can undo the chunk donation because
+            // no other state change could be ongoing
 
             BSONObj res;
             bool ok;
@@ -1511,12 +1513,13 @@ public:
             // 5.c
 
             // version at which the next highest lastmod will be set
-            // if the chunk being moved is the last in the shard, nextVersion is that chunk's lastmod
-            // otherwise the highest version is from the chunk being bumped on the FROM-shard
+            // if the chunk being moved is the last in the shard, nextVersion is that chunk's
+            // lastmod otherwise the highest version is from the chunk being bumped on the
+            // FROM-shard
             ChunkVersion nextVersion;
 
-            // we want to go only once to the configDB but perhaps change two chunks, the one being migrated and another
-            // local one (so to bump version for the entire shard)
+            // we want to go only once to the configDB but perhaps change two chunks, the one being
+            // migrated and another local one (so to bump version for the entire shard)
             // we use the 'applyOps' mechanism to group the two updates and make them safer
             // TODO pull config update code to a module
 
@@ -1657,9 +1660,11 @@ public:
                 // this could be a blip in the connectivity
                 // wait out a few seconds and check if the commit request made it
                 //
-                // if the commit made it to the config, we'll see the chunk in the new shard and there's no action
-                // if the commit did not make it, currently the only way to fix this state is to bounce the mongod so
-                // that the old state (before migrating) be brought in
+                // if the commit made it to the config, we'll see the chunk in the new shard and
+                // there's no action
+                //
+                // if the commit did not make it, currently the only way to fix this state is to
+                // bounce the mongod so that the old state (before migrating) be brought in
 
                 warning() << "moveChunk commit outcome ongoing" << migrateLog;
                 sleepsecs(10);

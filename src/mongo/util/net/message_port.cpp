@@ -194,7 +194,8 @@ bool MessagingPort::recv(Message& m) {
             send(s.c_str(), s.size(), "http");
             return false;
         } else if (len == -1) {
-            // Endian check from the client, after connecting, to see what mode server is running in.
+            // Endian check from the client, after connecting, to see what mode
+            // server is running in.
             unsigned foo = 0x10203040;
             send((char*)&foo, 4, "endian");
             psock->setHandshakeReceived();

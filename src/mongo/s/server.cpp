@@ -330,7 +330,8 @@ static int _main() {
 
     ExitCode exitCode = runMongosServer(mongosGlobalParams.upgrade);
 
-    // To maintain backwards compatibility, we exit with EXIT_NET_ERROR if the listener loop returns.
+    // To maintain backwards compatibility, we exit with EXIT_NET_ERROR if the listener loop
+    // returns.
     if (exitCode == EXIT_NET_ERROR) {
         dbexit(EXIT_NET_ERROR);
     }

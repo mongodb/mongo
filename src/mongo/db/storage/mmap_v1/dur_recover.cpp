@@ -207,7 +207,8 @@ public:
                     _entries->skip(len + 1);      // skip '\0' too
                     _entries->read(lenOrOpCode);  // read this for the fall through
                 }
-                // fall through as a basic operation always follows jdbcontext, and we don't have anything to return yet
+                // fall through as a basic operation always follows jdbcontext, and we don't have
+                // anything to return yet
 
                 default:
                     // fall through
@@ -517,7 +518,8 @@ bool RecoveryJob::processFile(boost::filesystem::path journalfile) {
             return true;
         }
     } catch (...) {
-        // if something weird like a permissions problem keep going so the massert down below can happen (presumably)
+        // if something weird like a permissions problem keep going so the massert down below can
+        // happen (presumably)
         log() << "recover exception checking filesize" << endl;
     }
 

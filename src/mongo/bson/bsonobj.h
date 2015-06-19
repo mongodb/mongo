@@ -147,22 +147,22 @@ public:
        A BSONObj can use a buffer it "owns" or one it does not.
 
        OWNED CASE
-       If the BSONObj owns the buffer, the buffer can be shared among several BSONObj's (by assignment).
-       In this case the buffer is basically implemented as a shared_ptr.
+       If the BSONObj owns the buffer, the buffer can be shared among several BSONObj's (by
+       assignment). In this case the buffer is basically implemented as a shared_ptr.
        Since BSONObj's are typically immutable, this works well.
 
        UNOWNED CASE
-       A BSONObj can also point to BSON data in some other data structure it does not "own" or free later.
-       For example, in a memory mapped file.  In this case, it is important the original data stays in
-       scope for as long as the BSONObj is in use.  If you think the original data may go out of scope,
-       call BSONObj::getOwned() to promote your BSONObj to having its own copy.
+       A BSONObj can also point to BSON data in some other data structure it does not "own" or free
+       later. For example, in a memory mapped file.  In this case, it is important the original data
+       stays in scope for as long as the BSONObj is in use.  If you think the original data may go
+       out of scope, call BSONObj::getOwned() to promote your BSONObj to having its own copy.
 
        On a BSONObj assignment, if the source is unowned, both the source and dest will have unowned
        pointers to the original buffer after the assignment.
 
        If you are not sure about ownership but need the buffer to last as long as the BSONObj, call
-       getOwned().  getOwned() is a no-op if the buffer is already owned.  If not already owned, a malloc
-       and memcpy will result.
+       getOwned().  getOwned() is a no-op if the buffer is already owned.  If not already owned, a
+       malloc and memcpy will result.
 
        Most ways to create BSONObj's create 'owned' variants.  Unowned versions can be created with:
        (1) specifying true for the ifree parameter in the constructor
@@ -240,8 +240,8 @@ public:
     /** Get several fields at once. This is faster than separate getField() calls as the size of
         elements iterated can then be calculated only once each.
         @param n number of fieldNames, and number of elements in the fields array
-        @param fields if a field is found its element is stored in its corresponding position in this array.
-               if not found the array element is unchanged.
+        @param fields if a field is found its element is stored in its corresponding position in
+                this array. if not found the array element is unchanged.
      */
     void getFields(unsigned n, const char** fieldNames, BSONElement* fields) const;
 
@@ -459,9 +459,9 @@ public:
         return BSONElement(objdata() + 4);
     }
 
-    /** faster than firstElement().fieldName() - for the first element we can easily find the fieldname without
-        computing the element size.
-    */
+    /** faster than firstElement().fieldName() - for the first element we can easily find the
+     * fieldname without computing the element size.
+     */
     const char* firstElementFieldName() const {
         const char* p = objdata() + 4;
         return *p == EOO ? "" : p + 1;
@@ -655,12 +655,15 @@ public:
         return _pos < _theend;
     }
 
-    /** @return true if more elements exist to be enumerated INCLUDING the EOO element which is always at the end. */
+    /** @return true if more elements exist to be enumerated INCLUDING the EOO element which is
+     * always at the end. */
     bool moreWithEOO() {
         return _pos <= _theend;
     }
 
-    /** @return the next element in the object. For the final element, element.eoo() will be true. */
+    /**
+     * @return the next element in the object. For the final element, element.eoo() will be true.
+     */
     BSONElement next(bool checkEnd) {
         verify(_pos <= _theend);
 

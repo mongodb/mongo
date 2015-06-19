@@ -108,8 +108,8 @@ private:
     static void preFlush();
     static void postFlush();
     unsigned long long _preFlushTime;
-    unsigned long long
-        _lastFlushTime;  // data < this time is fsynced in the datafiles (unless hard drive controller is caching)
+    // data < this time is fsynced in the datafiles (unless hard drive controller is caching)
+    unsigned long long _lastFlushTime;
     bool _writeToLSNNeeded;
     void updateLSNFile();
 };

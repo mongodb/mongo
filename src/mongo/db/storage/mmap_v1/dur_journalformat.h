@@ -49,11 +49,12 @@ struct JHeader {
     JHeader() {}
     JHeader(std::string fname);
 
-    char magic
-        [2];  // "j\n". j means journal, then a linefeed, fwiw if you were to run "less" on the file or something...
+    // "j\n". j means journal, then a linefeed, fwiw if you were to run "less" on the file or
+    // something...
+    char magic[2];
 
-// x4142 is asci--readable if you look at the file with head/less -- thus the starting values were near
-// that.  simply incrementing the version # is safe on a fwd basis.
+// x4142 is asci--readable if you look at the file with head/less -- thus the starting values were
+// near that.  simply incrementing the version # is safe on a fwd basis.
 #if defined(_NOCOMPRESS)
     enum { CurrentVersion = 0x4148 };
 #else
@@ -62,15 +63,15 @@ struct JHeader {
     unsigned short _version;
 
     // these are just for diagnostic ease (make header more useful as plain text)
-    char n1;      // '\n'
-    char ts[20];  // ascii timestamp of file generation.  for user reading, not used by code.
-    char n2;      // '\n'
-    char dbpath
-        [128];  // path/filename of this file for human reading and diagnostics.  not used by code.
-    char n3, n4;  // '\n', '\n'
+    char n1;           // '\n'
+    char ts[20];       // ascii timestamp of file generation.  for user reading, not used by code.
+    char n2;           // '\n'
+    char dbpath[128];  // path/filename of this file for human reading and diagnostics.  not used
+                       // by code.
+    char n3, n4;       // '\n', '\n'
 
-    unsigned long long
-        fileId;  // unique identifier that will be in each JSectHeader. important as we recycle prealloced files
+    unsigned long long fileId;  // unique identifier that will be in each JSectHeader.
+                                // important as we recycle prealloced files
 
     char reserved3[8026];  // 8KB total for the file header
     char txt2[2];          // "\n\n" at the end
@@ -112,7 +113,8 @@ public:
 };
 
 /** an individual write operation within a group commit section.  Either the entire section should
-    be applied, or nothing.  (We check the md5 for the whole section before doing anything on recovery.)
+    be applied, or nothing.  (We check the md5 for the whole section before doing anything on
+    recovery.)
 */
 struct JEntry {
     enum OpCodes {

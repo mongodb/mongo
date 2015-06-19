@@ -44,15 +44,14 @@ public:
     MiniWebServer(const std::string& name, const std::string& ip, int _port);
     virtual ~MiniWebServer() {}
 
-    virtual void doRequest(
-        const char* rq,  // the full request
-        std::string url,
-        // set these and return them:
-        std::string& responseMsg,
-        int& responseCode,
-        std::vector<std::string>&
-            headers,  // if completely empty, content-type: text/html will be added
-        const SockAddr& from) = 0;
+    virtual void doRequest(const char* rq,  // the full request
+                           std::string url,
+                           // set these and return them:
+                           std::string& responseMsg,
+                           int& responseCode,
+                           std::vector<std::string>& headers,  // if completely empty, content-type:
+                                                               // text/html will be added
+                           const SockAddr& from) = 0;
 
     // --- static helpers ----
 

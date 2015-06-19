@@ -687,8 +687,8 @@ Status applyOperation_inlock(OperationContext* txn,
                     return Status(ErrorCodes::OperationFailed, msg);
                 }
 
-                // Otherwise, it's present; zero objects were updated because of additional specifiers
-                // in the query for idempotence
+                // Otherwise, it's present; zero objects were updated because of additional
+                // specifiers in the query for idempotence
             } else {
                 // this could happen benignly on an oplog duplicate replay of an upsert
                 // (because we are idempotent),

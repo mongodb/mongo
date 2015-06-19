@@ -46,7 +46,8 @@ void breakpoint() {
 #ifndef _WIN32
     // code to raise a breakpoint in GDB
     ONCE {
-        // prevent SIGTRAP from crashing the program if default action is specified and we are not in gdb
+        // prevent SIGTRAP from crashing the program if default action is specified and we are not
+        // in gdb
         struct sigaction current;
         sigaction(SIGTRAP, NULL, &current);
         if (current.sa_handler == SIG_DFL) {

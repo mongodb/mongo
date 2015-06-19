@@ -34,7 +34,8 @@
 /* replication data overview
 
    at the slave:
-     local.sources { host: ..., source: ..., only: ..., syncedTo: ..., localLogTs: ..., dbsNextPass: { ... }, incompleteCloneDbs: { ... } }
+     local.sources { host: ..., source: ..., only: ..., syncedTo: ..., localLogTs: ...,
+                    dbsNextPass: { ... }, incompleteCloneDbs: { ... } }
 
    at the master:
      local.oplog.$<source>
@@ -68,7 +69,8 @@ public:
 
    Can be a group of things to replicate for several databases.
 
-      { host: ..., source: ..., only: ..., syncedTo: ..., dbsNextPass: { ... }, incompleteCloneDbs: { ... } }
+      { host: ..., source: ..., only: ..., syncedTo: ..., dbsNextPass: { ... },
+        incompleteCloneDbs: { ... } }
 
    'source' defaults to 'main'; support for multiple source names is
    not done (always use main for now).
@@ -135,8 +137,10 @@ public:
     std::string sourceName() const {
         return _sourceName.empty() ? "main" : _sourceName;
     }
-    std::string
-        only;  // only a certain db. note that in the sources collection, this may not be changed once you start replicating.
+
+    // only a certain db. note that in the sources collection, this may not be changed once you
+    // start replicating.
+    std::string only;
 
     /* the last time point we have already synced up to (in the remote/master's oplog). */
     Timestamp syncedTo;

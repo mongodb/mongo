@@ -81,8 +81,8 @@ void Grid::setAllowLocalHost(bool allow) {
 }
 
 /*
- * Returns whether balancing is enabled, with optional namespace "ns" parameter for balancing on a particular
- * collection.
+ * Returns whether balancing is enabled, with optional namespace "ns" parameter for balancing on a
+ * particular collection.
  */
 bool Grid::shouldBalance(const SettingsType& balancerSettings) const {
     if (balancerSettings.isBalancerStoppedSet() && balancerSettings.getBalancerStopped()) {

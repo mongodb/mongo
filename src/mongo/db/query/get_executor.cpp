@@ -1132,8 +1132,8 @@ std::string getProjectedDottedField(const std::string& field, bool* isIDOut) {
                 // Generate prefix of field up to (but not including) array index.
                 std::vector<std::string> prefixStrings(res);
                 prefixStrings.resize(i);
-                // Reset projectedField. Instead of overwriting, joinStringDelim() appends joined string
-                // to the end of projectedField.
+                // Reset projectedField. Instead of overwriting, joinStringDelim() appends joined
+                // string to the end of projectedField.
                 std::string projectedField;
                 mongo::joinStringDelim(prefixStrings, &projectedField, '.');
                 return projectedField;

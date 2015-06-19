@@ -69,8 +69,8 @@ struct Helpers {
     /* fetch a single object from collection ns that matches query.
        set your db SavedContext first.
 
-       @param query - the query to perform.  note this is the low level portion of query so "orderby : ..."
-                      won't work.
+       @param query - the query to perform.  note this is the low level portion of query so
+                      "orderby : ..." won't work.
 
        @param requireIndex if true, assert if no index for the query.  a way to guard against
        writing a slow query.

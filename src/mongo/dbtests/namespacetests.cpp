@@ -142,302 +142,305 @@ public:
 namespace NamespaceDetailsTests {
 #if 0   // SERVER-13640
 
-        class Base {
-            const char *ns_;
+    class Base {
+        const char *ns_;
+        Lock::GlobalWrite lk;
+        OldClientContext _context;
+    public:
+        Base( const char *ns = "unittests.NamespaceDetailsTests" ) : ns_( ns ) , _context( ns ) {}
+        virtual ~Base() {
+            OperationContextImpl txn;
+            if ( !nsd() )
+                return;
+            _context.db()->dropCollection( &txn, ns() );
+        }
+    protected:
+        void create() {
             Lock::GlobalWrite lk;
-            OldClientContext _context;
-        public:
-            Base( const char *ns = "unittests.NamespaceDetailsTests" ) : ns_( ns ) , _context( ns ) {}
-            virtual ~Base() {
-                OperationContextImpl txn;
-                if ( !nsd() )
-                    return;
-                _context.db()->dropCollection( &txn, ns() );
-            }
-        protected:
-            void create() {
-                Lock::GlobalWrite lk;
-                OperationContextImpl txn;
-                ASSERT( userCreateNS( &txn, db(), ns(), fromjson( spec() ), false ).isOK() );
-            }
-            virtual string spec() const = 0;
-            int nRecords() const {
-                int count = 0;
-                const Extent* ext;
-                for ( RecordId extLoc = nsd()->firstExtent();
-                        !extLoc.isNull();
-                        extLoc = ext->xnext) {
-                    ext = extentManager()->getExtent(extLoc);
-                    int fileNo = ext->firstRecord.a();
-                    if ( fileNo == -1 )
-                        continue;
-                    for ( int recOfs = ext->firstRecord.getOfs(); recOfs != RecordId::NullOfs;
-                          recOfs = recordStore()->recordFor(RecordId(fileNo, recOfs))->nextOfs() ) {
-                        ++count;
-                    }
-                }
-                ASSERT_EQUALS( count, nsd()->numRecords() );
-                return count;
-            }
-            int nExtents() const {
-                int count = 0;
-                for ( RecordId extLoc = nsd()->firstExtent();
-                        !extLoc.isNull();
-                        extLoc = extentManager()->getExtent(extLoc)->xnext ) {
+            OperationContextImpl txn;
+            ASSERT( userCreateNS( &txn, db(), ns(), fromjson( spec() ), false ).isOK() );
+        }
+        virtual string spec() const = 0;
+        int nRecords() const {
+            int count = 0;
+            const Extent* ext;
+            for ( RecordId extLoc = nsd()->firstExtent();
+                    !extLoc.isNull();
+                    extLoc = ext->xnext) {
+                ext = extentManager()->getExtent(extLoc);
+                int fileNo = ext->firstRecord.a();
+                if ( fileNo == -1 )
+                    continue;
+                for ( int recOfs = ext->firstRecord.getOfs(); recOfs != RecordId::NullOfs;
+                      recOfs = recordStore()->recordFor(RecordId(fileNo, recOfs))->nextOfs() ) {
                     ++count;
                 }
-                return count;
             }
-            const char *ns() const {
-                return ns_;
+            ASSERT_EQUALS( count, nsd()->numRecords() );
+            return count;
+        }
+        int nExtents() const {
+            int count = 0;
+            for ( RecordId extLoc = nsd()->firstExtent();
+                    !extLoc.isNull();
+                    extLoc = extentManager()->getExtent(extLoc)->xnext ) {
+                ++count;
             }
-            const NamespaceDetails *nsd() const {
-                Collection* c = collection();
-                if ( !c )
-                    return NULL;
-                return c->detailsDeprecated();
-            }
-            const RecordStore* recordStore() const {
-                Collection* c = collection();
-                if ( !c )
-                    return NULL;
-                return c->getRecordStore();
-            }
-            Database* db() const {
-                return _context.db();
-            }
-            const ExtentManager* extentManager() const {
-                return db()->getExtentManager();
-            }
-            Collection* collection() const {
-                return db()->getCollection( ns() );
-            }
-
-            static BSONObj bigObj() {
-                BSONObjBuilder b;
-                b.appendOID("_id", 0, true);
-                string as( 187, 'a' );
-                b.append( "a", as );
-                return b.obj();
-            }
-
-        };
-
-        class Create : public Base {
-        public:
-            void run() {
-                create();
-                ASSERT( nsd() );
-                ASSERT_EQUALS( 0, nRecords() );
-                ASSERT( nsd()->firstExtent() == nsd()->capExtent() );
-                RecordId initial = RecordId();
-                initial.setInvalid();
-                ASSERT( initial == nsd()->capFirstNewRecord() );
-            }
-            virtual string spec() const { return "{\"capped\":true,\"size\":512,\"$nExtents\":1}"; }
-        };
-
-        class SingleAlloc : public Base {
-        public:
-            void run() {
-                OperationContextImpl txn;
-                create();
-                BSONObj b = bigObj();
-                ASSERT( collection()->insertDocument( &txn, b, true ).isOK() );
-                ASSERT_EQUALS( 1, nRecords() );
-            }
-            virtual string spec() const { return "{\"capped\":true,\"size\":512,\"$nExtents\":1}"; }
-        };
-
-        class Realloc : public Base {
-        public:
-            void run() {
-                OperationContextImpl txn;
-                create();
-
-                const int N = 20;
-                const int Q = 16; // these constants depend on the size of the bson object, the extent size allocated by the system too
-                RecordId l[ N ];
-                for ( int i = 0; i < N; ++i ) {
-                    BSONObj b = bigObj();
-                    StatusWith<RecordId> status = collection()->insertDocument( &txn, b, true );
-                    ASSERT( status.isOK() );
-                    l[ i ] = status.getValue();
-                    ASSERT( !l[ i ].isNull() );
-                    ASSERT( nRecords() <= Q );
-                    //ASSERT_EQUALS( 1 + i % 2, nRecords() );
-                    if ( i >= 16 )
-                        ASSERT( l[ i ] == l[ i - Q] );
-                }
-            }
-            virtual string spec() const { return "{\"capped\":true,\"size\":512,\"$nExtents\":1}"; }
-        };
-
-        class TwoExtent : public Base {
-        public:
-            void run() {
-                OperationContextImpl txn;
-                create();
-                ASSERT_EQUALS( 2, nExtents() );
-
-                RecordId l[ 8 ];
-                for ( int i = 0; i < 8; ++i ) {
-                    StatusWith<RecordId> status = collection()->insertDocument( &txn, bigObj(), true );
-                    ASSERT( status.isOK() );
-                    l[ i ] = status.getValue();
-                    ASSERT( !l[ i ].isNull() );
-                    //ASSERT_EQUALS( i < 2 ? i + 1 : 3 + i % 2, nRecords() );
-                    //if ( i > 3 )
-                    //    ASSERT( l[ i ] == l[ i - 4 ] );
-                }
-                ASSERT( nRecords() == 8 );
-
-                // Too big
-                BSONObjBuilder bob;
-                bob.appendOID( "_id", NULL, true );
-                bob.append( "a", string( MinExtentSize + 500, 'a' ) ); // min extent size is now 4096
-                BSONObj bigger = bob.done();
-                StatusWith<RecordId> status = collection()->insertDocument( &txn, bigger, false );
-                ASSERT( !status.isOK() );
-                ASSERT_EQUALS( 0, nRecords() );
-            }
-        private:
-            virtual string spec() const {
-                return "{\"capped\":true,\"size\":512,\"$nExtents\":2}";
-            }
-        };
-
-
-        BSONObj docForRecordSize( int size ) {
-            BSONObjBuilder b;
-            b.append( "_id", 5 );
-            b.append( "x", string( size - Record::HeaderSize - 22, 'x' ) );
-            BSONObj x = b.obj();
-            ASSERT_EQUALS( Record::HeaderSize + x.objsize(), size );
-            return x;
+            return count;
+        }
+        const char *ns() const {
+            return ns_;
+        }
+        const NamespaceDetails *nsd() const {
+            Collection* c = collection();
+            if ( !c )
+                return NULL;
+            return c->detailsDeprecated();
+        }
+        const RecordStore* recordStore() const {
+            Collection* c = collection();
+            if ( !c )
+                return NULL;
+            return c->getRecordStore();
+        }
+        Database* db() const {
+            return _context.db();
+        }
+        const ExtentManager* extentManager() const {
+            return db()->getExtentManager();
+        }
+        Collection* collection() const {
+            return db()->getCollection( ns() );
         }
 
-        /** 
-         * alloc() does not quantize records in capped collections.
-         * NB: this actually tests that the code in Database::createCollection doesn't set
-         * PowerOf2Sizes for capped collections.
-         */
-        class AllocCappedNotQuantized : public Base {
-        public:
-            void run() {
-                OperationContextImpl txn;
-                create();
-                ASSERT( nsd()->isCapped() );
-                ASSERT( !nsd()->isUserFlagSet( NamespaceDetails::Flag_UsePowerOf2Sizes ) );
+        static BSONObj bigObj() {
+            BSONObjBuilder b;
+            b.appendOID("_id", 0, true);
+            string as( 187, 'a' );
+            b.append( "a", as );
+            return b.obj();
+        }
 
-                StatusWith<RecordId> result =
-                    collection()->insertDocument( &txn, docForRecordSize( 300 ), false );
-                ASSERT( result.isOK() );
-                Record* record = collection()->getRecordStore()->recordFor( result.getValue() );
-                // Check that no quantization is performed.
-                ASSERT_EQUALS( 300, record->lengthWithHeaders() );
-            }
-            virtual string spec() const { return "{capped:true,size:2048}"; }
-        };
+    };
 
+    class Create : public Base {
+    public:
+        void run() {
+            create();
+            ASSERT( nsd() );
+            ASSERT_EQUALS( 0, nRecords() );
+            ASSERT( nsd()->firstExtent() == nsd()->capExtent() );
+            RecordId initial = RecordId();
+            initial.setInvalid();
+            ASSERT( initial == nsd()->capFirstNewRecord() );
+        }
+        virtual string spec() const { return "{\"capped\":true,\"size\":512,\"$nExtents\":1}"; }
+    };
 
-        /* test  NamespaceDetails::cappedTruncateAfter(const char *ns, RecordId loc)
-        */
-        class TruncateCapped : public Base {
-            virtual string spec() const {
-                return "{\"capped\":true,\"size\":512,\"$nExtents\":2}";
-            }
-            void pass(int p) {
-                OperationContextImpl txn;
-                create();
-                ASSERT_EQUALS( 2, nExtents() );
+    class SingleAlloc : public Base {
+    public:
+        void run() {
+            OperationContextImpl txn;
+            create();
+            BSONObj b = bigObj();
+            ASSERT( collection()->insertDocument( &txn, b, true ).isOK() );
+            ASSERT_EQUALS( 1, nRecords() );
+        }
+        virtual string spec() const { return "{\"capped\":true,\"size\":512,\"$nExtents\":1}"; }
+    };
 
+    class Realloc : public Base {
+    public:
+        void run() {
+            OperationContextImpl txn;
+            create();
+
+            const int N = 20;
+            const int Q = 16; // these constants depend on the size of the bson object, the extent
+                              // size allocated by the system too
+            RecordId l[ N ];
+            for ( int i = 0; i < N; ++i ) {
                 BSONObj b = bigObj();
-
-                int N = MinExtentSize / b.objsize() * nExtents() + 5;
-                int T = N - 4;
-
-                RecordId truncAt;
-                //RecordId l[ 8 ];
-                for ( int i = 0; i < N; ++i ) {
-                    BSONObj bb = bigObj();
-                    StatusWith<RecordId> status = collection()->insertDocument( &txn, bb, true );
-                    ASSERT( status.isOK() );
-                    RecordId a = status.getValue();
-                    if( T == i )
-                        truncAt = a;
-                    ASSERT( !a.isNull() );
-                    /*ASSERT_EQUALS( i < 2 ? i + 1 : 3 + i % 2, nRecords() );
-                    if ( i > 3 )
-                        ASSERT( l[ i ] == l[ i - 4 ] );*/
-                }
-                ASSERT( nRecords() < N );
-
-                RecordId last, first;
-                {
-                    unique_ptr<Runner> runner(InternalPlanner::collectionScan(&txn,
-                                                                            ns(),
-                                                                            collection(),
-                                                                            InternalPlanner::BACKWARD));
-                    runner->getNext(NULL, &last);
-                    ASSERT( !last.isNull() );
-                }
-                {
-                    unique_ptr<Runner> runner(InternalPlanner::collectionScan(&txn,
-                                                                            ns(),
-                                                                            collection(),
-                                                                            InternalPlanner::FORWARD));
-                    runner->getNext(NULL, &first);
-                    ASSERT( !first.isNull() );
-                    ASSERT( first != last ) ;
-                }
-
-                collection()->temp_cappedTruncateAfter(&txn, truncAt, false);
-                ASSERT_EQUALS( collection()->numRecords() , 28u );
-
-                {
-                    RecordId loc;
-                    unique_ptr<Runner> runner(InternalPlanner::collectionScan(&txn,
-                                                                            ns(),
-                                                                            collection(),
-                                                                            InternalPlanner::FORWARD));
-                    runner->getNext(NULL, &loc);
-                    ASSERT( first == loc);
-                }
-                {
-                    unique_ptr<Runner> runner(InternalPlanner::collectionScan(&txn,
-                                                                            ns(),
-                                                                            collection(),
-                                                                            InternalPlanner::BACKWARD));
-                    RecordId loc;
-                    runner->getNext(NULL, &loc);
-                    ASSERT( last != loc );
-                    ASSERT( !last.isNull() );
-                }
-
-                // Too big
-                BSONObjBuilder bob;
-                bob.appendOID("_id", 0, true);
-                bob.append( "a", string( MinExtentSize + 300, 'a' ) );
-                BSONObj bigger = bob.done();
-                StatusWith<RecordId> status = collection()->insertDocument( &txn, bigger, true );
-                ASSERT( !status.isOK() );
-                ASSERT_EQUALS( 0, nRecords() );
+                StatusWith<RecordId> status = collection()->insertDocument( &txn, b, true );
+                ASSERT( status.isOK() );
+                l[ i ] = status.getValue();
+                ASSERT( !l[ i ].isNull() );
+                ASSERT( nRecords() <= Q );
+                //ASSERT_EQUALS( 1 + i % 2, nRecords() );
+                if ( i >= 16 )
+                    ASSERT( l[ i ] == l[ i - Q] );
             }
-        public:
-            void run() {
+        }
+        virtual string spec() const { return "{\"capped\":true,\"size\":512,\"$nExtents\":1}"; }
+    };
+
+    class TwoExtent : public Base {
+    public:
+        void run() {
+            OperationContextImpl txn;
+            create();
+            ASSERT_EQUALS( 2, nExtents() );
+
+            RecordId l[ 8 ];
+            for ( int i = 0; i < 8; ++i ) {
+                StatusWith<RecordId> status = collection()->insertDocument( &txn, bigObj(), true );
+                ASSERT( status.isOK() );
+                l[ i ] = status.getValue();
+                ASSERT( !l[ i ].isNull() );
+                //ASSERT_EQUALS( i < 2 ? i + 1 : 3 + i % 2, nRecords() );
+                //if ( i > 3 )
+                //    ASSERT( l[ i ] == l[ i - 4 ] );
+            }
+            ASSERT( nRecords() == 8 );
+
+            // Too big
+            BSONObjBuilder bob;
+            bob.appendOID( "_id", NULL, true );
+            bob.append( "a", string( MinExtentSize + 500, 'a' ) ); // min extent size is now 4096
+            BSONObj bigger = bob.done();
+            StatusWith<RecordId> status = collection()->insertDocument( &txn, bigger, false );
+            ASSERT( !status.isOK() );
+            ASSERT_EQUALS( 0, nRecords() );
+        }
+    private:
+        virtual string spec() const {
+            return "{\"capped\":true,\"size\":512,\"$nExtents\":2}";
+        }
+    };
+
+
+    BSONObj docForRecordSize( int size ) {
+        BSONObjBuilder b;
+        b.append( "_id", 5 );
+        b.append( "x", string( size - Record::HeaderSize - 22, 'x' ) );
+        BSONObj x = b.obj();
+        ASSERT_EQUALS( Record::HeaderSize + x.objsize(), size );
+        return x;
+    }
+
+    /**
+     * alloc() does not quantize records in capped collections.
+     * NB: this actually tests that the code in Database::createCollection doesn't set
+     * PowerOf2Sizes for capped collections.
+     */
+    class AllocCappedNotQuantized : public Base {
+    public:
+        void run() {
+            OperationContextImpl txn;
+            create();
+            ASSERT( nsd()->isCapped() );
+            ASSERT( !nsd()->isUserFlagSet( NamespaceDetails::Flag_UsePowerOf2Sizes ) );
+
+            StatusWith<RecordId> result =
+                collection()->insertDocument( &txn, docForRecordSize( 300 ), false );
+            ASSERT( result.isOK() );
+            Record* record = collection()->getRecordStore()->recordFor( result.getValue() );
+            // Check that no quantization is performed.
+            ASSERT_EQUALS( 300, record->lengthWithHeaders() );
+        }
+        virtual string spec() const { return "{capped:true,size:2048}"; }
+    };
+
+
+    /* test  NamespaceDetails::cappedTruncateAfter(const char *ns, RecordId loc)
+    */
+    class TruncateCapped : public Base {
+        virtual string spec() const {
+            return "{\"capped\":true,\"size\":512,\"$nExtents\":2}";
+        }
+        void pass(int p) {
+            OperationContextImpl txn;
+            create();
+            ASSERT_EQUALS( 2, nExtents() );
+
+            BSONObj b = bigObj();
+
+            int N = MinExtentSize / b.objsize() * nExtents() + 5;
+            int T = N - 4;
+
+            RecordId truncAt;
+            //RecordId l[ 8 ];
+            for ( int i = 0; i < N; ++i ) {
+                BSONObj bb = bigObj();
+                StatusWith<RecordId> status = collection()->insertDocument( &txn, bb, true );
+                ASSERT( status.isOK() );
+                RecordId a = status.getValue();
+                if( T == i )
+                    truncAt = a;
+                ASSERT( !a.isNull() );
+                /*ASSERT_EQUALS( i < 2 ? i + 1 : 3 + i % 2, nRecords() );
+                if ( i > 3 )
+                    ASSERT( l[ i ] == l[ i - 4 ] );*/
+            }
+            ASSERT( nRecords() < N );
+
+            RecordId last, first;
+            {
+                unique_ptr<Runner> runner(InternalPlanner::collectionScan(&txn,
+                                                                        ns(),
+                                                                        collection(),
+                                                                        InternalPlanner::BACKWARD));
+                runner->getNext(NULL, &last);
+                ASSERT( !last.isNull() );
+            }
+            {
+                unique_ptr<Runner> runner(InternalPlanner::collectionScan(&txn,
+                                                                        ns(),
+                                                                        collection(),
+                                                                        InternalPlanner::FORWARD));
+                runner->getNext(NULL, &first);
+                ASSERT( !first.isNull() );
+                ASSERT( first != last ) ;
+            }
+
+            collection()->temp_cappedTruncateAfter(&txn, truncAt, false);
+            ASSERT_EQUALS( collection()->numRecords() , 28u );
+
+            {
+                RecordId loc;
+                unique_ptr<Runner> runner(InternalPlanner::collectionScan(&txn,
+                                                                        ns(),
+                                                                        collection(),
+                                                                        InternalPlanner::FORWARD));
+                runner->getNext(NULL, &loc);
+                ASSERT( first == loc);
+            }
+            {
+                unique_ptr<Runner> runner(InternalPlanner::collectionScan(&txn,
+                                                                        ns(),
+                                                                        collection(),
+                                                                        InternalPlanner::BACKWARD));
+                RecordId loc;
+                runner->getNext(NULL, &loc);
+                ASSERT( last != loc );
+                ASSERT( !last.isNull() );
+            }
+
+            // Too big
+            BSONObjBuilder bob;
+            bob.appendOID("_id", 0, true);
+            bob.append( "a", string( MinExtentSize + 300, 'a' ) );
+            BSONObj bigger = bob.done();
+            StatusWith<RecordId> status = collection()->insertDocument( &txn, bigger, true );
+            ASSERT( !status.isOK() );
+            ASSERT_EQUALS( 0, nRecords() );
+        }
+    public:
+        void run() {
 //                log() << "******** NOT RUNNING TruncateCapped test yet ************" << endl;
-                pass(0);
-            }
-        };
+            pass(0);
+        }
+    };
 #endif  // SERVER-13640
 #if 0   // XXXXXX - once RecordStore is clean, we can put this back
         class Migrate : public Base {
         public:
             void run() {
                 create();
-                nsd()->deletedListEntry( 2 ) = nsd()->cappedListOfAllDeletedRecords().drec()->nextDeleted().drec()->nextDeleted();
-                nsd()->cappedListOfAllDeletedRecords().drec()->nextDeleted().drec()->nextDeleted().writing() = RecordId();
+                nsd()->deletedListEntry( 2 ) = nsd()->cappedListOfAllDeletedRecords().drec()->
+                        nextDeleted().drec()->nextDeleted();
+                nsd()->cappedListOfAllDeletedRecords().drec()->nextDeleted().drec()->
+                        nextDeleted().writing() = RecordId();
                 nsd()->cappedLastDelRecLastExtent().Null();
                 NamespaceDetails *d = nsd();
 
@@ -451,7 +454,8 @@ namespace NamespaceDetailsTests {
                 ASSERT( nsd()->capExtent().getOfs() != 0 );
                 ASSERT( !nsd()->capFirstNewRecord().isValid() );
                 int nDeleted = 0;
-                for ( RecordId i = nsd()->cappedListOfAllDeletedRecords(); !i.isNull(); i = i.drec()->nextDeleted(), ++nDeleted );
+                for ( RecordId i = nsd()->cappedListOfAllDeletedRecords();
+                        !i.isNull(); i = i.drec()->nextDeleted(), ++nDeleted );
                 ASSERT_EQUALS( 10, nDeleted );
                 ASSERT( nsd()->cappedLastDelRecLastExtent().isNull() );
             }

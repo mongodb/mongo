@@ -28,9 +28,11 @@
 *    it in the license file.
 */
 
-/* this module adds some of our layers atop memory mapped files - specifically our handling of private views & such
-   if you don't care about journaling/durability (temp sort files & such) use MemoryMappedFile class, not this.
-*/
+/**
+ * this module adds some of our layers atop memory mapped files - specifically our handling of
+ * private views & such if you don't care about journaling/durability (temp sort files & such) use
+ * MemoryMappedFile class, not this.
+ */
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
 
@@ -275,9 +277,8 @@ bool DurableMappedFile::finishOpening() {
                                                                       "(look in log for "
                                                                       "more information)");
             }
-            privateViews.add_inlock(
-                _view_private,
-                this);  // note that testIntent builds use this, even though it points to view_write then...
+            // note that testIntent builds use this, even though it points to view_write then...
+            privateViews.add_inlock(_view_private, this);
         } else {
             _view_private = _view_write;
         }

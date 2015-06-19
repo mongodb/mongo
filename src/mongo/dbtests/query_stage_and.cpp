@@ -27,8 +27,8 @@
  */
 
 /**
- * This file tests db/exec/and_*.cpp and RecordId invalidation.  RecordId invalidation forces a fetch
- * so we cannot test it outside of a dbtest.
+ * This file tests db/exec/and_*.cpp and RecordId invalidation.  RecordId invalidation forces a
+ * fetch so we cannot test it outside of a dbtest.
  */
 
 

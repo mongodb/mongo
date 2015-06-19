@@ -149,7 +149,8 @@ public:
     NamespaceString getTargetNSForListIndexesGetMore() const;
 
     /**
-     * @return true if the namespace is valid. Special namespaces for internal use are considered as valid.
+     * @return true if the namespace is valid. Special namespaces for internal use are considered as
+     * valid.
      */
     bool isValid() const {
         return validDBName(db()) && !coll().empty();

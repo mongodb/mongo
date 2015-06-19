@@ -172,7 +172,9 @@ SafeNum addInt32Int32(int lInt32, int rInt32) {
     // NOTE: Please see "Secure Coding in C and C++", Second Edition, page 264-265 for
     // details on this algorithm (for an alternative resources, see
     //
-    // https://www.securecoding.cert.org/confluence/display/seccode/INT32-C.+Ensure+that+operations+on+signed+integers+do+not+result+in+overflow?showComments=false).
+    // https://www.securecoding.cert.org/confluence/display/seccode/
+    // INT32-C.+Ensure+that+operations+on+signed+integers+do+not+result+in+overflow?
+    // showComments=false).
     //
     // We are using the "Downcast from a larger type" algorithm here. We always perform
     // the arithmetic in 64-bit mode, which can never overflow for 32-bit
@@ -214,7 +216,9 @@ SafeNum mulInt32Int32(int lInt32, int rInt32) {
     // NOTE: Please see "Secure Coding in C and C++", Second Edition, page 264-265 for
     // details on this algorithm (for an alternative resources, see
     //
-    // https://www.securecoding.cert.org/confluence/display/seccode/INT32-C.+Ensure+that+operations+on+signed+integers+do+not+result+in+overflow?showComments=false).
+    // https://www.securecoding.cert.org/confluence/display/seccode/
+    // INT32-C.+Ensure+that+operations+on+signed+integers+do+not+result+in+overflow?
+    // showComments=false).
     //
     // We are using the "Downcast from a larger type" algorithm here. We always perform
     // the arithmetic in 64-bit mode, which can never overflow for 32-bit

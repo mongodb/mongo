@@ -444,8 +444,8 @@ DiskLoc MmapV1ExtentManager::_allocFromFreeList(OperationContext* txn,
                         break;
                     }
                     if (t.seconds() >= 2) {
-                        // have spent lots of time in write lock, and we are in [low,high], so close enough
-                        // could come into play if extent freelist is very long
+                        // have spent lots of time in write lock, and we are in [low,high], so close
+                        // enough could come into play if extent freelist is very long
                         break;
                     }
                 } else {

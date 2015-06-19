@@ -890,7 +890,8 @@ void InputBuffer::refreshLine(PromptBase& pi) {
 #ifndef _WIN32
 
 /**
- * Read a UTF-8 sequence from the non-Windows keyboard and return the Unicode (UChar32) character it encodes
+ * Read a UTF-8 sequence from the non-Windows keyboard and return the Unicode (UChar32) character it
+ * encodes
  *
  * @return  UChar32 Unicode character
  */
@@ -1258,17 +1259,22 @@ static UChar32 linenoiseReadChar(void) {
                     char buf[1024];
                     sprintf(
                             buf,
-                            "Unicode character 0x%04X, repeat count %d, virtual keycode 0x%04X, virtual scancode 0x%04X, key %s%s%s%s%s\n",
+                            "Unicode character 0x%04X, repeat count %d, virtual keycode 0x%04X, "
+                            "virtual scancode 0x%04X, key %s%s%s%s%s\n",
                             rec.Event.KeyEvent.uChar.UnicodeChar,
                             rec.Event.KeyEvent.wRepeatCount,
                             rec.Event.KeyEvent.wVirtualKeyCode,
                             rec.Event.KeyEvent.wVirtualScanCode,
                             rec.Event.KeyEvent.bKeyDown ? "down" : "up",
-                                (rec.Event.KeyEvent.dwControlKeyState & LEFT_CTRL_PRESSED)  ? " L-Ctrl" : "",
-                                (rec.Event.KeyEvent.dwControlKeyState & RIGHT_CTRL_PRESSED) ? " R-Ctrl" : "",
-                                (rec.Event.KeyEvent.dwControlKeyState & LEFT_ALT_PRESSED)   ? " L-Alt"  : "",
-                                (rec.Event.KeyEvent.dwControlKeyState & RIGHT_ALT_PRESSED)  ? " R-Alt"  : ""
-                    );
+                                (rec.Event.KeyEvent.dwControlKeyState & LEFT_CTRL_PRESSED)  ?
+                                    " L-Ctrl" : "",
+                                (rec.Event.KeyEvent.dwControlKeyState & RIGHT_CTRL_PRESSED) ?
+                                    " R-Ctrl" : "",
+                                (rec.Event.KeyEvent.dwControlKeyState & LEFT_ALT_PRESSED)   ?
+                                    " L-Alt"  : "",
+                                (rec.Event.KeyEvent.dwControlKeyState & RIGHT_ALT_PRESSED)  ?
+                                    " R-Alt"  : ""
+                           );
                     OutputDebugStringA( buf );
                 //}
             }
@@ -1277,15 +1283,17 @@ static UChar32 linenoiseReadChar(void) {
         if (rec.EventType != KEY_EVENT) {
             continue;
         }
-        // Windows provides for entry of characters that are not on your keyboard by sending the Unicode
-        // characters as a "key up" with virtual keycode 0x12 (VK_MENU == Alt key) ... accept these characters,
-        // otherwise only process characters on "key down"
+        // Windows provides for entry of characters that are not on your keyboard by sending the
+        // Unicode characters as a "key up" with virtual keycode 0x12 (VK_MENU == Alt key) ...
+        // accept these characters, otherwise only process characters on "key down"
         if (!rec.Event.KeyEvent.bKeyDown && rec.Event.KeyEvent.wVirtualKeyCode != VK_MENU) {
             continue;
         }
         modifierKeys = 0;
-        // AltGr is encoded as ( LEFT_CTRL_PRESSED | RIGHT_ALT_PRESSED ), so don't treat this combination as either CTRL or META
-        // we just turn off those two bits, so it is still possible to combine CTRL and/or META with an AltGr key by using right-Ctrl and/or left-Alt
+        // AltGr is encoded as ( LEFT_CTRL_PRESSED | RIGHT_ALT_PRESSED ), so don't treat this
+        // combination as either CTRL or META we just turn off those two bits, so it is still
+        // possible to combine CTRL and/or META with an AltGr key by using right-Ctrl and/or
+        // left-Alt
         if ((rec.Event.KeyEvent.dwControlKeyState & (LEFT_CTRL_PRESSED | RIGHT_ALT_PRESSED)) ==
             (LEFT_CTRL_PRESSED | RIGHT_ALT_PRESSED)) {
             rec.Event.KeyEvent.dwControlKeyState &= ~(LEFT_CTRL_PRESSED | RIGHT_ALT_PRESSED);
@@ -1438,16 +1446,16 @@ static const size_t completionCountCutoff = 100;
 
 /**
  * Handle command completion, using a completionCallback() routine to provide possible substitutions
- * This routine handles the mechanics of updating the user's input buffer with possible replacement of
- * text as the user selects a proposed completion string, or cancels the completion attempt.
+ * This routine handles the mechanics of updating the user's input buffer with possible replacement
+ * of text as the user selects a proposed completion string, or cancels the completion attempt.
  * @param pi     PromptBase struct holding information about the prompt and our screen position
  */
 int InputBuffer::completeLine(PromptBase& pi) {
     linenoiseCompletions lc;
     char c = 0;
 
-    // completionCallback() expects a parsable entity, so find the previous break character and extract
-    // a copy to parse.  we also handle the case where tab is hit while not at end-of-line.
+    // completionCallback() expects a parsable entity, so find the previous break character and
+    // extract a copy to parse.  we also handle the case where tab is hit while not at end-of-line.
     int startIndex = pos;
     while (--startIndex >= 0) {
         if (strchr(breakChars, buf32[startIndex])) {
@@ -1705,10 +1713,11 @@ void InputBuffer::clearScreen(PromptBase& pi) {
 }
 
 /**
- * Incremental history search -- take over the prompt and keyboard as the user types a search string,
- * deletes characters from it, changes direction, and either accepts the found line (for execution or
- * editing) or cancels.
- * @param pi        PromptBase struct holding information about the (old, static) prompt and our screen position
+ * Incremental history search -- take over the prompt and keyboard as the user types a search
+ * string, deletes characters from it, changes direction, and either accepts the found line (for
+ * execution orediting) or cancels.
+ * @param pi        PromptBase struct holding information about the (old, static) prompt and our
+ *                  screen position
  * @param startChar the character that began the search, used to set the initial direction
  */
 int InputBuffer::incrementalHistorySearch(PromptBase& pi, int startChar) {
@@ -1716,7 +1725,8 @@ int InputBuffer::incrementalHistorySearch(PromptBase& pi, int startChar) {
     size_t ucharCount;
     int errorCode;
 
-    // if not already recalling, add the current line to the history list so we don't have to special case it
+    // if not already recalling, add the current line to the history list so we don't have to
+    // special case it
     if (historyIndex == historyLen - 1) {
         free(history[historyLen - 1]);
         bufferSize = sizeof(UChar32) * len + 1;
@@ -2272,7 +2282,8 @@ int InputBuffer::getInputLine(PromptBase& pi) {
             case DOWN_ARROW_KEY:
             case UP_ARROW_KEY:
                 killRing.lastAction = KillRing::actionOther;
-                // if not already recalling, add the current line to the history list so we don't have to special case it
+                // if not already recalling, add the current line to the history list so we don't
+                // have to special case it
                 if (historyIndex == historyLen - 1) {
                     free(history[historyLen - 1]);
                     size_t tempBufferSize = sizeof(UChar32) * len + 1;
@@ -2475,7 +2486,8 @@ int InputBuffer::getInputLine(PromptBase& pi) {
             case META + '>':     // meta->, end of history
             case PAGE_DOWN_KEY:  // Page Down, end of history
                 killRing.lastAction = KillRing::actionOther;
-                // if not already recalling, add the current line to the history list so we don't have to special case it
+                // if not already recalling, add the current line to the history list so we don't
+                // have to special case it
                 if (historyIndex == historyLen - 1) {
                     free(history[historyLen - 1]);
                     size_t tempBufferSize = sizeof(UChar32) * len + 1;
@@ -2611,7 +2623,8 @@ void linenoisePreloadBuffer(const char* preloadText) {
  * call it with a prompt to display and it will return a line of input from the user
  *
  * @param prompt text of prompt to display to the user
- * @return       the returned string belongs to the caller on return and must be freed to prevent memory leaks
+ * @return       the returned string belongs to the caller on return and must be freed to prevent
+ *               memory leaks
  */
 char* linenoise(const char* prompt) {
     if (isatty(STDIN_FILENO)) {  // input is from a terminal

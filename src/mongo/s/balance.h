@@ -85,11 +85,12 @@ private:
     bool _init();
 
     /**
-     * Gathers all the necessary information about shards and chunks, and decides whether there are candidate chunks to
-     * be moved.
+     * Gathers all the necessary information about shards and chunks, and decides whether there are
+     * candidate chunks to be moved.
      *
      * @param conn is the connection with the config server(s)
-     * @param candidateChunks (IN/OUT) filled with candidate chunks, one per collection, that could possibly be moved
+     * @param candidateChunks (IN/OUT) filled with candidate chunks, one per collection, that could
+     *                          possibly be moved
      */
     void _doBalanceRound(std::vector<std::shared_ptr<MigrateInfo>>* candidateChunks);
 
@@ -111,7 +112,8 @@ private:
     void _ping(bool waiting = false);
 
     /**
-     * @return true if all the servers listed in configdb as being shards are reachable and are distinct processes
+     * @return true if all the servers listed in configdb as being shards are reachable and are
+     *         distinct processes
      */
     bool _checkOIDs();
 };

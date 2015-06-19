@@ -317,7 +317,8 @@ void FileAllocator::ensureLength(int fd, long size) {
 
 void FileAllocator::checkFailure() {
     if (_failed) {
-        // we want to log the problem (diskfull.js expects it) but we do not want to dump a stack tracke
+        // we want to log the problem (diskfull.js expects it) but we do not want to dump a stack
+        // trace
         msgassertedNoTrace(12520, "new file allocation failure");
     }
 }

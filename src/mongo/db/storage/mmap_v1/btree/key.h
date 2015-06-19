@@ -81,10 +81,11 @@ class KeyV1Owned;
 
 // corresponding to BtreeData_V1
 class KeyV1 {
-    void operator=(
-        const KeyV1&);  // disallowed just to make people be careful as we don't own the buffer
-    KeyV1(
-        const KeyV1Owned&);  // disallowed as this is not a great idea as KeyV1Owned likely will go out of scope
+    // disallowed just to make people be careful as we don't own the buffer
+    void operator=(const KeyV1&);
+    // disallowed as this is not a great idea as KeyV1Owned likely will go out of scope
+    KeyV1(const KeyV1Owned&);
+
 public:
     KeyV1() {
         _keyData = 0;

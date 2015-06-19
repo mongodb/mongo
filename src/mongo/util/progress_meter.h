@@ -127,8 +127,8 @@ private:
 
 // e.g.:
 // CurOp * op = CurOp::get(txn);
-// ProgressMeterHolder pm(op->setMessage("index: (1/3) external sort", "Index: External Sort Progress", d->stats.nrecords, 10));
-// loop { pm.hit(); }
+// ProgressMeterHolder pm(op->setMessage("index: (1/3) external sort",
+// "Index: External Sort Progress", d->stats.nrecords, 10)); loop { pm.hit(); }
 class ProgressMeterHolder {
     MONGO_DISALLOW_COPYING(ProgressMeterHolder);
 

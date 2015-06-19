@@ -173,8 +173,9 @@ public:
     OptionDescription& validRange(long min, long max);
 
     /**
-     * Specifies that this option is incompatible with another option.  The std::string provided must
-     * be the dottedName, which is the name used to access the option in the result Environment.
+     * Specifies that this option is incompatible with another option.  The std::string provided
+     * must be the dottedName, which is the name used to access the option in the result
+     * Environment.
      *
      * TODO: Find a way to check that that option actually exists in our section somewhere.
      */

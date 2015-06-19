@@ -82,9 +82,13 @@ DistributionEstimators<NumQuantiles>::DistributionEstimators()
  * The quantile estimation follows the extended_p_square implementation in boost.accumulators.
  * It differs by removing the ability to request arbitrary quantiles and computing exactly
  * 'NumQuantiles' equidistant quantiles (plus minimum and maximum) instead.
- * See http://www.boost.org/doc/libs/1_51_0/doc/html/boost/accumulators/impl/extended_p_square_impl.html ,
- * R. Jain and I. Chlamtac, The P^2 algorithmus for dynamic calculation of quantiles and histograms without storing observations, Communications of the ACM, Volume 28 (October), Number 10, 1985, p. 1076-1085. and
- * K. E. E. Raatikainen, Simultaneous estimation of several quantiles, Simulation, Volume 49, Number 4 (October), 1986, p. 159-164.
+ * See http://www.boost.org/doc/libs/1_51_0/doc/html/boost/accumulators/impl/
+ *  extended_p_square_impl.html ,
+ * R. Jain and I. Chlamtac, The P^2 algorithmus for dynamic calculation of quantiles and histograms
+ *  without storing observations, Communications of the ACM, Volume 28
+ *  (October), Number 10, 1985, p. 1076-1085. and
+ * K. E. E. Raatikainen, Simultaneous estimation of several quantiles, Simulation,
+ *   Volume 49, Number 4 (October), 1986, p. 159-164.
  */
 template <std::size_t NumQuantiles>
 DistributionEstimators<NumQuantiles>& DistributionEstimators<NumQuantiles>::operator<<(

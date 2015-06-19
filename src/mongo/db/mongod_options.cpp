@@ -788,8 +788,8 @@ Status canonicalizeMongodOptions(moe::Environment* params) {
         }
     }
 
-    // "storage.mmapv1.preallocDataFiles" comes from the config file, so override it if "noprealloc" is
-    // set since that comes from the command line.
+    // "storage.mmapv1.preallocDataFiles" comes from the config file, so override it if "noprealloc"
+    // is set since that comes from the command line.
     if (params->count("noprealloc")) {
         Status ret = params->set("storage.mmapv1.preallocDataFiles",
                                  moe::Value(!(*params)["noprealloc"].as<bool>()));

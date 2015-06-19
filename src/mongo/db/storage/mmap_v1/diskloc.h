@@ -52,12 +52,15 @@ class BtreeBucket;
     (such as adding a virtual function)
  */
 class DiskLoc {
-    int _a;  // this will be volume, file #, etc. but is a logical value could be anything depending on storage engine
+    // this will be volume, file #, etc. but is a logical value could be anything depending on
+    // storage engine
+    int _a;
     int ofs;
 
 public:
     enum SentinelValues {
-        /* note NullOfs is different. todo clean up.  see refs to NullOfs in code - use is valid but outside DiskLoc context so confusing as-is. */
+        /* note NullOfs is different. todo clean up.  see refs to NullOfs in code - use is valid but
+         * outside DiskLoc context so confusing as-is. */
         NullOfs = -1,
 
         // Caps the number of files that may be allocated in a database, allowing about 32TB of
@@ -74,15 +77,16 @@ public:
         Null();
     }
 
-    // Minimum allowed DiskLoc.  No MmapV1RecordHeader may begin at this location because file and extent
-    // headers must precede Records in a file.
+    // Minimum allowed DiskLoc.  No MmapV1RecordHeader may begin at this location because file and
+    // extent headers must precede Records in a file.
     static DiskLoc min() {
         return DiskLoc(0, 0);
     }
 
     // Maximum allowed DiskLoc.
-    // No MmapV1RecordHeader may begin at this location because the minimum size of a MmapV1RecordHeader is larger than
-    // one byte.  Also, the last bit is not able to be used because mmapv1 uses that for "used".
+    // No MmapV1RecordHeader may begin at this location because the minimum size of a
+    // MmapV1RecordHeader is larger than one byte.  Also, the last bit is not able to be used
+    // because mmapv1 uses that for "used".
     static DiskLoc max() {
         return DiskLoc(0x7fffffff, 0x7ffffffe);
     }
@@ -96,8 +100,9 @@ public:
     }
     DiskLoc& Null() {
         _a = -1;
-        ofs =
-            0; /* note NullOfs is different. todo clean up.  see refs to NullOfs in code - use is valid but outside DiskLoc context so confusing as-is. */
+        /* note NullOfs is different. todo clean up.  see refs to NullOfs in code - use is valid but
+         * outside DiskLoc context so confusing as-is. */
+        ofs = 0;
         return *this;
     }
     void assertOk() const {

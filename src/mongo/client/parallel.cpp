@@ -765,14 +765,15 @@ void ParallelSortClusteredCursor::startInit() {
                         _qSpec.options(),                                     // options
                         // NtoReturn is weird.
                         // If zero, it means use default size, so we do that for all cursors
-                        // If positive, it's the batch size (we don't want this cursor limiting results), that's
-                        // done at a higher level
-                        // If negative, it's the batch size, but we don't create a cursor - so we don't want
-                        // to create a child cursor either.
-                        // Either way, if non-zero, we want to pull back the batch size + the skip amount as
-                        // quickly as possible.  Potentially, for a cursor on a single shard or if we keep better track of
-                        // chunks, we can actually add the skip value into the cursor and/or make some assumptions about the
-                        // return value size ( (batch size + skip amount) / num_servers ).
+                        // If positive, it's the batch size (we don't want this cursor limiting
+                        // results), that's done at a higher level
+                        // If negative, it's the batch size, but we don't create a cursor - so we
+                        // don't want to create a child cursor either.
+                        // Either way, if non-zero, we want to pull back the batch size + the skip
+                        // amount as quickly as possible.  Potentially, for a cursor on a single
+                        // shard or if we keep better track of chunks, we can actually add the skip
+                        // value into the cursor and/or make some assumptions about the return value
+                        // size ( (batch size + skip amount) / num_servers ).
                         _qSpec.ntoreturn() == 0 ? 0 : (_qSpec.ntoreturn() > 0
                                                            ? _qSpec.ntoreturn() + _qSpec.ntoskip()
                                                            : _qSpec.ntoreturn() -
@@ -830,7 +831,8 @@ void ParallelSortClusteredCursor::startInit() {
                     << (lazyInit ? "(lazily) " : "(full) ") << "on shard " << shardId
                     << ", current connection state is " << mdata.toBSON() << endl;
         } catch (StaleConfigException& e) {
-            // Our version isn't compatible with the current version anymore on at least one shard, need to retry immediately
+            // Our version isn't compatible with the current version anymore on at least one shard,
+            // need to retry immediately
             NamespaceString staleNS(e.getns());
 
             // For legacy reasons, this may not be set in the exception :-(
@@ -1185,7 +1187,8 @@ void ParallelSortClusteredCursor::_oldInit() {
     vector<shared_ptr<ShardConnection>> conns;
     vector<string> servers;
 
-    // Since we may get all sorts of errors, record them all as they come and throw them later if necessary
+    // Since we may get all sorts of errors, record them all as they come and throw them later if
+    // necessary
     vector<string> staleConfigExs;
     vector<string> socketExs;
     vector<string> otherExs;
@@ -1194,7 +1197,8 @@ void ParallelSortClusteredCursor::_oldInit() {
     int retries = -1;
 
     // Loop through all the queries until we've finished or gotten a socket exception on all of them
-    // We break early for non-socket exceptions, and socket exceptions if we aren't returning partial results
+    // We break early for non-socket exceptions, and socket exceptions if we aren't returning
+    // partial results
     do {
         retries++;
 
@@ -1224,7 +1228,8 @@ void ParallelSortClusteredCursor::_oldInit() {
             const string errLoc = " @ " + serverHost;
 
             if (firstPass) {
-                // This may be the first time connecting to this shard, if so we can get an error here
+                // This may be the first time connecting to this shard, if so we can get an error
+                // here
                 try {
                     conns.push_back(shared_ptr<ShardConnection>(new ShardConnection(
                         uassertStatusOK(ConnectionString::parse(serverHost)), _ns)));
@@ -1288,10 +1293,10 @@ void ParallelSortClusteredCursor::_oldInit() {
             }
         }
 
-        // Go through all the potentially started cursors and finish initializing them or log any errors and
-        // potentially retry
-        // TODO:  Better error classification would make this easier, errors are indicated in all sorts of ways
-        // here that we need to trap.
+        // Go through all the potentially started cursors and finish initializing them or log any
+        // errors and potentially retry
+        // TODO:  Better error classification would make this easier, errors are indicated in all
+        // sorts of ways here that we need to trap.
         for (size_t i = 0; i < num; i++) {
             const string errLoc = " @ " + serverHosts[i];
 
@@ -1625,8 +1630,8 @@ bool Future::CommandResult::join(int maxRetries) {
                 }
             }
 
-            // We may not always have a collection, since we don't know from a generic command what collection
-            // is supposed to be acted on, if any
+            // We may not always have a collection, since we don't know from a generic command what
+            // collection is supposed to be acted on, if any
             if (nsGetCollection(staleNS).size() == 0) {
                 warning() << "no collection namespace in stale config exception "
                           << "for lazy command " << _cmd << ", could not refresh " << staleNS

@@ -113,9 +113,9 @@ public:
     /**
      * @param loc - has to be for a specific MmapV1RecordHeader
      * Note(erh): this sadly cannot be removed.
-     * A MmapV1RecordHeader DiskLoc has an offset from a file, while a RecordStore really wants an offset
-     * from an extent.  This intrinsically links an original record store to the original extent
-     * manager.
+     * A MmapV1RecordHeader DiskLoc has an offset from a file, while a RecordStore really wants an
+     * offset from an extent.  This intrinsically links an original record store to the original
+     * extent manager.
      */
     MmapV1RecordHeader* recordForV1(const DiskLoc& loc) const;
 

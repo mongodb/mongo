@@ -68,7 +68,10 @@ static DurableMappedFile* findMMF_inlock(void* ptr, size_t& ofs) {
     DurableMappedFile* f = privateViews.find_inlock(ptr, ofs);
     if (f == 0) {
         error() << "findMMF_inlock failed " << privateViews.numberOfViews_inlock() << endl;
-        printStackTrace();  // we want a stack trace and the assert below didn't print a trace once in the real world - not sure why
+
+        // we want a stack trace and the assert below didn't print a trace once in the real world
+        // - not sure why
+        printStackTrace();
         stringstream ss;
         ss << "view pointer cannot be resolved " << std::hex << (size_t)ptr;
         journalingFailure(ss.str().c_str());  // asserts, which then abends

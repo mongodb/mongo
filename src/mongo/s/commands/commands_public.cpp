@@ -1108,7 +1108,8 @@ public:
             verify(0);
         }
 
-        // We could support arbitrary shard keys by sending commands to all shards but I don't think we should
+        // We could support arbitrary shard keys by sending commands to all shards but I don't think
+        // we should
         errmsg =
             "GridFS fs.chunks collection must be sharded on either {files_id:1} or {files_id:1, "
             "n:1}";

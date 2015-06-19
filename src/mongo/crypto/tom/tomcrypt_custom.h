@@ -410,7 +410,8 @@
 
 /* Debuggers */
 
-/* define this if you use Valgrind, note: it CHANGES the way SOBER-128 and LTC_RC4 work (see the code) */
+/* define this if you use Valgrind, note: it CHANGES the way SOBER-128 and LTC_RC4 work (see the
+ * code) */
 /* #define LTC_VALGRIND */
 
 #endif

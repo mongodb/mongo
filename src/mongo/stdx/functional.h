@@ -31,7 +31,8 @@
 // As of VS2013, the Windows STL still doesn't have an adequate implementation
 // of std::function.
 //
-// See https://connect.microsoft.com/VisualStudio/feedback/details/768899/std-function-not-compiling-in-vs2012
+// See https://connect.microsoft.com/VisualStudio/feedback/details/768899/
+// std-function-not-compiling-in-vs2012
 //
 // The bug is fixed in VS2015.
 #if !defined(_MSC_VER) || (_MSC_VER > 1800)

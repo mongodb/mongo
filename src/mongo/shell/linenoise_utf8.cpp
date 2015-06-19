@@ -43,8 +43,8 @@ namespace linenoise_utf8 {
  * Convert a null terminated UTF-8 string from UTF-8 and store it in a UChar32 destination buffer
  * Always null terminates the destination string if at least one character position is available
  * Errors in the UTF-8 encoding will be handled in two ways: the erroneous characters will be
- * converted to the Unicode error character U+FFFD and flag bits will be set in the conversionErrorCode
- * int.
+ * converted to the Unicode error character U+FFFD and flag bits will be set in the
+ * conversionErrorCode int.
  *
  * @param uchar32output                 Destination UChar32 buffer
  * @param utf8input                     Source UTF-8 string
@@ -212,15 +212,16 @@ void copyString32(UChar32* dest32, const UChar32* source32, size_t destLengthInC
 }
 
 /**
- * Convert a specified number of UChar32 characters from a possibly null terminated UChar32 string to UTF-8
- * and store it in a UChar8 destination buffer
+ * Convert a specified number of UChar32 characters from a possibly null terminated UChar32 string
+ * to UTF-8 and store it in a UChar8 destination buffer
  * Always null terminates the destination string if at least one character position is available
  *
  * @param dest8                     Destination UChar8 buffer
  * @param source32                  Source UChar32 string
  * @param outputBufferSizeInBytes   Destination buffer size in bytes
  * @param charCount                 Maximum number of UChar32 characters to process
- * @return                          Count of bytes written to output buffer, not including null terminator
+ * @return                          Count of bytes written to output buffer, not including null
+ *                                  terminator
  */
 size_t copyString32to8counted(UChar8* dest8,
                               const UChar32* source32,
@@ -263,7 +264,8 @@ size_t copyString32to8counted(UChar8* dest8,
  * @param dest8                     Destination UChar8 buffer
  * @param source32                  Source UChar32 string
  * @param outputBufferSizeInBytes   Destination buffer size in bytes
- * @return                          Count of bytes written to output buffer, not including null terminator
+ * @return                          Count of bytes written to output buffer, not including null
+ *                                  terminator
  */
 size_t copyString32to8(UChar8* dest8, const UChar32* source32, size_t outputBufferSizeInBytes) {
     return copyString32to8counted(dest8, source32, outputBufferSizeInBytes, 0x7FFFFFFF);
@@ -303,7 +305,8 @@ int strncmp32(UChar32* first32, UChar32* second32, size_t length) {
 }
 
 /**
- * Internally convert an array of UChar32 characters of specified length to UTF-8 and write it to fileHandle
+ * Internally convert an array of UChar32 characters of specified length to UTF-8 and write it to
+ * fileHandle
  *
  * @param fileHandle                File handle to write to
  * @param string32                  Source UChar32 characters, may not be null terminated
