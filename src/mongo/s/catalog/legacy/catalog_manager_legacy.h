@@ -36,6 +36,7 @@
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/platform/atomic_word.h"
 
 namespace mongo {
 
@@ -186,6 +187,12 @@ private:
 
     // Distribted lock manager singleton.
     std::unique_ptr<DistLockManager> _distLockManager;
+
+    // Whether the logChange call should attempt to create the changelog collection
+    AtomicInt32 _changeLogCollectionCreated;
+
+    // Whether the logAction call should attempt to create the actionlog collection
+    AtomicInt32 _actionLogCollectionCreated;
 
     // protects _inShutdown, _consistentFromLastCheck; used by _consistencyCheckerCV
     stdx::mutex _mutex;

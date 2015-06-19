@@ -301,6 +301,8 @@ public:
     /**
      * Logs to the actionlog.
      * Used by the balancer to report the result of a balancing round.
+     *
+     * NOTE: This method is best effort so it should never throw.
      */
     virtual void logAction(const ActionLogType& actionLog) = 0;
 

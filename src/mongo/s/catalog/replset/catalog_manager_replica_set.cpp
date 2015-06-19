@@ -45,6 +45,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/dist_lock_manager.h"
+#include "mongo/s/catalog/type_actionlog.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_database.h"
@@ -81,6 +82,7 @@ const ReadPreferenceSetting kConfigReadSelector(ReadPreference::SecondaryOnly, T
 
 const int kNotMasterNumRetries = 3;
 const Milliseconds kNotMasterRetryInterval{500};
+const int kActionLogCollectionSize = 1024 * 1024 * 2;
 
 void _toBatchError(const Status& status, BatchedCommandResponse* response) {
     response->clear();
@@ -253,7 +255,30 @@ Status CatalogManagerReplicaSet::dropCollection(const std::string& collectionNs)
     return notYetImplemented;
 }
 
-void CatalogManagerReplicaSet::logAction(const ActionLogType& actionLog) {}
+void CatalogManagerReplicaSet::logAction(const ActionLogType& actionLog) {
+    if (_actionLogCollectionCreated.load() == 0) {
+        BSONObj createCmd = BSON("create" << ActionLogType::ConfigNS << "capped" << true << "size"
+                                          << kActionLogCollectionSize);
+        auto result = _runConfigServerCommandWithNotMasterRetries("config", createCmd);
+        if (!result.isOK()) {
+            LOG(1) << "couldn't create actionlog collection: " << causedBy(result.getStatus());
+            return;
+        }
+
+        Status commandStatus = Command::getStatusFromCommandResult(result.getValue());
+        if (commandStatus.isOK() || commandStatus == ErrorCodes::NamespaceExists) {
+            _actionLogCollectionCreated.store(1);
+        } else {
+            LOG(1) << "couldn't create actionlog collection: " << causedBy(commandStatus);
+            return;
+        }
+    }
+
+    Status result = insert(ActionLogType::ConfigNS, actionLog.toBSON(), NULL);
+    if (!result.isOK()) {
+        log() << "error encountered while logging action: " << result;
+    }
+}
 
 void CatalogManagerReplicaSet::logChange(OperationContext* opCtx,
                                          const string& what,

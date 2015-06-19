@@ -42,6 +42,7 @@
 #include "mongo/s/catalog/dist_lock_manager_mock.h"
 #include "mongo/s/catalog/replset/catalog_manager_replica_set.h"
 #include "mongo/s/catalog/replset/catalog_manager_replica_set_test_fixture.h"
+#include "mongo/s/catalog/type_actionlog.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_database.h"
@@ -50,6 +51,7 @@
 #include "mongo/s/catalog/type_settings.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/write_ops/batched_command_response.h"
+#include "mongo/s/write_ops/batched_insert_request.h"
 #include "mongo/s/write_ops/batched_update_request.h"
 #include "mongo/util/log.h"
 

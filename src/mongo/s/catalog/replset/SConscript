@@ -43,6 +43,7 @@ env.CppUnitTest(
     target='catalog_manager_replica_set_test',
     source=[
         'catalog_manager_replica_set_test.cpp',
+        'catalog_manager_replica_set_log_action_test.cpp',
         'catalog_manager_replica_set_test_fixture.cpp',
     ],
     LIBDEPS=[

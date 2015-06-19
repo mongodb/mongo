@@ -35,6 +35,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/connection_string.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/s/catalog/catalog_manager.h"
 
 namespace mongo {
@@ -152,6 +153,9 @@ private:
 
     // Distribted lock manager singleton.
     std::unique_ptr<DistLockManager> _distLockManager;
+
+    // Whether the logAction call should attempt to create the actionlog collection
+    AtomicInt32 _actionLogCollectionCreated;
 
     // protects _inShutdown
     std::mutex _mutex;

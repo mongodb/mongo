@@ -263,12 +263,6 @@ BSONObj buildRemoveLogEntry(const string& shardName, bool isDraining) {
     return details.obj();
 }
 
-// Whether the logChange call should attempt to create the changelog collection
-AtomicInt32 changeLogCollectionCreated(0);
-
-// Whether the logAction call should attempt to create the actionlog collection
-AtomicInt32 actionLogCollectionCreated(0);
-
 }  // namespace
 
 
@@ -1028,16 +1022,18 @@ Status CatalogManagerLegacy::dropCollection(const std::string& collectionNs) {
 void CatalogManagerLegacy::logAction(const ActionLogType& actionLog) {
     // Create the action log collection and ensure that it is capped. Wrap in try/catch,
     // because creating an existing collection throws.
-    if (actionLogCollectionCreated.load() == 0) {
+    if (_actionLogCollectionCreated.load() == 0) {
         try {
             ScopedDbConnection conn(_configServerConnectionString, 30.0);
             conn->createCollection(ActionLogType::ConfigNS, 1024 * 1024 * 2, true);
             conn.done();
 
-            actionLogCollectionCreated.store(1);
+            _actionLogCollectionCreated.store(1);
         } catch (const DBException& e) {
-            // It's ok to ignore this exception
             LOG(1) << "couldn't create actionlog collection: " << e;
+            // If we couldn't create the collection don't attempt the insert otherwise we might
+            // implicitly create the collection without it being capped.
+            return;
         }
     }
 
@@ -1053,13 +1049,13 @@ void CatalogManagerLegacy::logChange(OperationContext* opCtx,
                                      const BSONObj& detail) {
     // Create the change log collection and ensure that it is capped. Wrap in try/catch,
     // because creating an existing collection throws.
-    if (changeLogCollectionCreated.load() == 0) {
+    if (_changeLogCollectionCreated.load() == 0) {
         try {
             ScopedDbConnection conn(_configServerConnectionString, 30.0);
             conn->createCollection(ChangelogType::ConfigNS, 1024 * 1024 * 10, true);
             conn.done();
 
-            changeLogCollectionCreated.store(1);
+            _changeLogCollectionCreated.store(1);
         } catch (const UserException& e) {
             // It's ok to ignore this exception
             LOG(1) << "couldn't create changelog collection: " << e;
