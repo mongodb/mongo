@@ -48,7 +48,6 @@ namespace mongo {
     namespace mb = mongo::mutablebson;
 
     using std::unique_ptr;
-    using std::unique_ptr;
     using std::vector;
 
     using pathsupport::EqualityMatches;

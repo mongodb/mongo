@@ -46,12 +46,11 @@
 
 namespace mongo {
 
-    using std::unique_ptr;
-    using std::unique_ptr;
-    using std::list;
     using std::endl;
+    using std::list;
     using std::set;
     using std::string;
+    using std::unique_ptr;
     using std::vector;
 
     DBHashCmd dbhashCmd;

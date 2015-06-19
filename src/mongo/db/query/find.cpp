@@ -61,9 +61,8 @@
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
-using std::unique_ptr;
-using std::unique_ptr;
 using std::endl;
+using std::unique_ptr;
 
 namespace mongo {
 

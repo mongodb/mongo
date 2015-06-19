@@ -43,7 +43,6 @@
 namespace QueryStageCount {
 
     using std::unique_ptr;
-    using std::unique_ptr;
     using std::vector;
 
     const int kDocuments = 100;

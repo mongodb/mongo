@@ -83,10 +83,9 @@
 
 namespace mongo {
 
-    using std::unique_ptr;
-    using std::unique_ptr;
     using std::endl;
     using std::string;
+    using std::unique_ptr;
     using std::vector;
 
     namespace {

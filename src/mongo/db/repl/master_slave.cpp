@@ -70,14 +70,13 @@
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 
-using std::unique_ptr;
-using std::unique_ptr;
 using std::cout;
 using std::endl;
 using std::max;
 using std::min;
 using std::set;
 using std::stringstream;
+using std::unique_ptr;
 using std::vector;
 
 namespace mongo {

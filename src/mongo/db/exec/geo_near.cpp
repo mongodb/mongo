@@ -51,7 +51,6 @@
 
 namespace mongo {
 
-    using std::unique_ptr;
     using std::abs;
     using std::unique_ptr;
 

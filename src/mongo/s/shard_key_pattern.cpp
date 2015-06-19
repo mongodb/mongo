@@ -40,13 +40,12 @@
 
 namespace mongo {
 
-    using std::unique_ptr;
-    using std::shared_ptr;
-    using std::unique_ptr;
-    using std::pair;
     using std::make_pair;
-    using std::vector;
+    using std::pair;
+    using std::shared_ptr;
     using std::string;
+    using std::unique_ptr;
+    using std::vector;
 
     using pathsupport::EqualityMatches;
     using mongoutils::str::stream;

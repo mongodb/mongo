@@ -49,7 +49,6 @@
 namespace QueryStageCollectionScan {
 
     using std::unique_ptr;
-    using std::unique_ptr;
     using std::vector;
 
     //

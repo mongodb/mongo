@@ -43,10 +43,9 @@
 
 namespace mongo {
 
-    using std::unique_ptr;
     using mongoutils::str::stream;
-    using std::unique_ptr;
     using std::string;
+    using std::unique_ptr;
     using std::vector;
 
     void msgToBatchRequests( const Message& msg, vector<BatchedCommandRequest*>* requests ) {

@@ -64,12 +64,11 @@
 
 namespace mongo {
 
-    using std::unique_ptr;
-    using std::shared_ptr;
-    using std::unique_ptr;
     using std::map;
     using std::set;
+    using std::shared_ptr;
     using std::string;
+    using std::unique_ptr;
     using std::vector;
 
     MONGO_FP_DECLARE(skipBalanceRound);

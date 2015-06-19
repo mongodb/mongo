@@ -109,15 +109,14 @@
 
 namespace mongo {
 
-    using std::unique_ptr;
     using logger::LogComponent;
-    using std::unique_ptr;
     using std::endl;
     using std::hex;
     using std::ios;
     using std::ofstream;
     using std::string;
     using std::stringstream;
+    using std::unique_ptr;
     using std::vector;
 
     // for diaglog

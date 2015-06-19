@@ -54,7 +54,6 @@
 namespace QueryStageUpdate {
 
     using std::unique_ptr;
-    using std::unique_ptr;
     using std::vector;
 
     class QueryStageUpdateBase {

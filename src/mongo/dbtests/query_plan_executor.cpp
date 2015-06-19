@@ -49,10 +49,9 @@
 
 namespace QueryPlanExecutor {
 
-    using std::unique_ptr;
     using std::shared_ptr;
-    using std::unique_ptr;
     using std::string;
+    using std::unique_ptr;
 
     class PlanExecutorBase {
     public:

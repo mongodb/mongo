@@ -44,10 +44,9 @@ using namespace mongo;
 
 namespace {
 
-    using std::unique_ptr;
-    using std::unique_ptr;
     using std::max;
     using std::min;
+    using std::unique_ptr;
 
     static const int N = 50;
 

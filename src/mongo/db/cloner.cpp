@@ -66,12 +66,11 @@
 
 namespace mongo {
 
-    using std::unique_ptr;
-    using std::unique_ptr;
+    using std::endl;
     using std::list;
     using std::set;
-    using std::endl;
     using std::string;
+    using std::unique_ptr;
     using std::vector;
 
     MONGO_EXPORT_SERVER_PARAMETER(skipCorruptDocumentsWhenCloning, bool, false);

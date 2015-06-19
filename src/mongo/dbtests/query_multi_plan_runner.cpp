@@ -57,7 +57,6 @@ namespace mongo {
 namespace QueryMultiPlanRunner {
 
     using std::unique_ptr;
-    using std::unique_ptr;
     using std::vector;
 
     /**

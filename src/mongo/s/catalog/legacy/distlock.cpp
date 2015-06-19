@@ -43,13 +43,12 @@
 
 namespace mongo {
 
-    using std::unique_ptr;
-    using std::unique_ptr;
     using std::endl;
     using std::list;
     using std::set;
     using std::string;
     using std::stringstream;
+    using std::unique_ptr;
     using std::vector;
 
     LabeledLevel DistributedLock::logLvl( 1 );

@@ -48,8 +48,8 @@
 
 namespace {
 
-    using std::unique_ptr;
     using std::string;
+    using std::unique_ptr;
     using namespace mongo;
 
     /**

@@ -45,9 +45,8 @@ using namespace mongo;
 
 namespace {
 
-    using std::unique_ptr;
-    using std::unique_ptr;
     using std::string;
+    using std::unique_ptr;
     using std::vector;
 
     static const char* ns = "test.t";

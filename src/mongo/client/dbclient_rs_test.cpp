@@ -50,12 +50,11 @@
 #include "mongo/util/assert_util.h"
 
 namespace {
-    using std::unique_ptr;
-    using std::unique_ptr;
-    using std::map;
     using std::make_pair;
+    using std::map;
     using std::pair;
     using std::string;
+    using std::unique_ptr;
     using std::vector;
 
     using mongo::AssertionException;

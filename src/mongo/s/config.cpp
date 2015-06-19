@@ -56,11 +56,10 @@
 
 namespace mongo {
 
-    using std::unique_ptr;
-    using std::unique_ptr;
     using std::endl;
     using std::set;
     using std::string;
+    using std::unique_ptr;
     using std::vector;
 
     CollectionInfo::CollectionInfo(const CollectionType& coll) {

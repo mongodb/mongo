@@ -47,12 +47,11 @@
 
 namespace mongo {
 
-    using std::unique_ptr;
-    using std::shared_ptr;
-    using std::unique_ptr;
     using std::endl;
     using std::set;
+    using std::shared_ptr;
     using std::string;
+    using std::unique_ptr;
 
     AtomicInt64 Scope::_lastVersion(1);
 

@@ -52,10 +52,9 @@
 
 namespace QueryStageAnd {
 
-    using std::unique_ptr;
+    using std::set;
     using std::shared_ptr;
     using std::unique_ptr;
-    using std::set;
 
     class QueryStageAndBase {
     public:

@@ -55,12 +55,11 @@
 namespace mongo {
 
     using boost::intrusive_ptr;
-    using std::unique_ptr;
+    using std::endl;
     using std::shared_ptr;
-    using std::unique_ptr;
     using std::string;
     using std::stringstream;
-    using std::endl;
+    using std::unique_ptr;
 
     /**
      * Returns true if we need to keep a ClientCursor saved for this pipeline (for future getMore

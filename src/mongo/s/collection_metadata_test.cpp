@@ -47,10 +47,9 @@ namespace {
 
     using namespace mongo;
 
-    using std::unique_ptr;
-    using std::unique_ptr;
     using std::make_pair;
     using std::string;
+    using std::unique_ptr;
     using std::vector;
 
     const std::string CONFIG_HOST_PORT = "$dummy_config:27017";

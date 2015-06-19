@@ -71,13 +71,12 @@
 
 namespace mongo {
 
-    using std::unique_ptr;
-    using std::shared_ptr;
-    using std::unique_ptr;
     using std::endl;
     using std::set;
+    using std::shared_ptr;
     using std::string;
     using std::stringstream;
+    using std::unique_ptr;
     using std::vector;
 
     namespace mr {

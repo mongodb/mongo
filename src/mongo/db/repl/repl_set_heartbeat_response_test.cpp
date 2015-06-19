@@ -38,7 +38,6 @@ namespace repl {
 namespace {
 
     using std::unique_ptr;
-    using std::unique_ptr;
 
     bool stringContains(const std::string &haystack, const std::string& needle) {
         return haystack.find(needle) != std::string::npos;

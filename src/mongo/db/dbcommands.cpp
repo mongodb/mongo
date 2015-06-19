@@ -110,12 +110,11 @@
 
 namespace mongo {
 
-    using std::unique_ptr;
-    using std::unique_ptr;
     using std::endl;
     using std::ostringstream;
     using std::string;
     using std::stringstream;
+    using std::unique_ptr;
 
     class CmdShutdownMongoD : public CmdShutdown {
     public:
