@@ -54,7 +54,7 @@ namespace {
      */
     Status parseCursorResponse(const BSONObj& obj,
                                const std::string& batchFieldName,
-                               Fetcher::BatchData* batchData) {
+                               Fetcher::QueryResponse* batchData) {
         invariant(batchFieldName == kFirstBatchFieldName || batchFieldName == kNextBatchFieldName);
         invariant(batchData);
 
@@ -136,9 +136,9 @@ namespace {
     
 } // namespace
 
-    Fetcher::BatchData::BatchData(CursorId theCursorId,
-                                  const NamespaceString& theNss,
-                                  Documents theDocuments)
+    Fetcher::QueryResponse::QueryResponse(CursorId theCursorId,
+                                          const NamespaceString& theNss,
+                                          Documents theDocuments)
         : cursorId(theCursorId),
           nss(theNss),
           documents(theDocuments) { }
@@ -234,7 +234,7 @@ namespace {
                             const char* batchFieldName) {
 
         if (!rcbd.response.isOK()) {
-            _work(StatusWith<Fetcher::BatchData>(rcbd.response.getStatus()), nullptr, nullptr);
+            _work(StatusWith<Fetcher::QueryResponse>(rcbd.response.getStatus()), nullptr, nullptr);
             _finishCallback();
             return;
         }
@@ -242,49 +242,61 @@ namespace {
         const BSONObj& queryResponseObj = rcbd.response.getValue().data;
         Status status = getStatusFromCommandResult(queryResponseObj);
         if (!status.isOK()) {
-            _work(StatusWith<Fetcher::BatchData>(status), nullptr, nullptr);
+            _work(StatusWith<Fetcher::QueryResponse>(status), nullptr, nullptr);
             _finishCallback();
             return;
         }
 
         status = parseReplResponse(queryResponseObj);
         if (!status.isOK()) {
-            _work(StatusWith<Fetcher::BatchData>(status), nullptr, nullptr);
+            _work(StatusWith<Fetcher::QueryResponse>(status), nullptr, nullptr);
             _finishCallback();
             return;
         }
 
-        BatchData batchData;
+        QueryResponse batchData;
         status = parseCursorResponse(queryResponseObj, batchFieldName, &batchData);
         if (!status.isOK()) {
-            _work(StatusWith<Fetcher::BatchData>(status), nullptr, nullptr);
+            _work(StatusWith<Fetcher::QueryResponse>(status), nullptr, nullptr);
             _finishCallback();
             return;
         }
 
         NextAction nextAction = NextAction::kNoAction;
 
-        if (batchData.cursorId) {
-            nextAction = NextAction::kGetMore;
+        if (!batchData.cursorId) {
+            _work(StatusWith<QueryResponse>(batchData), &nextAction, nullptr);
+            _finishCallback();
+            return;
         }
 
+        nextAction = NextAction::kGetMore;
+
         BSONObjBuilder bob;
-        _work(StatusWith<BatchData>(batchData), &nextAction, &bob);
+        _work(StatusWith<QueryResponse>(batchData), &nextAction, &bob);
 
         // Callback function _work may modify nextAction to request the fetcher
         // not to schedule a getMore command.
-        if (!batchData.cursorId || nextAction != NextAction::kGetMore) {
+        if (nextAction != NextAction::kGetMore) {
+            _finishCallback();
+            return;
+        }
+
+        // Callback function may also disable the fetching of additional data by not filling in the
+        // BSONObjBuilder for the getMore command.
+        auto cmdObj = bob.obj();
+        if (cmdObj.isEmpty()) {
             _finishCallback();
             return;
         }
 
         {
             stdx::lock_guard<stdx::mutex> lk(_mutex);
-            status = _schedule_inlock(bob.obj(), kNextBatchFieldName);
+            status = _schedule_inlock(cmdObj, kNextBatchFieldName);
         }
         if (!status.isOK()) {
             nextAction = NextAction::kNoAction;
-            _work(StatusWith<Fetcher::BatchData>(status), nullptr, nullptr);
+            _work(StatusWith<Fetcher::QueryResponse>(status), nullptr, nullptr);
             _finishCallback();
             return;
         }

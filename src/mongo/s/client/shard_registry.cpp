@@ -258,7 +258,7 @@ namespace {
         Status status = Status(ErrorCodes::InternalError, "Internal error running find command");
         vector<BSONObj> results;
 
-        auto fetcherCallback = [&status, &results](const QueryFetcher::BatchDataStatus& dataStatus,
+        auto fetcherCallback = [&status, &results](const Fetcher::QueryResponseStatus& dataStatus,
                                                    Fetcher::NextAction* nextAction) {
 
             // Throw out any accumulated results on error

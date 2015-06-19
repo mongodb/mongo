@@ -185,7 +185,7 @@ namespace repl {
         _scheduleDbWorkFn = scheduleDbWorkFn;
     }
 
-    void CollectionCloner::_listIndexesCallback(const StatusWith<Fetcher::BatchData>& fetchResult,
+    void CollectionCloner::_listIndexesCallback(const Fetcher::QueryResponseStatus& fetchResult,
                                                 Fetcher::NextAction* nextAction,
                                                 BSONObjBuilder* getMoreBob) {
         if (!fetchResult.isOK()) {
@@ -224,7 +224,7 @@ namespace repl {
         _dbWorkCallbackHandle = scheduleResult.getValue();
     }
 
-    void CollectionCloner::_findCallback(const StatusWith<Fetcher::BatchData>& fetchResult,
+    void CollectionCloner::_findCallback(const StatusWith<Fetcher::QueryResponse>& fetchResult,
                                          Fetcher::NextAction* nextAction,
                                          BSONObjBuilder* getMoreBob) {
         if (!fetchResult.isOK()) {

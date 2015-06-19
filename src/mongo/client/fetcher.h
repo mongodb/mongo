@@ -54,16 +54,24 @@ namespace mongo {
         typedef std::vector<BSONObj> Documents;
 
         /**
-         * Documents in current batch with cursor ID and associated namespace name.
+         * Documents in current query response with cursor ID and associated namespace name.
          * If cursor ID is zero, there are no additional batches.
          */
-        struct BatchData {
-            BatchData() = default;
-            BatchData(CursorId theCursorId, const NamespaceString& theNss, Documents theDocuments);
+        struct QueryResponse {
+            QueryResponse() = default;
+            QueryResponse(CursorId theCursorId,
+                          const NamespaceString& theNss,
+                          Documents theDocuments);
             CursorId cursorId = 0;
             NamespaceString nss;
             Documents documents;
+            // TODO: fill in with replication metadata.
+            struct OtherFields {
+                BSONObj metadata;
+            } otherFields;
         };
+
+        using QueryResponseStatus = StatusWith<Fetcher::QueryResponse>;
 
         /**
          * Represents next steps of fetcher.
@@ -77,7 +85,7 @@ namespace mongo {
         /**
          * Type of a fetcher callback function.
          */
-        typedef stdx::function<void (const StatusWith<BatchData>&,
+        typedef stdx::function<void (const StatusWith<QueryResponse>&,
                                      NextAction*,
                                      BSONObjBuilder*)> CallbackFn;
 
@@ -102,8 +110,11 @@ namespace mongo {
          * If the fetcher is canceled (either by calling cancel() or shutting down the executor),
          * 'work' will not be invoked.
          *
-         * Fetcher uses the NextAction argument to inform client via callback if a getMore command
-         * will be scheduled to be run by the executor to retrieve additional results.
+         * Fetcher uses the NextAction and BSONObjBuilder arguments to inform client via callback
+         * if a follow-up (like getMore) command will be scheduled to be run by the executor to
+         * retrieve additional results. The BSONObjBuilder pointer will be valid only if NextAction
+         * is kGetMore.
+         * Otherwise, the BSONObjBuilder pointer will be null.
          * Also, note that the NextAction is both an input and output argument to allow
          * the client to suggest a different action for the fetcher to take post-callback.
          *

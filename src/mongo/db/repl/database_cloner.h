@@ -138,7 +138,7 @@ namespace repl {
         /**
          * Read collection names and options from listCollections result.
          */
-        void _listCollectionsCallback(const StatusWith<Fetcher::BatchData>& fetchResult,
+        void _listCollectionsCallback(const StatusWith<Fetcher::QueryResponse>& fetchResult,
                                       Fetcher::NextAction* nextAction,
                                       BSONObjBuilder* getMoreBob);
 

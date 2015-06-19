@@ -186,7 +186,7 @@ namespace {
         _startCollectionCloner = startCollectionCloner;
     }
 
-    void DatabaseCloner::_listCollectionsCallback(const StatusWith<Fetcher::BatchData>& result,
+    void DatabaseCloner::_listCollectionsCallback(const StatusWith<Fetcher::QueryResponse>& result,
                                                   Fetcher::NextAction* nextAction,
                                                   BSONObjBuilder* getMoreBob) {
 

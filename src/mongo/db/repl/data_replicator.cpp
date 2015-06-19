@@ -114,7 +114,7 @@ std::string toString(DataReplicatorState s) {
 
     protected:
 
-        void _delegateCallback(const BatchDataStatus& fetchResult,
+        void _delegateCallback(const Fetcher::QueryResponseStatus& fetchResult,
                                NextAction* nextAction);
 
         const Timestamp _startTS;
@@ -139,13 +139,12 @@ std::string toString(DataReplicatorState s) {
     std::string OplogFetcher::toString() const {
         return str::stream() << "OplogReader -"
                              << " startTS: " << _startTS.toString()
-                             << " responses: " << _responses
-                             << " fetcher: " << _fetcher.getDiagnosticString();
+                             << " fetcher: " << QueryFetcher::getDiagnosticString();
     }
 
-    void OplogFetcher::_delegateCallback(const BatchDataStatus& fetchResult,
+    void OplogFetcher::_delegateCallback(const Fetcher::QueryResponseStatus& fetchResult,
                                          Fetcher::NextAction* nextAction) {
-        const bool checkStartTS = _responses == 0;
+        const bool checkStartTS = _getResponses() == 0;
 
         if (fetchResult.isOK()) {
             Fetcher::Documents::const_iterator firstDoc = fetchResult.getValue().documents.begin();
@@ -155,40 +154,42 @@ std::string toString(DataReplicatorState s) {
                 if (!hasDoc) {
                     // Set next action to none.
                     *nextAction = Fetcher::NextAction::kNoAction;
-                    _work(Status(ErrorCodes::OplogStartMissing, str::stream() <<
-                                 "No operations on sync source with op time starting at: " <<
-                                 _startTS.toString()),
-                          nextAction);
+                    _onQueryResponse(
+                        Status(ErrorCodes::OplogStartMissing, str::stream() <<
+                               "No operations on sync source with op time starting at: " <<
+                               _startTS.toString()),
+                        nextAction);
                     return;
                 } else if ((*firstDoc)["ts"].eoo()) {
                     // Set next action to none.
                     *nextAction = Fetcher::NextAction::kNoAction;
-                    _work(Status(ErrorCodes::OplogStartMissing, str::stream() <<
-                                 "Missing 'ts' field in first returned " << (*firstDoc)["ts"] <<
-                                 " starting at " << _startTS.toString()),
-                          nextAction);
+                    _onQueryResponse(
+                        Status(ErrorCodes::OplogStartMissing, str::stream() <<
+                               "Missing 'ts' field in first returned " << (*firstDoc)["ts"] <<
+                               " starting at " << _startTS.toString()),
+                        nextAction);
                     return;
                 } else if ((*firstDoc)["ts"].timestamp() != _startTS) {
                     // Set next action to none.
                     *nextAction = Fetcher::NextAction::kNoAction;
-                    _work(Status(ErrorCodes::OplogStartMissing,
-                                 str::stream() << "First returned " << (*firstDoc)["ts"]
-                                               << " is not where we wanted to start: "
-                                               << _startTS.toString()),
-                          nextAction);
+                    _onQueryResponse(
+                        Status(ErrorCodes::OplogStartMissing, str::stream() <<
+                               "First returned " << (*firstDoc)["ts"] <<
+                               " is not where we wanted to start: " << _startTS.toString()),
+                        nextAction);
                     return;
                 }
 
             }
 
             if (hasDoc) {
-                _work(fetchResult, nextAction);
+                _onQueryResponse(fetchResult, nextAction);
             }
             else {
             }
         }
         else {
-            _work(fetchResult, nextAction);
+            _onQueryResponse(fetchResult, nextAction);
         }
     };
 
@@ -321,7 +322,7 @@ std::string toString(DataReplicatorState s) {
                                                 const NamespaceString& oplogNS);
         void setStatus(const Status& s);
         void setStatus(const CBHStatus& s);
-        void _setTimestampStatus(const BatchDataStatus& fetchResult,
+        void _setTimestampStatus(const QueryResponseStatus& fetchResult,
                                  Fetcher::NextAction* nextAction,
                                  TimestampStatus* status) ;
     };
@@ -352,7 +353,7 @@ std::string toString(DataReplicatorState s) {
         return timestampStatus;
     }
 
-    void InitialSyncState::_setTimestampStatus(const BatchDataStatus& fetchResult,
+    void InitialSyncState::_setTimestampStatus(const QueryResponseStatus& fetchResult,
                                                Fetcher::NextAction* nextAction,
                                                TimestampStatus* status) {
         if (!fetchResult.isOK()) {
@@ -863,7 +864,7 @@ std::string toString(DataReplicatorState s) {
         }
     }
 
-    void DataReplicator::_onApplierReadyStart(const BatchDataStatus& fetchResult,
+    void DataReplicator::_onApplierReadyStart(const QueryResponseStatus& fetchResult,
                                               NextAction* nextAction) {
         // Data clone done, move onto apply.
         TimestampStatus ts(ErrorCodes::OplogStartMissing, "");
@@ -1096,7 +1097,7 @@ std::string toString(DataReplicatorState s) {
         }
     }
 
-    void DataReplicator::_onMissingFetched(const BatchDataStatus& fetchResult,
+    void DataReplicator::_onMissingFetched(const QueryResponseStatus& fetchResult,
                                            Fetcher::NextAction* nextAction,
                                            const Operations& ops,
                                            const NamespaceString nss) {
@@ -1290,7 +1291,7 @@ std::string toString(DataReplicatorState s) {
         return status;
     }
 
-    void DataReplicator::_onOplogFetchFinish(const StatusWith<Fetcher::BatchData>& fetchResult,
+    void DataReplicator::_onOplogFetchFinish(const StatusWith<Fetcher::QueryResponse>& fetchResult,
                                              Fetcher::NextAction* nextAction) {
         const Status status = fetchResult.getStatus();
         if (status.code() == ErrorCodes::CallbackCanceled)

@@ -54,7 +54,7 @@ class QueryFetcher;
 namespace repl {
 
 using Operations = Applier::Operations;
-using BatchDataStatus = StatusWith<Fetcher::BatchData>;
+using QueryResponseStatus = StatusWith<Fetcher::QueryResponse>;
 using CallbackArgs = ReplicationExecutor::CallbackArgs;
 using CBHStatus = StatusWith<ReplicationExecutor::CallbackHandle>;
 using CommandCallbackArgs = ReplicationExecutor::RemoteCommandCallbackArgs;
@@ -199,7 +199,7 @@ private:
 
     // Only executed via executor
     void _resumeFinish(CallbackArgs cbData);
-    void _onOplogFetchFinish(const BatchDataStatus& fetchResult,
+    void _onOplogFetchFinish(const QueryResponseStatus& fetchResult,
                              Fetcher::NextAction* nextAction);
     void _doNextActions();
     void _doNextActions_InitialSync_inlock();
@@ -219,14 +219,14 @@ private:
     void _handleFailedApplyBatch(const TimestampStatus&, const Operations&);
     // Fetches the last doc from the first operation, and reschedules the apply for the ops.
     void _scheduleApplyAfterFetch(const Operations&);
-    void _onMissingFetched(const BatchDataStatus& fetchResult,
+    void _onMissingFetched(const QueryResponseStatus& fetchResult,
                            Fetcher::NextAction* nextAction,
                            const Operations& ops,
                            const NamespaceString nss);
 
     void _onDataClonerFinish(const Status& status);
     // Called after _onDataClonerFinish when the new Timestamp is avail, to use for minvalid
-    void _onApplierReadyStart(const BatchDataStatus& fetchResult,
+    void _onApplierReadyStart(const QueryResponseStatus& fetchResult,
                               Fetcher::NextAction* nextAction);
 
     Status _scheduleApplyBatch();

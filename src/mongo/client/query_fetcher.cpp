@@ -52,7 +52,11 @@ namespace mongo {
 
     }
 
-    void QueryFetcher::_onFetchCallback(const BatchDataStatus& fetchResult,
+    int QueryFetcher::_getResponses() const {
+        return _responses;
+    }
+
+    void QueryFetcher::_onFetchCallback(const Fetcher::QueryResponseStatus& fetchResult,
                                         Fetcher::NextAction* nextAction,
                                         BSONObjBuilder* getMoreBob) {
 
@@ -69,7 +73,17 @@ namespace mongo {
         }
     }
 
-    std::string QueryFetcher::toString() const {
+    void QueryFetcher::_onQueryResponse(const Fetcher::QueryResponseStatus& fetchResult,
+                                        Fetcher::NextAction* nextAction) {
+        _work(fetchResult, nextAction);
+    }
+
+    void QueryFetcher::_delegateCallback(const Fetcher::QueryResponseStatus& fetchResult,
+                                         Fetcher::NextAction* nextAction) {
+        _onQueryResponse(fetchResult, nextAction);
+    };
+
+    std::string QueryFetcher::getDiagnosticString() const {
         return str::stream() << "QueryFetcher -"
                              << " responses: " << _responses
                              << " fetcher: " << _fetcher.getDiagnosticString();

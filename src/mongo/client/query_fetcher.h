@@ -50,8 +50,8 @@ namespace mongo {
     class QueryFetcher {
         MONGO_DISALLOW_COPYING(QueryFetcher);
     public:
-        using BatchDataStatus = StatusWith<Fetcher::BatchData>;
-        using CallbackFn = stdx::function<void (const BatchDataStatus&, Fetcher::NextAction*)>;
+        using CallbackFn =
+            stdx::function<void (const Fetcher::QueryResponseStatus&, Fetcher::NextAction*)>;
 
         QueryFetcher(executor::TaskExecutor* exec,
                      const HostAndPort& source,
@@ -64,18 +64,24 @@ namespace mongo {
         Status schedule() { return _fetcher.schedule(); }
         void cancel() { return _fetcher.cancel(); }
         void wait() { if (_fetcher.isActive()) _fetcher.wait(); }
-        std::string toString() const;
+        std::string getDiagnosticString() const;
 
     protected:
-        void _onFetchCallback(const BatchDataStatus& fetchResult,
+        int _getResponses() const;
+        void _onFetchCallback(const Fetcher::QueryResponseStatus& fetchResult,
                               Fetcher::NextAction* nextAction,
                               BSONObjBuilder* getMoreBob);
 
-        virtual void _delegateCallback(const BatchDataStatus& fetchResult,
-                                       Fetcher::NextAction* nextAction) {
-            _work(fetchResult, nextAction);
-        };
+        /**
+         * Called by _delegateCallback() to forward query results to '_work'.
+         */
+        void _onQueryResponse(const Fetcher::QueryResponseStatus& fetchResult,
+                              Fetcher::NextAction* nextAction);
 
+        virtual void _delegateCallback(const Fetcher::QueryResponseStatus& fetchResult,
+                                       Fetcher::NextAction* nextAction);
+
+    private:
         executor::TaskExecutor* _exec;
         Fetcher _fetcher;
         int _responses;
