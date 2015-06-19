@@ -618,7 +618,7 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 			 */
 			if (child_ref->home == parent) {
 				child_ref->home = child;
-				child_ref->ref_hint = 0;
+				child_ref->pindex_hint = 0;
 			}
 		} WT_INTL_FOREACH_END;
 		WT_LEAVE_PAGE_INDEX(session);

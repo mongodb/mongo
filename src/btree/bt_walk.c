@@ -146,7 +146,7 @@ ascend:	/*
 				 * Set the reference hint (used when we continue
 				 * the walk).
 				 */
-				ref->ref_hint = slot;
+				ref->pindex_hint = slot;
 			}
 
 			*refp = ref;
@@ -168,7 +168,7 @@ ascend:	/*
 			 * Set the reference hint (used when we continue the
 			 * walk).
 			 */
-			ref->ref_hint = slot;
+			ref->pindex_hint = slot;
 
 			if (LF_ISSET(WT_READ_CACHE)) {
 				/*

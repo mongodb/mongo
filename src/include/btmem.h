@@ -658,7 +658,7 @@ typedef enum __wt_page_state {
 	WT_REF_LOCKED,			/* Page locked for exclusive access */
 	WT_REF_MEM,			/* Page is in cache and valid */
 	WT_REF_READING,			/* Page being read */
-	WT_REF_SPLIT			/* Page was split */
+	WT_REF_SPLIT			/* Parent page split (WT_REF dead) */
 } WT_PAGE_STATE;
 
 /*
@@ -685,7 +685,7 @@ struct __wt_ref {
 	 * up our slot in the page's index structure.
 	 */
 	WT_PAGE * volatile home;	/* Reference page */
-	uint32_t ref_hint;		/* Reference page index hint */
+	uint32_t pindex_hint;		/* Reference page index hint */
 
 	volatile WT_PAGE_STATE state;	/* Page state */
 
