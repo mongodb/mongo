@@ -33,7 +33,6 @@
 #include "mongo/db/repl/replication_executor.h"
 
 #include <limits>
-#include <thread>
 
 #include "mongo/db/repl/database_task.h"
 #include "mongo/db/repl/storage_interface.h"

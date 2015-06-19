@@ -31,12 +31,8 @@
 #include "mongo/platform/basic.h"
 
 #include <algorithm>
-#include <chrono>
-#include <condition_variable>
 #include <map>
-#include <mutex>
 #include <string>
-#include <thread>
 #include <vector>
 
 #include "mongo/client/connpool.h"
@@ -55,7 +51,6 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/field_parser.h"
-#include "mongo/db/service_context.h"
 #include "mongo/db/hasher.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
@@ -67,21 +62,26 @@
 #include "mongo/db/range_deleter_service.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/logger/ramlog.h"
 #include "mongo/s/catalog/catalog_manager.h"
+#include "mongo/s/catalog/dist_lock_manager.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/chunk_version.h"
-#include "mongo/s/config.h"
-#include "mongo/s/d_state.h"
-#include "mongo/s/catalog/dist_lock_manager.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/config.h"
+#include "mongo/s/d_state.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_key_pattern.h"
+#include "mongo/stdx/chrono.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/elapsed_tracker.h"
 #include "mongo/util/exit.h"
@@ -98,7 +98,7 @@
 
 namespace mongo {
 
-using namespace std::chrono;
+using namespace stdx::chrono;
 using std::list;
 using std::set;
 using std::string;
@@ -194,7 +194,7 @@ public:
 
         CurOp* op = CurOp::get(_txn);
         {
-            std::lock_guard<Client> lk(*_txn->getClient());
+            stdx::lock_guard<Client> lk(*_txn->getClient());
             op->setMessage_inlock(s.c_str());
         }
 
@@ -266,7 +266,7 @@ public:
         // Get global shared to synchronize with logOp. Also see comments in the class
         // members declaration for more details.
         Lock::GlobalRead globalShared(txn->lockState());
-        std::lock_guard<std::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
 
         if (_active) {
             return false;
@@ -283,7 +283,7 @@ public:
 
         _active = true;
 
-        std::lock_guard<std::mutex> tLock(_cloneLocsMutex);
+        stdx::lock_guard<stdx::mutex> tLock(_cloneLocsMutex);
         verify(_cloneLocs.size() == 0);
 
         return true;
@@ -296,7 +296,7 @@ public:
         // Get global shared to synchronize with logOp. Also see comments in the class
         // members declaration for more details.
         Lock::GlobalRead globalShared(txn->lockState());
-        std::lock_guard<std::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
 
         _active = false;
         _deleteNotifyExec.reset(NULL);
@@ -307,7 +307,7 @@ public:
         _reload.clear();
         _memoryUsed = 0;
 
-        std::lock_guard<std::mutex> cloneLock(_cloneLocsMutex);
+        stdx::lock_guard<stdx::mutex> cloneLock(_cloneLocsMutex);
         _cloneLocs.clear();
     }
 
@@ -434,7 +434,7 @@ public:
         {
             AutoGetCollectionForRead ctx(txn, getNS());
 
-            std::lock_guard<std::mutex> sl(_mutex);
+            stdx::lock_guard<stdx::mutex> sl(_mutex);
             if (!_active) {
                 errmsg = "no active migration!";
                 return false;
@@ -493,7 +493,7 @@ public:
             // It's alright not to lock _mutex all the way through based on the assumption
             // that this is only called by the main thread that drives the migration and
             // only it can start and stop the current migration.
-            std::lock_guard<std::mutex> sl(_mutex);
+            stdx::lock_guard<stdx::mutex> sl(_mutex);
 
             invariant(_deleteNotifyExec.get() == NULL);
             unique_ptr<WorkingSet> ws = stdx::make_unique<WorkingSet>();
@@ -540,7 +540,7 @@ public:
         RecordId dl;
         while (PlanExecutor::ADVANCED == exec->getNext(NULL, &dl)) {
             if (!isLargeChunk) {
-                std::lock_guard<std::mutex> lk(_cloneLocsMutex);
+                stdx::lock_guard<stdx::mutex> lk(_cloneLocsMutex);
                 _cloneLocs.insert(dl);
             }
 
@@ -553,7 +553,7 @@ public:
         exec.reset();
 
         if (isLargeChunk) {
-            std::lock_guard<std::mutex> sl(_mutex);
+            stdx::lock_guard<stdx::mutex> sl(_mutex);
             warning() << "cannot move chunk: the maximum number of documents for a chunk is "
                       << maxRecsWhenFull << " , the maximum chunk size is " << maxChunkSize
                       << " , average document size is " << avgRecSize << ". Found " << recCount
@@ -579,7 +579,7 @@ public:
         {
             AutoGetCollectionForRead ctx(txn, getNS());
 
-            std::lock_guard<std::mutex> sl(_mutex);
+            stdx::lock_guard<stdx::mutex> sl(_mutex);
             if (!_active) {
                 errmsg = "not active";
                 return false;
@@ -601,7 +601,7 @@ public:
         while (!isBufferFilled) {
             AutoGetCollectionForRead ctx(txn, getNS());
 
-            std::lock_guard<std::mutex> sl(_mutex);
+            stdx::lock_guard<stdx::mutex> sl(_mutex);
             if (!_active) {
                 errmsg = "not active";
                 return false;
@@ -616,7 +616,7 @@ public:
                 return false;
             }
 
-            std::lock_guard<std::mutex> lk(_cloneLocsMutex);
+            stdx::lock_guard<stdx::mutex> lk(_cloneLocsMutex);
             set<RecordId>::iterator cloneLocsIter = _cloneLocs.begin();
             for (; cloneLocsIter != _cloneLocs.end(); ++cloneLocsIter) {
                 if (tracker.intervalHasElapsed())  // should I yield?
@@ -659,33 +659,33 @@ public:
         // that check only works for non-mmapv1 engines, and this is needed
         // for mmapv1.
 
-        std::lock_guard<std::mutex> lk(_cloneLocsMutex);
+        stdx::lock_guard<stdx::mutex> lk(_cloneLocsMutex);
         _cloneLocs.erase(dl);
     }
 
     std::size_t cloneLocsRemaining() {
-        std::lock_guard<std::mutex> lk(_cloneLocsMutex);
+        stdx::lock_guard<stdx::mutex> lk(_cloneLocsMutex);
         return _cloneLocs.size();
     }
 
     long long mbUsed() const {
-        std::lock_guard<std::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         return _memoryUsed / (1024 * 1024);
     }
 
     bool getInCriticalSection() const {
-        std::lock_guard<std::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         return _inCriticalSection;
     }
 
     void setInCriticalSection(bool b) {
-        std::lock_guard<std::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         _inCriticalSection = b;
         _inCriticalSectionCV.notify_all();
     }
 
     std::string getNS() const {
-        std::lock_guard<std::mutex> sl(_mutex);
+        stdx::lock_guard<stdx::mutex> sl(_mutex);
         return _ns;
     }
 
@@ -694,9 +694,9 @@ public:
      */
     bool waitTillNotInCriticalSection(int maxSecondsToWait) {
         const auto deadline = system_clock::now() + seconds(maxSecondsToWait);
-        std::unique_lock<std::mutex> lk(_mutex);
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
         while (_inCriticalSection) {
-            if (std::cv_status::timeout == _inCriticalSectionCV.wait_until(lk, deadline))
+            if (stdx::cv_status::timeout == _inCriticalSectionCV.wait_until(lk, deadline))
                 return false;
         }
 
@@ -709,11 +709,11 @@ public:
 
 private:
     bool _getActive() const {
-        std::lock_guard<std::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         return _active;
     }
     void _setActive(bool b) {
-        std::lock_guard<std::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         _active = b;
     }
 
@@ -735,7 +735,7 @@ private:
         virtual void commit() {
             switch (_op) {
                 case 'd': {
-                    std::lock_guard<std::mutex> sl(_migrateFromStatus->_mutex);
+                    stdx::lock_guard<stdx::mutex> sl(_migrateFromStatus->_mutex);
                     _migrateFromStatus->_deleted.push_back(_idObj);
                     _migrateFromStatus->_memoryUsed += _idObj.firstElement().size() + 5;
                     break;
@@ -743,7 +743,7 @@ private:
 
                 case 'i':
                 case 'u': {
-                    std::lock_guard<std::mutex> sl(_migrateFromStatus->_mutex);
+                    stdx::lock_guard<stdx::mutex> sl(_migrateFromStatus->_mutex);
                     _migrateFromStatus->_reload.push_back(_idObj);
                     _migrateFromStatus->_memoryUsed += _idObj.firstElement().size() + 5;
                     break;
@@ -819,9 +819,9 @@ private:
     //
     // Global Lock -> _mutex -> _cloneLocsMutex
 
-    mutable std::mutex _mutex;
+    mutable stdx::mutex _mutex;
 
-    std::condition_variable _inCriticalSectionCV;  // (M)
+    stdx::condition_variable _inCriticalSectionCV;  // (M)
 
     // Is migration currently in critical section. This can be used to block new writes.
     bool _inCriticalSection;  // (M)
@@ -845,7 +845,7 @@ private:
     BSONObj _max;              // (MG)
     BSONObj _shardKeyPattern;  // (MG)
 
-    mutable std::mutex _cloneLocsMutex;
+    mutable stdx::mutex _cloneLocsMutex;
 
     // List of record id that needs to be transferred from here to the other side.
     set<RecordId> _cloneLocs;  // (C)
@@ -1804,12 +1804,12 @@ public:
           _state(READY) {}
 
     void setState(State newState) {
-        std::lock_guard<std::mutex> sl(_mutex);
+        stdx::lock_guard<stdx::mutex> sl(_mutex);
         _state = newState;
     }
 
     State getState() const {
-        std::lock_guard<std::mutex> sl(_mutex);
+        stdx::lock_guard<stdx::mutex> sl(_mutex);
         return _state;
     }
 
@@ -1821,7 +1821,7 @@ public:
                    const BSONObj& min,
                    const BSONObj& max,
                    const BSONObj& shardKeyPattern) {
-        std::lock_guard<std::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
 
         if (_active) {
             return Status(ErrorCodes::ConflictingOperationInProgress,
@@ -1861,7 +1861,7 @@ public:
             _go(txn, ns, min, max, shardKeyPattern, fromShard, epoch, writeConcern);
         } catch (std::exception& e) {
             {
-                std::lock_guard<std::mutex> sl(_mutex);
+                stdx::lock_guard<stdx::mutex> sl(_mutex);
                 _state = FAIL;
                 _errmsg = e.what();
             }
@@ -1869,7 +1869,7 @@ public:
             error() << "migrate failed: " << e.what() << migrateLog;
         } catch (...) {
             {
-                std::lock_guard<std::mutex> sl(_mutex);
+                stdx::lock_guard<stdx::mutex> sl(_mutex);
                 _state = FAIL;
                 _errmsg = "UNKNOWN ERROR";
             }
@@ -2146,7 +2146,7 @@ public:
                     thisTime++;
 
                     {
-                        std::lock_guard<std::mutex> statsLock(_mutex);
+                        stdx::lock_guard<stdx::mutex> statsLock(_mutex);
                         _numCloned++;
                         _clonedBytes += docToClone.objsize();
                     }
@@ -2320,7 +2320,7 @@ public:
     }
 
     void status(BSONObjBuilder& b) {
-        std::lock_guard<std::mutex> sl(_mutex);
+        stdx::lock_guard<stdx::mutex> sl(_mutex);
 
         b.appendBool("active", _active);
 
@@ -2536,7 +2536,7 @@ public:
     }
 
     bool startCommit() {
-        std::unique_lock<std::mutex> lock(_mutex);
+        stdx::unique_lock<stdx::mutex> lock(_mutex);
 
         if (_state != STEADY) {
             return false;
@@ -2545,7 +2545,7 @@ public:
         const auto deadline = system_clock::now() + seconds(30);
         _state = COMMIT_START;
         while (_active) {
-            if (std::cv_status::timeout == isActiveCV.wait_until(lock, deadline)) {
+            if (stdx::cv_status::timeout == isActiveCV.wait_until(lock, deadline)) {
                 _state = FAIL;
                 log() << "startCommit never finished!" << migrateLog;
                 return false;
@@ -2561,25 +2561,25 @@ public:
     }
 
     void abort() {
-        std::lock_guard<std::mutex> sl(_mutex);
+        stdx::lock_guard<stdx::mutex> sl(_mutex);
         _state = ABORT;
         _errmsg = "aborted";
     }
 
     bool getActive() const {
-        std::lock_guard<std::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         return _active;
     }
     void setActive(bool b) {
-        std::lock_guard<std::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         _active = b;
         isActiveCV.notify_all();
     }
 
     // Guards all fields.
-    mutable std::mutex _mutex;
+    mutable stdx::mutex _mutex;
     bool _active;
-    std::condition_variable isActiveCV;
+    stdx::condition_variable isActiveCV;
 
     std::string _ns;
     std::string _from;
@@ -2778,14 +2778,14 @@ public:
             return appendCommandStatus(result, prepareStatus);
         }
 
-        std::thread m(migrateThread,
-                      ns,
-                      min,
-                      max,
-                      shardKeyPattern,
-                      fromShard,
-                      currentVersion.epoch(),
-                      writeConcern);
+        stdx::thread m(migrateThread,
+                       ns,
+                       min,
+                       max,
+                       shardKeyPattern,
+                       fromShard,
+                       currentVersion.epoch(),
+                       writeConcern);
 
         m.detach();
         result.appendBool("started", true);

@@ -129,6 +129,7 @@ FileAllocator::FileAllocator() : _failed() {}
 
 void FileAllocator::start() {
     stdx::thread t(stdx::bind(&FileAllocator::run, this));
+    t.detach();
 }
 
 void FileAllocator::requestAllocation(const string& name, long& size) {

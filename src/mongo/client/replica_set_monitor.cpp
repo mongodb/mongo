@@ -127,7 +127,7 @@ protected:
         // using it.
         if (!inShutdown() && !StaticObserver::_destroyingStatics) {
             stdx::unique_lock<stdx::mutex> sl(_monitorMutex);
-            _stopRequestedCV.timed_wait(sl, boost::posix_time::seconds(10));
+            _stopRequestedCV.wait_for(sl, stdx::chrono::seconds(10));
         }
 
         while (!inShutdown() && !StaticObserver::_destroyingStatics) {
@@ -151,7 +151,7 @@ protected:
                 break;
             }
 
-            _stopRequestedCV.timed_wait(sl, boost::posix_time::seconds(10));
+            _stopRequestedCV.wait_for(sl, stdx::chrono::seconds(10));
         }
     }
 

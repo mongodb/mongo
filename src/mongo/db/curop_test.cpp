@@ -65,6 +65,7 @@ void timeTrackerSetup() {
 
 MONGO_INITIALIZER(CurOpTest)(InitializerContext* context) {
     stdx::thread t(timeTrackerSetup);
+    t.detach();
 
     // Wait for listener thread to start tracking time.
     while (Listener::getElapsedTimeMillis() == 0) {

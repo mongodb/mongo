@@ -29,10 +29,8 @@
 
 #include "mongo/platform/basic.h"
 
-#include <mutex>
 #include <vector>
 #include <string>
-#include <thread>
 
 #include "mongo/client/connpool.h"
 #include "mongo/client/global_conn_pool.h"
@@ -40,6 +38,8 @@
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/rpc/request_interface.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
@@ -68,14 +68,14 @@ class OperationContext;
 
 namespace {
 
-std::mutex shutDownMutex;
+stdx::mutex shutDownMutex;
 bool shuttingDown = false;
 
 }  // namespace
 
 // Symbols defined to build the binary correctly.
 bool inShutdown() {
-    std::lock_guard<std::mutex> sl(shutDownMutex);
+    stdx::lock_guard<stdx::mutex> sl(shutDownMutex);
     return shuttingDown;
 }
 
@@ -87,7 +87,7 @@ DBClientBase* createDirectClient(OperationContext* txn) {
 
 void dbexit(ExitCode rc, const char* why) {
     {
-        std::lock_guard<std::mutex> sl(shutDownMutex);
+        stdx::lock_guard<stdx::mutex> sl(shutDownMutex);
         shuttingDown = true;
     }
 
@@ -172,12 +172,12 @@ public:
         options.port = _port;
 
         {
-            std::lock_guard<std::mutex> sl(shutDownMutex);
+            stdx::lock_guard<stdx::mutex> sl(shutDownMutex);
             shuttingDown = false;
         }
 
         _server.reset(createServer(options, messsageHandler));
-        _serverThread = std::thread(runServer, _server.get());
+        _serverThread = stdx::thread(runServer, _server.get());
     }
 
     /**
@@ -189,7 +189,7 @@ public:
         }
 
         {
-            std::lock_guard<std::mutex> sl(shutDownMutex);
+            stdx::lock_guard<stdx::mutex> sl(shutDownMutex);
             shuttingDown = true;
         }
 
@@ -222,7 +222,7 @@ public:
 private:
     const int _port;
 
-    std::thread _serverThread;
+    stdx::thread _serverThread;
     unique_ptr<MessageServer> _server;
 };
 

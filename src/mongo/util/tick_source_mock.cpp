@@ -28,6 +28,8 @@
 
 #include "mongo/util/tick_source_mock.h"
 
+#include <utility>
+
 namespace mongo {
 
 namespace {

@@ -33,6 +33,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include <boost/thread/barrier.hpp>
 #include <boost/version.hpp>
 #include <iostream>
 

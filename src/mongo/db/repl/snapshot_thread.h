@@ -28,11 +28,10 @@
 
 #pragma once
 
-#include <functional>
-
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/snapshot_manager.h"
+#include "mongo/stdx/functional.h"
 #include "mongo/stdx/thread.h"
 
 namespace mongo {
@@ -48,7 +47,7 @@ class SnapshotThread {
     MONGO_DISALLOW_COPYING(SnapshotThread);
 
 public:
-    using Callback = std::function<void(SnapshotName)>;
+    using Callback = stdx::function<void(SnapshotName)>;
 
     /**
      * Starts a thread to take periodic snapshots if supported by the storageEngine.

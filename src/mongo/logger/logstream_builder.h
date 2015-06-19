@@ -192,7 +192,10 @@ public:
 
     template <typename Rep, typename Period>
     LogstreamBuilder& operator<<(stdx::chrono::duration<Rep, Period> d) {
-        stream() << d;
+        // We can't rely on ADL to find our custom stream out class,
+        // since neither the class (ostream) nor the argument are in
+        // our namespace. Just manually invoke
+        mongo::operator<<(stream(), d);
         return *this;
     }
 

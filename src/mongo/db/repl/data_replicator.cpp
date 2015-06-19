@@ -33,7 +33,6 @@
 #include "data_replicator.h"
 
 #include <algorithm>
-#include <thread>
 
 #include "mongo/base/status.h"
 #include "mongo/client/query_fetcher.h"

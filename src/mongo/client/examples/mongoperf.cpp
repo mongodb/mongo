@@ -216,6 +216,7 @@ void go() {
         syncDelaySecs = options["syncDelay"].numberInt();
         if (syncDelaySecs) {
             stdx::thread t(syncThread);
+            t.detach();
         }
     }
 
@@ -241,6 +242,7 @@ void go() {
                 while (nthr < wthr && nthr < d) {
                     nthr++;
                     stdx::thread w(workerThread);
+                    w.detach();
                 }
                 cout << "new thread, total running : " << nthr << endl;
                 d *= 2;

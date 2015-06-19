@@ -687,7 +687,7 @@ static void durThread() {
             stdx::unique_lock<stdx::mutex> lock(flushMutex);
 
             for (unsigned i = 0; i <= 2; i++) {
-                if (boost::cv_status::no_timeout ==
+                if (stdx::cv_status::no_timeout ==
                     flushRequested.wait_for(lock, Milliseconds(oneThird))) {
                     // Someone forced a flush
                     break;

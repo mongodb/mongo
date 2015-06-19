@@ -123,7 +123,7 @@ ConnectionString CatalogManagerReplicaSet::connectionString() const {
 void CatalogManagerReplicaSet::shutDown() {
     LOG(1) << "CatalogManagerReplicaSet::shutDown() called.";
     {
-        std::lock_guard<std::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         _inShutdown = true;
     }
 

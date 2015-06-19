@@ -46,6 +46,7 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/type_lockpings.h"
 #include "mongo/s/type_locks.h"
+#include "mongo/stdx/future.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"

@@ -30,8 +30,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <chrono>
-
 #include "mongo/s/catalog/replset/replset_dist_lock_manager.h"
 
 #include "mongo/base/status.h"
@@ -40,6 +38,7 @@
 #include "mongo/s/catalog/dist_lock_catalog.h"
 #include "mongo/s/type_lockpings.h"
 #include "mongo/s/type_locks.h"
+#include "mongo/stdx/chrono.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/log.h"
@@ -51,7 +50,7 @@ namespace mongo {
 using std::string;
 using std::unique_ptr;
 using stdx::chrono::milliseconds;
-using std::chrono::duration_cast;
+using stdx::chrono::duration_cast;
 
 ReplSetDistLockManager::ReplSetDistLockManager(ServiceContext* globalContext,
                                                StringData processID,

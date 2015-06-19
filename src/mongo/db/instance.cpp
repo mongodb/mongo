@@ -1163,6 +1163,7 @@ static void shutdownServer() {
     /* must do this before unmapping mem or you may get a seg fault */
     log(LogComponent::kNetwork) << "shutdown: going to close sockets..." << endl;
     stdx::thread close_socket_thread(stdx::bind(MessagingPort::closeAllSockets, 0));
+    close_socket_thread.detach();
 
     getGlobalServiceContext()->shutdownGlobalStorageEngineCleanly();
 }

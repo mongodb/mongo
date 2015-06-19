@@ -62,7 +62,7 @@ struct WaitUntilDurableData {
         stdx::unique_lock<stdx::mutex> lk(mutex);
         long long start = lastSyncTime;
         numWaitingForSync.fetchAndAdd(1);
-        condvar.timed_wait(lk, boost::posix_time::milliseconds(50));
+        condvar.wait_for(lk, stdx::chrono::milliseconds(50));
         numWaitingForSync.fetchAndAdd(-1);
         return lastSyncTime > start;
     }

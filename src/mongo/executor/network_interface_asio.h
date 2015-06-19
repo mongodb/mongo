@@ -155,7 +155,7 @@ private:
     void _signalWorkAvailable_inlock();
 
     asio::io_service _io_service;
-    std::thread _serviceRunner;
+    stdx::thread _serviceRunner;
 
     std::atomic<State> _state;
 

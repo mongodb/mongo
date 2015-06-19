@@ -30,8 +30,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <chrono>
-
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/commands.h"
 #include "mongo/executor/network_interface_mock.h"
@@ -42,6 +40,8 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
+#include "mongo/stdx/chrono.h"
+#include "mongo/stdx/future.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -51,7 +51,7 @@ using executor::NetworkInterfaceMock;
 using executor::TaskExecutor;
 using unittest::assertGet;
 
-static const std::chrono::seconds kFutureTimeout{5};
+static const stdx::chrono::seconds kFutureTimeout{5};
 
 class LogActionTest : public CatalogManagerReplSetTestFixture {
 public:

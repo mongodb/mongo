@@ -824,7 +824,7 @@ void waitUpToOneSecondForTimestampChange(const Timestamp& referenceTime) {
     stdx::unique_lock<stdx::mutex> lk(newOpMutex);
 
     while (referenceTime == getLastSetTimestamp()) {
-        if (!newTimestampNotifier.timed_wait(lk, boost::posix_time::seconds(1)))
+        if (stdx::cv_status::timeout == newTimestampNotifier.wait_for(lk, stdx::chrono::seconds(1)))
             return;
     }
 }

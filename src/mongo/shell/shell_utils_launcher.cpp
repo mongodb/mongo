@@ -558,6 +558,7 @@ BSONObj StartMongoProgram(const BSONObj& a, void* data) {
     ProgramRunner r(a);
     r.start();
     stdx::thread t(r);
+    t.detach();
     return BSON(string("") << r.pid().asLongLong());
 }
 
@@ -565,6 +566,7 @@ BSONObj RunMongoProgram(const BSONObj& a, void* data) {
     ProgramRunner r(a);
     r.start();
     stdx::thread t(r);
+    t.detach();
     int exit_code = -123456;  // sentinel value
     wait_for_pid(r.pid(), true, &exit_code);
     if (r.port() > 0) {
@@ -579,6 +581,7 @@ BSONObj RunProgram(const BSONObj& a, void* data) {
     ProgramRunner r(a);
     r.start();
     stdx::thread t(r);
+    t.detach();
     int exit_code = -123456;  // sentinel value
     wait_for_pid(r.pid(), true, &exit_code);
     registry.deletePid(r.pid());

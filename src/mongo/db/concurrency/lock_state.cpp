@@ -226,7 +226,7 @@ void CondVarLockGrantNotification::clear() {
 LockResult CondVarLockGrantNotification::wait(unsigned timeoutMs) {
     stdx::unique_lock<stdx::mutex> lock(_mutex);
     while (_result == LOCK_INVALID) {
-        if (boost::cv_status::timeout == _cond.wait_for(lock, Milliseconds(timeoutMs))) {
+        if (stdx::cv_status::timeout == _cond.wait_for(lock, Milliseconds(timeoutMs))) {
             // Timeout
             return LOCK_TIMEOUT;
         }

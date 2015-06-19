@@ -68,7 +68,7 @@ ShardRegistry::ShardRegistry(std::unique_ptr<RemoteCommandTargeterFactory> targe
       _network(network),
       _catalogManager(catalogManager) {
     // add config shard registry entry so know it's always there
-    std::lock_guard<std::mutex> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     _addConfigShard_inlock();
 }
 
@@ -92,7 +92,7 @@ void ShardRegistry::reload() {
 
     LOG(1) << "found " << numShards << " shards listed on config server(s)";
 
-    std::lock_guard<std::mutex> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     _lookup.clear();
     _rsLookup.clear();
@@ -125,14 +125,14 @@ shared_ptr<Shard> ShardRegistry::getShard(const ShardId& shardId) {
 }
 
 shared_ptr<Shard> ShardRegistry::lookupRSName(const string& name) const {
-    std::lock_guard<std::mutex> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     ShardMap::const_iterator i = _rsLookup.find(name);
 
     return (i == _rsLookup.end()) ? nullptr : i->second;
 }
 
 void ShardRegistry::remove(const ShardId& id) {
-    std::lock_guard<std::mutex> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     for (ShardMap::iterator i = _lookup.begin(); i != _lookup.end();) {
         shared_ptr<Shard> s = i->second;
@@ -157,7 +157,7 @@ void ShardRegistry::getAllShardIds(vector<ShardId>* all) const {
     std::set<string> seen;
 
     {
-        std::lock_guard<std::mutex> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         for (ShardMap::const_iterator i = _lookup.begin(); i != _lookup.end(); ++i) {
             const shared_ptr<Shard>& s = i->second;
             if (s->getId() == "config") {
@@ -177,7 +177,7 @@ void ShardRegistry::getAllShardIds(vector<ShardId>* all) const {
 void ShardRegistry::toBSON(BSONObjBuilder* result) {
     BSONObjBuilder b(_lookup.size() + 50);
 
-    std::lock_guard<std::mutex> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     for (ShardMap::const_iterator i = _lookup.begin(); i != _lookup.end(); ++i) {
         b.append(i->first, i->second->getConnString().toString());
@@ -242,7 +242,7 @@ void ShardRegistry::_addShard_inlock(const ShardType& shardType) {
 }
 
 shared_ptr<Shard> ShardRegistry::_findUsingLookUp(const ShardId& shardId) {
-    std::lock_guard<std::mutex> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     ShardMap::iterator it = _lookup.find(shardId);
     if (it != _lookup.end()) {
         return it->second;

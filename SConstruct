@@ -2039,13 +2039,20 @@ def doConfigure(myenv):
             myenv.ConfError("Cannot find wiredtiger headers")
         conf.FindSysLibDep("wiredtiger", ["wiredtiger"])
 
+    conf.env.Append(
+        CPPDEFINES=[
+            ("BOOST_THREAD_VERSION", "4"),
+            # Boost thread v4's variadic thread support doesn't
+            # permit more than four parameters.
+            "BOOST_THREAD_DONT_PROVIDE_VARIADIC_THREAD",
+        ]
+    )
+
     if use_system_version_of_library("boost"):
         if not conf.CheckCXXHeader( "boost/filesystem/operations.hpp" ):
             myenv.ConfError("can't find boost headers")
         if not conf.CheckBoostMinVersion():
             myenv.ConfError("system's version of boost is too old. version 1.49 or better required")
-
-        conf.env.Append(CPPDEFINES=[("BOOST_THREAD_VERSION", "2")])
 
         # Note that on Windows with using-system-boost builds, the following
         # FindSysLibDep calls do nothing useful (but nothing problematic either)

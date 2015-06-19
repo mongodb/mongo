@@ -29,7 +29,6 @@
 #pragma once
 
 #include <memory>
-#include <mutex>
 #include <string>
 #include <vector>
 
@@ -37,6 +36,7 @@
 #include "mongo/client/connection_string.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/s/catalog/catalog_manager.h"
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 
@@ -162,7 +162,7 @@ private:
     AtomicInt32 _changeLogCollectionCreated;
 
     // protects _inShutdown
-    std::mutex _mutex;
+    stdx::mutex _mutex;
 
     // True if shutDown() has been called. False, otherwise.
     bool _inShutdown = false;

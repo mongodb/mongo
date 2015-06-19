@@ -30,6 +30,9 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/util/concurrency/ticketholder.h"
+
+#include <iostream>
+
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 

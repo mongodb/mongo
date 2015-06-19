@@ -154,6 +154,7 @@ SocketPair socketPair(const int type, const int protocol) {
         stdx::bind(&detail::awaitConnect, &connectSock, *connectRes, boost::ref(connected)));
 
     connected.waitToBeNotified();
+    connector.join();
     if (connectSock == INVALID_SOCKET) {
         closesocket(listenSock);
         ::freeaddrinfo(res);
@@ -164,6 +165,7 @@ SocketPair socketPair(const int type, const int protocol) {
     }
 
     accepted.waitToBeNotified();
+    acceptor.join();
     if (acceptSock == INVALID_SOCKET) {
         closesocket(listenSock);
         ::freeaddrinfo(res);

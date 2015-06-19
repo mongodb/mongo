@@ -30,7 +30,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <future>
 #include <iostream>
 #include <memory>
 #include <set>
@@ -57,6 +56,7 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/stdx/future.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -1872,7 +1872,6 @@ TEST_F(ReplCoordTest, AwaitReplicationReconfigNodeCountExceedsNumberOfNodes) {
     getNet()->exitNetwork();
     reconfigThread.join();
     ASSERT_OK(status);
-    std::cout << "asdf" << std::endl;
 
     // writeconcern feasability should be reevaluated and an error should be returned
     ReplicationCoordinator::StatusAndDuration statusAndDur = awaiter.getResult();
@@ -2162,11 +2161,11 @@ TEST_F(ReplCoordTest, ReadAfterDeferredGreaterOpTime) {
 
     getReplCoord()->setMyLastOptime(OpTimeWithTermZero(0, 0));
 
-    auto pseudoLogOp = std::async(std::launch::async,
-                                  [this]() {
-                                      // Not guaranteed to be scheduled after waitUnitl blocks...
-                                      getReplCoord()->setMyLastOptime(OpTimeWithTermZero(200, 0));
-                                  });
+    auto pseudoLogOp = stdx::async(stdx::launch::async,
+                                   [this]() {
+                                       // Not guaranteed to be scheduled after waitUntil blocks...
+                                       getReplCoord()->setMyLastOptime(OpTimeWithTermZero(200, 0));
+                                   });
 
     auto result =
         getReplCoord()->waitUntilOpTime(&txn, ReadAfterOpTimeArgs(OpTimeWithTermZero(100, 0)));
@@ -2189,11 +2188,11 @@ TEST_F(ReplCoordTest, ReadAfterDeferredEqualOpTime) {
 
     OpTimeWithTermZero opTimeToWait(100, 0);
 
-    auto pseudoLogOp = std::async(std::launch::async,
-                                  [this, &opTimeToWait]() {
-                                      // Not guaranteed to be scheduled after waitUnitl blocks...
-                                      getReplCoord()->setMyLastOptime(opTimeToWait);
-                                  });
+    auto pseudoLogOp = stdx::async(stdx::launch::async,
+                                   [this, &opTimeToWait]() {
+                                       // Not guaranteed to be scheduled after waitUntil blocks...
+                                       getReplCoord()->setMyLastOptime(opTimeToWait);
+                                   });
 
     auto result = getReplCoord()->waitUntilOpTime(&txn, ReadAfterOpTimeArgs(opTimeToWait));
     pseudoLogOp.get();

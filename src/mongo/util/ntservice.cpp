@@ -39,6 +39,9 @@
 
 #include "mongo/db/client.h"
 #include "mongo/db/instance.h"
+#include "mongo/stdx/chrono.h"
+#include "mongo/stdx/future.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
@@ -502,15 +505,6 @@ bool reportStatus(DWORD reportState, DWORD waitHint, DWORD exitCode) {
     return SetServiceStatus(_statusHandle, &ssStatus);
 }
 
-static void serviceStopWorker() {
-    Client::initThread("serviceStopWorker");
-
-    // Stop the process
-    // TODO: SERVER-5703, separate the "cleanup for shutdown" functionality from
-    // the "terminate process" functionality in exitCleanly.
-    exitCleanly(EXIT_WINDOWS_SERVICE_STOP);
-}
-
 // Minimum of time we tell Windows to wait before we are guilty of a hung shutdown
 const int kStopWaitHintMillis = 30000;
 
@@ -519,12 +513,23 @@ const int kStopWaitHintMillis = 30000;
 // On client OSes, SERVICE_CONTROL_SHUTDOWN has a 5 second timeout configured in
 // HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control
 static void serviceStop() {
-    stdx::thread serviceWorkerThread(serviceStopWorker);
+    stdx::packaged_task<void()> exitCleanlyTask([] {
+        Client::initThread("serviceStopWorker");
+        // Stop the process
+        // TODO: SERVER-5703, separate the "cleanup for shutdown" functionality from
+        // the "terminate process" functionality in exitCleanly.
+        exitCleanly(EXIT_WINDOWS_SERVICE_STOP);
+    });
+    stdx::future<void> exitedCleanly = exitCleanlyTask.get_future();
+
+    // Launch the packaged task in a thread. We needn't ever join it,
+    // so it doesn't even need a name.
+    stdx::thread(std::move(exitCleanlyTask)).detach();
+
+    const auto timeout = stdx::chrono::milliseconds(kStopWaitHintMillis / 2);
 
     // We periodically check if we are done exiting by polling at half of each wait interval
-    //
-    while (
-        !serviceWorkerThread.try_join_for(boost::chrono::milliseconds(kStopWaitHintMillis / 2))) {
+    while (exitedCleanly.wait_for(timeout) != stdx::future_status::ready) {
         reportStatus(SERVICE_STOP_PENDING, kStopWaitHintMillis);
         log() << "Service Stop is waiting for storage engine to finish shutdown";
     }

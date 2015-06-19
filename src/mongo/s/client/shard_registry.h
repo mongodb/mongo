@@ -30,12 +30,12 @@
 
 #include <boost/optional.hpp>
 #include <memory>
-#include <mutex>
 #include <string>
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/s/client/shard.h"
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 
@@ -172,7 +172,7 @@ private:
     CatalogManager* const _catalogManager;
 
     // Protects the maps below
-    mutable std::mutex _mutex;
+    mutable stdx::mutex _mutex;
 
     // Map of both shardName -> Shard and hostName -> Shard
     ShardMap _lookup;

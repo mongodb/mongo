@@ -33,13 +33,11 @@
 
 #include "mongo/util/background.h"
 
-#include <chrono>
-#include <condition_variable>
-#include <functional>
-#include <mutex>
-#include <thread>
-
 #include "mongo/config.h"
+#include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/functional.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/concurrency/spin_lock.h"
 #include "mongo/util/concurrency/thread_name.h"
@@ -82,11 +80,11 @@ private:
     void _runTask(PeriodicTask* task);
 
     // _mutex protects the _shutdownRequested flag and the _tasks vector.
-    std::mutex _mutex;
+    stdx::mutex _mutex;
 
     // The condition variable is used to sleep for the interval between task
     // executions, and is notified when the _shutdownRequested flag is toggled.
-    std::condition_variable _cond;
+    stdx::condition_variable _cond;
 
     // Used to break the loop. You should notify _cond after changing this to true
     // so that shutdown proceeds promptly.
@@ -133,8 +131,8 @@ bool runnerDestroyed;
 struct BackgroundJob::JobStatus {
     JobStatus() : state(NotStarted) {}
 
-    std::mutex mutex;
-    std::condition_variable done;
+    stdx::mutex mutex;
+    stdx::condition_variable done;
     State state;
 };
 
@@ -172,7 +170,7 @@ void BackgroundJob::jobBody() {
     {
         // It is illegal to access any state owned by this BackgroundJob after leaving this
         // scope, with the exception of the call to 'delete this' below.
-        std::unique_lock<std::mutex> l(_status->mutex);
+        stdx::unique_lock<stdx::mutex> l(_status->mutex);
         _status->state = Done;
         _status->done.notify_all();
     }
@@ -182,7 +180,7 @@ void BackgroundJob::jobBody() {
 }
 
 void BackgroundJob::go() {
-    std::unique_lock<std::mutex> l(_status->mutex);
+    stdx::unique_lock<stdx::mutex> l(_status->mutex);
     massert(17234,
             mongoutils::str::stream() << "backgroundJob already running: " << name(),
             _status->state != Running);
@@ -190,14 +188,14 @@ void BackgroundJob::go() {
     // If the job is already 'done', for instance because it was cancelled or already
     // finished, ignore additional requests to run the job.
     if (_status->state == NotStarted) {
-        std::thread t(std::bind(&BackgroundJob::jobBody, this));
+        stdx::thread t(stdx::bind(&BackgroundJob::jobBody, this));
         t.detach();
         _status->state = Running;
     }
 }
 
 Status BackgroundJob::cancel() {
-    std::unique_lock<std::mutex> l(_status->mutex);
+    stdx::unique_lock<stdx::mutex> l(_status->mutex);
 
     if (_status->state == Running)
         return Status(ErrorCodes::IllegalOperation, "Cannot cancel a running BackgroundJob");
@@ -212,11 +210,11 @@ Status BackgroundJob::cancel() {
 
 bool BackgroundJob::wait(unsigned msTimeOut) {
     verify(!_selfDelete);  // you cannot call wait on a self-deleting job
-    const auto deadline = std::chrono::system_clock::now() + std::chrono::milliseconds(msTimeOut);
-    std::unique_lock<std::mutex> l(_status->mutex);
+    const auto deadline = stdx::chrono::system_clock::now() + stdx::chrono::milliseconds(msTimeOut);
+    stdx::unique_lock<stdx::mutex> l(_status->mutex);
     while (_status->state != Done) {
         if (msTimeOut) {
-            if (std::cv_status::timeout == _status->done.wait_until(l, deadline))
+            if (stdx::cv_status::timeout == _status->done.wait_until(l, deadline))
                 return false;
         } else {
             _status->done.wait(l);
@@ -226,12 +224,12 @@ bool BackgroundJob::wait(unsigned msTimeOut) {
 }
 
 BackgroundJob::State BackgroundJob::getState() const {
-    std::unique_lock<std::mutex> l(_status->mutex);
+    stdx::unique_lock<stdx::mutex> l(_status->mutex);
     return _status->state;
 }
 
 bool BackgroundJob::running() const {
-    std::unique_lock<std::mutex> l(_status->mutex);
+    stdx::unique_lock<stdx::mutex> l(_status->mutex);
     return _status->state == Running;
 }
 
@@ -286,12 +284,12 @@ Status PeriodicTask::stopRunningPeriodicTasks(int gracePeriodMillis) {
 }
 
 void PeriodicTaskRunner::add(PeriodicTask* task) {
-    std::lock_guard<std::mutex> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     _tasks.push_back(task);
 }
 
 void PeriodicTaskRunner::remove(PeriodicTask* task) {
-    std::lock_guard<std::mutex> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     for (size_t i = 0; i != _tasks.size(); i++) {
         if (_tasks[i] == task) {
             _tasks[i] = NULL;
@@ -302,7 +300,7 @@ void PeriodicTaskRunner::remove(PeriodicTask* task) {
 
 Status PeriodicTaskRunner::stop(int gracePeriodMillis) {
     {
-        std::lock_guard<std::mutex> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
         _shutdownRequested = true;
         _cond.notify_one();
     }
@@ -316,11 +314,11 @@ Status PeriodicTaskRunner::stop(int gracePeriodMillis) {
 
 void PeriodicTaskRunner::run() {
     // Use a shorter cycle time in debug mode to help catch race conditions.
-    const std::chrono::seconds waitTime(kDebugBuild ? 5 : 60);
+    const stdx::chrono::seconds waitTime(kDebugBuild ? 5 : 60);
 
-    std::unique_lock<std::mutex> lock(_mutex);
+    stdx::unique_lock<stdx::mutex> lock(_mutex);
     while (!_shutdownRequested) {
-        if (std::cv_status::timeout == _cond.wait_for(lock, waitTime))
+        if (stdx::cv_status::timeout == _cond.wait_for(lock, waitTime))
             _runTasks();
     }
 }

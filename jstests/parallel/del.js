@@ -75,5 +75,5 @@ for ( i=0; i<10; i++ ){
 a.del_parallel.save({done: 1})
 b.del_parallel.save({done: 1})
 
-all[0].join()
-
+for ( i=0; i<all.length; i++ )
+    all[i].join()

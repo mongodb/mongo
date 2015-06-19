@@ -417,7 +417,10 @@ void CatalogManagerLegacy::shutDown() {
         _inShutdown = true;
         _consistencyCheckerCV.notify_one();
     }
-    _consistencyCheckerThread.join();
+
+    // Only try to join the thread if we actually started it.
+    if (_consistencyCheckerThread.joinable())
+        _consistencyCheckerThread.join();
 
     invariant(_distLockManager);
     _distLockManager->shutDown();

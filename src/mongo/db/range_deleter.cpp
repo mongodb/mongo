@@ -436,7 +436,8 @@ void RangeDeleter::doWork() {
         {
             stdx::unique_lock<stdx::mutex> sl(_queueMutex);
             while (_taskQueue.empty()) {
-                _taskQueueNotEmptyCV.timed_wait(sl, duration::milliseconds(kNotEmptyTimeoutMillis));
+                _taskQueueNotEmptyCV.wait_for(sl,
+                                              stdx::chrono::milliseconds(kNotEmptyTimeoutMillis));
 
                 if (stopRequested()) {
                     log() << "stopping range deleter worker" << endl;

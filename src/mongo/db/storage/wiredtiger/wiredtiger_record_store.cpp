@@ -620,7 +620,7 @@ int64_t WiredTigerRecordStore::cappedDeleteAsNeeded(OperationContext* txn,
         // Don't wait forever: we're in a transaction, we could block eviction.
         if (!lock.try_lock()) {
             Date_t before = Date_t::now();
-            (void)lock.timed_lock(boost::posix_time::millisec(200));
+            (void)lock.try_lock_for(stdx::chrono::milliseconds(200));
             stdx::chrono::milliseconds delay = Date_t::now() - before;
             _cappedSleep.fetchAndAdd(1);
             _cappedSleepMS.fetchAndAdd(delay.count());
@@ -635,7 +635,7 @@ int64_t WiredTigerRecordStore::cappedDeleteAsNeeded(OperationContext* txn,
 
             // Don't wait forever: we're in a transaction, we could block eviction.
             Date_t before = Date_t::now();
-            bool gotLock = lock.timed_lock(boost::posix_time::millisec(200));
+            bool gotLock = lock.try_lock_for(stdx::chrono::milliseconds(200));
             stdx::chrono::milliseconds delay = Date_t::now() - before;
             _cappedSleep.fetchAndAdd(1);
             _cappedSleepMS.fetchAndAdd(delay.count());
@@ -823,7 +823,7 @@ bool WiredTigerRecordStore::isCappedHidden(const RecordId& loc) const {
 }
 
 RecordId WiredTigerRecordStore::lowestCappedHiddenRecord() const {
-    boost::lock_guard<boost::mutex> lk(_uncommittedDiskLocsMutex);
+    stdx::lock_guard<stdx::mutex> lk(_uncommittedDiskLocsMutex);
     return _uncommittedDiskLocs.empty() ? RecordId() : _uncommittedDiskLocs.front();
 }
 

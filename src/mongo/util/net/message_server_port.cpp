@@ -32,6 +32,7 @@
 #include "mongo/platform/basic.h"
 
 #include <memory>
+#include <system_error>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/config.h"
@@ -116,7 +117,10 @@ public:
 
         try {
 #ifndef __linux__  // TODO: consider making this ifdef _WIN32
-            { stdx::thread thr(stdx::bind(&handleIncomingMsg, portWithHandler.get())); }
+            {
+                stdx::thread thr(stdx::bind(&handleIncomingMsg, portWithHandler.get()));
+                thr.detach();
+            }
 #else
             pthread_attr_t attrs;
             pthread_attr_init(&attrs);
@@ -147,18 +151,16 @@ public:
 
             if (failed) {
                 log() << "pthread_create failed: " << errnoWithDescription(failed) << endl;
-                throw boost::thread_resource_error();  // for consistency with boost::thread
+                throw std::system_error(
+                    std::make_error_code(std::errc::resource_unavailable_try_again));
             }
 #endif  // __linux__
 
             portWithHandler.release();
             sleepAfterClosingPort.Dismiss();
-        } catch (boost::thread_resource_error&) {
-            Listener::globalTicketHolder.release();
-            log() << "can't create new thread, closing connection" << endl;
         } catch (...) {
             Listener::globalTicketHolder.release();
-            log() << "unknown error accepting new socket" << endl;
+            log() << "failed to create thread after accepting new connection, closing connection";
         }
     }
 

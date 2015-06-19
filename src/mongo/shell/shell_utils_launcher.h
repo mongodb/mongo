@@ -38,6 +38,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/platform/process_id.h"
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 
@@ -95,7 +96,7 @@ public:
 private:
     std::map<int, std::pair<ProcessId, int>> _ports;
     std::map<ProcessId, int> _pids;
-    mutable boost::recursive_mutex _mutex;
+    mutable stdx::recursive_mutex _mutex;
 
 #ifdef _WIN32
 public:

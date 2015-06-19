@@ -142,6 +142,7 @@ public:
         ports.insert(mp);
         Forwarder f(*mp);
         stdx::thread t(f);
+        t.detach();
     }
 };
 

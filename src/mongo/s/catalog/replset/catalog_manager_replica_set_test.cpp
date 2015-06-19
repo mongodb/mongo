@@ -30,8 +30,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <chrono>
-
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/query/lite_parsed_query.h"
@@ -52,6 +50,8 @@
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/s/write_ops/batched_insert_request.h"
 #include "mongo/s/write_ops/batched_update_request.h"
+#include "mongo/stdx/chrono.h"
+#include "mongo/stdx/future.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -64,7 +64,7 @@ using std::vector;
 using stdx::chrono::milliseconds;
 using unittest::assertGet;
 
-static const std::chrono::seconds kFutureTimeout{5};
+static const stdx::chrono::seconds kFutureTimeout{5};
 
 TEST_F(CatalogManagerReplSetTestFixture, GetCollectionExisting) {
     RemoteCommandTargeterMock* targeter =
@@ -1388,7 +1388,7 @@ TEST_F(CatalogManagerReplSetTestFixture, ApplyChunkOpsDeprecated) {
                                         << BSON("precondition2"
                                                 << "second precondition"));
 
-    auto future = async(std::launch::async,
+    auto future = async(stdx::launch::async,
                         [this, updateOps, preCondition] {
                             auto status =
                                 catalogManager()->applyChunkOpsDeprecated(updateOps, preCondition);
@@ -1421,7 +1421,7 @@ TEST_F(CatalogManagerReplSetTestFixture, ApplyChunkOpsDeprecatedCommandFailed) {
                                         << BSON("precondition2"
                                                 << "second precondition"));
 
-    auto future = async(std::launch::async,
+    auto future = async(stdx::launch::async,
                         [this, updateOps, preCondition] {
                             auto status =
                                 catalogManager()->applyChunkOpsDeprecated(updateOps, preCondition);

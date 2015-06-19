@@ -356,7 +356,7 @@ protected:
     }
 
     void verifySync(Status s = Status::OK()) {
-        verifySync(_isbr->getResult().getStatus().code());
+        ASSERT_EQ(_isbr->getResult().getStatus(), s) << "status objects differ";
     }
 
     void verifySync(ErrorCodes::Error code) {

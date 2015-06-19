@@ -30,8 +30,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <chrono>
-#include <future>
 #include <vector>
 
 #include "mongo/client/remote_command_targeter_mock.h"
@@ -44,6 +42,8 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
+#include "mongo/stdx/chrono.h"
+#include "mongo/stdx/future.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/text.h"
@@ -53,10 +53,10 @@ namespace {
 
 using executor::NetworkInterfaceMock;
 using executor::TaskExecutor;
-using std::async;
+using stdx::async;
 using unittest::assertGet;
 
-static const std::chrono::seconds kFutureTimeout{5};
+static const stdx::chrono::seconds kFutureTimeout{5};
 
 class LogChangeTest : public CatalogManagerReplSetTestFixture {
 public:
@@ -129,7 +129,7 @@ TEST_F(LogChangeTest, LogChangeNoRetryAfterSuccessfulCreate) {
     expectedChangeLog.setWhat("moved a chunk");
     expectedChangeLog.setDetails(BSON("min" << 3 << "max" << 4));
 
-    auto future = async(std::launch::async,
+    auto future = async(stdx::launch::async,
                         [this, &expectedChangeLog] {
                             catalogManager()->logChange(expectedChangeLog.getClientAddr(),
                                                         expectedChangeLog.getWhat(),
@@ -144,7 +144,7 @@ TEST_F(LogChangeTest, LogChangeNoRetryAfterSuccessfulCreate) {
     future.wait_for(kFutureTimeout);
 
     // Now log another change and confirm that we don't re-attempt to create the collection
-    future = async(std::launch::async,
+    future = async(stdx::launch::async,
                    [this, &expectedChangeLog] {
                        catalogManager()->logChange(expectedChangeLog.getClientAddr(),
                                                    expectedChangeLog.getWhat(),
@@ -171,7 +171,7 @@ TEST_F(LogChangeTest, LogActionNoRetryCreateIfAlreadyExists) {
     expectedChangeLog.setWhat("moved a chunk");
     expectedChangeLog.setDetails(BSON("min" << 3 << "max" << 4));
 
-    auto future = async(std::launch::async,
+    auto future = async(stdx::launch::async,
                         [this, &expectedChangeLog] {
                             catalogManager()->logChange(expectedChangeLog.getClientAddr(),
                                                         expectedChangeLog.getWhat(),
@@ -189,7 +189,7 @@ TEST_F(LogChangeTest, LogActionNoRetryCreateIfAlreadyExists) {
     future.wait_for(kFutureTimeout);
 
     // Now log another change and confirm that we don't re-attempt to create the collection
-    future = async(std::launch::async,
+    future = async(stdx::launch::async,
                    [this, &expectedChangeLog] {
                        catalogManager()->logChange(expectedChangeLog.getClientAddr(),
                                                    expectedChangeLog.getWhat(),
@@ -216,7 +216,7 @@ TEST_F(LogChangeTest, LogActionCreateFailure) {
     expectedChangeLog.setWhat("moved a chunk");
     expectedChangeLog.setDetails(BSON("min" << 3 << "max" << 4));
 
-    auto future = async(std::launch::async,
+    auto future = async(stdx::launch::async,
                         [this, &expectedChangeLog] {
                             catalogManager()->logChange(expectedChangeLog.getClientAddr(),
                                                         expectedChangeLog.getWhat(),
@@ -233,7 +233,7 @@ TEST_F(LogChangeTest, LogActionCreateFailure) {
     future.wait_for(kFutureTimeout);
 
     // Now log another change and confirm that we *do* attempt to create the collection
-    future = async(std::launch::async,
+    future = async(stdx::launch::async,
                    [this, &expectedChangeLog] {
                        catalogManager()->logChange(expectedChangeLog.getClientAddr(),
                                                    expectedChangeLog.getWhat(),
