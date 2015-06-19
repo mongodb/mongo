@@ -40,7 +40,7 @@ namespace mongo {
 
     class BSONObjBuilder;
     class CatalogManager;
-    class HostAndPort;
+    struct HostAndPort;
     class NamespaceString;
     class RemoteCommandRunner;
     class RemoteCommandTargeterFactory;
