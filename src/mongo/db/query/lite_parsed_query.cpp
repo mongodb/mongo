@@ -372,19 +372,9 @@ namespace {
             }
         }
 
-        // We might need to update the projection object with a $meta projection.
-        if (pq->returnKey()) {
-            pq->addReturnKeyMetaProj();
-        }
-        if (pq->showRecordId()) {
-            pq->addShowRecordIdMetaProj();
-        }
+        pq->addMetaProjection();
 
-        if (pq->isAwaitData() && !pq->isTailable()) {
-            return Status(ErrorCodes::BadValue, "Cannot set awaitData without tailable");
-        }
-
-        Status validateStatus = pq->validate();
+        Status validateStatus = pq->validateFindCmd();
         if (!validateStatus.isOK()) {
             return validateStatus;
         }
@@ -393,36 +383,18 @@ namespace {
     }
 
     // static
-    StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::make(const std::string& ns,
-                                                                  int ntoreturn,
-                                                                  const BSONObj& query) {
-        return make(ns,
-                    0,          // ntoskip
-                    ntoreturn,
-                    0,          // query options
-                    query,
-                    BSONObj(),  // proj
-                    BSONObj(),  // sort
-                    BSONObj(),  // hint
-                    BSONObj(),  // minObj
-                    BSONObj(),  // maxObj
-                    false,      // snapshot
-                    false);     // explain
-    }
-
-    // static
-    StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::make(const string& ns,
-                                                                  int ntoskip,
-                                                                  int ntoreturn,
-                                                                  int queryOptions,
-                                                                  const BSONObj& query,
-                                                                  const BSONObj& proj,
-                                                                  const BSONObj& sort,
-                                                                  const BSONObj& hint,
-                                                                  const BSONObj& minObj,
-                                                                  const BSONObj& maxObj,
-                                                                  bool snapshot,
-                                                                  bool explain) {
+    StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeAsOpQuery(const string& ns,
+                                                                           int ntoskip,
+                                                                           int ntoreturn,
+                                                                           int queryOptions,
+                                                                           const BSONObj& query,
+                                                                           const BSONObj& proj,
+                                                                           const BSONObj& sort,
+                                                                           const BSONObj& hint,
+                                                                           const BSONObj& minObj,
+                                                                           const BSONObj& maxObj,
+                                                                           bool snapshot,
+                                                                           bool explain) {
         unique_ptr<LiteParsedQuery> pq(new LiteParsedQuery());
         pq->_sort = sort.getOwned();
         pq->_hint = hint.getOwned();
@@ -434,6 +406,31 @@ namespace {
         Status status = pq->init(ns, ntoskip, ntoreturn, queryOptions, query, proj, false);
         if (!status.isOK()) {
             return status;
+        }
+
+        return std::move(pq);
+    }
+
+    // static
+    StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeAsFindCmd(const std::string& ns,
+                                                                           const BSONObj& query,
+                                                                           int limit) {
+        unique_ptr<LiteParsedQuery> pq(new LiteParsedQuery());
+
+        pq->_ns = ns;
+        pq->_filter = query.getOwned();
+
+        if (limit <= 0) {
+            return Status(ErrorCodes::BadValue, "limit value must be positive");
+        }
+
+        pq->_limit = limit;
+
+        pq->addMetaProjection();
+
+        Status validateStatus = pq->validateFindCmd();
+        if (!validateStatus.isOK()) {
+            return validateStatus;
         }
 
         return std::move(pq);
@@ -937,6 +934,25 @@ namespace {
         _awaitData = (options & QueryOption_AwaitData) != 0;
         _exhaust = (options & QueryOption_Exhaust) != 0;
         _partial = (options & QueryOption_PartialResults) != 0;
+    }
+
+    void LiteParsedQuery::addMetaProjection() {
+        // We might need to update the projection object with a $meta projection.
+        if (returnKey()) {
+            addReturnKeyMetaProj();
+        }
+
+        if (showRecordId()) {
+            addShowRecordIdMetaProj();
+        }
+    }
+
+    Status LiteParsedQuery::validateFindCmd() {
+        if (isAwaitData() && !isTailable()) {
+            return Status(ErrorCodes::BadValue, "Cannot set awaitData without tailable");
+        }
+
+        return validate();
     }
 
 } // namespace mongo
