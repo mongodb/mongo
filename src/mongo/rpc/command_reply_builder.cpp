@@ -101,5 +101,15 @@ namespace rpc {
         return std::move(_message);
     }
 
+    std::size_t CommandReplyBuilder::availableSpaceForOutputDocs() const {
+        invariant (State::kDone != _state);
+        int intLen = _builder.len();
+        invariant(0 <= intLen);
+        std::size_t len = static_cast<std::size_t>(intLen);
+        std::size_t msgHeaderSz = static_cast<std::size_t>(MsgData::MsgDataHeaderSize);
+        invariant(len + msgHeaderSz <= mongo::MaxMessageSizeBytes);
+        return mongo::MaxMessageSizeBytes - len - msgHeaderSz;
+    }
+
 }  // rpc
 }  // mongo

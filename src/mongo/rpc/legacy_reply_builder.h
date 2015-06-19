@@ -60,7 +60,10 @@ namespace rpc {
 
         Protocol getProtocol() const final;
 
+        std::size_t availableSpaceForOutputDocs() const final;
+
     private:
+
         BufBuilder _builder{};
         BSONObj _metadata{};
         std::unique_ptr<Message> _message;

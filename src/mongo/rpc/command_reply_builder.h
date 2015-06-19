@@ -76,6 +76,8 @@ namespace rpc {
          */
         std::unique_ptr<Message> done() final;
 
+        std::size_t availableSpaceForOutputDocs() const final;
+
     private:
         // Default values are all empty.
         BufBuilder _builder{};

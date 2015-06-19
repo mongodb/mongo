@@ -98,6 +98,7 @@ namespace rpc {
         _state = State::kMetadata;
     }
 
+
     std::unique_ptr<Message> LegacyReplyBuilder::done() {
         invariant(_state == State::kOutputDocs);
         std::unique_ptr<Message> message = stdx::make_unique<Message>();
@@ -115,6 +116,12 @@ namespace rpc {
 
         _state = State::kDone;
         return std::move(message);
+    }
+
+    std::size_t LegacyReplyBuilder::availableSpaceForOutputDocs() const {
+        invariant (State::kDone != _state);
+        // LegacyReplyBuilder currently does not support addOutputDoc(s)
+        return 0u;
     }
 
 }  // namespace rpc

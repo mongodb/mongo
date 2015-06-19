@@ -125,6 +125,12 @@ namespace rpc {
         virtual void reset() = 0;
 
         /**
+         * Returns available space in bytes, should be used to verify that the message have enough 
+         * space for ouput documents.
+         */
+        virtual std::size_t availableSpaceForOutputDocs() const = 0;
+
+        /**
          * Writes data then transfers ownership of the message to the caller. The behavior of
          * calling any methods on the builder is subsequently undefined.
          */
