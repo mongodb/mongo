@@ -131,7 +131,7 @@ namespace mongo {
     }
 
     bool WhereMatchExpression::matches( const MatchableDocument* doc, MatchDetails* details ) const {
-        uassert(28689, "$where compile error", _func);
+        uassert(28692, "$where compile error", _func);
         BSONObj obj = doc->toBSON();
 
         if ( ! _userScope.isEmpty() ) {
