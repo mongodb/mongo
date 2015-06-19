@@ -1237,12 +1237,11 @@ static void multiUpdate(OperationContext* txn,
 
         try {
             invariant(collection);
-            PlanExecutor* rawExec;
-            uassertStatusOK(getExecutorUpdate(txn, collection, &parsedUpdate, debug, &rawExec));
-            std::unique_ptr<PlanExecutor> exec(rawExec);
+            std::unique_ptr<PlanExecutor> exec =
+                uassertStatusOK(getExecutorUpdate(txn, collection, &parsedUpdate, debug));
 
             uassertStatusOK(exec->executePlan());
-            UpdateResult res = UpdateStage::makeUpdateResult(exec.get(), debug);
+            UpdateResult res = UpdateStage::makeUpdateResult(*exec, debug);
 
             const long long numDocsModified = res.numDocsModified;
             const long long numMatched = res.numMatched;
@@ -1331,14 +1330,12 @@ static void multiRemove(OperationContext* txn,
                 return;
             }
 
-            PlanExecutor* rawExec;
-            uassertStatusOK(getExecutorDelete(
-                txn, autoDb.getDb()->getCollection(nss), &parsedDelete, &rawExec));
-            std::unique_ptr<PlanExecutor> exec(rawExec);
+            std::unique_ptr<PlanExecutor> exec = uassertStatusOK(
+                getExecutorDelete(txn, autoDb.getDb()->getCollection(nss), &parsedDelete));
 
             // Execute the delete and retrieve the number deleted.
             uassertStatusOK(exec->executePlan());
-            result->getStats().n = DeleteStage::getNumDeleted(exec.get());
+            result->getStats().n = DeleteStage::getNumDeleted(*exec);
 
             break;
         } catch (const WriteConflictException& dle) {

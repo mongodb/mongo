@@ -182,11 +182,9 @@ protected:
         auto statusWithCQ = CanonicalQuery::canonicalize(ns, /*query=*/BSONObj());
         uassertStatusOK(statusWithCQ.getStatus());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
-        PlanExecutor* execBare;
-        uassertStatusOK(getExecutor(
-            &_opCtx, ctx.getCollection(), cq.release(), PlanExecutor::YIELD_MANUAL, &execBare));
+        _exec = uassertStatusOK(
+            getExecutor(&_opCtx, ctx.getCollection(), std::move(cq), PlanExecutor::YIELD_MANUAL));
 
-        _exec.reset(execBare);
         _exec->saveState();
         _exec->registerExec();
 

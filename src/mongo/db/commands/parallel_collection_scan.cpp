@@ -37,12 +37,14 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/multi_iterator.h"
 #include "mongo/db/query/cursor_responses.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/touch_pages.h"
 
 namespace mongo {
 
 using std::unique_ptr;
 using std::string;
+using stdx::make_unique;
 
 class ParallelCollectionScanCmd : public Command {
 public:
@@ -106,15 +108,15 @@ public:
 
         OwnedPointerVector<PlanExecutor> execs;
         for (size_t i = 0; i < numCursors; i++) {
-            WorkingSet* ws = new WorkingSet();
-            MultiIteratorStage* mis = new MultiIteratorStage(txn, ws, collection);
+            unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
+            unique_ptr<MultiIteratorStage> mis =
+                make_unique<MultiIteratorStage>(txn, ws.get(), collection);
 
-            PlanExecutor* rawExec;
             // Takes ownership of 'ws' and 'mis'.
-            Status execStatus =
-                PlanExecutor::make(txn, ws, mis, collection, PlanExecutor::YIELD_AUTO, &rawExec);
-            invariant(execStatus.isOK());
-            unique_ptr<PlanExecutor> curExec(rawExec);
+            auto statusWithPlanExecutor = PlanExecutor::make(
+                txn, std::move(ws), std::move(mis), collection, PlanExecutor::YIELD_AUTO);
+            invariant(statusWithPlanExecutor.isOK());
+            unique_ptr<PlanExecutor> curExec = std::move(statusWithPlanExecutor.getValue());
 
             // The PlanExecutor was registered on construction due to the YIELD_AUTO policy.
             // We have to deregister it, as it will be registered with ClientCursor.

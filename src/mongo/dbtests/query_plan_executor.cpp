@@ -103,17 +103,11 @@ public:
         // Make the stage.
         unique_ptr<PlanStage> root(new CollectionScan(&_txn, csparams, ws.get(), cq.get()->root()));
 
-        PlanExecutor* exec;
         // Hand the plan off to the executor.
-        Status stat = PlanExecutor::make(&_txn,
-                                         ws.release(),
-                                         root.release(),
-                                         cq.release(),
-                                         coll,
-                                         PlanExecutor::YIELD_MANUAL,
-                                         &exec);
-        ASSERT_OK(stat);
-        return exec;
+        auto statusWithPlanExecutor = PlanExecutor::make(
+            &_txn, std::move(ws), std::move(root), std::move(cq), coll, PlanExecutor::YIELD_MANUAL);
+        ASSERT_OK(statusWithPlanExecutor.getStatus());
+        return statusWithPlanExecutor.getValue().release();
     }
 
     /**
@@ -150,17 +144,11 @@ public:
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
         verify(NULL != cq.get());
 
-        PlanExecutor* exec;
         // Hand the plan off to the executor.
-        Status stat = PlanExecutor::make(&_txn,
-                                         ws.release(),
-                                         root.release(),
-                                         cq.release(),
-                                         coll,
-                                         PlanExecutor::YIELD_MANUAL,
-                                         &exec);
-        ASSERT_OK(stat);
-        return exec;
+        auto statusWithPlanExecutor = PlanExecutor::make(
+            &_txn, std::move(ws), std::move(root), std::move(cq), coll, PlanExecutor::YIELD_MANUAL);
+        ASSERT_OK(statusWithPlanExecutor.getStatus());
+        return statusWithPlanExecutor.getValue().release();
     }
 
     static const char* ns() {
@@ -296,11 +284,10 @@ public:
             new PipelineProxyStage(pipeline, innerExec, ws.get()));
         Collection* collection = ctx.getCollection();
 
-        PlanExecutor* rawExec;
-        Status status = PlanExecutor::make(
-            &_txn, ws.release(), proxy.release(), collection, PlanExecutor::YIELD_MANUAL, &rawExec);
-        ASSERT_OK(status);
-        std::unique_ptr<PlanExecutor> outerExec(rawExec);
+        auto statusWithPlanExecutor = PlanExecutor::make(
+            &_txn, std::move(ws), std::move(proxy), collection, PlanExecutor::YIELD_MANUAL);
+        ASSERT_OK(statusWithPlanExecutor.getStatus());
+        std::unique_ptr<PlanExecutor> outerExec = std::move(statusWithPlanExecutor.getValue());
 
         // Only the outer executor gets registered.
         registerExec(outerExec.get());

@@ -235,9 +235,8 @@ Status WriteCmd::explain(OperationContext* txn,
             collection = autoDb.getDb()->getCollection(nsString.ns());
         }
 
-        PlanExecutor* rawExec;
-        uassertStatusOK(getExecutorUpdate(txn, collection, &parsedUpdate, debug, &rawExec));
-        std::unique_ptr<PlanExecutor> exec(rawExec);
+        std::unique_ptr<PlanExecutor> exec =
+            uassertStatusOK(getExecutorUpdate(txn, collection, &parsedUpdate, debug));
 
         // Explain the plan tree.
         Explain::explainStages(exec.get(), verbosity, out);
@@ -274,9 +273,8 @@ Status WriteCmd::explain(OperationContext* txn,
             collection = autoDb.getDb()->getCollection(nsString.ns());
         }
 
-        PlanExecutor* rawExec;
-        uassertStatusOK(getExecutorDelete(txn, collection, &parsedDelete, &rawExec));
-        std::unique_ptr<PlanExecutor> exec(rawExec);
+        std::unique_ptr<PlanExecutor> exec =
+            uassertStatusOK(getExecutorDelete(txn, collection, &parsedDelete));
 
         // Explain the plan tree.
         Explain::explainStages(exec.get(), verbosity, out);

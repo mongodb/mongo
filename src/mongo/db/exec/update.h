@@ -111,7 +111,7 @@ public:
      *
      * Should only be called once this stage is EOF.
      */
-    static UpdateResult makeUpdateResult(PlanExecutor* exec, OpDebug* opDebug);
+    static UpdateResult makeUpdateResult(const PlanExecutor& exec, OpDebug* opDebug);
 
     /**
      * Computes the document to insert if the upsert flag is set to true and no matching

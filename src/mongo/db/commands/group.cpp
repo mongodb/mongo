@@ -136,14 +136,13 @@ bool GroupCommand::run(OperationContext* txn,
     AutoGetCollectionForRead ctx(txn, groupRequest.ns);
     Collection* coll = ctx.getCollection();
 
-    PlanExecutor* rawPlanExecutor;
-    Status getExecStatus =
-        getExecutorGroup(txn, coll, groupRequest, PlanExecutor::YIELD_AUTO, &rawPlanExecutor);
-    if (!getExecStatus.isOK()) {
-        return appendCommandStatus(out, getExecStatus);
+    auto statusWithPlanExecutor =
+        getExecutorGroup(txn, coll, groupRequest, PlanExecutor::YIELD_AUTO);
+    if (!statusWithPlanExecutor.isOK()) {
+        return appendCommandStatus(out, statusWithPlanExecutor.getStatus());
     }
 
-    unique_ptr<PlanExecutor> planExecutor(rawPlanExecutor);
+    unique_ptr<PlanExecutor> planExecutor = std::move(statusWithPlanExecutor.getValue());
 
     // Group executors return ADVANCED exactly once, with the entire group result.
     BSONObj retval;
@@ -191,14 +190,13 @@ Status GroupCommand::explain(OperationContext* txn,
     AutoGetCollectionForRead ctx(txn, groupRequest.ns);
     Collection* coll = ctx.getCollection();
 
-    PlanExecutor* rawPlanExecutor;
-    Status getExecStatus =
-        getExecutorGroup(txn, coll, groupRequest, PlanExecutor::YIELD_AUTO, &rawPlanExecutor);
-    if (!getExecStatus.isOK()) {
-        return getExecStatus;
+    auto statusWithPlanExecutor =
+        getExecutorGroup(txn, coll, groupRequest, PlanExecutor::YIELD_AUTO);
+    if (!statusWithPlanExecutor.isOK()) {
+        return statusWithPlanExecutor.getStatus();
     }
 
-    unique_ptr<PlanExecutor> planExecutor(rawPlanExecutor);
+    unique_ptr<PlanExecutor> planExecutor = std::move(statusWithPlanExecutor.getValue());
 
     Explain::explainStages(planExecutor.get(), verbosity, out);
     return Status::OK();

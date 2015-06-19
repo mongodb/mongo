@@ -44,12 +44,14 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/dbtests/dbtests.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/fail_point_service.h"
 
 namespace QueryStageCollectionScan {
 
 using std::unique_ptr;
 using std::vector;
+using stdx::make_unique;
 
 //
 // Stage-specific tests.
@@ -91,14 +93,14 @@ public:
         unique_ptr<MatchExpression> filterExpr(swme.getValue());
 
         // Make a scan and have the runner own it.
-        WorkingSet* ws = new WorkingSet();
-        PlanStage* ps = new CollectionScan(&_txn, params, ws, filterExpr.get());
+        unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
+        unique_ptr<PlanStage> ps =
+            make_unique<CollectionScan>(&_txn, params, ws.get(), filterExpr.get());
 
-        PlanExecutor* rawExec;
-        Status status = PlanExecutor::make(
-            &_txn, ws, ps, params.collection, PlanExecutor::YIELD_MANUAL, &rawExec);
-        ASSERT_OK(status);
-        std::unique_ptr<PlanExecutor> exec(rawExec);
+        auto statusWithPlanExecutor = PlanExecutor::make(
+            &_txn, std::move(ws), std::move(ps), params.collection, PlanExecutor::YIELD_MANUAL);
+        ASSERT_OK(statusWithPlanExecutor.getStatus());
+        unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
 
         // Use the runner to count the number of objects scanned.
         int count = 0;
@@ -207,14 +209,13 @@ public:
         params.tailable = false;
 
         // Make a scan and have the runner own it.
-        WorkingSet* ws = new WorkingSet();
-        PlanStage* ps = new CollectionScan(&_txn, params, ws, NULL);
+        unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
+        unique_ptr<PlanStage> ps = make_unique<CollectionScan>(&_txn, params, ws.get(), nullptr);
 
-        PlanExecutor* rawExec;
-        Status status = PlanExecutor::make(
-            &_txn, ws, ps, params.collection, PlanExecutor::YIELD_MANUAL, &rawExec);
-        ASSERT_OK(status);
-        std::unique_ptr<PlanExecutor> exec(rawExec);
+        auto statusWithPlanExecutor = PlanExecutor::make(
+            &_txn, std::move(ws), std::move(ps), params.collection, PlanExecutor::YIELD_MANUAL);
+        ASSERT_OK(statusWithPlanExecutor.getStatus());
+        unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
 
         int count = 0;
         for (BSONObj obj; PlanExecutor::ADVANCED == exec->getNext(&obj, NULL);) {
@@ -241,14 +242,13 @@ public:
         params.direction = CollectionScanParams::BACKWARD;
         params.tailable = false;
 
-        WorkingSet* ws = new WorkingSet();
-        PlanStage* ps = new CollectionScan(&_txn, params, ws, NULL);
+        unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
+        unique_ptr<PlanStage> ps = make_unique<CollectionScan>(&_txn, params, ws.get(), nullptr);
 
-        PlanExecutor* rawExec;
-        Status status = PlanExecutor::make(
-            &_txn, ws, ps, params.collection, PlanExecutor::YIELD_MANUAL, &rawExec);
-        ASSERT_OK(status);
-        std::unique_ptr<PlanExecutor> exec(rawExec);
+        auto statusWithPlanExecutor = PlanExecutor::make(
+            &_txn, std::move(ws), std::move(ps), params.collection, PlanExecutor::YIELD_MANUAL);
+        ASSERT_OK(statusWithPlanExecutor.getStatus());
+        unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
 
         int count = 0;
         for (BSONObj obj; PlanExecutor::ADVANCED == exec->getNext(&obj, NULL);) {

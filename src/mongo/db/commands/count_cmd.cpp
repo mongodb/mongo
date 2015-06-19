@@ -99,18 +99,16 @@ public:
         // version on initial entry into count.
         RangePreserver preserver(collection);
 
-        PlanExecutor* rawExec;
-        Status getExecStatus = getExecutorCount(txn,
-                                                collection,
-                                                request.getValue(),
-                                                true,  // explain
-                                                PlanExecutor::YIELD_AUTO,
-                                                &rawExec);
-        if (!getExecStatus.isOK()) {
-            return getExecStatus;
+        auto statusWithPlanExecutor = getExecutorCount(txn,
+                                                       collection,
+                                                       request.getValue(),
+                                                       true,  // explain
+                                                       PlanExecutor::YIELD_AUTO);
+        if (!statusWithPlanExecutor.isOK()) {
+            return statusWithPlanExecutor.getStatus();
         }
 
-        unique_ptr<PlanExecutor> exec(rawExec);
+        unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
 
         Explain::explainStages(exec.get(), verbosity, out);
         return Status::OK();
@@ -134,18 +132,16 @@ public:
         // version on initial entry into count.
         RangePreserver preserver(collection);
 
-        PlanExecutor* rawExec;
-        Status getExecStatus = getExecutorCount(txn,
-                                                collection,
-                                                request.getValue(),
-                                                false,  // !explain
-                                                PlanExecutor::YIELD_AUTO,
-                                                &rawExec);
-        if (!getExecStatus.isOK()) {
-            return appendCommandStatus(result, getExecStatus);
+        auto statusWithPlanExecutor = getExecutorCount(txn,
+                                                       collection,
+                                                       request.getValue(),
+                                                       false,  // !explain
+                                                       PlanExecutor::YIELD_AUTO);
+        if (!statusWithPlanExecutor.isOK()) {
+            return appendCommandStatus(result, statusWithPlanExecutor.getStatus());
         }
 
-        unique_ptr<PlanExecutor> exec(rawExec);
+        unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
 
         // Store the plan summary string in CurOp.
         if (NULL != CurOp::get(txn)) {

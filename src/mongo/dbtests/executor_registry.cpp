@@ -76,17 +76,15 @@ public:
         ASSERT_OK(statusWithCQ.getStatus());
         std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
-        PlanExecutor* exec;
         // Takes ownership of 'ws', 'scan', and 'cq'.
-        Status status = PlanExecutor::make(&_opCtx,
-                                           ws.release(),
-                                           scan.release(),
-                                           cq.release(),
-                                           _ctx->db()->getCollection(ns()),
-                                           PlanExecutor::YIELD_MANUAL,
-                                           &exec);
-        ASSERT_OK(status);
-        return exec;
+        auto statusWithPlanExecutor = PlanExecutor::make(&_opCtx,
+                                                         std::move(ws),
+                                                         std::move(scan),
+                                                         std::move(cq),
+                                                         _ctx->db()->getCollection(ns()),
+                                                         PlanExecutor::YIELD_MANUAL);
+        ASSERT_OK(statusWithPlanExecutor.getStatus());
+        return statusWithPlanExecutor.getValue().release();
     }
 
     void registerExecutor(PlanExecutor* exec) {

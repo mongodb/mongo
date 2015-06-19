@@ -96,16 +96,16 @@ std::string DBHashCmd::hashCollection(OperationContext* opCtx,
 
     unique_ptr<PlanExecutor> exec;
     if (desc) {
-        exec.reset(InternalPlanner::indexScan(opCtx,
-                                              collection,
-                                              desc,
-                                              BSONObj(),
-                                              BSONObj(),
-                                              false,
-                                              InternalPlanner::FORWARD,
-                                              InternalPlanner::IXSCAN_FETCH));
+        exec = InternalPlanner::indexScan(opCtx,
+                                          collection,
+                                          desc,
+                                          BSONObj(),
+                                          BSONObj(),
+                                          false,
+                                          InternalPlanner::FORWARD,
+                                          InternalPlanner::IXSCAN_FETCH);
     } else if (collection->isCapped()) {
-        exec.reset(InternalPlanner::collectionScan(opCtx, fullCollectionName, collection));
+        exec = InternalPlanner::collectionScan(opCtx, fullCollectionName, collection);
     } else {
         log() << "can't find _id index for: " << fullCollectionName << endl;
         return "no _id _index";

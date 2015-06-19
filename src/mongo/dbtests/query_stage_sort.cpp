@@ -39,6 +39,7 @@
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/dbtests/dbtests.h"
+#include "mongo/stdx/memory.h"
 
 /**
  * This file tests db/exec/sort.cpp
@@ -46,8 +47,9 @@
 
 namespace QueryStageSortTests {
 
-using std::unique_ptr;
 using std::set;
+using std::unique_ptr;
+using stdx::make_unique;
 
 class QueryStageSortTestBase {
 public:
@@ -100,9 +102,8 @@ public:
      * which is owned by the caller.
      */
     PlanExecutor* makePlanExecutorWithSortStage(Collection* coll) {
-        PlanExecutor* exec;
         // Build the mock scan stage which feeds the data.
-        std::unique_ptr<WorkingSet> ws(new WorkingSet());
+        unique_ptr<WorkingSet> ws(new WorkingSet());
         unique_ptr<QueuedDataStage> ms(new QueuedDataStage(ws.get()));
         insertVarietyOfObjects(ms.get(), coll);
 
@@ -114,10 +115,10 @@ public:
 
         // The PlanExecutor will be automatically registered on construction due to the auto
         // yield policy, so it can receive invalidations when we remove documents later.
-        Status execStatus = PlanExecutor::make(
-            &_txn, ws.release(), ss.release(), coll, PlanExecutor::YIELD_AUTO, &exec);
-        invariant(execStatus.isOK());
-        return exec;
+        auto statusWithPlanExecutor =
+            PlanExecutor::make(&_txn, std::move(ws), std::move(ss), coll, PlanExecutor::YIELD_AUTO);
+        invariant(statusWithPlanExecutor.isOK());
+        return statusWithPlanExecutor.getValue().release();
     }
 
     // Return a value in the set {-1, 0, 1} to represent the sign of parameter i.  Used to
@@ -135,8 +136,8 @@ public:
      * If limit is not zero, we limit the output of the sort stage to 'limit' results.
      */
     void sortAndCheck(int direction, Collection* coll) {
-        WorkingSet* ws = new WorkingSet();
-        QueuedDataStage* ms = new QueuedDataStage(ws);
+        unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
+        QueuedDataStage* ms = new QueuedDataStage(ws.get());
 
         // Insert a mix of the various types of data.
         insertVarietyOfObjects(ms, coll);
@@ -146,17 +147,14 @@ public:
         params.pattern = BSON("foo" << direction);
         params.limit = limit();
 
+        unique_ptr<FetchStage> fetchStage = make_unique<FetchStage>(
+            &_txn, ws.get(), new SortStage(params, ws.get(), ms), nullptr, coll);
+
         // Must fetch so we can look at the doc as a BSONObj.
-        PlanExecutor* rawExec;
-        Status status =
-            PlanExecutor::make(&_txn,
-                               ws,
-                               new FetchStage(&_txn, ws, new SortStage(params, ws, ms), NULL, coll),
-                               coll,
-                               PlanExecutor::YIELD_MANUAL,
-                               &rawExec);
-        ASSERT_OK(status);
-        std::unique_ptr<PlanExecutor> exec(rawExec);
+        auto statusWithPlanExecutor = PlanExecutor::make(
+            &_txn, std::move(ws), std::move(fetchStage), coll, PlanExecutor::YIELD_MANUAL);
+        ASSERT_OK(statusWithPlanExecutor.getStatus());
+        unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
 
         // Look at pairs of objects to make sure that the sort order is pairwise (and therefore
         // totally) correct.
@@ -316,7 +314,7 @@ public:
         set<RecordId> locs;
         getLocs(&locs, coll);
 
-        std::unique_ptr<PlanExecutor> exec(makePlanExecutorWithSortStage(coll));
+        unique_ptr<PlanExecutor> exec(makePlanExecutorWithSortStage(coll));
         SortStage* ss = static_cast<SortStage*>(exec->getRootStage());
         QueuedDataStage* ms = static_cast<QueuedDataStage*>(ss->getChildren()[0]);
 
@@ -425,7 +423,7 @@ public:
         set<RecordId> locs;
         getLocs(&locs, coll);
 
-        std::unique_ptr<PlanExecutor> exec(makePlanExecutorWithSortStage(coll));
+        unique_ptr<PlanExecutor> exec(makePlanExecutorWithSortStage(coll));
         SortStage* ss = static_cast<SortStage*>(exec->getRootStage());
         QueuedDataStage* ms = static_cast<QueuedDataStage*>(ss->getChildren()[0]);
 
@@ -514,8 +512,8 @@ public:
             wuow.commit();
         }
 
-        WorkingSet* ws = new WorkingSet();
-        QueuedDataStage* ms = new QueuedDataStage(ws);
+        unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
+        QueuedDataStage* ms = new QueuedDataStage(ws.get());
 
         for (int i = 0; i < numObj(); ++i) {
             WorkingSetMember member;
@@ -534,16 +532,12 @@ public:
         params.pattern = BSON("b" << -1 << "c" << 1 << "a" << 1);
         params.limit = 0;
 
+        unique_ptr<FetchStage> fetchStage = make_unique<FetchStage>(
+            &_txn, ws.get(), new SortStage(params, ws.get(), ms), nullptr, coll);
         // We don't get results back since we're sorting some parallel arrays.
-        PlanExecutor* rawExec;
-        Status status =
-            PlanExecutor::make(&_txn,
-                               ws,
-                               new FetchStage(&_txn, ws, new SortStage(params, ws, ms), NULL, coll),
-                               coll,
-                               PlanExecutor::YIELD_MANUAL,
-                               &rawExec);
-        std::unique_ptr<PlanExecutor> exec(rawExec);
+        auto statusWithPlanExecutor = PlanExecutor::make(
+            &_txn, std::move(ws), std::move(fetchStage), coll, PlanExecutor::YIELD_MANUAL);
+        unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
 
         PlanExecutor::ExecState runnerState = exec->getNext(NULL, NULL);
         ASSERT_EQUALS(PlanExecutor::FAILURE, runnerState);

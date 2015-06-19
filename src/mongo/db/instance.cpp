@@ -151,7 +151,7 @@ MONGO_FP_DECLARE(rsStopGetMore);
 
 namespace {
 
-std::unique_ptr<AuthzManagerExternalState> createAuthzManagerExternalStateMongod() {
+unique_ptr<AuthzManagerExternalState> createAuthzManagerExternalStateMongod() {
     return stdx::make_unique<AuthzManagerExternalStateMongod>();
 }
 
@@ -689,14 +689,12 @@ void receivedUpdate(OperationContext* txn, const NamespaceString& nsString, Mess
 
             //  The common case: no implicit collection creation
             if (!upsert || ctx.db()->getCollection(nsString) != NULL) {
-                PlanExecutor* rawExec;
-                uassertStatusOK(getExecutorUpdate(
-                    txn, ctx.db()->getCollection(nsString), &parsedUpdate, &op.debug(), &rawExec));
-                std::unique_ptr<PlanExecutor> exec(rawExec);
+                unique_ptr<PlanExecutor> exec = uassertStatusOK(getExecutorUpdate(
+                    txn, ctx.db()->getCollection(nsString), &parsedUpdate, &op.debug()));
 
                 // Run the plan and get stats out.
                 uassertStatusOK(exec->executePlan());
-                UpdateResult res = UpdateStage::makeUpdateResult(exec.get(), &op.debug());
+                UpdateResult res = UpdateStage::makeUpdateResult(*exec, &op.debug());
 
                 // for getlasterror
                 LastError::get(txn->getClient())
@@ -738,14 +736,12 @@ void receivedUpdate(OperationContext* txn, const NamespaceString& nsString, Mess
             wuow.commit();
         }
 
-        PlanExecutor* rawExec;
-        uassertStatusOK(getExecutorUpdate(
-            txn, ctx.db()->getCollection(nsString), &parsedUpdate, &op.debug(), &rawExec));
-        std::unique_ptr<PlanExecutor> exec(rawExec);
+        unique_ptr<PlanExecutor> exec = uassertStatusOK(
+            getExecutorUpdate(txn, ctx.db()->getCollection(nsString), &parsedUpdate, &op.debug()));
 
         // Run the plan and get stats out.
         uassertStatusOK(exec->executePlan());
-        UpdateResult res = UpdateStage::makeUpdateResult(exec.get(), &op.debug());
+        UpdateResult res = UpdateStage::makeUpdateResult(*exec, &op.debug());
 
         LastError::get(txn->getClient()).recordUpdate(res.existing, res.numMatched, res.upserted);
     }
@@ -795,14 +791,12 @@ void receivedDelete(OperationContext* txn, const NamespaceString& nsString, Mess
                 txn->lockState(), nsString.ns(), parsedDelete.isIsolated() ? MODE_X : MODE_IX);
             OldClientContext ctx(txn, nsString);
 
-            PlanExecutor* rawExec;
-            uassertStatusOK(
-                getExecutorDelete(txn, ctx.db()->getCollection(nsString), &parsedDelete, &rawExec));
-            std::unique_ptr<PlanExecutor> exec(rawExec);
+            unique_ptr<PlanExecutor> exec = uassertStatusOK(
+                getExecutorDelete(txn, ctx.db()->getCollection(nsString), &parsedDelete));
 
             // Run the plan and get the number of docs deleted.
             uassertStatusOK(exec->executePlan());
-            long long n = DeleteStage::getNumDeleted(exec.get());
+            long long n = DeleteStage::getNumDeleted(*exec);
             LastError::get(txn->getClient()).recordDelete(n);
             op.debug().ndeleted = n;
 

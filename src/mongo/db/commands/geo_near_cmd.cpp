@@ -194,14 +194,14 @@ public:
         // version on initial entry into geoNear.
         RangePreserver preserver(collection);
 
-        PlanExecutor* rawExec;
-        if (!getExecutor(txn, collection, cq.release(), PlanExecutor::YIELD_AUTO, &rawExec, 0)
-                 .isOK()) {
+        auto statusWithPlanExecutor =
+            getExecutor(txn, collection, std::move(cq), PlanExecutor::YIELD_AUTO, 0);
+        if (!statusWithPlanExecutor.isOK()) {
             errmsg = "can't get query executor";
             return false;
         }
 
-        unique_ptr<PlanExecutor> exec(rawExec);
+        unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
 
         double totalDistance = 0;
         BSONObjBuilder resultBuilder(result.subarrayStart("results"));
@@ -256,7 +256,7 @@ public:
 
         // Fill in nscanned from the explain.
         PlanSummaryStats summary;
-        Explain::getSummaryStats(exec.get(), &summary);
+        Explain::getSummaryStats(*exec, &summary);
         stats.appendNumber("nscanned", summary.totalKeysExamined);
         stats.appendNumber("objectsLoaded", summary.totalDocsExamined);
 

@@ -140,48 +140,44 @@ public:
      * Right now this is only for idhack updates which neither canonicalize
      * nor go through normal planning.
      */
-    static Status make(OperationContext* opCtx,
-                       WorkingSet* ws,
-                       PlanStage* rt,
-                       const Collection* collection,
-                       YieldPolicy yieldPolicy,
-                       PlanExecutor** out);
+    static StatusWith<std::unique_ptr<PlanExecutor>> make(OperationContext* opCtx,
+                                                          std::unique_ptr<WorkingSet> ws,
+                                                          std::unique_ptr<PlanStage> rt,
+                                                          const Collection* collection,
+                                                          YieldPolicy yieldPolicy);
 
     /**
      * Used when we have a NULL collection and no canonical query. In this case,
      * we need to explicitly pass a namespace to the plan executor.
      */
-    static Status make(OperationContext* opCtx,
-                       WorkingSet* ws,
-                       PlanStage* rt,
-                       const std::string& ns,
-                       YieldPolicy yieldPolicy,
-                       PlanExecutor** out);
+    static StatusWith<std::unique_ptr<PlanExecutor>> make(OperationContext* opCtx,
+                                                          std::unique_ptr<WorkingSet> ws,
+                                                          std::unique_ptr<PlanStage> rt,
+                                                          const std::string& ns,
+                                                          YieldPolicy yieldPolicy);
 
     /**
      * Used when there is a canonical query but no query solution (e.g. idhack
      * queries, queries against a NULL collection, queries using the subplan stage).
      */
-    static Status make(OperationContext* opCtx,
-                       WorkingSet* ws,
-                       PlanStage* rt,
-                       CanonicalQuery* cq,
-                       const Collection* collection,
-                       YieldPolicy yieldPolicy,
-                       PlanExecutor** out);
+    static StatusWith<std::unique_ptr<PlanExecutor>> make(OperationContext* opCtx,
+                                                          std::unique_ptr<WorkingSet> ws,
+                                                          std::unique_ptr<PlanStage> rt,
+                                                          std::unique_ptr<CanonicalQuery> cq,
+                                                          const Collection* collection,
+                                                          YieldPolicy yieldPolicy);
 
     /**
-     * The constructor for the normal case, when you have both a canonical query
+     * The constructor for the normal case, when you have a collection, a canonical query,
      * and a query solution.
      */
-    static Status make(OperationContext* opCtx,
-                       WorkingSet* ws,
-                       PlanStage* rt,
-                       QuerySolution* qs,
-                       CanonicalQuery* cq,
-                       const Collection* collection,
-                       YieldPolicy yieldPolicy,
-                       PlanExecutor** out);
+    static StatusWith<std::unique_ptr<PlanExecutor>> make(OperationContext* opCtx,
+                                                          std::unique_ptr<WorkingSet> ws,
+                                                          std::unique_ptr<PlanStage> rt,
+                                                          std::unique_ptr<QuerySolution> qs,
+                                                          std::unique_ptr<CanonicalQuery> cq,
+                                                          const Collection* collection,
+                                                          YieldPolicy yieldPolicy);
 
     ~PlanExecutor();
 
@@ -377,25 +373,24 @@ private:
      * New PlanExecutor instances are created with the static make() methods above.
      */
     PlanExecutor(OperationContext* opCtx,
-                 WorkingSet* ws,
-                 PlanStage* rt,
-                 QuerySolution* qs,
-                 CanonicalQuery* cq,
+                 std::unique_ptr<WorkingSet> ws,
+                 std::unique_ptr<PlanStage> rt,
+                 std::unique_ptr<QuerySolution> qs,
+                 std::unique_ptr<CanonicalQuery> cq,
                  const Collection* collection,
                  const std::string& ns);
 
     /**
      * Public factory methods delegate to this private factory to do their work.
      */
-    static Status make(OperationContext* opCtx,
-                       WorkingSet* ws,
-                       PlanStage* rt,
-                       QuerySolution* qs,
-                       CanonicalQuery* cq,
-                       const Collection* collection,
-                       const std::string& ns,
-                       YieldPolicy yieldPolicy,
-                       PlanExecutor** out);
+    static StatusWith<std::unique_ptr<PlanExecutor>> make(OperationContext* txn,
+                                                          std::unique_ptr<WorkingSet> ws,
+                                                          std::unique_ptr<PlanStage> rt,
+                                                          std::unique_ptr<QuerySolution> qs,
+                                                          std::unique_ptr<CanonicalQuery> cq,
+                                                          const Collection* collection,
+                                                          const std::string& ns,
+                                                          YieldPolicy yieldPolicy);
 
     /**
      * Clients of PlanExecutor expect that on receiving a new instance from one of the make()

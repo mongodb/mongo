@@ -217,9 +217,8 @@ public:
             verify(pPipeline);
         }
 
-        PlanExecutor* exec = NULL;
-        unique_ptr<ClientCursorPin> pin;  // either this OR the execHolder will be non-null
-        unique_ptr<PlanExecutor> execHolder;
+        unique_ptr<ClientCursorPin> pin;  // either this OR the exec will be non-null
+        unique_ptr<PlanExecutor> exec;
         {
             // This will throw if the sharding version for this connection is out of date. The
             // lock must be held continuously from now until we have we created both the output
@@ -243,24 +242,14 @@ public:
             unique_ptr<WorkingSet> ws(new WorkingSet());
             unique_ptr<PipelineProxyStage> proxy(
                 new PipelineProxyStage(pPipeline, input, ws.get()));
-            Status execStatus = Status::OK();
-            if (NULL == collection) {
-                execStatus = PlanExecutor::make(txn,
-                                                ws.release(),
-                                                proxy.release(),
-                                                nss.ns(),
-                                                PlanExecutor::YIELD_MANUAL,
-                                                &exec);
-            } else {
-                execStatus = PlanExecutor::make(txn,
-                                                ws.release(),
-                                                proxy.release(),
-                                                collection,
-                                                PlanExecutor::YIELD_MANUAL,
-                                                &exec);
-            }
-            invariant(execStatus.isOK());
-            execHolder.reset(exec);
+
+            auto statusWithPlanExecutor = (NULL == collection)
+                ? PlanExecutor::make(
+                      txn, std::move(ws), std::move(proxy), nss.ns(), PlanExecutor::YIELD_MANUAL)
+                : PlanExecutor::make(
+                      txn, std::move(ws), std::move(proxy), collection, PlanExecutor::YIELD_MANUAL);
+            invariant(statusWithPlanExecutor.isOK());
+            exec = std::move(statusWithPlanExecutor.getValue());
 
             if (!collection && input) {
                 // If we don't have a collection, we won't be able to register any executors, so
@@ -272,7 +261,7 @@ public:
             if (collection) {
                 const bool isAggCursor = true;  // enable special locking behavior
                 ClientCursor* cursor = new ClientCursor(collection->getCursorManager(),
-                                                        execHolder.release(),
+                                                        exec.release(),
                                                         nss.ns(),
                                                         0,
                                                         cmdObj.getOwned(),
@@ -286,7 +275,7 @@ public:
             //   collection lock later when cleaning up our ClientCursorPin.
             // - In the case where we don't have a collection: our PlanExecutor won't be
             //   registered, so it will be safe to clean it up outside the lock.
-            invariant(NULL == execHolder.get() || NULL == execHolder->collection());
+            invariant(NULL == exec.get() || NULL == exec->collection());
         }
 
         try {
@@ -299,7 +288,12 @@ public:
             if (pPipeline->isExplain()) {
                 result << "stages" << Value(pPipeline->writeExplainOps());
             } else if (isCursorCommand) {
-                keepCursor = handleCursorCommand(txn, nss.ns(), pin.get(), exec, cmdObj, result);
+                keepCursor = handleCursorCommand(txn,
+                                                 nss.ns(),
+                                                 pin.get(),
+                                                 pin ? pin->c()->getExecutor() : exec.get(),
+                                                 cmdObj,
+                                                 result);
             } else {
                 pPipeline->run(result);
             }

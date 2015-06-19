@@ -137,7 +137,7 @@ public:
      *
      * Does not take ownership of its arguments.
      */
-    static void getSummaryStats(const PlanExecutor* exec, PlanSummaryStats* statsOut);
+    static void getSummaryStats(const PlanExecutor& exec, PlanSummaryStats* statsOut);
 
 private:
     /**

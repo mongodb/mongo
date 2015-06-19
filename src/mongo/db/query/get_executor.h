@@ -63,19 +63,19 @@ void fillOutPlannerParams(OperationContext* txn,
                           QueryPlannerParams* plannerParams);
 
 /**
- * Get a plan executor for a query. Takes ownership of 'rawCanonicalQuery'.
+ * Get a plan executor for a query.
  *
- * If the query is valid and an executor could be created, returns Status::OK()
- * and populates *out with the PlanExecutor.
+ * If the query is valid and an executor could be created, returns a StatusWith with the
+ * PlanExecutor.
  *
  * If the query cannot be executed, returns a Status indicating why.
  */
-Status getExecutor(OperationContext* txn,
-                   Collection* collection,
-                   CanonicalQuery* rawCanonicalQuery,
-                   PlanExecutor::YieldPolicy yieldPolicy,
-                   PlanExecutor** out,
-                   size_t plannerOptions = 0);
+StatusWith<std::unique_ptr<PlanExecutor>> getExecutor(
+    OperationContext* txn,
+    Collection* collection,
+    std::unique_ptr<CanonicalQuery> canonicalQuery,
+    PlanExecutor::YieldPolicy yieldPolicy,
+    size_t plannerOptions = 0);
 
 /**
  * Get a plan executor for query. This differs from the getExecutor(...) function
@@ -84,33 +84,32 @@ Status getExecutor(OperationContext* txn,
  *
  * Used to support idhack updates that do not create a canonical query.
  *
- * If the query is valid and an executor could be created, returns Status::OK()
- * and populates *out with the PlanExecutor.
+ * If the query is valid and an executor could be created, returns a StatusWith with the
+ * PlanExecutor.
  *
  * If the query cannot be executed, returns a Status indicating why.
  */
-Status getExecutor(OperationContext* txn,
-                   Collection* collection,
-                   const std::string& ns,
-                   const BSONObj& unparsedQuery,
-                   PlanExecutor::YieldPolicy yieldPolicy,
-                   PlanExecutor** out,
-                   size_t plannerOptions = 0);
+StatusWith<std::unique_ptr<PlanExecutor>> getExecutor(OperationContext* txn,
+                                                      Collection* collection,
+                                                      const std::string& ns,
+                                                      const BSONObj& unparsedQuery,
+                                                      PlanExecutor::YieldPolicy yieldPolicy,
+                                                      size_t plannerOptions = 0);
 
 /**
- * Get a plan executor for a .find() operation. Takes ownership of 'rawCanonicalQuery'.
+ * Get a plan executor for a .find() operation.
  *
- * If the query is valid and an executor could be created, returns Status::OK()
- * and populates *out with the PlanExecutor.
+ * If the query is valid and an executor could be created, returns a StatusWith with the
+ * PlanExecutor.
  *
  * If the query cannot be executed, returns a Status indicating why.
  */
-Status getExecutorFind(OperationContext* txn,
-                       Collection* collection,
-                       const NamespaceString& nss,
-                       CanonicalQuery* rawCanonicalQuery,
-                       PlanExecutor::YieldPolicy yieldPolicy,
-                       PlanExecutor** out);
+StatusWith<std::unique_ptr<PlanExecutor>> getExecutorFind(
+    OperationContext* txn,
+    Collection* collection,
+    const NamespaceString& nss,
+    std::unique_ptr<CanonicalQuery> canonicalQuery,
+    PlanExecutor::YieldPolicy yieldPolicy);
 
 /**
  * If possible, turn the provided QuerySolution into a QuerySolution that uses a DistinctNode
@@ -128,12 +127,12 @@ bool turnIxscanIntoDistinctIxscan(QuerySolution* soln, const std::string& field)
  * possible values of a certain field.  As such, we can skip lots of data in certain cases (see
  * body of method for detail).
  */
-Status getExecutorDistinct(OperationContext* txn,
-                           Collection* collection,
-                           const BSONObj& query,
-                           const std::string& field,
-                           PlanExecutor::YieldPolicy yieldPolicy,
-                           PlanExecutor** out);
+StatusWith<std::unique_ptr<PlanExecutor>> getExecutorDistinct(
+    OperationContext* txn,
+    Collection* collection,
+    const BSONObj& query,
+    const std::string& field,
+    PlanExecutor::YieldPolicy yieldPolicy);
 
 /*
  * Get a PlanExecutor for a query executing as part of a count command.
@@ -142,12 +141,11 @@ Status getExecutorDistinct(OperationContext* txn,
  * As such, with certain covered queries, we can skip the overhead of fetching etc. when
  * executing a count.
  */
-Status getExecutorCount(OperationContext* txn,
-                        Collection* collection,
-                        const CountRequest& request,
-                        bool explain,
-                        PlanExecutor::YieldPolicy yieldPolicy,
-                        PlanExecutor** execOut);
+StatusWith<std::unique_ptr<PlanExecutor>> getExecutorCount(OperationContext* txn,
+                                                           Collection* collection,
+                                                           const CountRequest& request,
+                                                           bool explain,
+                                                           PlanExecutor::YieldPolicy yieldPolicy);
 
 /**
  * Get a PlanExecutor for a delete operation. 'parsedDelete' describes the query predicate
@@ -158,15 +156,14 @@ Status getExecutorCount(OperationContext* txn,
  *
  * Does not take ownership of its arguments.
  *
- * If the query is valid and an executor could be created, returns Status::OK() and populates
- * *execOut with the PlanExecutor. The caller takes ownership of *execOut.
+ * If the query is valid and an executor could be created, returns a StatusWith with the
+ * PlanExecutor.
  *
  * If the query cannot be executed, returns a Status indicating why.
  */
-Status getExecutorDelete(OperationContext* txn,
-                         Collection* collection,
-                         ParsedDelete* parsedDelete,
-                         PlanExecutor** execOut);
+StatusWith<std::unique_ptr<PlanExecutor>> getExecutorDelete(OperationContext* txn,
+                                                            Collection* collection,
+                                                            ParsedDelete* parsedDelete);
 
 /**
  * Get a PlanExecutor for an update operation. 'parsedUpdate' describes the query predicate
@@ -178,32 +175,27 @@ Status getExecutorDelete(OperationContext* txn,
  *
  * Does not take ownership of its arguments.
  *
- * If the query is valid and an executor could be created, returns Status::OK() and populates
- * *out with the PlanExecutor. The caller takes ownership of *execOut.
+ * If the query is valid and an executor could be created, returns a StatusWith with the
+ * PlanExecutor.
  *
  * If the query cannot be executed, returns a Status indicating why.
  */
-Status getExecutorUpdate(OperationContext* txn,
-                         Collection* collection,
-                         ParsedUpdate* parsedUpdate,
-                         OpDebug* opDebug,
-                         PlanExecutor** execOut);
+StatusWith<std::unique_ptr<PlanExecutor>> getExecutorUpdate(OperationContext* txn,
+                                                            Collection* collection,
+                                                            ParsedUpdate* parsedUpdate,
+                                                            OpDebug* opDebug);
 
 /**
- * Get a PlanExecutor for a group operation.  'rawCanonicalQuery' describes the predicate for
- * the documents to be grouped.
+ * Get a PlanExecutor for a group operation.
  *
- * Takes ownership of 'rawCanonicalQuery'. Does not take ownership of other args.
- *
- * If the query is valid and an executor could be created, returns Status::OK() and populates
- * *out with the PlanExecutor.
+ * If the query is valid and an executor could be created, returns a StatusWith with the
+ * PlanExecutor.
  *
  * If an executor could not be created, returns a Status indicating why.
  */
-Status getExecutorGroup(OperationContext* txn,
-                        Collection* collection,
-                        const GroupRequest& request,
-                        PlanExecutor::YieldPolicy yieldPolicy,
-                        PlanExecutor** execOut);
+StatusWith<std::unique_ptr<PlanExecutor>> getExecutorGroup(OperationContext* txn,
+                                                           Collection* collection,
+                                                           const GroupRequest& request,
+                                                           PlanExecutor::YieldPolicy yieldPolicy);
 
 }  // namespace mongo

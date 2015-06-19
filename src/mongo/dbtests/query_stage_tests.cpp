@@ -38,6 +38,7 @@
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/dbtests/dbtests.h"
+#include "mongo/stdx/memory.h"
 
 /**
  * This file tests db/exec/index_scan.cpp
@@ -80,17 +81,14 @@ public:
         verify(swme.isOK());
         unique_ptr<MatchExpression> filterExpr(swme.getValue());
 
-        WorkingSet* ws = new WorkingSet();
+        unique_ptr<WorkingSet> ws = stdx::make_unique<WorkingSet>();
+        unique_ptr<IndexScan> ix =
+            stdx::make_unique<IndexScan>(&_txn, params, ws.get(), filterExpr.get());
 
-        PlanExecutor* rawExec;
-        Status status = PlanExecutor::make(&_txn,
-                                           ws,
-                                           new IndexScan(&_txn, params, ws, filterExpr.get()),
-                                           ctx.getCollection(),
-                                           PlanExecutor::YIELD_MANUAL,
-                                           &rawExec);
-        ASSERT_OK(status);
-        std::unique_ptr<PlanExecutor> exec(rawExec);
+        auto statusWithPlanExecutor = PlanExecutor::make(
+            &_txn, std::move(ws), std::move(ix), ctx.getCollection(), PlanExecutor::YIELD_MANUAL);
+        ASSERT_OK(statusWithPlanExecutor.getStatus());
+        unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
 
         int count = 0;
         for (RecordId dl; PlanExecutor::ADVANCED == exec->getNext(NULL, &dl);) {

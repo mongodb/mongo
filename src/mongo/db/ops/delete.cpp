@@ -67,12 +67,11 @@ long long deleteObjects(OperationContext* txn,
     ParsedDelete parsedDelete(txn, &request);
     uassertStatusOK(parsedDelete.parseRequest());
 
-    PlanExecutor* rawExec;
-    uassertStatusOK(getExecutorDelete(txn, collection, &parsedDelete, &rawExec));
-    std::unique_ptr<PlanExecutor> exec(rawExec);
+    std::unique_ptr<PlanExecutor> exec =
+        uassertStatusOK(getExecutorDelete(txn, collection, &parsedDelete));
 
     uassertStatusOK(exec->executePlan());
-    return DeleteStage::getNumDeleted(exec.get());
+    return DeleteStage::getNumDeleted(*exec);
 }
 
 }  // namespace mongo

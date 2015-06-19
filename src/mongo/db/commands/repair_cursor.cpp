@@ -93,11 +93,10 @@ public:
             new MultiIteratorStage(txn, ws.get(), collection));
         stage->addIterator(std::move(cursor));
 
-        PlanExecutor* rawExec;
-        Status execStatus = PlanExecutor::make(
-            txn, ws.release(), stage.release(), collection, PlanExecutor::YIELD_AUTO, &rawExec);
-        invariant(execStatus.isOK());
-        std::unique_ptr<PlanExecutor> exec(rawExec);
+        auto statusWithPlanExecutor = PlanExecutor::make(
+            txn, std::move(ws), std::move(stage), collection, PlanExecutor::YIELD_AUTO);
+        invariant(statusWithPlanExecutor.isOK());
+        std::unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
 
         // 'exec' will be used in getMore(). It was automatically registered on construction
         // due to the auto yield policy, so it could yield during plan selection. We deregister

@@ -63,23 +63,23 @@ public:
     /**
      * Return a collection scan.  Caller owns pointer.
      */
-    static PlanExecutor* collectionScan(OperationContext* txn,
-                                        StringData ns,
-                                        Collection* collection,
-                                        const Direction direction = FORWARD,
-                                        const RecordId startLoc = RecordId());
+    static std::unique_ptr<PlanExecutor> collectionScan(OperationContext* txn,
+                                                        StringData ns,
+                                                        Collection* collection,
+                                                        const Direction direction = FORWARD,
+                                                        const RecordId startLoc = RecordId());
 
     /**
      * Return an index scan.  Caller owns returned pointer.
      */
-    static PlanExecutor* indexScan(OperationContext* txn,
-                                   const Collection* collection,
-                                   const IndexDescriptor* descriptor,
-                                   const BSONObj& startKey,
-                                   const BSONObj& endKey,
-                                   bool endKeyInclusive,
-                                   Direction direction = FORWARD,
-                                   int options = 0);
+    static std::unique_ptr<PlanExecutor> indexScan(OperationContext* txn,
+                                                   const Collection* collection,
+                                                   const IndexDescriptor* descriptor,
+                                                   const BSONObj& startKey,
+                                                   const BSONObj& endKey,
+                                                   bool endKeyInclusive,
+                                                   Direction direction = FORWARD,
+                                                   int options = 0);
 };
 
 }  // namespace mongo

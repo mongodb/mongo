@@ -135,15 +135,14 @@ RecordId Helpers::findOne(OperationContext* txn,
     massert(17244, "Could not canonicalize " + query.toString(), statusWithCQ.isOK());
     unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
-    PlanExecutor* rawExec;
     size_t options = requireIndex ? QueryPlannerParams::NO_TABLE_SCAN : QueryPlannerParams::DEFAULT;
-    massert(
-        17245,
-        "Could not get executor for query " + query.toString(),
-        getExecutor(txn, collection, cq.release(), PlanExecutor::YIELD_MANUAL, &rawExec, options)
-            .isOK());
+    auto statusWithPlanExecutor =
+        getExecutor(txn, collection, std::move(cq), PlanExecutor::YIELD_MANUAL, options);
+    massert(17245,
+            "Could not get executor for query " + query.toString(),
+            statusWithPlanExecutor.isOK());
 
-    unique_ptr<PlanExecutor> exec(rawExec);
+    unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
     PlanExecutor::ExecState state;
     RecordId loc;
     if (PlanExecutor::ADVANCED == (state = exec->getNext(NULL, &loc))) {

@@ -670,10 +670,10 @@ std::string Explain::getPlanSummary(const PlanStage* root) {
 }
 
 // static
-void Explain::getSummaryStats(const PlanExecutor* exec, PlanSummaryStats* statsOut) {
+void Explain::getSummaryStats(const PlanExecutor& exec, PlanSummaryStats* statsOut) {
     invariant(NULL != statsOut);
 
-    PlanStage* root = exec->getRootStage();
+    PlanStage* root = exec.getRootStage();
 
     // We can get some of the fields we need from the common stats stored in the
     // root stage of the plan tree.

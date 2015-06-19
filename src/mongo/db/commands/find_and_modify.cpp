@@ -261,12 +261,11 @@ public:
                         str::stream() << "database " << dbName << " does not exist."};
             }
 
-            PlanExecutor* rawExec;
-            Status execStatus = getExecutorDelete(txn, collection, &parsedDelete, &rawExec);
-            if (!execStatus.isOK()) {
-                return execStatus;
+            auto statusWithPlanExecutor = getExecutorDelete(txn, collection, &parsedDelete);
+            if (!statusWithPlanExecutor.isOK()) {
+                return statusWithPlanExecutor.getStatus();
             }
-            const std::unique_ptr<PlanExecutor> exec(rawExec);
+            const std::unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
             Explain::explainStages(exec.get(), verbosity, out);
         } else {
             UpdateRequest request(nsString);
@@ -298,13 +297,12 @@ public:
                         str::stream() << "database " << dbName << " does not exist."};
             }
 
-            PlanExecutor* rawExec;
-            Status execStatus =
-                getExecutorUpdate(txn, collection, &parsedUpdate, opDebug, &rawExec);
-            if (!execStatus.isOK()) {
-                return execStatus;
+            auto statusWithPlanExecutor =
+                getExecutorUpdate(txn, collection, &parsedUpdate, opDebug);
+            if (!statusWithPlanExecutor.isOK()) {
+                return statusWithPlanExecutor.getStatus();
             }
-            const std::unique_ptr<PlanExecutor> exec(rawExec);
+            const std::unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
             Explain::explainStages(exec.get(), verbosity, out);
         }
 
@@ -378,12 +376,12 @@ public:
                     return appendCommandStatus(result, isPrimary);
                 }
 
-                PlanExecutor* rawExec;
-                Status execStatus = getExecutorDelete(txn, collection, &parsedDelete, &rawExec);
-                if (!execStatus.isOK()) {
-                    return appendCommandStatus(result, execStatus);
+                auto statusWithPlanExecutor = getExecutorDelete(txn, collection, &parsedDelete);
+                if (!statusWithPlanExecutor.isOK()) {
+                    return appendCommandStatus(result, statusWithPlanExecutor.getStatus());
                 }
-                const std::unique_ptr<PlanExecutor> exec(rawExec);
+                const std::unique_ptr<PlanExecutor> exec =
+                    std::move(statusWithPlanExecutor.getValue());
 
                 StatusWith<boost::optional<BSONObj>> advanceStatus =
                     advanceExecutor(exec.get(), args.isRemove());
@@ -447,13 +445,13 @@ public:
                     }
                 }
 
-                PlanExecutor* rawExec;
-                Status execStatus =
-                    getExecutorUpdate(txn, collection, &parsedUpdate, opDebug, &rawExec);
-                if (!execStatus.isOK()) {
-                    return appendCommandStatus(result, execStatus);
+                auto statusWithPlanExecutor =
+                    getExecutorUpdate(txn, collection, &parsedUpdate, opDebug);
+                if (!statusWithPlanExecutor.isOK()) {
+                    return appendCommandStatus(result, statusWithPlanExecutor.getStatus());
                 }
-                const std::unique_ptr<PlanExecutor> exec(rawExec);
+                const std::unique_ptr<PlanExecutor> exec =
+                    std::move(statusWithPlanExecutor.getValue());
 
                 StatusWith<boost::optional<BSONObj>> advanceStatus =
                     advanceExecutor(exec.get(), args.isRemove());

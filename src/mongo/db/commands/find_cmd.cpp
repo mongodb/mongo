@@ -144,16 +144,12 @@ public:
         Collection* collection = ctx.getCollection();
 
         // We have a parsed query. Time to get the execution plan for it.
-        std::unique_ptr<PlanExecutor> exec;
-        {
-            PlanExecutor* rawExec;
-            Status execStatus = getExecutorFind(
-                txn, collection, nss, cq.release(), PlanExecutor::YIELD_AUTO, &rawExec);
-            if (!execStatus.isOK()) {
-                return execStatus;
-            }
-            exec.reset(rawExec);
+        auto statusWithPlanExecutor =
+            getExecutorFind(txn, collection, nss, std::move(cq), PlanExecutor::YIELD_AUTO);
+        if (!statusWithPlanExecutor.isOK()) {
+            return statusWithPlanExecutor.getStatus();
         }
+        std::unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
 
         // Got the execution tree. Explain it.
         Explain::explainStages(exec.get(), verbosity, out);
@@ -231,16 +227,12 @@ public:
         const ChunkVersion shardingVersionAtStart = shardingState.getVersion(nss.ns());
 
         // 3) Get the execution plan for the query.
-        std::unique_ptr<PlanExecutor> execHolder;
-        {
-            PlanExecutor* rawExec;
-            Status execStatus = getExecutorFind(
-                txn, collection, nss, cq.release(), PlanExecutor::YIELD_AUTO, &rawExec);
-            if (!execStatus.isOK()) {
-                return appendCommandStatus(result, execStatus);
-            }
-            execHolder.reset(rawExec);
+        auto statusWithPlanExecutor =
+            getExecutorFind(txn, collection, nss, std::move(cq), PlanExecutor::YIELD_AUTO);
+        if (!statusWithPlanExecutor.isOK()) {
+            return appendCommandStatus(result, statusWithPlanExecutor.getStatus());
         }
+        std::unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
 
         // TODO: Currently, chunk ranges are kept around until all ClientCursors created while
         // the chunk belonged on this node are gone. Separating chunk lifetime management from
@@ -259,24 +251,24 @@ public:
             // there is no ClientCursor id, and then return.
             const int numResults = 0;
             const CursorId cursorId = 0;
-            endQueryOp(txn, execHolder.get(), dbProfilingLevel, numResults, cursorId);
+            endQueryOp(txn, *exec, dbProfilingLevel, numResults, cursorId);
             appendCursorResponseObject(cursorId, nss.ns(), BSONArray(), &result);
             return true;
         }
 
-        const LiteParsedQuery& pq = execHolder->getCanonicalQuery()->getParsed();
+        const LiteParsedQuery& pq = exec->getCanonicalQuery()->getParsed();
 
         // 4) If possible, register the execution plan inside a ClientCursor, and pin that
         // cursor. In this case, ownership of the PlanExecutor is transferred to the
         // ClientCursor, and 'exec' becomes null.
         //
         // First unregister the PlanExecutor so it can be re-registered with ClientCursor.
-        execHolder->deregisterExec();
+        exec->deregisterExec();
 
         // Create a ClientCursor containing this plan executor. We don't have to worry
         // about leaking it as it's inserted into a global map by its ctor.
         ClientCursor* cursor = new ClientCursor(collection->getCursorManager(),
-                                                execHolder.release(),
+                                                exec.release(),
                                                 nss.ns(),
                                                 pq.getOptions(),
                                                 pq.getFilter());
@@ -286,8 +278,8 @@ public:
         // On early return, get rid of the the cursor.
         ScopeGuard cursorFreer = MakeGuard(&ClientCursorPin::deleteUnderlying, ccPin);
 
-        invariant(!execHolder);
-        PlanExecutor* exec = cursor->getExecutor();
+        invariant(!exec);
+        PlanExecutor* cursorExec = cursor->getExecutor();
 
         // 5) Stream query results, adding them to a BSONArray as we go.
         BSONArrayBuilder firstBatch;
@@ -295,11 +287,11 @@ public:
         PlanExecutor::ExecState state;
         int numResults = 0;
         while (!enoughForFirstBatch(pq, numResults, firstBatch.len()) &&
-               PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL))) {
+               PlanExecutor::ADVANCED == (state = cursorExec->getNext(&obj, NULL))) {
             // If adding this object will cause us to exceed the BSON size limit, then we stash
             // it for later.
             if (firstBatch.len() + obj.objsize() > BSONObjMaxUserSize && numResults > 0) {
-                exec->enqueue(obj);
+                cursorExec->enqueue(obj);
                 break;
             }
 
@@ -310,7 +302,7 @@ public:
 
         // Throw an assertion if query execution fails for any reason.
         if (PlanExecutor::FAILURE == state || PlanExecutor::DEAD == state) {
-            const std::unique_ptr<PlanStageStats> stats(exec->getStats());
+            const std::unique_ptr<PlanStageStats> stats(cursorExec->getStats());
             error() << "Plan executor error during find command: " << PlanExecutor::statestr(state)
                     << ", stats: " << Explain::statsToBSON(*stats);
 
@@ -322,9 +314,9 @@ public:
         }
 
         // 6) Set up the cursor for getMore.
-        if (shouldSaveCursor(txn, collection, state, exec)) {
+        if (shouldSaveCursor(txn, collection, state, cursorExec)) {
             // State will be restored on getMore.
-            exec->saveState();
+            cursorExec->saveState();
 
             cursor->setLeftoverMaxTimeMicros(CurOp::get(txn)->getRemainingMaxTimeMicros());
             cursor->setPos(numResults);
@@ -344,7 +336,7 @@ public:
         }
 
         // Fill out curop based on the results.
-        endQueryOp(txn, exec, dbProfilingLevel, numResults, cursorId);
+        endQueryOp(txn, *cursorExec, dbProfilingLevel, numResults, cursorId);
 
         // 7) Generate the response object to send to the client.
         appendCursorResponseObject(cursorId, nss.ns(), firstBatch.arr(), &result);

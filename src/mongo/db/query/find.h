@@ -127,7 +127,7 @@ void beginQueryOp(OperationContext* txn,
  * do expensive stats gathering.
  */
 void endQueryOp(OperationContext* txn,
-                PlanExecutor* exec,
+                const PlanExecutor& exec,
                 int dbProfilingLevel,
                 int numResults,
                 CursorId cursorId);
@@ -139,13 +139,10 @@ void endQueryOp(OperationContext* txn,
  *
  * The oplog start finding hack requires that 'cq' has a $gt or $gte predicate over
  * a field named 'ts'.
- *
- * On success, caller takes ownership of *execOut.
  */
-Status getOplogStartHack(OperationContext* txn,
-                         Collection* collection,
-                         CanonicalQuery* cq,
-                         PlanExecutor** execOut);
+StatusWith<std::unique_ptr<PlanExecutor>> getOplogStartHack(OperationContext* txn,
+                                                            Collection* collection,
+                                                            std::unique_ptr<CanonicalQuery> cq);
 
 /**
  * Called from the getMore entry point in ops/query.cpp.

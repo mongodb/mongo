@@ -99,12 +99,11 @@ UpdateResult update(OperationContext* txn,
     ParsedUpdate parsedUpdate(txn, &request);
     uassertStatusOK(parsedUpdate.parseRequest());
 
-    PlanExecutor* rawExec;
-    uassertStatusOK(getExecutorUpdate(txn, collection, &parsedUpdate, opDebug, &rawExec));
-    std::unique_ptr<PlanExecutor> exec(rawExec);
+    std::unique_ptr<PlanExecutor> exec =
+        uassertStatusOK(getExecutorUpdate(txn, collection, &parsedUpdate, opDebug));
 
     uassertStatusOK(exec->executePlan());
-    return UpdateStage::makeUpdateResult(exec.get(), opDebug);
+    return UpdateStage::makeUpdateResult(*exec, opDebug);
 }
 
 BSONObj applyUpdateOperators(const BSONObj& from, const BSONObj& operators) {

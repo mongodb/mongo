@@ -1012,15 +1012,11 @@ void State::finalReduce(CurOp* op, ProgressMeterHolder& pm) {
     Collection* coll = getCollectionOrUassert(ctx->getDb(), _config.incLong);
     invariant(coll);
 
-    PlanExecutor* rawExec;
-    verify(getExecutor(_txn,
-                       coll,
-                       cq.release(),
-                       PlanExecutor::YIELD_AUTO,
-                       &rawExec,
-                       QueryPlannerParams::NO_TABLE_SCAN).isOK());
+    auto statusWithPlanExecutor = getExecutor(
+        _txn, coll, std::move(cq), PlanExecutor::YIELD_AUTO, QueryPlannerParams::NO_TABLE_SCAN);
+    verify(statusWithPlanExecutor.isOK());
 
-    unique_ptr<PlanExecutor> exec(rawExec);
+    unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
 
     // iterate over all sorted objects
     BSONObj o;
@@ -1375,14 +1371,14 @@ public:
                 Collection* coll = state.getCollectionOrUassert(db, config.ns);
                 invariant(coll);
 
-                PlanExecutor* rawExec;
-                if (!getExecutor(txn, coll, cq.release(), PlanExecutor::YIELD_AUTO, &rawExec)
-                         .isOK()) {
+                auto statusWithPlanExecutor =
+                    getExecutor(txn, coll, std::move(cq), PlanExecutor::YIELD_AUTO);
+                if (!statusWithPlanExecutor.isOK()) {
                     uasserted(17239, "Can't get executor for query " + config.filter.toString());
                     return 0;
                 }
 
-                unique_ptr<PlanExecutor> exec(rawExec);
+                unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
 
                 Timer mt;
 

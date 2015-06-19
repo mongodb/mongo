@@ -190,12 +190,11 @@ void beginQueryOp(OperationContext* txn,
 }
 
 void endQueryOp(OperationContext* txn,
-                PlanExecutor* exec,
+                const PlanExecutor& exec,
                 int dbProfilingLevel,
                 int numResults,
                 CursorId cursorId) {
     auto curop = CurOp::get(txn);
-    invariant(exec);
 
     // Fill out basic curop query exec properties.
     curop->debug().nreturned = numResults;
@@ -217,13 +216,13 @@ void endQueryOp(OperationContext* txn,
     if (dbProfilingLevel > 0 || curop->elapsedMillis() > serverGlobalParams.slowMS ||
         logger::globalLogDomain()->shouldLog(queryLogComponent, logLevelOne)) {
         // Generate plan summary string.
-        curop->debug().planSummary = Explain::getPlanSummary(exec);
+        curop->debug().planSummary = Explain::getPlanSummary(&exec);
     }
 
     // Set debug information for consumption by the profiler only.
     if (dbProfilingLevel > 0) {
         // Get BSON stats.
-        unique_ptr<PlanStageStats> execStats(exec->getStats());
+        unique_ptr<PlanStageStats> execStats(exec.getStats());
         BSONObjBuilder statsBob;
         Explain::statsToBSON(*execStats, &statsBob);
         curop->debug().execStats.set(statsBob.obj());
@@ -531,14 +530,9 @@ std::string runQuery(OperationContext* txn,
         ctx.getDb() ? ctx.getDb()->getProfilingLevel() : serverGlobalParams.defaultProfile;
 
     // We have a parsed query. Time to get the execution plan for it.
-    unique_ptr<PlanExecutor> exec;
-    {
-        PlanExecutor* rawExec;
-        Status execStatus =
-            getExecutorFind(txn, collection, nss, cq.release(), PlanExecutor::YIELD_AUTO, &rawExec);
-        uassertStatusOK(execStatus);
-        exec.reset(rawExec);
-    }
+    std::unique_ptr<PlanExecutor> exec = uassertStatusOK(
+        getExecutorFind(txn, collection, nss, std::move(cq), PlanExecutor::YIELD_AUTO));
+
     const LiteParsedQuery& pq = exec->getCanonicalQuery()->getParsed();
 
     // If it's actually an explain, do the explain and return rather than falling through
@@ -707,10 +701,10 @@ std::string runQuery(OperationContext* txn,
         // use by future getmore ops).
         cc->setLeftoverMaxTimeMicros(curop.getRemainingMaxTimeMicros());
 
-        endQueryOp(txn, cc->getExecutor(), dbProfilingLevel, numResults, ccId);
+        endQueryOp(txn, *cc->getExecutor(), dbProfilingLevel, numResults, ccId);
     } else {
         LOG(5) << "Not caching executor but returning " << numResults << " results.\n";
-        endQueryOp(txn, exec.get(), dbProfilingLevel, numResults, ccId);
+        endQueryOp(txn, *exec, dbProfilingLevel, numResults, ccId);
     }
 
     // Add the results from the query into the output buffer.

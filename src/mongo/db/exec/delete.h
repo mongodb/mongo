@@ -113,7 +113,7 @@ public:
      *
      * Should only be called if the root plan stage of 'exec' is UPDATE and if 'exec' is EOF.
      */
-    static long long getNumDeleted(PlanExecutor* exec);
+    static long long getNumDeleted(const PlanExecutor& exec);
 
 private:
     // Transactional context.  Not owned by us.

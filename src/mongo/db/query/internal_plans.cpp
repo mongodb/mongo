@@ -37,25 +37,25 @@
 #include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/index_scan.h"
 #include "mongo/db/query/plan_executor.h"
+#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
 // static
-PlanExecutor* InternalPlanner::collectionScan(OperationContext* txn,
-                                              StringData ns,
-                                              Collection* collection,
-                                              const Direction direction,
-                                              const RecordId startLoc) {
-    WorkingSet* ws = new WorkingSet();
+std::unique_ptr<PlanExecutor> InternalPlanner::collectionScan(OperationContext* txn,
+                                                              StringData ns,
+                                                              Collection* collection,
+                                                              const Direction direction,
+                                                              const RecordId startLoc) {
+    std::unique_ptr<WorkingSet> ws = stdx::make_unique<WorkingSet>();
 
     if (NULL == collection) {
-        EOFStage* eof = new EOFStage();
-        PlanExecutor* exec;
+        std::unique_ptr<EOFStage> eof = stdx::make_unique<EOFStage>();
         // Takes ownership of 'ws' and 'eof'.
-        Status execStatus =
-            PlanExecutor::make(txn, ws, eof, ns.toString(), PlanExecutor::YIELD_MANUAL, &exec);
-        invariant(execStatus.isOK());
-        return exec;
+        auto statusWithPlanExecutor = PlanExecutor::make(
+            txn, std::move(ws), std::move(eof), ns.toString(), PlanExecutor::YIELD_MANUAL);
+        invariant(statusWithPlanExecutor.isOK());
+        return std::move(statusWithPlanExecutor.getValue());
     }
 
     invariant(ns == collection->ns().ns());
@@ -70,24 +70,24 @@ PlanExecutor* InternalPlanner::collectionScan(OperationContext* txn,
         params.direction = CollectionScanParams::BACKWARD;
     }
 
-    CollectionScan* cs = new CollectionScan(txn, params, ws, NULL);
-    PlanExecutor* exec;
+    std::unique_ptr<CollectionScan> cs =
+        stdx::make_unique<CollectionScan>(txn, params, ws.get(), nullptr);
     // Takes ownership of 'ws' and 'cs'.
-    Status execStatus =
-        PlanExecutor::make(txn, ws, cs, collection, PlanExecutor::YIELD_MANUAL, &exec);
-    invariant(execStatus.isOK());
-    return exec;
+    auto statusWithPlanExecutor = PlanExecutor::make(
+        txn, std::move(ws), std::move(cs), collection, PlanExecutor::YIELD_MANUAL);
+    invariant(statusWithPlanExecutor.isOK());
+    return std::move(statusWithPlanExecutor.getValue());
 }
 
 // static
-PlanExecutor* InternalPlanner::indexScan(OperationContext* txn,
-                                         const Collection* collection,
-                                         const IndexDescriptor* descriptor,
-                                         const BSONObj& startKey,
-                                         const BSONObj& endKey,
-                                         bool endKeyInclusive,
-                                         Direction direction,
-                                         int options) {
+std::unique_ptr<PlanExecutor> InternalPlanner::indexScan(OperationContext* txn,
+                                                         const Collection* collection,
+                                                         const IndexDescriptor* descriptor,
+                                                         const BSONObj& startKey,
+                                                         const BSONObj& endKey,
+                                                         bool endKeyInclusive,
+                                                         Direction direction,
+                                                         int options) {
     invariant(collection);
     invariant(descriptor);
 
@@ -99,21 +99,19 @@ PlanExecutor* InternalPlanner::indexScan(OperationContext* txn,
     params.bounds.endKey = endKey;
     params.bounds.endKeyInclusive = endKeyInclusive;
 
-    WorkingSet* ws = new WorkingSet();
-    IndexScan* ix = new IndexScan(txn, params, ws, NULL);
+    std::unique_ptr<WorkingSet> ws = stdx::make_unique<WorkingSet>();
 
-    PlanStage* root = ix;
+    std::unique_ptr<PlanStage> root = stdx::make_unique<IndexScan>(txn, params, ws.get(), nullptr);
 
     if (IXSCAN_FETCH & options) {
-        root = new FetchStage(txn, ws, root, NULL, collection);
+        root = stdx::make_unique<FetchStage>(txn, ws.get(), root.release(), nullptr, collection);
     }
 
-    PlanExecutor* exec;
     // Takes ownership of 'ws' and 'root'.
-    Status execStatus =
-        PlanExecutor::make(txn, ws, root, collection, PlanExecutor::YIELD_MANUAL, &exec);
-    invariant(execStatus.isOK());
-    return exec;
+    auto statusWithPlanExecutor = PlanExecutor::make(
+        txn, std::move(ws), std::move(root), collection, PlanExecutor::YIELD_MANUAL);
+    invariant(statusWithPlanExecutor.isOK());
+    return std::move(statusWithPlanExecutor.getValue());
 }
 
 }  // namespace mongo

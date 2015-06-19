@@ -46,6 +46,7 @@
 #include "mongo/db/query/query_planner_test_lib.h"
 #include "mongo/db/query/stage_builder.h"
 #include "mongo/dbtests/dbtests.h"
+#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
@@ -58,6 +59,7 @@ namespace QueryMultiPlanRunner {
 
 using std::unique_ptr;
 using std::vector;
+using stdx::make_unique;
 
 /**
  * Create query solution.
@@ -157,7 +159,8 @@ public:
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
         verify(NULL != cq.get());
 
-        MultiPlanStage* mps = new MultiPlanStage(&_txn, ctx.getCollection(), cq.get());
+        unique_ptr<MultiPlanStage> mps =
+            make_unique<MultiPlanStage>(&_txn, ctx.getCollection(), cq.get());
         mps->addPlan(createQuerySolution(), firstRoot.release(), sharedWs.get());
         mps->addPlan(createQuerySolution(), secondRoot.release(), sharedWs.get());
 
@@ -168,16 +171,14 @@ public:
         ASSERT_EQUALS(0, mps->bestPlanIdx());
 
         // Takes ownership of arguments other than 'collection'.
-        PlanExecutor* rawExec;
-        Status status = PlanExecutor::make(&_txn,
-                                           sharedWs.release(),
-                                           mps,
-                                           cq.release(),
-                                           coll,
-                                           PlanExecutor::YIELD_MANUAL,
-                                           &rawExec);
-        ASSERT_OK(status);
-        unique_ptr<PlanExecutor> exec(rawExec);
+        auto statusWithPlanExecutor = PlanExecutor::make(&_txn,
+                                                         std::move(sharedWs),
+                                                         std::move(mps),
+                                                         std::move(cq),
+                                                         coll,
+                                                         PlanExecutor::YIELD_MANUAL);
+        ASSERT_OK(statusWithPlanExecutor.getStatus());
+        std::unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
 
         // Get all our results out.
         int results = 0;

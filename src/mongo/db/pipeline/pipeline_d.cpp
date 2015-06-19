@@ -184,22 +184,22 @@ shared_ptr<PlanExecutor> PipelineD::prepareCursorSource(
         auto statusWithCQ = CanonicalQuery::canonicalize(
             pExpCtx->ns, queryObj, sortObj, projectionForQuery, whereCallback);
 
-        PlanExecutor* rawExec;
-        if (statusWithCQ.isOK() &&
-            getExecutor(txn,
-                        collection,
-                        statusWithCQ.getValue().release(),
-                        PlanExecutor::YIELD_AUTO,
-                        &rawExec,
-                        runnerOptions).isOK()) {
-            // success: The PlanExecutor will handle sorting for us using an index.
-            exec.reset(rawExec);
-            sortInRunner = true;
+        if (statusWithCQ.isOK()) {
+            auto statusWithPlanExecutor = getExecutor(txn,
+                                                      collection,
+                                                      std::move(statusWithCQ.getValue()),
+                                                      PlanExecutor::YIELD_AUTO,
+                                                      runnerOptions);
+            if (statusWithPlanExecutor.isOK()) {
+                // success: The PlanExecutor will handle sorting for us using an index.
+                exec = std::move(statusWithPlanExecutor.getValue());
+                sortInRunner = true;
 
-            sources.pop_front();
-            if (sortStage->getLimitSrc()) {
-                // need to reinsert coalesced $limit after removing $sort
-                sources.push_front(sortStage->getLimitSrc());
+                sources.pop_front();
+                if (sortStage->getLimitSrc()) {
+                    // need to reinsert coalesced $limit after removing $sort
+                    sources.push_front(sortStage->getLimitSrc());
+                }
             }
         }
     }
@@ -209,12 +209,12 @@ shared_ptr<PlanExecutor> PipelineD::prepareCursorSource(
         auto statusWithCQ = CanonicalQuery::canonicalize(
             pExpCtx->ns, queryObj, noSort, projectionForQuery, whereCallback);
         uassertStatusOK(statusWithCQ.getStatus());
-        unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
-        PlanExecutor* rawExec;
-        uassertStatusOK(getExecutor(
-            txn, collection, cq.release(), PlanExecutor::YIELD_AUTO, &rawExec, runnerOptions));
-        exec.reset(rawExec);
+        exec = uassertStatusOK(getExecutor(txn,
+                                           collection,
+                                           std::move(statusWithCQ.getValue()),
+                                           PlanExecutor::YIELD_AUTO,
+                                           runnerOptions));
     }
 
 

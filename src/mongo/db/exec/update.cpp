@@ -1030,11 +1030,11 @@ const SpecificStats* UpdateStage::getSpecificStats() const {
 }
 
 // static
-UpdateResult UpdateStage::makeUpdateResult(PlanExecutor* exec, OpDebug* opDebug) {
+UpdateResult UpdateStage::makeUpdateResult(const PlanExecutor& exec, OpDebug* opDebug) {
     // Get stats from the root stage.
-    invariant(exec->getRootStage()->isEOF());
-    invariant(exec->getRootStage()->stageType() == STAGE_UPDATE);
-    UpdateStage* updateStage = static_cast<UpdateStage*>(exec->getRootStage());
+    invariant(exec.getRootStage()->isEOF());
+    invariant(exec.getRootStage()->stageType() == STAGE_UPDATE);
+    UpdateStage* updateStage = static_cast<UpdateStage*>(exec.getRootStage());
     const UpdateStats* updateStats =
         static_cast<const UpdateStats*>(updateStage->getSpecificStats());
 

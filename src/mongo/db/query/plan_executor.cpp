@@ -43,6 +43,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/storage/record_fetcher.h"
+#include "mongo/stdx/memory.h"
 
 #include "mongo/util/stacktrace.h"
 
@@ -50,7 +51,9 @@ namespace mongo {
 
 using std::shared_ptr;
 using std::string;
+using std::unique_ptr;
 using std::vector;
+using stdx::make_unique;
 
 namespace {
 
@@ -76,59 +79,65 @@ PlanStage* getStageByType(PlanStage* root, StageType type) {
 }
 
 // static
-Status PlanExecutor::make(OperationContext* opCtx,
-                          WorkingSet* ws,
-                          PlanStage* rt,
-                          const Collection* collection,
-                          YieldPolicy yieldPolicy,
-                          PlanExecutor** out) {
-    return PlanExecutor::make(opCtx, ws, rt, NULL, NULL, collection, "", yieldPolicy, out);
+StatusWith<unique_ptr<PlanExecutor>> PlanExecutor::make(OperationContext* opCtx,
+                                                        unique_ptr<WorkingSet> ws,
+                                                        unique_ptr<PlanStage> rt,
+                                                        const Collection* collection,
+                                                        YieldPolicy yieldPolicy) {
+    return PlanExecutor::make(
+        opCtx, std::move(ws), std::move(rt), nullptr, nullptr, collection, "", yieldPolicy);
 }
 
 // static
-Status PlanExecutor::make(OperationContext* opCtx,
-                          WorkingSet* ws,
-                          PlanStage* rt,
-                          const std::string& ns,
-                          YieldPolicy yieldPolicy,
-                          PlanExecutor** out) {
-    return PlanExecutor::make(opCtx, ws, rt, NULL, NULL, NULL, ns, yieldPolicy, out);
+StatusWith<unique_ptr<PlanExecutor>> PlanExecutor::make(OperationContext* opCtx,
+                                                        unique_ptr<WorkingSet> ws,
+                                                        unique_ptr<PlanStage> rt,
+                                                        const std::string& ns,
+                                                        YieldPolicy yieldPolicy) {
+    return PlanExecutor::make(
+        opCtx, std::move(ws), std::move(rt), nullptr, nullptr, nullptr, ns, yieldPolicy);
 }
 
 // static
-Status PlanExecutor::make(OperationContext* opCtx,
-                          WorkingSet* ws,
-                          PlanStage* rt,
-                          CanonicalQuery* cq,
-                          const Collection* collection,
-                          YieldPolicy yieldPolicy,
-                          PlanExecutor** out) {
-    return PlanExecutor::make(opCtx, ws, rt, NULL, cq, collection, "", yieldPolicy, out);
+StatusWith<unique_ptr<PlanExecutor>> PlanExecutor::make(OperationContext* opCtx,
+                                                        unique_ptr<WorkingSet> ws,
+                                                        unique_ptr<PlanStage> rt,
+                                                        unique_ptr<CanonicalQuery> cq,
+                                                        const Collection* collection,
+                                                        YieldPolicy yieldPolicy) {
+    return PlanExecutor::make(
+        opCtx, std::move(ws), std::move(rt), nullptr, std::move(cq), collection, "", yieldPolicy);
 }
 
 // static
-Status PlanExecutor::make(OperationContext* opCtx,
-                          WorkingSet* ws,
-                          PlanStage* rt,
-                          QuerySolution* qs,
-                          CanonicalQuery* cq,
-                          const Collection* collection,
-                          YieldPolicy yieldPolicy,
-                          PlanExecutor** out) {
-    return PlanExecutor::make(opCtx, ws, rt, qs, cq, collection, "", yieldPolicy, out);
+StatusWith<unique_ptr<PlanExecutor>> PlanExecutor::make(OperationContext* opCtx,
+                                                        unique_ptr<WorkingSet> ws,
+                                                        unique_ptr<PlanStage> rt,
+                                                        unique_ptr<QuerySolution> qs,
+                                                        unique_ptr<CanonicalQuery> cq,
+                                                        const Collection* collection,
+                                                        YieldPolicy yieldPolicy) {
+    return PlanExecutor::make(opCtx,
+                              std::move(ws),
+                              std::move(rt),
+                              std::move(qs),
+                              std::move(cq),
+                              collection,
+                              "",
+                              yieldPolicy);
 }
 
 // static
-Status PlanExecutor::make(OperationContext* opCtx,
-                          WorkingSet* ws,
-                          PlanStage* rt,
-                          QuerySolution* qs,
-                          CanonicalQuery* cq,
-                          const Collection* collection,
-                          const std::string& ns,
-                          YieldPolicy yieldPolicy,
-                          PlanExecutor** out) {
-    std::unique_ptr<PlanExecutor> exec(new PlanExecutor(opCtx, ws, rt, qs, cq, collection, ns));
+StatusWith<unique_ptr<PlanExecutor>> PlanExecutor::make(OperationContext* txn,
+                                                        unique_ptr<WorkingSet> ws,
+                                                        unique_ptr<PlanStage> rt,
+                                                        unique_ptr<QuerySolution> qs,
+                                                        unique_ptr<CanonicalQuery> cq,
+                                                        const Collection* collection,
+                                                        const std::string& ns,
+                                                        YieldPolicy yieldPolicy) {
+    unique_ptr<PlanExecutor> exec(new PlanExecutor(
+        txn, std::move(ws), std::move(rt), std::move(qs), std::move(cq), collection, ns));
 
     // Perform plan selection, if necessary.
     Status status = exec->pickBestPlan(yieldPolicy);
@@ -136,23 +145,22 @@ Status PlanExecutor::make(OperationContext* opCtx,
         return status;
     }
 
-    *out = exec.release();
-    return Status::OK();
+    return std::move(exec);
 }
 
 PlanExecutor::PlanExecutor(OperationContext* opCtx,
-                           WorkingSet* ws,
-                           PlanStage* rt,
-                           QuerySolution* qs,
-                           CanonicalQuery* cq,
+                           unique_ptr<WorkingSet> ws,
+                           unique_ptr<PlanStage> rt,
+                           unique_ptr<QuerySolution> qs,
+                           unique_ptr<CanonicalQuery> cq,
                            const Collection* collection,
                            const std::string& ns)
     : _opCtx(opCtx),
       _collection(collection),
-      _cq(cq),
-      _workingSet(ws),
-      _qs(qs),
-      _root(rt),
+      _cq(std::move(cq)),
+      _workingSet(std::move(ws)),
+      _qs(std::move(qs)),
+      _root(std::move(rt)),
       _ns(ns),
       _yieldPolicy(new PlanYieldPolicy(this, YIELD_MANUAL)) {
     // We may still need to initialize _ns from either _collection or _cq.
@@ -328,7 +336,7 @@ PlanExecutor::ExecState PlanExecutor::getNextSnapshotted(Snapshotted<BSONObj>* o
     // to use to pull the record into memory. We take ownership of the RecordFetcher here,
     // deleting it after we've had a chance to do the fetch. For timing-based yields, we
     // just pass a NULL fetcher.
-    std::unique_ptr<RecordFetcher> fetcher;
+    unique_ptr<RecordFetcher> fetcher;
 
     // Incremented on every writeConflict, reset to 0 on any successful call to _root->work.
     size_t writeConflictsInARow = 0;

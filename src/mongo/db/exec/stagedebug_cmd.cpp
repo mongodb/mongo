@@ -55,6 +55,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/query/plan_executor.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -62,6 +63,7 @@ namespace mongo {
 using std::unique_ptr;
 using std::string;
 using std::vector;
+using stdx::make_unique;
 
 /**
  * A command for manually constructing a query tree and running it.
@@ -168,13 +170,13 @@ public:
 
         // Add a fetch at the top for the user so we can get obj back for sure.
         // TODO: Do we want to do this for the user?  I think so.
-        PlanStage* rootFetch = new FetchStage(txn, ws.get(), userRoot, NULL, collection);
+        unique_ptr<PlanStage> rootFetch =
+            make_unique<FetchStage>(txn, ws.get(), userRoot, nullptr, collection);
 
-        PlanExecutor* rawExec;
-        Status execStatus = PlanExecutor::make(
-            txn, ws.release(), rootFetch, collection, PlanExecutor::YIELD_AUTO, &rawExec);
-        fassert(28536, execStatus);
-        std::unique_ptr<PlanExecutor> exec(rawExec);
+        auto statusWithPlanExecutor = PlanExecutor::make(
+            txn, std::move(ws), std::move(rootFetch), collection, PlanExecutor::YIELD_AUTO);
+        fassert(28536, statusWithPlanExecutor.getStatus());
+        std::unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
 
         BSONArrayBuilder resultBuilder(result.subarrayStart("results"));
 

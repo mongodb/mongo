@@ -487,8 +487,8 @@ public:
                 log() << "splitVector doing another cycle because of force, keyCount now: "
                       << keyCount << endl;
 
-                exec.reset(InternalPlanner::indexScan(
-                    txn, collection, idx, min, max, false, InternalPlanner::FORWARD));
+                exec = InternalPlanner::indexScan(
+                    txn, collection, idx, min, max, false, InternalPlanner::FORWARD);
 
                 exec->setYieldPolicy(PlanExecutor::YIELD_AUTO);
                 state = exec->getNext(&currKey, NULL);
