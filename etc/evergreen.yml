@@ -256,6 +256,7 @@ tasks:
     - func: "build new tools" # noop if ${newtools} is not "true"
     - func: "build rocksdb" # noop if ${build_rocksdb} is not "true"
     - command: shell.exec
+      timeout_secs: 240
       params:
         working_dir: src
         script: |
