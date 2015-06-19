@@ -1348,9 +1348,9 @@ bool CatalogManagerLegacy::runUserManagementWriteCommand(const string& commandNa
     return Command::appendCommandStatus(*result, status);
 }
 
-bool CatalogManagerLegacy::runUserManagementReadCommand(const string& dbname,
-                                                        const BSONObj& cmdObj,
-                                                        BSONObjBuilder* result) {
+bool CatalogManagerLegacy::runReadCommand(const string& dbname,
+                                          const BSONObj& cmdObj,
+                                          BSONObjBuilder* result) {
     try {
         // let SyncClusterConnection handle connecting to the first config server
         // that is reachable and returns data

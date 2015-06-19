@@ -122,16 +122,6 @@ env.Library(
 )
 
 env.Library(
-    target='remote_command_runner_mock',
-    source=[
-        'remote_command_runner_mock.cpp',
-    ],
-    LIBDEPS=[
-         'remote_command_runner',
-    ]
-)
-
-env.Library(
     target='remote_command_targeter',
     source=[
         'remote_command_targeter_factory_impl.cpp',

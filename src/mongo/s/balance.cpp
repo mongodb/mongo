@@ -35,6 +35,7 @@
 #include <algorithm>
 
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/client.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
@@ -243,6 +244,7 @@ static BSONObj _buildDetails(bool didError,
         builder.append("candidateChunks", candidateChunks);
         builder.append("chunksMoved", chunksMoved);
     }
+
     return builder.obj();
 }
 
@@ -259,7 +261,11 @@ bool Balancer::_checkOIDs() {
             continue;
         }
 
-        BSONObj f = s->runCommand("admin", "features");
+        const auto shardHost = uassertStatusOK(
+            s->getTargeter()->findHost({ReadPreference::PrimaryOnly, TagSet::primaryOnly()}));
+
+        BSONObj f = uassertStatusOK(
+            grid.shardRegistry()->runCommand(shardHost, "admin", BSON("features" << 1)));
         if (f["oidMachine"].isNumber()) {
             int x = f["oidMachine"].numberInt();
             if (oids.count(x) == 0) {
@@ -267,18 +273,26 @@ bool Balancer::_checkOIDs() {
             } else {
                 log() << "error: 2 machines have " << x << " as oid machine piece: " << shardId
                       << " and " << oids[x];
-                s->runCommand("admin", BSON("features" << 1 << "oidReset" << 1));
+
+                uassertStatusOK(grid.shardRegistry()->runCommand(
+                    shardHost, "admin", BSON("features" << 1 << "oidReset" << 1)));
 
                 const auto otherShard = grid.shardRegistry()->getShard(oids[x]);
                 if (otherShard) {
-                    otherShard->runCommand("admin", BSON("features" << 1 << "oidReset" << 1));
+                    const auto otherShardHost = uassertStatusOK(otherShard->getTargeter()->findHost(
+                        {ReadPreference::PrimaryOnly, TagSet::primaryOnly()}));
+
+                    uassertStatusOK(grid.shardRegistry()->runCommand(
+                        otherShardHost, "admin", BSON("features" << 1 << "oidReset" << 1)));
                 }
+
                 return false;
             }
         } else {
             log() << "warning: oidMachine not set on: " << s->toString();
         }
     }
+
     return true;
 }
 
@@ -488,8 +502,8 @@ bool Balancer::_init() {
 void Balancer::run() {
     Client::initThread("Balancer");
 
-    // This is the body of a BackgroundJob so if we throw here we're basically ending the
-    // balancer thread prematurely.
+    // This is the body of a BackgroundJob so if we throw here we're basically ending the balancer
+    // thread prematurely.
     while (!inShutdown()) {
         if (!_init()) {
             log() << "will retry to initialize balancer in one minute";
