@@ -58,7 +58,7 @@ double positiveInfinity = numeric_limits<double>::infinity();
 MatchExpression* parseMatchExpression(const BSONObj& obj) {
     StatusWithMatchExpression status = MatchExpressionParser::parse(obj);
     ASSERT_TRUE(status.isOK());
-    MatchExpression* expr(status.getValue());
+    MatchExpression* expr(status.getValue().release());
     return expr;
 }
 

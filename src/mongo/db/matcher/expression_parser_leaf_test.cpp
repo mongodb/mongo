@@ -49,7 +49,6 @@ TEST(MatchExpressionParserLeafTest, SimpleEQ2) {
     BSONObj query = BSON("x" << BSON("$eq" << 2));
     StatusWithMatchExpression result = MatchExpressionParser::parse(query);
     ASSERT_TRUE(result.isOK());
-    std::unique_ptr<MatchExpression> destroy(result.getValue());
 
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << 1)));
     ASSERT(result.getValue()->matchesBSON(BSON("x" << 2)));
@@ -66,7 +65,6 @@ TEST(MatchExpressionParserLeafTest, SimpleGT1) {
     BSONObj query = BSON("x" << BSON("$gt" << 2));
     StatusWithMatchExpression result = MatchExpressionParser::parse(query);
     ASSERT_TRUE(result.isOK());
-    std::unique_ptr<MatchExpression> destroy(result.getValue());
 
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << 2)));
     ASSERT(result.getValue()->matchesBSON(BSON("x" << 3)));
@@ -76,7 +74,6 @@ TEST(MatchExpressionParserLeafTest, SimpleLT1) {
     BSONObj query = BSON("x" << BSON("$lt" << 2));
     StatusWithMatchExpression result = MatchExpressionParser::parse(query);
     ASSERT_TRUE(result.isOK());
-    std::unique_ptr<MatchExpression> destroy(result.getValue());
 
     ASSERT(result.getValue()->matchesBSON(BSON("x" << 1)));
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << 2)));
@@ -87,7 +84,6 @@ TEST(MatchExpressionParserLeafTest, SimpleGTE1) {
     BSONObj query = BSON("x" << BSON("$gte" << 2));
     StatusWithMatchExpression result = MatchExpressionParser::parse(query);
     ASSERT_TRUE(result.isOK());
-    std::unique_ptr<MatchExpression> destroy(result.getValue());
 
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << 1)));
     ASSERT(result.getValue()->matchesBSON(BSON("x" << 2)));
@@ -98,7 +94,6 @@ TEST(MatchExpressionParserLeafTest, SimpleLTE1) {
     BSONObj query = BSON("x" << BSON("$lte" << 2));
     StatusWithMatchExpression result = MatchExpressionParser::parse(query);
     ASSERT_TRUE(result.isOK());
-    std::unique_ptr<MatchExpression> destroy(result.getValue());
 
     ASSERT(result.getValue()->matchesBSON(BSON("x" << 1)));
     ASSERT(result.getValue()->matchesBSON(BSON("x" << 2)));
@@ -109,7 +104,6 @@ TEST(MatchExpressionParserLeafTest, SimpleNE1) {
     BSONObj query = BSON("x" << BSON("$ne" << 2));
     StatusWithMatchExpression result = MatchExpressionParser::parse(query);
     ASSERT_TRUE(result.isOK());
-    std::unique_ptr<MatchExpression> destroy(result.getValue());
 
     ASSERT(result.getValue()->matchesBSON(BSON("x" << 1)));
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << 2)));
@@ -120,7 +114,6 @@ TEST(MatchExpressionParserLeafTest, SimpleModBad1) {
     BSONObj query = BSON("x" << BSON("$mod" << BSON_ARRAY(3 << 2)));
     StatusWithMatchExpression result = MatchExpressionParser::parse(query);
     ASSERT_TRUE(result.isOK());
-    std::unique_ptr<MatchExpression> destroy1(result.getValue());
 
     query = BSON("x" << BSON("$mod" << BSON_ARRAY(3)));
     result = MatchExpressionParser::parse(query);
@@ -147,7 +140,6 @@ TEST(MatchExpressionParserLeafTest, SimpleMod1) {
     BSONObj query = BSON("x" << BSON("$mod" << BSON_ARRAY(3 << 2)));
     StatusWithMatchExpression result = MatchExpressionParser::parse(query);
     ASSERT_TRUE(result.isOK());
-    std::unique_ptr<MatchExpression> destroy(result.getValue());
 
     ASSERT(result.getValue()->matchesBSON(BSON("x" << 5)));
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << 4)));
@@ -158,7 +150,6 @@ TEST(MatchExpressionParserLeafTest, SimpleModNotNumber) {
     BSONObj query = BSON("x" << BSON("$mod" << BSON_ARRAY(2 << "r")));
     StatusWithMatchExpression result = MatchExpressionParser::parse(query);
     ASSERT_TRUE(result.isOK());
-    std::unique_ptr<MatchExpression> destroy(result.getValue());
 
     ASSERT(result.getValue()->matchesBSON(BSON("x" << 2)));
     ASSERT(result.getValue()->matchesBSON(BSON("x" << 4)));
@@ -172,7 +163,6 @@ TEST(MatchExpressionParserLeafTest, SimpleIN1) {
     BSONObj query = BSON("x" << BSON("$in" << BSON_ARRAY(2 << 3)));
     StatusWithMatchExpression result = MatchExpressionParser::parse(query);
     ASSERT_TRUE(result.isOK());
-    std::unique_ptr<MatchExpression> destroy(result.getValue());
 
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << 1)));
     ASSERT(result.getValue()->matchesBSON(BSON("x" << 2)));
@@ -187,7 +177,6 @@ TEST(MatchExpressionParserLeafTest, INSingleDBRef) {
                                                               << "db"))));
     StatusWithMatchExpression result = MatchExpressionParser::parse(query);
     ASSERT_TRUE(result.isOK());
-    std::unique_ptr<MatchExpression> destroy(result.getValue());
 
     OID oidx = OID::gen();
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON("$ref"
@@ -250,7 +239,6 @@ TEST(MatchExpressionParserLeafTest, INMultipleDBRef) {
                                                                  << "db"))));
     StatusWithMatchExpression result = MatchExpressionParser::parse(query);
     ASSERT_TRUE(result.isOK());
-    std::unique_ptr<MatchExpression> destroy(result.getValue());
 
     OID oidx = OID::gen();
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON("$ref"
@@ -350,7 +338,6 @@ TEST(MatchExpressionParserLeafTest, INDBRefWithOptionalField1) {
                                                               << "$id" << oid << "foo" << 12345))));
     StatusWithMatchExpression result = MatchExpressionParser::parse(query);
     ASSERT_TRUE(result.isOK());
-    std::unique_ptr<MatchExpression> destroy(result.getValue());
 
     OID oidx = OID::gen();
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << BSON("$ref"
@@ -452,7 +439,6 @@ TEST(MatchExpressionParserLeafTest, INRegexStuff) {
     BSONObj query = BSON("a" << operand.obj());
     StatusWithMatchExpression result = MatchExpressionParser::parse(query);
     ASSERT_TRUE(result.isOK());
-    std::unique_ptr<MatchExpression> destroy(result.getValue());
 
     BSONObj matchFirst = BSON("a"
                               << "ax");
@@ -478,7 +464,6 @@ TEST(MatchExpressionParserLeafTest, SimpleNIN1) {
     BSONObj query = BSON("x" << BSON("$nin" << BSON_ARRAY(2 << 3)));
     StatusWithMatchExpression result = MatchExpressionParser::parse(query);
     ASSERT_TRUE(result.isOK());
-    std::unique_ptr<MatchExpression> destroy(result.getValue());
 
     ASSERT(result.getValue()->matchesBSON(BSON("x" << 1)));
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << 2)));
@@ -498,7 +483,6 @@ TEST(MatchExpressionParserLeafTest, Regex1) {
     BSONObj query = b.obj();
     StatusWithMatchExpression result = MatchExpressionParser::parse(query);
     ASSERT_TRUE(result.isOK());
-    std::unique_ptr<MatchExpression> destroy(result.getValue());
 
     ASSERT(result.getValue()->matchesBSON(BSON("x"
                                                << "abc")));
@@ -515,7 +499,6 @@ TEST(MatchExpressionParserLeafTest, Regex2) {
                                      << "i"));
     StatusWithMatchExpression result = MatchExpressionParser::parse(query);
     ASSERT_TRUE(result.isOK());
-    std::unique_ptr<MatchExpression> destroy(result.getValue());
 
     ASSERT(result.getValue()->matchesBSON(BSON("x"
                                                << "abc")));
@@ -533,7 +516,6 @@ TEST(MatchExpressionParserLeafTest, Regex3) {
     StatusWithMatchExpression result = MatchExpressionParser::parse(query);
     log() << "result: " << result.getStatus() << endl;
     ASSERT_TRUE(result.isOK());
-    std::unique_ptr<MatchExpression> destroy(result.getValue());
 
     ASSERT(result.getValue()->matchesBSON(BSON("x"
                                                << "abc")));
@@ -578,7 +560,6 @@ TEST(MatchExpressionParserLeafTest, ExistsYes1) {
     BSONObj query = BSON("x" << b.obj());
     StatusWithMatchExpression result = MatchExpressionParser::parse(query);
     ASSERT_TRUE(result.isOK());
-    std::unique_ptr<MatchExpression> destroy(result.getValue());
 
     ASSERT(result.getValue()->matchesBSON(BSON("x"
                                                << "abc")));
@@ -592,7 +573,6 @@ TEST(MatchExpressionParserLeafTest, ExistsNO1) {
     BSONObj query = BSON("x" << b.obj());
     StatusWithMatchExpression result = MatchExpressionParser::parse(query);
     ASSERT_TRUE(result.isOK());
-    std::unique_ptr<MatchExpression> destroy(result.getValue());
 
     ASSERT(!result.getValue()->matchesBSON(BSON("x"
                                                 << "abc")));
@@ -604,7 +584,6 @@ TEST(MatchExpressionParserLeafTest, Type1) {
     BSONObj query = BSON("x" << BSON("$type" << String));
     StatusWithMatchExpression result = MatchExpressionParser::parse(query);
     ASSERT_TRUE(result.isOK());
-    std::unique_ptr<MatchExpression> destroy(result.getValue());
 
     ASSERT(result.getValue()->matchesBSON(BSON("x"
                                                << "abc")));
@@ -615,7 +594,6 @@ TEST(MatchExpressionParserLeafTest, Type2) {
     BSONObj query = BSON("x" << BSON("$type" << (double)NumberDouble));
     StatusWithMatchExpression result = MatchExpressionParser::parse(query);
     ASSERT_TRUE(result.isOK());
-    std::unique_ptr<MatchExpression> destroy(result.getValue());
 
     ASSERT(result.getValue()->matchesBSON(BSON("x" << 5.3)));
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << 5)));
@@ -625,7 +603,6 @@ TEST(MatchExpressionParserLeafTest, TypeDoubleOperator) {
     BSONObj query = BSON("x" << BSON("$type" << 1.5));
     StatusWithMatchExpression result = MatchExpressionParser::parse(query);
     ASSERT_TRUE(result.isOK());
-    std::unique_ptr<MatchExpression> destroy(result.getValue());
 
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << 5.3)));
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << 5)));
@@ -635,7 +612,6 @@ TEST(MatchExpressionParserLeafTest, TypeNull) {
     BSONObj query = BSON("x" << BSON("$type" << jstNULL));
     StatusWithMatchExpression result = MatchExpressionParser::parse(query);
     ASSERT_TRUE(result.isOK());
-    std::unique_ptr<MatchExpression> destroy(result.getValue());
 
     ASSERT(!result.getValue()->matchesBSON(BSONObj()));
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << 5)));
@@ -650,7 +626,6 @@ TEST(MatchExpressionParserLeafTest, TypeBadType) {
     BSONObj query = BSON("x" << b.obj());
     StatusWithMatchExpression result = MatchExpressionParser::parse(query);
     ASSERT_TRUE(result.isOK());
-    std::unique_ptr<MatchExpression> destroy(result.getValue());
 
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << 5.3)));
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << 5)));
@@ -663,12 +638,12 @@ TEST(MatchExpressionParserLeafTest, TypeBad) {
 }
 
 TEST(MatchExpressionParserLeafTest, TypeBadString) {
-    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$type: null}}")));
-    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$type: true}}")));
-    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$type: {}}}}")));
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$type: null}}")).getStatus());
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$type: true}}")).getStatus());
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$type: {}}}}")).getStatus());
     ASSERT_NOT_OK(MatchExpressionParser::parse(
-        fromjson("{a: {$type: ObjectId('000000000000000000000000')}}")));
-    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$type: []}}")));
+                     fromjson("{a: {$type: ObjectId('000000000000000000000000')}}")).getStatus());
+    ASSERT_NOT_OK(MatchExpressionParser::parse(fromjson("{a: {$type: []}}")).getStatus());
 }
 
 TEST(MatchExpressionParserLeafTest, TypeStringnameDouble) {
@@ -676,7 +651,7 @@ TEST(MatchExpressionParserLeafTest, TypeStringnameDouble) {
         MatchExpressionParser::parse(fromjson("{a: {$type: 'double'}}"));
     ASSERT(typeNumberDouble.isOK());
     TypeMatchExpression* tmeNumberDouble =
-        static_cast<TypeMatchExpression*>(typeNumberDouble.getValue());
+        static_cast<TypeMatchExpression*>(typeNumberDouble.getValue().get());
     ASSERT(tmeNumberDouble->getData() == NumberDouble);
     ASSERT_TRUE(tmeNumberDouble->matchesBSON(fromjson("{a: 5.4}")));
     ASSERT_FALSE(tmeNumberDouble->matchesBSON(fromjson("{a: NumberInt(5)}")));
@@ -686,7 +661,8 @@ TEST(MatchExpressionParserLeafTest, TypeStringnameNumberInt) {
     StatusWithMatchExpression typeNumberInt =
         MatchExpressionParser::parse(fromjson("{a: {$type: 'int'}}"));
     ASSERT(typeNumberInt.isOK());
-    TypeMatchExpression* tmeNumberInt = static_cast<TypeMatchExpression*>(typeNumberInt.getValue());
+    TypeMatchExpression* tmeNumberInt =
+        static_cast<TypeMatchExpression*>(typeNumberInt.getValue().get());
     ASSERT(tmeNumberInt->getData() == NumberInt);
     ASSERT_TRUE(tmeNumberInt->matchesBSON(fromjson("{a: NumberInt(5)}")));
     ASSERT_FALSE(tmeNumberInt->matchesBSON(fromjson("{a: 5.4}")));
@@ -697,7 +673,7 @@ TEST(MatchExpressionParserLeafTest, TypeStringnameNumberLong) {
         MatchExpressionParser::parse(fromjson("{a: {$type: 'long'}}"));
     ASSERT(typeNumberLong.isOK());
     TypeMatchExpression* tmeNumberLong =
-        static_cast<TypeMatchExpression*>(typeNumberLong.getValue());
+        static_cast<TypeMatchExpression*>(typeNumberLong.getValue().get());
     ASSERT(tmeNumberLong->getData() == NumberLong);
     ASSERT_TRUE(tmeNumberLong->matchesBSON(BSON("a" << static_cast<long long>(-1))));
     ASSERT_FALSE(tmeNumberLong->matchesBSON(fromjson("{a: true}")));
@@ -707,7 +683,8 @@ TEST(MatchExpressionParserLeafTest, TypeStringnameString) {
     StatusWithMatchExpression typeString =
         MatchExpressionParser::parse(fromjson("{a: {$type: 'string'}}"));
     ASSERT(typeString.isOK());
-    TypeMatchExpression* tmeString = static_cast<TypeMatchExpression*>(typeString.getValue());
+    TypeMatchExpression* tmeString =
+        static_cast<TypeMatchExpression*>(typeString.getValue().get());
     ASSERT(tmeString->getData() == String);
     ASSERT_TRUE(tmeString->matchesBSON(fromjson("{a: 'hello world'}")));
     ASSERT_FALSE(tmeString->matchesBSON(fromjson("{a: 5.4}")));
@@ -717,7 +694,8 @@ TEST(MatchExpressionParserLeafTest, TypeStringnamejstOID) {
     StatusWithMatchExpression typejstOID =
         MatchExpressionParser::parse(fromjson("{a: {$type: 'objectId'}}"));
     ASSERT(typejstOID.isOK());
-    TypeMatchExpression* tmejstOID = static_cast<TypeMatchExpression*>(typejstOID.getValue());
+    TypeMatchExpression* tmejstOID =
+        static_cast<TypeMatchExpression*>(typejstOID.getValue().get());
     ASSERT(tmejstOID->getData() == jstOID);
     ASSERT_TRUE(tmejstOID->matchesBSON(fromjson("{a: ObjectId('000000000000000000000000')}")));
     ASSERT_FALSE(tmejstOID->matchesBSON(fromjson("{a: 'hello world'}")));
@@ -727,7 +705,8 @@ TEST(MatchExpressionParserLeafTest, TypeStringnamejstNULL) {
     StatusWithMatchExpression typejstNULL =
         MatchExpressionParser::parse(fromjson("{a: {$type: 'null'}}"));
     ASSERT(typejstNULL.isOK());
-    TypeMatchExpression* tmejstNULL = static_cast<TypeMatchExpression*>(typejstNULL.getValue());
+    TypeMatchExpression* tmejstNULL =
+        static_cast<TypeMatchExpression*>(typejstNULL.getValue().get());
     ASSERT(tmejstNULL->getData() == jstNULL);
     ASSERT_TRUE(tmejstNULL->matchesBSON(fromjson("{a: null}")));
     ASSERT_FALSE(tmejstNULL->matchesBSON(fromjson("{a: true}")));
@@ -737,7 +716,7 @@ TEST(MatchExpressionParserLeafTest, TypeStringnameBool) {
     StatusWithMatchExpression typeBool =
         MatchExpressionParser::parse(fromjson("{a: {$type: 'bool'}}"));
     ASSERT(typeBool.isOK());
-    TypeMatchExpression* tmeBool = static_cast<TypeMatchExpression*>(typeBool.getValue());
+    TypeMatchExpression* tmeBool = static_cast<TypeMatchExpression*>(typeBool.getValue().get());
     ASSERT(tmeBool->getData() == Bool);
     ASSERT_TRUE(tmeBool->matchesBSON(fromjson("{a: true}")));
     ASSERT_FALSE(tmeBool->matchesBSON(fromjson("{a: null}")));
@@ -747,7 +726,8 @@ TEST(MatchExpressionParserLeafTest, TypeStringnameObject) {
     StatusWithMatchExpression typeObject =
         MatchExpressionParser::parse(fromjson("{a: {$type: 'object'}}"));
     ASSERT(typeObject.isOK());
-    TypeMatchExpression* tmeObject = static_cast<TypeMatchExpression*>(typeObject.getValue());
+    TypeMatchExpression* tmeObject =
+        static_cast<TypeMatchExpression*>(typeObject.getValue().get());
     ASSERT(tmeObject->getData() == Object);
     ASSERT_TRUE(tmeObject->matchesBSON(fromjson("{a: {}}")));
     ASSERT_FALSE(tmeObject->matchesBSON(fromjson("{a: []}")));
@@ -757,7 +737,8 @@ TEST(MatchExpressionParserLeafTest, TypeStringnameArray) {
     StatusWithMatchExpression typeArray =
         MatchExpressionParser::parse(fromjson("{a: {$type: 'array'}}"));
     ASSERT(typeArray.isOK());
-    TypeMatchExpression* tmeArray = static_cast<TypeMatchExpression*>(typeArray.getValue());
+    TypeMatchExpression* tmeArray =
+        static_cast<TypeMatchExpression*>(typeArray.getValue().get());
     ASSERT(tmeArray->getData() == Array);
     ASSERT_TRUE(tmeArray->matchesBSON(fromjson("{a: [[]]}")));
     ASSERT_FALSE(tmeArray->matchesBSON(fromjson("{a: {}}")));

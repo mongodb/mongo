@@ -33,23 +33,25 @@
 #include "mongo/base/init.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression_geo.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
 using std::unique_ptr;
+using stdx::make_unique;
 
 StatusWithMatchExpression expressionParserGeoCallbackReal(const char* name,
                                                           int type,
                                                           const BSONObj& section) {
     if (BSONObj::opWITHIN == type || BSONObj::opGEO_INTERSECTS == type) {
-        unique_ptr<GeoExpression> gq(new GeoExpression(name));
+        unique_ptr<GeoExpression> gq = make_unique<GeoExpression>(name);
         Status parseStatus = gq->parseFrom(section);
 
         if (!parseStatus.isOK())
             return StatusWithMatchExpression(parseStatus);
 
-        unique_ptr<GeoMatchExpression> e(new GeoMatchExpression());
+        unique_ptr<GeoMatchExpression> e = make_unique<GeoMatchExpression>();
 
         // Until the index layer accepts non-BSON predicates, or special indices are moved into
         // stages, we have to clean up the raw object so it can be passed down to the index
@@ -59,15 +61,15 @@ StatusWithMatchExpression expressionParserGeoCallbackReal(const char* name,
         Status s = e->init(name, gq.release(), bob.obj());
         if (!s.isOK())
             return StatusWithMatchExpression(s);
-        return StatusWithMatchExpression(e.release());
+        return {std::move(e)};
     } else {
         verify(BSONObj::opNEAR == type);
-        unique_ptr<GeoNearExpression> nq(new GeoNearExpression(name));
+        unique_ptr<GeoNearExpression> nq = make_unique<GeoNearExpression>(name);
         Status s = nq->parseFrom(section);
         if (!s.isOK()) {
             return StatusWithMatchExpression(s);
         }
-        unique_ptr<GeoNearMatchExpression> e(new GeoNearMatchExpression());
+        unique_ptr<GeoNearMatchExpression> e = make_unique<GeoNearMatchExpression>();
         // Until the index layer accepts non-BSON predicates, or special indices are moved into
         // stages, we have to clean up the raw object so it can be passed down to the index
         // layer.
@@ -76,7 +78,7 @@ StatusWithMatchExpression expressionParserGeoCallbackReal(const char* name,
         s = e->init(name, nq.release(), bob.obj());
         if (!s.isOK())
             return StatusWithMatchExpression(s);
-        return StatusWithMatchExpression(e.release());
+        return {std::move(e)};
     }
 }
 

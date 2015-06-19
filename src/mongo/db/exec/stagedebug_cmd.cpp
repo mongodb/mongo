@@ -230,13 +230,14 @@ public:
             }
             BSONObj argObj = e.Obj();
             if (filterTag == e.fieldName()) {
-                StatusWithMatchExpression swme = MatchExpressionParser::parse(
+                StatusWithMatchExpression statusWithMatcher = MatchExpressionParser::parse(
                     argObj, WhereCallbackReal(txn, collection->ns().db()));
-                if (!swme.isOK()) {
+                if (!statusWithMatcher.isOK()) {
                     return NULL;
                 }
+                std::unique_ptr<MatchExpression> me = std::move(statusWithMatcher.getValue());
                 // exprs is what will wind up deleting this.
-                matcher = swme.getValue();
+                matcher = me.release();
                 verify(NULL != matcher);
                 exprs->mutableVector().push_back(matcher);
             } else if (argsTag == e.fieldName()) {

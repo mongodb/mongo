@@ -140,8 +140,10 @@ public:
 
         unique_ptr<WorkingSet> ws(new WorkingSet);
 
-        StatusWithMatchExpression swme = MatchExpressionParser::parse(request.getQuery());
-        unique_ptr<MatchExpression> expression(swme.getValue());
+        StatusWithMatchExpression statusWithMatcher =
+            MatchExpressionParser::parse(request.getQuery());
+        ASSERT(statusWithMatcher.isOK());
+        unique_ptr<MatchExpression> expression = std::move(statusWithMatcher.getValue());
 
         PlanStage* scan;
         if (indexed) {

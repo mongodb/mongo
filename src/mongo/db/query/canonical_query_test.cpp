@@ -53,7 +53,7 @@ MatchExpression* parseMatchExpression(const BSONObj& obj) {
         FAIL(ss);
     }
 
-    return status.getValue();
+    return status.getValue().release();
 }
 
 /**

@@ -47,7 +47,7 @@ TEST(MatchExpressionParserText, Basic) {
 
     ASSERT_EQUALS(MatchExpression::TEXT, result.getValue()->matchType());
     std::unique_ptr<TextMatchExpression> textExp(
-        static_cast<TextMatchExpression*>(result.getValue()));
+        static_cast<TextMatchExpression*>(result.getValue().release()));
     ASSERT_EQUALS(textExp->getQuery(), "awesome");
     ASSERT_EQUALS(textExp->getLanguage(), "english");
     ASSERT_EQUALS(textExp->getCaseSensitive(), fts::FTSQuery::caseSensitiveDefault);
@@ -68,7 +68,7 @@ TEST(MatchExpressionParserText, CaseSensitiveTrue) {
 
     ASSERT_EQUALS(MatchExpression::TEXT, result.getValue()->matchType());
     std::unique_ptr<TextMatchExpression> textExp(
-        static_cast<TextMatchExpression*>(result.getValue()));
+        static_cast<TextMatchExpression*>(result.getValue().release()));
     ASSERT_EQUALS(textExp->getCaseSensitive(), true);
 }
 
@@ -80,7 +80,7 @@ TEST(MatchExpressionParserText, CaseSensitiveFalse) {
 
     ASSERT_EQUALS(MatchExpression::TEXT, result.getValue()->matchType());
     std::unique_ptr<TextMatchExpression> textExp(
-        static_cast<TextMatchExpression*>(result.getValue()));
+        static_cast<TextMatchExpression*>(result.getValue().release()));
     ASSERT_EQUALS(textExp->getCaseSensitive(), false);
 }
 

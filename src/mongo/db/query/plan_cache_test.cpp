@@ -135,7 +135,7 @@ unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
 /**
  * Utility function to create MatchExpression
  */
-MatchExpression* parseMatchExpression(const BSONObj& obj) {
+unique_ptr<MatchExpression> parseMatchExpression(const BSONObj& obj) {
     StatusWithMatchExpression status = MatchExpressionParser::parse(obj);
     if (!status.isOK()) {
         str::stream ss;
@@ -143,8 +143,8 @@ MatchExpression* parseMatchExpression(const BSONObj& obj) {
            << ". Reason: " << status.getStatus().toString();
         FAIL(ss);
     }
-    MatchExpression* expr(status.getValue());
-    return expr;
+
+    return std::move(status.getValue());
 }
 
 void assertEquivalent(const char* queryStr,

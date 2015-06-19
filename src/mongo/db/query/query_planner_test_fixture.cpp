@@ -340,7 +340,7 @@ std::unique_ptr<MatchExpression> QueryPlannerTest::parseMatchExpression(const BS
         FAIL(str::stream() << "failed to parse query: " << obj.toString()
                            << ". Reason: " << status.getStatus().toString());
     }
-    return std::unique_ptr<MatchExpression>(status.getValue());
+    return std::move(status.getValue());
 }
 
 }  // namespace mongo

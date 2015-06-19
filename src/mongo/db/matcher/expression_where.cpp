@@ -189,7 +189,7 @@ StatusWithMatchExpression WhereCallbackReal::parseWhere(const BSONElement& where
         Status s = exp->init(_dbName, where.valuestr(), BSONObj());
         if (!s.isOK())
             return StatusWithMatchExpression(s);
-        return StatusWithMatchExpression(exp.release());
+        return {std::move(exp)};
     }
 
     if (where.type() == CodeWScope) {
@@ -197,7 +197,7 @@ StatusWithMatchExpression WhereCallbackReal::parseWhere(const BSONElement& where
             exp->init(_dbName, where.codeWScopeCode(), BSONObj(where.codeWScopeScopeDataUnsafe()));
         if (!s.isOK())
             return StatusWithMatchExpression(s);
-        return StatusWithMatchExpression(exp.release());
+        return {std::move(exp)};
     }
 
     return StatusWithMatchExpression(ErrorCodes::BadValue, "$where got bad type");

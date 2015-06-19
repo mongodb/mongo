@@ -88,7 +88,7 @@ StatusWithMatchExpression expressionParserTextCallbackReal(const BSONObj& queryO
     if (!s.isOK()) {
         return StatusWithMatchExpression(s);
     }
-    return StatusWithMatchExpression(e.release());
+    return {std::move(e)};
 }
 
 MONGO_INITIALIZER(MatchExpressionParserText)(::mongo::InitializerContext* context) {

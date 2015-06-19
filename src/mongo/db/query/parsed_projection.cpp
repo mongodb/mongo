@@ -129,12 +129,11 @@ Status ParsedProjection::make(const BSONObj& spec,
                 verify(elemMatchObj.isOwned());
 
                 // TODO: Is there a faster way of validating the elemMatchObj?
-                StatusWithMatchExpression swme =
+                StatusWithMatchExpression statusWithMatcher =
                     MatchExpressionParser::parse(elemMatchObj, whereCallback);
-                if (!swme.isOK()) {
-                    return swme.getStatus();
+                if (!statusWithMatcher.isOK()) {
+                    return statusWithMatcher.getStatus();
                 }
-                delete swme.getValue();
             } else if (mongoutils::str::equals(e2.fieldName(), "$meta")) {
                 // Field for meta must be top level.  We can relax this at some point.
                 if (mongoutils::str::contains(e.fieldName(), '.')) {

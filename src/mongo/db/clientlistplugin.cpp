@@ -168,11 +168,12 @@ public:
              BSONObjBuilder& result) {
         unique_ptr<MatchExpression> filter;
         if (cmdObj["filter"].isABSONObj()) {
-            StatusWithMatchExpression res = MatchExpressionParser::parse(cmdObj["filter"].Obj());
-            if (!res.isOK()) {
-                return appendCommandStatus(result, res.getStatus());
+            StatusWithMatchExpression statusWithMatcher =
+                MatchExpressionParser::parse(cmdObj["filter"].Obj());
+            if (!statusWithMatcher.isOK()) {
+                return appendCommandStatus(result, statusWithMatcher.getStatus());
             }
-            filter.reset(res.getValue());
+            filter = std::move(statusWithMatcher.getValue());
         }
 
         result.appendArray("operations",

@@ -123,14 +123,14 @@ StatusWithMatchExpression WhereCallbackNoop::parseWhere(const BSONElement& where
         Status s = exp->init(where.valuestr());
         if (!s.isOK())
             return StatusWithMatchExpression(s);
-        return StatusWithMatchExpression(exp.release());
+        return {std::move(exp)};
     }
 
     if (where.type() == CodeWScope) {
         Status s = exp->init(where.codeWScopeCode());
         if (!s.isOK())
             return StatusWithMatchExpression(s);
-        return StatusWithMatchExpression(exp.release());
+        return {std::move(exp)};
     }
 
     return StatusWithMatchExpression(ErrorCodes::BadValue, "$where got bad type");

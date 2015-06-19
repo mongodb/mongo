@@ -103,10 +103,10 @@ void IndexCatalogEntry::init(OperationContext* txn, IndexAccessMethod* accessMet
     if (filterElement.type()) {
         invariant(filterElement.isABSONObj());
         BSONObj filter = filterElement.Obj();
-        StatusWithMatchExpression res = MatchExpressionParser::parse(filter);
+        StatusWithMatchExpression statusWithMatcher = MatchExpressionParser::parse(filter);
         // this should be checked in create, so can blow up here
-        invariantOK(res.getStatus());
-        _filterExpression.reset(res.getValue());
+        invariantOK(statusWithMatcher.getStatus());
+        _filterExpression = std::move(statusWithMatcher.getValue());
         LOG(2) << "have filter expression for " << _ns << " " << _descriptor->indexName() << " "
                << filter;
     }

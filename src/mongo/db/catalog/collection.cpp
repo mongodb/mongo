@@ -237,8 +237,7 @@ Status Collection::checkValidation(OperationContext* txn, const BSONObj& documen
     return {ErrorCodes::DocumentValidationFailure, "Document failed validation"};
 }
 
-StatusWith<std::unique_ptr<MatchExpression>> Collection::parseValidator(
-    const BSONObj& validator) const {
+StatusWithMatchExpression Collection::parseValidator(const BSONObj& validator) const {
     if (validator.isEmpty())
         return {nullptr};
 
@@ -259,11 +258,11 @@ StatusWith<std::unique_ptr<MatchExpression>> Collection::parseValidator(
             return status;
     }
 
-    auto statusWithRawPtr = MatchExpressionParser::parse(validator);
-    if (!statusWithRawPtr.isOK())
-        return statusWithRawPtr.getStatus();
+    auto statusWithMatcher = MatchExpressionParser::parse(validator);
+    if (!statusWithMatcher.isOK())
+        return statusWithMatcher.getStatus();
 
-    return {std::unique_ptr<MatchExpression>(statusWithRawPtr.getValue())};
+    return statusWithMatcher;
 }
 
 StatusWith<RecordId> Collection::insertDocument(OperationContext* txn,

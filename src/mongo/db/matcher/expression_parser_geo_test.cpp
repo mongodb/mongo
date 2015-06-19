@@ -44,7 +44,6 @@ TEST(MatchExpressionParserGeo, WithinBox) {
 
     StatusWithMatchExpression result = MatchExpressionParser::parse(query);
     ASSERT_TRUE(result.isOK());
-    std::unique_ptr<MatchExpression> destroy(result.getValue());
 
     ASSERT(!result.getValue()->matchesBSON(fromjson("{a: [3,4]}")));
     ASSERT(result.getValue()->matchesBSON(fromjson("{a: [4,4]}")));
@@ -60,9 +59,8 @@ TEST(MatchExpressionParserGeoNear, ParseNear) {
 
     StatusWithMatchExpression result = MatchExpressionParser::parse(query);
     ASSERT_TRUE(result.isOK());
-    std::unique_ptr<MatchExpression> destroy(result.getValue());
 
-    MatchExpression* exp = result.getValue();
+    MatchExpression* exp = result.getValue().get();
     ASSERT_EQUALS(MatchExpression::GEO_NEAR, exp->matchType());
 
     GeoNearMatchExpression* gnexp = static_cast<GeoNearMatchExpression*>(exp);

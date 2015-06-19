@@ -41,7 +41,7 @@ namespace mongo {
 
 class OperationContext;
 
-typedef StatusWith<MatchExpression*> StatusWithMatchExpression;
+typedef StatusWith<std::unique_ptr<MatchExpression>> StatusWithMatchExpression;
 
 class MatchExpressionParser {
 public:

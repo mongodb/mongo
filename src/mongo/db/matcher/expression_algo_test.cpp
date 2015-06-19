@@ -49,7 +49,7 @@ public:
     ParsedMatchExpression(const std::string& str) : _obj(fromjson(str)) {
         StatusWithMatchExpression result = MatchExpressionParser::parse(_obj);
         ASSERT_OK(result.getStatus());
-        _expr.reset(result.getValue());
+        _expr = std::move(result.getValue());
     }
 
     const MatchExpression* get() const {

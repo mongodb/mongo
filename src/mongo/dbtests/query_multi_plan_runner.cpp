@@ -146,9 +146,9 @@ public:
 
         // Make the filter.
         BSONObj filterObj = BSON("foo" << 7);
-        StatusWithMatchExpression swme = MatchExpressionParser::parse(filterObj);
-        verify(swme.isOK());
-        unique_ptr<MatchExpression> filter(swme.getValue());
+        StatusWithMatchExpression statusWithMatcher = MatchExpressionParser::parse(filterObj);
+        verify(statusWithMatcher.isOK());
+        unique_ptr<MatchExpression> filter = std::move(statusWithMatcher.getValue());
         // Make the stage.
         unique_ptr<PlanStage> secondRoot(
             new CollectionScan(&_txn, csparams, sharedWs.get(), filter.get()));

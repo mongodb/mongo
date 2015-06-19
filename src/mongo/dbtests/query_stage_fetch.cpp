@@ -190,9 +190,9 @@ public:
 
         // Make the filter.
         BSONObj filterObj = BSON("foo" << 6);
-        StatusWithMatchExpression swme = MatchExpressionParser::parse(filterObj);
-        verify(swme.isOK());
-        unique_ptr<MatchExpression> filterExpr(swme.getValue());
+        StatusWithMatchExpression statusWithMatcher = MatchExpressionParser::parse(filterObj);
+        verify(statusWithMatcher.isOK());
+        unique_ptr<MatchExpression> filterExpr = std::move(statusWithMatcher.getValue());
 
         // Matcher requires that foo==6 but we only have data with foo==5.
         unique_ptr<FetchStage> fetchStage(

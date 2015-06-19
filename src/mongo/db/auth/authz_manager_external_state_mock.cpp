@@ -278,7 +278,7 @@ Status AuthzManagerExternalStateMock::_queryVector(
     if (!parseResult.isOK()) {
         return parseResult.getStatus();
     }
-    const std::unique_ptr<MatchExpression> matcher(parseResult.getValue());
+    const std::unique_ptr<MatchExpression> matcher = std::move(parseResult.getValue());
 
     NamespaceDocumentMap::iterator mapIt = _documents.find(collectionName);
     if (mapIt == _documents.end())

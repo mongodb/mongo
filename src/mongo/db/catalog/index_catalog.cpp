@@ -535,11 +535,12 @@ Status IndexCatalog::_isSpecOk(const BSONObj& spec) const {
             return Status(ErrorCodes::CannotCreateIndex,
                           "'partialFilterExpression' for an index has to be a document");
         }
-        StatusWithMatchExpression res = MatchExpressionParser::parse(filterElement.Obj());
-        if (!res.isOK()) {
-            return res.getStatus();
+        StatusWithMatchExpression statusWithMatcher =
+            MatchExpressionParser::parse(filterElement.Obj());
+        if (!statusWithMatcher.isOK()) {
+            return statusWithMatcher.getStatus();
         }
-        const std::unique_ptr<MatchExpression> filterExpr(res.getValue());
+        const std::unique_ptr<MatchExpression> filterExpr = std::move(statusWithMatcher.getValue());
 
         Status status = _checkValidFilterExpressions(filterExpr.get());
         if (!status.isOK()) {

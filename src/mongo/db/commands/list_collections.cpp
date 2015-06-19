@@ -111,7 +111,7 @@ public:
             if (!statusWithMatcher.isOK()) {
                 return appendCommandStatus(result, statusWithMatcher.getStatus());
             }
-            matcher.reset(statusWithMatcher.getValue());
+            matcher = std::move(statusWithMatcher.getValue());
         }
 
         const long long defaultBatchSize = std::numeric_limits<long long>::max();

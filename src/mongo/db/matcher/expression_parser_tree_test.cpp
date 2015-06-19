@@ -48,8 +48,6 @@ TEST(MatchExpressionParserTreeTest, OR1) {
     ASSERT(result.getValue()->matchesBSON(BSON("y" << 2)));
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << 3)));
     ASSERT(!result.getValue()->matchesBSON(BSON("y" << 1)));
-
-    delete result.getValue();
 }
 
 TEST(MatchExpressionParserTreeTest, OREmbedded) {
@@ -62,8 +60,6 @@ TEST(MatchExpressionParserTreeTest, OREmbedded) {
     ASSERT(result.getValue()->matchesBSON(BSON("y" << 2)));
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << 3)));
     ASSERT(!result.getValue()->matchesBSON(BSON("y" << 1)));
-
-    delete result.getValue();
 }
 
 
@@ -78,8 +74,6 @@ TEST(MatchExpressionParserTreeTest, AND1) {
     ASSERT(!result.getValue()->matchesBSON(BSON("y" << 1)));
     ASSERT(result.getValue()->matchesBSON(BSON("x" << 1 << "y" << 2)));
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << 2 << "y" << 2)));
-
-    delete result.getValue();
 }
 
 TEST(MatchExpressionParserTreeTest, NOREmbedded) {
@@ -91,8 +85,6 @@ TEST(MatchExpressionParserTreeTest, NOREmbedded) {
     ASSERT(!result.getValue()->matchesBSON(BSON("y" << 2)));
     ASSERT(result.getValue()->matchesBSON(BSON("x" << 3)));
     ASSERT(result.getValue()->matchesBSON(BSON("y" << 1)));
-
-    delete result.getValue();
 }
 
 TEST(MatchExpressionParserTreeTest, NOT1) {
@@ -102,8 +94,6 @@ TEST(MatchExpressionParserTreeTest, NOT1) {
 
     ASSERT(result.getValue()->matchesBSON(BSON("x" << 2)));
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << 8)));
-
-    delete result.getValue();
 }
 
 // Test a deep match tree that is not deep enough to hit the maximum depth limit.
@@ -122,7 +112,6 @@ TEST(MatchExpressionParserTreeTest, MaximumTreeDepthNotExceed) {
     BSONObj query = fromjson(ss.str());
     StatusWithMatchExpression result = MatchExpressionParser::parse(query);
     ASSERT(result.isOK());
-    delete result.getValue();
 }
 
 // Test a tree that exceeds the maximum depth limit.
@@ -193,7 +182,5 @@ TEST(MatchExpressionParserLeafTest, NotRegex1) {
                                                 << "ABC")));
     ASSERT(result.getValue()->matchesBSON(BSON("x"
                                                << "AC")));
-
-    delete result.getValue();
 }
 }

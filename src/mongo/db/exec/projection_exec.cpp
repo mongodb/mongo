@@ -113,11 +113,12 @@ ProjectionExec::ProjectionExec(const BSONObj& spec,
                 BSONObj elemMatchObj = e.wrap();
                 verify(elemMatchObj.isOwned());
                 _elemMatchObjs.push_back(elemMatchObj);
-                StatusWithMatchExpression swme =
+                StatusWithMatchExpression statusWithMatcher =
                     MatchExpressionParser::parse(elemMatchObj, whereCallback);
-                verify(swme.isOK());
+                verify(statusWithMatcher.isOK());
                 // And store it in _matchers.
-                _matchers[mongoutils::str::before(e.fieldName(), '.').c_str()] = swme.getValue();
+                _matchers[mongoutils::str::before(e.fieldName(), '.').c_str()] =
+                    statusWithMatcher.getValue().release();
 
                 add(e.fieldName(), true);
             } else if (mongoutils::str::equals(e2.fieldName(), "$meta")) {

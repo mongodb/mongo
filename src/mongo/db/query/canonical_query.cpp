@@ -212,17 +212,17 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
     std::unique_ptr<LiteParsedQuery> autoLpq(lpq);
 
     // Make MatchExpression.
-    StatusWithMatchExpression swme =
+    StatusWithMatchExpression statusWithMatcher =
         MatchExpressionParser::parse(autoLpq->getFilter(), whereCallback);
-    if (!swme.isOK()) {
-        return swme.getStatus();
+    if (!statusWithMatcher.isOK()) {
+        return statusWithMatcher.getStatus();
     }
+    std::unique_ptr<MatchExpression> me = std::move(statusWithMatcher.getValue());
 
     // Make the CQ we'll hopefully return.
     std::unique_ptr<CanonicalQuery> cq(new CanonicalQuery());
 
-    // Takes ownership of lpq and the MatchExpression* in swme.
-    Status initStatus = cq->init(autoLpq.release(), whereCallback, swme.getValue());
+    Status initStatus = cq->init(autoLpq.release(), whereCallback, me.release());
 
     if (!initStatus.isOK()) {
         return initStatus;
@@ -303,15 +303,16 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
     auto& lpq = lpqStatus.getValue();
 
     // Build a parse tree from the BSONObj in the parsed query.
-    StatusWithMatchExpression swme = MatchExpressionParser::parse(lpq->getFilter(), whereCallback);
-    if (!swme.isOK()) {
-        return swme.getStatus();
+    StatusWithMatchExpression statusWithMatcher =
+        MatchExpressionParser::parse(lpq->getFilter(), whereCallback);
+    if (!statusWithMatcher.isOK()) {
+        return statusWithMatcher.getStatus();
     }
+    std::unique_ptr<MatchExpression> me = std::move(statusWithMatcher.getValue());
 
     // Make the CQ we'll hopefully return.
     std::unique_ptr<CanonicalQuery> cq(new CanonicalQuery());
-    // Takes ownership of lpq and the MatchExpression* in swme.
-    Status initStatus = cq->init(lpq.release(), whereCallback, swme.getValue());
+    Status initStatus = cq->init(lpq.release(), whereCallback, me.release());
 
     if (!initStatus.isOK()) {
         return initStatus;

@@ -40,7 +40,7 @@ std::unique_ptr<MatchExpression> parseMatchExpression(const BSONObj& obj) {
         FAIL(str::stream() << "failed to parse query: " << obj.toString()
                            << ". Reason: " << status.getStatus().toString());
     }
-    return std::unique_ptr<MatchExpression>(status.getValue());
+    return std::move(status.getValue());
 }
 
 // Test sparse index discriminators for a simple sparse index.

@@ -51,11 +51,11 @@ bool filterMatches(const BSONObj& testFilter, const QuerySolutionNode* trueFilte
     if (NULL == trueFilterNode->filter) {
         return false;
     }
-    StatusWithMatchExpression swme = MatchExpressionParser::parse(testFilter);
-    if (!swme.isOK()) {
+    StatusWithMatchExpression statusWithMatcher = MatchExpressionParser::parse(testFilter);
+    if (!statusWithMatcher.isOK()) {
         return false;
     }
-    const std::unique_ptr<MatchExpression> root(swme.getValue());
+    const std::unique_ptr<MatchExpression> root = std::move(statusWithMatcher.getValue());
     CanonicalQuery::sortTree(root.get());
     std::unique_ptr<MatchExpression> trueFilter(trueFilterNode->filter->shallowClone());
     CanonicalQuery::sortTree(trueFilter.get());

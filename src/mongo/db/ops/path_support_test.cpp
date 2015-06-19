@@ -491,7 +491,7 @@ TEST_F(ArrayDoc, NonNumericPathInArray) {
 
 static MatchExpression* makeExpr(const BSONObj& exprBSON) {
     static const WhereCallbackNoop callbackNoop;
-    return MatchExpressionParser::parse(exprBSON, callbackNoop).getValue();
+    return MatchExpressionParser::parse(exprBSON, callbackNoop).getValue().release();
 }
 
 static void assertContains(const EqualityMatches& equalities, const BSONObj& wrapped) {

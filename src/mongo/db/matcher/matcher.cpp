@@ -43,12 +43,13 @@ namespace mongo {
 
 Matcher::Matcher(const BSONObj& pattern, const MatchExpressionParser::WhereCallback& whereCallback)
     : _pattern(pattern) {
-    StatusWithMatchExpression result = MatchExpressionParser::parse(pattern, whereCallback);
+    StatusWithMatchExpression statusWithMatcher =
+        MatchExpressionParser::parse(pattern, whereCallback);
     uassert(16810,
-            mongoutils::str::stream() << "bad query: " << result.getStatus().toString(),
-            result.isOK());
+            mongoutils::str::stream() << "bad query: " << statusWithMatcher.getStatus().toString(),
+            statusWithMatcher.isOK());
 
-    _expression.reset(result.getValue());
+    _expression = std::move(statusWithMatcher.getValue());
 }
 
 bool Matcher::matches(const BSONObj& doc, MatchDetails* details) const {

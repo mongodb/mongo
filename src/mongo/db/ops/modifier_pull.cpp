@@ -119,10 +119,11 @@ Status ModifierPull::init(const BSONElement& modExpr, const Options& opts, bool*
         // $pull operations to contain $where clauses, so preserving this behaviour.
         StatusWithMatchExpression parseResult =
             MatchExpressionParser::parse(_exprObj, MatchExpressionParser::WhereCallback());
-        if (!parseResult.isOK())
+        if (!parseResult.isOK()) {
             return parseResult.getStatus();
+        }
 
-        _matchExpr.reset(parseResult.getValue());
+        _matchExpr = std::move(parseResult.getValue());
     }
 
     return Status::OK();

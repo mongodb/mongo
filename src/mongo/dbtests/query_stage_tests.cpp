@@ -77,9 +77,9 @@ public:
     int countResults(const IndexScanParams& params, BSONObj filterObj = BSONObj()) {
         AutoGetCollectionForRead ctx(&_txn, ns());
 
-        StatusWithMatchExpression swme = MatchExpressionParser::parse(filterObj);
-        verify(swme.isOK());
-        unique_ptr<MatchExpression> filterExpr(swme.getValue());
+        StatusWithMatchExpression statusWithMatcher = MatchExpressionParser::parse(filterObj);
+        verify(statusWithMatcher.isOK());
+        unique_ptr<MatchExpression> filterExpr = std::move(statusWithMatcher.getValue());
 
         unique_ptr<WorkingSet> ws = stdx::make_unique<WorkingSet>();
         unique_ptr<IndexScan> ix =

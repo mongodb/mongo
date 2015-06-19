@@ -35,6 +35,7 @@
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -59,7 +60,7 @@ Status MatchExpressionParser::_parseTreeList(const BSONObj& arr,
         if (!sub.isOK())
             return sub.getStatus();
 
-        out->add(sub.getValue());
+        out->add(sub.getValue().release());
     }
     return Status::OK();
 }
@@ -71,11 +72,11 @@ StatusWithMatchExpression MatchExpressionParser::_parseNot(const char* name,
         StatusWithMatchExpression s = _parseRegexElement(name, e);
         if (!s.isOK())
             return s;
-        std::unique_ptr<NotMatchExpression> n(new NotMatchExpression());
-        Status s2 = n->init(s.getValue());
+        std::unique_ptr<NotMatchExpression> n = stdx::make_unique<NotMatchExpression>();
+        Status s2 = n->init(s.getValue().release());
         if (!s2.isOK())
             return StatusWithMatchExpression(s2);
-        return StatusWithMatchExpression(n.release());
+        return {std::move(n)};
     }
 
     if (e.type() != Object)
@@ -85,7 +86,7 @@ StatusWithMatchExpression MatchExpressionParser::_parseNot(const char* name,
     if (notObject.isEmpty())
         return StatusWithMatchExpression(ErrorCodes::BadValue, "$not cannot be empty");
 
-    std::unique_ptr<AndMatchExpression> theAnd(new AndMatchExpression());
+    std::unique_ptr<AndMatchExpression> theAnd = stdx::make_unique<AndMatchExpression>();
     Status s = _parseSub(name, notObject, theAnd.get(), level);
     if (!s.isOK())
         return StatusWithMatchExpression(s);
@@ -96,11 +97,11 @@ StatusWithMatchExpression MatchExpressionParser::_parseNot(const char* name,
         if (theAnd->getChild(i)->matchType() == MatchExpression::REGEX)
             return StatusWithMatchExpression(ErrorCodes::BadValue, "$not cannot have a regex");
 
-    std::unique_ptr<NotMatchExpression> theNot(new NotMatchExpression());
+    std::unique_ptr<NotMatchExpression> theNot = stdx::make_unique<NotMatchExpression>();
     s = theNot->init(theAnd.release());
     if (!s.isOK())
         return StatusWithMatchExpression(s);
 
-    return StatusWithMatchExpression(theNot.release());
+    return {std::move(theNot)};
 }
 }
