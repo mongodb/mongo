@@ -361,7 +361,8 @@ namespace mongo {
         }
 
         const int ms = timer.millis();
-        LOG( ms <= 3 ? 3 : 0 ) << "task: " << taskName << " took: " << ms << "ms" << endl;
+        const int kMinLogMs = 100;
+        LOG( ms <= kMinLogMs ? 3 : 0 ) << "task: " << taskName << " took: " << ms << "ms" << endl;
     }
 
 } // namespace mongo
