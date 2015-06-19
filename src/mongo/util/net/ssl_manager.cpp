@@ -106,16 +106,18 @@ namespace mongo {
 
             void lock_callback( int mode, int type, const char *file, int line ) {
                 if ( mode & CRYPTO_LOCK ) {
-                    _mutex[type]->lock();
+                    _mutex[type].lock();
                 }
                 else {
-                    _mutex[type]->unlock();
+                    _mutex[type].unlock();
                 }
             }
 
             static void init() {
-                while ( (int)_mutex.size() < CRYPTO_num_locks() )
-                    _mutex.push_back( new stdx::recursive_mutex );
+                // Default insert all the mutexes OpenSSL needs inside of this vector, which will
+                // own them. On process termination, the vector will be responsible for their
+                // deconstruction.
+                _mutex = std::vector<stdx::recursive_mutex>( CRYPTO_num_locks() );
             }
 
             static SSLThreadInfo* get() {
@@ -134,7 +136,7 @@ namespace mongo {
             // Note: see SERVER-8734 for why we are using a recursive mutex here.
             // Once the deadlock fix in OpenSSL is incorporated into most distros of
             // Linux, this can be changed back to a nonrecursive mutex.
-            static std::vector<stdx::recursive_mutex*> _mutex;
+            static std::vector<stdx::recursive_mutex> _mutex;
             static boost::thread_specific_ptr<SSLThreadInfo> _thread;
         };
 
@@ -147,7 +149,7 @@ namespace mongo {
         }
 
         AtomicUInt32 SSLThreadInfo::_next;
-        std::vector<stdx::recursive_mutex*> SSLThreadInfo::_mutex;
+        std::vector<stdx::recursive_mutex> SSLThreadInfo::_mutex;
         boost::thread_specific_ptr<SSLThreadInfo> SSLThreadInfo::_thread;
 
         ////////////////////////////////////////////////////////////////
