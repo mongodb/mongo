@@ -1265,9 +1265,10 @@ void DiagLog::openFile() {
     string name = ss.str();
     f = new ofstream(name.c_str(), ios::out | ios::binary);
     if (!f->good()) {
-        log() << "diagLogging couldn't open " << name << endl;
-        // todo what is this? :
-        throw 1717;
+        str::stream msg;
+        msg << "diagLogging couldn't open " << name;
+        log() << msg.ss.str();
+        uasserted(ErrorCodes::FileStreamFailed, msg.ss.str());
     } else {
         log() << "diagLogging using file " << name << endl;
     }
