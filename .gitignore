@@ -143,6 +143,7 @@ src/third_party/v8/src/libraries.cc
 # Eclipse build artifacts
 .cproject
 .project
+.pydevproject
 
 # old things that should be removed
 # maybe remove this mid 2012
