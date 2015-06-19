@@ -34,6 +34,9 @@
 // Define if building a debug build
 @mongo_config_debug_build@
 
+// Defined if thread_local storage class is available
+@mongo_config_have_thread_local@
+
 // Defined if __declspec(thread) is available
 @mongo_config_have___declspec_thread@
 
