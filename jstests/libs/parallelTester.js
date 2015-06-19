@@ -120,6 +120,10 @@ if ( typeof _threadInject != "undefined" ){
                                    "extent.js",
                                    "indexb.js",
 
+                                   // sets a failpoint that causes the server to ignore long keys,
+                                   // which makes index_bigkeys.js fail
+                                   "index_bigkeys_nofail.js",
+
                                    // tests turn on profiling
                                    "profile1.js",
                                    "profile3.js",
