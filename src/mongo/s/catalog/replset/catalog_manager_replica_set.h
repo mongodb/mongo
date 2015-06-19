@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -148,7 +149,7 @@ namespace mongo {
         StatusWith<std::vector<BSONObj>> _find(const HostAndPort& host,
                                                const NamespaceString& nss,
                                                const BSONObj& query,
-                                               int limit);
+                                               boost::optional<int> limit);
 
         /**
          * Runs a command against the specified host and returns the result.

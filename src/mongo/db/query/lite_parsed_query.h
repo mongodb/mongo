@@ -76,9 +76,10 @@ namespace mongo {
          * Constructs a LiteParseQuery object that can be used to serialize to find command
          * BSON object.
          */
-        static StatusWith<std::unique_ptr<LiteParsedQuery>> makeAsFindCmd(const std::string& ns,
-                                                                          const BSONObj& query,
-                                                                          int limit);
+        static StatusWith<std::unique_ptr<LiteParsedQuery>>
+        makeAsFindCmd(const NamespaceString& ns,
+                      const BSONObj& query,
+                      boost::optional<int> limit);
 
         /**
          * Converts this LPQ into a find command.

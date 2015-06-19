@@ -412,19 +412,23 @@ namespace {
     }
 
     // static
-    StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeAsFindCmd(const std::string& ns,
-                                                                           const BSONObj& query,
-                                                                           int limit) {
+    StatusWith<unique_ptr<LiteParsedQuery>>
+    LiteParsedQuery::makeAsFindCmd(const NamespaceString& ns,
+                                   const BSONObj& query,
+                                   boost::optional<int> limit) {
         unique_ptr<LiteParsedQuery> pq(new LiteParsedQuery());
 
-        pq->_ns = ns;
+        pq->_fromCommand = true;
+        pq->_ns = ns.ns();
         pq->_filter = query.getOwned();
 
-        if (limit <= 0) {
-            return Status(ErrorCodes::BadValue, "limit value must be positive");
-        }
+        if (limit) {
+            if (limit <= 0) {
+                return Status(ErrorCodes::BadValue, "limit value must be positive");
+            }
 
-        pq->_limit = limit;
+            pq->_limit = std::move(limit);
+        }
 
         pq->addMetaProjection();
 

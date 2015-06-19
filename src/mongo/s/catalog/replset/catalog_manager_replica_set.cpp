@@ -326,7 +326,7 @@ namespace {
         auto findStatus = _find(readHostStatus.getValue(),
                                 NamespaceString(ChunkType::ConfigNS),
                                 query.obj,
-                                0); // no limit
+                                boost::none); // no limit
         if (!findStatus.isOK()) {
             return findStatus.getStatus();
         }
@@ -367,7 +367,7 @@ namespace {
         auto findStatus = _find(readHost.getValue(),
                                 NamespaceString(ShardType::ConfigNS),
                                 BSONObj(), // no query filter
-                                0); // no limit
+                                boost::none); // no limit
         if (!findStatus.isOK()) {
             return findStatus.getStatus();
         }
@@ -526,7 +526,7 @@ namespace {
     StatusWith<vector<BSONObj>> CatalogManagerReplicaSet::_find(const HostAndPort& host,
                                                                 const NamespaceString& nss,
                                                                 const BSONObj& query,
-                                                                int limit) {
+                                                                boost::optional<int> limit) {
 
         // If for some reason the callback never gets invoked, we will return this status
         Status status = Status(ErrorCodes::InternalError, "Internal error running find command");
@@ -551,7 +551,7 @@ namespace {
         };
 
         unique_ptr<LiteParsedQuery> findCmd(
-            fassertStatusOK(28688, LiteParsedQuery::makeAsFindCmd(nss.toString(), query, limit)));
+            fassertStatusOK(28688, LiteParsedQuery::makeAsFindCmd(nss, query, std::move(limit))));
 
         QueryFetcher fetcher(grid.shardRegistry()->getExecutor(),
                              host,

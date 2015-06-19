@@ -264,11 +264,13 @@ namespace {
     }
 
     TEST(LiteParsedQueryTest, MakeFindCmd) {
-        auto result = LiteParsedQuery::makeAsFindCmd("testns", BSON("x" << 1), 2);
+        auto result = LiteParsedQuery::makeAsFindCmd(NamespaceString("test.ns"),
+                                                     BSON("x" << 1),
+                                                     2);
         ASSERT_OK(result.getStatus());
 
         auto&& lpq = result.getValue();
-        ASSERT_EQUALS("testns", lpq->ns());
+        ASSERT_EQUALS("test.ns", lpq->ns());
         ASSERT_EQUALS(BSON("x" << 1), lpq->getFilter());
         ASSERT_EQUALS(2, lpq->getLimit());
 
@@ -285,7 +287,7 @@ namespace {
 
         ASSERT_FALSE(lpq->getBatchSize());
 
-        ASSERT_FALSE(lpq->fromFindCommand());
+        ASSERT_TRUE(lpq->isFromFindCommand());
         ASSERT_FALSE(lpq->isExplain());
         ASSERT_FALSE(lpq->returnKey());
         ASSERT_FALSE(lpq->showRecordId());
@@ -298,6 +300,53 @@ namespace {
         ASSERT_FALSE(lpq->isAwaitData());
         ASSERT_FALSE(lpq->isExhaust());
         ASSERT_FALSE(lpq->isPartial());
+    }
+
+    TEST(LiteParsedQueryTest, MakeFindCmdNoLimit) {
+        auto result = LiteParsedQuery::makeAsFindCmd(NamespaceString("test.ns"),
+                                                     BSON("x" << 1),
+                                                     boost::none);
+        ASSERT_OK(result.getStatus());
+
+        auto&& lpq = result.getValue();
+        ASSERT_EQUALS("test.ns", lpq->ns());
+        ASSERT_EQUALS(BSON("x" << 1), lpq->getFilter());
+
+        ASSERT_EQUALS(BSONObj(), lpq->getProj());
+        ASSERT_EQUALS(BSONObj(), lpq->getSort());
+        ASSERT_EQUALS(BSONObj(), lpq->getHint());
+        ASSERT_EQUALS(BSONObj(), lpq->getMin());
+        ASSERT_EQUALS(BSONObj(), lpq->getMax());
+
+        ASSERT_EQUALS(0, lpq->getSkip());
+        ASSERT_EQUALS(0, lpq->getMaxScan());
+        ASSERT_EQUALS(0, lpq->getMaxTimeMS());
+        ASSERT_EQUALS(0, lpq->getOptions());
+
+        ASSERT_FALSE(lpq->getBatchSize());
+        ASSERT_FALSE(lpq->getLimit());
+
+        ASSERT_TRUE(lpq->isFromFindCommand());
+        ASSERT_FALSE(lpq->isExplain());
+        ASSERT_FALSE(lpq->returnKey());
+        ASSERT_FALSE(lpq->showRecordId());
+        ASSERT_FALSE(lpq->isSnapshot());
+        ASSERT_FALSE(lpq->hasReadPref());
+        ASSERT_FALSE(lpq->isTailable());
+        ASSERT_FALSE(lpq->isSlaveOk());
+        ASSERT_FALSE(lpq->isOplogReplay());
+        ASSERT_FALSE(lpq->isNoCursorTimeout());
+        ASSERT_FALSE(lpq->isAwaitData());
+        ASSERT_FALSE(lpq->isExhaust());
+        ASSERT_FALSE(lpq->isPartial());
+    }
+
+    TEST(LiteParsedQueryTest, MakeFindCmdBadLimit) {
+        auto status = LiteParsedQuery::makeAsFindCmd(NamespaceString("test.ns"),
+                                                     BSON("x" << 1),
+                                                     0).getStatus();
+        ASSERT_NOT_OK(status);
+        ASSERT_EQUALS(ErrorCodes::BadValue, status.code());
     }
 
     //
