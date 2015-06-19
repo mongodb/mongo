@@ -194,7 +194,7 @@ namespace {
                 connCount = Listener::globalTicketHolder.used();
             }
 
-            _server.release();
+            _server.reset();
         }
 
         /**
