@@ -102,7 +102,7 @@ namespace {
         replyBuilder.setMetadata(BSONObj()).setCommandReply(BSONObj());
 
         std::size_t spaceBefore = replyBuilder.availableSpaceForOutputDocs();
-        ASSERT_EQUALS(spaceBefore, 0);
+        ASSERT_EQUALS(spaceBefore, 0u);
 
         BSONObjBuilder docBuilder{};
         docBuilder.append("foo", "bar");
@@ -110,7 +110,7 @@ namespace {
 
         replyBuilder.addOutputDoc(doc); //no-op
         std::size_t spaceAfter = replyBuilder.availableSpaceForOutputDocs();
-        ASSERT_EQUALS(spaceAfter, 0);
+        ASSERT_EQUALS(spaceAfter, 0u);
     }
 
     class CommandReplyBuilderSpaceTest : public mongo::unittest::Test {
@@ -127,7 +127,7 @@ namespace {
         virtual void tearDown() override {
         }
 
-        std::size_t emptyDocSize = 0;
+        std::size_t emptyDocSize = 0u;
     };
 
     TEST_F(CommandReplyBuilderSpaceTest, DocSizeEq) {
@@ -154,7 +154,7 @@ namespace {
 
         std::size_t availSpace = replyBuilder.availableSpaceForOutputDocs();
 
-        while (availSpace > 0) {
+        while (availSpace > 0u) {
             std::size_t payloadSz =
                 std::min(availSpace, static_cast<std::size_t>(mongo::BSONObjMaxUserSize)) -
                 emptyDocSize;
@@ -166,8 +166,9 @@ namespace {
             availSpace = replyBuilder.availableSpaceForOutputDocs();
         }
         auto msg = replyBuilder.done();
+        auto sizeUInt = static_cast<std::size_t>(msg->size());
 
-        ASSERT_EQUALS(msg->size(), mongo::MaxMessageSizeBytes);
+        ASSERT_EQUALS(sizeUInt, mongo::MaxMessageSizeBytes);
     }
 
     // multiple calls to addOutputDoc, some metadata
@@ -186,7 +187,7 @@ namespace {
 
         std::size_t availSpace = replyBuilder.availableSpaceForOutputDocs();
 
-        while (availSpace > 0) {
+        while (availSpace > 0u) {
             std::size_t payloadSz =
                 std::min(availSpace, static_cast<std::size_t>(mongo::BSONObjMaxUserSize)) -
                 emptyDocSize;
@@ -198,8 +199,9 @@ namespace {
             availSpace = replyBuilder.availableSpaceForOutputDocs();
         }
         auto msg = replyBuilder.done();
+        auto sizeUInt = static_cast<std::size_t>(msg->size());
 
-        ASSERT_EQUALS(msg->size(), mongo::MaxMessageSizeBytes);
+        ASSERT_EQUALS(sizeUInt, mongo::MaxMessageSizeBytes);
     }
 
 
@@ -220,7 +222,7 @@ namespace {
         std::size_t availSpace = replyBuilder.availableSpaceForOutputDocs();
 
         BufBuilder docs;
-        while (availSpace > 0) {
+        while (availSpace > 0u) {
             std::size_t payloadSz =
                 std::min(availSpace, static_cast<std::size_t>(mongo::BSONObjMaxUserSize)) -
                 emptyDocSize;
@@ -235,8 +237,9 @@ namespace {
         replyBuilder.addOutputDocs(docRange);
 
         auto msg = replyBuilder.done();
+        auto sizeUInt = static_cast<std::size_t>(msg->size());
 
-        ASSERT_EQUALS(msg->size(), mongo::MaxMessageSizeBytes);
+        ASSERT_EQUALS(sizeUInt, mongo::MaxMessageSizeBytes);
     }
 
    // call to addCommandReply
@@ -251,7 +254,7 @@ namespace {
         auto metadata = metadataBuilder.done();
         replyBuilder.setMetadata(metadata);
 
-        std::size_t payloadSz = static_cast<std::size_t>(mongo::BSONObjMaxUserSize) -
+        auto payloadSz = static_cast<std::size_t>(mongo::BSONObjMaxUserSize) -
             emptyDocSize;
 
         BSONObjBuilder commandReplyBuilder{};
